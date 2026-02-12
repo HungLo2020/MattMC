@@ -23,6 +23,7 @@ public class VulkanicAPI {
      * 
      * @return CommandContext for immediate-mode rendering (OpenGL) or default context (Vulkan)
      */
+    @Deprecated
     public static CommandContext getImmediateContext() {
         return CTX;
     }
@@ -479,6 +480,7 @@ public class VulkanicAPI {
     /**
      * Initialize the Vulkanic API with the default backend (OpenGL).
      */
+    @Deprecated
     public static void initialize() {
         initialize(BackendType.OPENGL);
     }
@@ -487,6 +489,7 @@ public class VulkanicAPI {
      * Initialize the Vulkanic API with a specific backend.
      * @param backendType The backend type to use
      */
+    @Deprecated
     public static synchronized void initialize(BackendType backendType) {
         if (backend == null) {
             switch (backendType) {
@@ -502,6 +505,7 @@ public class VulkanicAPI {
     /**
      * Get the current graphics backend.
      */
+    @Deprecated
     public static GraphicsBackend getBackend() {
         if (backend == null) {
             initialize();
@@ -587,6 +591,7 @@ public class VulkanicAPI {
      * @param width The width of the viewport in pixels
      * @param height The height of the viewport in pixels
      */
+    @Deprecated
     public static void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
         getBackend().setDynamicViewport(ctx, x, y, width, height);
     }
@@ -611,6 +616,7 @@ public class VulkanicAPI {
      * @param width The width of the scissor rectangle in pixels
      * @param height The height of the scissor rectangle in pixels
      */
+    @Deprecated
     public static void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height) {
         getBackend().setDynamicScissor(ctx, x, y, width, height);
     }
@@ -633,6 +639,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param mask Bitwise OR of buffer masks (e.g., GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
      */
+    @Deprecated
     public static void clear(CommandContext ctx, int mask) {
         getBackend().clear(ctx, mask);
     }
@@ -657,6 +664,7 @@ public class VulkanicAPI {
      * @param first Starting vertex index in the vertex buffer
      * @param count Number of vertices to draw
      */
+    @Deprecated
     public static void drawArrays(CommandContext ctx, int mode, int first, int count) {
         getBackend().drawArrays(ctx, mode, first, count);
     }
@@ -682,6 +690,7 @@ public class VulkanicAPI {
      * @param type Data type of indices (e.g., GL_UNSIGNED_INT, GL_UNSIGNED_SHORT)
      * @param indices Offset in bytes from the start of the index buffer, or pointer to index data
      */
+    @Deprecated
     public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
         getBackend().drawElements(ctx, mode, count, type, indices);
     }
@@ -709,6 +718,7 @@ public class VulkanicAPI {
      * @param instanceCount Number of instances to render
      * @param baseVertex Value added to each index before accessing the vertex buffer
      */
+    @Deprecated
     public static void renderIndexedInstancedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
         getBackend().renderIndexedInstancedWithBase(ctx, mode, count, type, indices, instanceCount, baseVertex);
     }
@@ -735,6 +745,7 @@ public class VulkanicAPI {
      * @param indices Offset in bytes from the start of the index buffer
      * @param baseVertex Value added to each index before accessing the vertex buffer
      */
+    @Deprecated
     public static void renderIndexedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
         getBackend().renderIndexedWithBase(ctx, mode, count, type, indices, baseVertex);
     }
@@ -761,6 +772,7 @@ public class VulkanicAPI {
      * @param indices Offset in bytes from the start of the index buffer
      * @param instanceCount Number of instances to render
      */
+    @Deprecated
     public static void renderIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
         getBackend().renderIndexedInstanced(ctx, mode, count, type, indices, instanceCount);
     }
@@ -786,6 +798,7 @@ public class VulkanicAPI {
      * @param count Number of vertices to draw
      * @param instanceCount Number of instances to render
      */
+    @Deprecated
     public static void renderArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
         getBackend().renderArraysInstanced(ctx, mode, first, count, instanceCount);
     }
@@ -808,6 +821,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param programId The shader program ID to bind
      */
+    @Deprecated
     public static void bindShaderProgram(CommandContext ctx, int programId) {
         getBackend().bindShaderProgram(ctx, programId);
     }
@@ -830,6 +844,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param enabled true to enable depth writes, false to disable
      */
+    @Deprecated
     public static void setDepthWriteMask(CommandContext ctx, boolean enabled) {
         getBackend().setDepthWriteMask(ctx, enabled);
     }
@@ -855,6 +870,7 @@ public class VulkanicAPI {
      * @param b true to enable blue channel writes
      * @param a true to enable alpha channel writes
      */
+    @Deprecated
     public static void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
         getBackend().setColorWriteMask(ctx, r, g, b, a);
     }
@@ -877,6 +893,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param func The depth comparison function (e.g., GL_LESS, GL_LEQUAL, GL_ALWAYS)
      */
+    @Deprecated
     public static void setDepthFunc(CommandContext ctx, int func) {
         getBackend().setDepthFunc(ctx, func);
     }
@@ -902,6 +919,7 @@ public class VulkanicAPI {
      * @param srcAlpha Source alpha blend factor
      * @param dstAlpha Destination alpha blend factor
      */
+    @Deprecated
     public static void setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
         getBackend().setBlendFunc(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
@@ -925,6 +943,7 @@ public class VulkanicAPI {
      * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)
      * @param buffer The buffer object ID to bind
      */
+    @Deprecated
     public static void bindBuffer(CommandContext ctx, int target, int buffer) {
         getBackend().bindBuffer(ctx, target, buffer);
     }
@@ -946,6 +965,7 @@ public class VulkanicAPI {
      * 
      * @param ctx Command context for recording this command
      */
+    @Deprecated
     public static void enableBlend(CommandContext ctx) {
         getBackend().enableBlend(ctx);
     }
@@ -967,6 +987,7 @@ public class VulkanicAPI {
      * 
      * @param ctx Command context for recording this command
      */
+    @Deprecated
     public static void disableBlend(CommandContext ctx) {
         getBackend().disableBlend(ctx);
     }
@@ -989,6 +1010,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param cap The capability to enable (e.g., GL_DEPTH_TEST, GL_CULL_FACE)
      */
+    @Deprecated
     public static void enable(CommandContext ctx, int cap) {
         getBackend().enable(ctx, cap);
     }
@@ -1011,6 +1033,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param cap The capability to disable (e.g., GL_DEPTH_TEST, GL_CULL_FACE)
      */
+    @Deprecated
     public static void disable(CommandContext ctx, int cap) {
         getBackend().disable(ctx, cap);
     }
@@ -1033,6 +1056,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param unit The texture unit to activate (e.g., GL_TEXTURE0)
      */
+    @Deprecated
     public static void activateTextureUnit(CommandContext ctx, int unit) {
         getBackend().activateTextureUnit(ctx, unit);
     }
@@ -1055,6 +1079,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param target The texture target (e.g., GL_TEXTURE_2D)
      */
+    @Deprecated
     public static void generateMipmap(CommandContext ctx, int target) {
         getBackend().generateMipmap(ctx, target);
     }
@@ -1077,6 +1102,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param textureId The texture ID to bind
      */
+    @Deprecated
     public static void bindTexture(CommandContext ctx, int textureId) {
         getBackend().bindTexture(ctx, textureId);
     }
@@ -1100,6 +1126,7 @@ public class VulkanicAPI {
      * @param target The texture target (e.g., GL_TEXTURE_2D)
      * @param textureId The texture ID to bind
      */
+    @Deprecated
     public static void bindTexture(CommandContext ctx, int target, int textureId) {
         getBackend().bindTexture(ctx, target, textureId);
     }
@@ -1123,6 +1150,7 @@ public class VulkanicAPI {
      * @param pname The pixel storage parameter name
      * @param value The value to set
      */
+    @Deprecated
     public static void setPixelStoreMode(CommandContext ctx, int pname, int value) {
         getBackend().setPixelStoreMode(ctx, pname, value);
     }
@@ -1146,6 +1174,7 @@ public class VulkanicAPI {
      * @param target The framebuffer target
      * @param fbo The framebuffer object ID to bind (0 for default framebuffer)
      */
+    @Deprecated
     public static void attachFramebuffer(CommandContext ctx, int target, int fbo) {
         getBackend().attachFramebuffer(ctx, target, fbo);
     }
@@ -1173,6 +1202,7 @@ public class VulkanicAPI {
      * @param texture The texture ID to attach
      * @param level The mipmap level to attach
      */
+    @Deprecated
     public static void attachTextureToFramebuffer(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
         getBackend().attachTextureToFramebuffer(ctx, target, attachment, textarget, texture, level);
     }
@@ -1197,6 +1227,7 @@ public class VulkanicAPI {
      * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER)
      * @param param The parameter value
      */
+    @Deprecated
     public static void configureTextureParameter(CommandContext ctx, int target, int pname, int param) {
         getBackend().configureTextureParameter(ctx, target, pname, param);
     }
@@ -1219,6 +1250,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param texture The texture ID to delete
      */
+    @Deprecated
     public static void removeTexture(CommandContext ctx, int texture) {
         getBackend().removeTexture(ctx, texture);
     }
@@ -1242,6 +1274,7 @@ public class VulkanicAPI {
      * @param face Which faces to apply to (e.g., GL_FRONT_AND_BACK)
      * @param mode The rasterization mode (e.g., GL_FILL, GL_LINE, GL_POINT)
      */
+    @Deprecated
     public static void configurePolygonMode(CommandContext ctx, int face, int mode) {
         getBackend().configurePolygonMode(ctx, face, mode);
     }
@@ -1264,6 +1297,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The newly created texture ID
      */
+    @Deprecated
     public static int createTexture(CommandContext ctx) {
         return getBackend().createTexture(ctx);
     }
@@ -1287,6 +1321,7 @@ public class VulkanicAPI {
      * @param factor Scale factor for depth slope
      * @param units Constant depth offset value
      */
+    @Deprecated
     public static void configurePolygonOffset(CommandContext ctx, float factor, float units) {
         getBackend().configurePolygonOffset(ctx, factor, units);
     }
@@ -1309,6 +1344,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param opcode The logical operation code (e.g., GL_COPY, GL_XOR)
      */
+    @Deprecated
     public static void configureLogicOp(CommandContext ctx, int opcode) {
         getBackend().configureLogicOp(ctx, opcode);
     }
@@ -1331,6 +1367,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param depth The depth clear value (typically 1.0 for far plane)
      */
+    @Deprecated
     public static void setClearDepthValue(CommandContext ctx, double depth) {
         getBackend().setClearDepthValue(ctx, depth);
     }
@@ -1356,6 +1393,7 @@ public class VulkanicAPI {
      * @param blue Blue component (0.0 to 1.0)
      * @param alpha Alpha component (0.0 to 1.0)
      */
+    @Deprecated
     public static void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha) {
         getBackend().setClearColorValue(ctx, red, green, blue, alpha);
     }
@@ -1378,6 +1416,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param mode The draw buffer mode (e.g., GL_BACK, GL_FRONT)
      */
+    @Deprecated
     public static void selectDrawBuffer(CommandContext ctx, int mode) {
         getBackend().selectDrawBuffer(ctx, mode);
     }
@@ -1400,6 +1439,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The newly created buffer object ID
      */
+    @Deprecated
     public static int allocateBufferObject(CommandContext ctx) {
         return getBackend().allocateBufferObject(ctx);
     }
@@ -1422,6 +1462,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param buf The buffer object ID to release
      */
+    @Deprecated
     public static void releaseBufferObject(CommandContext ctx, int buf) {
         getBackend().releaseBufferObject(ctx, buf);
     }
@@ -1444,6 +1485,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The newly created vertex array object ID
      */
+    @Deprecated
     public static int createVertexArrayObject(CommandContext ctx) {
         return getBackend().createVertexArrayObject(ctx);
     }
@@ -1466,6 +1508,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The newly created framebuffer object ID
      */
+    @Deprecated
     public static int generateFramebufferObject(CommandContext ctx) {
         return getBackend().generateFramebufferObject(ctx);
     }
@@ -1488,6 +1531,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param fbo The framebuffer object ID to destroy
      */
+    @Deprecated
     public static void destroyFramebufferObject(CommandContext ctx, int fbo) {
         getBackend().destroyFramebufferObject(ctx, fbo);
     }
@@ -1510,6 +1554,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param vao The vertex array object ID to bind
      */
+    @Deprecated
     public static void selectVertexArray(CommandContext ctx, int vao) {
         getBackend().selectVertexArray(ctx, vao);
     }
@@ -1535,6 +1580,7 @@ public class VulkanicAPI {
      * @param dat The data to upload
      * @param usg Usage hint for the buffer (e.g., GL_STATIC_DRAW)
      */
+    @Deprecated
     public static void fillBufferWithData(CommandContext ctx, int tgt, java.nio.ByteBuffer dat, int usg) {
         getBackend().fillBufferWithData(ctx, tgt, dat, usg);
     }
@@ -1559,6 +1605,7 @@ public class VulkanicAPI {
      * @param sz The size in bytes to allocate
      * @param usg Usage hint for the buffer (e.g., GL_DYNAMIC_DRAW)
      */
+    @Deprecated
     public static void fillBufferWithSize(CommandContext ctx, int tgt, long sz, int usg) {
         getBackend().fillBufferWithSize(ctx, tgt, sz, usg);
     }
@@ -1584,6 +1631,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The error code, or NO_ERROR (0) if no error occurred
      */
+    @Deprecated
     public static int checkForErrors(CommandContext ctx) {
         return getBackend().checkForErrors(ctx);
     }
@@ -1607,6 +1655,7 @@ public class VulkanicAPI {
      * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)
      * @param buffer The buffer object ID to bind (0 to unbind)
      */
+    @Deprecated
     public static void attachBuffer(CommandContext ctx, int target, int buffer) {
         getBackend().attachBuffer(ctx, target, buffer);
     }
@@ -1631,6 +1680,7 @@ public class VulkanicAPI {
      * @param ctx Command context for error checking
      * @return The error code, or NO_ERROR (0) if no error occurred
      */
+    @Deprecated
     public static int pollErrorCode(CommandContext ctx) {
         return getBackend().pollErrorCode(ctx);
     }
@@ -1660,6 +1710,7 @@ public class VulkanicAPI {
      * @param type Pixel data type (e.g., GL_UNSIGNED_BYTE)
      * @param pixels Memory address to write pixel data to
      */
+    @Deprecated
     public static void readFramebufferPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
         getBackend().readFramebufferPixels(ctx, x, y, width, height, format, type, pixels);
     }
@@ -1685,6 +1736,7 @@ public class VulkanicAPI {
      * @param pname Parameter name to query (e.g., GL_TEXTURE_WIDTH)
      * @return The queried parameter value
      */
+    @Deprecated
     public static int queryTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
         return getBackend().queryTextureLevelParameter(ctx, target, level, pname);
     }
@@ -1710,6 +1762,7 @@ public class VulkanicAPI {
      * @param off Offset in bytes from the start of the buffer
      * @param dat The data to upload
      */
+    @Deprecated
     public static void fillBufferSubregion(CommandContext ctx, int tgt, long off, java.nio.ByteBuffer dat) {
         getBackend().fillBufferSubregion(ctx, tgt, off, dat);
     }
@@ -1738,6 +1791,7 @@ public class VulkanicAPI {
      * @param acc Access flags (e.g., GL_MAP_READ_BIT, GL_MAP_WRITE_BIT)
      * @return A ByteBuffer providing access to the mapped memory region
      */
+    @Deprecated
     public static java.nio.ByteBuffer mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc) {
         return getBackend().mapBufferRegion(ctx, tgt, off, len, acc);
     }
@@ -1762,6 +1816,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
      */
+    @Deprecated
     public static void unmapBufferData(CommandContext ctx, int tgt) {
         getBackend().unmapBufferData(ctx, tgt);
     }
@@ -1795,6 +1850,7 @@ public class VulkanicAPI {
      * @param msk Bit mask indicating which buffers to copy (GL_COLOR_BUFFER_BIT, etc.)
      * @param flt Filter mode for scaling (GL_NEAREST or GL_LINEAR)
      */
+    @Deprecated
     public static void copyFramebufferRegion(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
                                              int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
         getBackend().copyFramebufferRegion(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
@@ -1828,6 +1884,7 @@ public class VulkanicAPI {
      * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
      * @param pix Buffer containing pixel data, or null to allocate without initializing
      */
+    @Deprecated
     public static void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int intfmt, int w, int h, 
                                               int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
         getBackend().transferTexture2DImage(ctx, tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
@@ -1861,6 +1918,7 @@ public class VulkanicAPI {
      * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
      * @param pix Native pointer to pixel data
      */
+    @Deprecated
     public static void transferTexture2DSubregion(CommandContext ctx, int tgt, int lvl, int xoff, int yoff, 
                                                   int w, int h, int fmt, int typ, long pix) {
         getBackend().transferTexture2DSubregion(ctx, tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
@@ -1894,6 +1952,7 @@ public class VulkanicAPI {
      * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
      * @param pix ByteBuffer containing pixel data
      */
+    @Deprecated
     public static void transferTexture2DSubregionBuf(CommandContext ctx, int tgt, int lvl, int xoff, int yoff, 
                                                      int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
         getBackend().transferTexture2DSubregionBuf(ctx, tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
@@ -1913,6 +1972,7 @@ public class VulkanicAPI {
      * @param shaderType Type of shader (e.g., GL_VERTEX_SHADER, GL_FRAGMENT_SHADER)
      * @return Shader object ID/handle
      */
+    @Deprecated
     public static int constructShaderObject(CommandContext ctx, int shaderType) {
         return getBackend().constructShaderObject(ctx, shaderType);
     }
@@ -1929,6 +1989,7 @@ public class VulkanicAPI {
      * @param ctx Command context for resource tracking
      * @param shader Shader object ID to delete
      */
+    @Deprecated
     public static void disposeShaderObject(CommandContext ctx, int shader) {
         getBackend().disposeShaderObject(ctx, shader);
     }
@@ -1945,6 +2006,7 @@ public class VulkanicAPI {
      * @param ctx Command context for compilation pipeline
      * @param shader Shader object ID to compile
      */
+    @Deprecated
     public static void compileShaderSource(CommandContext ctx, int shader) {
         getBackend().compileShaderSource(ctx, shader);
     }
@@ -1961,6 +2023,7 @@ public class VulkanicAPI {
      * @param ctx Command context for pipeline creation
      * @return Program/Pipeline object ID/handle
      */
+    @Deprecated
     public static int constructProgramObject(CommandContext ctx) {
         return getBackend().constructProgramObject(ctx);
     }
@@ -1977,6 +2040,7 @@ public class VulkanicAPI {
      * @param ctx Command context for resource tracking
      * @param program Program/Pipeline object ID to delete
      */
+    @Deprecated
     public static void disposeProgramObject(CommandContext ctx, int program) {
         getBackend().disposeProgramObject(ctx, program);
     }
@@ -1998,6 +2062,7 @@ public class VulkanicAPI {
      * @param stringCount Number of source strings
      * @param lengthsPointer Native pointer to array of string lengths
      */
+    @Deprecated
     public static void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         getBackend().uploadShaderSource(ctx, shader, pointerBufferAddress, stringCount, lengthsPointer);
     }
@@ -2019,6 +2084,7 @@ public class VulkanicAPI {
      * @param strings Native pointer to array of source string pointers
      * @param length Native pointer to array of string lengths
      */
+    @Deprecated
     public static void uploadShaderSourceNative(CommandContext ctx, int shader, int count, long strings, long length) {
         getBackend().uploadShaderSourceNative(ctx, shader, count, strings, length);
     }
@@ -2041,6 +2107,7 @@ public class VulkanicAPI {
      * @param program Program object ID
      * @param shader Compiled shader object ID to attach
      */
+    @Deprecated
     public static void attachShaderToProgram(CommandContext ctx, int program, int shader) {
         getBackend().attachShaderToProgram(ctx, program, shader);
     }
@@ -2060,6 +2127,7 @@ public class VulkanicAPI {
      * @param ctx Command context for pipeline creation
      * @param program Program object ID to link
      */
+    @Deprecated
     public static void linkProgramBinary(CommandContext ctx, int program) {
         getBackend().linkProgramBinary(ctx, program);
     }
@@ -2081,6 +2149,7 @@ public class VulkanicAPI {
      * @param program Program object ID
      * @param shader Shader object ID to detach
      */
+    @Deprecated
     public static void glDetachShader(CommandContext ctx, int program, int shader) {
         getBackend().glDetachShader(ctx, program, shader);
     }
@@ -2105,6 +2174,7 @@ public class VulkanicAPI {
      * @param index The attribute index to bind to
      * @param name The name of the vertex attribute variable
      */
+    @Deprecated
     public static void bindAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
         getBackend().bindAttributeLocation(ctx, program, index, name);
     }
@@ -2129,6 +2199,7 @@ public class VulkanicAPI {
      * @param name The name of the vertex attribute variable
      * @return The attribute location/index, or -1 if not found
      */
+    @Deprecated
     public static int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
         return getBackend().getAttributeLocation(ctx, program, name);
     }
@@ -2153,6 +2224,7 @@ public class VulkanicAPI {
      * @param name The name of the uniform variable
      * @return The uniform location, or -1 if not found
      */
+    @Deprecated
     public static int locateUniformVariable(CommandContext ctx, int program, CharSequence name) {
         return getBackend().locateUniformVariable(ctx, program, name);
     }
@@ -2176,6 +2248,7 @@ public class VulkanicAPI {
      * @param location The uniform location
      * @param value The integer value to assign
      */
+    @Deprecated
     public static void assignUniformInteger(CommandContext ctx, int location, int value) {
         getBackend().assignUniformInteger(ctx, location, value);
     }
@@ -2199,6 +2272,7 @@ public class VulkanicAPI {
      * @param location The uniform location
      * @param value The float value to assign
      */
+    @Deprecated
     public static void assignUniformFloat(CommandContext ctx, int location, float value) {
         getBackend().assignUniformFloat(ctx, location, value);
     }
@@ -2222,6 +2296,7 @@ public class VulkanicAPI {
      * @param y The y component
      * @param z The z component
      */
+    @Deprecated
     public static void assignUniformFloat3(CommandContext ctx, int location, float x, float y, float z) {
         getBackend().assignUniformFloat3(ctx, location, x, y, z);
     }
@@ -2245,6 +2320,7 @@ public class VulkanicAPI {
      * @param y The y component
      * @param z The z component
      */
+    @Deprecated
     public static void assignUniformInteger3(CommandContext ctx, int location, int x, int y, int z) {
         getBackend().assignUniformInteger3(ctx, location, x, y, z);
     }
@@ -2269,6 +2345,7 @@ public class VulkanicAPI {
      * @param z The z component
      * @param w The w component
      */
+    @Deprecated
     public static void assignUniformFloat4(CommandContext ctx, int location, float x, float y, float z, float w) {
         getBackend().assignUniformFloat4(ctx, location, x, y, z, w);
     }
@@ -2292,6 +2369,7 @@ public class VulkanicAPI {
      * @param transpose Whether to transpose the matrix
      * @param value Buffer containing 16 floats
      */
+    @Deprecated
     public static void assignUniformMatrix4(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value) {
         getBackend().assignUniformMatrix4(ctx, location, transpose, value);
     }
@@ -2312,6 +2390,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param index The vertex attribute index to enable
      */
+    @Deprecated
     public static void activateVertexAttributeArray(CommandContext ctx, int index) {
         getBackend().activateVertexAttributeArray(ctx, index);
     }
@@ -2331,6 +2410,7 @@ public class VulkanicAPI {
      * @param x The first component (x coordinate)
      * @param y The second component (y coordinate)
      */
+    @Deprecated
     public static void assignUniformFloat2(CommandContext ctx, int location, float x, float y) {
         getBackend().assignUniformFloat2(ctx, location, x, y);
     }
@@ -2350,6 +2430,7 @@ public class VulkanicAPI {
      * @param x The first component
      * @param y The second component
      */
+    @Deprecated
     public static void assignUniformInteger2(CommandContext ctx, int location, int x, int y) {
         getBackend().assignUniformInteger2(ctx, location, x, y);
     }
@@ -2374,6 +2455,7 @@ public class VulkanicAPI {
      * @param width Width of the region
      * @param height Height of the region
      */
+    @Deprecated
     public static void copyTexture2DSubImage(CommandContext ctx, int target, int level, int xoffset, int yoffset, 
                                              int x, int y, int width, int height) {
         getBackend().copyTexture2DSubImage(ctx, target, level, xoffset, yoffset, x, y, width, height);
@@ -2398,6 +2480,7 @@ public class VulkanicAPI {
      * @param type Data type (e.g., GL_FLOAT)
      * @param pixels Array to store the pixel data
      */
+    @Deprecated
     public static void readPixelsFromFramebuffer(CommandContext ctx, int x, int y, int width, int height, 
                                                  int format, int type, float[] pixels) {
         getBackend().readPixelsFromFramebuffer(ctx, x, y, width, height, format, type, pixels);
@@ -2419,6 +2502,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param barriers Bitfield of barrier types
      */
+    @Deprecated
     public static void setMemoryBarrier(CommandContext ctx, int barriers) {
         getBackend().setMemoryBarrier(ctx, barriers);
     }
@@ -2441,6 +2525,7 @@ public class VulkanicAPI {
      * @param drawbuffer The draw buffer index (for GL_COLOR)
      * @param values Array of float values to clear with
      */
+    @Deprecated
     public static void clearFloatBuffer(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
         getBackend().clearFloatBuffer(ctx, buffer, drawbuffer, values);
     }
@@ -2463,6 +2548,7 @@ public class VulkanicAPI {
      * @param drawbuffer The draw buffer index (for GL_COLOR)
      * @param values Array of integer values to clear with
      */
+    @Deprecated
     public static void clearIntegerBuffer(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
         getBackend().clearIntegerBuffer(ctx, buffer, drawbuffer, values);
     }
@@ -2484,6 +2570,7 @@ public class VulkanicAPI {
      * @param stride Byte offset between consecutive attributes
      * @param pointer Offset of the first component
      */
+    @Deprecated
     public static void configureVertexAttributeIntegerPointer(CommandContext ctx, int index, int size, int type,
                                                               int stride, long pointer) {
         getBackend().configureVertexAttributeIntegerPointer(ctx, index, size, type, stride, pointer);
@@ -2504,6 +2591,7 @@ public class VulkanicAPI {
      * @param width Width of the viewport
      * @param height Height of the viewport
      */
+    @Deprecated
     public static void setStaticViewport(CommandContext ctx, int x, int y, int width, int height) {
         getBackend().setStaticViewport(ctx, x, y, width, height);
     }
@@ -2525,6 +2613,7 @@ public class VulkanicAPI {
      * @param stride Byte offset between consecutive attributes
      * @param pointer Offset of the first component
      */
+    @Deprecated
     public static void configureVertexAttributePointer(CommandContext ctx, int index, int size, int type,
                                                       boolean normalized, int stride, long pointer) {
         getBackend().configureVertexAttributePointer(ctx, index, size, type, normalized, stride, pointer);
@@ -2542,6 +2631,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param index The index of the vertex attribute to disable
      */
+    @Deprecated
     public static void deactivateVertexAttributeArray(CommandContext ctx, int index) {
         getBackend().deactivateVertexAttributeArray(ctx, index);
     }
@@ -2562,6 +2652,7 @@ public class VulkanicAPI {
      * @param transpose Whether to transpose the matrix
      * @param value FloatBuffer containing 9 floats
      */
+    @Deprecated
     public static void assignUniformMatrix3(CommandContext ctx, int location, boolean transpose, FloatBuffer value) {
         getBackend().assignUniformMatrix3(ctx, location, transpose, value);
     }
@@ -2582,6 +2673,7 @@ public class VulkanicAPI {
      * @param transpose Whether to transpose the matrix
      * @param value Float array containing 9 floats
      */
+    @Deprecated
     public static void assignUniformMatrix3Array(CommandContext ctx, int location, boolean transpose, float[] value) {
         getBackend().assignUniformMatrix3Array(ctx, location, transpose, value);
     }
@@ -2598,6 +2690,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param mode The blend equation mode (GL_FUNC_ADD, GL_FUNC_SUBTRACT, etc.)
      */
+    @Deprecated
     public static void setBlendEquation(CommandContext ctx, int mode) {
         getBackend().setBlendEquation(ctx, mode);
     }
@@ -2622,6 +2715,7 @@ public class VulkanicAPI {
      * @param pname The parameter to query (e.g., GL_COMPILE_STATUS, GL_SHADER_TYPE)
      * @return The requested parameter value
      */
+    @Deprecated
     public static int queryShaderParameter(CommandContext ctx, int shader, int pname) {
         return getBackend().queryShaderParameter(ctx, shader, pname);
     }
@@ -2641,6 +2735,7 @@ public class VulkanicAPI {
      * @param shader The shader object ID
      * @return The shader info log string
      */
+    @Deprecated
     public static String retrieveShaderInfoLog(CommandContext ctx, int shader) {
         return getBackend().retrieveShaderInfoLog(ctx, shader);
     }
@@ -2661,6 +2756,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param array The vertex array object ID to bind (0 to unbind)
      */
+    @Deprecated
     public static void bindVertexArray(CommandContext ctx, int array) {
         getBackend().bindVertexArray(ctx, array);
     }
@@ -2682,6 +2778,7 @@ public class VulkanicAPI {
      * @param offset Offset in bytes to the first vertex data
      * @param stride The byte stride between consecutive vertices
      */
+    @Deprecated
     public static void attachVertexBuffer(CommandContext ctx, int bindingIndex, int buffer, long offset, int stride) {
         getBackend().attachVertexBuffer(ctx, bindingIndex, buffer, offset, stride);
     }
@@ -2701,6 +2798,7 @@ public class VulkanicAPI {
      * @param attribIndex The vertex attribute index to associate
      * @param bindingIndex The vertex buffer binding point to associate with
      */
+    @Deprecated
     public static void associateVertexAttrib(CommandContext ctx, int attribIndex, int bindingIndex) {
         getBackend().associateVertexAttrib(ctx, attribIndex, bindingIndex);
     }
@@ -2718,6 +2816,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param buffers Array to receive the generated buffer IDs
      */
+    @Deprecated
     public static void createBufferObjects(CommandContext ctx, int[] buffers) {
         getBackend().createBufferObjects(ctx, buffers);
     }
@@ -2735,6 +2834,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The generated buffer object ID
      */
+    @Deprecated
     public static int createSingleBufferObject(CommandContext ctx) {
         return getBackend().createSingleBufferObject(ctx);
     }
@@ -2762,6 +2862,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The generated query object ID
      */
+    @Deprecated
     public static int generateQueryObject(CommandContext ctx) {
         return getBackend().generateQueryObject(ctx);
     }
@@ -2779,6 +2880,7 @@ public class VulkanicAPI {
      * @param target The query target type (e.g., GL_TIME_ELAPSED)
      * @param id The query object ID to begin
      */
+    @Deprecated
     public static void initiateQuery(CommandContext ctx, int target, int id) {
         getBackend().initiateQuery(ctx, target, id);
     }
@@ -2795,6 +2897,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param target The query target type (must match the target used in beginQuery)
      */
+    @Deprecated
     public static void concludeQuery(CommandContext ctx, int target) {
         getBackend().concludeQuery(ctx, target);
     }
@@ -2811,6 +2914,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param id The query object ID to delete
      */
+    @Deprecated
     public static void disposeQueryObject(CommandContext ctx, int id) {
         getBackend().disposeQueryObject(ctx, id);
     }
@@ -2829,6 +2933,7 @@ public class VulkanicAPI {
      * @param pname The parameter to query (e.g., GL_QUERY_RESULT, GL_QUERY_RESULT_AVAILABLE)
      * @return The query result value
      */
+    @Deprecated
     public static int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
         return getBackend().retrieveQueryObjectInt(ctx, id, pname);
     }
@@ -2852,6 +2957,7 @@ public class VulkanicAPI {
      * @param pname The parameter to query (e.g., GL_QUERY_RESULT)
      * @return The query result value as a 64-bit integer
      */
+    @Deprecated
     public static long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
         return getBackend().retrieveQueryObjectInt64(ctx, id, pname);
     }
@@ -2877,6 +2983,7 @@ public class VulkanicAPI {
      * @param name The object ID/handle
      * @param label The debug name/label string
      */
+    @Deprecated
     public static void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
         getBackend().labelDebugObject(ctx, identifier, name, label);
     }
@@ -2905,6 +3012,7 @@ public class VulkanicAPI {
      * @param uniformBlockIndex The index of the uniform block
      * @return The name of the uniform block
      */
+    @Deprecated
     public static String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
         return getBackend().retrieveActiveUniformBlockName(ctx, program, uniformBlockIndex);
     }
@@ -2931,6 +3039,7 @@ public class VulkanicAPI {
      * @param id Numeric identifier
      * @param message Human-readable description
      */
+    @Deprecated
     public static void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
         getBackend().enterDebugGroup(ctx, source, id, message);
     }
@@ -2954,6 +3063,7 @@ public class VulkanicAPI {
      * 
      * @param ctx Command context for recording this command
      */
+    @Deprecated
     public static void exitDebugGroup(CommandContext ctx) {
         getBackend().exitDebugGroup(ctx);
     }
@@ -2979,6 +3089,7 @@ public class VulkanicAPI {
      * @param object The object ID
      * @param label The debug label string
      */
+    @Deprecated
     public static void labelObjectExt(CommandContext ctx, int type, int object, String label) {
         getBackend().labelObjectExt(ctx, type, object, label);
     }
@@ -3007,6 +3118,7 @@ public class VulkanicAPI {
      * @param drawCount Number of draws to execute
      * @param pBaseVertex Pointer to array of base vertex offsets
      */
+    @Deprecated
     public static void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         getBackend().multiDrawElementsBaseVertex(ctx, mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
@@ -3032,6 +3144,7 @@ public class VulkanicAPI {
      * @param size Size of buffer in bytes
      * @param flags Bitfield of storage flags
      */
+    @Deprecated
     public static void createBufferStorage(CommandContext ctx, int target, long size, int flags) {
         getBackend().createBufferStorage(ctx, target, size, flags);
     }
@@ -3058,6 +3171,7 @@ public class VulkanicAPI {
      * @param data ByteBuffer containing initial data
      * @param flags Bitfield of storage flags
      */
+    @Deprecated
     public static void createBufferStorage(CommandContext ctx, int target, ByteBuffer data, int flags) {
         getBackend().createBufferStorage(ctx, target, data, flags);
     }
@@ -3086,6 +3200,7 @@ public class VulkanicAPI {
      * @param normalized Whether to normalize fixed-point data
      * @param relativeOffset Offset within the vertex structure
      */
+    @Deprecated
     public static void specifyVertexAttribFormat(CommandContext ctx, int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
         getBackend().specifyVertexAttribFormat(ctx, attribIndex, size, type, normalized, relativeOffset);
     }
@@ -3112,6 +3227,7 @@ public class VulkanicAPI {
      * @param type Component data type (e.g., GL_INT)
      * @param relativeOffset Offset within the vertex structure
      */
+    @Deprecated
     public static void specifyVertexAttribIFormat(CommandContext ctx, int attribIndex, int size, int type, int relativeOffset) {
         getBackend().specifyVertexAttribIFormat(ctx, attribIndex, size, type, relativeOffset);
     }
@@ -3137,6 +3253,7 @@ public class VulkanicAPI {
      * @param internalFormat Texel format (e.g., GL_RGBA32F)
      * @param buffer Buffer object ID to attach
      */
+    @Deprecated
     public static void attachBufferToTexture(CommandContext ctx, int target, int internalFormat, int buffer) {
         getBackend().attachBufferToTexture(ctx, target, internalFormat, buffer);
     }
@@ -3164,6 +3281,7 @@ public class VulkanicAPI {
      * @param stride Byte offset between consecutive vertex attributes
      * @param pointer Offset of the first component in the buffer
      */
+    @Deprecated
     public static void configureVertexAttribute(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {
         getBackend().configureVertexAttribute(ctx, index, size, type, normalized, stride, pointer);
     }
@@ -3190,6 +3308,7 @@ public class VulkanicAPI {
      * @param stride Byte offset between consecutive vertex attributes
      * @param pointer Offset of the first component in the buffer
      */
+    @Deprecated
     public static void configureVertexAttributeInteger(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
         getBackend().configureVertexAttributeInteger(ctx, index, size, type, stride, pointer);
     }
@@ -3212,6 +3331,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param index The index of the vertex attribute to enable
      */
+    @Deprecated
     public static void activateVertexAttribute(CommandContext ctx, int index) {
         getBackend().activateVertexAttribute(ctx, index);
     }
@@ -3234,6 +3354,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param index The index of the vertex attribute to disable
      */
+    @Deprecated
     public static void deactivateVertexAttribute(CommandContext ctx, int index) {
         getBackend().deactivateVertexAttribute(ctx, index);
     }
@@ -3257,6 +3378,7 @@ public class VulkanicAPI {
      * @param index The index of the vertex attribute
      * @param divisor The number of instances that will pass between updates (0 = per-vertex)
      */
+    @Deprecated
     public static void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
         getBackend().setVertexAttribDivisor(ctx, index, divisor);
     }
@@ -3281,6 +3403,7 @@ public class VulkanicAPI {
      * @param location The uniform location (from locateUniformVariable)
      * @param value Array containing at least 2 float values (x, y)
      */
+    @Deprecated
     public static void assignUniformFloat2v(CommandContext ctx, int location, float[] value) {
         getBackend().assignUniformFloat2v(ctx, location, value);
     }
@@ -3305,6 +3428,7 @@ public class VulkanicAPI {
      * @param location The uniform location (from locateUniformVariable)
      * @param value Array containing at least 3 float values (x, y, z)
      */
+    @Deprecated
     public static void assignUniformFloat3v(CommandContext ctx, int location, float[] value) {
         getBackend().assignUniformFloat3v(ctx, location, value);
     }
@@ -3329,6 +3453,7 @@ public class VulkanicAPI {
      * @param location The uniform location (from locateUniformVariable)
      * @param value Array containing at least 4 float values (x, y, z, w)
      */
+    @Deprecated
     public static void assignUniformFloat4v(CommandContext ctx, int location, float[] value) {
         getBackend().assignUniformFloat4v(ctx, location, value);
     }
@@ -3353,6 +3478,7 @@ public class VulkanicAPI {
      * @param location The uniform location (from locateUniformVariable)
      * @param matrix Buffer containing 16 float values in column-major order
      */
+    @Deprecated
     public static void assignUniformMatrix4f(CommandContext ctx, int location, java.nio.FloatBuffer matrix) {
         getBackend().assignUniformMatrix4f(ctx, location, matrix);
     }
@@ -3378,6 +3504,7 @@ public class VulkanicAPI {
      * @param transpose Whether to transpose the matrix
      * @param value Buffer containing 16 float values
      */
+    @Deprecated
     public static void assignUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value) {
         getBackend().assignUniformMatrix4fv(ctx, location, transpose, value);
     }
@@ -3402,6 +3529,7 @@ public class VulkanicAPI {
      * @param uniformBlockName The name of the uniform block in the shader
      * @return The uniform block index, or -1 if not found
      */
+    @Deprecated
     public static int locateUniformBlock(CommandContext ctx, int program, String uniformBlockName) {
         return getBackend().locateUniformBlock(ctx, program, uniformBlockName);
     }
@@ -3426,6 +3554,7 @@ public class VulkanicAPI {
      * @param uniformBlockIndex The uniform block index (from locateUniformBlock)
      * @param uniformBlockBinding The binding point to associate with
      */
+    @Deprecated
     public static void bindUniformBlock(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
         getBackend().bindUniformBlock(ctx, program, uniformBlockIndex, uniformBlockBinding);
     }
@@ -3452,6 +3581,7 @@ public class VulkanicAPI {
      * @param offset Offset into the buffer in bytes
      * @param size Size of the buffer range in bytes
      */
+    @Deprecated
     public static void attachUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
         getBackend().attachUniformBufferRange(ctx, target, index, buffer, offset, size);
     }
@@ -3470,6 +3600,7 @@ public class VulkanicAPI {
      * @param binding The binding point index (matches layout(binding=N) in shaders)
      * @param bufferId The buffer object ID to bind
      */
+    @Deprecated
     public static void bindUniformBufferBase(CommandContext ctx, int binding, int bufferId) {
         getBackend().bindUniformBufferBase(ctx, binding, bufferId);
     }
@@ -3491,6 +3622,7 @@ public class VulkanicAPI {
      * @param colorNumber The color attachment index (0-7 typically)
      * @param name The name of the fragment shader output variable
      */
+    @Deprecated
     public static void bindFragmentDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name) {
         getBackend().bindFragmentDataLocation(ctx, program, colorNumber, name);
     }
@@ -3516,6 +3648,7 @@ public class VulkanicAPI {
      * @param size Size of the buffer in bytes
      * @param flags Storage flags (e.g., GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT)
      */
+    @Deprecated
     public static void glBufferStorage(CommandContext ctx, int target, long size, int flags) {
         getBackend().glBufferStorage(ctx, target, size, flags);
     }
@@ -3541,6 +3674,7 @@ public class VulkanicAPI {
      * @param data ByteBuffer containing initial data
      * @param flags Storage flags (e.g., GL_DYNAMIC_STORAGE_BIT)
      */
+    @Deprecated
     public static void glBufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
         getBackend().glBufferStorage(ctx, target, data, flags);
     }
@@ -3569,6 +3703,7 @@ public class VulkanicAPI {
      * @param access Access flags (e.g., GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT)
      * @return ByteBuffer representing the mapped memory region
      */
+    @Deprecated
     public static java.nio.ByteBuffer glMapBufferRange(CommandContext ctx, int target, long offset, long length, int access) {
         return getBackend().glMapBufferRange(ctx, target, offset, length, access);
     }
@@ -3593,6 +3728,7 @@ public class VulkanicAPI {
      * @param workY Number of work groups in Y dimension
      * @param workZ Number of work groups in Z dimension
      */
+    @Deprecated
     public static void glDispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
         getBackend().glDispatchCompute(ctx, workX, workY, workZ);
     }
@@ -3620,6 +3756,7 @@ public class VulkanicAPI {
      * @param texture Texture object ID
      * @param level Mipmap level to attach
      */
+    @Deprecated
     public static void glFramebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
         getBackend().glFramebufferTexture2D(ctx, target, attachment, textarget, texture, level);
     }
@@ -3648,6 +3785,7 @@ public class VulkanicAPI {
      * @param access Access mode (e.g., GL_READ_ONLY, GL_WRITE_ONLY, GL_READ_WRITE)
      * @param format Internal format (e.g., GL_RGBA8)
      */
+    @Deprecated
     public static void glBindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format) {
         getBackend().glBindImageTexture(ctx, unit, texture, level, layered, layer, access, format);
     }
@@ -3671,6 +3809,7 @@ public class VulkanicAPI {
      * @param unit Texture unit index
      * @param sampler Sampler object ID (0 to unbind)
      */
+    @Deprecated
     public static void glBindSampler(CommandContext ctx, int unit, int sampler) {
         getBackend().glBindSampler(ctx, unit, sampler);
     }
@@ -3859,6 +3998,7 @@ public class VulkanicAPI {
      * @param ctx Command context for querying capabilities
      * @return true if KHR debug functionality is available
      */
+    @Deprecated
     public static boolean supportsKhrDebug(CommandContext ctx) {
         return getBackend().supportsKhrDebug(ctx);
     }
@@ -3875,6 +4015,7 @@ public class VulkanicAPI {
      * @param ctx Command context for querying capabilities
      * @return true if ARB debug output is available
      */
+    @Deprecated
     public static boolean supportsArbDebugOutput(CommandContext ctx) {
         return getBackend().supportsArbDebugOutput(ctx);
     }
@@ -3901,6 +4042,7 @@ public class VulkanicAPI {
      * @param synchronous Whether to make debug callbacks synchronous (slower but more reliable)
      * @param messageHandler Consumer that receives debug messages as strings
      */
+    @Deprecated
     public static void setupKhrDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupKhrDebugSystem(ctx, verbosityLevel, synchronous, messageHandler);
     }
@@ -3919,6 +4061,7 @@ public class VulkanicAPI {
      * @param synchronous Whether to make debug callbacks synchronous
      * @param messageHandler Consumer that receives debug messages
      */
+    @Deprecated
     public static void setupArbDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupArbDebugSystem(ctx, verbosityLevel, synchronous, messageHandler);
     }
@@ -3943,6 +4086,7 @@ public class VulkanicAPI {
      * @param ctx Command context for querying capabilities
      * @return true if immutable buffer storage is supported
      */
+    @Deprecated
     public static boolean hasBufferStorageExtension(CommandContext ctx) {
         return getBackend().hasBufferStorageExtension(ctx);
     }
@@ -3967,6 +4111,7 @@ public class VulkanicAPI {
      * @param ctx Command context for querying capabilities
      * @return true if separate vertex attribute binding is supported
      */
+    @Deprecated
     public static boolean hasVertexAttribBindingExtension(CommandContext ctx) {
         return getBackend().hasVertexAttribBindingExtension(ctx);
     }
@@ -3993,6 +4138,7 @@ public class VulkanicAPI {
      * @param length Buffer to receive the number of values returned
      * @return The queried value
      */
+    @Deprecated
     public static int querySyncStatus(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
         return getBackend().querySyncStatus(ctx, sync, pname, length);
     }
@@ -4018,6 +4164,7 @@ public class VulkanicAPI {
      * @param ctx Command context for capability queries
      * @return Graphics capabilities structure with extension/feature flags
      */
+    @Deprecated
     public static GraphicsCapabilities obtainGraphicsCapabilities(CommandContext ctx) {
         return getBackend().obtainGraphicsCapabilities(ctx);
     }
@@ -4040,6 +4187,7 @@ public class VulkanicAPI {
      * @param ctx Command context for initialization
      * @return Newly initialized graphics capabilities structure
      */
+    @Deprecated
     public static GraphicsCapabilities initializeGraphicsCapabilities(CommandContext ctx) {
         return getBackend().initializeGraphicsCapabilities(ctx);
     }
@@ -4065,6 +4213,7 @@ public class VulkanicAPI {
      * @param functionName Name of the OpenGL function (e.g., "glDispatchCompute")
      * @return true if the function is available
      */
+    @Deprecated
     public static boolean checkFunctionAvailable(CommandContext ctx, String functionName) {
         return getBackend().checkFunctionAvailable(ctx, functionName);
     }
@@ -4935,6 +5084,7 @@ public class VulkanicAPI {
      * }
      * }</pre>
      */
+    @Deprecated
     public static int queryProgramParameter(CommandContext ctx, int program, int pname) {
         return getBackend().queryProgramParameter(ctx, program, pname);
     }
@@ -4954,6 +5104,7 @@ public class VulkanicAPI {
      * }
      * }</pre>
      */
+    @Deprecated
     public static String retrieveProgramInfoLog(CommandContext ctx, int program) {
         return getBackend().retrieveProgramInfoLog(ctx, program);
     }
@@ -4971,6 +5122,7 @@ public class VulkanicAPI {
      * int boundVAO = VulkanicAPI.queryIntegerState(CTX, GL_VERTEX_ARRAY_BINDING);
      * }</pre>
      */
+    @Deprecated
     public static int queryIntegerState(CommandContext ctx, int pname) {
         return getBackend().queryIntegerState(ctx, pname);
     }
@@ -4990,6 +5142,7 @@ public class VulkanicAPI {
      * VulkanicAPI.activateShaderProgram(CTX, 0); // Unbind
      * }</pre>
      */
+    @Deprecated
     public static void activateShaderProgram(CommandContext ctx, int program) {
         getBackend().activateShaderProgram(ctx, program);
     }
@@ -5007,6 +5160,7 @@ public class VulkanicAPI {
      * VulkanicAPI.destroyShaderProgram(CTX, oldProgramId);
      * }</pre>
      */
+    @Deprecated
     public static void destroyShaderProgram(CommandContext ctx, int program) {
         getBackend().destroyShaderProgram(ctx, program);
     }
@@ -5024,6 +5178,7 @@ public class VulkanicAPI {
      * VulkanicAPI.deleteVertexArray(CTX, vaoId);
      * }</pre>
      */
+    @Deprecated
     public static void deleteVertexArray(CommandContext ctx, int array) {
         getBackend().deleteVertexArray(ctx, array);
     }
@@ -5041,6 +5196,7 @@ public class VulkanicAPI {
      * VulkanicAPI.queryFloatState(CTX, GL_COLOR_CLEAR_VALUE, clearColor);
      * }</pre>
      */
+    @Deprecated
     public static void queryFloatState(CommandContext ctx, int pname, float[] params) {
         getBackend().queryFloatState(ctx, pname, params);
     }
@@ -5056,6 +5212,7 @@ public class VulkanicAPI {
      * VulkanicAPI.setReadBuffer(CTX, GL_COLOR_ATTACHMENT0);
      * }</pre>
      */
+    @Deprecated
     public static void setReadBuffer(CommandContext ctx, int mode) {
         getBackend().setReadBuffer(ctx, mode);
     }
@@ -5072,6 +5229,7 @@ public class VulkanicAPI {
      * VulkanicAPI.setDrawBuffers(CTX, drawBuffers);
      * }</pre>
      */
+    @Deprecated
     public static void setDrawBuffers(CommandContext ctx, int[] bufs) {
         getBackend().setDrawBuffers(ctx, bufs);
     }
@@ -5090,6 +5248,7 @@ public class VulkanicAPI {
      * // Later: check if fence is signaled
      * }</pre>
      */
+    @Deprecated
     public static long createFenceSync(CommandContext ctx, int condition, int flags) {
         return getBackend().createFenceSync(ctx, condition, flags);
     }
@@ -5118,6 +5277,7 @@ public class VulkanicAPI {
      * }
      * }</pre>
      */
+    @Deprecated
     public static int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
         return getBackend().waitForSync(ctx, sync, flags, timeout);
     }
@@ -5143,6 +5303,7 @@ public class VulkanicAPI {
      * VulkanicAPI.destroySync(ctx, fence);  // Clean up when done
      * }</pre>
      */
+    @Deprecated
     public static void destroySync(CommandContext ctx, long sync) {
         getBackend().destroySync(ctx, sync);
     }
@@ -5161,6 +5322,7 @@ public class VulkanicAPI {
      * System.out.println("Using " + backendName + " backend");
      * }</pre>
      */
+    @Deprecated
     public static String getBackendName() {
         return getBackend().getBackendName();
     }
@@ -5189,6 +5351,7 @@ public class VulkanicAPI {
      * @param pname The name of the string to query (e.g., GL_VERSION, GL_VENDOR, GL_RENDERER)
      * @return The requested string or null if not available
      */
+    @Deprecated
     public static String queryStringInfo(CommandContext ctx, int pname) {
         return getBackend().queryStringInfo(ctx, pname);
     }
@@ -5212,6 +5375,7 @@ public class VulkanicAPI {
      * @param ctx Command context
      * @return The capabilities object (implementation-specific)
      */
+    @Deprecated
     public static Object getGLCapabilities(CommandContext ctx) {
         return getBackend().getGLCapabilities(ctx);
     }
@@ -5233,6 +5397,7 @@ public class VulkanicAPI {
      * @param pname The parameter name to query
      * @return The queried integer value
      */
+    @Deprecated
     public static int glGetInteger(CommandContext ctx, int pname) {
         return getBackend().glGetInteger(ctx, pname);
     }
@@ -5254,6 +5419,7 @@ public class VulkanicAPI {
      * @param pname The parameter name to query
      * @param params Array to receive the values
      */
+    @Deprecated
     public static void glGetIntegerv(CommandContext ctx, int pname, int[] params) {
         getBackend().glGetIntegerv(ctx, pname, params);
     }
@@ -5279,6 +5445,7 @@ public class VulkanicAPI {
      * @param index The index of the string to retrieve
      * @return The indexed string or null if not available
      */
+    @Deprecated
     public static String glGetStringi(CommandContext ctx, int pname, int index) {
         return getBackend().glGetStringi(ctx, pname, index);
     }
@@ -5301,6 +5468,7 @@ public class VulkanicAPI {
      * @param program Program object ID
      * @return The program info log string
      */
+    @Deprecated
     public static String glGetProgramInfoLog(CommandContext ctx, int program) {
         return getBackend().glGetProgramInfoLog(ctx, program);
     }
@@ -5323,6 +5491,7 @@ public class VulkanicAPI {
      * @param shader Shader object ID
      * @return The shader info log string
      */
+    @Deprecated
     public static String glGetShaderInfoLog(CommandContext ctx, int shader) {
         return getBackend().glGetShaderInfoLog(ctx, shader);
     }
@@ -5350,6 +5519,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The newly created buffer object ID
      */
+    @Deprecated
     public static int createBufferDSA(CommandContext ctx) {
         return getBackend().createBufferDSA(ctx);
     }
@@ -5375,6 +5545,7 @@ public class VulkanicAPI {
      * @param size Size in bytes to allocate
      * @param usage Usage hint (GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.)
      */
+    @Deprecated
     public static void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
         getBackend().namedBufferDataDSA(ctx, buffer, size, usage);
     }
@@ -5401,6 +5572,7 @@ public class VulkanicAPI {
      * @param data Data to upload
      * @param usage Usage hint (GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.)
      */
+    @Deprecated
     public static void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
         getBackend().namedBufferDataDSA(ctx, buffer, data, usage);
     }
@@ -5426,6 +5598,7 @@ public class VulkanicAPI {
      * @param offset Offset in bytes into the buffer
      * @param data Data to upload
      */
+    @Deprecated
     public static void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
         getBackend().namedBufferSubDataDSA(ctx, buffer, offset, data);
     }
@@ -5453,6 +5626,7 @@ public class VulkanicAPI {
      * @param size Size in bytes to allocate
      * @param flags Storage flags (GL_DYNAMIC_STORAGE_BIT, GL_MAP_READ_BIT, etc.)
      */
+    @Deprecated
     public static void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
         getBackend().namedBufferStorageDSA(ctx, buffer, size, flags);
     }
@@ -5479,6 +5653,7 @@ public class VulkanicAPI {
      * @param data Initial data to upload
      * @param flags Storage flags (GL_DYNAMIC_STORAGE_BIT, GL_MAP_WRITE_BIT, etc.)
      */
+    @Deprecated
     public static void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
         getBackend().namedBufferStorageDSA(ctx, buffer, data, flags);
     }
@@ -5511,6 +5686,7 @@ public class VulkanicAPI {
      * @param access Access flags (GL_MAP_READ_BIT, GL_MAP_WRITE_BIT, etc.)
      * @return ByteBuffer mapped to the buffer's memory, or null on failure
      */
+    @Deprecated
     public static java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
         return getBackend().mapNamedBufferRangeDSA(ctx, buffer, offset, length, access);
     }
@@ -5535,6 +5711,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param buffer Buffer object ID
      */
+    @Deprecated
     public static void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
         getBackend().unmapNamedBufferDSA(ctx, buffer);
     }
@@ -5563,6 +5740,7 @@ public class VulkanicAPI {
      * @param offset Offset in bytes into the mapped region
      * @param length Length in bytes to flush
      */
+    @Deprecated
     public static void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
         getBackend().flushMappedNamedBufferRangeDSA(ctx, buffer, offset, length);
     }
@@ -5589,6 +5767,7 @@ public class VulkanicAPI {
      * @param writeOffset Offset in bytes into the destination buffer
      * @param size Number of bytes to copy
      */
+    @Deprecated
     public static void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
         getBackend().copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size);
     }
@@ -5615,6 +5794,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @return The newly created framebuffer object ID
      */
+    @Deprecated
     public static int createFramebufferDSA(CommandContext ctx) {
         return getBackend().createFramebufferDSA(ctx);
     }
@@ -5642,6 +5822,7 @@ public class VulkanicAPI {
      * @param texture Texture object ID to attach
      * @param level Mipmap level of the texture to attach
      */
+    @Deprecated
     public static void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
         getBackend().namedFramebufferTextureDSA(ctx, framebuffer, attachment, texture, level);
     }
@@ -5678,6 +5859,7 @@ public class VulkanicAPI {
      * @param mask Buffer bit mask (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, etc.)
      * @param filter Interpolation filter (GL_NEAREST or GL_LINEAR)
      */
+    @Deprecated
     public static void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, 
                                                int srcX0, int srcY0, int srcX1, int srcY1,
                                                int dstX0, int dstY0, int dstX1, int dstY1, 
@@ -5716,6 +5898,7 @@ public class VulkanicAPI {
      * @param writeOffset Offset in bytes into the destination buffer
      * @param size Number of bytes to copy
      */
+    @Deprecated
     public static void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         getBackend().copyBufferSubData(ctx, readTarget, writeTarget, readOffset, writeOffset, size);
     }
@@ -5745,6 +5928,7 @@ public class VulkanicAPI {
      * @param offset Offset in bytes into the mapped region
      * @param length Length in bytes to flush
      */
+    @Deprecated
     public static void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
         getBackend().flushMappedBufferRange(ctx, target, offset, length);
     }
@@ -5770,6 +5954,7 @@ public class VulkanicAPI {
      * @param cap The capability to query (e.g., GL_BLEND, GL_DEPTH_TEST)
      * @return true if the capability is enabled, false otherwise
      */
+    @Deprecated
     public static boolean glIsEnabled(CommandContext ctx, int cap) {
         return getBackend().glIsEnabled(ctx, cap);
     }
@@ -5792,6 +5977,7 @@ public class VulkanicAPI {
      * @param framebuffer The framebuffer object ID to test
      * @return true if the ID is a valid framebuffer object, false otherwise
      */
+    @Deprecated
     public static boolean glIsFramebuffer(CommandContext ctx, int framebuffer) {
         return getBackend().glIsFramebuffer(ctx, framebuffer);
     }
@@ -5814,6 +6000,7 @@ public class VulkanicAPI {
      * @param texture The texture object ID to test
      * @return true if the ID is a valid texture object, false otherwise
      */
+    @Deprecated
     public static boolean glIsTexture(CommandContext ctx, int texture) {
         return getBackend().glIsTexture(ctx, texture);
     }
@@ -5836,6 +6023,7 @@ public class VulkanicAPI {
      * @param array The vertex array object ID to test
      * @return true if the ID is a valid vertex array object, false otherwise
      */
+    @Deprecated
     public static boolean glIsVertexArray(CommandContext ctx, int array) {
         return getBackend().glIsVertexArray(ctx, array);
     }
@@ -5858,6 +6046,7 @@ public class VulkanicAPI {
      * @param program The shader program object ID to test
      * @return true if the ID is a valid program object, false otherwise
      */
+    @Deprecated
     public static boolean glIsProgram(CommandContext ctx, int program) {
         return getBackend().glIsProgram(ctx, program);
     }
@@ -5880,6 +6069,7 @@ public class VulkanicAPI {
      * @param buffer The buffer object ID to test
      * @return true if the ID is a valid buffer object, false otherwise
      */
+    @Deprecated
     public static boolean glIsBuffer(CommandContext ctx, int buffer) {
         return getBackend().glIsBuffer(ctx, buffer);
     }
@@ -5902,6 +6092,7 @@ public class VulkanicAPI {
      * @param modeRGB Blend equation for RGB components
      * @param modeAlpha Blend equation for alpha component
      */
+    @Deprecated
     public static void glBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
         getBackend().glBlendEquationSeparate(ctx, modeRGB, modeAlpha);
     }
@@ -5924,6 +6115,7 @@ public class VulkanicAPI {
      * @param ref Reference value for stencil test
      * @param mask Mask that is ANDed with both reference and stored stencil value
      */
+    @Deprecated
     public static void glStencilFunc(CommandContext ctx, int func, int ref, int mask) {
         getBackend().glStencilFunc(ctx, func, ref, mask);
     }
@@ -5944,6 +6136,7 @@ public class VulkanicAPI {
      * @param ctx Command context for recording this command
      * @param mode The face(s) to cull (GL_FRONT, GL_BACK, or GL_FRONT_AND_BACK)
      */
+    @Deprecated
     public static void glCullFace(CommandContext ctx, int mode) {
         getBackend().glCullFace(ctx, mode);
     }

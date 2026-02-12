@@ -40,6 +40,7 @@ public interface GraphicsBackend {
      * @param width The width of the viewport in pixels
      * @param height The height of the viewport in pixels
      */
+    @Deprecated
     void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height);
     
     @Deprecated
@@ -62,6 +63,7 @@ public interface GraphicsBackend {
      * @param width The width of the scissor rectangle in pixels
      * @param height The height of the scissor rectangle in pixels
      */
+    @Deprecated
     void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height);
     
     /**
@@ -76,6 +78,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param mask Bitwise OR of buffer masks (e.g., GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
      */
+    @Deprecated
     void clear(CommandContext ctx, int mask);
     
     /**
@@ -92,6 +95,7 @@ public interface GraphicsBackend {
      * @param first Starting vertex index in the vertex buffer
      * @param count Number of vertices to draw
      */
+    @Deprecated
     void drawArrays(CommandContext ctx, int mode, int first, int count);
     
     /**
@@ -110,6 +114,7 @@ public interface GraphicsBackend {
      * @param type Data type of indices (e.g., GL_UNSIGNED_INT, GL_UNSIGNED_SHORT)
      * @param indices Offset in bytes from the start of the index buffer, or pointer to index data
      */
+    @Deprecated
     void drawElements(CommandContext ctx, int mode, int count, int type, long indices);
     
     /**
@@ -129,6 +134,7 @@ public interface GraphicsBackend {
      * @param instanceCount Number of instances to render
      * @param baseVertex Value added to each index before accessing the vertex buffer
      */
+    @Deprecated
     void renderIndexedInstancedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex);
     
     /**
@@ -147,6 +153,7 @@ public interface GraphicsBackend {
      * @param indices Offset in bytes from the start of the index buffer
      * @param baseVertex Value added to each index before accessing the vertex buffer
      */
+    @Deprecated
     void renderIndexedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex);
     
     /**
@@ -165,6 +172,7 @@ public interface GraphicsBackend {
      * @param indices Offset in bytes from the start of the index buffer
      * @param instanceCount Number of instances to render
      */
+    @Deprecated
     void renderIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount);
     
     /**
@@ -182,6 +190,7 @@ public interface GraphicsBackend {
      * @param count Number of vertices to draw
      * @param instanceCount Number of instances to render
      */
+    @Deprecated
     void renderArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount);
     
     /**
@@ -196,6 +205,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param programId The shader program ID to bind
      */
+    @Deprecated
     void bindShaderProgram(CommandContext ctx, int programId);
     
     /**
@@ -210,6 +220,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param enabled true to enable depth writes, false to disable
      */
+    @Deprecated
     void setDepthWriteMask(CommandContext ctx, boolean enabled);
     
     /**
@@ -227,6 +238,7 @@ public interface GraphicsBackend {
      * @param b true to enable blue channel writes
      * @param a true to enable alpha channel writes
      */
+    @Deprecated
     void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a);
     
     /**
@@ -242,6 +254,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param func The depth comparison function (e.g., GL_LESS, GL_LEQUAL)
      */
+    @Deprecated
     void setDepthFunc(CommandContext ctx, int func);
     
     /**
@@ -259,6 +272,7 @@ public interface GraphicsBackend {
      * @param srcAlpha Source alpha blend factor
      * @param dstAlpha Destination alpha blend factor
      */
+    @Deprecated
     void setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
     
     /**
@@ -274,6 +288,7 @@ public interface GraphicsBackend {
      * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER)
      * @param buffer The buffer object ID to bind
      */
+    @Deprecated
     void bindBuffer(CommandContext ctx, int target, int buffer);
     
     /**
@@ -287,6 +302,7 @@ public interface GraphicsBackend {
      * 
      * @param ctx Command context for recording this command
      */
+    @Deprecated
     void enableBlend(CommandContext ctx);
     
     /**
@@ -299,6 +315,7 @@ public interface GraphicsBackend {
      * 
      * @param ctx Command context for recording this command
      */
+    @Deprecated
     void disableBlend(CommandContext ctx);
     
     /**
@@ -313,6 +330,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param cap The capability to enable (e.g., GL_DEPTH_TEST)
      */
+    @Deprecated
     void enable(CommandContext ctx, int cap);
     
     /**
@@ -326,6 +344,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param cap The capability to disable (e.g., GL_DEPTH_TEST)
      */
+    @Deprecated
     void disable(CommandContext ctx, int cap);
     
     /**
@@ -340,6 +359,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param unit The texture unit to activate (e.g., GL_TEXTURE0)
      */
+    @Deprecated
     void activateTextureUnit(CommandContext ctx, int unit);
     
     /**
@@ -354,6 +374,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param target The texture target (e.g., GL_TEXTURE_2D)
      */
+    @Deprecated
     void generateMipmap(CommandContext ctx, int target);
     
     /**
@@ -368,6 +389,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param textureId The texture ID to bind
      */
+    @Deprecated
     void bindTexture(CommandContext ctx, int textureId);
     
     /**
@@ -383,6 +405,7 @@ public interface GraphicsBackend {
      * @param target The texture target (e.g., GL_TEXTURE_2D)
      * @param textureId The texture ID to bind
      */
+    @Deprecated
     void bindTexture(CommandContext ctx, int target, int textureId);
     
     /**
@@ -398,6 +421,7 @@ public interface GraphicsBackend {
      * @param pname The pixel storage parameter name
      * @param value The value to set
      */
+    @Deprecated
     void setPixelStoreMode(CommandContext ctx, int pname, int value);
     
     /**
@@ -413,6 +437,7 @@ public interface GraphicsBackend {
      * @param target The framebuffer target
      * @param fbo The framebuffer object ID to bind (0 for default framebuffer)
      */
+    @Deprecated
     void attachFramebuffer(CommandContext ctx, int target, int fbo);
     
     /**
@@ -431,6 +456,7 @@ public interface GraphicsBackend {
      * @param texture The texture ID to attach
      * @param level The mipmap level to attach
      */
+    @Deprecated
     void attachTextureToFramebuffer(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
     
     /**
@@ -446,6 +472,7 @@ public interface GraphicsBackend {
      * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER)
      * @param param The parameter value
      */
+    @Deprecated
     void configureTextureParameter(CommandContext ctx, int target, int pname, int param);
     
     /**
@@ -459,6 +486,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param texture The texture ID to delete
      */
+    @Deprecated
     void removeTexture(CommandContext ctx, int texture);
     
     /**
@@ -473,6 +501,7 @@ public interface GraphicsBackend {
      * @param face Which faces to apply to (e.g., GL_FRONT_AND_BACK)
      * @param mode The rasterization mode (e.g., GL_FILL, GL_LINE, GL_POINT)
      */
+    @Deprecated
     void configurePolygonMode(CommandContext ctx, int face, int mode);
     
     /**
@@ -486,6 +515,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The newly created texture ID
      */
+    @Deprecated
     int createTexture(CommandContext ctx);
     
     /**
@@ -500,6 +530,7 @@ public interface GraphicsBackend {
      * @param factor Scale factor for depth slope
      * @param units Constant depth offset value
      */
+    @Deprecated
     void configurePolygonOffset(CommandContext ctx, float factor, float units);
     
     /**
@@ -513,6 +544,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param opcode The logical operation code (e.g., GL_COPY, GL_XOR)
      */
+    @Deprecated
     void configureLogicOp(CommandContext ctx, int opcode);
     
     /**
@@ -526,6 +558,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param depth The depth clear value (typically 1.0 for far plane)
      */
+    @Deprecated
     void setClearDepthValue(CommandContext ctx, double depth);
     
     /**
@@ -542,6 +575,7 @@ public interface GraphicsBackend {
      * @param blue Blue component (0.0 to 1.0)
      * @param alpha Alpha component (0.0 to 1.0)
      */
+    @Deprecated
     void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha);
     
     /**
@@ -556,6 +590,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param mode The draw buffer mode (e.g., GL_BACK, GL_FRONT, GL_COLOR_ATTACHMENT0)
      */
+    @Deprecated
     void selectDrawBuffer(CommandContext ctx, int mode);
     
     /**
@@ -570,6 +605,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The newly created buffer object ID
      */
+    @Deprecated
     int allocateBufferObject(CommandContext ctx);
     
     /**
@@ -584,6 +620,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param buf The buffer object ID to release
      */
+    @Deprecated
     void releaseBufferObject(CommandContext ctx, int buf);
     
     /**
@@ -598,6 +635,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The newly created vertex array object ID
      */
+    @Deprecated
     int createVertexArrayObject(CommandContext ctx);
     
     /**
@@ -612,6 +650,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The newly created framebuffer object ID
      */
+    @Deprecated
     int generateFramebufferObject(CommandContext ctx);
     
     /**
@@ -626,6 +665,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param fbo The framebuffer object ID to destroy
      */
+    @Deprecated
     void destroyFramebufferObject(CommandContext ctx, int fbo);
     
     /**
@@ -640,6 +680,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param vao The vertex array object ID to bind
      */
+    @Deprecated
     void selectVertexArray(CommandContext ctx, int vao);
     
     /**
@@ -656,6 +697,7 @@ public interface GraphicsBackend {
      * @param dat The data to upload
      * @param usg Usage hint for the buffer (e.g., GL_STATIC_DRAW)
      */
+    @Deprecated
     void fillBufferWithData(CommandContext ctx, int tgt, java.nio.ByteBuffer dat, int usg);
     
     /**
@@ -672,6 +714,7 @@ public interface GraphicsBackend {
      * @param sz The size in bytes to allocate
      * @param usg Usage hint for the buffer (e.g., GL_DYNAMIC_DRAW)
      */
+    @Deprecated
     void fillBufferWithSize(CommandContext ctx, int tgt, long sz, int usg);
     
     /**
@@ -687,6 +730,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The error code, or NO_ERROR (0) if no error occurred
      */
+    @Deprecated
     int checkForErrors(CommandContext ctx);
     
     /**
@@ -702,6 +746,7 @@ public interface GraphicsBackend {
      * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)
      * @param buffer The buffer object ID to bind (0 to unbind)
      */
+    @Deprecated
     void attachBuffer(CommandContext ctx, int target, int buffer);
     
     /**
@@ -716,6 +761,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for error checking
      * @return The error code, or NO_ERROR (0) if no error occurred
      */
+    @Deprecated
     int pollErrorCode(CommandContext ctx);
     
     /**
@@ -736,6 +782,7 @@ public interface GraphicsBackend {
      * @param type Pixel data type (e.g., GL_UNSIGNED_BYTE)
      * @param pixels Memory address to write pixel data to
      */
+    @Deprecated
     void readFramebufferPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels);
     
     /**
@@ -753,6 +800,7 @@ public interface GraphicsBackend {
      * @param pname Parameter name to query (e.g., GL_TEXTURE_WIDTH)
      * @return The queried parameter value
      */
+    @Deprecated
     int queryTextureLevelParameter(CommandContext ctx, int target, int level, int pname);
     
     /**
@@ -770,6 +818,7 @@ public interface GraphicsBackend {
      * @param off Offset in bytes from the start of the buffer
      * @param dat The data to upload
      */
+    @Deprecated
     void fillBufferSubregion(CommandContext ctx, int tgt, long off, java.nio.ByteBuffer dat);
     
     /**
@@ -789,6 +838,7 @@ public interface GraphicsBackend {
      * @param acc Access flags (e.g., GL_MAP_READ_BIT, GL_MAP_WRITE_BIT)
      * @return A ByteBuffer providing access to the mapped memory region
      */
+    @Deprecated
     java.nio.ByteBuffer mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc);
     
     /**
@@ -804,6 +854,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
      */
+    @Deprecated
     void unmapBufferData(CommandContext ctx, int tgt);
     
     /**
@@ -929,6 +980,7 @@ public interface GraphicsBackend {
      * @param shaderType Type of shader (e.g., GL_VERTEX_SHADER, GL_FRAGMENT_SHADER)
      * @return Shader object ID/handle
      */
+    @Deprecated
     int constructShaderObject(CommandContext ctx, int shaderType);
     
     /**
@@ -943,6 +995,7 @@ public interface GraphicsBackend {
      * @param ctx Command context (for future Vulkan resource tracking)
      * @param shader Shader object ID to delete
      */
+    @Deprecated
     void disposeShaderObject(CommandContext ctx, int shader);
     
     /**
@@ -957,6 +1010,7 @@ public interface GraphicsBackend {
      * @param ctx Command context (for future Vulkan compilation pipeline)
      * @param shader Shader object ID to compile
      */
+    @Deprecated
     void compileShaderSource(CommandContext ctx, int shader);
     
     /**
@@ -971,6 +1025,7 @@ public interface GraphicsBackend {
      * @param ctx Command context (for future Vulkan pipeline creation)
      * @return Program/Pipeline object ID/handle
      */
+    @Deprecated
     int constructProgramObject(CommandContext ctx);
     
     /**
@@ -984,6 +1039,7 @@ public interface GraphicsBackend {
      * @param ctx Command context (for future Vulkan resource tracking)
      * @param program Program/Pipeline object ID to delete
      */
+    @Deprecated
     void disposeProgramObject(CommandContext ctx, int program);
     
     /**
@@ -1001,6 +1057,7 @@ public interface GraphicsBackend {
      * @param stringCount Number of source strings
      * @param lengthsPointer Native pointer to array of string lengths (or 0 for null-terminated)
      */
+    @Deprecated
     void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
     
     /**
@@ -1017,6 +1074,7 @@ public interface GraphicsBackend {
      * @param strings Native pointer to array of source string pointers
      * @param length Native pointer to array of string lengths (or 0 for null-terminated)
      */
+    @Deprecated
     void uploadShaderSourceNative(CommandContext ctx, int shader, int count, long strings, long length);
     
     /**
@@ -1032,6 +1090,7 @@ public interface GraphicsBackend {
      * @param program Program object ID
      * @param shader Compiled shader object ID to attach
      */
+    @Deprecated
     void attachShaderToProgram(CommandContext ctx, int program, int shader);
     
     /**
@@ -1047,6 +1106,7 @@ public interface GraphicsBackend {
      * @param ctx Command context (for future Vulkan pipeline creation)
      * @param program Program object ID to link
      */
+    @Deprecated
     void linkProgramBinary(CommandContext ctx, int program);
     
     /**
@@ -1062,6 +1122,7 @@ public interface GraphicsBackend {
      * @param program Program object ID
      * @param shader Shader object ID to detach
      */
+    @Deprecated
     void glDetachShader(CommandContext ctx, int program, int shader);
     
     /**
@@ -1079,6 +1140,7 @@ public interface GraphicsBackend {
      * @param index The attribute index to bind to (0-15 typically)
      * @param name The name of the vertex attribute variable in the shader
      */
+    @Deprecated
     void bindAttributeLocation(CommandContext ctx, int program, int index, CharSequence name);
     
     /**
@@ -1095,6 +1157,7 @@ public interface GraphicsBackend {
      * @param name The name of the vertex attribute variable to query
      * @return The attribute location/index, or -1 if not found
      */
+    @Deprecated
     int getAttributeLocation(CommandContext ctx, int program, CharSequence name);
     
     /**
@@ -1111,6 +1174,7 @@ public interface GraphicsBackend {
      * @param name The name of the uniform variable to query
      * @return The uniform location, or -1 if not found or not active
      */
+    @Deprecated
     int locateUniformVariable(CommandContext ctx, int program, CharSequence name);
     
     /**
@@ -1126,6 +1190,7 @@ public interface GraphicsBackend {
      * @param location The uniform location (from locateUniformVariable)
      * @param value The integer value to assign to the uniform
      */
+    @Deprecated
     void assignUniformInteger(CommandContext ctx, int location, int value);
     
     /**
@@ -1141,6 +1206,7 @@ public interface GraphicsBackend {
      * @param location The uniform location (from locateUniformVariable)
      * @param value The float value to assign to the uniform
      */
+    @Deprecated
     void assignUniformFloat(CommandContext ctx, int location, float value);
     
     /**
@@ -1158,6 +1224,7 @@ public interface GraphicsBackend {
      * @param y The y component value
      * @param z The z component value
      */
+    @Deprecated
     void assignUniformFloat3(CommandContext ctx, int location, float x, float y, float z);
     
     /**
@@ -1175,6 +1242,7 @@ public interface GraphicsBackend {
      * @param y The y component value
      * @param z The z component value
      */
+    @Deprecated
     void assignUniformInteger3(CommandContext ctx, int location, int x, int y, int z);
     
     /**
@@ -1193,6 +1261,7 @@ public interface GraphicsBackend {
      * @param z The z component value
      * @param w The w component value
      */
+    @Deprecated
     void assignUniformFloat4(CommandContext ctx, int location, float x, float y, float z, float w);
     
     /**
@@ -1209,6 +1278,7 @@ public interface GraphicsBackend {
      * @param transpose Whether to transpose the matrix (typically false for column-major)
      * @param value Buffer containing the 16 float values of the matrix
      */
+    @Deprecated
     void assignUniformMatrix4(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value);
     
     /**
@@ -1224,6 +1294,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param index The index of the generic vertex attribute to enable
      */
+    @Deprecated
     void activateVertexAttributeArray(CommandContext ctx, int index);
     
     /**
@@ -1240,6 +1311,7 @@ public interface GraphicsBackend {
      * @param x The first component (x coordinate)
      * @param y The second component (y coordinate)
      */
+    @Deprecated
     void assignUniformFloat2(CommandContext ctx, int location, float x, float y);
     
     /**
@@ -1256,6 +1328,7 @@ public interface GraphicsBackend {
      * @param x The first component
      * @param y The second component
      */
+    @Deprecated
     void assignUniformInteger2(CommandContext ctx, int location, int x, int y);
     
     /**
@@ -1322,6 +1395,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param barriers Bitfield of barrier types (e.g., GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
      */
+    @Deprecated
     void setMemoryBarrier(CommandContext ctx, int barriers);
     
     /**
@@ -1342,6 +1416,7 @@ public interface GraphicsBackend {
      * @param drawbuffer The draw buffer index (for GL_COLOR, typically 0)
      * @param values Array of float values to clear with (4 values for color, 1 for depth)
      */
+    @Deprecated
     void clearFloatBuffer(CommandContext ctx, int buffer, int drawbuffer, float[] values);
     
     /**
@@ -1362,6 +1437,7 @@ public interface GraphicsBackend {
      * @param drawbuffer The draw buffer index (for GL_COLOR, typically 0)
      * @param values Array of integer values to clear with (4 values for color, 1 for stencil)
      */
+    @Deprecated
     void clearIntegerBuffer(CommandContext ctx, int buffer, int drawbuffer, int[] values);
     
     /**
@@ -1400,6 +1476,7 @@ public interface GraphicsBackend {
      * @param width Width of the viewport
      * @param height Height of the viewport
      */
+    @Deprecated
     void setStaticViewport(CommandContext ctx, int x, int y, int width, int height);
     
     /**
@@ -1434,6 +1511,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param index The index of the vertex attribute to disable
      */
+    @Deprecated
     void deactivateVertexAttributeArray(CommandContext ctx, int index);
     
     /**
@@ -1450,6 +1528,7 @@ public interface GraphicsBackend {
      * @param transpose Whether to transpose the matrix
      * @param value FloatBuffer containing the matrix data (9 floats)
      */
+    @Deprecated
     void assignUniformMatrix3(CommandContext ctx, int location, boolean transpose, FloatBuffer value);
     
     /**
@@ -1466,6 +1545,7 @@ public interface GraphicsBackend {
      * @param transpose Whether to transpose the matrix
      * @param value Float array containing the matrix data (9 floats)
      */
+    @Deprecated
     void assignUniformMatrix3Array(CommandContext ctx, int location, boolean transpose, float[] value);
     
     /**
@@ -1480,6 +1560,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param mode The blend equation mode (e.g., GL_FUNC_ADD)
      */
+    @Deprecated
     void setBlendEquation(CommandContext ctx, int mode);
     
     /**
@@ -1496,6 +1577,7 @@ public interface GraphicsBackend {
      * @param pname The parameter to query (e.g., GL_COMPILE_STATUS)
      * @return The requested parameter value
      */
+    @Deprecated
     int queryShaderParameter(CommandContext ctx, int shader, int pname);
     
     /**
@@ -1511,6 +1593,7 @@ public interface GraphicsBackend {
      * @param shader The shader object ID
      * @return The shader info log string
      */
+    @Deprecated
     String retrieveShaderInfoLog(CommandContext ctx, int shader);
     
     /**
@@ -1525,6 +1608,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param array The vertex array object ID to bind (0 to unbind)
      */
+    @Deprecated
     void bindVertexArray(CommandContext ctx, int array);
     
     /**
@@ -1543,6 +1627,7 @@ public interface GraphicsBackend {
      * @param offset Offset in bytes to the first vertex data
      * @param stride The byte stride between consecutive vertices
      */
+    @Deprecated
     void attachVertexBuffer(CommandContext ctx, int bindingIndex, int buffer, long offset, int stride);
     
     /**
@@ -1559,6 +1644,7 @@ public interface GraphicsBackend {
      * @param attribIndex The vertex attribute index to associate
      * @param bindingIndex The vertex buffer binding point to associate with
      */
+    @Deprecated
     void associateVertexAttrib(CommandContext ctx, int attribIndex, int bindingIndex);
     
     /**
@@ -1573,6 +1659,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param buffers Array to receive the generated buffer IDs
      */
+    @Deprecated
     void createBufferObjects(CommandContext ctx, int[] buffers);
     
     /**
@@ -1587,6 +1674,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The generated buffer object ID
      */
+    @Deprecated
     int createSingleBufferObject(CommandContext ctx);
     
     /**
@@ -1601,6 +1689,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The generated query object ID
      */
+    @Deprecated
     int generateQueryObject(CommandContext ctx);
     
     /**
@@ -1616,6 +1705,7 @@ public interface GraphicsBackend {
      * @param target The query target type (e.g., GL_TIME_ELAPSED)
      * @param id The query object ID to begin
      */
+    @Deprecated
     void initiateQuery(CommandContext ctx, int target, int id);
     
     /**
@@ -1630,6 +1720,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param target The query target type (must match the target used in beginQuery)
      */
+    @Deprecated
     void concludeQuery(CommandContext ctx, int target);
     
     /**
@@ -1644,6 +1735,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param id The query object ID to delete
      */
+    @Deprecated
     void disposeQueryObject(CommandContext ctx, int id);
     
     /**
@@ -1661,6 +1753,7 @@ public interface GraphicsBackend {
      * @param pname The parameter to query (e.g., GL_QUERY_RESULT)
      * @return The query result value
      */
+    @Deprecated
     int retrieveQueryObjectInt(CommandContext ctx, int id, int pname);
     
     /**
@@ -1677,6 +1770,7 @@ public interface GraphicsBackend {
      * @param pname The parameter to query (e.g., GL_QUERY_RESULT)
      * @return The query result value as a 64-bit integer
      */
+    @Deprecated
     long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname);
     
     /**
@@ -1694,6 +1788,7 @@ public interface GraphicsBackend {
      * @param name The object ID/handle
      * @param label The debug name/label string
      */
+    @Deprecated
     void labelDebugObject(CommandContext ctx, int identifier, int name, String label);
     
     /**
@@ -1710,6 +1805,7 @@ public interface GraphicsBackend {
      * @param uniformBlockIndex The index of the uniform block (0 to count-1)
      * @return The name of the uniform block
      */
+    @Deprecated
     String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex);
     
     /**
@@ -1730,6 +1826,7 @@ public interface GraphicsBackend {
      * @param id Numeric identifier for the group
      * @param message Human-readable description of the debug group
      */
+    @Deprecated
     void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message);
     
     /**
@@ -1744,6 +1841,7 @@ public interface GraphicsBackend {
      * 
      * @param ctx Command context for recording this command
      */
+    @Deprecated
     void exitDebugGroup(CommandContext ctx);
     
     /**
@@ -1761,6 +1859,7 @@ public interface GraphicsBackend {
      * @param object The object ID/handle
      * @param label The debug name/label string
      */
+    @Deprecated
     void labelObjectExt(CommandContext ctx, int type, int object, String label);
     
     /**
@@ -1784,6 +1883,7 @@ public interface GraphicsBackend {
      * @param drawCount Number of draws to execute
      * @param pBaseVertex Pointer to array of base vertex offsets
      */
+    @Deprecated
     void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
     
     /**
@@ -1810,6 +1910,7 @@ public interface GraphicsBackend {
      * @param size Size of buffer in bytes
      * @param flags Bitfield of storage flags
      */
+    @Deprecated
     void createBufferStorage(CommandContext ctx, int target, long size, int flags);
     
     /**
@@ -1827,6 +1928,7 @@ public interface GraphicsBackend {
      * @param data ByteBuffer containing initial data
      * @param flags Bitfield of storage flags
      */
+    @Deprecated
     void createBufferStorage(CommandContext ctx, int target, ByteBuffer data, int flags);
     
     /**
@@ -1852,6 +1954,7 @@ public interface GraphicsBackend {
      * @param normalized Whether to normalize fixed-point data
      * @param relativeOffset Offset within the vertex structure
      */
+    @Deprecated
     void specifyVertexAttribFormat(CommandContext ctx, int attribIndex, int size, int type, boolean normalized, int relativeOffset);
     
     /**
@@ -1870,6 +1973,7 @@ public interface GraphicsBackend {
      * @param type Component data type (e.g., GL_INT, GL_UNSIGNED_INT)
      * @param relativeOffset Offset within the vertex structure
      */
+    @Deprecated
     void specifyVertexAttribIFormat(CommandContext ctx, int attribIndex, int size, int type, int relativeOffset);
     
     /**
@@ -1896,6 +2000,7 @@ public interface GraphicsBackend {
      * @param internalFormat Texel format (e.g., GL_RGBA32F, GL_R32I)
      * @param buffer Buffer object ID to attach
      */
+    @Deprecated
     void attachBufferToTexture(CommandContext ctx, int target, int internalFormat, int buffer);
     
     // ================================================================================
@@ -2028,6 +2133,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for querying capabilities
      * @return true if KHR debug functionality is available
      */
+    @Deprecated
     boolean supportsKhrDebug(CommandContext ctx);
     
     /**
@@ -2039,6 +2145,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for querying capabilities
      * @return true if ARB debug output is available
      */
+    @Deprecated
     boolean supportsArbDebugOutput(CommandContext ctx);
     
     /**
@@ -2052,6 +2159,7 @@ public interface GraphicsBackend {
      * @param synchronous Whether to make debug callbacks synchronous (slower but more reliable)
      * @param messageHandler Consumer that receives debug messages as strings
      */
+    @Deprecated
     void setupKhrDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
     
     /**
@@ -2065,6 +2173,7 @@ public interface GraphicsBackend {
      * @param synchronous Whether to make debug callbacks synchronous
      * @param messageHandler Consumer that receives debug messages
      */
+    @Deprecated
     void setupArbDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
     
     // Extension capability checking (CommandContext versions)
@@ -2077,6 +2186,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for querying capabilities
      * @return true if immutable buffer storage is supported
      */
+    @Deprecated
     boolean hasBufferStorageExtension(CommandContext ctx);
     
     /**
@@ -2088,6 +2198,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for querying capabilities
      * @return true if separate vertex attribute binding is supported
      */
+    @Deprecated
     boolean hasVertexAttribBindingExtension(CommandContext ctx);
     
     // Sync query operations (CommandContext version)
@@ -2103,6 +2214,7 @@ public interface GraphicsBackend {
      * @param length Buffer to receive the number of values returned
      * @return The queried value
      */
+    @Deprecated
     int querySyncStatus(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length);
     
     // Graphics capabilities (CommandContext versions)
@@ -2115,6 +2227,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for capability queries
      * @return Graphics capabilities structure with extension/feature flags
      */
+    @Deprecated
     GraphicsCapabilities obtainGraphicsCapabilities(CommandContext ctx);
     
     /**
@@ -2126,6 +2239,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for initialization
      * @return Newly initialized graphics capabilities structure
      */
+    @Deprecated
     GraphicsCapabilities initializeGraphicsCapabilities(CommandContext ctx);
     
     /**
@@ -2138,6 +2252,7 @@ public interface GraphicsBackend {
      * @param functionName Name of the OpenGL function (e.g., "glDispatchCompute")
      * @return true if the function is available
      */
+    @Deprecated
     boolean checkFunctionAvailable(CommandContext ctx, String functionName);
     
     // String queries
@@ -2463,6 +2578,7 @@ public interface GraphicsBackend {
      * }
      * }</pre>
      */
+    @Deprecated
     int queryProgramParameter(CommandContext ctx, int program, int pname);
     
     /**
@@ -2486,6 +2602,7 @@ public interface GraphicsBackend {
      * }
      * }</pre>
      */
+    @Deprecated
     String retrieveProgramInfoLog(CommandContext ctx, int program);
     
     /**
@@ -2516,6 +2633,7 @@ public interface GraphicsBackend {
      * int boundVAO = backend.queryIntegerState(CTX, GL_VERTEX_ARRAY_BINDING);
      * }</pre>
      */
+    @Deprecated
     int queryIntegerState(CommandContext ctx, int pname);
     
     /**
@@ -2540,6 +2658,7 @@ public interface GraphicsBackend {
      * backend.activateShaderProgram(CTX, 0); // Unbind
      * }</pre>
      */
+    @Deprecated
     void activateShaderProgram(CommandContext ctx, int program);
     
     /**
@@ -2563,6 +2682,7 @@ public interface GraphicsBackend {
      * backend.destroyShaderProgram(CTX, oldProgramId);
      * }</pre>
      */
+    @Deprecated
     void destroyShaderProgram(CommandContext ctx, int program);
     
     // Phase 14: Additional resource management and state query methods
@@ -2585,6 +2705,7 @@ public interface GraphicsBackend {
      * backend.deleteVertexArray(CTX, vaoId);
      * }</pre>
      */
+    @Deprecated
     void deleteVertexArray(CommandContext ctx, int array);
     
     /**
@@ -2611,6 +2732,7 @@ public interface GraphicsBackend {
      * backend.configureVertexAttribute(CTX, 0, 3, GL_FLOAT, false, 8 * Float.BYTES, 0);
      * }</pre>
      */
+    @Deprecated
     void configureVertexAttribute(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer);
     
     /**
@@ -2636,6 +2758,7 @@ public interface GraphicsBackend {
      * backend.configureVertexAttributeInteger(CTX, 1, 4, GL_INT, 8 * Integer.BYTES, 12);
      * }</pre>
      */
+    @Deprecated
     void configureVertexAttributeInteger(CommandContext ctx, int index, int size, int type, int stride, long pointer);
     
     /**
@@ -2656,6 +2779,7 @@ public interface GraphicsBackend {
      * backend.activateVertexAttribute(CTX, 0);  // Enable position attribute
      * }</pre>
      */
+    @Deprecated
     void activateVertexAttribute(CommandContext ctx, int index);
     
     /**
@@ -2676,6 +2800,7 @@ public interface GraphicsBackend {
      * backend.deactivateVertexAttribute(CTX, 0);  // Disable position attribute
      * }</pre>
      */
+    @Deprecated
     void deactivateVertexAttribute(CommandContext ctx, int index);
     
     /**
@@ -2697,6 +2822,7 @@ public interface GraphicsBackend {
      * backend.setVertexAttribDivisor(CTX, 3, 1);  // Attribute 3 advances per instance
      * }</pre>
      */
+    @Deprecated
     void setVertexAttribDivisor(CommandContext ctx, int index, int divisor);
     
     /**
@@ -2719,6 +2845,7 @@ public interface GraphicsBackend {
      * backend.assignUniformFloat2v(CTX, uniformLoc, texSize);
      * }</pre>
      */
+    @Deprecated
     void assignUniformFloat2v(CommandContext ctx, int location, float[] value);
     
     /**
@@ -2741,6 +2868,7 @@ public interface GraphicsBackend {
      * backend.assignUniformFloat3v(CTX, uniformLoc, color);
      * }</pre>
      */
+    @Deprecated
     void assignUniformFloat3v(CommandContext ctx, int location, float[] value);
     
     /**
@@ -2763,6 +2891,7 @@ public interface GraphicsBackend {
      * backend.assignUniformFloat4v(CTX, uniformLoc, color);
      * }</pre>
      */
+    @Deprecated
     void assignUniformFloat4v(CommandContext ctx, int location, float[] value);
     
     /**
@@ -2784,6 +2913,7 @@ public interface GraphicsBackend {
      * backend.assignUniformMatrix4f(CTX, uniformLoc, matrixBuffer);
      * }</pre>
      */
+    @Deprecated
     void assignUniformMatrix4f(CommandContext ctx, int location, java.nio.FloatBuffer matrix);
     
     /**
@@ -2807,6 +2937,7 @@ public interface GraphicsBackend {
      * backend.assignUniformMatrix4fv(CTX, uniformLoc, false, matrixBuffer);
      * }</pre>
      */
+    @Deprecated
     void assignUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value);
     
     /**
@@ -2829,6 +2960,7 @@ public interface GraphicsBackend {
      * int blockIndex = backend.locateUniformBlock(CTX, programId, "Matrices");
      * }</pre>
      */
+    @Deprecated
     int locateUniformBlock(CommandContext ctx, int program, String uniformBlockName);
     
     /**
@@ -2851,6 +2983,7 @@ public interface GraphicsBackend {
      * backend.bindUniformBlock(CTX, programId, blockIndex, 0);
      * }</pre>
      */
+    @Deprecated
     void bindUniformBlock(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding);
     
     /**
@@ -2875,6 +3008,7 @@ public interface GraphicsBackend {
      * backend.attachUniformBufferRange(CTX, GL_UNIFORM_BUFFER, 0, bufferId, 0, 256);
      * }</pre>
      */
+    @Deprecated
     void attachUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size);
     
     /**
@@ -2897,6 +3031,7 @@ public interface GraphicsBackend {
      * // Shader can now access uniform block at binding=0
      * }</pre>
      */
+    @Deprecated
     void bindUniformBufferBase(CommandContext ctx, int binding, int bufferId);
     
     /**
@@ -2921,6 +3056,7 @@ public interface GraphicsBackend {
      * backend.linkProgramBinary(CTX, programId);
      * }</pre>
      */
+    @Deprecated
     void bindFragmentDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name);
     
     /**
@@ -2942,6 +3078,7 @@ public interface GraphicsBackend {
      * backend.queryFloatState(CTX, GL_COLOR_CLEAR_VALUE, clearColor);
      * }</pre>
      */
+    @Deprecated
     void queryFloatState(CommandContext ctx, int pname, float[] params);
     
     /**
@@ -2962,6 +3099,7 @@ public interface GraphicsBackend {
      * backend.setReadBuffer(CTX, GL_COLOR_ATTACHMENT0);
      * }</pre>
      */
+    @Deprecated
     void setReadBuffer(CommandContext ctx, int mode);
     
     /**
@@ -2983,6 +3121,7 @@ public interface GraphicsBackend {
      * backend.setDrawBuffers(CTX, drawBuffers);
      * }</pre>
      */
+    @Deprecated
     void setDrawBuffers(CommandContext ctx, int[] bufs);
     
     /**
@@ -3006,6 +3145,7 @@ public interface GraphicsBackend {
      *     GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
      * }</pre>
      */
+    @Deprecated
     void glBufferStorage(CommandContext ctx, int target, long size, int flags);
     
     /**
@@ -3029,6 +3169,7 @@ public interface GraphicsBackend {
      * backend.glBufferStorage(CTX, GL_ARRAY_BUFFER, vertexData, 0);
      * }</pre>
      */
+    @Deprecated
     void glBufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags);
     
     /**
@@ -3055,6 +3196,7 @@ public interface GraphicsBackend {
      * mapped.putFloat(1.0f);
      * }</pre>
      */
+    @Deprecated
     java.nio.ByteBuffer glMapBufferRange(CommandContext ctx, int target, long offset, long length, int access);
     
     /**
@@ -3078,6 +3220,7 @@ public interface GraphicsBackend {
      * backend.glDispatchCompute(CTX, 16, 16, 1);
      * }</pre>
      */
+    @Deprecated
     void glDispatchCompute(CommandContext ctx, int workX, int workY, int workZ);
     
     /**
@@ -3103,6 +3246,7 @@ public interface GraphicsBackend {
      *     GL_TEXTURE_2D, colorTexture, 0);
      * }</pre>
      */
+    @Deprecated
     void glFramebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
     
     /**
@@ -3130,6 +3274,7 @@ public interface GraphicsBackend {
      * backend.glBindImageTexture(CTX, 0, texture, 0, false, 0, GL_WRITE_ONLY, GL_RGBA8);
      * }</pre>
      */
+    @Deprecated
     void glBindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format);
     
     /**
@@ -3151,6 +3296,7 @@ public interface GraphicsBackend {
      * backend.glBindSampler(CTX, 0, samplerObject);
      * }</pre>
      */
+    @Deprecated
     void glBindSampler(CommandContext ctx, int unit, int sampler);
     
     /**
@@ -3174,6 +3320,7 @@ public interface GraphicsBackend {
      * // Later: check if fence is signaled
      * }</pre>
      */
+    @Deprecated
     long createFenceSync(CommandContext ctx, int condition, int flags);
     
     /**
@@ -3200,6 +3347,7 @@ public interface GraphicsBackend {
      * }
      * }</pre>
      */
+    @Deprecated
     int waitForSync(CommandContext ctx, long sync, int flags, long timeout);
     
     /**
@@ -3222,6 +3370,7 @@ public interface GraphicsBackend {
      * backend.destroySync(CTX, fence);  // Clean up when done
      * }</pre>
      */
+    @Deprecated
     void destroySync(CommandContext ctx, long sync);
     
     /**
@@ -3241,6 +3390,7 @@ public interface GraphicsBackend {
      * System.out.println("Using " + backendName + " backend");
      * }</pre>
      */
+    @Deprecated
     String getBackendName();
     
     // Phase 18: Info query and capability methods with CommandContext
@@ -3265,6 +3415,7 @@ public interface GraphicsBackend {
      * System.out.println(vendor + " " + version);
      * }</pre>
      */
+    @Deprecated
     String queryStringInfo(CommandContext ctx, int pname);
     
     /**
@@ -3286,6 +3437,7 @@ public interface GraphicsBackend {
      * // Use implementation-specific code to query capabilities
      * }</pre>
      */
+    @Deprecated
     Object getGLCapabilities(CommandContext ctx);
     
     /**
@@ -3305,6 +3457,7 @@ public interface GraphicsBackend {
      * int maxTextureSize = backend.glGetInteger(CTX, GL_MAX_TEXTURE_SIZE);
      * }</pre>
      */
+    @Deprecated
     int glGetInteger(CommandContext ctx, int pname);
     
     /**
@@ -3325,6 +3478,7 @@ public interface GraphicsBackend {
      * backend.glGetIntegerv(CTX, GL_VIEWPORT, viewport);
      * }</pre>
      */
+    @Deprecated
     void glGetIntegerv(CommandContext ctx, int pname, int[] params);
     
     /**
@@ -3349,6 +3503,7 @@ public interface GraphicsBackend {
      * }
      * }</pre>
      */
+    @Deprecated
     String glGetStringi(CommandContext ctx, int pname, int index);
     
     /**
@@ -3360,6 +3515,7 @@ public interface GraphicsBackend {
      * @param program Program object ID
      * @return The program info log string
      */
+    @Deprecated
     String glGetProgramInfoLog(CommandContext ctx, int program);
     
     /**
@@ -3371,6 +3527,7 @@ public interface GraphicsBackend {
      * @param shader Shader object ID
      * @return The shader info log string
      */
+    @Deprecated
     String glGetShaderInfoLog(CommandContext ctx, int shader);
     
     // ========================================================================
@@ -3390,6 +3547,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The newly created buffer object ID
      */
+    @Deprecated
     int createBufferDSA(CommandContext ctx);
     
     /**
@@ -3406,6 +3564,7 @@ public interface GraphicsBackend {
      * @param size Size in bytes to allocate
      * @param usage Usage hint (GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.)
      */
+    @Deprecated
     void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage);
     
     /**
@@ -3422,6 +3581,7 @@ public interface GraphicsBackend {
      * @param data Data to upload
      * @param usage Usage hint (GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.)
      */
+    @Deprecated
     void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage);
     
     /**
@@ -3438,6 +3598,7 @@ public interface GraphicsBackend {
      * @param offset Offset in bytes into the buffer
      * @param data Data to upload
      */
+    @Deprecated
     void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data);
     
     /**
@@ -3455,6 +3616,7 @@ public interface GraphicsBackend {
      * @param size Size in bytes to allocate
      * @param flags Storage flags (GL_DYNAMIC_STORAGE_BIT, GL_MAP_READ_BIT, etc.)
      */
+    @Deprecated
     void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags);
     
     /**
@@ -3472,6 +3634,7 @@ public interface GraphicsBackend {
      * @param data Initial data to upload
      * @param flags Storage flags (GL_DYNAMIC_STORAGE_BIT, GL_MAP_WRITE_BIT, etc.)
      */
+    @Deprecated
     void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags);
     
     /**
@@ -3491,6 +3654,7 @@ public interface GraphicsBackend {
      * @param access Access flags (GL_MAP_READ_BIT, GL_MAP_WRITE_BIT, etc.)
      * @return ByteBuffer mapped to the buffer's memory, or null on failure
      */
+    @Deprecated
     java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access);
     
     /**
@@ -3506,6 +3670,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param buffer Buffer object ID
      */
+    @Deprecated
     void unmapNamedBufferDSA(CommandContext ctx, int buffer);
     
     /**
@@ -3523,6 +3688,7 @@ public interface GraphicsBackend {
      * @param offset Offset in bytes into the mapped region
      * @param length Length in bytes to flush
      */
+    @Deprecated
     void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length);
     
     /**
@@ -3541,6 +3707,7 @@ public interface GraphicsBackend {
      * @param writeOffset Offset in bytes into the destination buffer
      * @param size Number of bytes to copy
      */
+    @Deprecated
     void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
     
     // ========================================================================
@@ -3559,6 +3726,7 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @return The newly created framebuffer object ID
      */
+    @Deprecated
     int createFramebufferDSA(CommandContext ctx);
     
     /**
@@ -3576,6 +3744,7 @@ public interface GraphicsBackend {
      * @param texture Texture object ID to attach
      * @param level Mipmap level of the texture to attach
      */
+    @Deprecated
     void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level);
     
     /**
@@ -3626,6 +3795,7 @@ public interface GraphicsBackend {
      * @param writeOffset Offset in bytes into the destination buffer
      * @param size Number of bytes to copy
      */
+    @Deprecated
     void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size);
     
     /**
@@ -3643,6 +3813,7 @@ public interface GraphicsBackend {
      * @param offset Offset in bytes into the mapped region
      * @param length Length in bytes to flush
      */
+    @Deprecated
     void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length);
     
     // ========================================================================
@@ -3666,6 +3837,7 @@ public interface GraphicsBackend {
      * @param cap The capability to query (e.g., GL_BLEND, GL_DEPTH_TEST)
      * @return true if the capability is enabled, false otherwise
      */
+    @Deprecated
     boolean glIsEnabled(CommandContext ctx, int cap);
     
     /**
@@ -3681,6 +3853,7 @@ public interface GraphicsBackend {
      * @param framebuffer The framebuffer object ID to test
      * @return true if the ID is a valid framebuffer object, false otherwise
      */
+    @Deprecated
     boolean glIsFramebuffer(CommandContext ctx, int framebuffer);
     
     /**
@@ -3696,6 +3869,7 @@ public interface GraphicsBackend {
      * @param texture The texture object ID to test
      * @return true if the ID is a valid texture object, false otherwise
      */
+    @Deprecated
     boolean glIsTexture(CommandContext ctx, int texture);
     
     /**
@@ -3711,6 +3885,7 @@ public interface GraphicsBackend {
      * @param array The vertex array object ID to test
      * @return true if the ID is a valid vertex array object, false otherwise
      */
+    @Deprecated
     boolean glIsVertexArray(CommandContext ctx, int array);
     
     /**
@@ -3726,6 +3901,7 @@ public interface GraphicsBackend {
      * @param program The shader program object ID to test
      * @return true if the ID is a valid program object, false otherwise
      */
+    @Deprecated
     boolean glIsProgram(CommandContext ctx, int program);
     
     /**
@@ -3741,6 +3917,7 @@ public interface GraphicsBackend {
      * @param buffer The buffer object ID to test
      * @return true if the ID is a valid buffer object, false otherwise
      */
+    @Deprecated
     boolean glIsBuffer(CommandContext ctx, int buffer);
     
     /**
@@ -3760,6 +3937,7 @@ public interface GraphicsBackend {
      * @param modeRGB Blend equation for RGB components
      * @param modeAlpha Blend equation for alpha component
      */
+    @Deprecated
     void glBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha);
     
     /**
@@ -3781,6 +3959,7 @@ public interface GraphicsBackend {
      * @param ref Reference value for stencil test (clamped to [0, 2^n-1])
      * @param mask Mask that is ANDed with both reference and stored stencil value
      */
+    @Deprecated
     void glStencilFunc(CommandContext ctx, int func, int ref, int mask);
     
     /**
@@ -3798,5 +3977,6 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      * @param mode The face(s) to cull
      */
+    @Deprecated
     void glCullFace(CommandContext ctx, int mode);
 }
