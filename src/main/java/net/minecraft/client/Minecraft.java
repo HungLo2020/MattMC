@@ -708,6 +708,12 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		} catch (Exception e) {
 			LOGGER.error("Failed to initialize VoxelMap", e);
 		}
+		
+		// Fabric Loader: Initialize client mod entrypoints
+		// NOTE: This call was previously injected by the EntrypointPatch transformation system.
+		// Since we removed the transformation system (all code is pre-integrated), we call it directly here.
+		// This initializes all client mods (Sodium, Distant Horizons, etc.) before the game starts.
+		net.fabricmc.loader.impl.game.minecraft.Hooks.startClient(gameDirectory, this);
 	}
 
 	public boolean hasShiftDown() {
