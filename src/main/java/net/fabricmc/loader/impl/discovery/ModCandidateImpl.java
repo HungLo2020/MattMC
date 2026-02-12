@@ -19,13 +19,10 @@ import java.util.zip.ZipInputStream;
 
 import net.fabricmc.loader.api.Version;
 import net.fabricmc.loader.api.metadata.ModDependency;
-import net.fabricmc.loader.impl.game.GameProvider.BuiltinMod;
 import net.fabricmc.loader.impl.metadata.AbstractModMetadata;
-import net.fabricmc.loader.impl.metadata.DependencyOverrides;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
-import net.fabricmc.loader.impl.metadata.VersionOverrides;
 
-public final class ModCandidateImpl implements DomainObject.Mod {
+public final class ModCandidateImpl {
 	static final Comparator<ModCandidateImpl> ID_VERSION_COMPARATOR = new Comparator<ModCandidateImpl>() {
 		@Override
 		public int compare(ModCandidateImpl a, ModCandidateImpl b) {
@@ -46,13 +43,7 @@ public final class ModCandidateImpl implements DomainObject.Mod {
 	private int minNestLevel;
 	private SoftReference<ByteBuffer> dataRef;
 
-	static ModCandidateImpl createBuiltin(BuiltinMod mod, VersionOverrides versionOverrides, DependencyOverrides depOverrides) {
-		LoaderModMetadata metadata = new BuiltinMetadataWrapper(mod.metadata);
-		versionOverrides.apply(metadata);
-		depOverrides.apply(metadata);
-
-		return new ModCandidateImpl(mod.paths, null, -1, metadata, false, Collections.emptyList());
-	}
+	// createBuiltin removed - not needed for integrated mod approach
 
 	public static ModCandidateImpl createPlain(List<Path> paths, LoaderModMetadata metadata, boolean requiresRemap, Collection<ModCandidateImpl> nestedMods) {
 		return new ModCandidateImpl(paths, null, -1, metadata, requiresRemap, nestedMods);
@@ -119,12 +110,10 @@ public final class ModCandidateImpl implements DomainObject.Mod {
 		return metadata;
 	}
 
-	@Override
 	public String getId() {
 		return metadata.getId();
 	}
 
-	@Override
 	public Version getVersion() {
 		return metadata.getVersion();
 	}
@@ -137,9 +126,7 @@ public final class ModCandidateImpl implements DomainObject.Mod {
 		return metadata.getType().equals(AbstractModMetadata.TYPE_BUILTIN);
 	}
 
-	public ModLoadCondition getLoadCondition() {
-		return minNestLevel == 0 ? ModLoadCondition.ALWAYS : ModLoadCondition.IF_POSSIBLE;
-	}
+	// getLoadCondition removed - not needed for integrated mod approach
 
 	public Collection<ModDependency> getDependencies() {
 		return metadata.getDependencies();
@@ -157,35 +144,10 @@ public final class ModCandidateImpl implements DomainObject.Mod {
 		return parentMods;
 	}
 
-	boolean addParent(ModCandidateImpl parent) {
-		if (minNestLevel == 0) return false;
-		if (parentMods.contains(parent)) return false;
-
-		parentMods.add(parent);
-		updateMinNestLevel(parent);
-
-		return true;
-	}
+	// Nested mod methods removed - not needed for single integrated mod
 
 	public int getMinNestLevel() {
 		return minNestLevel;
-	}
-
-	boolean resetMinNestLevel() {
-		if (minNestLevel > 0) {
-			minNestLevel = Integer.MAX_VALUE;
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	boolean updateMinNestLevel(ModCandidateImpl parent) {
-		if (minNestLevel <= parent.minNestLevel) return false;
-
-		this.minNestLevel = parent.minNestLevel + 1;
-
-		return true;
 	}
 
 	public boolean isRoot() {
@@ -255,123 +217,26 @@ public final class ModCandidateImpl implements DomainObject.Mod {
 	private static final Pattern FILE_NAME_SANITIZING_PATTERN = Pattern.compile("[^\\w\\.\\-\\+]+");
 
 	private void copyToFile(Path out) throws IOException {
-		SoftReference<ByteBuffer> dataRef = this.dataRef;
-
-		if (dataRef != null) {
-			ByteBuffer data = dataRef.get();
-
-			if (data != null) {
-				Files.copy(new ByteArrayInputStream(data.array(), data.arrayOffset() + data.position(), data.arrayOffset() + data.limit()), out, StandardCopyOption.REPLACE_EXISTING);
-				return;
-			}
+		// Simplified for integrated mod - no nested mods
+		if (paths == null || paths.isEmpty()) {
+			throw new UnsupportedOperationException("Nested mods not supported in simplified integrated mod loader");
 		}
-
-		if (paths != null) {
-			if (paths.size() != 1) throw new UnsupportedOperationException("multiple paths for "+this);
-
-			Files.copy(paths.get(0), out);
-
-			return;
+		
+		if (paths.size() != 1) {
+			throw new UnsupportedOperationException("Multiple paths not supported for " + this);
 		}
-
-		ModCandidateImpl parent = getBestSourcingParent();
-
-		if (parent.paths != null) {
-			if (parent.paths.size() != 1) throw new UnsupportedOperationException("multiple parent paths for "+this);
-
-			try (ZipFile zf = new ZipFile(parent.paths.get(0).toFile())) {
-				ZipEntry entry = zf.getEntry(localPath);
-				if (entry == null) throw new IOException(String.format("can't find nested mod %s in its parent mod %s", this, parent));
-
-				Files.copy(zf.getInputStream(entry), out);
-			}
-		} else {
-			ByteBuffer data = parent.getData();
-
-			try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(data.array(), data.arrayOffset() + data.position(), data.arrayOffset() + data.limit()))) {
-				ZipEntry entry = null;
-
-				while ((entry = zis.getNextEntry()) != null) {
-					if (entry.getName().equals(localPath)) {
-						Files.copy(zis, out);
-						return;
-					}
-				}
-			}
-
-			throw new IOException(String.format("can't find nested mod %s in its parent mod %s", this, parent));
-		}
+		
+		Files.copy(paths.get(0), out);
 	}
 
 	private ByteBuffer getData() throws IOException {
-		SoftReference<ByteBuffer> dataRef = this.dataRef;
-
-		if (dataRef != null) {
-			ByteBuffer ret = dataRef.get();
-			if (ret != null) return ret;
-		}
-
-		ByteBuffer ret;
-
-		if (paths != null) {
-			if (paths.size() != 1) throw new UnsupportedOperationException("multiple paths for "+this);
-
-			ret = ByteBuffer.wrap(Files.readAllBytes(paths.get(0)));
-		} else {
-			ModCandidateImpl parent = getBestSourcingParent();
-
-			if (parent.paths != null) {
-				if (parent.paths.size() != 1) throw new UnsupportedOperationException("multiple parent paths for "+this);
-
-				try (ZipFile zf = new ZipFile(parent.paths.get(0).toFile())) {
-					ZipEntry entry = zf.getEntry(localPath);
-					if (entry == null) throw new IOException(String.format("can't find nested mod %s in its parent mod %s", this, parent));
-
-					ret = ModDiscoverer.readMod(zf.getInputStream(entry));
-				}
-			} else {
-				ByteBuffer data = parent.getData();
-				ret = null;
-
-				try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(data.array(), data.arrayOffset() + data.position(), data.arrayOffset() + data.limit()))) {
-					ZipEntry entry = null;
-
-					while ((entry = zis.getNextEntry()) != null) {
-						if (entry.getName().equals(localPath)) {
-							ret = ModDiscoverer.readMod(zis);
-							break;
-						}
-					}
-				}
-
-				if (ret == null) throw new IOException(String.format("can't find nested mod %s in its parent mods %s", this, parent));
-			}
-		}
-
-		this.dataRef = new SoftReference<>(ret);
-
-		return ret;
+		// Nested mods not supported in simplified loader
+		throw new UnsupportedOperationException("Nested mods not supported in simplified integrated mod loader");
 	}
 
 	private ModCandidateImpl getBestSourcingParent() {
-		if (parentMods.isEmpty()) return null;
-
-		ModCandidateImpl ret = null;
-
-		for (ModCandidateImpl parent : parentMods) {
-			if (parent.minNestLevel >= minNestLevel) continue;
-
-			if (parent.paths != null && parent.paths.size() == 1
-					|| parent.dataRef != null && parent.dataRef.get() != null) {
-				return parent;
-			}
-
-			if (ret == null) ret = parent;
-		}
-
-		if (ret == null) throw new IllegalStateException("invalid nesting?");
-
-		return ret;
+		// Nested mods not supported in simplified loader
+		throw new UnsupportedOperationException("Nested mods not supported in simplified integrated mod loader");
 	}
 
 	@Override
