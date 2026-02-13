@@ -306,13 +306,12 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
                     mob.setLastHurtMob(null);
                 }
             }
-            // TODO: GrottoceratopsEntity reference removed - would need to implement if needed
-            // if (target instanceof GrottoceratopsEntity && (tickCount + this.getId()) % 20 == 0 && getPackSize() < 4 && !this.isTame()) {
-            //     this.fleeFromPosition = target.position();
-            //     this.fleeTicks = 100 + random.nextInt(100);
-            //     this.setTarget(null);
-            //     this.setLastHurtByMob(null);
-            // }
+            if (target instanceof GrottoceratopsEntity && (tickCount + this.getId()) % 20 == 0 && getPackSize() < 4 && !this.isTame()) {
+                this.fleeFromPosition = target.position();
+                this.fleeTicks = 100 + random.nextInt(100);
+                this.setTarget(null);
+                this.setLastHurtByMob(null);
+            }
         }
         tailYaw = Mth.approachDegrees(this.tailYaw, yBodyRot, 8);
         prevPuzzleHeadRot = headPuzzleRot;
