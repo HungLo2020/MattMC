@@ -73,7 +73,7 @@ public class ClientPackSource extends BuiltInPackSource {
 	private static VanillaPackResources createVanillaPackSource(Path path) {
 		VanillaPackResourcesBuilder vanillaPackResourcesBuilder = new VanillaPackResourcesBuilder()
 			.setMetadata(BUILT_IN_METADATA)
-			.exposeNamespace(new String[]{"minecraft", "voxelmap", "sodium", "iris", "distanthorizons"});
+			.exposeNamespace(new String[]{"minecraft", "voxelmap", "sodium", "iris", "distanthorizons", "alexscaves"});
 		// Load assets from JAR only - no external filesystem path needed
 		// This eliminates the need to copy 407MB of assets to the filesystem
 		return vanillaPackResourcesBuilder.applyDevelopmentConfig().pushJarResources().build(VANILLA_PACK_INFO);
