@@ -52,7 +52,7 @@ public abstract class DirectStateAccess {
 		@Override
 		int createBuffer() {
 			GlStateManager.incrementTrackedBuffers();
-			return net.vulkanic.VulkanicAPI.createBufferDSA();
+			return org.lwjgl.opengl.GL45.glCreateBuffers();
 		}
 
 		@Override

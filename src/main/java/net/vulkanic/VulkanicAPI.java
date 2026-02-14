@@ -628,11 +628,6 @@ public class VulkanicAPI {
     
     // Direct State Access buffer operations
     @Deprecated
-    public static int createBufferDSA() {
-        return getBackend().createBufferDSA();
-    }
-    
-    @Deprecated
     public static void namedBufferDataDSA(int buffer, long size, int usage) {
         getBackend().namedBufferDataDSA(buffer, size, usage);
     }
