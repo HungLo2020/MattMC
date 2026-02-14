@@ -1560,6 +1560,12 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glPolygonMode(int face, int mode) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        // Note: GL allows different polygon modes for front and back faces,
+        // but PipelineManager tracks a single mode (most common use case)
+        pipelineManager.setPolygonMode(mode);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL43C.glPolygonMode(face, mode);
     }
     
@@ -1614,6 +1620,10 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glClearColor(float r, float g, float b, float a) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setClearColor(r, g, b, a);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL46C.glClearColor(r, g, b, a);
     }
     
@@ -1767,6 +1777,10 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glClearDepth(double depth) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setClearDepth(depth);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL32.glClearDepth(depth);
     }
     
@@ -2021,6 +2035,12 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        // Note: PipelineManager currently only tracks single blend equation
+        // For now, use the RGB mode (most common case)
+        pipelineManager.setBlendEquation(modeRGB);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
     }
     
