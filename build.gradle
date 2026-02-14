@@ -88,10 +88,13 @@ configurations.all {
     }
 }
 
-// Exclude transitive ASM from dependencies that bring in older versions
-// This prevents conflicts with Fabric Loader's ASM 9.9 requirement
-configurations.runtimeClasspath {
-    exclude group: 'org.ow2.asm'
+// Exclude transitive ASM from dependencies ONLY when using bundled JARs
+// When useBundledDeps=true: Prevents conflicts between bundled ASM 9.9 JARs and transitive ASM 9.3
+// When useBundledDeps=false: ASM is provided via Maven dependencies and should NOT be excluded
+if (useBundledDeps) {
+    configurations.runtimeClasspath {
+        exclude group: 'org.ow2.asm'
+    }
 }
 
 // Minecraft 1.21.10 dependencies
