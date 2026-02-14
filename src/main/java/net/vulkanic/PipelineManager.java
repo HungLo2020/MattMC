@@ -44,6 +44,13 @@ public class PipelineManager {
     private boolean colorMaskA = true;
     private float lineWidth = 1.0f;
     private boolean scissorTestEnabled = false;
+    private int polygonMode = GL11.GL_FILL;
+    private int logicOp = GL11.GL_COPY;
+    private double clearDepth = 1.0;
+    private float clearColorR = 0.0f;
+    private float clearColorG = 0.0f;
+    private float clearColorB = 0.0f;
+    private float clearColorA = 0.0f;
     private long vertexShader = 0;
     private long fragmentShader = 0;
     
@@ -147,6 +154,37 @@ public class PipelineManager {
      */
     public void setScissorTest(boolean enabled) {
         this.scissorTestEnabled = enabled;
+    }
+    
+    /**
+     * Set polygon mode
+     */
+    public void setPolygonMode(int mode) {
+        this.polygonMode = mode;
+    }
+    
+    /**
+     * Set logic operation
+     */
+    public void setLogicOp(int opcode) {
+        this.logicOp = opcode;
+    }
+    
+    /**
+     * Set clear depth value
+     */
+    public void setClearDepth(double depth) {
+        this.clearDepth = depth;
+    }
+    
+    /**
+     * Set clear color value
+     */
+    public void setClearColor(float r, float g, float b, float a) {
+        this.clearColorR = r;
+        this.clearColorG = g;
+        this.clearColorB = b;
+        this.clearColorA = a;
     }
     
     /**

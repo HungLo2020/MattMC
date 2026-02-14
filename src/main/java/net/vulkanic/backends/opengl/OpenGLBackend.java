@@ -329,18 +329,28 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void configurePolygonMode(int face, int mode) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setPolygonMode(mode);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glPolygonMode(face, mode);
     }
     
     @Deprecated
     @Override
     public void configurePolygonOffset(float factor, float units) {
+        // Note: PipelineManager doesn't track polygon offset yet, but method exists for future
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glPolygonOffset(factor, units);
     }
     
     @Deprecated
     @Override
     public void configureLogicOp(int opcode) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setLogicOp(opcode);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glLogicOp(opcode);
     }
     
@@ -822,12 +832,20 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void setClearDepthValue(double depth) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setClearDepth(depth);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL11.glClearDepth(depth);
     }
     
     @Deprecated
     @Override
     public void setClearColorValue(float red, float green, float blue, float alpha) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setClearColor(red, green, blue, alpha);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL11.glClearColor(red, green, blue, alpha);
     }
     
