@@ -1,13 +1,13 @@
 # Vulkan Migration Progress Tracking
 
-**Last Updated:** 2026-02-14 19:35 UTC
+**Last Updated:** 2026-02-14 19:40 UTC
 
 ## Deprecated Methods Count
 
 Total at start:     301 deprecated methods
-Currently remaining: 299 deprecated methods
-Deleted this phase:   2
-Total deleted:        2 (0.66% complete)
+Currently remaining: 298 deprecated methods
+Deleted this phase:   3
+Total deleted:        3 (1.00% complete)
 
 ## Phase Status
 
@@ -43,9 +43,10 @@ Total deleted:        2 (0.66% complete)
 
 **🎉 FIRST DELETION MILESTONE!**
 
-Deleted 2 deprecated methods:
+Deleted 3 deprecated methods:
 1. `enableBlend()` - No call sites, safely deleted
 2. `disableBlend()` - No call sites, safely deleted
+3. `labelObject()` - No call sites, safely deleted (labelObjectExt is still used)
 
 Deleted from:
 - ✅ VulkanicAPI.java
@@ -87,5 +88,6 @@ OpenGL backend: ✅ WORKING
 3. Phase 2 progress: Infrastructure complete
 4. Create PipelineAPIExample.java demonstrating new API usage
 5. Delete enableBlend() and disableBlend() - first deprecated method deletion
+6. Delete labelObject() - third deprecated method deletion
 
-**Current Focus:** Successfully deleted first 2 methods (301 → 299). Looking for more unused or simple methods to delete next.
+**Current Focus:** Successfully deleted 3 methods (301 → 298). Continue searching for more unused methods to build deletion momentum.

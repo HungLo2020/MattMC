@@ -1290,12 +1290,6 @@ public class VulkanicAPI {
         getBackend().glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
     }
     
-    // Debug object labeling (KHRDebug/GL43)
-    @Deprecated
-    public static void labelObject(int identifier, int name, String label) {
-        getBackend().labelObject(identifier, name, label);
-    }
-    
     // Debug group push/pop (KHRDebug/GL43)
     @Deprecated
     public static void pushDebugGroup(int source, int id, String message) {

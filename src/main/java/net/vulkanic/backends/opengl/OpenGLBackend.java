@@ -1036,12 +1036,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void labelObject(int identifier, int name, String label) {
-        org.lwjgl.opengl.KHRDebug.glObjectLabel(identifier, name, label);
-    }
-    
-    @Deprecated
-    @Override
     public void pushDebugGroup(int source, int id, String message) {
         org.lwjgl.opengl.KHRDebug.glPushDebugGroup(source, id, message);
     }

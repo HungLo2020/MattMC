@@ -434,10 +434,6 @@ public interface GraphicsBackend {
     @Deprecated
     GraphicsCapabilities getGraphicsCapabilities();
     
-    // Debug object labeling
-    @Deprecated
-    void labelObject(int identifier, int name, String label);
-    
     // Debug group push/pop
     @Deprecated
     void pushDebugGroup(int source, int id, String message);
