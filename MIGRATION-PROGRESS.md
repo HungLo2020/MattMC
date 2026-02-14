@@ -1,6 +1,6 @@
 # Vulkan Migration Progress Tracking
 
-**Last Updated:** 2026-02-14 19:48 UTC
+**Last Updated:** 2026-02-14 20:03 UTC
 
 ## Deprecated Methods Count
 
@@ -9,7 +9,17 @@ Currently remaining: 298 deprecated methods
 Deleted this phase:   3
 Total deleted:        3 (1.00% complete)
 
-**Phase 2 REAL WORK:** Created PipelineManager bridge infrastructure and integrated first deprecated method!
+**Phase 2 MAJOR PROGRESS:** Created PipelineManager (195 LOC) and integrated 5 deprecated methods!
+
+## Methods Integrated with PipelineManager
+
+Total integrated: 5 of 298 (1.7%)
+
+1. ✅ `setDepthTestFunction(int func)` - GL constants → CompareOp enum
+2. ✅ `setDepthWriteEnabled(boolean)` - Updates depth write state
+3. ✅ `useProgram(int programId)` - Tracks shader programs  
+4. ✅ `enable(int cap)` - Maps GL_BLEND, GL_DEPTH_TEST, GL_CULL_FACE
+5. ✅ `disable(int cap)` - Same capability mapping
 
 ## Phase Status
 
