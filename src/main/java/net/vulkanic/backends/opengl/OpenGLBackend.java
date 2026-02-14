@@ -1,16 +1,14 @@
 package net.vulkanic.backends.opengl;
 
 import net.blaze3d.opengl.GlStateManager;
-import net.vulkanic.CommandContext;
-import net.vulkanic.GraphicsBackend;
-import net.vulkanic.GraphicsCapabilities;
-import net.vulkanic.VulkanicAPI;
+import net.vulkanic.*;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.Map;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
@@ -1933,5 +1931,284 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public int glGenTextures() {
         return org.lwjgl.opengl.GL11.glGenTextures();
+    }
+    
+    // ========================================================================
+    // NEW VULKAN-COMPATIBLE API IMPLEMENTATION (Phase 1)
+    // ========================================================================
+    
+    // State tracking for new API
+    private long nextHandle = 1;  // Simple handle counter
+    private GLPipeline currentPipeline;
+    private GLDescriptorSet currentDescriptorSet;
+    private GLRenderPass currentRenderPass;
+    private long currentFramebuffer;
+    
+    // Pipeline State Objects
+    
+    @Override
+    public Pipeline createPipeline(PipelineStateDesc desc) {
+        long handle = nextHandle++;
+        return new GLPipeline(handle, desc);
+    }
+    
+    @Override
+    public void bindPipeline(CommandBuffer cmd, Pipeline pipeline) {
+        // Track current pipeline - state will be applied on draw
+        this.currentPipeline = (GLPipeline) pipeline;
+    }
+    
+    @Override
+    public void destroyPipeline(Pipeline pipeline) {
+        // In OpenGL, nothing to destroy (no compiled pipeline object)
+        // Just remove reference if it's current
+        if (currentPipeline == pipeline) {
+            currentPipeline = null;
+        }
+    }
+    
+    // Descriptor Sets
+    
+    @Override
+    public DescriptorSetLayout createDescriptorSetLayout(DescriptorSetLayoutBuilder builder) {
+        long handle = nextHandle++;
+        return new GLDescriptorSetLayout(handle, builder.getBindings());
+    }
+    
+    @Override
+    public DescriptorSet allocateDescriptorSet(DescriptorSetLayout layout) {
+        long handle = nextHandle++;
+        return new GLDescriptorSet(handle, layout);
+    }
+    
+    @Override
+    public void updateDescriptorSetTexture(DescriptorSet set, int binding, Texture texture) {
+        GLDescriptorSet glSet = (GLDescriptorSet) set;
+        glSet.setBinding(binding, GLDescriptorSet.Binding.Type.TEXTURE, texture.getHandle());
+    }
+    
+    @Override
+    public void updateDescriptorSetBuffer(DescriptorSet set, int binding, Buffer buffer) {
+        GLDescriptorSet glSet = (GLDescriptorSet) set;
+        glSet.setBinding(binding, GLDescriptorSet.Binding.Type.UNIFORM_BUFFER, buffer.getHandle());
+    }
+    
+    @Override
+    public void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int setIndex) {
+        // Track current descriptor set - bindings will be applied on draw
+        this.currentDescriptorSet = (GLDescriptorSet) set;
+    }
+    
+    // Render Passes
+    
+    @Override
+    public RenderPass createRenderPass(RenderPassDesc desc) {
+        long handle = nextHandle++;
+        return new GLRenderPass(handle, desc);
+    }
+    
+    @Override
+    public void beginRenderPass(CommandBuffer cmd, RenderPass renderPass, long framebuffer) {
+        GLRenderPass glRenderPass = (GLRenderPass) renderPass;
+        RenderPassDesc desc = glRenderPass.getDesc();
+        
+        this.currentRenderPass = glRenderPass;
+        this.currentFramebuffer = framebuffer;
+        
+        // Bind framebuffer
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, (int) framebuffer);
+        
+        // Apply clear operations
+        int clearMask = 0;
+        
+        if (desc.hasClearColor()) {
+            GL11.glClearColor(desc.getClearR(), desc.getClearG(), desc.getClearB(), desc.getClearA());
+            clearMask |= GL11.GL_COLOR_BUFFER_BIT;
+        }
+        
+        if (desc.hasClearDepth()) {
+            GL11.glClearDepth(desc.getClearDepth());
+            clearMask |= GL11.GL_DEPTH_BUFFER_BIT;
+        }
+        
+        if (clearMask != 0) {
+            GL11.glClear(clearMask);
+        }
+    }
+    
+    @Override
+    public void endRenderPass(CommandBuffer cmd) {
+        // In OpenGL, just track that we've ended
+        // Could unbind framebuffer here, but typically leave bound
+        this.currentRenderPass = null;
+    }
+    
+    // Command Buffers
+    
+    @Override
+    public CommandBuffer allocateCommandBuffer() {
+        long handle = nextHandle++;
+        return new GLCommandBuffer(handle);
+    }
+    
+    @Override
+    public void beginCommandBuffer(CommandBuffer cmd) {
+        // In OpenGL immediate mode, this is a no-op
+        // Just mark as recording for tracking purposes
+        if (cmd instanceof GLCommandBuffer) {
+            ((GLCommandBuffer) cmd).setRecording(true);
+        }
+    }
+    
+    @Override
+    public void endCommandBuffer(CommandBuffer cmd) {
+        // In OpenGL immediate mode, this is a no-op
+        // Just mark as not recording
+        if (cmd instanceof GLCommandBuffer) {
+            ((GLCommandBuffer) cmd).setRecording(false);
+        }
+    }
+    
+    @Override
+    public void submitCommandBuffer(CommandBuffer cmd) {
+        // In OpenGL immediate mode, this is a no-op
+        // Commands have already executed
+    }
+    
+    // Resources
+    
+    @Override
+    public Buffer createBuffer(long size, BufferUsage usage) {
+        int glBuffer = GL15.glGenBuffers();
+        return new GLBuffer(glBuffer, size, usage);
+    }
+    
+    @Override
+    public void destroyBuffer(Buffer buffer) {
+        GL15.glDeleteBuffers((int) buffer.getHandle());
+    }
+    
+    @Override
+    public Texture createTexture(int width, int height, Format format) {
+        int glTexture = GL11.glGenTextures();
+        return new GLTexture(glTexture, width, height, format);
+    }
+    
+    @Override
+    public void destroyTexture(Texture texture) {
+        GL11.glDeleteTextures((int) texture.getHandle());
+    }
+    
+    // Helper method: Apply pipeline state before drawing
+    // This will be called from draw methods in future phases
+    private void applyPipelineState() {
+        if (currentPipeline == null) {
+            return;
+        }
+        
+        // Apply blend state
+        BlendMode blendMode = currentPipeline.getBlendMode();
+        switch (blendMode) {
+            case NONE:
+                GL11.glDisable(GL11.GL_BLEND);
+                break;
+            case ALPHA_BLEND:
+                GL11.glEnable(GL11.GL_BLEND);
+                GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+                break;
+            case ADDITIVE:
+                GL11.glEnable(GL11.GL_BLEND);
+                GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_ONE);
+                break;
+            case MULTIPLY:
+                GL11.glEnable(GL11.GL_BLEND);
+                GL11.glBlendFunc(GL11.GL_DST_COLOR, GL11.GL_ZERO);
+                break;
+            case PREMULTIPLIED_ALPHA:
+                GL11.glEnable(GL11.GL_BLEND);
+                GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+                break;
+        }
+        
+        // Apply depth state
+        if (currentPipeline.isDepthTestEnabled()) {
+            GL11.glEnable(GL11.GL_DEPTH_TEST);
+            GL11.glDepthFunc(compareOpToGL(currentPipeline.getDepthCompareOp()));
+        } else {
+            GL11.glDisable(GL11.GL_DEPTH_TEST);
+        }
+        GL11.glDepthMask(currentPipeline.isDepthWriteEnabled());
+        
+        // Apply cull state
+        CullMode cullMode = currentPipeline.getCullMode();
+        if (cullMode == CullMode.NONE) {
+            GL11.glDisable(GL11.GL_CULL_FACE);
+        } else {
+            GL11.glEnable(GL11.GL_CULL_FACE);
+            switch (cullMode) {
+                case FRONT:
+                    GL11.glCullFace(GL11.GL_FRONT);
+                    break;
+                case BACK:
+                    GL11.glCullFace(GL11.GL_BACK);
+                    break;
+                case FRONT_AND_BACK:
+                    GL11.glCullFace(GL11.GL_FRONT_AND_BACK);
+                    break;
+            }
+        }
+        
+        // Apply front face
+        GL11.glFrontFace(currentPipeline.isFrontFaceCounterClockwise() ? 
+            GL11.GL_CCW : GL11.GL_CW);
+        
+        // Apply shaders (if any)
+        Map<ShaderStage, Long> shaders = currentPipeline.getShaders();
+        if (shaders.containsKey(ShaderStage.VERTEX) || shaders.containsKey(ShaderStage.FRAGMENT)) {
+            // For now, just track that we have shaders
+            // Actual shader binding will be handled in Phase 2
+        }
+    }
+    
+    // Helper method: Apply descriptor set bindings before drawing
+    private void applyDescriptorSetBindings() {
+        if (currentDescriptorSet == null) {
+            return;
+        }
+        
+        Map<Integer, GLDescriptorSet.Binding> bindings = currentDescriptorSet.getBindings();
+        for (Map.Entry<Integer, GLDescriptorSet.Binding> entry : bindings.entrySet()) {
+            int binding = entry.getKey();
+            GLDescriptorSet.Binding resource = entry.getValue();
+            
+            switch (resource.type) {
+                case TEXTURE:
+                    GL20.glActiveTexture(GL20.GL_TEXTURE0 + binding);
+                    GL11.glBindTexture(GL11.GL_TEXTURE_2D, (int) resource.resourceHandle);
+                    break;
+                case UNIFORM_BUFFER:
+                    GL30.glBindBufferBase(GL30.GL_UNIFORM_BUFFER, binding, (int) resource.resourceHandle);
+                    break;
+                case STORAGE_BUFFER:
+                    // GL_SHADER_STORAGE_BUFFER = 0x90D2
+                    GL30.glBindBufferBase(0x90D2, binding, (int) resource.resourceHandle);
+                    break;
+            }
+        }
+    }
+    
+    // Helper: Convert CompareOp to GL constant
+    private int compareOpToGL(CompareOp op) {
+        switch (op) {
+            case NEVER: return GL11.GL_NEVER;
+            case LESS: return GL11.GL_LESS;
+            case EQUAL: return GL11.GL_EQUAL;
+            case LESS_EQUAL: return GL11.GL_LEQUAL;
+            case GREATER: return GL11.GL_GREATER;
+            case NOT_EQUAL: return GL11.GL_NOTEQUAL;
+            case GREATER_EQUAL: return GL11.GL_GEQUAL;
+            case ALWAYS: return GL11.GL_ALWAYS;
+            default: return GL11.GL_LESS;
+        }
     }
 }
