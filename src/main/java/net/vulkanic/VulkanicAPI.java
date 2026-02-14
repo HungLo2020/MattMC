@@ -592,11 +592,6 @@ public class VulkanicAPI {
         getBackend().disable(cap);
     }
     
-    @Deprecated
-    public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
-        getBackend().setColorWriteMask(r, g, b, a);
-    }
-    
     /**
      * Sets the dynamic scissor rectangle for rendering with explicit command context.
      * 

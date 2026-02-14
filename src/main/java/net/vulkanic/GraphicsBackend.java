@@ -52,8 +52,6 @@ public interface GraphicsBackend {
     // Depth operations
     
     // Color operations
-    @Deprecated
-    void setColorWriteMask(boolean r, boolean g, boolean b, boolean a);
     
     // Scissor operations
     

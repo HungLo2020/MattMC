@@ -150,16 +150,6 @@ public class OpenGLBackend implements GraphicsBackend {
         };
     }
     
-    @Deprecated
-    @Override
-    public void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
-        // Update pipeline manager state (Vulkan-compatible path)
-        pipelineManager.setColorMask(r, g, b, a);
-        
-        // Also apply directly for immediate effect (OpenGL path)
-        GL11.glColorMask(r, g, b, a);
-    }
-    
     /**
      * Sets the dynamic scissor rectangle with explicit command context.
      * This is the Vulkan-compatible implementation for scissor control.
