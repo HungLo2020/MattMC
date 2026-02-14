@@ -91,11 +91,29 @@ OpenGL backend: ✅ WORKING
 4. Create PipelineAPIExample.java demonstrating new API usage
 5. Delete enableBlend() and disableBlend() - first deprecated method deletion
 6. Delete labelObject() - third deprecated method deletion
-7. **Create PipelineManager.java (195 LOC) - stateful-to-pipeline bridge**
-8. **Integrate setDepthTestFunction() with PipelineManager - REAL WORK!**
+7. Create PipelineManager.java (195 LOC) - stateful-to-pipeline bridge
+8. Integrate setDepthTestFunction() with PipelineManager
+9. **Integrate 4 more methods: setDepthWriteEnabled, useProgram, enable, disable**
 
-**Current Focus:** Created PipelineManager bridge infrastructure (195 LOC). First deprecated method (`setDepthTestFunction`) now updates PipelineManager state while maintaining OpenGL compatibility. This enables gradual migration from stateful to pipeline-based rendering.
+**Current Focus:** Integrating deprecated methods with PipelineManager bridge infrastructure.
 
-**Latest Achievement:** ACTUAL IMPLEMENTATION WORK - PipelineManager is production-ready code that enables the migration strategy documented in VULKAN-MIGRATION.md.
+**Latest Achievement:** 5 deprecated methods now integrated with PipelineManager!
+- ✅ setDepthTestFunction()
+- ✅ setDepthWriteEnabled()
+- ✅ useProgram()
+- ✅ enable() (with GL_BLEND, GL_DEPTH_TEST, GL_CULL_FACE mapping)
+- ✅ disable() (with GL_BLEND, GL_DEPTH_TEST, GL_CULL_FACE mapping)
 
-**Next Phase:** Continue integrating more deprecated methods with PipelineManager, then use getCurrentPipeline() in draw calls.
+**Methods Integrated:** 5 of 298 deprecated methods (1.7%)
+
+**Key Infrastructure:**
+- PipelineManager tracks: blend mode, depth test, depth write, cull mode, shaders
+- Dual-path execution: Updates PipelineManager + direct GL calls
+- Pipeline caching with LRU eviction (256 max)
+- Helper methods for GL constant → enum conversion
+
+**Next Steps:**
+1. Integrate more state management methods
+2. Add blendFunc/blendFuncSeparate integration
+3. Use getCurrentPipeline() in draw calls (make pipelines active)
+4. Continue gradual integration
