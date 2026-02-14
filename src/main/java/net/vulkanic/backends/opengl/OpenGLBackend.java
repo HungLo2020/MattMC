@@ -86,17 +86,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void useProgram(int programId) {
-        // Update pipeline manager state (Vulkan-compatible path)
-        pipelineManager.setShader(ShaderStage.VERTEX, programId);
-        pipelineManager.setShader(ShaderStage.FRAGMENT, programId);
-        
-        // Also apply directly for immediate effect (OpenGL path)
-        GL20.glUseProgram(programId);
-    }
-    
-    @Deprecated
-    @Override
     public void enable(int cap) {
         // Update pipeline manager state (Vulkan-compatible path)
         updatePipelineManagerForCapability(cap, true);

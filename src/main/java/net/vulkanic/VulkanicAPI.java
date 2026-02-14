@@ -583,11 +583,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void useProgram(int programId) {
-        getBackend().useProgram(programId);
-    }
-    
-    @Deprecated
     public static void enable(int cap) {
         getBackend().enable(cap);
     }
@@ -1937,11 +1932,12 @@ public class VulkanicAPI {
     
     /**
      * Installs a program object as part of current rendering state.
-     * Wrapper for useProgram.
+     * Wrapper for glUseProgram.
+     * MIGRATED: Now calls GL20 directly since useProgram was deleted.
      */
     @Deprecated
     public static void glUseProgram(int program) {
-        useProgram(program);
+        org.lwjgl.opengl.GL20.glUseProgram(program);
     }
     
     /**

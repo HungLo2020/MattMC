@@ -45,8 +45,6 @@ public interface GraphicsBackend {
     @Deprecated
     void clear(int mask);
     @Deprecated
-    void useProgram(int programId);
-    @Deprecated
     void enable(int cap);
     @Deprecated
     void disable(int cap);

@@ -35,11 +35,13 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
     }
 
     public void bind() {
-        VulkanicAPI.useProgram(this.handle());
+        // MIGRATED: Use direct GL call instead of deprecated VulkanicAPI
+        org.lwjgl.opengl.GL20.glUseProgram(this.handle());
     }
 
     public void unbind() {
-        VulkanicAPI.useProgram(0);
+        // MIGRATED: Use direct GL call instead of deprecated VulkanicAPI
+        org.lwjgl.opengl.GL20.glUseProgram(0);
     }
 
     public void delete() {

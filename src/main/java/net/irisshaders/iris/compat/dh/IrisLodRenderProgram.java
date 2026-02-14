@@ -99,7 +99,8 @@ public class IrisLodRenderProgram {
 			this.free();
 			throw new RuntimeException(message);
 		} else {
-			VulkanicAPI.useProgram(this.id);
+			// MIGRATED: Use direct GL call instead of deprecated VulkanicAPI
+			org.lwjgl.opengl.GL20.glUseProgram(this.id);
 		}
 
 		vert.destroy();
@@ -210,7 +211,8 @@ public class IrisLodRenderProgram {
 
 	// Override ShaderProgram.bind()
 	public void bind() {
-		VulkanicAPI.useProgram(id);
+		// MIGRATED: Use direct GL call instead of deprecated VulkanicAPI
+		org.lwjgl.opengl.GL20.glUseProgram(id);
 		if (blend != null) blend.apply();
 
 		for (BufferBlendOverride override : bufferBlendOverrides) {
@@ -219,7 +221,8 @@ public class IrisLodRenderProgram {
 	}
 
 	public void unbind() {
-		VulkanicAPI.useProgram(0);
+		// MIGRATED: Use direct GL call instead of deprecated VulkanicAPI
+		org.lwjgl.opengl.GL20.glUseProgram(0);
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
 		BlendModeOverride.restore();
@@ -230,7 +233,8 @@ public class IrisLodRenderProgram {
 	}
 
 	public void fillUniformData(Matrix4fc projection, Matrix4fc modelView, int worldYOffset, float partialTicks) {
-		VulkanicAPI.useProgram(id);
+		// MIGRATED: Use direct GL call instead of deprecated VulkanicAPI
+		org.lwjgl.opengl.GL20.glUseProgram(id);
 
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
 		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, RenderSystem.getShaderTexture(2).texture().iris$getGlId());
