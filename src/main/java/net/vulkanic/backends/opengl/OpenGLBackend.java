@@ -295,12 +295,20 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void drawPrimitiveArrays(int mode, int first, int count) {
+        // Apply current pipeline state and descriptor bindings before drawing
+        applyPipelineState();
+        applyDescriptorSetBindings();
+        
         GL11.glDrawArrays(mode, first, count);
     }
 
     @Deprecated
     @Override
     public void drawIndexedElements(int mode, int count, int type, long indices) {
+        // Apply current pipeline state and descriptor bindings before drawing
+        applyPipelineState();
+        applyDescriptorSetBindings();
+        
         GL11.glDrawElements(mode, count, type, indices);
     }
     
@@ -776,24 +784,32 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        applyPipelineState();
+        applyDescriptorSetBindings();
         org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
     }
     
     @Deprecated
     @Override
     public void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
+        applyPipelineState();
+        applyDescriptorSetBindings();
         org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
     }
     
     @Deprecated
     @Override
     public void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
+        applyPipelineState();
+        applyDescriptorSetBindings();
         org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
     }
     
     @Deprecated
     @Override
     public void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
+        applyPipelineState();
+        applyDescriptorSetBindings();
         org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
     }
     
@@ -1644,6 +1660,8 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glDrawElements(int mode, int count, int type, long indices) {
+        applyPipelineState();
+        applyDescriptorSetBindings();
         org.lwjgl.opengl.GL32.glDrawElements(mode, count, type, indices);
     }
     
