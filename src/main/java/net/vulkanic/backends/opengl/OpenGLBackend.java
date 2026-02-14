@@ -163,16 +163,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void setDepthWriteEnabled(boolean enabled) {
-        // Update pipeline manager state (Vulkan-compatible path)
-        pipelineManager.setDepthWrite(enabled);
-        
-        // Also apply directly for immediate effect (OpenGL path)
-        GL11.glDepthMask(enabled);
-    }
-    
-    @Deprecated
-    @Override
     public void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
         // Update pipeline manager state (Vulkan-compatible path)
         pipelineManager.setColorMask(r, g, b, a);

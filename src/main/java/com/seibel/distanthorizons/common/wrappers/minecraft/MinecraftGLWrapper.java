@@ -96,14 +96,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableDepthMask() 
 	{
-		VulkanicAPI.setDepthWriteEnabled(true);
+		// MIGRATED: Removed deprecated VulkanicAPI.setDepthWriteEnabled call
 		GlStateManager._depthMask(true); 
 	}
 	/** Disables depth buffer writing */
 	@Override
 	public void disableDepthMask() 
 	{
-		VulkanicAPI.setDepthWriteEnabled(false);
+		// MIGRATED: Removed deprecated VulkanicAPI.setDepthWriteEnabled call
 		GlStateManager._depthMask(false); 
 	}
 	

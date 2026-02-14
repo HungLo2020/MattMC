@@ -598,11 +598,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void setDepthWriteEnabled(boolean enabled) {
-        getBackend().setDepthWriteEnabled(enabled);
-    }
-    
-    @Deprecated
     public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
         getBackend().setColorWriteMask(r, g, b, a);
     }

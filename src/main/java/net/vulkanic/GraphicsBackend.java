@@ -52,8 +52,6 @@ public interface GraphicsBackend {
     void disable(int cap);
     
     // Depth operations
-    @Deprecated
-    void setDepthWriteEnabled(boolean enabled);
     
     // Color operations
     @Deprecated
