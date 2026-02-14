@@ -1,5 +1,7 @@
 package net.vulkanic;
 
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL14;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -26,10 +28,22 @@ public class PipelineManager {
     
     // Current state
     private BlendMode blendMode = BlendMode.NONE;
+    private int blendSrcFactor = GL11.GL_ONE;
+    private int blendDstFactor = GL11.GL_ZERO;
+    private int blendSrcFactorAlpha = GL11.GL_ONE;
+    private int blendDstFactorAlpha = GL11.GL_ZERO;
+    private int blendEquation = GL14.GL_FUNC_ADD;
     private boolean depthTestEnabled = true;
     private CompareOp depthCompareOp = CompareOp.LESS;
     private boolean depthWriteEnabled = true;
     private CullMode cullMode = CullMode.NONE;
+    private int frontFaceMode = GL11.GL_CCW;
+    private boolean colorMaskR = true;
+    private boolean colorMaskG = true;
+    private boolean colorMaskB = true;
+    private boolean colorMaskA = true;
+    private float lineWidth = 1.0f;
+    private boolean scissorTestEnabled = false;
     private long vertexShader = 0;
     private long fragmentShader = 0;
     
@@ -56,6 +70,33 @@ public class PipelineManager {
     }
     
     /**
+     * Set blend function factors
+     */
+    public void setBlendFunc(int srcFactor, int dstFactor) {
+        this.blendSrcFactor = srcFactor;
+        this.blendDstFactor = dstFactor;
+        this.blendSrcFactorAlpha = srcFactor;
+        this.blendDstFactorAlpha = dstFactor;
+    }
+    
+    /**
+     * Set blend function factors separately for RGB and Alpha
+     */
+    public void setBlendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        this.blendSrcFactor = srcRGB;
+        this.blendDstFactor = dstRGB;
+        this.blendSrcFactorAlpha = srcAlpha;
+        this.blendDstFactorAlpha = dstAlpha;
+    }
+    
+    /**
+     * Set blend equation
+     */
+    public void setBlendEquation(int mode) {
+        this.blendEquation = mode;
+    }
+    
+    /**
      * Set depth test configuration
      */
     public void setDepthTest(boolean enabled, CompareOp compareOp) {
@@ -75,6 +116,37 @@ public class PipelineManager {
      */
     public void setCullMode(CullMode mode) {
         this.cullMode = mode != null ? mode : CullMode.NONE;
+    }
+    
+    /**
+     * Set front face winding order
+     */
+    public void setFrontFace(int mode) {
+        this.frontFaceMode = mode;
+    }
+    
+    /**
+     * Set color write mask
+     */
+    public void setColorMask(boolean r, boolean g, boolean b, boolean a) {
+        this.colorMaskR = r;
+        this.colorMaskG = g;
+        this.colorMaskB = b;
+        this.colorMaskA = a;
+    }
+    
+    /**
+     * Set line width
+     */
+    public void setLineWidth(float width) {
+        this.lineWidth = width;
+    }
+    
+    /**
+     * Set scissor test enabled
+     */
+    public void setScissorTest(boolean enabled) {
+        this.scissorTestEnabled = enabled;
     }
     
     /**

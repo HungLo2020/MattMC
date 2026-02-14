@@ -170,6 +170,10 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setColorMask(r, g, b, a);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glColorMask(r, g, b, a);
     }
     
@@ -363,6 +367,10 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
@@ -1435,12 +1443,20 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBlendFunc(int sfactor, int dfactor) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setBlendFunc(sfactor, dfactor);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glBlendFunc(sfactor, dfactor);
     }
     
     @Deprecated
     @Override
     public void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setBlendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.ARBDrawBuffersBlend.glBlendFuncSeparateiARB(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
     
@@ -1710,6 +1726,10 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBlendEquation(int mode) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setBlendEquation(mode);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL32.glBlendEquation(mode);
     }
     
@@ -1982,6 +2002,16 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glCullFace(int mode) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        CullMode cullMode = switch (mode) {
+            case GL11.GL_FRONT -> CullMode.FRONT;
+            case GL11.GL_BACK -> CullMode.BACK;
+            case GL11.GL_FRONT_AND_BACK -> CullMode.FRONT; // Approximation
+            default -> CullMode.NONE;
+        };
+        pipelineManager.setCullMode(cullMode);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL11.glCullFace(mode);
     }
     
