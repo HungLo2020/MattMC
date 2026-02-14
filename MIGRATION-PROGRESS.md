@@ -1,6 +1,6 @@
 # Vulkan Migration Progress Tracking
 
-**Last Updated:** 2026-02-14 19:20 UTC
+**Last Updated:** 2026-02-14 19:30 UTC
 
 ## Deprecated Methods Count
 
@@ -13,7 +13,7 @@ Total deleted:        0 (0% complete)
 
 [✅] Phase 0: Foundation - COMPLETE
 [✅] Phase 1: Core Types & Infrastructure - COMPLETE
-[🔄] Phase 2: Pipeline State Objects - IN PROGRESS (Infrastructure Complete)
+[🔄] Phase 2: Pipeline State Objects - IN PROGRESS (Examples Complete)
 [ ] Phase 3: Descriptor Sets (Target: Delete 90 methods)
 [ ] Phase 4: Render Passes (Target: Delete 45 methods)
 [ ] Phase 5: Command Buffers (Target: Delete 35 methods)
@@ -35,9 +35,19 @@ Total deleted:        0 (0% complete)
 - [x] Integrate applyDescriptorSetBindings() into all draw calls
 - [x] Verify build successful
 - [x] Analyze deprecated method usage patterns
+- [x] Create Pipeline API usage examples (PipelineAPIExample.java)
 - [ ] Migrate first deprecated method
 - [ ] Delete first deprecated method
 - [ ] Document migration pattern for future methods
+
+**Migration Examples Created:**
+- ✅ PipelineAPIExample.java demonstrates:
+  - How to create pipelines for different rendering passes
+  - Opaque geometry pipeline (no blend, depth test, cull back)
+  - Transparent geometry pipeline (alpha blend, depth read-only, no cull)
+  - UI overlay pipeline (alpha blend, no depth, no cull)
+  - Complete rendering loop example
+  - Migration pattern documentation
 
 **Draw Methods Updated:**
 1. drawPrimitiveArrays() - applies state before glDrawArrays
@@ -52,7 +62,7 @@ Total deleted:        0 (0% complete)
 - `enable(int cap)` - 2 calls (generic state)
 - `disable(int cap)` - 2 calls (generic state)
 - `useProgram(int id)` - 1 call
-- `setDepthTestFunction(int func)` - 1 call
+- `setDepthTestFunction(int func)` - 2 calls (GlStateManager + MinecraftGLWrapper)
 - `setDepthWriteEnabled(boolean)` - 1 call
 - `setColorWriteMask(...)` - 1 call
 
@@ -60,5 +70,6 @@ Total deleted:        0 (0% complete)
 1. Update migration docs: Mark Phase 1 complete, create progress tracker
 2. Apply pipeline state and descriptor bindings before all draw calls
 3. Phase 2 progress: Infrastructure complete
+4. Create PipelineAPIExample.java demonstrating new API usage
 
-**Current Focus:** Determining best first method to migrate - considering `setDepthTestFunction()` or creating a test case to demonstrate the migration pattern.
+**Current Focus:** Examples demonstrate the path forward. Next session can continue with actual deprecated method migration or proceed with demonstrating descriptor sets and render passes usage.
