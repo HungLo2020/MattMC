@@ -37,10 +37,17 @@ if (useBundledDeps) {
 }
 
 repositories {
-    // Always include Maven Central (for most dependencies)
+    // Add bundled dependencies as a flat directory repository (offline mode)
+    if (useBundledDeps) {
+        flatDir {
+            dirs bundledDepsDir
+        }
+    }
+    
+    // Maven Central (for most dependencies not in bundled set)
     mavenCentral()
     
-    // Only add remote repositories if bundled dependencies are NOT available
+    // Only add specialized remote repositories if bundled dependencies are NOT available
     if (!useBundledDeps) {
         println "⚠ Bundled dependencies not found. Using remote repositories."
         println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
@@ -65,13 +72,6 @@ repositories {
             content {
                 includeGroup 'com.github.Mojang'
             }
-        }
-    }
-    
-    // Add bundled dependencies as a flat directory repository
-    if (useBundledDeps) {
-        flatDir {
-            dirs bundledDepsDir
         }
     }
 }
