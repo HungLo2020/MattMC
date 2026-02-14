@@ -36,6 +36,8 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void bindTexture(int textureId) {
+        // Note: Texture binding would be tracked via Descriptor Sets in full Vulkan API
+        // For now, just apply GL call directly
         int activeTexUnit = GlStateManager.activeTexture;
         if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
             GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
@@ -46,6 +48,8 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void bindTexture(int target, int textureId) {
+        // Note: Texture binding would be tracked via Descriptor Sets in full Vulkan API
+        // For now, just apply GL call directly
         GL11.glBindTexture(target, textureId);
     }
     
@@ -216,6 +220,8 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void attachFramebuffer(int target, int fbo) {
+        // Note: Framebuffer binding would be handled via RenderPass in full Vulkan API
+        // For now, just apply GL call directly
         GL30.glBindFramebuffer(target, fbo);
     }
     
@@ -228,6 +234,8 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void attachBuffer(int target, int buffer) {
+        // Note: Buffer binding would be tracked via Descriptor Sets in full Vulkan API
+        // For now, just apply GL call directly
         GL15.glBindBuffer(target, buffer);
     }
     
@@ -316,6 +324,8 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void activateTextureUnit(int unit) {
+        // Note: Texture units would be implicit in Descriptor Set bindings in Vulkan
+        // For now, just apply GL call directly
         org.lwjgl.opengl.GL13.glActiveTexture(unit);
     }
     
