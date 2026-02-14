@@ -26,7 +26,18 @@
 
 ### The Goal
 
-Transform the Vulkanic API from an **OpenGL-flavored abstraction** to a **Vulkan-native abstraction** that efficiently supports Vulkan while emulating OpenGL on top of it.
+Transform the Vulkanic API from an **OpenGL-flavored abstraction** to a **Vulkan-compatible abstraction** that will make implementing a Vulkan backend simple and efficient when we're ready.
+
+### Critical Understanding: Compatibility First, Implementation Later
+
+**We are NOT building the Vulkan backend now.** Our priority is making Vulkan support **possible** by:
+
+1. Designing a Vulkan-compatible API architecture
+2. Implementing it in the OpenGL backend (which emulates the new API)
+3. Migrating all call sites incrementally
+4. Ensuring OpenGL continues to work at every step
+
+When we eventually build the Vulkan backend, it will be **simple and clean** because the API will already match Vulkan's architecture.
 
 ### Why This Matters
 
@@ -39,19 +50,22 @@ The current API is designed around OpenGL's stateful, immediate-mode execution m
 
 ### The Architectural Decision
 
-**Make the API Vulkan-native, then emulate OpenGL on top of it.**
+**Design a Vulkan-native API and make OpenGL emulate it.**
 
 This means:
-- ✅ Vulkan backend is clean, efficient, and fast (direct 1:1 mapping)
+- ✅ When we build Vulkan backend (later), it will be clean, efficient, and fast (direct 1:1 mapping)
 - ✅ API matches modern GPU architecture (future-proof for DX12, Metal)
-- ⚠️ OpenGL backend requires state tracking and emulation (acceptable - OpenGL is legacy)
+- ✅ OpenGL backend emulates the new API (we're building this now)
+- ✅ Each step moves us closer to Vulkan compatibility
 
 ### Migration Principles
 
-1. **Incremental** - Small, testable steps that build toward the goal
-2. **Testable** - Each step can be validated independently
-3. **Non-breaking** - Maintain backward compatibility during migration
-4. **Visible Progress** - Track deprecated vs new API usage
+1. **Compatibility First** - Build toward Vulkan support, implement Vulkan later
+2. **Incremental** - Small, testable steps that build toward the goal
+3. **OpenGL Always Works** - OpenGL backend must function at every step
+4. **Delete as We Go** - Remove deprecated methods incrementally after migrating call sites
+5. **Test Everything** - Each change must be validated before moving forward
+6. **Each Step Matters** - Every change must move us closer to Vulkan support
 
 ---
 
@@ -685,84 +699,408 @@ public class VulkanicAPI {
 
 ## Incremental Migration Strategy
 
-### Core Principle: Non-Breaking, Testable Steps
+### Core Principle: Compatibility Through Incremental Replacement
+
+**PARAMOUNT:** Each step must move us closer to Vulkan support while keeping OpenGL functional.
 
 Each migration step must:
-1. ✅ **Not break existing code** - Old API continues to work
-2. ✅ **Be independently testable** - Can validate the step in isolation
-3. ✅ **Make visible progress** - Reduce deprecated method usage
-4. ✅ **Move toward target** - Build toward Vulkan-native API
+1. ✅ **OpenGL MUST work** - OpenGL backend functions correctly at every step
+2. ✅ **One thing at a time** - Small, focused changes
+3. ✅ **Delete as we go** - Remove deprecated methods after migrating call sites
+4. ✅ **Test immediately** - Validate each change before proceeding
+5. ✅ **Move toward Vulkan** - Each step brings us closer to Vulkan compatibility
 
-### Migration Workflow
+### Migration Workflow: The Critical Pattern
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 1: Add New API Alongside Old API                      │
+│ Step 1: Add New Vulkan-Compatible API                      │
 │ ├─ Define new types (Pipeline, DescriptorSet, etc.)       │
-│ ├─ Implement in GraphicsBackend interface                  │
-│ ├─ Implement OpenGL emulation in OpenGLBackend            │
-│ └─ Add to VulkanicAPI frontend (public API)               │
+│ ├─ Add to GraphicsBackend interface                        │
+│ ├─ Add to VulkanicAPI frontend (public API)               │
+│ └─ Do NOT remove old API yet                              │
 └────────────┬───────────────────────────────────────────────┘
              │
              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 2: Test New API in Isolation                          │
-│ ├─ Write unit tests for new API                           │
-│ ├─ Write integration tests (simple rendering)             │
-│ └─ Verify OpenGL backend emulation works correctly        │
+│ Step 2: Implement in OpenGL Backend (Emulation)            │
+│ ├─ OpenGL backend implements new API                      │
+│ ├─ Uses new API internally (emulates OpenGL)              │
+│ ├─ Old methods can delegate to new API internally         │
+│ └─ TEST: Verify new API works with OpenGL                 │
 └────────────┬───────────────────────────────────────────────┘
              │
              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 3: Migrate One Consumer at a Time                     │
-│ ├─ Identify isolated usage of deprecated API              │
+│ Step 3: Migrate Call Sites ONE AT A TIME                   │
+│ ├─ Find ONE usage of deprecated API                       │
 │ ├─ Replace with new API                                   │
-│ ├─ Test that functionality still works                    │
-│ └─ Commit (small, testable change)                        │
+│ ├─ TEST: Verify that specific functionality still works   │
+│ ├─ Commit (tiny, testable change)                         │
+│ └─ Repeat for next call site                              │
 └────────────┬───────────────────────────────────────────────┘
              │
              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 4: Track Progress                                     │
-│ ├─ Count deprecated method calls (decreasing)             │
-│ ├─ Count new API usage (increasing)                       │
-│ └─ Celebrate milestones (25%, 50%, 75%, 100%)            │
+│ Step 4: Delete Deprecated Method                           │
+│ ├─ Verify NO call sites remain for this deprecated method │
+│ ├─ Remove @Deprecated method from VulkanicAPI             │
+│ ├─ Remove from GraphicsBackend interface                  │
+│ ├─ Remove from OpenGLBackend implementation               │
+│ ├─ TEST: Everything still works                           │
+│ └─ Commit: "Remove deprecated X, fully migrated"          │
 └────────────┬───────────────────────────────────────────────┘
              │
              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 5: Remove Deprecated API (Final Step)                 │
-│ ├─ Verify all consumers migrated                          │
-│ ├─ Remove @Deprecated methods                             │
-│ └─ Clean, Vulkan-native API!                              │
+│ Step 5: Repeat for Next Method                             │
+│ └─ One method at a time, one step at a time               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Example: Migrating Texture Binding
+### Critical Understanding
 
-**Before (deprecated):**
+**We are NOT building Vulkan backend during this process.**
+
+Instead, we are:
+1. Designing Vulkan-compatible API
+2. Making OpenGL backend use it (emulation)
+3. Migrating all call sites
+4. Deleting deprecated methods
+5. **Result:** When we build Vulkan backend later, it will be trivial
+
+### Example: Migrating Texture Binding (Complete Workflow)
+
+**Starting Point:**
 ```java
-// Game code using old API
+// Game code using old API (multiple places)
 VulkanicAPI.activeTexture(GL_TEXTURE0);
 VulkanicAPI.bindTexture(GL_TEXTURE_2D, albedoTexId);
 VulkanicAPI.activeTexture(GL_TEXTURE1);
 VulkanicAPI.bindTexture(GL_TEXTURE_2D, normalTexId);
 ```
 
-**Step 1: Add new API**
+**Step 1: Add new Vulkan-compatible API**
 ```java
-// New API added to VulkanicAPI
-public static DescriptorSet allocateDescriptorSet(DescriptorSetLayout layout);
-public static void updateDescriptorSet(DescriptorSet set, int binding, Texture texture);
-public static void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int index);
+// Add to GraphicsBackend interface
+DescriptorSetLayout createDescriptorSetLayout(DescriptorSetLayoutBuilder builder);
+DescriptorSet allocateDescriptorSet(DescriptorSetLayout layout);
+void updateDescriptorSet(DescriptorSet set, int binding, Texture texture);
+void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int index);
+
+// Add to VulkanicAPI frontend
+public static DescriptorSet allocateDescriptorSet(DescriptorSetLayout layout) {
+    return getBackend().allocateDescriptorSet(layout);
+}
+// ... etc
 ```
 
-**Step 2: Implement OpenGL emulation**
+**Step 2: Implement in OpenGL backend (emulate with new API)**
 ```java
 // OpenGLBackend implementation
 @Override
 public void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int index) {
-    // Extract texture bindings from descriptor set
+    // Emulate descriptor set binding using OpenGL calls
+    for (int i = 0; i < set.getBindingCount(); i++) {
+        Binding binding = set.getBinding(i);
+        if (binding.type == TEXTURE) {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, binding.textureId);
+        }
+    }
+}
+
+// OPTIONAL: Old methods can now delegate to new API internally
+@Deprecated
+@Override
+public void bindTexture(int textureId) {
+    // Still works, but uses new API under the hood
+    // This makes migration safer
+}
+```
+
+**Step 3: Migrate ONE call site**
+```java
+// Find one usage in GlStateManager.java
+// BEFORE:
+VulkanicAPI.activeTexture(GL_TEXTURE0);
+VulkanicAPI.bindTexture(GL_TEXTURE_2D, albedoTexId);
+
+// AFTER (replace just this one location):
+DescriptorSet descriptors = VulkanicAPI.allocateDescriptorSet(layout);
+VulkanicAPI.updateDescriptorSet(descriptors, 0, albedoTexture);
+VulkanicAPI.bindDescriptorSet(cmd, descriptors, 0);
+```
+
+**Step 3.1: Test immediately**
+- ✅ Run game, verify rendering works
+- ✅ Check that specific feature using this code still functions
+- ✅ Commit: "Migrate texture binding in GlStateManager.setTexture()"
+
+**Step 3.2: Migrate next call site**
+```java
+// Find another usage in different file
+// Repeat the process
+```
+
+**Step 3.N: Continue until all call sites migrated**
+- One at a time
+- Test after each
+- Small commits
+
+**Step 4: Delete deprecated methods**
+```java
+// ONLY after ALL call sites migrated
+// Search codebase: NO references to activeTexture() remain
+
+// Remove from VulkanicAPI:
+@Deprecated public static void activeTexture(int unit);  // DELETE THIS LINE
+
+// Remove from GraphicsBackend:
+@Deprecated void activeTexture(int unit);  // DELETE THIS LINE
+
+// Remove from OpenGLBackend:
+@Deprecated @Override public void activeTexture(int unit) { ... }  // DELETE THIS METHOD
+```
+
+**Step 4.1: Test after deletion**
+- ✅ Run full test suite
+- ✅ Verify nothing broke
+- ✅ Commit: "Remove activeTexture() - fully migrated to descriptor sets"
+
+**Step 5: Repeat for bindTexture()**
+- Same process
+- One method at a time
+
+**Result:**
+- ✅ OpenGL works at every step
+- ✅ Code progressively becomes more Vulkan-compatible
+- ✅ Deprecated methods disappear one by one
+- ✅ When done: Clean API ready for Vulkan backend
+
+---
+
+## Phase-by-Phase Plan
+
+**CRITICAL REMINDER:** We are NOT building Vulkan backend. We are building Vulkan-compatible API with OpenGL emulation, then incrementally deleting deprecated methods.
+
+### Phase 0: Foundation (Week 1-2) - **Current Phase**
+
+**Goal:** Establish migration plan and tracking.
+
+**Tasks:**
+- [x] Create VULKAN-MIGRATION.md document
+- [x] Verify all legacy methods marked @Deprecated
+- [ ] Create migration tracking system (count deprecated vs new API usage)
+- [ ] Establish testing baseline
+
+**Deliverables:**
+- Comprehensive migration document
+- All legacy API marked @Deprecated
+- Baseline metrics established
+
+**Success Criteria:**
+- ✅ Documentation explains strategy
+- ✅ Can track progress objectively
+- ✅ OpenGL backend works perfectly
+
+---
+
+### Phase 1: Core Types & Infrastructure (Week 3-6)
+
+**Goal:** Define new Vulkan-compatible types and implement them in OpenGL backend.
+
+**NOT building Vulkan - building compatibility!**
+
+**1.1 Define Core Interfaces**
+```java
+// Add to net.vulkanic package
+public interface Pipeline { }
+public interface DescriptorSet { }
+public interface DescriptorSetLayout { }
+public interface RenderPass { }
+public interface CommandBuffer extends CommandContext { }
+public interface Buffer { }
+public interface Texture { }
+```
+
+**1.2 Define Backend-Agnostic Enums**
+```java
+// Replace GL_* constants with these
+public enum ShaderStage { VERTEX, FRAGMENT, GEOMETRY, COMPUTE }
+public enum BufferUsage { VERTEX, INDEX, UNIFORM, STORAGE }
+public enum BlendMode { NONE, ALPHA_BLEND, ADDITIVE }
+public enum CompareOp { LESS, LESS_EQUAL, EQUAL, GREATER }
+public enum CullMode { NONE, FRONT, BACK }
+```
+
+**1.3 Add to GraphicsBackend Interface**
+```java
+// New methods (NOT deprecated)
+Pipeline createPipeline(PipelineStateDesc desc);
+void bindPipeline(CommandBuffer cmd, Pipeline pipeline);
+// ... etc
+```
+
+**1.4 Implement in OpenGLBackend (Emulation)**
+```java
+// OpenGL backend uses new API internally
+@Override
+public void bindPipeline(CommandBuffer cmd, Pipeline pipeline) {
+    this.currentPipeline = pipeline;
+    // Will apply state when draw() is called
+}
+```
+
+**1.5 Add to VulkanicAPI Frontend**
+```java
+public static Pipeline createPipeline(PipelineStateDesc desc) {
+    return getBackend().createPipeline(desc);
+}
+```
+
+**Testing:**
+- Unit tests for each type
+- Integration test: Create and bind pipeline
+- **VERIFY: OpenGL backend still works!**
+
+**Success Criteria:**
+- ✅ New types defined
+- ✅ OpenGL backend implements them
+- ✅ Tests pass
+- ✅ **OpenGL rendering still works**
+- ✅ Existing code unaffected (deprecated methods still work)
+
+---
+
+### Phase 2: Pipeline State Objects - INCREMENTAL DELETION (Week 7-10)
+
+**Goal:** Replace individual state calls with Pipeline State Objects, DELETE deprecated methods one by one.
+
+**Deprecated Methods to Replace and DELETE:**
+```java
+@Deprecated void enable(int cap);
+@Deprecated void disable(int cap);
+@Deprecated void enableBlend();
+@Deprecated void disableBlend();
+@Deprecated void useProgram(int programId);
+@Deprecated void setDepthTestFunction(int func);
+// ... etc
+```
+
+**Migration Process (ONE METHOD AT A TIME):**
+
+**2.1 Pick ONE deprecated method:** `enableBlend()`
+
+**2.2 Find ALL call sites**
+```bash
+grep -r "VulkanicAPI.enableBlend()" src/
+# Example: Found 5 call sites
+```
+
+**2.3 Migrate call sites ONE BY ONE**
+
+**Call Site 1: GlStateManager.java line 123**
+```java
+// BEFORE:
+VulkanicAPI.enableBlend();
+
+// AFTER:
+Pipeline pipeline = VulkanicAPI.createPipeline(new PipelineStateDesc()
+    .setBlendMode(BlendMode.ALPHA_BLEND));
+VulkanicAPI.bindPipeline(cmd, pipeline);
+```
+- Test immediately
+- Commit: "Migrate enableBlend in GlStateManager line 123"
+
+**Call Site 2: CloudRenderer.java line 456**
+- Replace
+- Test
+- Commit: "Migrate enableBlend in CloudRenderer line 456"
+
+**...Continue for all 5 call sites...**
+
+**2.4 DELETE deprecated method**
+```java
+// After ALL call sites migrated:
+// DELETE from VulkanicAPI.java:
+@Deprecated public static void enableBlend() { ... }  // DELETE
+
+// DELETE from GraphicsBackend.java:
+@Deprecated void enableBlend();  // DELETE
+
+// DELETE from OpenGLBackend.java:
+@Deprecated @Override public void enableBlend() { ... }  // DELETE
+```
+- Test everything
+- Commit: "Delete enableBlend() - fully migrated to Pipeline"
+
+**2.5 Repeat for next method:** `disableBlend()`
+- Same process
+- One method at a time
+
+**OpenGL Backend Implementation:**
+```java
+// OpenGL backend applies pipeline state lazily
+private void applyPipelineState(Pipeline pipeline) {
+    PipelineState state = pipeline.getState();
+    
+    if (state.blendEnabled) {
+        glEnable(GL_BLEND);
+        glBlendFunc(state.srcBlend, state.dstBlend);
+    } else {
+        glDisable(GL_BLEND);
+    }
+    // ... apply all state
+}
+
+@Override
+public void draw(...) {
+    applyPipelineState(currentPipeline);  // Apply before drawing
+    glDrawElements(...);
+}
+```
+
+**Testing After Each Deletion:**
+- ✅ Full rendering test
+- ✅ Visual validation (screenshots)
+- ✅ **OpenGL backend must work perfectly**
+
+**Success Criteria:**
+- ✅ State management migrated to Pipelines
+- ✅ **Deprecated methods DELETED** (not just unused)
+- ✅ Rendering output identical
+- ✅ **OpenGL backend works at every step**
+- ✅ Deprecated method count reduced by ~20%
+
+---
+
+### Phase 3: Descriptor Sets - INCREMENTAL DELETION (Week 11-14)
+
+**Goal:** Replace texture/buffer binding with Descriptor Sets, DELETE deprecated methods.
+
+**Deprecated Methods to Replace and DELETE:**
+```java
+@Deprecated void bindTexture(int textureId);
+@Deprecated void activateTextureUnit(int unit);
+@Deprecated void attachBuffer(int target, int buffer);
+```
+
+**Migration Process (ONE METHOD AT A TIME):**
+
+**3.1 Pick ONE method:** `bindTexture(int textureId)`
+
+**3.2 Find all call sites, migrate one by one**
+
+**3.3 DELETE after all migrated**
+
+**3.4 Repeat for next method**
+
+**OpenGL Backend Emulation:**
+```java
+@Override
+public void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int index) {
+    // Emulate descriptor set with OpenGL texture binding
     for (int i = 0; i < set.getBindingCount(); i++) {
         Binding binding = set.getBinding(i);
         if (binding.type == TEXTURE) {
@@ -773,208 +1111,97 @@ public void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int index) {
 }
 ```
 
-**Step 3: Migrate game code**
-```java
-// Create descriptor set layout (once)
-DescriptorSetLayout layout = new DescriptorSetLayoutBuilder()
-    .addTexture(0, ShaderStage.FRAGMENT)  // Albedo
-    .addTexture(1, ShaderStage.FRAGMENT)  // Normal
-    .build();
-
-// Allocate descriptor set
-DescriptorSet descriptors = VulkanicAPI.allocateDescriptorSet(layout);
-
-// Update with textures
-VulkanicAPI.updateDescriptorSet(descriptors, 0, albedoTexture);
-VulkanicAPI.updateDescriptorSet(descriptors, 1, normalTexture);
-
-// Bind all at once
-CommandBuffer cmd = VulkanicAPI.getImmediateContext();
-VulkanicAPI.bindDescriptorSet(cmd, descriptors, 0);
-```
-
-**Step 4: Verify**
-- ✅ Rendering still works correctly
-- ✅ Textures appear properly
-- ✅ Old API calls reduced by 4
-- ✅ New API usage increased
-
-**Step 5: Eventually remove deprecated methods**
-```java
-// After ALL code migrated, remove:
-@Deprecated public static void activeTexture(int unit);  // REMOVE
-@Deprecated public static void bindTexture(int textureId);  // REMOVE
-```
-
----
-
-## Phase-by-Phase Plan
-
-### Phase 0: Foundation (Week 1-2) - **Current Phase**
-
-**Goal:** Mark all legacy methods as deprecated and establish migration tracking.
-
-**Tasks:**
-- [x] Create VULKAN-MIGRATION.md document
-- [ ] Verify all legacy methods marked @Deprecated
-- [ ] Add deprecation messages pointing to replacement APIs (TBD)
-- [ ] Create migration tracking system (count deprecated vs new API usage)
-- [ ] Establish testing baseline
-
-**Deliverables:**
-- Comprehensive migration document
-- All legacy API marked @Deprecated
-- Baseline metrics established
+**Testing After Each Deletion:**
+- ✅ Texture rendering correct
+- ✅ Visual validation
+- ✅ **OpenGL backend works**
 
 **Success Criteria:**
-- All methods except infrastructure and Vulkan-compatible ones are @Deprecated
-- Documentation explains migration strategy
-- Can track progress objectively
+- ✅ All texture/buffer binding migrated
+- ✅ **Deprecated methods DELETED**
+- ✅ Rendering identical
+- ✅ **OpenGL backend works**
+- ✅ Deprecated method count reduced by ~30%
 
 ---
 
-### Phase 1: Core Types & Infrastructure (Week 3-6)
+### Phase 4: Render Passes - INCREMENTAL DELETION (Week 15-18)
 
-**Goal:** Define new API types and basic infrastructure without breaking existing code.
+**Goal:** Replace framebuffer binding with Render Passes, DELETE deprecated methods.
 
-**Tasks:**
-
-**1.1 Define Core Interfaces**
+**Deprecated Methods to DELETE:**
 ```java
-// Add to VulkanicAPI
-public interface Pipeline { }
-public interface DescriptorSet { }
-public interface DescriptorSetLayout { }
-public interface RenderPass { }
-public interface CommandBuffer extends CommandContext { }
-public interface Buffer { }
-public interface Texture { }
+@Deprecated void attachFramebuffer(int target, int fbo);
+@Deprecated void clear(int mask);
 ```
 
-**1.2 Define Builder Classes**
-```java
-public class PipelineStateDesc { }
-public class DescriptorSetLayoutBuilder { }
-public class RenderPassDesc { }
-```
-
-**1.3 Define Backend-Agnostic Enums**
-```java
-public enum ShaderStage { VERTEX, FRAGMENT, GEOMETRY, COMPUTE }
-public enum BufferUsage { VERTEX, INDEX, UNIFORM, STORAGE }
-public enum BlendMode { NONE, ALPHA_BLEND, ADDITIVE }
-public enum CompareOp { LESS, LESS_EQUAL, EQUAL, GREATER, /* ... */ }
-public enum CullMode { NONE, FRONT, BACK }
-// ... etc
-```
-
-**1.4 Add to GraphicsBackend Interface**
-```java
-// New methods (NOT deprecated)
-Pipeline createPipeline(PipelineStateDesc desc);
-void bindPipeline(CommandBuffer cmd, Pipeline pipeline);
-
-DescriptorSetLayout createDescriptorSetLayout(/* ... */);
-DescriptorSet allocateDescriptorSet(DescriptorSetLayout layout);
-void updateDescriptorSet(DescriptorSet set, int binding, /* ... */);
-void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int index);
-
-// ... etc for all new API
-```
-
-**1.5 Implement in OpenGLBackend**
-```java
-// Implement OpenGL emulation for each new method
-@Override
-public void bindPipeline(CommandBuffer cmd, Pipeline pipeline) {
-    // Track current pipeline
-    this.currentPipeline = pipeline;
-}
-
-@Override
-public void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int index) {
-    // Track current descriptor set
-    this.currentDescriptorSet = set;
-}
-```
-
-**1.6 Add to VulkanicAPI Frontend**
-```java
-// Expose new API publicly
-public static Pipeline createPipeline(PipelineStateDesc desc) {
-    return getBackend().createPipeline(desc);
-}
-```
-
-**Testing:**
-- Unit tests for each new type
-- Integration test: Create pipeline, bind it, verify it doesn't crash
-- Integration test: Create descriptor set, bind it, verify state tracking
+**Same process:** Migrate one by one, delete incrementally, test at each step.
 
 **Success Criteria:**
-- All new types defined
-- OpenGL backend can track state
-- Tests pass
-- Existing code unaffected
+- ✅ Framebuffer operations migrated
+- ✅ **Deprecated methods DELETED**
+- ✅ **OpenGL backend works**
 
 ---
 
-### Phase 2: Pipeline State Objects (Week 7-10)
+### Phase 5-7: Continue Pattern
 
-**Goal:** Replace individual state calls with Pipeline State Objects.
+Each phase:
+1. Pick methods to migrate
+2. Migrate call sites one by one
+3. DELETE deprecated methods incrementally
+4. TEST: OpenGL must work at every step
+5. Move to next phase
 
-**Current Deprecated Methods to Replace:**
-```java
-@Deprecated void enable(int cap);
-@Deprecated void disable(int cap);
-@Deprecated void enableBlend();
-@Deprecated void disableBlend();
-@Deprecated void useProgram(int programId);
-@Deprecated void setDepthTestFunction(int func);
-@Deprecated void setDepthWriteEnabled(boolean enabled);
-@Deprecated void configurePolygonMode(int face, int mode);
-// ... etc
+---
+
+### Phase 8: Cleanup & Optimization (Week 31-34)
+
+**Goal:** Verify all deprecated methods deleted, optimize OpenGL backend.
+
+**Verification:**
+```bash
+# Should return 0 (no deprecated methods remain)
+grep -r "@Deprecated" src/main/java/net/vulkanic/VulkanicAPI.java | wc -l
 ```
 
-**Migration Steps:**
+**Tasks:**
+- ✅ Verify NO deprecated methods remain
+- ✅ Optimize OpenGL backend emulation
+- ✅ Update all documentation
+- ✅ Performance benchmarks
 
-**2.1 Identify Pipeline State Usage**
-- Find all places that call `enable(GL_BLEND)`, `disable(GL_DEPTH_TEST)`, etc.
-- Group related state changes together
+**Success Criteria:**
+- ✅ ZERO deprecated methods
+- ✅ Clean, Vulkan-compatible API
+- ✅ **OpenGL backend works perfectly**
+- ✅ Ready for Vulkan backend implementation
 
-**2.2 Create Pipeline Descriptors**
+---
+
+### Phase 9: Vulkan Backend (Week 35+) - **FUTURE**
+
+**NOW we can build Vulkan backend** - it will be trivial!
+
+**Why it's easy now:**
+- ✅ API is Vulkan-native
+- ✅ Direct 1:1 mapping
+- ✅ No translation needed
+- ✅ Clean implementation
+
 ```java
-// Example: Migrate GlStateManager blend state
-// BEFORE:
-VulkanicAPI.enableBlend();
-VulkanicAPI.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+package net.vulkanic.backends.vulkan;
 
-// AFTER:
-PipelineStateDesc desc = new PipelineStateDesc()
-    .setBlendMode(BlendMode.ALPHA_BLEND);
-Pipeline pipeline = VulkanicAPI.createPipeline(desc);
-VulkanicAPI.bindPipeline(cmd, pipeline);
+public class VulkanBackend implements GraphicsBackend {
+    @Override
+    public void bindPipeline(CommandBuffer cmd, Pipeline pipeline) {
+        // Direct Vulkan call - no overhead!
+        vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.vkPipeline);
+    }
+}
 ```
 
-**2.3 Implement OpenGL State Application**
-```java
-// OpenGLBackend.draw() applies pipeline state
-private void applyPipelineState(Pipeline pipeline) {
-    PipelineState state = pipeline.getState();
-    
-    // Blend state
-    if (state.blendEnabled) {
-        glEnable(GL_BLEND);
-        glBlendFunc(state.srcBlend, state.dstBlend);
-    } else {
-        glDisable(GL_BLEND);
-    }
-    
-    // Depth state
-    if (state.depthTestEnabled) {
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(state.depthFunc);
-    }
+**This is the payoff for all the incremental work!**
     
     // Program
     glUseProgram(state.programId);
@@ -1551,96 +1778,106 @@ public void benchmarkPipelineBinding() {
 
 ### Quantitative Metrics
 
-**Deprecated API Usage:**
+**CRITICAL METRIC: Number of Deprecated Methods**
+
+The primary success metric is **deprecated methods deleted**, not just "unused":
+
 ```
-Baseline: 100% (all calls use deprecated API)
-Phase 1:  100% (no migration yet)
-Phase 2:   80% (pipeline state migrated)
-Phase 3:   50% (descriptor sets migrated)
-Phase 4:   35% (render passes migrated)
-Phase 5:   20% (command buffers explicit)
-Phase 6:    5% (resources typed)
-Phase 7:    0% (constants removed)
-Phase 8:    0% (deprecated methods deleted)
+Baseline:     301 deprecated methods (100%)
+Phase 1:      301 deprecated methods (infrastructure added, nothing deleted yet)
+Phase 2:      241 deprecated methods (60 state methods DELETED - 20% reduction)
+Phase 3:      151 deprecated methods (90 texture/buffer methods DELETED - 50% total)
+Phase 4:      106 deprecated methods (45 framebuffer methods DELETED - 65% total)
+Phase 5:       71 deprecated methods (35 command methods DELETED - 76% total)
+Phase 6:       16 deprecated methods (55 resource methods DELETED - 95% total)
+Phase 7:        0 deprecated methods (16 constant methods DELETED - 100% DONE!)
+Phase 8:        0 deprecated methods (verification and cleanup)
 ```
 
-**New API Usage:**
+**OpenGL Backend Status:**
 ```
-Baseline:   0% (no new API)
-Phase 1:    0% (infrastructure only)
-Phase 2:   20% (pipeline binding)
-Phase 3:   50% (descriptor sets)
-Phase 4:   65% (render passes)
-Phase 5:   80% (command buffers)
-Phase 6:   95% (typed resources)
-Phase 7:  100% (fully migrated)
+All phases: OpenGL backend MUST work perfectly
+- No regressions allowed
+- Visual output identical
+- Performance acceptable (<5% overhead)
 ```
 
-**Performance:**
+**Vulkan Backend Status:**
 ```
-OpenGL backend overhead: < 5% vs direct OpenGL
-Vulkan backend overhead: < 1% vs direct Vulkan
+Phase 0-8: NOT IMPLEMENTED (we're building compatibility)
+Phase 9:   IMPLEMENTATION BEGINS (will be easy because API is ready)
 ```
 
 ### Qualitative Metrics
 
 **Code Quality:**
+- ✅ Zero deprecated methods (they're DELETED, not just unused)
 - ✅ No GL_* constants in game code
 - ✅ No direct LWJGL imports in game code
 - ✅ Type-safe resource management
-- ✅ Clear separation of concerns
+- ✅ **OpenGL backend works perfectly at every step**
 
 **API Design:**
-- ✅ Vulkan-native architecture
+- ✅ Vulkan-compatible architecture
 - ✅ Modern GPU mental model
-- ✅ Future-proof for DX12/Metal
+- ✅ Future-proof for Vulkan (and DX12/Metal)
 - ✅ Clean, intuitive API
+- ✅ **OpenGL backend emulates it successfully**
 
-**Maintainability:**
-- ✅ Clear migration path
-- ✅ Testable at each step
-- ✅ Incremental progress
-- ✅ Backward compatibility during migration
+**Migration Progress:**
+- ✅ Each step deletes deprecated methods
+- ✅ Each step tested independently
+- ✅ Each step moves toward Vulkan compatibility
+- ✅ **OpenGL never breaks**
 
 ---
 
 ## Risk Mitigation
 
-### Risk 1: Breaking Existing Code
+### Risk 1: Breaking OpenGL Backend
+
+**THIS IS THE PARAMOUNT RISK.**
 
 **Mitigation:**
-- Keep deprecated API functional throughout migration
-- Migrate one subsystem at a time
-- Extensive testing at each step
-- Rollback capability for each phase
+- Test OpenGL backend after EVERY change
+- Visual validation (screenshots) after each migration
+- Automated rendering tests
+- If something breaks, fix immediately before proceeding
+- Small commits allow easy rollback
 
-### Risk 2: Performance Regression
+### Risk 2: Deleting Methods Too Early
+
+**Mitigation:**
+- Verify ALL call sites migrated before deletion
+- Use IDE "Find Usages" to confirm
+- Grep codebase to double-check
+- Compile after deletion (will fail if anything missed)
+- Test after deletion
+
+### Risk 3: Performance Regression in OpenGL
 
 **Mitigation:**
 - Benchmark at each phase
-- Optimize OpenGL emulation
-- Performance budgets for each subsystem
-- Profile and optimize hot paths
+- OpenGL emulation should be efficient
+- Profile hot paths
+- Optimize state tracking
+- Target: <5% overhead vs direct OpenGL (acceptable for legacy path)
 
-### Risk 3: Scope Creep
+### Risk 4: Losing Track of Progress
 
 **Mitigation:**
+- Count deprecated methods regularly
+- Track in MIGRATION-PROGRESS.md
+- Celebrate milestones (25%, 50%, 75%, 100%)
 - Clear phase boundaries
-- Focus on incremental progress
-- Resist adding "nice to have" features
-- Stick to the migration plan
 
-### Risk 4: Testing Complexity
+### Risk 5: Scope Creep
 
 **Mitigation:**
-- Automated test suite
-- Visual validation tools
-- Screenshot comparison
-- Continuous integration
-
-### Risk 5: Developer Confusion
-
-**Mitigation:**
+- Focus ONLY on Vulkan compatibility
+- Do NOT implement Vulkan backend yet
+- Resist adding features
+- Stick to the plan: API design → OpenGL emulation → migration → deletion
 - Clear documentation
 - Migration examples
 - API usage guides
@@ -1652,65 +1889,124 @@ Vulkan backend overhead: < 1% vs direct Vulkan
 
 ### Migration Dashboard
 
-Create a simple tracking file:
+Track progress in MIGRATION-PROGRESS.md:
 
 ```
 MIGRATION-PROGRESS.md
 
-## Deprecated API Usage
+## Deprecated Methods Count
 
-Total deprecated methods: 285
-Methods still in use: 285 (100%)
-Methods migrated: 0 (0%)
-
-## New API Usage
-
-Pipeline State Objects: 0 instances
-Descriptor Sets: 0 instances
-Render Passes: 0 instances
-Command Buffers: 0 instances (all immediate)
-Typed Resources: 0 instances
+Total at start:     301 deprecated methods
+Currently remaining: 301 deprecated methods
+Deleted this phase:   0
+Total deleted:        0 (0% complete)
 
 ## Phase Status
 
-[✅] Phase 0: Foundation
+[✅] Phase 0: Foundation - COMPLETE
 [ ] Phase 1: Core Types & Infrastructure
-[ ] Phase 2: Pipeline State Objects
-[ ] Phase 3: Descriptor Sets
-[ ] Phase 4: Render Passes
-[ ] Phase 5: Command Buffers
-[ ] Phase 6: Resource Objects
-[ ] Phase 7: Constant Migration
-[ ] Phase 8: Cleanup & Optimization
-[ ] Phase 9: Vulkan Backend
+[ ] Phase 2: Pipeline State Objects (Target: Delete 60 methods)
+[ ] Phase 3: Descriptor Sets (Target: Delete 90 methods)
+[ ] Phase 4: Render Passes (Target: Delete 45 methods)
+[ ] Phase 5: Command Buffers (Target: Delete 35 methods)
+[ ] Phase 6: Resource Objects (Target: Delete 55 methods)
+[ ] Phase 7: Constant Migration (Target: Delete 16 methods)
+[ ] Phase 8: Cleanup & Verification (Target: 0 methods remain)
+[ ] Phase 9: Vulkan Backend (Implementation phase)
+
+## OpenGL Backend Status
+
+✅ WORKING PERFECTLY (must remain true at all times)
 
 ## Current Focus
 
 Phase: 0 - Foundation
-Task: Create migration document
-Status: In Progress
-Blockers: None
+Task: Document migration strategy
+Status: Complete
+Next: Phase 1 - Define core types
+
+## This Week
+
+- Created VULKAN-MIGRATION.md
+- Verified all legacy methods marked @Deprecated
+- Ready to begin Phase 1
 ```
 
-### Weekly Updates
+### After Each Deprecated Method Deletion
 
-Update progress weekly:
-- Methods migrated this week
-- New API usage added
-- Tests added
-- Issues encountered
-- Next week's focus
+Update the count:
+```
+Deleted: bindTexture(int textureId) 
+Reason: Migrated to descriptor sets
+Call sites migrated: 47
+Tests passed: ✅
+OpenGL works: ✅
+Commit: abc123
+```
 
 ---
 
 ## Conclusion
 
-This migration strategy provides:
+### What We're Doing
 
-1. ✅ **Clear Goal** - Vulkan-native API with OpenGL emulation
-2. ✅ **Incremental Path** - Small, testable steps
-3. ✅ **Non-Breaking** - Backward compatibility maintained
-4. ✅ **Visible Progress** - Metrics track advancement
+**Building Vulkan compatibility, NOT implementing Vulkan yet.**
+
+1. ✅ Design Vulkan-compatible API
+2. ✅ Implement in OpenGL backend (emulation)
+3. ✅ Migrate call sites one by one
+4. ✅ Delete deprecated methods incrementally
+5. ✅ Test OpenGL backend at every step
+6. ✅ Each step moves toward Vulkan support
+
+### What We're NOT Doing
+
+❌ Building Vulkan backend now  
+❌ Optimizing for Vulkan performance yet  
+❌ Adding Vulkan-specific features  
+❌ Breaking OpenGL backend  
+
+### The Critical Rules
+
+**PARAMOUNT:**
+- ✅ **OpenGL backend MUST work at every step**
+- ✅ **Delete deprecated methods as we go**
+- ✅ **Test after each change**
+- ✅ **Each step moves toward Vulkan compatibility**
+
+### The Payoff
+
+When we finish all phases (0-8):
+- ✅ ZERO deprecated methods
+- ✅ Clean, Vulkan-compatible API
+- ✅ OpenGL backend working perfectly
+- ✅ **Ready to implement Vulkan backend (Phase 9)**
+
+Then implementing Vulkan will be **trivial**:
+```java
+public class VulkanBackend implements GraphicsBackend {
+    @Override
+    public void bindPipeline(CommandBuffer cmd, Pipeline pipeline) {
+        // Direct Vulkan call - no translation needed!
+        vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.vkPipeline);
+    }
+}
+```
+
+**This is the goal. We get there by:**
+1. One step at a time
+2. One deprecated method deleted at a time
+3. OpenGL working at every step
+4. Moving closer to Vulkan compatibility with each change
+
+---
+
+**Document Version:** 2.0  
+**Last Updated:** 2026-02-14  
+**Status:** Active Migration Plan - Compatibility First Approach  
+**Next Review:** After Phase 1 completion
+
+**Key Change from v1.0:** Emphasis on incremental deletion, OpenGL functionality, and compatibility before implementation.
 5. ✅ **Future-Proof** - Modern GPU architecture
 6. ✅ **Efficient Vulkan** - Clean, fast implementation
 
