@@ -144,17 +144,6 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
     
-    @Deprecated
-    @Override
-    public void setDepthTestFunction(int func) {
-        // Update pipeline manager state (Vulkan-compatible path)
-        CompareOp compareOp = glCompareOpToEnum(func);
-        pipelineManager.setDepthTest(true, compareOp);
-        
-        // Also apply directly for immediate effect (OpenGL path)
-        GL11.glDepthFunc(func);
-    }
-    
     /**
      * Converts GL depth function constant to CompareOp enum
      */

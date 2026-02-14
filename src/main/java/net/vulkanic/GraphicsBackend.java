@@ -53,8 +53,6 @@ public interface GraphicsBackend {
     
     // Depth operations
     @Deprecated
-    void setDepthTestFunction(int func);
-    @Deprecated
     void setDepthWriteEnabled(boolean enabled);
     
     // Color operations

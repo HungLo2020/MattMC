@@ -598,11 +598,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void setDepthTestFunction(int func) {
-        getBackend().setDepthTestFunction(func);
-    }
-    
-    @Deprecated
     public static void setDepthWriteEnabled(boolean enabled) {
         getBackend().setDepthWriteEnabled(enabled);
     }

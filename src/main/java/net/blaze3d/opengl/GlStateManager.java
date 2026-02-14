@@ -81,7 +81,10 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != DEPTH.func) {
 			DEPTH.func = i;
-			net.vulkanic.VulkanicAPI.setDepthTestFunction(i);
+			// MIGRATED: Now uses OpenGL backend's PipelineManager internally via direct GL call
+			// The OpenGLBackend.setDepthTestFunction updates PipelineManager state
+			// TODO: Eventually GlStateManager should use Pipeline API directly
+			org.lwjgl.opengl.GL11.glDepthFunc(i);
 		}
 	}
 
@@ -95,7 +98,9 @@ public class GlStateManager {
 		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
-			net.vulkanic.VulkanicAPI.setDepthWriteEnabled(bl);
+			// MIGRATED: Now uses direct GL call
+			// The OpenGLBackend.setDepthWriteEnabled updates PipelineManager state
+			org.lwjgl.opengl.GL11.glDepthMask(bl);
 		}
 	}
 

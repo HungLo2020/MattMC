@@ -87,7 +87,8 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glDepthFunc(int func) 
 	{ 
-		VulkanicAPI.setDepthTestFunction(func);
+		// MIGRATED: Removed deprecated VulkanicAPI.setDepthTestFunction call
+		// Now just calls GlStateManager which calls GL directly
 		GlStateManager._depthFunc(func); 
 	}
 	
