@@ -37,10 +37,17 @@ if (useBundledDeps) {
 }
 
 repositories {
-    // Always include Maven Central (for most dependencies)
+    // Add bundled dependencies as a flat directory repository (offline mode)
+    if (useBundledDeps) {
+        flatDir {
+            dirs bundledDepsDir
+        }
+    }
+    
+    // Maven Central (for most dependencies not in bundled set)
     mavenCentral()
     
-    // Only add remote repositories if bundled dependencies are NOT available
+    // Only add specialized remote repositories if bundled dependencies are NOT available
     if (!useBundledDeps) {
         println "⚠ Bundled dependencies not found. Using remote repositories."
         println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
@@ -67,13 +74,6 @@ repositories {
             }
         }
     }
-    
-    // Add bundled dependencies as a flat directory repository
-    if (useBundledDeps) {
-        flatDir {
-            dirs bundledDepsDir
-        }
-    }
 }
 
 configurations.all {
@@ -88,10 +88,13 @@ configurations.all {
     }
 }
 
-// Exclude transitive ASM from dependencies that bring in older versions
-// This prevents conflicts with Fabric Loader's ASM 9.9 requirement
-configurations.runtimeClasspath {
-    exclude group: 'org.ow2.asm'
+// Exclude transitive ASM from dependencies ONLY when using bundled JARs
+// When useBundledDeps=true: Prevents conflicts between bundled ASM 9.9 JARs and transitive ASM 9.3
+// When useBundledDeps=false: ASM is provided via Maven dependencies and should NOT be excluded
+if (useBundledDeps) {
+    configurations.runtimeClasspath {
+        exclude group: 'org.ow2.asm'
+    }
 }
 
 // Minecraft 1.21.10 dependencies
