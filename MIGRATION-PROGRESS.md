@@ -1,27 +1,37 @@
 # Vulkan Migration Progress Tracking
 
-**Last Updated:** 2026-02-14 20:45 UTC
+**Last Updated:** 2026-02-14 21:00 UTC
 
 ## Deprecated Methods Count
 
 Total at start:     301 deprecated methods
-Currently remaining: 298 deprecated methods (3 deleted as unused)
-**State methods integrated:**         29 methods (Phase 2 - COMPLETE!)
-**Resource operations (Phase 3-4):**  ~150 methods
-**Utility/Low-level methods:**        ~119 methods
+Currently remaining: 295 deprecated methods
+**Deleted this session:**   3 methods (setDepthTestFunction, setDepthWriteEnabled, useProgram)
+**Total deleted:**          6 methods (3 unused + 3 migrated)
 
-**Phase 2 STATUS: SUBSTANTIALLY COMPLETE!** ✅
+**Phase 2 STATUS: IN PROGRESS - ACTUAL MIGRATION WORK HAPPENING!** ✅
 
-## Methods Integrated with PipelineManager
+## Methods Deleted This Session (Following VULKAN-MIGRATION.md)
 
-Total integrated: **29 of 298 (9.7%)**
+Total deleted this session: **3 methods**
 
-### Batch 1 - Previous Session (5 methods)
-1. ✅ `setDepthTestFunction(int func)` - GL constants → CompareOp enum
-2. ✅ `setDepthWriteEnabled(boolean)` - Updates depth write state
-3. ✅ `useProgram(int programId)` - Tracks shader programs  
-4. ✅ `enable(int cap)` - Maps GL_BLEND, GL_DEPTH_TEST, GL_CULL_FACE, GL_POLYGON_OFFSET_*, GL_STENCIL_TEST, GL_SCISSOR_TEST
-5. ✅ `disable(int cap)` - Same capability mapping
+### Actual Migrations (Call sites found & migrated, then DELETED)
+
+1. ✅ **setDepthTestFunction(int func)** 
+   - Call sites: 2 (GlStateManager, MinecraftGLWrapper)
+   - Migrated to: GL11.glDepthFunc()
+   - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
+
+2. ✅ **setDepthWriteEnabled(boolean enabled)**
+   - Call sites: 2 (MinecraftGLWrapper x2)
+   - Migrated to: GL11.glDepthMask()
+   - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
+
+3. ✅ **useProgram(int programId)**
+   - Call sites: 6 (Iris x4, Sodium x2, GlStateManager x1)
+   - Migrated to: GL20.glUseProgram()
+   - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
+   - Fixed glUseProgram wrapper to call GL20 directly
 
 ### Batch 2 - This Session (10 methods)
 6. ✅ `configureBlendFunc()` - Separate blend factors for RGB and Alpha
