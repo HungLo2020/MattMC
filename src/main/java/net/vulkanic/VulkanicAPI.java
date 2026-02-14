@@ -628,16 +628,6 @@ public class VulkanicAPI {
     
     // Direct State Access buffer operations
     @Deprecated
-    public static void namedBufferDataDSA(int buffer, long size, int usage) {
-        getBackend().namedBufferDataDSA(buffer, size, usage);
-    }
-    
-    @Deprecated
-    public static void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        getBackend().namedBufferDataDSA(buffer, data, usage);
-    }
-    
-    @Deprecated
     public static void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
         getBackend().namedBufferSubDataDSA(buffer, offset, data);
     }

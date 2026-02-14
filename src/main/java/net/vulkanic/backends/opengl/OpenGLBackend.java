@@ -194,18 +194,6 @@ public class OpenGLBackend implements GraphicsBackend {
     // Direct State Access buffer operations
     @Deprecated
     @Override
-    public void namedBufferDataDSA(int buffer, long size, int usage) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, size, usage);
-    }
-    
-    @Deprecated
-    @Override
-    public void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, data, usage);
-    }
-    
-    @Deprecated
-    @Override
     public void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferSubData(buffer, offset, data);
     }

@@ -57,12 +57,12 @@ public abstract class DirectStateAccess {
 
 		@Override
 		void bufferData(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, l, GlConst.bufferUsageToGlEnum(j));
+			org.lwjgl.opengl.GL45.glNamedBufferData(i, l, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			org.lwjgl.opengl.GL45.glNamedBufferData(i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override

@@ -86,10 +86,6 @@ public interface GraphicsBackend {
     
     // Direct State Access buffer operations
     @Deprecated
-    void namedBufferDataDSA(int buffer, long size, int usage);
-    @Deprecated
-    void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage);
-    @Deprecated
     void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data);
     @Deprecated
     void namedBufferStorageDSA(int buffer, long size, int flags);
