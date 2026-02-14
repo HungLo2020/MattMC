@@ -45,10 +45,6 @@ public interface GraphicsBackend {
     @Deprecated
     void clear(int mask);
     @Deprecated
-    void enableBlend();
-    @Deprecated
-    void disableBlend();
-    @Deprecated
     void useProgram(int programId);
     @Deprecated
     void enable(int cap);

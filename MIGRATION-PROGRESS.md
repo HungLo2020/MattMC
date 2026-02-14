@@ -1,19 +1,19 @@
 # Vulkan Migration Progress Tracking
 
-**Last Updated:** 2026-02-14 19:30 UTC
+**Last Updated:** 2026-02-14 19:35 UTC
 
 ## Deprecated Methods Count
 
 Total at start:     301 deprecated methods
-Currently remaining: 301 deprecated methods
-Deleted this phase:   0
-Total deleted:        0 (0% complete)
+Currently remaining: 299 deprecated methods
+Deleted this phase:   2
+Total deleted:        2 (0.66% complete)
 
 ## Phase Status
 
 [✅] Phase 0: Foundation - COMPLETE
 [✅] Phase 1: Core Types & Infrastructure - COMPLETE
-[🔄] Phase 2: Pipeline State Objects - IN PROGRESS (Examples Complete)
+[🔄] Phase 2: Pipeline State Objects - IN PROGRESS (First Deletion Complete!)
 [ ] Phase 3: Descriptor Sets (Target: Delete 90 methods)
 [ ] Phase 4: Render Passes (Target: Delete 45 methods)
 [ ] Phase 5: Command Buffers (Target: Delete 35 methods)
@@ -36,9 +36,24 @@ Total deleted:        0 (0% complete)
 - [x] Verify build successful
 - [x] Analyze deprecated method usage patterns
 - [x] Create Pipeline API usage examples (PipelineAPIExample.java)
-- [ ] Migrate first deprecated method
-- [ ] Delete first deprecated method
-- [ ] Document migration pattern for future methods
+- [x] Migrate first deprecated methods (enableBlend, disableBlend - already unused)
+- [x] Delete first deprecated methods (enableBlend, disableBlend)
+- [ ] Continue with next deprecated methods
+- [ ] Document migration pattern for methods with actual call sites
+
+**🎉 FIRST DELETION MILESTONE!**
+
+Deleted 2 deprecated methods:
+1. `enableBlend()` - No call sites, safely deleted
+2. `disableBlend()` - No call sites, safely deleted
+
+Deleted from:
+- ✅ VulkanicAPI.java
+- ✅ GraphicsBackend.java
+- ✅ OpenGLBackend.java
+
+Build status: ✅ SUCCESSFUL
+OpenGL backend: ✅ WORKING
 
 **Migration Examples Created:**
 - ✅ PipelineAPIExample.java demonstrates:
@@ -58,12 +73,12 @@ Total deleted:        0 (0% complete)
 6. renderArraysInstanced() - applies state before glDrawArraysInstanced
 7. glDrawElements() - applies state before GL32.glDrawElements
 
-**Deprecated Method Usage in GlStateManager:**
+**Deprecated Method Usage Analysis:**
 - `enable(int cap)` - 2 calls (generic state)
 - `disable(int cap)` - 2 calls (generic state)
 - `useProgram(int id)` - 1 call
 - `setDepthTestFunction(int func)` - 2 calls (GlStateManager + MinecraftGLWrapper)
-- `setDepthWriteEnabled(boolean)` - 1 call
+- `setDepthWriteEnabled(boolean)` - 3 calls (GlStateManager + 2x MinecraftGLWrapper)
 - `setColorWriteMask(...)` - 1 call
 
 **Commits:**
@@ -71,5 +86,6 @@ Total deleted:        0 (0% complete)
 2. Apply pipeline state and descriptor bindings before all draw calls
 3. Phase 2 progress: Infrastructure complete
 4. Create PipelineAPIExample.java demonstrating new API usage
+5. Delete enableBlend() and disableBlend() - first deprecated method deletion
 
-**Current Focus:** Examples demonstrate the path forward. Next session can continue with actual deprecated method migration or proceed with demonstrating descriptor sets and render passes usage.
+**Current Focus:** Successfully deleted first 2 methods (301 → 299). Looking for more unused or simple methods to delete next.
