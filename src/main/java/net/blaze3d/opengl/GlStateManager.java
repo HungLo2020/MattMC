@@ -580,7 +580,7 @@ public class GlStateManager {
 
 	public static void _pixelStore(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setPixelStoreMode(i, j);
+		org.lwjgl.opengl.GL11.glPixelStorei(i, j);
 	}
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {

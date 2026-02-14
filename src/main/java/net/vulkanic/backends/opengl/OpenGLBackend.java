@@ -171,12 +171,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void setPixelStoreMode(int pname, int value) {
-        GL11.glPixelStorei(pname, value);
-    }
-    
-    @Deprecated
-    @Override
     public void attachFramebuffer(int target, int fbo) {
         // Note: Framebuffer binding would be handled via RenderPass in full Vulkan API
         // For now, just apply GL call directly

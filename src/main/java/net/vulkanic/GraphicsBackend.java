@@ -73,8 +73,6 @@ public interface GraphicsBackend {
     void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height);
     
     // Pixel operations
-    @Deprecated
-    void setPixelStoreMode(int pname, int value);
     
     // Framebuffer operations
     @Deprecated
