@@ -2255,4 +2255,239 @@ public class VulkanicAPI {
     public static void glBindTexture(int target, int texture) {
         getBackend().bindTexture(target, texture);
     }
+    
+    // ========================================================================
+    // NEW VULKAN-COMPATIBLE API (Phase 1)
+    // These methods are NOT deprecated - they form the new Vulkan-compatible API
+    // ========================================================================
+    
+    // Pipeline State Objects
+    
+    /**
+     * Creates an immutable pipeline state object.
+     * 
+     * Pipelines encapsulate shader stages, rasterization state, blend state,
+     * and depth/stencil state. Once created, pipelines are immutable.
+     * 
+     * Example:
+     * <pre>
+     * PipelineStateDesc desc = new PipelineStateDesc()
+     *     .setBlendMode(BlendMode.ALPHA_BLEND)
+     *     .setDepthTest(true, CompareOp.LESS)
+     *     .setCullMode(CullMode.BACK);
+     * Pipeline pipeline = VulkanicAPI.createPipeline(desc);
+     * </pre>
+     * 
+     * @param desc Pipeline state descriptor
+     * @return The created pipeline
+     */
+    public static Pipeline createPipeline(PipelineStateDesc desc) {
+        return getBackend().createPipeline(desc);
+    }
+    
+    /**
+     * Binds a pipeline for subsequent draw calls.
+     * 
+     * @param cmd Command buffer/context
+     * @param pipeline Pipeline to bind
+     */
+    public static void bindPipeline(CommandBuffer cmd, Pipeline pipeline) {
+        getBackend().bindPipeline(cmd, pipeline);
+    }
+    
+    /**
+     * Destroys a pipeline and frees its resources.
+     * 
+     * @param pipeline Pipeline to destroy
+     */
+    public static void destroyPipeline(Pipeline pipeline) {
+        getBackend().destroyPipeline(pipeline);
+    }
+    
+    // Descriptor Sets
+    
+    /**
+     * Creates a descriptor set layout.
+     * 
+     * Example:
+     * <pre>
+     * DescriptorSetLayout layout = VulkanicAPI.createDescriptorSetLayout(
+     *     new DescriptorSetLayoutBuilder()
+     *         .addTexture(0, ShaderStage.FRAGMENT)
+     *         .addUniformBuffer(1, ShaderStage.VERTEX)
+     * );
+     * </pre>
+     * 
+     * @param builder Builder containing binding specifications
+     * @return The created layout
+     */
+    public static DescriptorSetLayout createDescriptorSetLayout(DescriptorSetLayoutBuilder builder) {
+        return getBackend().createDescriptorSetLayout(builder);
+    }
+    
+    /**
+     * Allocates a descriptor set from a layout.
+     * 
+     * @param layout Descriptor set layout
+     * @return Allocated descriptor set
+     */
+    public static DescriptorSet allocateDescriptorSet(DescriptorSetLayout layout) {
+        return getBackend().allocateDescriptorSet(layout);
+    }
+    
+    /**
+     * Updates a descriptor set with a texture resource.
+     * 
+     * @param set Descriptor set to update
+     * @param binding Binding index
+     * @param texture Texture to bind
+     */
+    public static void updateDescriptorSetTexture(DescriptorSet set, int binding, Texture texture) {
+        getBackend().updateDescriptorSetTexture(set, binding, texture);
+    }
+    
+    /**
+     * Updates a descriptor set with a buffer resource.
+     * 
+     * @param set Descriptor set to update
+     * @param binding Binding index
+     * @param buffer Buffer to bind
+     */
+    public static void updateDescriptorSetBuffer(DescriptorSet set, int binding, Buffer buffer) {
+        getBackend().updateDescriptorSetBuffer(set, binding, buffer);
+    }
+    
+    /**
+     * Binds a descriptor set for subsequent draw calls.
+     * 
+     * @param cmd Command buffer/context
+     * @param set Descriptor set to bind
+     * @param setIndex Set index (for multiple sets)
+     */
+    public static void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int setIndex) {
+        getBackend().bindDescriptorSet(cmd, set, setIndex);
+    }
+    
+    // Render Passes
+    
+    /**
+     * Creates a render pass.
+     * 
+     * Example:
+     * <pre>
+     * RenderPassDesc desc = new RenderPassDesc()
+     *     .addColorAttachment(Format.RGBA8, LoadOp.CLEAR, StoreOp.STORE)
+     *     .setDepthAttachment(Format.D24, LoadOp.CLEAR, StoreOp.DONT_CARE)
+     *     .setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+     * RenderPass renderPass = VulkanicAPI.createRenderPass(desc);
+     * </pre>
+     * 
+     * @param desc Render pass descriptor
+     * @return The created render pass
+     */
+    public static RenderPass createRenderPass(RenderPassDesc desc) {
+        return getBackend().createRenderPass(desc);
+    }
+    
+    /**
+     * Begins a render pass.
+     * 
+     * @param cmd Command buffer/context
+     * @param renderPass Render pass to begin
+     * @param framebuffer Framebuffer handle (backend-specific)
+     */
+    public static void beginRenderPass(CommandBuffer cmd, RenderPass renderPass, long framebuffer) {
+        getBackend().beginRenderPass(cmd, renderPass, framebuffer);
+    }
+    
+    /**
+     * Ends the current render pass.
+     * 
+     * @param cmd Command buffer/context
+     */
+    public static void endRenderPass(CommandBuffer cmd) {
+        getBackend().endRenderPass(cmd);
+    }
+    
+    // Command Buffers
+    
+    /**
+     * Allocates a command buffer.
+     * 
+     * @return Allocated command buffer
+     */
+    public static CommandBuffer allocateCommandBuffer() {
+        return getBackend().allocateCommandBuffer();
+    }
+    
+    /**
+     * Begins recording commands into a command buffer.
+     * 
+     * @param cmd Command buffer to begin
+     */
+    public static void beginCommandBuffer(CommandBuffer cmd) {
+        getBackend().beginCommandBuffer(cmd);
+    }
+    
+    /**
+     * Ends recording commands into a command buffer.
+     * 
+     * @param cmd Command buffer to end
+     */
+    public static void endCommandBuffer(CommandBuffer cmd) {
+        getBackend().endCommandBuffer(cmd);
+    }
+    
+    /**
+     * Submits a command buffer for execution.
+     * 
+     * @param cmd Command buffer to submit
+     */
+    public static void submitCommandBuffer(CommandBuffer cmd) {
+        getBackend().submitCommandBuffer(cmd);
+    }
+    
+    // Resources
+    
+    /**
+     * Creates a buffer resource.
+     * 
+     * @param size Size in bytes
+     * @param usage Buffer usage flags
+     * @return Created buffer
+     */
+    public static Buffer createBuffer(long size, BufferUsage usage) {
+        return getBackend().createBuffer(size, usage);
+    }
+    
+    /**
+     * Destroys a buffer and frees its resources.
+     * 
+     * @param buffer Buffer to destroy
+     */
+    public static void destroyBuffer(Buffer buffer) {
+        getBackend().destroyBuffer(buffer);
+    }
+    
+    /**
+     * Creates a texture resource.
+     * 
+     * @param width Width in pixels
+     * @param height Height in pixels
+     * @param format Texture format
+     * @return Created texture
+     */
+    public static Texture createTexture(int width, int height, Format format) {
+        return getBackend().createTexture(width, height, format);
+    }
+    
+    /**
+     * Destroys a texture and frees its resources.
+     * 
+     * @param texture Texture to destroy
+     */
+    public static void destroyTexture(Texture texture) {
+        getBackend().destroyTexture(texture);
+    }
 }
+
