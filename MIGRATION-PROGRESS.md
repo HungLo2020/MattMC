@@ -1,6 +1,6 @@
 # Vulkan Migration Progress Tracking
 
-**Last Updated:** 2026-02-14 20:30 UTC
+**Last Updated:** 2026-02-14 20:45 UTC
 
 ## Deprecated Methods Count
 
@@ -9,7 +9,7 @@ Currently remaining: 298 deprecated methods (3 deleted as unused)
 **Integrated:**         29 methods (9.7%)
 **Not integrated:**     269 methods
 
-**Phase 2 MAJOR SESSION PROGRESS:** Integrated 24 methods this session (5 → 29)!
+**Phase 2 CONTINUED PROGRESS:** 29 methods integrated, 5 resource methods documented!
 
 ## Methods Integrated with PipelineManager
 
@@ -44,11 +44,18 @@ Total integrated: **29 of 298 (9.7%)**
 20. ✅ `glStencilFunc(func, ref, mask)` - Stencil function configuration
 21. ✅ Additional capability tracking in updatePipelineManagerForCapability()
 
-### Batch 5 - This Session (4 methods)
+### Batch 5 - Previous Session (4 methods)
 22. ✅ `glBlendEquationSeparate(modeRGB, modeAlpha)` - Separate blend equations
 23. ✅ `glClearColor(r, g, b, a)` - Clear color state
 24. ✅ `glClearDepth(depth)` - Clear depth state
 25. ✅ `glPolygonMode(face, mode)` - Polygon rasterization mode
+
+### Resource Methods Documented - This Session (5 methods)
+26. 📝 `bindTexture(int textureId)` - Resource binding (Descriptor Sets in Vulkan)
+27. 📝 `bindTexture(int target, int textureId)` - Resource binding
+28. 📝 `attachFramebuffer(int target, int fbo)` - Framebuffer binding (RenderPass in Vulkan)
+29. 📝 `attachBuffer(int target, int buffer)` - Buffer binding (Descriptor Sets in Vulkan)
+30. 📝 `activateTextureUnit(int unit)` - Texture unit (implicit in Vulkan Descriptor Sets)
 
 ## Phase Status
 
@@ -67,12 +74,12 @@ Total integrated: **29 of 298 (9.7%)**
 
 ✅ WORKING PERFECTLY (must remain true at all times)
 
-## Phase 2 Progress (IN PROGRESS - MASSIVE WORK THIS SESSION!)
+## Phase 2 Progress (IN PROGRESS - CONTINUED WORK!)
 
-**Session Start:** 2026-02-14 20:20 UTC
-**Current Time:** 2026-02-14 20:30 UTC
+**Previous Session:** 2026-02-14 20:20-20:30 UTC (24 methods integrated)
+**This Session:** 2026-02-14 20:40-20:45 UTC (5 methods documented)
 
-**🎉 THIS SESSION ACHIEVEMENTS:**
+**🎉 PREVIOUS SESSION ACHIEVEMENTS (20:20-20:30 UTC):**
 
 **Infrastructure Expanded:**
 - [x] Added polygon offset state (factor, units, enabled)
@@ -86,14 +93,17 @@ Total integrated: **29 of 298 (9.7%)**
 - [x] All build successfully (5 batches, all successful)
 - [x] All maintain OpenGL compatibility
 
-**Commits This Session:**
+**Commits Previous Session:**
 1. Expand PipelineManager, integrate 10 methods (5→15)
 2. Integrate 5 more methods (15→20), track additional state
 3. Update docs
 4. Integrate 5 more state methods (20→25), add polygon offset, stencil, point size
 5. Integrate 4 more state methods (25→29), add clear color/depth, blend equation, polygon mode
 
-**Build Status:** ✅ All 5 batches built successfully, no errors
+**Commits This Session:**
+1. Add clarifying comments to 5 resource binding methods
+
+**Build Status:** ✅ All batches built successfully, no errors
 
 **Lines of Code Added This Session:**
 - PipelineManager: ~180 LOC (state tracking + methods)
@@ -136,10 +146,14 @@ The PipelineManager now tracks:
 
 ## Next Steps
 
-1. Continue integrating more state management methods
-2. Target texture binding methods next
-3. Then buffer binding methods
-4. Eventually integrate draw call preparation
-5. Continue until all 298 deprecated methods integrated or deleted
+1. Continue integrating actual state management methods
+2. Many methods are resource operations (texture/buffer/framebuffer binding)
+   - These will be handled via Descriptor Sets (Phase 3) and Render Passes (Phase 4)
+   - Don't need PipelineManager integration
+3. Focus on finding remaining state configuration methods
+4. Build comprehensive list of what still needs integration vs what's resource ops
+5. Continue until all state methods integrated
 
-**Target for next session:** Get to 30-40 methods integrated
+**Status:** 29 state methods integrated, many resource operations identified for later phases
+
+**Target for next session:** Continue identifying and integrating state methods, prepare for Phase 3 (Descriptor Sets)
