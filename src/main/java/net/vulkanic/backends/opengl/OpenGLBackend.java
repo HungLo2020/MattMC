@@ -125,6 +125,17 @@ public class OpenGLBackend implements GraphicsBackend {
             case GL11.GL_CULL_FACE:
                 pipelineManager.setCullMode(enabled ? CullMode.BACK : CullMode.NONE);
                 break;
+            case GL11.GL_POLYGON_OFFSET_FILL:
+            case GL11.GL_POLYGON_OFFSET_LINE:
+            case GL11.GL_POLYGON_OFFSET_POINT:
+                pipelineManager.setPolygonOffsetEnabled(enabled);
+                break;
+            case GL11.GL_STENCIL_TEST:
+                pipelineManager.setStencilTestEnabled(enabled);
+                break;
+            case GL11.GL_SCISSOR_TEST:
+                pipelineManager.setScissorTest(enabled);
+                break;
             // Other capabilities don't map to pipeline state
         }
     }
@@ -339,7 +350,9 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void configurePolygonOffset(float factor, float units) {
-        // Note: PipelineManager doesn't track polygon offset yet, but method exists for future
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setPolygonOffset(factor, units);
+        
         // Also apply directly for immediate effect (OpenGL path)
         GL11.glPolygonOffset(factor, units);
     }
@@ -2014,6 +2027,10 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glStencilFunc(int func, int ref, int mask) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setStencilFunc(func, ref, mask);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
     }
     

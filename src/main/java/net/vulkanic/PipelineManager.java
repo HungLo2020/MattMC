@@ -53,6 +53,17 @@ public class PipelineManager {
     private float clearColorA = 0.0f;
     private long vertexShader = 0;
     private long fragmentShader = 0;
+    private float polygonOffsetFactor = 0.0f;
+    private float polygonOffsetUnits = 0.0f;
+    private boolean polygonOffsetEnabled = false;
+    private float pointSize = 1.0f;
+    private boolean stencilTestEnabled = false;
+    private int stencilFunc = GL11.GL_ALWAYS;
+    private int stencilRef = 0;
+    private int stencilMask = 0xFFFFFFFF;
+    private int stencilOpFail = GL11.GL_KEEP;
+    private int stencilOpZFail = GL11.GL_KEEP;
+    private int stencilOpZPass = GL11.GL_KEEP;
     
     // Pipeline cache with LRU eviction
     private final Map<StateKey, Pipeline> pipelineCache = new LinkedHashMap<>(16, 0.75f, true) {
@@ -185,6 +196,53 @@ public class PipelineManager {
         this.clearColorG = g;
         this.clearColorB = b;
         this.clearColorA = a;
+    }
+    
+    /**
+     * Set polygon offset
+     */
+    public void setPolygonOffset(float factor, float units) {
+        this.polygonOffsetFactor = factor;
+        this.polygonOffsetUnits = units;
+    }
+    
+    /**
+     * Set polygon offset enabled
+     */
+    public void setPolygonOffsetEnabled(boolean enabled) {
+        this.polygonOffsetEnabled = enabled;
+    }
+    
+    /**
+     * Set point size
+     */
+    public void setPointSize(float size) {
+        this.pointSize = size;
+    }
+    
+    /**
+     * Set stencil test enabled
+     */
+    public void setStencilTestEnabled(boolean enabled) {
+        this.stencilTestEnabled = enabled;
+    }
+    
+    /**
+     * Set stencil function
+     */
+    public void setStencilFunc(int func, int ref, int mask) {
+        this.stencilFunc = func;
+        this.stencilRef = ref;
+        this.stencilMask = mask;
+    }
+    
+    /**
+     * Set stencil operations
+     */
+    public void setStencilOp(int fail, int zfail, int zpass) {
+        this.stencilOpFail = fail;
+        this.stencilOpZFail = zfail;
+        this.stencilOpZPass = zpass;
     }
     
     /**
