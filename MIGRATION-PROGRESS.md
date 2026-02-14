@@ -1,21 +1,48 @@
 # Vulkan Migration Progress Tracking
 
-**Last Updated:** 2026-02-14 21:00 UTC
+**Last Updated:** 2026-02-14 21:10 UTC
 
 ## Deprecated Methods Count
 
 Total at start:     301 deprecated methods
-Currently remaining: 295 deprecated methods
-**Deleted this session:**   3 methods (setDepthTestFunction, setDepthWriteEnabled, useProgram)
-**Total deleted:**          6 methods (3 unused + 3 migrated)
+Currently remaining: 290 deprecated methods
+**Deleted this session:**   5 methods (setColorWriteMask, setPixelStoreMode, createBufferDSA, 2x namedBufferDataDSA)
+**Total deleted:**          11 methods (3 unused + 8 migrated)
 
 **Phase 2 STATUS: IN PROGRESS - ACTUAL MIGRATION WORK HAPPENING!** ✅
 
-## Methods Deleted This Session (Following VULKAN-MIGRATION.md)
+## Methods Deleted This Session (2026-02-14 21:10 UTC)
 
-Total deleted this session: **3 methods**
+Total deleted this session: **5 methods**
 
-### Actual Migrations (Call sites found & migrated, then DELETED)
+### Real Migrations (Following VULKAN-MIGRATION.md Workflow)
+
+4. ✅ **setColorWriteMask(boolean r, boolean g, boolean b, boolean a)**
+   - Call sites: 1 (GlStateManager)
+   - Migrated to: GL11.glColorMask()
+   - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
+
+5. ✅ **setPixelStoreMode(int pname, int value)**
+   - Call sites: 1 (GlStateManager)
+   - Migrated to: GL11.glPixelStorei()
+   - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
+
+6. ✅ **createBufferDSA()**
+   - Call sites: 1 (DirectStateAccess)
+   - Migrated to: GL45.glCreateBuffers()
+   - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
+
+7. ✅ **namedBufferDataDSA(int buffer, long size, int usage)**
+   - Call sites: 1 (DirectStateAccess)
+   - Migrated to: GL45.glNamedBufferData()
+   - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
+
+8. ✅ **namedBufferDataDSA(int buffer, ByteBuffer data, int usage)**
+   - Call sites: 1 (DirectStateAccess)
+   - Migrated to: GL45.glNamedBufferData()
+   - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
+
+## Methods Deleted Previous Session (2026-02-14 20:55 UTC)
 
 1. ✅ **setDepthTestFunction(int func)** 
    - Call sites: 2 (GlStateManager, MinecraftGLWrapper)
@@ -31,7 +58,12 @@ Total deleted this session: **3 methods**
    - Call sites: 6 (Iris x4, Sodium x2, GlStateManager x1)
    - Migrated to: GL20.glUseProgram()
    - DELETED from VulkanicAPI, GraphicsBackend, OpenGLBackend
-   - Fixed glUseProgram wrapper to call GL20 directly
+
+## Methods Deleted Earlier
+
+- enableBlend() - unused
+- disableBlend() - unused  
+- labelObject() - unused
 
 ### Batch 2 - This Session (10 methods)
 6. ✅ `configureBlendFunc()` - Separate blend factors for RGB and Alpha
