@@ -1,0 +1,191 @@
+package net.vulkanic;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Pipeline Manager - Bridges stateful rendering API to pipeline-based API.
+ * 
+ * This class tracks rendering state (blend mode, depth test, cull mode, shaders)
+ * and automatically creates/caches Pipeline objects for each unique state combination.
+ * 
+ * Purpose: Enable gradual migration from stateful OpenGL-style API to Vulkan-compatible
+ * Pipeline State Objects without breaking existing code.
+ * 
+ * Usage:
+ * <pre>
+ * PipelineManager manager = new PipelineManager();
+ * manager.setBlendMode(BlendMode.ALPHA_BLEND);
+ * manager.setDepthTest(true, CompareOp.LESS);
+ * Pipeline pipeline = manager.getCurrentPipeline();
+ * VulkanicAPI.bindPipeline(cmd, pipeline);
+ * </pre>
+ */
+public class PipelineManager {
+    
+    // Current state
+    private BlendMode blendMode = BlendMode.NONE;
+    private boolean depthTestEnabled = true;
+    private CompareOp depthCompareOp = CompareOp.LESS;
+    private boolean depthWriteEnabled = true;
+    private CullMode cullMode = CullMode.NONE;
+    private long vertexShader = 0;
+    private long fragmentShader = 0;
+    
+    // Pipeline cache with LRU eviction
+    private final Map<StateKey, Pipeline> pipelineCache = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<StateKey, Pipeline> eldest) {
+            boolean shouldRemove = size() > MAX_CACHE_SIZE;
+            if (shouldRemove && eldest.getValue() != null) {
+                // Clean up old pipeline
+                VulkanicAPI.destroyPipeline(eldest.getValue());
+            }
+            return shouldRemove;
+        }
+    };
+    
+    private static final int MAX_CACHE_SIZE = 256;
+    
+    /**
+     * Set blend mode
+     */
+    public void setBlendMode(BlendMode mode) {
+        this.blendMode = mode != null ? mode : BlendMode.NONE;
+    }
+    
+    /**
+     * Set depth test configuration
+     */
+    public void setDepthTest(boolean enabled, CompareOp compareOp) {
+        this.depthTestEnabled = enabled;
+        this.depthCompareOp = compareOp != null ? compareOp : CompareOp.LESS;
+    }
+    
+    /**
+     * Set depth write enabled
+     */
+    public void setDepthWrite(boolean enabled) {
+        this.depthWriteEnabled = enabled;
+    }
+    
+    /**
+     * Set cull mode
+     */
+    public void setCullMode(CullMode mode) {
+        this.cullMode = mode != null ? mode : CullMode.NONE;
+    }
+    
+    /**
+     * Set shader for a stage
+     */
+    public void setShader(ShaderStage stage, long shaderHandle) {
+        if (stage == ShaderStage.VERTEX) {
+            this.vertexShader = shaderHandle;
+        } else if (stage == ShaderStage.FRAGMENT) {
+            this.fragmentShader = shaderHandle;
+        }
+    }
+    
+    /**
+     * Get or create pipeline for current state.
+     * Pipelines are cached and reused for identical state.
+     */
+    public Pipeline getCurrentPipeline() {
+        StateKey key = new StateKey(
+            blendMode,
+            depthTestEnabled,
+            depthCompareOp,
+            depthWriteEnabled,
+            cullMode,
+            vertexShader,
+            fragmentShader
+        );
+        
+        return pipelineCache.computeIfAbsent(key, k -> createPipeline(k));
+    }
+    
+    /**
+     * Create a new pipeline from state key
+     */
+    private Pipeline createPipeline(StateKey key) {
+        PipelineStateDesc desc = new PipelineStateDesc()
+            .setBlendMode(key.blendMode)
+            .setDepthTest(key.depthTestEnabled, key.depthCompareOp)
+            .setDepthWrite(key.depthWriteEnabled)
+            .setCullMode(key.cullMode);
+        
+        if (key.vertexShader != 0) {
+            desc.setShader(ShaderStage.VERTEX, key.vertexShader);
+        }
+        if (key.fragmentShader != 0) {
+            desc.setShader(ShaderStage.FRAGMENT, key.fragmentShader);
+        }
+        
+        return VulkanicAPI.createPipeline(desc);
+    }
+    
+    /**
+     * Clear pipeline cache and destroy all cached pipelines
+     */
+    public void clearCache() {
+        for (Pipeline pipeline : pipelineCache.values()) {
+            if (pipeline != null) {
+                VulkanicAPI.destroyPipeline(pipeline);
+            }
+        }
+        pipelineCache.clear();
+    }
+    
+    /**
+     * Get cache statistics
+     */
+    public int getCacheSize() {
+        return pipelineCache.size();
+    }
+    
+    /**
+     * State key for pipeline caching
+     */
+    private static class StateKey {
+        final BlendMode blendMode;
+        final boolean depthTestEnabled;
+        final CompareOp depthCompareOp;
+        final boolean depthWriteEnabled;
+        final CullMode cullMode;
+        final long vertexShader;
+        final long fragmentShader;
+        
+        StateKey(BlendMode blendMode, boolean depthTestEnabled, CompareOp depthCompareOp,
+                 boolean depthWriteEnabled, CullMode cullMode, long vertexShader, long fragmentShader) {
+            this.blendMode = blendMode;
+            this.depthTestEnabled = depthTestEnabled;
+            this.depthCompareOp = depthCompareOp;
+            this.depthWriteEnabled = depthWriteEnabled;
+            this.cullMode = cullMode;
+            this.vertexShader = vertexShader;
+            this.fragmentShader = fragmentShader;
+        }
+        
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            StateKey stateKey = (StateKey) o;
+            return depthTestEnabled == stateKey.depthTestEnabled &&
+                   depthWriteEnabled == stateKey.depthWriteEnabled &&
+                   vertexShader == stateKey.vertexShader &&
+                   fragmentShader == stateKey.fragmentShader &&
+                   blendMode == stateKey.blendMode &&
+                   depthCompareOp == stateKey.depthCompareOp &&
+                   cullMode == stateKey.cullMode;
+        }
+        
+        @Override
+        public int hashCode() {
+            return Objects.hash(blendMode, depthTestEnabled, depthCompareOp,
+                               depthWriteEnabled, cullMode, vertexShader, fragmentShader);
+        }
+    }
+}

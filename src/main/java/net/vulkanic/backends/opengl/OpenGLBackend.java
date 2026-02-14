@@ -16,6 +16,9 @@ import java.util.Map;
  */
 public class OpenGLBackend implements GraphicsBackend {
     
+    // Pipeline manager for bridging stateful API to pipeline-based API
+    private final PipelineManager pipelineManager = new PipelineManager();
+    
     @Deprecated
     @Override
     public long getGraphicsContext() {
@@ -98,7 +101,29 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void setDepthTestFunction(int func) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        CompareOp compareOp = glCompareOpToEnum(func);
+        pipelineManager.setDepthTest(true, compareOp);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glDepthFunc(func);
+    }
+    
+    /**
+     * Converts GL depth function constant to CompareOp enum
+     */
+    private CompareOp glCompareOpToEnum(int glFunc) {
+        return switch (glFunc) {
+            case GL11.GL_NEVER -> CompareOp.NEVER;
+            case GL11.GL_LESS -> CompareOp.LESS;
+            case GL11.GL_EQUAL -> CompareOp.EQUAL;
+            case GL11.GL_LEQUAL -> CompareOp.LESS_EQUAL;
+            case GL11.GL_GREATER -> CompareOp.GREATER;
+            case GL11.GL_NOTEQUAL -> CompareOp.NOT_EQUAL;
+            case GL11.GL_GEQUAL -> CompareOp.GREATER_EQUAL;
+            case GL11.GL_ALWAYS -> CompareOp.ALWAYS;
+            default -> CompareOp.LESS; // Safe default
+        };
     }
     
     @Deprecated
