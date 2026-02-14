@@ -83,19 +83,50 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void useProgram(int programId) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setShader(ShaderStage.VERTEX, programId);
+        pipelineManager.setShader(ShaderStage.FRAGMENT, programId);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL20.glUseProgram(programId);
     }
     
     @Deprecated
     @Override
     public void enable(int cap) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        updatePipelineManagerForCapability(cap, true);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glEnable(cap);
     }
     
     @Deprecated
     @Override
     public void disable(int cap) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        updatePipelineManagerForCapability(cap, false);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glDisable(cap);
+    }
+    
+    /**
+     * Updates PipelineManager state based on GL capability enable/disable
+     */
+    private void updatePipelineManagerForCapability(int cap, boolean enabled) {
+        switch (cap) {
+            case GL11.GL_BLEND:
+                pipelineManager.setBlendMode(enabled ? BlendMode.ALPHA_BLEND : BlendMode.NONE);
+                break;
+            case GL11.GL_DEPTH_TEST:
+                pipelineManager.setDepthTest(enabled, CompareOp.LESS);
+                break;
+            case GL11.GL_CULL_FACE:
+                pipelineManager.setCullMode(enabled ? CullMode.BACK : CullMode.NONE);
+                break;
+            // Other capabilities don't map to pipeline state
+        }
     }
     
     @Deprecated
@@ -129,6 +160,10 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void setDepthWriteEnabled(boolean enabled) {
+        // Update pipeline manager state (Vulkan-compatible path)
+        pipelineManager.setDepthWrite(enabled);
+        
+        // Also apply directly for immediate effect (OpenGL path)
         GL11.glDepthMask(enabled);
     }
     
