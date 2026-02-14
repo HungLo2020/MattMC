@@ -745,4 +745,201 @@ public interface GraphicsBackend {
     // Additional texture methods
     @Deprecated
     int glGenTextures();
+    
+    // ========================================================================
+    // NEW VULKAN-COMPATIBLE API (Phase 1)
+    // These methods are NOT deprecated - they form the new Vulkan-compatible API
+    // ========================================================================
+    
+    // Pipeline State Objects
+    /**
+     * Creates an immutable pipeline state object.
+     * 
+     * In Vulkan: Creates VkPipeline
+     * In OpenGL: Creates a state configuration object
+     * 
+     * @param desc Pipeline state descriptor
+     * @return The created pipeline
+     */
+    Pipeline createPipeline(PipelineStateDesc desc);
+    
+    /**
+     * Binds a pipeline for subsequent draw calls.
+     * 
+     * In Vulkan: vkCmdBindPipeline
+     * In OpenGL: Tracks current pipeline, applies state on draw
+     * 
+     * @param cmd Command buffer/context
+     * @param pipeline Pipeline to bind
+     */
+    void bindPipeline(CommandBuffer cmd, Pipeline pipeline);
+    
+    /**
+     * Destroys a pipeline and frees its resources.
+     * 
+     * @param pipeline Pipeline to destroy
+     */
+    void destroyPipeline(Pipeline pipeline);
+    
+    // Descriptor Sets
+    /**
+     * Creates a descriptor set layout.
+     * 
+     * In Vulkan: Creates VkDescriptorSetLayout
+     * In OpenGL: Creates a binding configuration
+     * 
+     * @param builder Builder containing binding specifications
+     * @return The created layout
+     */
+    DescriptorSetLayout createDescriptorSetLayout(DescriptorSetLayoutBuilder builder);
+    
+    /**
+     * Allocates a descriptor set from a layout.
+     * 
+     * In Vulkan: Allocates from descriptor pool
+     * In OpenGL: Creates a binding set
+     * 
+     * @param layout Descriptor set layout
+     * @return Allocated descriptor set
+     */
+    DescriptorSet allocateDescriptorSet(DescriptorSetLayout layout);
+    
+    /**
+     * Updates a descriptor set with a texture resource.
+     * 
+     * @param set Descriptor set to update
+     * @param binding Binding index
+     * @param texture Texture to bind
+     */
+    void updateDescriptorSetTexture(DescriptorSet set, int binding, Texture texture);
+    
+    /**
+     * Updates a descriptor set with a buffer resource.
+     * 
+     * @param set Descriptor set to update
+     * @param binding Binding index
+     * @param buffer Buffer to bind
+     */
+    void updateDescriptorSetBuffer(DescriptorSet set, int binding, Buffer buffer);
+    
+    /**
+     * Binds a descriptor set for subsequent draw calls.
+     * 
+     * In Vulkan: vkCmdBindDescriptorSets
+     * In OpenGL: Tracks current descriptor set, applies bindings on draw
+     * 
+     * @param cmd Command buffer/context
+     * @param set Descriptor set to bind
+     * @param setIndex Set index (for multiple sets)
+     */
+    void bindDescriptorSet(CommandBuffer cmd, DescriptorSet set, int setIndex);
+    
+    // Render Passes
+    /**
+     * Creates a render pass.
+     * 
+     * In Vulkan: Creates VkRenderPass
+     * In OpenGL: Creates framebuffer configuration
+     * 
+     * @param desc Render pass descriptor
+     * @return The created render pass
+     */
+    RenderPass createRenderPass(RenderPassDesc desc);
+    
+    /**
+     * Begins a render pass.
+     * 
+     * In Vulkan: vkCmdBeginRenderPass
+     * In OpenGL: Binds framebuffer and clears attachments
+     * 
+     * @param cmd Command buffer/context
+     * @param renderPass Render pass to begin
+     * @param framebuffer Framebuffer handle (backend-specific)
+     */
+    void beginRenderPass(CommandBuffer cmd, RenderPass renderPass, long framebuffer);
+    
+    /**
+     * Ends the current render pass.
+     * 
+     * In Vulkan: vkCmdEndRenderPass
+     * In OpenGL: Unbinds framebuffer
+     * 
+     * @param cmd Command buffer/context
+     */
+    void endRenderPass(CommandBuffer cmd);
+    
+    // Command Buffers
+    /**
+     * Allocates a command buffer.
+     * 
+     * In Vulkan: Allocates VkCommandBuffer from pool
+     * In OpenGL: Creates immediate-mode context
+     * 
+     * @return Allocated command buffer
+     */
+    CommandBuffer allocateCommandBuffer();
+    
+    /**
+     * Begins recording commands into a command buffer.
+     * 
+     * In Vulkan: vkBeginCommandBuffer
+     * In OpenGL: No-op (immediate mode)
+     * 
+     * @param cmd Command buffer to begin
+     */
+    void beginCommandBuffer(CommandBuffer cmd);
+    
+    /**
+     * Ends recording commands into a command buffer.
+     * 
+     * In Vulkan: vkEndCommandBuffer
+     * In OpenGL: No-op (immediate mode)
+     * 
+     * @param cmd Command buffer to end
+     */
+    void endCommandBuffer(CommandBuffer cmd);
+    
+    /**
+     * Submits a command buffer for execution.
+     * 
+     * In Vulkan: Submits to queue
+     * In OpenGL: No-op (already executed)
+     * 
+     * @param cmd Command buffer to submit
+     */
+    void submitCommandBuffer(CommandBuffer cmd);
+    
+    // Resources
+    /**
+     * Creates a buffer resource.
+     * 
+     * @param size Size in bytes
+     * @param usage Buffer usage flags
+     * @return Created buffer
+     */
+    Buffer createBuffer(long size, BufferUsage usage);
+    
+    /**
+     * Destroys a buffer and frees its resources.
+     * 
+     * @param buffer Buffer to destroy
+     */
+    void destroyBuffer(Buffer buffer);
+    
+    /**
+     * Creates a texture resource.
+     * 
+     * @param width Width in pixels
+     * @param height Height in pixels
+     * @param format Texture format
+     * @return Created texture
+     */
+    Texture createTexture(int width, int height, Format format);
+    
+    /**
+     * Destroys a texture and frees its resources.
+     * 
+     * @param texture Texture to destroy
+     */
+    void destroyTexture(Texture texture);
 }
