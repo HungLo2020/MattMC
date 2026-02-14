@@ -2187,11 +2187,12 @@ public class OpenGLBackend implements GraphicsBackend {
                     GL11.glBindTexture(GL11.GL_TEXTURE_2D, (int) resource.resourceHandle);
                     break;
                 case UNIFORM_BUFFER:
-                    GL30.glBindBufferBase(GL30.GL_UNIFORM_BUFFER, binding, (int) resource.resourceHandle);
+                    // GL_UNIFORM_BUFFER = 0x8A11
+                    org.lwjgl.opengl.GL31.glBindBufferBase(0x8A11, binding, (int) resource.resourceHandle);
                     break;
                 case STORAGE_BUFFER:
                     // GL_SHADER_STORAGE_BUFFER = 0x90D2
-                    GL30.glBindBufferBase(0x90D2, binding, (int) resource.resourceHandle);
+                    org.lwjgl.opengl.GL43.glBindBufferBase(0x90D2, binding, (int) resource.resourceHandle);
                     break;
             }
         }
