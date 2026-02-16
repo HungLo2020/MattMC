@@ -481,33 +481,43 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL30.glGenFramebuffers();
     }
     
-    @Deprecated
     @Override
-    public void destroyFramebufferObject(int fbo) {
+    public void deleteFramebuffer(CommandContext ctx, int fbo) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL30.glDeleteFramebuffers(fbo);
     }
     
-    @Deprecated
     @Override
-    public void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+    public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
     @Override
-    public int constructShaderObject(int shaderType) {
+    public int createShader(CommandContext ctx, int shaderType) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glCreateShader(shaderType);
     }
     
-    @Deprecated
     @Override
-    public void disposeShaderObject(int shader) {
+    public void deleteShader(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glDeleteShader(shader);
     }
     
-    @Deprecated
     @Override
-    public void compileShaderSource(int shader) {
+    public void compileShader(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glCompileShader(shader);
     }
     

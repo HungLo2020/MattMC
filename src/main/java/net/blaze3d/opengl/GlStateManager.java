@@ -154,12 +154,12 @@ public class GlStateManager {
 
 	public static void glDeleteShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.disposeShaderObject(i);
+		net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static int glCreateShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.constructShaderObject(i);
+		return net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void glShaderSource(int i, String string) {
@@ -181,7 +181,7 @@ public class GlStateManager {
 
 	public static void glCompileShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.compileShaderSource(i);
+		net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static int glGetShaderi(int i, int j) {
@@ -346,12 +346,12 @@ public class GlStateManager {
 
 	public static void _glBlitFrameBuffer(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.copyFramebufferRegion(i, j, k, l, m, n, o, p, q, r);
+		net.vulkanic.VulkanicAPI.blitFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, q, r);
 	}
 
 	public static void _glDeleteFramebuffers(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.destroyFramebufferObject(i);
+		net.vulkanic.VulkanicAPI.deleteFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 		if (readFbo == i) {
 			readFbo = 0;
 		}

@@ -974,29 +974,24 @@ public class VulkanicAPI {
         return getBackend().createFramebufferObject(ctx);
     }
     
-    @Deprecated
-    public static void destroyFramebufferObject(int fbo) {
-        getBackend().destroyFramebufferObject(fbo);
+    public static void deleteFramebuffer(CommandContext ctx, int fbo) {
+        getBackend().deleteFramebuffer(ctx, fbo);
     }
     
-    @Deprecated
-    public static void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        getBackend().copyFramebufferRegion(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+    public static void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    public static int constructShaderObject(int shaderType) {
-        return getBackend().constructShaderObject(shaderType);
+    public static int createShader(CommandContext ctx, int shaderType) {
+        return getBackend().createShader(ctx, shaderType);
     }
     
-    @Deprecated
-    public static void disposeShaderObject(int shader) {
-        getBackend().disposeShaderObject(shader);
+    public static void deleteShader(CommandContext ctx, int shader) {
+        getBackend().deleteShader(ctx, shader);
     }
     
-    @Deprecated
-    public static void compileShaderSource(int shader) {
-        getBackend().compileShaderSource(shader);
+    public static void compileShader(CommandContext ctx, int shader) {
+        getBackend().compileShader(ctx, shader);
     }
     
     @Deprecated
@@ -1928,7 +1923,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glDeleteFramebuffers(int framebuffer) {
-        getBackend().destroyFramebufferObject(framebuffer);
+        getBackend().deleteFramebuffer(getImmediateContext(), framebuffer);
     }
     
     @Deprecated

@@ -19,9 +19,9 @@ public class GlShader extends GlObject {
     public GlShader(ShaderType type, ResourceLocation name, ShaderParser.ParsedShader parsedShader) {
         this.name = name;
 
-        int handle = VulkanicAPI.constructShaderObject(type.id);
+        int handle = VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext(), type.id);
         ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
-        VulkanicAPI.compileShaderSource(handle);
+        VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getImmediateContext(), handle);
 
         String log = VulkanicAPI.retrieveShaderInfoLog(handle);
 
@@ -44,7 +44,7 @@ public class GlShader extends GlObject {
     }
 
     public void delete() {
-        VulkanicAPI.disposeShaderObject(this.handle());
+        VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), this.handle());
 
         this.invalidateHandle();
     }

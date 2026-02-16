@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 14.1% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 15.9% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 14.1% | 100% | In Progress |
+| **API Vulkan Compatibility** | 🟡 15.9% | 100% | In Progress |
 
 ---
 
@@ -168,6 +168,10 @@
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Third batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Fourth batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Fifth batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Sixth batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Seventh batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Eighth batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Ninth batch complete
 - [ ] **Design Phase 2.5 roadmap** - API redesign planning
 - [ ] **Prioritize Phase 2.5 tasks** - Command buffers, pipelines, descriptors
 
@@ -189,11 +193,12 @@
 - [x] **Migrated sixth 5 methods** - createBufferDSA(), namedBufferDataDSA(), allocateBufferObject(), releaseBufferObject(), checkForErrors()
 - [x] **Migrated seventh 5 methods** - namedBufferSubDataDSA(), namedBufferStorageDSA() (2 overloads), mapNamedBufferRangeDSA(), unmapNamedBufferDSA()
 - [x] **Migrated eighth 5 methods** - createVertexArrayObject(), selectVertexArray(), mapBufferRegion(), unmapBufferData(), generateFramebufferObject()
-- [x] **40 of 283 deprecated methods migrated** (14.1% complete)
+- [x] **Migrated ninth 5 methods** - destroyFramebufferObject(), copyFramebufferRegion(), constructShaderObject(), disposeShaderObject(), compileShaderSource()
+- [x] **45 of 283 deprecated methods migrated** (15.9% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 40 / 283 (14.1%)
+**Methods Migrated to CommandContext Pattern**: 45 / 283 (15.9%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -250,9 +255,16 @@
 4. ✅ unmapBufferData(int) → unmapBufferTarget(CommandContext, int) - 2 call sites updated (GlStateManager, GLRenderDevice)
 5. ✅ generateFramebufferObject() → createFramebufferObject(CommandContext) - 5 call sites updated (FogRenderer, VanillaFadeRenderer, DhFadeRenderer, SSAORenderer, GlStateManager)
 
-**Total Call Sites Updated**: 99
+**Batch 9 (Completed 2026-02-16)**:
+1. ✅ destroyFramebufferObject(int) → deleteFramebuffer(CommandContext, int) - 5 call sites updated (GlStateManager, FogRenderer, VanillaFadeRenderer, DhFadeRenderer, SSAORenderer)
+2. ✅ copyFramebufferRegion(...) → blitFramebuffer(CommandContext, ...) - 1 call site updated (GlStateManager)
+3. ✅ constructShaderObject(int) → createShader(CommandContext, int) - 4 call sites updated (GlStateManager, GlShader, Shader x2)
+4. ✅ disposeShaderObject(int) → deleteShader(CommandContext, int) - 3 call sites updated (GlStateManager, GlShader, Shader)
+5. ✅ compileShaderSource(int) → compileShader(CommandContext, int) - 4 call sites updated (GlStateManager, GlShader, Shader x2)
 
-**Remaining Deprecated Methods**: 243 (85.9%)
+**Total Call Sites Updated**: 116
+
+**Remaining Deprecated Methods**: 238 (84.1%)
 
 ### Blockers
 

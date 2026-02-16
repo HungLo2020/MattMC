@@ -51,7 +51,7 @@ public class Shader
 	{
 		LOGGER.info("Loading shader at [" + path + "]");
 		// Create an empty shader object
-		this.id = VulkanicAPI.constructShaderObject(type);
+		this.id = VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext(), type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"].");
@@ -60,7 +60,7 @@ public class Shader
 		StringBuilder source = loadFile(path, absoluteFilePath, new StringBuilder());
 		safeShaderSource(this.id, source);
 		
-		VulkanicAPI.compileShaderSource(this.id);
+		VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getImmediateContext(), this.id);
 		// check if the shader compiled
 		int status = VulkanicAPI.queryShaderParameter(this.id, VulkanicAPI.GL_COMPILE_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
@@ -82,14 +82,14 @@ public class Shader
 		}
 		
 		// Create an empty shader object
-		this.id = VulkanicAPI.constructShaderObject(type);
+		this.id = VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext(), type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"] and Source: \n["+sourceString+"].");
 		}
 		
 		safeShaderSource(this.id, sourceString);
-		VulkanicAPI.compileShaderSource(this.id);
+		VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getImmediateContext(), this.id);
 		// check if the shader compiled
 		int status = VulkanicAPI.queryShaderParameter(this.id, VulkanicAPI.GL_COMPILE_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
@@ -140,7 +140,7 @@ public class Shader
 		}
 	}
 	
-	public void free() { VulkanicAPI.disposeShaderObject(this.id); }
+	public void free() { VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), this.id); }
 	
 	public static StringBuilder loadFile(String path, boolean absoluteFilePath, StringBuilder stringBuilder)
 	{

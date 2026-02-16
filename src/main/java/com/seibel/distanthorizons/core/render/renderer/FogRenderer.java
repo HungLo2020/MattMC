@@ -55,7 +55,7 @@ public class FogRenderer
 	{
 		if (this.fogFramebuffer != -1)
 		{
-			VulkanicAPI.destroyFramebufferObject(this.fogFramebuffer);
+			VulkanicAPI.deleteFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), this.fogFramebuffer);
 			this.fogFramebuffer = -1;
 		}
 		

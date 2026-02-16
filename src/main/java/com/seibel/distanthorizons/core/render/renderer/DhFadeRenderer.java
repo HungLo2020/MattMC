@@ -62,7 +62,7 @@ public class DhFadeRenderer
 	{
 		if (this.fadeFramebuffer != -1)
 		{
-			VulkanicAPI.destroyFramebufferObject(this.fadeFramebuffer);
+			VulkanicAPI.deleteFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), this.fadeFramebuffer);
 			this.fadeFramebuffer = -1;
 		}
 		

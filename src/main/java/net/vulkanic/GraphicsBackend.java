@@ -502,18 +502,13 @@ public interface GraphicsBackend {
     
     // Framebuffer lifecycle
     int createFramebufferObject(CommandContext ctx);
-    @Deprecated
-    void destroyFramebufferObject(int fbo);
-    @Deprecated
-    void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt);
+    void deleteFramebuffer(CommandContext ctx, int fbo);
+    void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
     // Shader pipeline
-    @Deprecated
-    int constructShaderObject(int shaderType);
-    @Deprecated
-    void disposeShaderObject(int shader);
-    @Deprecated
-    void compileShaderSource(int shader);
+    int createShader(CommandContext ctx, int shaderType);
+    void deleteShader(CommandContext ctx, int shader);
+    void compileShader(CommandContext ctx, int shader);
     @Deprecated
     int constructProgramObject();
     @Deprecated

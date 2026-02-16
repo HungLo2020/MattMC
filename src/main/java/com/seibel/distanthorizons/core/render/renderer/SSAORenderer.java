@@ -55,7 +55,7 @@ public class SSAORenderer
 	{
 		if (this.ssaoFramebuffer != -1)
 		{
-			VulkanicAPI.destroyFramebufferObject(this.ssaoFramebuffer);
+			VulkanicAPI.deleteFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), this.ssaoFramebuffer);
 			this.ssaoFramebuffer = -1;
 		}
 		
