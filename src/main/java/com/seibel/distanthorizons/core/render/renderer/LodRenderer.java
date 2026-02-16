@@ -283,7 +283,8 @@ public class LodRenderer
 			{
 				// If MC's framebuffer is being used the depth needs to be cleared to prevent rendering on top of MC.
 				// This should only happen when Optifine shaders are being used.
-				VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				CommandContext ctx = VulkanicAPI.getImmediateContext();
+				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 			
 			
@@ -380,7 +381,8 @@ public class LodRenderer
 		GLMC.glBlendFunc(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
 		
-		VulkanicAPI.disable(VulkanicAPI.GL_SCISSOR_TEST);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, false);
 		
 		// Enable depth test and depth mask
 		GLMC.enableDepthTest();
@@ -389,7 +391,6 @@ public class LodRenderer
 		
 		// This is required for MC versions 1.21.5+
 		// due to MC updating the lightmap by changing the viewport size
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		VulkanicAPI.setDynamicViewport(ctx, 0, 0, this.textureWidth, this.textureHeight);
 		
 		this.lodRenderProgram.bind();
@@ -456,12 +457,12 @@ public class LodRenderer
 				framebuffer.addDepthAttachment(this.depthTexture.getTextureId(), EDhDepthBufferFormat.DEPTH32F.isCombinedStencil());
 				
 				
-				// don't clear the color texture, that removes the sky 
-				VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				// don't clear the color texture, that removes the sky
+				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 			else if (firstPass)
 			{
-				VulkanicAPI.clear(VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 		}
 		

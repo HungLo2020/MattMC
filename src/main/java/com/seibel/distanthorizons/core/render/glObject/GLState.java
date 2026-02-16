@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.render.glObject;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 // TODO make this Closable or AutoClosable so it can be used with try-resource blocks
@@ -214,13 +215,14 @@ public class GLState
 		}
 		GLMC.glDepthFunc(this.depthFunc);
 		
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		if (this.stencil)
 		{
-			VulkanicAPI.enable(VulkanicAPI.GL_STENCIL_TEST);
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_STENCIL_TEST, true);
 		}
 		else
 		{
-			VulkanicAPI.disable(VulkanicAPI.GL_STENCIL_TEST);
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_STENCIL_TEST, false);
 		}
 		VulkanicAPI.glStencilFunc(this.stencilFunc, this.stencilRef, this.stencilMask);
 		

@@ -197,7 +197,8 @@ public class GlStateManager {
 		net.irisshaders.iris.gl.IrisRenderSystem.onProgramUse();
 		
 		iris$program = i;
-		net.vulkanic.VulkanicAPI.useProgram(i);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.bindShaderProgram(ctx, i);
 		
 		// Iris: From MixinGlStateManager_DepthColorOverride - reset tessellation flag
 		net.irisshaders.iris.vertices.ImmediateState.usingTessellation = false;
@@ -535,7 +536,8 @@ public class GlStateManager {
 
 	public static void _clear(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.clear(i);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.clearBuffers(ctx, i);
 		if (MacosUtil.IS_MACOS) {
 			_getError();
 		}
@@ -660,21 +662,15 @@ public class GlStateManager {
 				this.enabled = bl;
 				stateUnknown = false;
 				// Delegate ALL enable/disable to VulkanicAPI
-				if (bl) {
-					net.vulkanic.VulkanicAPI.enable(this.state);
-				} else {
-					net.vulkanic.VulkanicAPI.disable(this.state);
-				}
+				CommandContext ctx = VulkanicAPI.getImmediateContext();
+				net.vulkanic.VulkanicAPI.setCapabilityEnabled(ctx, this.state, bl);
 				return;
 			}
 			if (bl != this.enabled) {
 				this.enabled = bl;
 				// Delegate ALL enable/disable to VulkanicAPI
-				if (bl) {
-					net.vulkanic.VulkanicAPI.enable(this.state);
-				} else {
-					net.vulkanic.VulkanicAPI.disable(this.state);
-				}
+				CommandContext ctx = VulkanicAPI.getImmediateContext();
+				net.vulkanic.VulkanicAPI.setCapabilityEnabled(ctx, this.state, bl);
 			}
 		}
 

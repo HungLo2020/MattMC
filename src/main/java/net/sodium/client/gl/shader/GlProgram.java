@@ -5,6 +5,7 @@ import net.sodium.client.gl.shader.uniform.GlUniform;
 import net.sodium.client.gl.shader.uniform.GlUniformBlock;
 import net.sodium.client.render.chunk.shader.ShaderBindingContext;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -35,11 +36,13 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
     }
 
     public void bind() {
-        VulkanicAPI.useProgram(this.handle());
+        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        VulkanicAPI.bindShaderProgram(ctx, this.handle());
     }
 
     public void unbind() {
-        VulkanicAPI.useProgram(0);
+        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        VulkanicAPI.bindShaderProgram(ctx, 0);
     }
 
     public void delete() {

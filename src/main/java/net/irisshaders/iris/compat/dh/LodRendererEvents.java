@@ -32,6 +32,7 @@ import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public class LodRendererEvents {
@@ -374,7 +375,8 @@ public class LodRendererEvents {
 						Matrix4fc projection = CapturedRenderingState.INSTANCE.getGbufferProjection();
 						//float nearClip = DhApi.Delayed.renderProxy.getNearClipPlaneDistanceInBlocks(partialTicks);
 						//float farClip = (float) ((double) (DHCompatInternal.getDhBlockRenderDistance() + 512) * Math.sqrt(2.0));
-						VulkanicAPI.disable(VulkanicAPI.GL_CULL_FACE);
+						CommandContext ctx = VulkanicAPI.getImmediateContext();
+						VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_CULL_FACE, false);
 						//Iris.logger.info("event near clip: "+event.value.nearClipPlane+" event far clip: "+event.value.farClipPlane+
 						//	" \niris near clip: "+nearClip+" iris far clip: "+farClip);
 

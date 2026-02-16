@@ -42,19 +42,6 @@ public interface GraphicsBackend {
      */
     void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height);
     
-    @Deprecated
-    void clear(int mask);
-    @Deprecated
-    void enableBlend();
-    @Deprecated
-    void disableBlend();
-    @Deprecated
-    void useProgram(int programId);
-    @Deprecated
-    void enable(int cap);
-    @Deprecated
-    void disable(int cap);
-    
     // Depth operations
     @Deprecated
     void setDepthTestFunction(int func);
@@ -83,6 +70,51 @@ public interface GraphicsBackend {
      * @param height The height of the scissor rectangle in pixels
      */
     void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height);
+    
+    /**
+     * Clears buffers to preset values.
+     * 
+     * In OpenGL: Maps to glClear()
+     * In Vulkan: Maps to vkCmdClearAttachments() within a render pass
+     * 
+     * @param ctx Command context for recording this command
+     * @param mask Bitwise OR of masks indicating which buffers to clear
+     */
+    void clearBuffers(CommandContext ctx, int mask);
+    
+    /**
+     * Sets blending enabled or disabled.
+     * 
+     * In OpenGL: Maps to glEnable/glDisable(GL_BLEND)
+     * In Vulkan: Part of pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param enabled True to enable blending, false to disable
+     */
+    void setBlendEnabled(CommandContext ctx, boolean enabled);
+    
+    /**
+     * Binds a shader program for use.
+     * 
+     * In OpenGL: Maps to glUseProgram()
+     * In Vulkan: Will be replaced by pipeline binding
+     * 
+     * @param ctx Command context for recording this command
+     * @param programId The shader program ID to bind
+     */
+    void bindShaderProgram(CommandContext ctx, int programId);
+    
+    /**
+     * Sets a capability enabled or disabled.
+     * 
+     * In OpenGL: Maps to glEnable/glDisable()
+     * In Vulkan: Most capabilities are part of pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param cap The capability to enable/disable
+     * @param enabled True to enable, false to disable
+     */
+    void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled);
     
     // Pixel operations
     @Deprecated

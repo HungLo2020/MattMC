@@ -577,35 +577,6 @@ public class VulkanicAPI {
         getBackend().setDynamicViewport(ctx, x, y, width, height);
     }
     
-    @Deprecated
-    public static void clear(int mask) {
-        getBackend().clear(mask);
-    }
-    
-    @Deprecated
-    public static void enableBlend() {
-        getBackend().enableBlend();
-    }
-    
-    @Deprecated
-    public static void disableBlend() {
-        getBackend().disableBlend();
-    }
-    
-    @Deprecated
-    public static void useProgram(int programId) {
-        getBackend().useProgram(programId);
-    }
-    
-    @Deprecated
-    public static void enable(int cap) {
-        getBackend().enable(cap);
-    }
-    
-    @Deprecated
-    public static void disable(int cap) {
-        getBackend().disable(cap);
-    }
     
     @Deprecated
     public static void setDepthTestFunction(int func) {
@@ -639,6 +610,47 @@ public class VulkanicAPI {
      */
     public static void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height) {
         getBackend().setDynamicScissor(ctx, x, y, width, height);
+    }
+    
+    /**
+     * Clears buffers to preset values.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mask Bitwise OR of masks (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, etc.)
+     */
+    public static void clearBuffers(CommandContext ctx, int mask) {
+        getBackend().clearBuffers(ctx, mask);
+    }
+    
+    /**
+     * Sets blending enabled or disabled.
+     * 
+     * @param ctx Command context for recording this command
+     * @param enabled True to enable, false to disable
+     */
+    public static void setBlendEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setBlendEnabled(ctx, enabled);
+    }
+    
+    /**
+     * Binds a shader program for use.
+     * 
+     * @param ctx Command context for recording this command
+     * @param programId The shader program ID
+     */
+    public static void bindShaderProgram(CommandContext ctx, int programId) {
+        getBackend().bindShaderProgram(ctx, programId);
+    }
+    
+    /**
+     * Sets a capability enabled or disabled.
+     * 
+     * @param ctx Command context for recording this command
+     * @param cap The capability
+     * @param enabled True to enable, false to disable
+     */
+    public static void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, cap, enabled);
     }
     
     @Deprecated
@@ -1963,11 +1975,12 @@ public class VulkanicAPI {
     
     /**
      * Installs a program object as part of current rendering state.
-     * Wrapper for useProgram.
+     * Wrapper for bindShaderProgram.
      */
     @Deprecated
     public static void glUseProgram(int program) {
-        useProgram(program);
+        CommandContext ctx = getImmediateContext();
+        bindShaderProgram(ctx, program);
     }
     
     /**

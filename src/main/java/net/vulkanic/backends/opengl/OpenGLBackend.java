@@ -73,40 +73,44 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glViewport(x, y, width, height);
     }
     
-    @Deprecated
     @Override
-    public void clear(int mask) {
+    public void clearBuffers(CommandContext ctx, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glClear(mask);
     }
     
-    @Deprecated
     @Override
-    public void enableBlend() {
-        GL11.glEnable(GL11.GL_BLEND);
+    public void setBlendEnabled(CommandContext ctx, boolean enabled) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (enabled) {
+            GL11.glEnable(GL11.GL_BLEND);
+        } else {
+            GL11.glDisable(GL11.GL_BLEND);
+        }
     }
     
-    @Deprecated
     @Override
-    public void disableBlend() {
-        GL11.glDisable(GL11.GL_BLEND);
-    }
-    
-    @Deprecated
-    @Override
-    public void useProgram(int programId) {
+    public void bindShaderProgram(CommandContext ctx, int programId) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glUseProgram(programId);
     }
     
-    @Deprecated
     @Override
-    public void enable(int cap) {
-        GL11.glEnable(cap);
-    }
-    
-    @Deprecated
-    @Override
-    public void disable(int cap) {
-        GL11.glDisable(cap);
+    public void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (enabled) {
+            GL11.glEnable(cap);
+        } else {
+            GL11.glDisable(cap);
+        }
     }
     
     @Deprecated
