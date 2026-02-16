@@ -159,7 +159,7 @@ public class GlStateManager {
 
 	public static int glCreateShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.constructShaderObject(i);
+		return net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void glShaderSource(int i, String string) {
@@ -181,7 +181,7 @@ public class GlStateManager {
 
 	public static void glCompileShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.compileShaderSource(i);
+		net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static int glGetShaderi(int i, int j) {
@@ -208,7 +208,7 @@ public class GlStateManager {
 
 	public static int glCreateProgram() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.constructProgramObject();
+		return net.vulkanic.VulkanicAPI.createShaderProgram(net.vulkanic.VulkanicAPI.getImmediateContext());
 	}
 
 	public static void glDeleteProgram(int i) {
@@ -498,7 +498,7 @@ public class GlStateManager {
 
 	public static void _texImage2D(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DImage(i, j, k, l, m, n, o, p, byteBuffer);
+		net.vulkanic.VulkanicAPI.uploadTexture2D(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, byteBuffer);
 		
 		// Iris: Track texture image data (from MixinGlStateManager texture)
 		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
@@ -506,12 +506,12 @@ public class GlStateManager {
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, long q) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DSubregion(i, j, k, l, m, n, o, p, q);
+		net.vulkanic.VulkanicAPI.uploadTexture2DSubImage(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, q);
 	}
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DSubregionBuf(i, j, k, l, m, n, o, p, byteBuffer);
+		net.vulkanic.VulkanicAPI.uploadTexture2DSubImage(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, byteBuffer);
 	}
 
 	public static void _viewport(int i, int j, int k, int l) {

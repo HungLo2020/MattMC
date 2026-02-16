@@ -887,19 +887,34 @@ public class VulkanicAPI {
         return getBackend().checkForErrors();
     }
     
+    public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
+                                        int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture2D(ctx, target, level, internalFormat, width, height, border, format, type, pixels);
+    }
+    
+    public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                                int width, int height, int format, int type, long pixels) {
+        getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
+    }
+    
+    public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                                int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
+    }
+    
     @Deprecated
     public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
-        getBackend().transferTexture2DImage(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+        uploadTexture2D(getImmediateContext(), tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
     }
     
     @Deprecated
     public static void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        getBackend().transferTexture2DSubregion(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+        uploadTexture2DSubImage(getImmediateContext(), tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
     @Deprecated
     public static void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        getBackend().transferTexture2DSubregionBuf(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+        uploadTexture2DSubImage(getImmediateContext(), tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
     public static int createBuffer(CommandContext ctx) {
@@ -982,9 +997,21 @@ public class VulkanicAPI {
         getBackend().copyFramebufferRegion(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
     }
     
+    public static int createShader(CommandContext ctx, int shaderType) {
+        return getBackend().createShader(ctx, shaderType);
+    }
+    
+    public static void compileShader(CommandContext ctx, int shader) {
+        getBackend().compileShader(ctx, shader);
+    }
+    
+    public static int createShaderProgram(CommandContext ctx) {
+        return getBackend().createShaderProgram(ctx);
+    }
+    
     @Deprecated
     public static int constructShaderObject(int shaderType) {
-        return getBackend().constructShaderObject(shaderType);
+        return createShader(getImmediateContext(), shaderType);
     }
     
     @Deprecated
@@ -994,12 +1021,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void compileShaderSource(int shader) {
-        getBackend().compileShaderSource(shader);
+        compileShader(getImmediateContext(), shader);
     }
     
     @Deprecated
     public static int constructProgramObject() {
-        return getBackend().constructProgramObject();
+        return createShaderProgram(getImmediateContext());
     }
     
     @Deprecated

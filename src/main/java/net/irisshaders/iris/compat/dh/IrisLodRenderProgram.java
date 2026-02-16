@@ -61,7 +61,7 @@ public class IrisLodRenderProgram {
 
 	// This will bind  AbstractVertexAttribute
 	private IrisLodRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
-		id = VulkanicAPI.constructProgramObject();
+		id = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
 
 		VulkanicAPI.bindAttributeLocation(this.id, 0, "vPosition");
 		VulkanicAPI.bindAttributeLocation(this.id, 1, "iris_color");

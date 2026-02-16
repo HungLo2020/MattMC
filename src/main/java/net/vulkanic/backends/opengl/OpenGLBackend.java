@@ -366,22 +366,49 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL11.glGetError();
     }
     
+    @Override
+    public void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
+                                 int border, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);
+    }
+    
+    @Override
+    public void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                         int width, int height, int format, int type, long pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexSubImage2D(target, level, xOffset, yOffset, width, height, format, type, pixels);
+    }
+    
+    @Override
+    public void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                         int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexSubImage2D(target, level, xOffset, yOffset, width, height, format, type, pixels);
+    }
+    
     @Deprecated
     @Override
     public void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
-        GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+        uploadTexture2D(VulkanicAPI.getImmediateContext(), tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
     }
     
     @Deprecated
     @Override
     public void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+        uploadTexture2DSubImage(VulkanicAPI.getImmediateContext(), tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
     @Deprecated
     @Override
     public void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+        uploadTexture2DSubImage(VulkanicAPI.getImmediateContext(), tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
     @Override
@@ -496,10 +523,34 @@ public class OpenGLBackend implements GraphicsBackend {
         GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
     }
     
+    @Override
+    public int createShader(CommandContext ctx, int shaderType) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glCreateShader(shaderType);
+    }
+    
+    @Override
+    public void compileShader(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glCompileShader(shader);
+    }
+    
+    @Override
+    public int createShaderProgram(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glCreateProgram();
+    }
+    
     @Deprecated
     @Override
     public int constructShaderObject(int shaderType) {
-        return GL20.glCreateShader(shaderType);
+        return createShader(VulkanicAPI.getImmediateContext(), shaderType);
     }
     
     @Deprecated
@@ -511,13 +562,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void compileShaderSource(int shader) {
-        GL20.glCompileShader(shader);
+        compileShader(VulkanicAPI.getImmediateContext(), shader);
     }
     
     @Deprecated
     @Override
     public int constructProgramObject() {
-        return GL20.glCreateProgram();
+        return createShaderProgram(VulkanicAPI.getImmediateContext());
     }
     
     @Deprecated

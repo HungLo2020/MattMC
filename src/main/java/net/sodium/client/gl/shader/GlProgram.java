@@ -105,7 +105,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
         public Builder(ResourceLocation name) {
             this.name = name;
-            this.program = VulkanicAPI.constructProgramObject();
+            this.program = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
         }
 
         public Builder attachShader(GlShader shader) {

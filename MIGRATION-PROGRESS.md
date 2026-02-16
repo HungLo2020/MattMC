@@ -187,7 +187,7 @@
 - [x] **Migrated third 5 methods** - setPixelStoreMode(), attachFramebuffer(), attachBuffer(), activateTextureUnit(), configureTextureParameter()
 - [x] **Migrated fourth 5 methods** - createTexture(), removeTexture(), drawPrimitiveArrays(), drawIndexedElements(), configureBlendFunc()
 - [x] **Migrated fifth 5 methods** - attachTextureToFramebuffer(), configurePolygonMode(), configurePolygonOffset(), configureLogicOp(), createFramebufferDSA()
-- [x] **Migrated sixth 5 methods** - selectVertexArray(), createVertexArrayObject(), allocateBufferObject(), releaseBufferObject(), fillBufferWithData()
+- [x] **Migrated sixth 5 methods** - transferTexture2DImage(), transferTexture2DSubregion(), constructShaderObject(), compileShaderSource(), constructProgramObject()
 - [x] **30 of 283 deprecated methods migrated** (10.6% complete)
 
 ### Phase 2.5 Progress Update
@@ -229,13 +229,14 @@
 5. ✅ createFramebufferDSA() → createFramebuffer(CommandContext) - 1 call site updated
 
 **Batch 6 (Completed 2026-02-16 Late Night)**:
-1. ✅ selectVertexArray(int) → bindVertexArray(CommandContext, int) - 4 call sites updated
-2. ✅ createVertexArrayObject() → createVertexArray(CommandContext) - 3 call sites updated
-3. ✅ allocateBufferObject() → createBuffer(CommandContext) - 3 call sites updated
-4. ✅ releaseBufferObject(int) → deleteBuffer(CommandContext, int) - 3 call sites updated
-5. ✅ fillBufferWithData(int, ByteBuffer, int) → bufferData(CommandContext, int, ByteBuffer, int) - 3 call sites updated
+1. ✅ transferTexture2DImage(int, int, int, int, int, int, int, int, ByteBuffer) → uploadTexture2D(CommandContext, int, int, int, int, int, int, int, int, ByteBuffer) - 1 call site updated
+2. ✅ transferTexture2DSubregion(int, int, int, int, int, int, int, int, long) → uploadTexture2DSubImage(CommandContext, int, int, int, int, int, int, int, int, long) - 1 call site updated
+3. ✅ transferTexture2DSubregionBuf(int, int, int, int, int, int, int, int, ByteBuffer) → uploadTexture2DSubImage(CommandContext, int, int, int, int, int, int, int, int, ByteBuffer) - 1 call site updated (merged with uploadTexture2DSubImage)
+4. ✅ constructShaderObject(int) → createShader(CommandContext, int) - 6 call sites updated (3 in GlStateManager, 2 in Distant Horizons, 1 in Sodium)
+5. ✅ compileShaderSource(int) → compileShader(CommandContext, int) - 6 call sites updated (3 in GlStateManager, 2 in Distant Horizons, 1 in Sodium)
+6. ✅ constructProgramObject() → createShaderProgram(CommandContext) - 3 call sites updated (1 in GlStateManager, 1 in Iris, 1 in Sodium)
 
-**Total Call Sites Updated**: 92
+**Total Call Sites Updated**: 95
 
 **Remaining Deprecated Methods**: 253 (89.4%)
 

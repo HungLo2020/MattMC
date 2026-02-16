@@ -379,6 +379,67 @@ public interface GraphicsBackend {
     int checkForErrors();
     
     // Texture pixel data transfer
+    
+    /**
+     * Uploads pixel data to a 2D texture.
+     * 
+     * In OpenGL: Maps to glTexImage2D()
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() after staging buffer setup
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param level Mipmap level
+     * @param internalFormat Internal format of the texture
+     * @param width Width of the texture
+     * @param height Height of the texture
+     * @param border Border width (must be 0)
+     * @param format Format of the pixel data
+     * @param type Data type of the pixel data
+     * @param pixels Pixel data buffer (can be null)
+     */
+    void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
+                         int border, int format, int type, java.nio.ByteBuffer pixels);
+    
+    /**
+     * Uploads pixel data to a subregion of a 2D texture.
+     * 
+     * In OpenGL: Maps to glTexSubImage2D()
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() with offset
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param level Mipmap level
+     * @param xOffset X offset in the texture
+     * @param yOffset Y offset in the texture
+     * @param width Width of the subregion
+     * @param height Height of the subregion
+     * @param format Format of the pixel data
+     * @param type Data type of the pixel data
+     * @param pixels Pixel data (can be pointer or ByteBuffer)
+     */
+    void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                  int width, int height, int format, int type, long pixels);
+    
+    /**
+     * Uploads pixel data to a subregion of a 2D texture from a ByteBuffer.
+     * 
+     * In OpenGL: Maps to glTexSubImage2D()
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() with offset
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param level Mipmap level
+     * @param xOffset X offset in the texture
+     * @param yOffset Y offset in the texture
+     * @param width Width of the subregion
+     * @param height Height of the subregion
+     * @param format Format of the pixel data
+     * @param type Data type of the pixel data
+     * @param pixels Pixel data buffer
+     */
+    void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                  int width, int height, int format, int type, java.nio.ByteBuffer pixels);
+    
     @Deprecated
     void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
     @Deprecated
@@ -478,6 +539,41 @@ public interface GraphicsBackend {
     void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt);
     
     // Shader pipeline
+    
+    /**
+     * Creates a new shader object.
+     * 
+     * In OpenGL: Maps to glCreateShader()
+     * In Vulkan: Maps to vkCreateShaderModule() with SPIR-V bytecode
+     * 
+     * @param ctx Command context for recording this command
+     * @param shaderType Type of shader (e.g., GL_VERTEX_SHADER, GL_FRAGMENT_SHADER)
+     * @return The shader object ID
+     */
+    int createShader(CommandContext ctx, int shaderType);
+    
+    /**
+     * Compiles a shader object.
+     * 
+     * In OpenGL: Maps to glCompileShader()
+     * In Vulkan: Shader compilation is done offline to SPIR-V
+     * 
+     * @param ctx Command context for recording this command
+     * @param shader The shader object ID to compile
+     */
+    void compileShader(CommandContext ctx, int shader);
+    
+    /**
+     * Creates a new shader program object.
+     * 
+     * In OpenGL: Maps to glCreateProgram()
+     * In Vulkan: Maps to pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @return The shader program object ID
+     */
+    int createShaderProgram(CommandContext ctx);
+    
     @Deprecated
     int constructShaderObject(int shaderType);
     @Deprecated

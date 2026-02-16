@@ -19,9 +19,9 @@ public class GlShader extends GlObject {
     public GlShader(ShaderType type, ResourceLocation name, ShaderParser.ParsedShader parsedShader) {
         this.name = name;
 
-        int handle = VulkanicAPI.constructShaderObject(type.id);
+        int handle = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type.id);
         ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
-        VulkanicAPI.compileShaderSource(handle);
+        VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), handle);
 
         String log = VulkanicAPI.retrieveShaderInfoLog(handle);
 
