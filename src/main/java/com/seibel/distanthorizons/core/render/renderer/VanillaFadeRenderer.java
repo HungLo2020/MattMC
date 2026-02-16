@@ -14,6 +14,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrap
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
 
 import java.nio.ByteBuffer;
 
@@ -67,7 +68,8 @@ public class VanillaFadeRenderer
 			this.fadeFramebuffer = -1;
 		}
 		
-		this.fadeFramebuffer = VulkanicAPI.generateFramebufferObject();
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		this.fadeFramebuffer = VulkanicAPI.createFramebufferObject(ctx);
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fadeFramebuffer);
 		
 		

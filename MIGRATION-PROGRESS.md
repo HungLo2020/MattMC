@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 12.4% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 14.1% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 12.4% | 100% | In Progress |
+| **API Vulkan Compatibility** | 🟡 14.1% | 100% | In Progress |
 
 ---
 
@@ -188,11 +188,12 @@
 - [x] **Migrated fifth 5 methods** - attachTextureToFramebuffer(), configurePolygonMode(), configurePolygonOffset(), configureLogicOp(), createFramebufferDSA()
 - [x] **Migrated sixth 5 methods** - createBufferDSA(), namedBufferDataDSA(), allocateBufferObject(), releaseBufferObject(), checkForErrors()
 - [x] **Migrated seventh 5 methods** - namedBufferSubDataDSA(), namedBufferStorageDSA() (2 overloads), mapNamedBufferRangeDSA(), unmapNamedBufferDSA()
-- [x] **35 of 283 deprecated methods migrated** (12.4% complete)
+- [x] **Migrated eighth 5 methods** - createVertexArrayObject(), selectVertexArray(), mapBufferRegion(), unmapBufferData(), generateFramebufferObject()
+- [x] **40 of 283 deprecated methods migrated** (14.1% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 35 / 283 (12.4%)
+**Methods Migrated to CommandContext Pattern**: 40 / 283 (14.1%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -242,9 +243,16 @@
 4. ✅ mapNamedBufferRangeDSA(int, long, long, int) → mapBufferRange(CommandContext, int, long, long, int) - 1 call site updated (DirectStateAccess)
 5. ✅ unmapNamedBufferDSA(int) → unmapBuffer(CommandContext, int) - 1 call site updated (DirectStateAccess)
 
-**Total Call Sites Updated**: 89
+**Batch 8 (Completed 2026-02-16)**:
+1. ✅ createVertexArrayObject() → createVertexArray(CommandContext) - 2 call sites updated (GlStateManager, GlVertexArray)
+2. ✅ selectVertexArray(int) → bindVertexArray(CommandContext, int) - 3 call sites updated (GlStateManager, GLRenderDevice)
+3. ✅ mapBufferRegion(int, int, int, int) → mapBuffer(CommandContext, int, int, int, int) - 2 call sites updated (GlStateManager, GLRenderDevice)
+4. ✅ unmapBufferData(int) → unmapBufferTarget(CommandContext, int) - 2 call sites updated (GlStateManager, GLRenderDevice)
+5. ✅ generateFramebufferObject() → createFramebufferObject(CommandContext) - 5 call sites updated (FogRenderer, VanillaFadeRenderer, DhFadeRenderer, SSAORenderer, GlStateManager)
 
-**Remaining Deprecated Methods**: 248 (87.6%)
+**Total Call Sites Updated**: 99
+
+**Remaining Deprecated Methods**: 243 (85.9%)
 
 ### Blockers
 

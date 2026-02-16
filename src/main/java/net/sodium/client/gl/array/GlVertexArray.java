@@ -2,6 +2,7 @@ package net.sodium.client.gl.array;
 
 import net.sodium.client.gl.GlObject;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
 
 /**
  * Provides Vertex Array functionality on supported platforms.
@@ -10,6 +11,7 @@ public class GlVertexArray extends GlObject {
     public static final int NULL_ARRAY_ID = 0;
 
     public GlVertexArray() {
-        this.setHandle(VulkanicAPI.createVertexArrayObject());
+        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        this.setHandle(VulkanicAPI.createVertexArray(ctx));
     }
 }

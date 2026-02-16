@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLW
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
 
 import java.nio.ByteBuffer;
 
@@ -64,7 +65,8 @@ public class SSAORenderer
 			this.ssaoTexture = -1;
 		}
 		
-		this.ssaoFramebuffer = VulkanicAPI.generateFramebufferObject();
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		this.ssaoFramebuffer = VulkanicAPI.createFramebufferObject(ctx);
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.ssaoFramebuffer);
 		
 		this.ssaoTexture = GLMC.glGenTextures();

@@ -493,20 +493,15 @@ public interface GraphicsBackend {
     void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     
     // Vertex array objects
-    @Deprecated
-    int createVertexArrayObject();
-    @Deprecated
-    void selectVertexArray(int vao);
+    int createVertexArray(CommandContext ctx);
+    void bindVertexArray(CommandContext ctx, int vao);
     
     // Buffer memory mapping
-    @Deprecated
-    java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc);
-    @Deprecated
-    void unmapBufferData(int tgt);
+    java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, int offset, int length, int access);
+    void unmapBufferTarget(CommandContext ctx, int target);
     
     // Framebuffer lifecycle
-    @Deprecated
-    int generateFramebufferObject();
+    int createFramebufferObject(CommandContext ctx);
     @Deprecated
     void destroyFramebufferObject(int fbo);
     @Deprecated

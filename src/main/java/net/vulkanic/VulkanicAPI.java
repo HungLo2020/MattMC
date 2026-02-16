@@ -954,29 +954,24 @@ public class VulkanicAPI {
         getBackend().fillBufferSubregion(tgt, off, dat);
     }
     
-    @Deprecated
-    public static int createVertexArrayObject() {
-        return getBackend().createVertexArrayObject();
+    public static int createVertexArray(CommandContext ctx) {
+        return getBackend().createVertexArray(ctx);
     }
     
-    @Deprecated
-    public static void selectVertexArray(int vao) {
-        getBackend().selectVertexArray(vao);
+    public static void bindVertexArray(CommandContext ctx, int vao) {
+        getBackend().bindVertexArray(ctx, vao);
     }
     
-    @Deprecated
-    public static java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return getBackend().mapBufferRegion(tgt, off, len, acc);
+    public static java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, int offset, int length, int access) {
+        return getBackend().mapBuffer(ctx, target, offset, length, access);
     }
     
-    @Deprecated
-    public static void unmapBufferData(int tgt) {
-        getBackend().unmapBufferData(tgt);
+    public static void unmapBufferTarget(CommandContext ctx, int target) {
+        getBackend().unmapBufferTarget(ctx, target);
     }
     
-    @Deprecated
-    public static int generateFramebufferObject() {
-        return getBackend().generateFramebufferObject();
+    public static int createFramebufferObject(CommandContext ctx) {
+        return getBackend().createFramebufferObject(ctx);
     }
     
     @Deprecated
@@ -1927,7 +1922,8 @@ public class VulkanicAPI {
     
     @Deprecated
     public static int glGenFramebuffers() {
-        return getBackend().generateFramebufferObject();
+        CommandContext ctx = getImmediateContext();
+        return getBackend().createFramebufferObject(ctx);
     }
     
     @Deprecated

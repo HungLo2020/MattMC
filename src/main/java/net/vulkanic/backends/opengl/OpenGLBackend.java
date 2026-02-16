@@ -441,33 +441,43 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBufferSubData(tgt, off, dat);
     }
     
-    @Deprecated
     @Override
-    public int createVertexArrayObject() {
+    public int createVertexArray(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL30.glGenVertexArrays();
     }
     
-    @Deprecated
     @Override
-    public void selectVertexArray(int vao) {
+    public void bindVertexArray(CommandContext ctx, int vao) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL30.glBindVertexArray(vao);
     }
     
-    @Deprecated
     @Override
-    public java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return GL30.glMapBufferRange(tgt, off, len, acc);
+    public java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, int offset, int length, int access) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL30.glMapBufferRange(target, offset, length, access);
     }
     
-    @Deprecated
     @Override
-    public void unmapBufferData(int tgt) {
-        GL15.glUnmapBuffer(tgt);
+    public void unmapBufferTarget(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glUnmapBuffer(target);
     }
     
-    @Deprecated
     @Override
-    public int generateFramebufferObject() {
+    public int createFramebufferObject(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL30.glGenFramebuffers();
     }
     

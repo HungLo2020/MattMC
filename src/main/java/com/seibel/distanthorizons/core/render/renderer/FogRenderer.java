@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
 
 import java.nio.ByteBuffer;
 
@@ -64,7 +65,8 @@ public class FogRenderer
 			this.fogTexture = -1;
 		}
 		
-		this.fogFramebuffer = VulkanicAPI.generateFramebufferObject();
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		this.fogFramebuffer = VulkanicAPI.createFramebufferObject(ctx);
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fogFramebuffer);
 		
 		this.fogTexture = GLMC.glGenTextures();

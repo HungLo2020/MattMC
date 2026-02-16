@@ -95,7 +95,8 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void bindVertexArray(GlVertexArray array) {
             if (this.stateTracker.makeVertexArrayActive(array)) {
-                VulkanicAPI.selectVertexArray(array.handle());
+                CommandContext ctx = VulkanicAPI.getImmediateContext();
+                VulkanicAPI.bindVertexArray(ctx, array.handle());
             }
         }
 
@@ -126,7 +127,8 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void unbindVertexArray() {
             if (this.stateTracker.makeVertexArrayActive(null)) {
-                VulkanicAPI.selectVertexArray(GlVertexArray.NULL_ARRAY_ID);
+                CommandContext ctx = VulkanicAPI.getImmediateContext();
+                VulkanicAPI.bindVertexArray(ctx, GlVertexArray.NULL_ARRAY_ID);
             }
         }
 
@@ -209,7 +211,8 @@ public class GLRenderDevice implements RenderDevice {
 
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            ByteBuffer buf = VulkanicAPI.mapBufferRegion(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), (int)offset, (int)length, flags.getBitField());
+            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            ByteBuffer buf = VulkanicAPI.mapBuffer(ctx, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), (int)offset, (int)length, flags.getBitField());
 
             if (buf == null) {
                 throw new RuntimeException("Failed to map buffer");
@@ -229,7 +232,8 @@ public class GLRenderDevice implements RenderDevice {
             GlBuffer buffer = map.getBufferObject();
 
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
-            VulkanicAPI.unmapBufferData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter());
+            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            VulkanicAPI.unmapBufferTarget(ctx, GlBufferTarget.ARRAY_BUFFER.getTargetParameter());
 
             buffer.setActiveMapping(null);
             map.dispose();
