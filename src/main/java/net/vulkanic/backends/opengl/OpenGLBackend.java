@@ -380,7 +380,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
+        return GL30.glGenFramebuffers();
     }
     
     @Override
