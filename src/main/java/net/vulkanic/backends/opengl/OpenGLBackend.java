@@ -577,28 +577,74 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glDeleteProgram(program);
     }
     
+    @Override
+    public void attachShader(CommandContext ctx, int program, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glAttachShader(program, shader);
+    }
+    
+    @Override
+    public void linkProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glLinkProgram(program);
+    }
+    
+    @Override
+    public int getProgramParameter(CommandContext ctx, int program, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetProgrami(program, pname);
+    }
+    
+    @Override
+    public int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetShaderi(shader, pname);
+    }
+    
+    @Override
+    public String getProgramInfoLog(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetProgramInfoLog(program);
+    }
+    
     @Deprecated
     @Override
     public void linkProgramBinary(int program) {
-        GL20.glLinkProgram(program);
+        linkProgram(VulkanicAPI.getImmediateContext(), program);
     }
     
     @Deprecated
     @Override
     public void attachShaderToProgram(int program, int shader) {
-        GL20.glAttachShader(program, shader);
+        attachShader(VulkanicAPI.getImmediateContext(), program, shader);
     }
     
     @Deprecated
     @Override
     public int queryProgramParameter(int program, int pname) {
-        return GL20.glGetProgrami(program, pname);
+        return getProgramParameter(VulkanicAPI.getImmediateContext(), program, pname);
     }
     
     @Deprecated
     @Override
     public int queryShaderParameter(int shader, int pname) {
-        return GL20.glGetShaderi(shader, pname);
+        return getShaderParameter(VulkanicAPI.getImmediateContext(), shader, pname);
+    }
+    
+    @Deprecated
+    @Override
+    public String retrieveProgramInfoLog(int program) {
+        return getProgramInfoLog(VulkanicAPI.getImmediateContext(), program);
     }
     
     @Deprecated
@@ -629,12 +675,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void setVertexAttribDivisor(int index, int divisor) {
         org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
-    }
-    
-    @Deprecated
-    @Override
-    public String retrieveProgramInfoLog(int program) {
-        return GL20.glGetProgramInfoLog(program);
     }
     
     @Deprecated

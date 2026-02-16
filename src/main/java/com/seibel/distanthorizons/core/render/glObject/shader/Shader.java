@@ -62,7 +62,7 @@ public class Shader
 		
 		VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), this.id);
 		// check if the shader compiled
-		int status = VulkanicAPI.queryShaderParameter(this.id, VulkanicAPI.GL_COMPILE_STATUS);
+		int status = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_COMPILE_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
 		{
 			String message = "Shader compiler error. Details: ["+VulkanicAPI.retrieveShaderInfoLog(this.id)+"].";
@@ -91,7 +91,7 @@ public class Shader
 		safeShaderSource(this.id, sourceString);
 		VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), this.id);
 		// check if the shader compiled
-		int status = VulkanicAPI.queryShaderParameter(this.id, VulkanicAPI.GL_COMPILE_STATUS);
+		int status = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_COMPILE_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
 		{
 			

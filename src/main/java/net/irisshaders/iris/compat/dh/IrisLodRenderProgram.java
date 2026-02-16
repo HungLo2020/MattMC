@@ -70,33 +70,33 @@ public class IrisLodRenderProgram {
 		this.bufferBlendOverrides = bufferBlendOverrides;
 
 		GlShader vert = new GlShader(ShaderType.VERTEX, name + ".vsh", vertex);
-		VulkanicAPI.attachShaderToProgram(id, vert.getHandle());
+		VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, vert.getHandle());
 
 		GlShader tessCont = null;
 		if (tessControl != null) {
 			tessCont = new GlShader(ShaderType.TESSELATION_CONTROL, name + ".tcs", tessControl);
-			VulkanicAPI.attachShaderToProgram(id, tessCont.getHandle());
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, tessCont.getHandle());
 		}
 
 		GlShader tessE = null;
 		if (tessEval != null) {
 			tessE = new GlShader(ShaderType.TESSELATION_EVAL, name + ".tes", tessEval);
-			VulkanicAPI.attachShaderToProgram(id, tessE.getHandle());
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, tessE.getHandle());
 		}
 
 		GlShader geom = null;
 		if (geometry != null) {
 			geom = new GlShader(ShaderType.GEOMETRY, name + ".gsh", geometry);
-			VulkanicAPI.attachShaderToProgram(id, geom.getHandle());
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, geom.getHandle());
 		}
 
 		GlShader frag = new GlShader(ShaderType.FRAGMENT, name + ".fsh", fragment);
-		VulkanicAPI.attachShaderToProgram(id, frag.getHandle());
+		VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, frag.getHandle());
 
-		VulkanicAPI.linkProgramBinary(this.id);
-		int status = VulkanicAPI.queryProgramParameter(this.id, VulkanicAPI.GL_LINK_STATUS);
+		VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), this.id);
+		int status = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != 1) {
-			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.retrieveProgramInfoLog(this.id);
+			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), this.id);
 			this.free();
 			throw new RuntimeException(message);
 		} else {

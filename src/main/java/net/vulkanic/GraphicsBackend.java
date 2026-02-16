@@ -582,6 +582,67 @@ public interface GraphicsBackend {
     void compileShaderSource(int shader);
     @Deprecated
     int constructProgramObject();
+    /**
+     * Attaches a shader to a program object.
+     * 
+     * In OpenGL: Maps to glAttachShader()
+     * In Vulkan: Shader modules are specified during pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param shader The shader object ID to attach
+     */
+    void attachShader(CommandContext ctx, int program, int shader);
+    
+    /**
+     * Links a shader program.
+     * 
+     * In OpenGL: Maps to glLinkProgram()
+     * In Vulkan: Part of pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID to link
+     */
+    void linkProgram(CommandContext ctx, int program);
+    
+    /**
+     * Queries a program parameter.
+     * 
+     * In OpenGL: Maps to glGetProgramiv()
+     * In Vulkan: Maps to pipeline state queries
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param pname The parameter name to query
+     * @return The parameter value
+     */
+    int getProgramParameter(CommandContext ctx, int program, int pname);
+    
+    /**
+     * Queries a shader parameter.
+     * 
+     * In OpenGL: Maps to glGetShaderiv()
+     * In Vulkan: Maps to shader module queries
+     * 
+     * @param ctx Command context for recording this command
+     * @param shader The shader object ID
+     * @param pname The parameter name to query
+     * @return The parameter value
+     */
+    int getShaderParameter(CommandContext ctx, int shader, int pname);
+    
+    /**
+     * Retrieves the information log for a program.
+     * 
+     * In OpenGL: Maps to glGetProgramInfoLog()
+     * In Vulkan: Maps to pipeline creation messages
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @return The information log string
+     */
+    String getProgramInfoLog(CommandContext ctx, int program);
+    
     @Deprecated
     void disposeProgramObject(int program);
     @Deprecated

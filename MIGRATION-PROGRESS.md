@@ -188,11 +188,12 @@
 - [x] **Migrated fourth 5 methods** - createTexture(), removeTexture(), drawPrimitiveArrays(), drawIndexedElements(), configureBlendFunc()
 - [x] **Migrated fifth 5 methods** - attachTextureToFramebuffer(), configurePolygonMode(), configurePolygonOffset(), configureLogicOp(), createFramebufferDSA()
 - [x] **Migrated sixth 5 methods** - transferTexture2DImage(), transferTexture2DSubregion(), constructShaderObject(), compileShaderSource(), constructProgramObject()
-- [x] **30 of 283 deprecated methods migrated** (10.6% complete)
+- [x] **Migrated seventh 5 methods** - attachShaderToProgram(), linkProgramBinary(), queryProgramParameter(), queryShaderParameter(), retrieveProgramInfoLog()
+- [x] **35 of 283 deprecated methods migrated** (12.4% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 30 / 283 (10.6%)
+**Methods Migrated to CommandContext Pattern**: 35 / 283 (12.4%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -236,9 +237,16 @@
 5. ✅ compileShaderSource(int) → compileShader(CommandContext, int) - 6 call sites updated (3 in GlStateManager, 2 in Distant Horizons, 1 in Sodium)
 6. ✅ constructProgramObject() → createShaderProgram(CommandContext) - 3 call sites updated (1 in GlStateManager, 1 in Iris, 1 in Sodium)
 
-**Total Call Sites Updated**: 95
+**Batch 7 (Completed 2026-02-16 Late Night)**:
+1. ✅ attachShaderToProgram(int, int) → attachShader(CommandContext, int, int) - 7 call sites updated (5 in Iris, 1 in Sodium, 1 in GlStateManager)
+2. ✅ linkProgramBinary(int) → linkProgram(CommandContext, int) - 3 call sites updated (1 in Iris, 1 in Sodium, 1 in GlStateManager)
+3. ✅ queryProgramParameter(int, int) → getProgramParameter(CommandContext, int, int) - 3 call sites updated (1 in Iris, 1 in Sodium, 1 in GlStateManager)
+4. ✅ queryShaderParameter(int, int) → getShaderParameter(CommandContext, int, int) - 4 call sites updated (2 in Distant Horizons, 1 in Iris, 1 in Sodium)
+5. ✅ retrieveProgramInfoLog(int) → getProgramInfoLog(CommandContext, int) - 4 call sites updated (1 in Iris, 1 in Sodium, 1 in GlStateManager, 1 wrapper in VulkanicAPI)
 
-**Remaining Deprecated Methods**: 253 (89.4%)
+**Total Call Sites Updated**: 116
+
+**Remaining Deprecated Methods**: 248 (87.6%)
 
 ### Blockers
 

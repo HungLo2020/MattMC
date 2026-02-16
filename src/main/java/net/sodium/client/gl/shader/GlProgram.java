@@ -109,7 +109,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         }
 
         public Builder attachShader(GlShader shader) {
-            VulkanicAPI.attachShaderToProgram(this.program, shader.handle());
+            VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), this.program, shader.handle());
 
             return this;
         }
@@ -124,15 +124,15 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
          * @return An instantiated shader container as provided by the factory
          */
         public <U> GlProgram<U> link(Function<ShaderBindingContext, U> factory) {
-            VulkanicAPI.linkProgramBinary(this.program);
+            VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), this.program);
 
-            String log = VulkanicAPI.retrieveProgramInfoLog(this.program);
+            String log = VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), this.program);
 
             if (!log.isEmpty()) {
                 LOGGER.warn("Program link log for " + this.name + ": " + log);
             }
 
-            int result = VulkanicAPI.queryProgramParameter(this.program, VulkanicAPI.GL_LINK_STATUS);
+            int result = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), this.program, VulkanicAPI.GL_LINK_STATUS);
 
             if (result != 1) { // GL_TRUE
                 throw new RuntimeException("Shader program linking failed, see log for details");

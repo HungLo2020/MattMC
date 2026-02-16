@@ -1034,24 +1034,49 @@ public class VulkanicAPI {
         getBackend().disposeProgramObject(program);
     }
     
+    public static void attachShader(CommandContext ctx, int program, int shader) {
+        getBackend().attachShader(ctx, program, shader);
+    }
+    
+    public static void linkProgram(CommandContext ctx, int program) {
+        getBackend().linkProgram(ctx, program);
+    }
+    
+    public static int getProgramParameter(CommandContext ctx, int program, int pname) {
+        return getBackend().getProgramParameter(ctx, program, pname);
+    }
+    
+    public static int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        return getBackend().getShaderParameter(ctx, shader, pname);
+    }
+    
+    public static String getProgramInfoLog(CommandContext ctx, int program) {
+        return getBackend().getProgramInfoLog(ctx, program);
+    }
+    
     @Deprecated
     public static void linkProgramBinary(int program) {
-        getBackend().linkProgramBinary(program);
+        linkProgram(getImmediateContext(), program);
     }
     
     @Deprecated
     public static void attachShaderToProgram(int program, int shader) {
-        getBackend().attachShaderToProgram(program, shader);
+        attachShader(getImmediateContext(), program, shader);
     }
     
     @Deprecated
     public static int queryProgramParameter(int program, int pname) {
-        return getBackend().queryProgramParameter(program, pname);
+        return getProgramParameter(getImmediateContext(), program, pname);
     }
     
     @Deprecated
     public static int queryShaderParameter(int shader, int pname) {
-        return getBackend().queryShaderParameter(shader, pname);
+        return getShaderParameter(getImmediateContext(), shader, pname);
+    }
+    
+    @Deprecated
+    public static String retrieveProgramInfoLog(int program) {
+        return getProgramInfoLog(getImmediateContext(), program);
     }
     
     @Deprecated
@@ -1077,11 +1102,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void setVertexAttribDivisor(int index, int divisor) {
         getBackend().setVertexAttribDivisor(index, divisor);
-    }
-    
-    @Deprecated
-    public static String retrieveProgramInfoLog(int program) {
-        return getBackend().retrieveProgramInfoLog(program);
     }
     
     @Deprecated
