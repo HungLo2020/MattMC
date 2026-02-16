@@ -1,3 +1,4 @@
+Starting a Gradle Daemon, 1 busy Daemon could not be reused, use --status for details
 
 > Configure project :
 ✓ Using bundled dependencies from libraries/deps/
@@ -14,49 +15,94 @@
 > Task :processResources
 > Task :classes
 > Task :jar
+> Task :compileTestJava
+> Task :processTestResources NO-SOURCE
+> Task :testClasses
+
+> Task :test
+
+Mth Utility Tests > should clamp values within range PASSED
+
+Mth Utility Tests > should calculate floor correctly PASSED
+
+Mth Utility Tests > should calculate square root correctly PASSED
+
+ProfilerCollectorWrapperTest > testBasicHierarchy() PASSED
+
+ProfilerCollectorWrapperTest > testClear() PASSED
+
+ProfilerCollectorWrapperTest > testPopPush() PASSED
+
+ProfilerCollectorWrapperTest > testMultipleOperations() PASSED
+
+ArchitecturalBoundaryTest > testVulkanImportsOnlyInBackend() PASSED
+
+ArchitecturalBoundaryTest > testOpenGLImportsOnlyInBackend() PASSED
+
+ArchitecturalBoundaryTest > testBackendDirectoriesExist() PASSED
+
+ArchitecturalBoundaryTest > testBackendImportsOnlyFromVulkanicPackage() PASSED
+
+CommandContextTest > testContextToString() PASSED
+
+CommandContextTest > testOpenGLCommandContextIsImmediate() PASSED
+
+CommandContextTest > testGetImmediateContext() PASSED
+
+CommandContextTest > testOpenGLCommandContextIsSingleton() PASSED
+
+CommandContextTest > testSetDynamicViewportWithContext() PASSED
+
+CommandContextTest > testSetDynamicScissorWithContext() PASSED
+
+CommandContextTest > testLegacyMethodsDelegateToContextVariant() PASSED
+
+Test Results: SUCCESS
+Tests run: 18, Passed: 18, Failed: 0, Skipped: 0
+
 > Task :shaderPackZip
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-25
-[11:13:49] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[11:13:49] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[11:13:49] [main/INFO]: Mappings not present!
-[11:13:49] [main/INFO]: Loading 3 mods:
+[21:02:46] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[21:02:46] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[21:02:46] [main/INFO]: Mappings not present!
+[21:02:46] [main/INFO]: Loading 3 mods:
 	- java 25
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[11:13:49] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[11:13:49] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[11:13:49] [main/INFO]: Searching for graphics cards...
-[11:13:49] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[11:13:49] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[11:13:49] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[21:02:46] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[21:02:46] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[21:02:46] [main/INFO]: Searching for graphics cards...
+[21:02:46] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[21:02:46] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[21:02:46] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
 WARNING: A restricted method in java.lang.System has been called
 WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/home/matt/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.14.0/67bf3eaea4f0718cb376a181a629e5f88fa1c9dd/jna-5.14.0.jar)
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[11:13:50] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 170 milliseconds
+[21:02:46] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 185 milliseconds
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/home/matt/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar)
 WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
 WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
-[11:13:52] [Render thread/INFO]: Setting user: HungLo
-[11:13:52] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[11:13:52] [Render thread/INFO]: Running library validation...
-[11:13:52] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
-[11:13:52] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[11:13:52] [Render thread/INFO]: Registering Fabric Client Events
-[11:13:52] [Render thread/INFO]: Registering Distant Horizons hooks
-[11:13:52] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[11:13:52] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[11:13:52] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[11:13:52] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[11:13:52] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[11:13:52] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[11:13:52] [Render thread/INFO]: [DistantHorizons] Config initialised
-[11:13:52] [Render thread/INFO]: Applying config to loggers
-[11:13:52] [Render thread/INFO]: Distant Horizons client Initialized.
+[21:02:49] [Render thread/INFO]: Setting user: HungLo
+[21:02:49] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[21:02:49] [Render thread/INFO]: Running library validation...
+[21:02:49] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
+[21:02:49] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[21:02:49] [Render thread/INFO]: Registering Fabric Client Events
+[21:02:49] [Render thread/INFO]: Registering Distant Horizons hooks
+[21:02:49] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[21:02:49] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[21:02:49] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[21:02:49] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[21:02:49] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[21:02:49] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[21:02:49] [Render thread/INFO]: [DistantHorizons] Config initialised
+[21:02:49] [Render thread/INFO]: Applying config to loggers
+[21:02:49] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-37-generic
 	JRE: Linux amd64 25.0.1
@@ -67,17 +113,17 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[11:13:52] [Render thread/INFO]: Queuing DH event binding...
-[11:13:52] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[21:02:49] [Render thread/INFO]: Queuing DH event binding...
+[21:02:49] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
+[21:02:49] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[21:02:49] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[11:13:52] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
-[11:13:52] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[11:13:52] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
+[21:02:49] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -89,76 +135,76 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
-[11:13:52] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+[21:02:50] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
 [LWJGL] Java 10 multiplyHigh enabled
-[11:13:52] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[11:13:52] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[11:13:52] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[11:13:52] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[11:13:52] [Render thread/INFO]: Debug functionality is disabled.
-[11:13:52] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[11:13:52] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[11:13:52] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
-[11:13:52] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
-[11:13:52] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
-[11:13:52] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
-[11:13:52] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[21:02:50] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[21:02:50] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[21:02:50] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[21:02:50] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[21:02:50] [Render thread/INFO]: Debug functionality is disabled.
+[21:02:50] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[21:02:50] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[21:02:50] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
+[21:02:50] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
+[21:02:50] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
+[21:02:50] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
+[21:02:50] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[11:13:52] [Render thread/INFO]: Hardware information:
-[11:13:52] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[11:13:52] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[11:13:52] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
+[21:02:50] [Render thread/INFO]: Hardware information:
+[21:02:50] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[21:02:50] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[21:02:50] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
 [LWJGL] Java 16 memcpy enabled
-[11:13:52] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[11:13:52] [Worker-Main-18/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[11:13:52] [Worker-Main-17/INFO]: Found unifont_pua-16.0.03.hex, loading
-[11:13:52] [Render thread/INFO]: Initializing VoxelMap...
-[11:13:52] [Render thread/INFO]: VoxelMap initialization complete
-[11:13:53] [Worker-Main-5/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[11:13:53] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
-[11:13:53] [Worker-Main-17/WARN]: Missing textures in model minecraft:block/tree_star:
+[21:02:50] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[21:02:50] [Render thread/INFO]: Initializing VoxelMap...
+[21:02:50] [Worker-Main-19/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[21:02:50] [Render thread/INFO]: VoxelMap initialization complete
+[21:02:50] [Worker-Main-15/INFO]: Found unifont_pua-16.0.03.hex, loading
+[21:02:50] [Worker-Main-19/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[21:02:50] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
+[21:02:51] [Worker-Main-2/WARN]: Missing textures in model minecraft:block/tree_star:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[11:13:53] [Worker-Main-17/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
+[21:02:51] [Worker-Main-2/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[11:13:53] [Worker-Main-17/WARN]: Missing texture references in model minecraft:block/fern_thatch:
+[21:02:51] [Worker-Main-2/WARN]: Missing texture references in model minecraft:block/fern_thatch:
     #missing
-[11:13:53] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[11:13:53] [Render thread/INFO]: Created: 256x256 waypoints-atlas
-[11:13:53] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
-[11:13:53] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
-[11:13:53] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
-[11:13:53] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
-[11:13:53] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
-[11:13:53] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
-[11:13:53] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[11:13:53] [Render thread/INFO]: Sound engine started
-[11:13:53] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[11:13:53] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[11:13:54] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
-[11:13:54] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[11:13:54] [Render thread/WARN]: Type is VERTEX
-[11:13:54] [Render thread/WARN]: Type is FRAGMENT
-[11:13:54] [Render thread/WARN]: Type is VERTEX
-[11:13:54] [Render thread/WARN]: Type is FRAGMENT
-[11:13:54] [Render thread/WARN]: Type is VERTEX
-[11:13:54] [Render thread/WARN]: Type is FRAGMENT
-[11:13:59] [Render thread/INFO]: Stopping!
-[11:13:59] [Render thread/INFO]: Saving all world maps
-[11:13:59] [Render thread/INFO]: Save queue flushed!
+[21:02:51] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[21:02:51] [Render thread/INFO]: Created: 256x256 waypoints-atlas
+[21:02:51] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
+[21:02:51] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
+[21:02:51] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
+[21:02:51] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
+[21:02:51] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
+[21:02:51] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
+[21:02:51] [Render thread/INFO]: OpenAL initialized on device CORSAIR Slipstream Multi-Device Receiver Analog Stereo
+[21:02:51] [Render thread/INFO]: Sound engine started
+[21:02:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[21:02:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[21:02:51] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
+[21:02:51] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[21:02:52] [Render thread/WARN]: Type is VERTEX
+[21:02:52] [Render thread/WARN]: Type is FRAGMENT
+[21:02:52] [Render thread/WARN]: Type is VERTEX
+[21:02:52] [Render thread/WARN]: Type is FRAGMENT
+[21:02:52] [Render thread/WARN]: Type is VERTEX
+[21:02:52] [Render thread/WARN]: Type is FRAGMENT
+[21:02:56] [Render thread/INFO]: Stopping!
+[21:02:56] [Render thread/INFO]: Saving all world maps
+[21:02:56] [Render thread/INFO]: Save queue flushed!
 
 [Incubating] Problems report is available at: file:///home/matt/Documents/Repos/MattMC/build/reports/problems/problems-report.html
 
@@ -168,6 +214,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 24s
-7 actionable tasks: 6 executed, 1 from cache
+BUILD SUCCESSFUL in 48s
+9 actionable tasks: 8 executed, 1 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html
