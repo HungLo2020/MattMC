@@ -145,7 +145,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBlendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha) 
 	{
-		VulkanicAPI.configureBlendFunc(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
+		VulkanicAPI.setBlendFunction(net.vulkanic.VulkanicAPI.getImmediateContext(), sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
 		GlStateManager._blendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha); 
 	}
 	

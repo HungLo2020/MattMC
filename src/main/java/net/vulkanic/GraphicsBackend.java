@@ -255,11 +255,68 @@ public interface GraphicsBackend {
     void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, 
                                   int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
-    // Texture unit and parameter operations
-    @Deprecated
-    int createTexture();
-    @Deprecated
-    void removeTexture(int texture);
+    /**
+     * Creates a new 2D texture object.
+     * 
+     * In OpenGL: Maps to glGenTextures()
+     * In Vulkan: Maps to vkCreateImage() for 2D texture
+     * 
+     * @param ctx Command context for recording this command
+     * @return The texture object ID
+     */
+    int createTexture2D(CommandContext ctx);
+    
+    /**
+     * Deletes a texture object.
+     * 
+     * In OpenGL: Maps to glDeleteTextures()
+     * In Vulkan: Maps to vkDestroyImage()
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture object ID to delete
+     */
+    void deleteTexture(CommandContext ctx, int texture);
+    
+    /**
+     * Renders primitives from array data.
+     * 
+     * In OpenGL: Maps to glDrawArrays()
+     * In Vulkan: Maps to vkCmdDraw()
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The kind of primitives to render
+     * @param first The starting index in the enabled arrays
+     * @param count The number of vertices to be rendered
+     */
+    void drawArrays(CommandContext ctx, int mode, int first, int count);
+    
+    /**
+     * Renders primitives from indexed array data.
+     * 
+     * In OpenGL: Maps to glDrawElements()
+     * In Vulkan: Maps to vkCmdDrawIndexed()
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The kind of primitives to render
+     * @param count The number of elements to be rendered
+     * @param type The type of the values in indices
+     * @param indices Byte offset into the bound element array buffer
+     */
+    void drawElements(CommandContext ctx, int mode, int count, int type, long indices);
+    
+    /**
+     * Sets the blend function for RGB and alpha channels separately.
+     * 
+     * In OpenGL: Maps to glBlendFuncSeparate()
+     * In Vulkan: Part of pipeline color blend state
+     * 
+     * @param ctx Command context for recording this command
+     * @param srcRgb Source RGB blend factor
+     * @param dstRgb Destination RGB blend factor
+     * @param srcAlpha Source alpha blend factor
+     * @param dstAlpha Destination alpha blend factor
+     */
+    void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
     
     // Polygon rendering operations
     @Deprecated
@@ -268,14 +325,6 @@ public interface GraphicsBackend {
     void configurePolygonOffset(float factor, float units);
     @Deprecated
     void configureLogicOp(int opcode);
-    
-    // Drawing operations
-    @Deprecated
-    void drawPrimitiveArrays(int mode, int first, int count);
-    @Deprecated
-    void drawIndexedElements(int mode, int count, int type, long indices);
-    @Deprecated
-    void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
     
     // Error checking
     @Deprecated

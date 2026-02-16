@@ -292,16 +292,44 @@ public class OpenGLBackend implements GraphicsBackend {
                                                                       dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
     @Override
-    public int createTexture() {
+    public int createTexture2D(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL11.glGenTextures();
     }
     
-    @Deprecated
     @Override
-    public void removeTexture(int texture) {
+    public void deleteTexture(CommandContext ctx, int texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glDeleteTextures(texture);
+    }
+    
+    @Override
+    public void drawArrays(CommandContext ctx, int mode, int first, int count) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glDrawArrays(mode, first, count);
+    }
+    
+    @Override
+    public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glDrawElements(mode, count, type, indices);
+    }
+    
+    @Override
+    public void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
     @Deprecated
@@ -320,24 +348,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void configureLogicOp(int opcode) {
         GL11.glLogicOp(opcode);
-    }
-    
-    @Deprecated
-    @Override
-    public void drawPrimitiveArrays(int mode, int first, int count) {
-        GL11.glDrawArrays(mode, first, count);
-    }
-
-    @Deprecated
-    @Override
-    public void drawIndexedElements(int mode, int count, int type, long indices) {
-        GL11.glDrawElements(mode, count, type, indices);
-    }
-    
-    @Deprecated
-    @Override
-    public void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        org.lwjgl.opengl.GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
     @Deprecated

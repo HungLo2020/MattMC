@@ -166,6 +166,7 @@
 - [x] **Update documentation** to reflect API incompatibility
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Second batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Third batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Fourth batch complete
 - [ ] **Design Phase 2.5 roadmap** - API redesign planning
 - [ ] **Prioritize Phase 2.5 tasks** - Command buffers, pipelines, descriptors
 
@@ -182,11 +183,12 @@
 - [x] **Migrated first 5 methods** - clear(), enableBlend(), disableBlend(), useProgram(), enable()/disable()
 - [x] **Migrated second 5 methods** - bindTexture(), setDepthTestFunction(), setDepthWriteEnabled(), setColorWriteMask(), generateMipmap()
 - [x] **Migrated third 5 methods** - setPixelStoreMode(), attachFramebuffer(), attachBuffer(), activateTextureUnit(), configureTextureParameter()
-- [x] **15 of 283 deprecated methods migrated** (5.3% complete)
+- [x] **Migrated fourth 5 methods** - createTexture(), removeTexture(), drawPrimitiveArrays(), drawIndexedElements(), configureBlendFunc()
+- [x] **20 of 283 deprecated methods migrated** (7.1% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 15 / 283 (5.3%)
+**Methods Migrated to CommandContext Pattern**: 20 / 283 (7.1%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -208,9 +210,16 @@
 4. ✅ activateTextureUnit(int) → setActiveTextureUnit(CommandContext, int) - 3 call sites updated
 5. ✅ configureTextureParameter(int, int, int) → setTextureParameter(CommandContext, int, int, int) - 3 call sites updated
 
-**Total Call Sites Updated**: 61
+**Batch 4 (Completed 2026-02-16 Night)**:
+1. ✅ createTexture() → createTexture2D(CommandContext) - 3 call sites updated
+2. ✅ removeTexture(int) → deleteTexture(CommandContext, int) - 1 call site updated
+3. ✅ drawPrimitiveArrays(int, int, int) → drawArrays(CommandContext, int, int, int) - 3 call sites updated
+4. ✅ drawIndexedElements(int, int, int, long) → drawElements(CommandContext, int, int, int, long) - 1 call site updated
+5. ✅ configureBlendFunc(int, int, int, int) → setBlendFunction(CommandContext, int, int, int, int) - 2 call sites updated
 
-**Remaining Deprecated Methods**: 268 (94.7%)
+**Total Call Sites Updated**: 71
+
+**Remaining Deprecated Methods**: 263 (92.9%)
 
 ### Blockers
 

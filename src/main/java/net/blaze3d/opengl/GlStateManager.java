@@ -369,7 +369,7 @@ public class GlStateManager {
 
 	public static void glBlendFuncSeparate(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configureBlendFunc(i, j, k, l);
+		net.vulkanic.VulkanicAPI.setBlendFunction(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l);
 	}
 
 	public static String glGetShaderInfoLog(int i, int j) {
@@ -463,12 +463,12 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		numTextures++;
 		PLOT_TEXTURES.setValue(numTextures);
-		return net.vulkanic.VulkanicAPI.createTexture();
+		return net.vulkanic.VulkanicAPI.createTexture2D(net.vulkanic.VulkanicAPI.getImmediateContext());
 	}
 
 	public static void _deleteTexture(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.removeTexture(i);
+		net.vulkanic.VulkanicAPI.deleteTexture(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 
 		for (GlStateManager.TextureState textureState : TEXTURES) {
 			if (textureState.binding == i) {
@@ -574,12 +574,12 @@ public class GlStateManager {
 			mode = VulkanicAPI.GL_PATCHES;
 		}
 		
-		net.vulkanic.VulkanicAPI.drawIndexedElements(mode, j, k, l);
+		net.vulkanic.VulkanicAPI.drawElements(net.vulkanic.VulkanicAPI.getImmediateContext(), mode, j, k, l);
 	}
 
 	public static void _drawArrays(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.drawPrimitiveArrays(i, j, k);
+		net.vulkanic.VulkanicAPI.drawArrays(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k);
 	}
 
 	public static void _pixelStore(int i, int j) {

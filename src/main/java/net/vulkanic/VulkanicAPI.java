@@ -815,14 +815,24 @@ public class VulkanicAPI {
                                               dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    public static int createTexture() {
-        return getBackend().createTexture();
+    public static int createTexture2D(CommandContext ctx) {
+        return getBackend().createTexture2D(ctx);
     }
     
-    @Deprecated
-    public static void removeTexture(int texture) {
-        getBackend().removeTexture(texture);
+    public static void deleteTexture(CommandContext ctx, int texture) {
+        getBackend().deleteTexture(ctx, texture);
+    }
+    
+    public static void drawArrays(CommandContext ctx, int mode, int first, int count) {
+        getBackend().drawArrays(ctx, mode, first, count);
+    }
+    
+    public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        getBackend().drawElements(ctx, mode, count, type, indices);
+    }
+    
+    public static void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        getBackend().setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
     @Deprecated
@@ -838,21 +848,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void configureLogicOp(int opcode) {
         getBackend().configureLogicOp(opcode);
-    }
-    
-    @Deprecated
-    public static void drawPrimitiveArrays(int mode, int first, int count) {
-        getBackend().drawPrimitiveArrays(mode, first, count);
-    }
-
-    @Deprecated
-    public static void drawIndexedElements(int mode, int count, int type, long indices) {
-        getBackend().drawIndexedElements(mode, count, type, indices);
-    }
-    
-    @Deprecated
-    public static void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        getBackend().configureBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
     @Deprecated
