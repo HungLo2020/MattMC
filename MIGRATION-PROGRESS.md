@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 10.6% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 12.4% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 10.6% | 100% | In Progress |
+| **API Vulkan Compatibility** | 🟡 12.4% | 100% | In Progress |
 
 ---
 
@@ -187,11 +187,12 @@
 - [x] **Migrated fourth 5 methods** - createTexture(), removeTexture(), drawPrimitiveArrays(), drawIndexedElements(), configureBlendFunc()
 - [x] **Migrated fifth 5 methods** - attachTextureToFramebuffer(), configurePolygonMode(), configurePolygonOffset(), configureLogicOp(), createFramebufferDSA()
 - [x] **Migrated sixth 5 methods** - createBufferDSA(), namedBufferDataDSA(), allocateBufferObject(), releaseBufferObject(), checkForErrors()
-- [x] **30 of 283 deprecated methods migrated** (10.6% complete)
+- [x] **Migrated seventh 5 methods** - namedBufferSubDataDSA(), namedBufferStorageDSA() (2 overloads), mapNamedBufferRangeDSA(), unmapNamedBufferDSA()
+- [x] **35 of 283 deprecated methods migrated** (12.4% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 30 / 283 (10.6%)
+**Methods Migrated to CommandContext Pattern**: 35 / 283 (12.4%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -234,9 +235,16 @@
 4. ✅ releaseBufferObject(int) → deleteBuffer(CommandContext, int) - 2 call sites updated (GlStateManager, GLRenderDevice)
 5. ✅ checkForErrors() → getError(CommandContext) - 1 call site updated (GlStateManager)
 
-**Total Call Sites Updated**: 84
+**Batch 7 (Completed 2026-02-16)**:
+1. ✅ namedBufferSubDataDSA(int, long, ByteBuffer) → bufferSubData(CommandContext, int, long, ByteBuffer) - 1 call site updated (DirectStateAccess)
+2. ✅ namedBufferStorageDSA(int, long, int) → bufferStorage(CommandContext, int, long, int) - 1 call site updated (DirectStateAccess)
+3. ✅ namedBufferStorageDSA(int, ByteBuffer, int) → bufferStorage(CommandContext, int, ByteBuffer, int) - 1 call site updated (DirectStateAccess)
+4. ✅ mapNamedBufferRangeDSA(int, long, long, int) → mapBufferRange(CommandContext, int, long, long, int) - 1 call site updated (DirectStateAccess)
+5. ✅ unmapNamedBufferDSA(int) → unmapBuffer(CommandContext, int) - 1 call site updated (DirectStateAccess)
 
-**Remaining Deprecated Methods**: 253 (89.4%)
+**Total Call Sites Updated**: 89
+
+**Remaining Deprecated Methods**: 248 (87.6%)
 
 ### Blockers
 

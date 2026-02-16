@@ -67,28 +67,28 @@ public abstract class DirectStateAccess {
 
 		@Override
 		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
-			net.vulkanic.VulkanicAPI.namedBufferSubDataDSA(i, (long)j, byteBuffer);
+			net.vulkanic.VulkanicAPI.bufferSubData(net.vulkanic.VulkanicAPI.getImmediateContext(), i, (long)j, byteBuffer);
 		}
 
 		@Override
 		void bufferStorage(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(i, l, GlConst.bufferUsageToGlFlag(j));
+			net.vulkanic.VulkanicAPI.bufferStorage(net.vulkanic.VulkanicAPI.getImmediateContext(), i, l, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Override
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			net.vulkanic.VulkanicAPI.bufferStorage(net.vulkanic.VulkanicAPI.getImmediateContext(), i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
-			return net.vulkanic.VulkanicAPI.mapNamedBufferRangeDSA(i, j, k, l);
+			return net.vulkanic.VulkanicAPI.mapBufferRange(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l);
 		}
 
 		@Override
 		void unmapBuffer(int i, int j) {
-			net.vulkanic.VulkanicAPI.unmapNamedBufferDSA(i);
+			net.vulkanic.VulkanicAPI.unmapBuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 		}
 
 		@Override

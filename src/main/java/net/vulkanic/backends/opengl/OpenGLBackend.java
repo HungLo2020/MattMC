@@ -228,33 +228,43 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, data, usage);
     }
     
-    @Deprecated
     @Override
-    public void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
+    public void bufferSubData(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferSubData(buffer, offset, data);
     }
     
-    @Deprecated
     @Override
-    public void namedBufferStorageDSA(int buffer, long size, int flags) {
+    public void bufferStorage(CommandContext ctx, int buffer, long size, int flags) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, size, flags);
     }
     
-    @Deprecated
     @Override
-    public void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
+    public void bufferStorage(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, data, flags);
     }
     
-    @Deprecated
     @Override
-    public java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
+    public java.nio.ByteBuffer mapBufferRange(CommandContext ctx, int buffer, long offset, long length, int access) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glMapNamedBufferRange(buffer, offset, length, access);
     }
     
-    @Deprecated
     @Override
-    public void unmapNamedBufferDSA(int buffer) {
+    public void unmapBuffer(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glUnmapNamedBuffer(buffer);
     }
     

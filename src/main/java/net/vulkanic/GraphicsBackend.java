@@ -259,17 +259,51 @@ public interface GraphicsBackend {
      */
     void bufferData(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage);
     
-    // Direct State Access buffer operations (deprecated ones)
-    @Deprecated
-    void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data);
-    @Deprecated
-    void namedBufferStorageDSA(int buffer, long size, int flags);
-    @Deprecated
-    void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags);
-    @Deprecated
-    java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access);
-    @Deprecated
-    void unmapNamedBufferDSA(int buffer);
+    /**
+     * Update a subset of buffer data.
+     * @param ctx Command context
+     * @param buffer Buffer object
+     * @param offset Offset in bytes
+     * @param data Data to upload
+     */
+    void bufferSubData(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data);
+    
+    /**
+     * Create immutable buffer storage (size).
+     * @param ctx Command context
+     * @param buffer Buffer object
+     * @param size Size in bytes
+     * @param flags Storage flags
+     */
+    void bufferStorage(CommandContext ctx, int buffer, long size, int flags);
+    
+    /**
+     * Create immutable buffer storage (data).
+     * @param ctx Command context
+     * @param buffer Buffer object
+     * @param data Initial data
+     * @param flags Storage flags
+     */
+    void bufferStorage(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags);
+    
+    /**
+     * Map a buffer range for client access.
+     * @param ctx Command context
+     * @param buffer Buffer object
+     * @param offset Offset in bytes
+     * @param length Length in bytes
+     * @param access Access flags
+     * @return Mapped buffer or null
+     */
+    java.nio.ByteBuffer mapBufferRange(CommandContext ctx, int buffer, long offset, long length, int access);
+    
+    /**
+     * Unmap a previously mapped buffer.
+     * @param ctx Command context
+     * @param buffer Buffer object
+     */
+    void unmapBuffer(CommandContext ctx, int buffer);
+    
     @Deprecated
     void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length);
     @Deprecated

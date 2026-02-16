@@ -809,29 +809,59 @@ public class VulkanicAPI {
         getBackend().bufferData(ctx, buffer, data, usage);
     }
     
-    @Deprecated
-    public static void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
-        getBackend().namedBufferSubDataDSA(buffer, offset, data);
+    /**
+     * Update a subset of buffer data.
+     * @param ctx Command context
+     * @param buffer Buffer object
+     * @param offset Offset in bytes
+     * @param data Data to upload
+     */
+    public static void bufferSubData(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        getBackend().bufferSubData(ctx, buffer, offset, data);
     }
     
-    @Deprecated
-    public static void namedBufferStorageDSA(int buffer, long size, int flags) {
-        getBackend().namedBufferStorageDSA(buffer, size, flags);
+    /**
+     * Create immutable buffer storage (size).
+     * @param ctx Command context
+     * @param buffer Buffer object
+     * @param size Size in bytes
+     * @param flags Storage flags
+     */
+    public static void bufferStorage(CommandContext ctx, int buffer, long size, int flags) {
+        getBackend().bufferStorage(ctx, buffer, size, flags);
     }
     
-    @Deprecated
-    public static void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
-        getBackend().namedBufferStorageDSA(buffer, data, flags);
+    /**
+     * Create immutable buffer storage (data).
+     * @param ctx Command context
+     * @param buffer Buffer object
+     * @param data Initial data
+     * @param flags Storage flags
+     */
+    public static void bufferStorage(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        getBackend().bufferStorage(ctx, buffer, data, flags);
     }
     
-    @Deprecated
-    public static java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
-        return getBackend().mapNamedBufferRangeDSA(buffer, offset, length, access);
+    /**
+     * Map a buffer range for client access.
+     * @param ctx Command context
+     * @param buffer Buffer object
+     * @param offset Offset in bytes
+     * @param length Length in bytes
+     * @param access Access flags
+     * @return Mapped buffer or null
+     */
+    public static java.nio.ByteBuffer mapBufferRange(CommandContext ctx, int buffer, long offset, long length, int access) {
+        return getBackend().mapBufferRange(ctx, buffer, offset, length, access);
     }
     
-    @Deprecated
-    public static void unmapNamedBufferDSA(int buffer) {
-        getBackend().unmapNamedBufferDSA(buffer);
+    /**
+     * Unmap a previously mapped buffer.
+     * @param ctx Command context
+     * @param buffer Buffer object
+     */
+    public static void unmapBuffer(CommandContext ctx, int buffer) {
+        getBackend().unmapBuffer(ctx, buffer);
     }
     
     @Deprecated
