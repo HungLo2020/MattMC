@@ -992,6 +992,15 @@ tasks.register('performanceTest', Test) {
     outputs.upToDateWhen { false }  // Always run performance tests to get fresh results
 }
 
+// ===== ARCHITECTURAL BOUNDARY ENFORCEMENT =====
+// Enforce architectural boundaries by running tests during compilation
+// This ensures that architectural violations (e.g., direct OpenGL/Vulkan imports
+// outside of backends/) will FAIL the build process, not just fail when tests are
+// manually run. See src/main/java/net/vulkanic/README.md for architectural principles.
+tasks.named('compileJava') {
+    finalizedBy test
+}
+
 // Task to run all tests (both misc and performance)
 tasks.register('testAll', Test) {
     group = 'verification'
