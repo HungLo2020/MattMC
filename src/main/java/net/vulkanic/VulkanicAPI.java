@@ -924,34 +924,16 @@ public class VulkanicAPI {
         return getBackend().checkForErrors();
     }
     
-    @Deprecated
-    public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
-        getBackend().transferTexture2DImage(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+    public static void texImage2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().texImage2D(ctx, target, level, internalFormat, width, height, border, format, type, pixels);
     }
     
-    @Deprecated
-    public static void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        getBackend().transferTexture2DSubregion(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    public static void texSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, long pixels) {
+        getBackend().texSubImage2D(ctx, target, level, xoffset, yoffset, width, height, format, type, pixels);
     }
     
-    @Deprecated
-    public static void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        getBackend().transferTexture2DSubregionBuf(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
-    }
-    
-    @Deprecated
-    public static void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        getBackend().fillBufferWithData(tgt, dat, usg);
-    }
-    
-    @Deprecated
-    public static void fillBufferWithSize(int tgt, long sz, int usg) {
-        getBackend().fillBufferWithSize(tgt, sz, usg);
-    }
-    
-    @Deprecated
-    public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        getBackend().fillBufferSubregion(tgt, off, dat);
+    public static void texSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().texSubImage2D(ctx, target, level, xoffset, yoffset, width, height, format, type, pixels);
     }
     
     public static int createVertexArray(CommandContext ctx) {

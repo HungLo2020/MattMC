@@ -477,20 +477,9 @@ public interface GraphicsBackend {
     int checkForErrors();
     
     // Texture pixel data transfer
-    @Deprecated
-    void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
-    @Deprecated
-    void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix);
-    @Deprecated
-    void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix);
-    
-    // GPU buffer lifecycle (deprecated)
-    @Deprecated
-    void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg);
-    @Deprecated
-    void fillBufferWithSize(int tgt, long sz, int usg);
-    @Deprecated
-    void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
+    void texImage2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels);
+    void texSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, long pixels);
+    void texSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, java.nio.ByteBuffer pixels);
     
     // Vertex array objects
     int createVertexArray(CommandContext ctx);

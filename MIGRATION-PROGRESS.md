@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 19.4% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 21.6% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 19.4% | 100% | In Progress |
+| **API Vulkan Compatibility** | 🟡 21.6% | 100% | In Progress |
 
 ---
 
@@ -200,7 +200,7 @@
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 55 / 283 (19.4%)
+**Methods Migrated to CommandContext Pattern**: 61 / 283 (21.6%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -279,9 +279,17 @@
 5. ✅ assignUniformInteger(int, int) → setUniformInt(CommandContext, int, int) - 4 call sites updated (GlStateManager, GlUniformInt, FallbackShader x2)
 6. ✅ bindAttributeLocation(int, int, CharSequence) → bindAttribLocation(CommandContext, int, int, CharSequence) - 9 call sites updated (GlStateManager, GlProgram, IrisRenderSystem, IrisLodRenderProgram x3, ProgramBuilder via IrisRenderSystem)
 
-**Total Call Sites Updated**: 169
+**Batch 12 (Completed 2026-02-16)**:
+1. ✅ transferTexture2DImage(...) → texImage2D(CommandContext, ...) - 1 call site updated (GlStateManager)
+2. ✅ transferTexture2DSubregion(...) → texSubImage2D(CommandContext, int, int, int, int, int, int, int, int, long) - 1 call site updated (GlStateManager)
+3. ✅ transferTexture2DSubregionBuf(...) → texSubImage2D(CommandContext, int, int, int, int, int, int, int, int, ByteBuffer) - 1 call site updated (GlStateManager)
+4. ✅ fillBufferWithData(int, ByteBuffer, int) → bufferData(CommandContext, int, ByteBuffer, int) [reused from Batch 6] - 2 call sites updated (GlStateManager, GLRenderDevice)
+5. ✅ fillBufferWithSize(int, long, int) → bufferData(CommandContext, int, long, int) [reused from Batch 6] - 2 call sites updated (GlStateManager, GLRenderDevice)
+6. ✅ fillBufferSubregion(int, long, ByteBuffer) → bufferSubData(CommandContext, int, long, ByteBuffer) [reused from Batch 7] - 1 call site updated (GlStateManager)
 
-**Remaining Deprecated Methods**: 228 (80.6%)
+**Total Call Sites Updated**: 177
+
+**Remaining Deprecated Methods**: 222 (78.4%)
 
 ### Blockers
 

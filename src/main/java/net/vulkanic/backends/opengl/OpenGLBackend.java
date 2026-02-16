@@ -405,40 +405,28 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL11.glGetError();
     }
     
-    @Deprecated
     @Override
-    public void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
-        GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+    public void texImage2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);
     }
     
-    @Deprecated
     @Override
-    public void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    public void texSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, long pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
     }
     
-    @Deprecated
     @Override
-    public void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
-    }
-    
-    @Deprecated
-    @Override
-    public void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        GL15.glBufferData(tgt, dat, usg);
-    }
-    
-    @Deprecated
-    @Override
-    public void fillBufferWithSize(int tgt, long sz, int usg) {
-        GL15.glBufferData(tgt, sz, usg);
-    }
-    
-    @Deprecated
-    @Override
-    public void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        GL15.glBufferSubData(tgt, off, dat);
+    public void texSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
     }
     
     @Override

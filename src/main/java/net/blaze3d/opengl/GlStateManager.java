@@ -291,17 +291,20 @@ public class GlStateManager {
 
 	public static void _glBufferData(int i, ByteBuffer byteBuffer, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.fillBufferWithData(i, byteBuffer, j);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.bufferData(ctx, i, byteBuffer, j);
 	}
 
 	public static void _glBufferSubData(int i, int j, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.fillBufferSubregion(i, (long)j, byteBuffer);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.bufferSubData(ctx, i, (long)j, byteBuffer);
 	}
 
 	public static void _glBufferData(int i, long l, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.fillBufferWithSize(i, l, j);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.bufferData(ctx, i, l, j);
 	}
 
 	@Nullable
@@ -499,7 +502,8 @@ public class GlStateManager {
 
 	public static void _texImage2D(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DImage(i, j, k, l, m, n, o, p, byteBuffer);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.texImage2D(ctx, i, j, k, l, m, n, o, p, byteBuffer);
 		
 		// Iris: Track texture image data (from MixinGlStateManager texture)
 		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
@@ -507,12 +511,14 @@ public class GlStateManager {
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, long q) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DSubregion(i, j, k, l, m, n, o, p, q);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.texSubImage2D(ctx, i, j, k, l, m, n, o, p, q);
 	}
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DSubregionBuf(i, j, k, l, m, n, o, p, byteBuffer);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.texSubImage2D(ctx, i, j, k, l, m, n, o, p, byteBuffer);
 	}
 
 	public static void _viewport(int i, int j, int k, int l) {

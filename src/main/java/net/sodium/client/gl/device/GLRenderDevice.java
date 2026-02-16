@@ -104,7 +104,8 @@ public class GLRenderDevice implements RenderDevice {
         public void uploadData(GlMutableBuffer glBuffer, ByteBuffer byteBuffer, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, glBuffer);
 
-            VulkanicAPI.fillBufferWithData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
+            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            VulkanicAPI.bufferData(ctx, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
             glBuffer.setSize(byteBuffer.remaining());
         }
 
@@ -136,7 +137,8 @@ public class GLRenderDevice implements RenderDevice {
         public void allocateStorage(GlMutableBuffer buffer, long bufferSize, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            VulkanicAPI.fillBufferWithSize(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
+            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            VulkanicAPI.bufferData(ctx, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
             buffer.setSize(bufferSize);
         }
 
