@@ -944,7 +944,7 @@ public class VulkanicAPI {
         getBackend().bindVertexArray(ctx, vao);
     }
     
-    public static java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, int offset, int length, int access) {
+    public static java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
         return getBackend().mapBuffer(ctx, target, offset, length, access);
     }
     

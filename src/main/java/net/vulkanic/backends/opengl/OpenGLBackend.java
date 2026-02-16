@@ -446,7 +446,7 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, int offset, int length, int access) {
+    public java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }

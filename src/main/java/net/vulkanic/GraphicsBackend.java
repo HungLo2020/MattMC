@@ -486,7 +486,7 @@ public interface GraphicsBackend {
     void bindVertexArray(CommandContext ctx, int vao);
     
     // Buffer memory mapping
-    java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, int offset, int length, int access);
+    java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access);
     void unmapBufferTarget(CommandContext ctx, int target);
     
     // Framebuffer lifecycle

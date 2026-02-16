@@ -308,7 +308,7 @@ public class GlStateManager {
 	}
 
 	@Nullable
-	public static ByteBuffer _glMapBufferRange(int i, int j, int k, int l) {
+	public static ByteBuffer _glMapBufferRange(int i, long j, long k, int l) {
 		RenderSystem.assertOnRenderThread();
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		return net.vulkanic.VulkanicAPI.mapBuffer(ctx, i, j, k, l);
