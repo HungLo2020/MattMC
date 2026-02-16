@@ -156,8 +156,9 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBindFramebuffer(int target, int framebuffer) 
 	{
-		VulkanicAPI.attachFramebuffer(target, framebuffer);
-		GlStateManager._glBindFramebuffer(target, framebuffer); 
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.bindFramebuffer(ctx, target, framebuffer);
+		GlStateManager._glBindFramebuffer(target, framebuffer);
 	}
 	
 	
@@ -214,8 +215,9 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	/** Sets the active texture unit */
 	@Override
 	public void glActiveTexture(int textureId) 
-	{ 
-		VulkanicAPI.activateTextureUnit(textureId);
+	{
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setActiveTextureUnit(ctx, textureId);
 		GlStateManager._activeTexture(textureId);
 	}
 	@Override

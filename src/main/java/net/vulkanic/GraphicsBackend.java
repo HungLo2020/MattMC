@@ -162,19 +162,68 @@ public interface GraphicsBackend {
      */
     void generateTextureMipmap(CommandContext ctx, int target);
     
-    // Pixel operations
-    @Deprecated
-    void setPixelStoreMode(int pname, int value);
+    /**
+     * Sets pixel storage mode parameters.
+     * 
+     * In OpenGL: Maps to glPixelStorei()
+     * In Vulkan: Used during image transfers
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The pixel storage parameter to set
+     * @param value The value to set
+     */
+    void setPixelStore(CommandContext ctx, int pname, int value);
     
-    // Framebuffer operations
-    @Deprecated
-    void attachFramebuffer(int target, int fbo);
+    /**
+     * Binds a framebuffer object.
+     * 
+     * In OpenGL: Maps to glBindFramebuffer()
+     * In Vulkan: Part of render pass setup
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (read, draw, or both)
+     * @param fbo The framebuffer object ID
+     */
+    void bindFramebuffer(CommandContext ctx, int target, int fbo);
+    
+    /**
+     * Binds a buffer object to a target.
+     * 
+     * In OpenGL: Maps to glBindBuffer()
+     * In Vulkan: Buffers are bound via descriptor sets
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target
+     * @param buffer The buffer object ID
+     */
+    void bindBuffer(CommandContext ctx, int target, int buffer);
+    
+    /**
+     * Sets the active texture unit.
+     * 
+     * In OpenGL: Maps to glActiveTexture()
+     * In Vulkan: Part of descriptor set binding
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit The texture unit to activate
+     */
+    void setActiveTextureUnit(CommandContext ctx, int unit);
+    
+    /**
+     * Sets a texture parameter.
+     * 
+     * In OpenGL: Maps to glTexParameteri()
+     * In Vulkan: Part of sampler object creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param pname The parameter name
+     * @param param The parameter value
+     */
+    void setTextureParameter(CommandContext ctx, int target, int pname, int param);
+    
     @Deprecated
     void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level);
-    
-    // Buffer operations  
-    @Deprecated
-    void attachBuffer(int target, int buffer);
     
     // Direct State Access buffer operations
     @Deprecated
@@ -207,10 +256,6 @@ public interface GraphicsBackend {
                                   int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
     // Texture unit and parameter operations
-    @Deprecated
-    void activateTextureUnit(int unit);
-    @Deprecated
-    void configureTextureParameter(int target, int pname, int param);
     @Deprecated
     int createTexture();
     @Deprecated

@@ -277,7 +277,8 @@ public class GlStateManager {
 
 	public static void _glBindBuffer(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.attachBuffer(i, j);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.bindBuffer(ctx, i, j);
 	}
 
 	public static void _glBindVertexArray(int i) {
@@ -319,13 +320,14 @@ public class GlStateManager {
 	}
 
 	public static void _glBindFramebuffer(int i, int j) {
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		if ((i == 36008 || i == 36160) && readFbo != j) {
-			net.vulkanic.VulkanicAPI.attachFramebuffer(36008, j);
+			net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, 36008, j);
 			readFbo = j;
 		}
 
 		if ((i == 36009 || i == 36160) && writeFbo != j) {
-			net.vulkanic.VulkanicAPI.attachFramebuffer(36009, j);
+			net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, 36009, j);
 			writeFbo = j;
 		}
 	}
@@ -442,13 +444,15 @@ public class GlStateManager {
 		
 		if (activeTexture != i - 33984) {
 			activeTexture = i - 33984;
-			net.vulkanic.VulkanicAPI.activateTextureUnit(i);
+			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			net.vulkanic.VulkanicAPI.setActiveTextureUnit(ctx, i);
 		}
 	}
 
 	public static void _texParameter(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configureTextureParameter(i, j, k);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.setTextureParameter(ctx, i, j, k);
 	}
 
 	public static int _getTexLevelParameter(int i, int j, int k) {
@@ -580,7 +584,8 @@ public class GlStateManager {
 
 	public static void _pixelStore(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setPixelStoreMode(i, j);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.setPixelStore(ctx, i, j);
 	}
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {

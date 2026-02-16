@@ -5,10 +5,7 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL20;
-import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
@@ -148,6 +145,46 @@ public class OpenGLBackend implements GraphicsBackend {
         GL30.glGenerateMipmap(target);
     }
     
+    @Override
+    public void setPixelStore(CommandContext ctx, int pname, int value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glPixelStorei(pname, value);
+    }
+    
+    @Override
+    public void bindFramebuffer(CommandContext ctx, int target, int fbo) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glBindFramebuffer(target, fbo);
+    }
+    
+    @Override
+    public void bindBuffer(CommandContext ctx, int target, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBindBuffer(target, buffer);
+    }
+    
+    @Override
+    public void setActiveTextureUnit(CommandContext ctx, int unit) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL13.glActiveTexture(unit);
+    }
+    
+    @Override
+    public void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexParameteri(target, pname, param);
+    }
+    
     /**
      * Sets the dynamic scissor rectangle with explicit command context.
      * This is the Vulkan-compatible implementation for scissor control.
@@ -169,26 +206,8 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void setPixelStoreMode(int pname, int value) {
-        GL11.glPixelStorei(pname, value);
-    }
-    
-    @Deprecated
-    @Override
-    public void attachFramebuffer(int target, int fbo) {
-        GL30.glBindFramebuffer(target, fbo);
-    }
-    
-    @Deprecated
-    @Override
     public void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
         GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
-    }
-    
-    @Deprecated
-    @Override
-    public void attachBuffer(int target, int buffer) {
-        GL15.glBindBuffer(target, buffer);
     }
     
     // Direct State Access buffer operations
@@ -271,18 +290,6 @@ public class OpenGLBackend implements GraphicsBackend {
                                         int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         org.lwjgl.opengl.ARBDirectStateAccess.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
                                                                       dstX0, dstY0, dstX1, dstY1, mask, filter);
-    }
-    
-    @Deprecated
-    @Override
-    public void activateTextureUnit(int unit) {
-        org.lwjgl.opengl.GL13.glActiveTexture(unit);
-    }
-    
-    @Deprecated
-    @Override
-    public void configureTextureParameter(int target, int pname, int param) {
-        GL11.glTexParameteri(target, pname, param);
     }
     
     @Deprecated

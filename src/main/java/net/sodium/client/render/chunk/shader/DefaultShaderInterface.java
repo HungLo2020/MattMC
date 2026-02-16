@@ -77,11 +77,11 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
     @Deprecated(forRemoval = true) // should be handled properly in GFX instead.
     private void bindTexture(ChunkShaderTextureSlot slot, GpuTextureView textureView) {
         GlTexture tex = (GlTexture) textureView.texture();
-        VulkanicAPI.activateTextureUnit(VulkanicAPI.GL_TEXTURE0 + slot.ordinal());
         CommandContext ctx = VulkanicAPI.getImmediateContext();
+        VulkanicAPI.setActiveTextureUnit(ctx, VulkanicAPI.GL_TEXTURE0 + slot.ordinal());
         VulkanicAPI.bindTexture2D(ctx, tex.glId());
-        VulkanicAPI.configureTextureParameter(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, textureView.baseMipLevel());
-        VulkanicAPI.configureTextureParameter(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
+        VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, textureView.baseMipLevel());
+        VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
         tex.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 
         var uniform = this.uniformTextures.get(slot);

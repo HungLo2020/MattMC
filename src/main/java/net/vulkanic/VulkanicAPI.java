@@ -686,24 +686,64 @@ public class VulkanicAPI {
         getBackend().generateTextureMipmap(ctx, target);
     }
     
-    @Deprecated
-    public static void setPixelStoreMode(int pname, int value) {
-        getBackend().setPixelStoreMode(pname, value);
+    /**
+     * Sets pixel storage mode parameters.
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The pixel storage parameter to set
+     * @param value The value to set
+     */
+    public static void setPixelStore(CommandContext ctx, int pname, int value) {
+        getBackend().setPixelStore(ctx, pname, value);
     }
     
-    @Deprecated
-    public static void attachFramebuffer(int target, int fbo) {
-        getBackend().attachFramebuffer(target, fbo);
+    /**
+     * Binds a framebuffer object.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (read, draw, or both)
+     * @param fbo The framebuffer object ID
+     */
+    public static void bindFramebuffer(CommandContext ctx, int target, int fbo) {
+        getBackend().bindFramebuffer(ctx, target, fbo);
+    }
+    
+    /**
+     * Binds a buffer object to a target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target
+     * @param buffer The buffer object ID
+     */
+    public static void bindBuffer(CommandContext ctx, int target, int buffer) {
+        getBackend().bindBuffer(ctx, target, buffer);
+    }
+    
+    /**
+     * Sets the active texture unit.
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit The texture unit to activate
+     */
+    public static void setActiveTextureUnit(CommandContext ctx, int unit) {
+        getBackend().setActiveTextureUnit(ctx, unit);
+    }
+    
+    /**
+     * Sets a texture parameter.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param pname The parameter name
+     * @param param The parameter value
+     */
+    public static void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        getBackend().setTextureParameter(ctx, target, pname, param);
     }
     
     @Deprecated
     public static void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
         getBackend().attachTextureToFramebuffer(target, attachment, textarget, texture, level);
-    }
-    
-    @Deprecated
-    public static void attachBuffer(int target, int buffer) {
-        getBackend().attachBuffer(target, buffer);
     }
     
     // Direct State Access buffer operations
@@ -773,16 +813,6 @@ public class VulkanicAPI {
                                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         getBackend().blitNamedFramebufferDSA(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
                                               dstX0, dstY0, dstX1, dstY1, mask, filter);
-    }
-    
-    @Deprecated
-    public static void activateTextureUnit(int unit) {
-        getBackend().activateTextureUnit(unit);
-    }
-    
-    @Deprecated
-    public static void configureTextureParameter(int target, int pname, int param) {
-        getBackend().configureTextureParameter(target, pname, param);
     }
     
     @Deprecated

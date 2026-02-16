@@ -10,6 +10,7 @@ import net.sodium.client.gl.sync.GlFence;
 import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.util.EnumBitField;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import java.nio.ByteBuffer;
 
@@ -117,7 +118,8 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void bindBuffer(GlBufferTarget target, GlBuffer buffer) {
             if (this.stateTracker.makeBufferActive(target, buffer)) {
-                VulkanicAPI.attachBuffer(target.getTargetParameter(), buffer.handle());
+                CommandContext ctx = VulkanicAPI.getImmediateContext();
+                VulkanicAPI.bindBuffer(ctx, target.getTargetParameter(), buffer.handle());
             }
         }
 

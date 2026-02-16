@@ -165,6 +165,7 @@
 - [x] **Analyze API Vulkan compatibility** - CRITICAL FINDING
 - [x] **Update documentation** to reflect API incompatibility
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Second batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Third batch complete
 - [ ] **Design Phase 2.5 roadmap** - API redesign planning
 - [ ] **Prioritize Phase 2.5 tasks** - Command buffers, pipelines, descriptors
 
@@ -180,11 +181,12 @@
 - [x] **Updated MIGRATION-PROGRESS.md** - Reflects API redesign requirement
 - [x] **Migrated first 5 methods** - clear(), enableBlend(), disableBlend(), useProgram(), enable()/disable()
 - [x] **Migrated second 5 methods** - bindTexture(), setDepthTestFunction(), setDepthWriteEnabled(), setColorWriteMask(), generateMipmap()
-- [x] **10 of 283 deprecated methods migrated** (3.5% complete)
+- [x] **Migrated third 5 methods** - setPixelStoreMode(), attachFramebuffer(), attachBuffer(), activateTextureUnit(), configureTextureParameter()
+- [x] **15 of 283 deprecated methods migrated** (5.3% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 10 / 283 (3.5%)
+**Methods Migrated to CommandContext Pattern**: 15 / 283 (5.3%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -199,9 +201,16 @@
 4. ✅ setColorWriteMask(...) → setColorMask(CommandContext, ...) - 1 call site updated  
 5. ✅ generateMipmap(int) → generateTextureMipmap(CommandContext, int) - 1 call site updated
 
-**Total Call Sites Updated**: 48
+**Batch 3 (Completed 2026-02-16 Evening)**:
+1. ✅ setPixelStoreMode(int, int) → setPixelStore(CommandContext, int, int) - 1 call site updated
+2. ✅ attachFramebuffer(int, int) → bindFramebuffer(CommandContext, int, int) - 4 call sites updated
+3. ✅ attachBuffer(int, int) → bindBuffer(CommandContext, int, int) - 2 call sites updated
+4. ✅ activateTextureUnit(int) → setActiveTextureUnit(CommandContext, int) - 3 call sites updated
+5. ✅ configureTextureParameter(int, int, int) → setTextureParameter(CommandContext, int, int, int) - 3 call sites updated
 
-**Remaining Deprecated Methods**: 273 (96.5%)
+**Total Call Sites Updated**: 61
+
+**Remaining Deprecated Methods**: 268 (94.7%)
 
 ### Blockers
 
