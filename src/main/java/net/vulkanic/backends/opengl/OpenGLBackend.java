@@ -561,17 +561,54 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL20.glGetProgramInfoLog(program);
     }
     
-    @Deprecated
     @Override
-    public void attachShaderToProgram(int program, int shader) {
+    public void attachShader(CommandContext ctx, int program, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glAttachShader(program, shader);
     }
     
-    @Deprecated
     @Override
-    public int queryShaderParameter(int shader, int pname) {
+    public int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glGetShaderi(shader, pname);
     }
+    
+    @Override
+    public String getShaderInfoLog(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetShaderInfoLog(shader);
+    }
+    
+    @Override
+    public int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetUniformLocation(program, name);
+    }
+    
+    @Override
+    public void setUniformInt(CommandContext ctx, int location, int value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform1i(location, value);
+    }
+    
+    @Override
+    public void bindAttribLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glBindAttribLocation(program, index, name);
+    }
+    
     
     @Deprecated
     @Override
@@ -603,29 +640,6 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
     }
     
-    @Deprecated
-    @Override
-    public String retrieveShaderInfoLog(int shader) {
-        return GL20.glGetShaderInfoLog(shader);
-    }
-    
-    @Deprecated
-    @Override
-    public int locateUniformVariable(int program, CharSequence name) {
-        return GL20.glGetUniformLocation(program, name);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformInteger(int location, int value) {
-        GL20.glUniform1i(location, value);
-    }
-    
-    @Deprecated
-    @Override
-    public void bindAttributeLocation(int program, int index, CharSequence name) {
-        GL20.glBindAttribLocation(program, index, name);
-    }
     
     @Deprecated
     @Override

@@ -37,7 +37,7 @@ public class GlShader extends GlResource {
 			LOGGER.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = VulkanicAPI.queryShaderParameter(handle, VulkanicAPI.GL_COMPILE_STATUS);
+		int result = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), handle, VulkanicAPI.GL_COMPILE_STATUS);
 
 		if (result != 1) {  // GL_TRUE
 			throw new ShaderCompileException(name, log);

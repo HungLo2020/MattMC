@@ -77,7 +77,8 @@ public class IrisRenderSystem {
 
 	public static void bindAttributeLocation(int program, int index, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.bindAttributeLocation(program, index, name);
+		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+		VulkanicAPI.bindAttribLocation(ctx, program, index, name);
 	}
 
 	public static void texImage1D(int texture, int target, int level, int internalformat, int width, int border, int format, int type, @Nullable ByteBuffer pixels) {

@@ -516,19 +516,18 @@ public interface GraphicsBackend {
     void linkProgram(CommandContext ctx, int program);
     int getProgramParameter(CommandContext ctx, int program, int pname);
     String getProgramInfoLog(CommandContext ctx, int program);
+    void attachShader(CommandContext ctx, int program, int shader);
     
-    @Deprecated
-    void attachShaderToProgram(int program, int shader);
-    @Deprecated
-    int queryShaderParameter(int shader, int pname);
-    @Deprecated
-    String retrieveShaderInfoLog(int shader);
-    @Deprecated
-    int locateUniformVariable(int program, CharSequence name);
-    @Deprecated
-    void assignUniformInteger(int location, int value);
-    @Deprecated
-    void bindAttributeLocation(int program, int index, CharSequence name);
+    // Shader queries
+    int getShaderParameter(CommandContext ctx, int shader, int pname);
+    String getShaderInfoLog(CommandContext ctx, int shader);
+    
+    // Uniforms and attributes
+    int getUniformLocation(CommandContext ctx, int program, CharSequence name);
+    void setUniformInt(CommandContext ctx, int location, int value);
+    void bindAttribLocation(CommandContext ctx, int program, int index, CharSequence name);
+    
+
     
     // Vertex attributes
     @Deprecated

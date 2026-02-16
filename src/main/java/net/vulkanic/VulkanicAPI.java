@@ -1014,15 +1014,30 @@ public class VulkanicAPI {
         return getBackend().getProgramInfoLog(ctx, program);
     }
     
-    @Deprecated
-    public static void attachShaderToProgram(int program, int shader) {
-        getBackend().attachShaderToProgram(program, shader);
+    public static void attachShader(CommandContext ctx, int program, int shader) {
+        getBackend().attachShader(ctx, program, shader);
     }
     
-    @Deprecated
-    public static int queryShaderParameter(int shader, int pname) {
-        return getBackend().queryShaderParameter(shader, pname);
+    public static int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        return getBackend().getShaderParameter(ctx, shader, pname);
     }
+    
+    public static String getShaderInfoLog(CommandContext ctx, int shader) {
+        return getBackend().getShaderInfoLog(ctx, shader);
+    }
+    
+    public static int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        return getBackend().getUniformLocation(ctx, program, name);
+    }
+    
+    public static void setUniformInt(CommandContext ctx, int location, int value) {
+        getBackend().setUniformInt(ctx, location, value);
+    }
+    
+    public static void bindAttribLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        getBackend().bindAttribLocation(ctx, program, index, name);
+    }
+    
     
     @Deprecated
     public static void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
@@ -1049,25 +1064,6 @@ public class VulkanicAPI {
         getBackend().setVertexAttribDivisor(index, divisor);
     }
     
-    @Deprecated
-    public static String retrieveShaderInfoLog(int shader) {
-        return getBackend().retrieveShaderInfoLog(shader);
-    }
-    
-    @Deprecated
-    public static int locateUniformVariable(int program, CharSequence name) {
-        return getBackend().locateUniformVariable(program, name);
-    }
-    
-    @Deprecated
-    public static void assignUniformInteger(int location, int value) {
-        getBackend().assignUniformInteger(location, value);
-    }
-    
-    @Deprecated
-    public static void bindAttributeLocation(int program, int index, CharSequence name) {
-        getBackend().bindAttributeLocation(program, index, name);
-    }
     
     @Deprecated
     public static long createFenceSync(int condition, int flags) {
@@ -2015,11 +2011,13 @@ public class VulkanicAPI {
     
     /**
      * Binds a vertex attribute to a specific location in a shader program.
-     * Wrapper for bindAttributeLocation.
+    /**
+     * Binds a user-defined attribute variable to a vertex shader attribute index.
+     * Wrapper for bindAttribLocation.
      */
     @Deprecated
     public static void glBindAttribLocation(int program, int index, CharSequence name) {
-        bindAttributeLocation(program, index, name);
+        bindAttribLocation(getImmediateContext(), program, index, name);
     }
     
     /**
@@ -2051,11 +2049,11 @@ public class VulkanicAPI {
     
     /**
      * Attaches a shader to a program.
-     * Wrapper for attachShaderToProgram.
+     * Wrapper for attachShader.
      */
     @Deprecated
     public static void glAttachShader(int program, int shader) {
-        attachShaderToProgram(program, shader);
+        attachShader(getImmediateContext(), program, shader);
     }
     
     /**
@@ -2097,20 +2095,20 @@ public class VulkanicAPI {
     
     /**
      * Returns the location of a uniform variable.
-     * Wrapper for locateUniformVariable.
+     * Wrapper for getUniformLocation.
      */
     @Deprecated
     public static int glGetUniformLocation(int program, CharSequence name) {
-        return locateUniformVariable(program, name);
+        return getUniformLocation(getImmediateContext(), program, name);
     }
     
     /**
      * Sets the value of a uniform variable.
-     * Wrapper for assignUniformInteger.
+     * Wrapper for setUniformInt.
      */
     @Deprecated
     public static void glUniform1i(int location, int value) {
-        assignUniformInteger(location, value);
+        setUniformInt(getImmediateContext(), location, value);
     }
     
     // GL43+ Vertex Attribute methods

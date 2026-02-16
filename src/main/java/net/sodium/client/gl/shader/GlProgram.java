@@ -53,7 +53,8 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public <U extends GlUniform<?>> @NotNull U bindUniform(String name, IntFunction<U> factory) {
-        int index = VulkanicAPI.locateUniformVariable(this.handle(), name);
+        net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+        int index = VulkanicAPI.getUniformLocation(ctx, this.handle(), name);
 
         if (index < 0) {
             throw new NullPointerException("No uniform exists with name: " + name);
@@ -64,7 +65,8 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public <U extends GlUniform<?>> U bindUniformOptional(String name, IntFunction<U> factory) {
-        int index = VulkanicAPI.locateUniformVariable(this.handle(), name);
+        net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+        int index = VulkanicAPI.getUniformLocation(ctx, this.handle(), name);
 
         if (index < 0) {
             return null;
@@ -109,7 +111,8 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         }
 
         public Builder attachShader(GlShader shader) {
-            VulkanicAPI.attachShaderToProgram(this.program, shader.handle());
+            net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+            VulkanicAPI.attachShader(ctx, this.program, shader.handle());
 
             return this;
         }
@@ -142,7 +145,8 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         }
 
         public Builder bindAttribute(String name, int index) {
-            VulkanicAPI.bindAttributeLocation(this.program, index, name);
+            net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+            VulkanicAPI.bindAttribLocation(ctx, this.program, index, name);
 
             return this;
         }

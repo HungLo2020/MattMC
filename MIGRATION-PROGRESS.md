@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 17.7% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 19.4% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 17.7% | 100% | In Progress |
+| **API Vulkan Compatibility** | 🟡 19.4% | 100% | In Progress |
 
 ---
 
@@ -200,7 +200,7 @@
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 50 / 283 (17.7%)
+**Methods Migrated to CommandContext Pattern**: 55 / 283 (19.4%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -271,9 +271,17 @@
 4. ✅ queryProgramParameter(int, int) → getProgramParameter(CommandContext, int, int) - 3 call sites updated (GlStateManager, GlProgram, IrisLodRenderProgram)
 5. ✅ retrieveProgramInfoLog(int) → getProgramInfoLog(CommandContext, int) - 3 call sites updated (GlStateManager, GlProgram, IrisLodRenderProgram)
 
-**Total Call Sites Updated**: 131
+**Batch 11 (Completed 2026-02-16)**:
+1. ✅ attachShaderToProgram(int, int) → attachShader(CommandContext, int, int) - 7 call sites updated (GlStateManager, GlProgram, IrisLodRenderProgram x5)
+2. ✅ queryShaderParameter(int, int) → getShaderParameter(CommandContext, int, int) - 5 call sites updated (GlStateManager, GlShader x2, Shader x2)
+3. ✅ retrieveShaderInfoLog(int) → getShaderInfoLog(CommandContext, int) - 4 call sites updated (GlStateManager, GlShader, Shader x2)
+4. ✅ locateUniformVariable(int, CharSequence) → getUniformLocation(CommandContext, int, CharSequence) - 9 call sites updated (GlStateManager x7, GlProgram x2, IrisLodRenderProgram)
+5. ✅ assignUniformInteger(int, int) → setUniformInt(CommandContext, int, int) - 4 call sites updated (GlStateManager, GlUniformInt, FallbackShader x2)
+6. ✅ bindAttributeLocation(int, int, CharSequence) → bindAttribLocation(CommandContext, int, int, CharSequence) - 9 call sites updated (GlStateManager, GlProgram, IrisRenderSystem, IrisLodRenderProgram x3, ProgramBuilder via IrisRenderSystem)
 
-**Remaining Deprecated Methods**: 233 (82.3%)
+**Total Call Sites Updated**: 169
+
+**Remaining Deprecated Methods**: 228 (80.6%)
 
 ### Blockers
 
