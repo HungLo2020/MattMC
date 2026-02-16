@@ -450,7 +450,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        return GL30.glMapBufferRange(target, offset, length, access);
+        return GL32C.glMapBufferRange(target, offset, length, access);
     }
     
     @Override
