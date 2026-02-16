@@ -93,7 +93,7 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public int createFrameBufferObject() {
-			return net.vulkanic.VulkanicAPI.createFramebufferDSA();
+			return net.vulkanic.VulkanicAPI.createFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext());
 		}
 
 		@Override

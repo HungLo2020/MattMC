@@ -167,6 +167,7 @@
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Second batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Third batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Fourth batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Fifth batch complete
 - [ ] **Design Phase 2.5 roadmap** - API redesign planning
 - [ ] **Prioritize Phase 2.5 tasks** - Command buffers, pipelines, descriptors
 
@@ -184,11 +185,12 @@
 - [x] **Migrated second 5 methods** - bindTexture(), setDepthTestFunction(), setDepthWriteEnabled(), setColorWriteMask(), generateMipmap()
 - [x] **Migrated third 5 methods** - setPixelStoreMode(), attachFramebuffer(), attachBuffer(), activateTextureUnit(), configureTextureParameter()
 - [x] **Migrated fourth 5 methods** - createTexture(), removeTexture(), drawPrimitiveArrays(), drawIndexedElements(), configureBlendFunc()
-- [x] **20 of 283 deprecated methods migrated** (7.1% complete)
+- [x] **Migrated fifth 5 methods** - attachTextureToFramebuffer(), configurePolygonMode(), configurePolygonOffset(), configureLogicOp(), createFramebufferDSA()
+- [x] **25 of 283 deprecated methods migrated** (8.8% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 20 / 283 (7.1%)
+**Methods Migrated to CommandContext Pattern**: 25 / 283 (8.8%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -217,9 +219,16 @@
 4. ✅ drawIndexedElements(int, int, int, long) → drawElements(CommandContext, int, int, int, long) - 1 call site updated
 5. ✅ configureBlendFunc(int, int, int, int) → setBlendFunction(CommandContext, int, int, int, int) - 2 call sites updated
 
-**Total Call Sites Updated**: 71
+**Batch 5 (Completed 2026-02-16 Late Night)**:
+1. ✅ attachTextureToFramebuffer(int,int,int,int,int) → framebufferTexture(CommandContext, int, int, int, int, int) - 1 call site updated
+2. ✅ configurePolygonMode(int, int) → setPolygonMode(CommandContext, int, int) - 1 call site updated
+3. ✅ configurePolygonOffset(float, float) → setPolygonOffset(CommandContext, float, float) - 1 call site updated
+4. ✅ configureLogicOp(int) → setLogicOp(CommandContext, int) - 1 call site updated
+5. ✅ createFramebufferDSA() → createFramebuffer(CommandContext) - 1 call site updated
 
-**Remaining Deprecated Methods**: 263 (92.9%)
+**Total Call Sites Updated**: 76
+
+**Remaining Deprecated Methods**: 258 (91.2%)
 
 ### Blockers
 

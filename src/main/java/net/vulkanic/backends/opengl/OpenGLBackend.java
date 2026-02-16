@@ -204,12 +204,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glScissor(x, y, width, height);
     }
     
-    @Deprecated
-    @Override
-    public void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
-        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
-    }
-    
     // Direct State Access buffer operations
     @Deprecated
     @Override
@@ -274,12 +268,6 @@ public class OpenGLBackend implements GraphicsBackend {
     // Direct State Access framebuffer operations
     @Deprecated
     @Override
-    public int createFramebufferDSA() {
-        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
-    }
-    
-    @Deprecated
-    @Override
     public void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
     }
@@ -332,22 +320,44 @@ public class OpenGLBackend implements GraphicsBackend {
         GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
-    @Deprecated
     @Override
-    public void configurePolygonMode(int face, int mode) {
+    public void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    @Override
+    public void setPolygonMode(CommandContext ctx, int face, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glPolygonMode(face, mode);
     }
     
-    @Deprecated
     @Override
-    public void configurePolygonOffset(float factor, float units) {
+    public void setPolygonOffset(CommandContext ctx, float factor, float units) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glPolygonOffset(factor, units);
     }
     
-    @Deprecated
     @Override
-    public void configureLogicOp(int opcode) {
+    public void setLogicOp(CommandContext ctx, int opcode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glLogicOp(opcode);
+    }
+    
+    @Override
+    public int createFramebuffer(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
     }
     
     @Deprecated

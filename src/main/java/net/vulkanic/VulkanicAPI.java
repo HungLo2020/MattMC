@@ -741,9 +741,60 @@ public class VulkanicAPI {
         getBackend().setTextureParameter(ctx, target, pname, param);
     }
     
-    @Deprecated
-    public static void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
-        getBackend().attachTextureToFramebuffer(target, attachment, textarget, texture, level);
+    /**
+     * Attaches a texture to a framebuffer attachment point.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target
+     * @param attachment The attachment point
+     * @param textarget The texture target
+     * @param texture The texture object ID
+     * @param level The mipmap level
+     */
+    public static void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        getBackend().framebufferTexture(ctx, target, attachment, textarget, texture, level);
+    }
+    
+    /**
+     * Sets the polygon rasterization mode.
+     * 
+     * @param ctx Command context for recording this command
+     * @param face Which polygons the mode applies to
+     * @param mode The rasterization mode
+     */
+    public static void setPolygonMode(CommandContext ctx, int face, int mode) {
+        getBackend().setPolygonMode(ctx, face, mode);
+    }
+    
+    /**
+     * Sets the polygon offset parameters for depth offset calculation.
+     * 
+     * @param ctx Command context for recording this command
+     * @param factor Scale factor for variable depth offset
+     * @param units Scale factor for constant depth offset
+     */
+    public static void setPolygonOffset(CommandContext ctx, float factor, float units) {
+        getBackend().setPolygonOffset(ctx, factor, units);
+    }
+    
+    /**
+     * Sets the logical operation for color blending.
+     * 
+     * @param ctx Command context for recording this command
+     * @param opcode The logical operation
+     */
+    public static void setLogicOp(CommandContext ctx, int opcode) {
+        getBackend().setLogicOp(ctx, opcode);
+    }
+    
+    /**
+     * Creates a new framebuffer object.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The framebuffer object ID
+     */
+    public static int createFramebuffer(CommandContext ctx) {
+        return getBackend().createFramebuffer(ctx);
     }
     
     // Direct State Access buffer operations
@@ -799,11 +850,6 @@ public class VulkanicAPI {
     
     // Direct State Access framebuffer operations
     @Deprecated
-    public static int createFramebufferDSA() {
-        return getBackend().createFramebufferDSA();
-    }
-    
-    @Deprecated
     public static void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
         getBackend().namedFramebufferTextureDSA(framebuffer, attachment, texture, level);
     }
@@ -835,20 +881,6 @@ public class VulkanicAPI {
         getBackend().setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
-    @Deprecated
-    public static void configurePolygonMode(int face, int mode) {
-        getBackend().configurePolygonMode(face, mode);
-    }
-    
-    @Deprecated
-    public static void configurePolygonOffset(float factor, float units) {
-        getBackend().configurePolygonOffset(factor, units);
-    }
-    
-    @Deprecated
-    public static void configureLogicOp(int opcode) {
-        getBackend().configureLogicOp(opcode);
-    }
     
     @Deprecated
     public static int checkForErrors() {

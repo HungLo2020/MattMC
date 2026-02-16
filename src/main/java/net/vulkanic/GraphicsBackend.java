@@ -222,9 +222,6 @@ public interface GraphicsBackend {
      */
     void setTextureParameter(CommandContext ctx, int target, int pname, int param);
     
-    @Deprecated
-    void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level);
-    
     // Direct State Access buffer operations
     @Deprecated
     int createBufferDSA();
@@ -248,8 +245,6 @@ public interface GraphicsBackend {
     void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
     
     // Direct State Access framebuffer operations
-    @Deprecated
-    int createFramebufferDSA();
     @Deprecated
     void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level);
     void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, 
@@ -318,13 +313,66 @@ public interface GraphicsBackend {
      */
     void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
     
-    // Polygon rendering operations
-    @Deprecated
-    void configurePolygonMode(int face, int mode);
-    @Deprecated
-    void configurePolygonOffset(float factor, float units);
-    @Deprecated
-    void configureLogicOp(int opcode);
+    /**
+     * Attaches a texture to a framebuffer attachment point.
+     * 
+     * In OpenGL: Maps to glFramebufferTexture2D()
+     * In Vulkan: Maps to framebuffer attachment configuration
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (e.g., GL_FRAMEBUFFER)
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param textarget The texture target (e.g., GL_TEXTURE_2D)
+     * @param texture The texture object ID
+     * @param level The mipmap level
+     */
+    void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
+    
+    /**
+     * Sets the polygon rasterization mode.
+     * 
+     * In OpenGL: Maps to glPolygonMode()
+     * In Vulkan: Part of pipeline rasterization state
+     * 
+     * @param ctx Command context for recording this command
+     * @param face Which polygons the mode applies to (e.g., GL_FRONT_AND_BACK)
+     * @param mode The rasterization mode (e.g., GL_FILL, GL_LINE, GL_POINT)
+     */
+    void setPolygonMode(CommandContext ctx, int face, int mode);
+    
+    /**
+     * Sets the polygon offset parameters for depth offset calculation.
+     * 
+     * In OpenGL: Maps to glPolygonOffset()
+     * In Vulkan: Part of pipeline rasterization state (depthBiasSlopeFactor, depthBiasConstantFactor)
+     * 
+     * @param ctx Command context for recording this command
+     * @param factor Scale factor for variable depth offset
+     * @param units Scale factor for constant depth offset
+     */
+    void setPolygonOffset(CommandContext ctx, float factor, float units);
+    
+    /**
+     * Sets the logical operation for color blending.
+     * 
+     * In OpenGL: Maps to glLogicOp()
+     * In Vulkan: Part of pipeline color blend state
+     * 
+     * @param ctx Command context for recording this command
+     * @param opcode The logical operation (e.g., GL_COPY, GL_AND, GL_XOR)
+     */
+    void setLogicOp(CommandContext ctx, int opcode);
+    
+    /**
+     * Creates a new framebuffer object.
+     * 
+     * In OpenGL: Maps to glCreateFramebuffers() (DSA) or glGenFramebuffers()
+     * In Vulkan: Maps to vkCreateFramebuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The framebuffer object ID
+     */
+    int createFramebuffer(CommandContext ctx);
     
     // Error checking
     @Deprecated

@@ -364,7 +364,7 @@ public class GlStateManager {
 
 	public static void _glFramebufferTexture2D(int i, int j, int k, int l, int m) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.attachTextureToFramebuffer(i, j, k, l, m);
+		net.vulkanic.VulkanicAPI.framebufferTexture(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m);
 	}
 
 	public static void glBlendFuncSeparate(int i, int j, int k, int l) {
@@ -394,7 +394,7 @@ public class GlStateManager {
 
 	public static void _polygonMode(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configurePolygonMode(i, j);
+		net.vulkanic.VulkanicAPI.setPolygonMode(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j);
 	}
 
 	public static void _enablePolygonOffset() {
@@ -412,7 +412,7 @@ public class GlStateManager {
 		if (f != POLY_OFFSET.factor || g != POLY_OFFSET.units) {
 			POLY_OFFSET.factor = f;
 			POLY_OFFSET.units = g;
-			net.vulkanic.VulkanicAPI.configurePolygonOffset(f, g);
+			net.vulkanic.VulkanicAPI.setPolygonOffset(net.vulkanic.VulkanicAPI.getImmediateContext(), f, g);
 		}
 	}
 
@@ -430,7 +430,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != COLOR_LOGIC.op) {
 			COLOR_LOGIC.op = i;
-			net.vulkanic.VulkanicAPI.configureLogicOp(i);
+			net.vulkanic.VulkanicAPI.setLogicOp(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 		}
 	}
 
