@@ -229,6 +229,14 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void bufferDataTarget(CommandContext ctx, int target, long size, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glBufferData(target, size, usage);
+    }
+    
+    @Override
     public void bufferSubData(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -450,25 +458,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        
-        // Clear any existing errors
-        org.lwjgl.opengl.GL11.glGetError();
-        
-        java.nio.ByteBuffer result = org.lwjgl.opengl.GL32C.glMapBufferRange(target, offset, length, access);
-        
-        int error = org.lwjgl.opengl.GL11.glGetError();
-        if (error != org.lwjgl.opengl.GL11.GL_NO_ERROR) {
-            System.err.println("OpenGL error in mapBuffer: 0x" + Integer.toHexString(error));
-            System.err.println("  target=0x" + Integer.toHexString(target) + ", offset=" + offset + ", length=" + length + ", access=0x" + Integer.toHexString(access));
-        }
-        
-        if (result == null) {
-            System.err.println("glMapBufferRange returned null!");
-            System.err.println("  target=0x" + Integer.toHexString(target) + ", offset=" + offset + ", length=" + length + ", access=0x" + Integer.toHexString(access));
-            System.err.println("  OpenGL error: 0x" + Integer.toHexString(error));
-        }
-        
-        return result;
+        return org.lwjgl.opengl.GL32C.glMapBufferRange(target, offset, length, access);
     }
     
     @Override

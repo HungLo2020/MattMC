@@ -260,6 +260,19 @@ public interface GraphicsBackend {
     void bufferData(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage);
     
     /**
+     * Allocates buffer storage for a bound buffer (non-DSA).
+     * 
+     * In OpenGL: Maps to glBufferData() - requires buffer to be bound first
+     * In Vulkan: Maps to vkCreateBuffer() + vkAllocateMemory() + vkBindBufferMemory()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param size Size in bytes
+     * @param usage Usage hint (e.g., GL_STATIC_DRAW, GL_DYNAMIC_DRAW)
+     */
+    void bufferDataTarget(CommandContext ctx, int target, long size, int usage);
+    
+    /**
      * Update a subset of buffer data.
      * @param ctx Command context
      * @param buffer Buffer object

@@ -138,7 +138,7 @@ public class GLRenderDevice implements RenderDevice {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
             CommandContext ctx = VulkanicAPI.getImmediateContext();
-            VulkanicAPI.bufferData(ctx, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
+            VulkanicAPI.bufferDataTarget(ctx, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
             buffer.setSize(bufferSize);
         }
 

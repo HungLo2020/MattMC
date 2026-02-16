@@ -809,6 +809,10 @@ public class VulkanicAPI {
         getBackend().bufferData(ctx, buffer, data, usage);
     }
     
+    public static void bufferDataTarget(CommandContext ctx, int target, long size, int usage) {
+        getBackend().bufferDataTarget(ctx, target, size, usage);
+    }
+    
     /**
      * Update a subset of buffer data.
      * @param ctx Command context
