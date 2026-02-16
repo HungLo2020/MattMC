@@ -509,20 +509,18 @@ public interface GraphicsBackend {
     int createShader(CommandContext ctx, int shaderType);
     void deleteShader(CommandContext ctx, int shader);
     void compileShader(CommandContext ctx, int shader);
-    @Deprecated
-    int constructProgramObject();
-    @Deprecated
-    void disposeProgramObject(int program);
-    @Deprecated
-    void linkProgramBinary(int program);
+    
+    // Program management
+    int createProgram(CommandContext ctx);
+    void deleteProgram(CommandContext ctx, int program);
+    void linkProgram(CommandContext ctx, int program);
+    int getProgramParameter(CommandContext ctx, int program, int pname);
+    String getProgramInfoLog(CommandContext ctx, int program);
+    
     @Deprecated
     void attachShaderToProgram(int program, int shader);
     @Deprecated
-    int queryProgramParameter(int program, int pname);
-    @Deprecated
     int queryShaderParameter(int shader, int pname);
-    @Deprecated
-    String retrieveProgramInfoLog(int program);
     @Deprecated
     String retrieveShaderInfoLog(int shader);
     @Deprecated

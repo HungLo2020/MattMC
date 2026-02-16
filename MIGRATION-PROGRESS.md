@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 15.9% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 17.7% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 15.9% | 100% | In Progress |
+| **API Vulkan Compatibility** | 🟡 17.7% | 100% | In Progress |
 
 ---
 
@@ -172,6 +172,7 @@
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Seventh batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Eighth batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Ninth batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Tenth batch complete
 - [ ] **Design Phase 2.5 roadmap** - API redesign planning
 - [ ] **Prioritize Phase 2.5 tasks** - Command buffers, pipelines, descriptors
 
@@ -194,11 +195,12 @@
 - [x] **Migrated seventh 5 methods** - namedBufferSubDataDSA(), namedBufferStorageDSA() (2 overloads), mapNamedBufferRangeDSA(), unmapNamedBufferDSA()
 - [x] **Migrated eighth 5 methods** - createVertexArrayObject(), selectVertexArray(), mapBufferRegion(), unmapBufferData(), generateFramebufferObject()
 - [x] **Migrated ninth 5 methods** - destroyFramebufferObject(), copyFramebufferRegion(), constructShaderObject(), disposeShaderObject(), compileShaderSource()
-- [x] **45 of 283 deprecated methods migrated** (15.9% complete)
+- [x] **Migrated tenth 5 methods** - constructProgramObject(), disposeProgramObject(), linkProgramBinary(), queryProgramParameter(), retrieveProgramInfoLog()
+- [x] **50 of 283 deprecated methods migrated** (17.7% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 45 / 283 (15.9%)
+**Methods Migrated to CommandContext Pattern**: 50 / 283 (17.7%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -262,9 +264,16 @@
 4. ✅ disposeShaderObject(int) → deleteShader(CommandContext, int) - 3 call sites updated (GlStateManager, GlShader, Shader)
 5. ✅ compileShaderSource(int) → compileShader(CommandContext, int) - 4 call sites updated (GlStateManager, GlShader, Shader x2)
 
-**Total Call Sites Updated**: 116
+**Batch 10 (Completed 2026-02-16)**:
+1. ✅ constructProgramObject() → createProgram(CommandContext) - 3 call sites updated (GlStateManager, GlProgram, IrisLodRenderProgram)
+2. ✅ disposeProgramObject(int) → deleteProgram(CommandContext, int) - 3 call sites updated (GlStateManager, GlProgram, IrisLodRenderProgram)
+3. ✅ linkProgramBinary(int) → linkProgram(CommandContext, int) - 3 call sites updated (GlStateManager, GlProgram, IrisLodRenderProgram)
+4. ✅ queryProgramParameter(int, int) → getProgramParameter(CommandContext, int, int) - 3 call sites updated (GlStateManager, GlProgram, IrisLodRenderProgram)
+5. ✅ retrieveProgramInfoLog(int) → getProgramInfoLog(CommandContext, int) - 3 call sites updated (GlStateManager, GlProgram, IrisLodRenderProgram)
 
-**Remaining Deprecated Methods**: 238 (84.1%)
+**Total Call Sites Updated**: 131
+
+**Remaining Deprecated Methods**: 233 (82.3%)
 
 ### Blockers
 

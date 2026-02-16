@@ -144,7 +144,7 @@ public class GlStateManager {
 
 	public static int glGetProgrami(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.queryProgramParameter(i, j);
+		return net.vulkanic.VulkanicAPI.getProgramParameter(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j);
 	}
 
 	public static void glAttachShader(int i, int j) {
@@ -208,17 +208,17 @@ public class GlStateManager {
 
 	public static int glCreateProgram() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.constructProgramObject();
+		return net.vulkanic.VulkanicAPI.createProgram(net.vulkanic.VulkanicAPI.getImmediateContext());
 	}
 
 	public static void glDeleteProgram(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.disposeProgramObject(i);
+		net.vulkanic.VulkanicAPI.deleteProgram(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void glLinkProgram(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.linkProgramBinary(i);
+		net.vulkanic.VulkanicAPI.linkProgram(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static int _glGetUniformLocation(int programId, CharSequence name) {
@@ -384,7 +384,7 @@ public class GlStateManager {
 
 	public static String glGetProgramInfoLog(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.retrieveProgramInfoLog(i);
+		return net.vulkanic.VulkanicAPI.getProgramInfoLog(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void _enableCull() {

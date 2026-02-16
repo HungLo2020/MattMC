@@ -61,7 +61,7 @@ public class IrisLodRenderProgram {
 
 	// This will bind  AbstractVertexAttribute
 	private IrisLodRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
-		id = VulkanicAPI.constructProgramObject();
+		id = VulkanicAPI.createProgram(VulkanicAPI.getImmediateContext());
 
 		VulkanicAPI.bindAttributeLocation(this.id, 0, "vPosition");
 		VulkanicAPI.bindAttributeLocation(this.id, 1, "iris_color");
@@ -93,10 +93,10 @@ public class IrisLodRenderProgram {
 		GlShader frag = new GlShader(ShaderType.FRAGMENT, name + ".fsh", fragment);
 		VulkanicAPI.attachShaderToProgram(id, frag.getHandle());
 
-		VulkanicAPI.linkProgramBinary(this.id);
-		int status = VulkanicAPI.queryProgramParameter(this.id, VulkanicAPI.GL_LINK_STATUS);
+		VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), this.id);
+		int status = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != 1) {
-			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.retrieveProgramInfoLog(this.id);
+			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), this.id);
 			this.free();
 			throw new RuntimeException(message);
 		} else {
@@ -230,7 +230,7 @@ public class IrisLodRenderProgram {
 	}
 
 	public void free() {
-		VulkanicAPI.disposeProgramObject(id);
+		VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), id);
 	}
 
 	public void fillUniformData(Matrix4fc projection, Matrix4fc modelView, int worldYOffset, float partialTicks) {

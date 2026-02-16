@@ -521,34 +521,50 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glCompileShader(shader);
     }
     
-    @Deprecated
     @Override
-    public int constructProgramObject() {
+    public int createProgram(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glCreateProgram();
     }
     
-    @Deprecated
     @Override
-    public void disposeProgramObject(int program) {
+    public void deleteProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glDeleteProgram(program);
     }
     
-    @Deprecated
     @Override
-    public void linkProgramBinary(int program) {
+    public void linkProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glLinkProgram(program);
+    }
+    
+    @Override
+    public int getProgramParameter(CommandContext ctx, int program, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetProgrami(program, pname);
+    }
+    
+    @Override
+    public String getProgramInfoLog(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetProgramInfoLog(program);
     }
     
     @Deprecated
     @Override
     public void attachShaderToProgram(int program, int shader) {
         GL20.glAttachShader(program, shader);
-    }
-    
-    @Deprecated
-    @Override
-    public int queryProgramParameter(int program, int pname) {
-        return GL20.glGetProgrami(program, pname);
     }
     
     @Deprecated
@@ -585,12 +601,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void setVertexAttribDivisor(int index, int divisor) {
         org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
-    }
-    
-    @Deprecated
-    @Override
-    public String retrieveProgramInfoLog(int program) {
-        return GL20.glGetProgramInfoLog(program);
     }
     
     @Deprecated

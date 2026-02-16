@@ -994,29 +994,29 @@ public class VulkanicAPI {
         getBackend().compileShader(ctx, shader);
     }
     
-    @Deprecated
-    public static int constructProgramObject() {
-        return getBackend().constructProgramObject();
+    public static int createProgram(CommandContext ctx) {
+        return getBackend().createProgram(ctx);
     }
     
-    @Deprecated
-    public static void disposeProgramObject(int program) {
-        getBackend().disposeProgramObject(program);
+    public static void deleteProgram(CommandContext ctx, int program) {
+        getBackend().deleteProgram(ctx, program);
     }
     
-    @Deprecated
-    public static void linkProgramBinary(int program) {
-        getBackend().linkProgramBinary(program);
+    public static void linkProgram(CommandContext ctx, int program) {
+        getBackend().linkProgram(ctx, program);
+    }
+    
+    public static int getProgramParameter(CommandContext ctx, int program, int pname) {
+        return getBackend().getProgramParameter(ctx, program, pname);
+    }
+    
+    public static String getProgramInfoLog(CommandContext ctx, int program) {
+        return getBackend().getProgramInfoLog(ctx, program);
     }
     
     @Deprecated
     public static void attachShaderToProgram(int program, int shader) {
         getBackend().attachShaderToProgram(program, shader);
-    }
-    
-    @Deprecated
-    public static int queryProgramParameter(int program, int pname) {
-        return getBackend().queryProgramParameter(program, pname);
     }
     
     @Deprecated
@@ -1047,11 +1047,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void setVertexAttribDivisor(int index, int divisor) {
         getBackend().setVertexAttribDivisor(index, divisor);
-    }
-    
-    @Deprecated
-    public static String retrieveProgramInfoLog(int program) {
-        return getBackend().retrieveProgramInfoLog(program);
     }
     
     @Deprecated
@@ -2047,11 +2042,11 @@ public class VulkanicAPI {
     
     /**
      * Creates a new shader program object.
-     * Wrapper for constructProgramObject.
+     * Wrapper for createProgram.
      */
     @Deprecated
     public static int glCreateProgram() {
-        return constructProgramObject();
+        return createProgram(getImmediateContext());
     }
     
     /**
@@ -2065,20 +2060,20 @@ public class VulkanicAPI {
     
     /**
      * Links a program object.
-     * Wrapper for linkProgramBinary.
+     * Wrapper for linkProgram.
      */
     @Deprecated
     public static void glLinkProgram(int program) {
-        linkProgramBinary(program);
+        linkProgram(getImmediateContext(), program);
     }
     
     /**
      * Returns a parameter from a program object.
-     * Wrapper for queryProgramParameter.
+     * Wrapper for getProgramParameter.
      */
     @Deprecated
     public static int glGetProgrami(int program, int pname) {
-        return queryProgramParameter(program, pname);
+        return getProgramParameter(getImmediateContext(), program, pname);
     }
     
     /**
@@ -2093,11 +2088,11 @@ public class VulkanicAPI {
     
     /**
      * Deletes a program object.
-     * Wrapper for disposeProgramObject.
+     * Wrapper for deleteProgram.
      */
     @Deprecated
     public static void glDeleteProgram(int program) {
-        disposeProgramObject(program);
+        deleteProgram(getImmediateContext(), program);
     }
     
     /**
