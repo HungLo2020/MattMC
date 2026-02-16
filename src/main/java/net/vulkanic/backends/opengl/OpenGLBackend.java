@@ -384,6 +384,30 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
+    @Override
+    public int createBuffer(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL15.glGenBuffers();
+    }
+    
+    @Override
+    public void deleteBuffer(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glDeleteBuffers(buffer);
+    }
+    
+    @Override
+    public void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferData(target, data, usage);
+    }
+    
     @Deprecated
     @Override
     public int allocateBufferObject() {
@@ -412,6 +436,22 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
         GL15.glBufferSubData(tgt, off, dat);
+    }
+    
+    @Override
+    public int createVertexArray(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL30.glGenVertexArrays();
+    }
+    
+    @Override
+    public void bindVertexArray(CommandContext ctx, int vao) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glBindVertexArray(vao);
     }
     
     @Deprecated

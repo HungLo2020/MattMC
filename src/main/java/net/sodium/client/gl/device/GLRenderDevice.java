@@ -95,7 +95,8 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void bindVertexArray(GlVertexArray array) {
             if (this.stateTracker.makeVertexArrayActive(array)) {
-                VulkanicAPI.selectVertexArray(array.handle());
+                CommandContext ctx = VulkanicAPI.getImmediateContext();
+                VulkanicAPI.bindVertexArray(ctx, array.handle());
             }
         }
 
@@ -103,7 +104,8 @@ public class GLRenderDevice implements RenderDevice {
         public void uploadData(GlMutableBuffer glBuffer, ByteBuffer byteBuffer, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, glBuffer);
 
-            VulkanicAPI.fillBufferWithData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
+            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            VulkanicAPI.bufferData(ctx, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
             glBuffer.setSize(byteBuffer.remaining());
         }
 
@@ -126,7 +128,8 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void unbindVertexArray() {
             if (this.stateTracker.makeVertexArrayActive(null)) {
-                VulkanicAPI.selectVertexArray(GlVertexArray.NULL_ARRAY_ID);
+                CommandContext ctx = VulkanicAPI.getImmediateContext();
+                VulkanicAPI.bindVertexArray(ctx, GlVertexArray.NULL_ARRAY_ID);
             }
         }
 
@@ -149,7 +152,8 @@ public class GLRenderDevice implements RenderDevice {
             int handle = buffer.handle();
             buffer.invalidateHandle();
 
-            VulkanicAPI.releaseBufferObject(handle);
+            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            VulkanicAPI.deleteBuffer(ctx, handle);
         }
 
         @Override

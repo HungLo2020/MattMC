@@ -387,6 +387,42 @@ public interface GraphicsBackend {
     void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix);
     
     // GPU buffer lifecycle
+    
+    /**
+     * Creates a new buffer object.
+     * 
+     * In OpenGL: Maps to glGenBuffers()
+     * In Vulkan: Maps to vkCreateBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The buffer object ID
+     */
+    int createBuffer(CommandContext ctx);
+    
+    /**
+     * Deletes a buffer object.
+     * 
+     * In OpenGL: Maps to glDeleteBuffers()
+     * In Vulkan: Maps to vkDestroyBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object ID to delete
+     */
+    void deleteBuffer(CommandContext ctx, int buffer);
+    
+    /**
+     * Uploads data to a buffer object.
+     * 
+     * In OpenGL: Maps to glBufferData()
+     * In Vulkan: Maps to vkCmdCopyBuffer() or buffer memory mapping
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param data The data to upload
+     * @param usage Usage hint (e.g., GL_STATIC_DRAW)
+     */
+    void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage);
+    
     @Deprecated
     int allocateBufferObject();
     @Deprecated
@@ -399,6 +435,29 @@ public interface GraphicsBackend {
     void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     
     // Vertex array objects
+    
+    /**
+     * Creates a new vertex array object (VAO).
+     * 
+     * In OpenGL: Maps to glGenVertexArrays()
+     * In Vulkan: No direct equivalent (vertex input state is part of pipeline)
+     * 
+     * @param ctx Command context for recording this command
+     * @return The vertex array object ID
+     */
+    int createVertexArray(CommandContext ctx);
+    
+    /**
+     * Binds a vertex array object for subsequent vertex attribute operations.
+     * 
+     * In OpenGL: Maps to glBindVertexArray()
+     * In Vulkan: No direct equivalent (vertex binding is part of vkCmdBindVertexBuffers)
+     * 
+     * @param ctx Command context for recording this command
+     * @param vao The vertex array object ID to bind (0 for default)
+     */
+    void bindVertexArray(CommandContext ctx, int vao);
+    
     @Deprecated
     int createVertexArrayObject();
     @Deprecated

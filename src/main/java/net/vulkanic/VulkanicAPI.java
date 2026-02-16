@@ -902,6 +902,18 @@ public class VulkanicAPI {
         getBackend().transferTexture2DSubregionBuf(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
+    public static int createBuffer(CommandContext ctx) {
+        return getBackend().createBuffer(ctx);
+    }
+    
+    public static void deleteBuffer(CommandContext ctx, int buffer) {
+        getBackend().deleteBuffer(ctx, buffer);
+    }
+    
+    public static void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage) {
+        getBackend().bufferData(ctx, target, data, usage);
+    }
+    
     @Deprecated
     public static int allocateBufferObject() {
         return getBackend().allocateBufferObject();
@@ -925,6 +937,14 @@ public class VulkanicAPI {
     @Deprecated
     public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
         getBackend().fillBufferSubregion(tgt, off, dat);
+    }
+    
+    public static int createVertexArray(CommandContext ctx) {
+        return getBackend().createVertexArray(ctx);
+    }
+    
+    public static void bindVertexArray(CommandContext ctx, int vao) {
+        getBackend().bindVertexArray(ctx, vao);
     }
     
     @Deprecated

@@ -168,6 +168,7 @@
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Third batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Fourth batch complete
 - [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Fifth batch complete
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Sixth batch complete
 - [ ] **Design Phase 2.5 roadmap** - API redesign planning
 - [ ] **Prioritize Phase 2.5 tasks** - Command buffers, pipelines, descriptors
 
@@ -186,11 +187,12 @@
 - [x] **Migrated third 5 methods** - setPixelStoreMode(), attachFramebuffer(), attachBuffer(), activateTextureUnit(), configureTextureParameter()
 - [x] **Migrated fourth 5 methods** - createTexture(), removeTexture(), drawPrimitiveArrays(), drawIndexedElements(), configureBlendFunc()
 - [x] **Migrated fifth 5 methods** - attachTextureToFramebuffer(), configurePolygonMode(), configurePolygonOffset(), configureLogicOp(), createFramebufferDSA()
-- [x] **25 of 283 deprecated methods migrated** (8.8% complete)
+- [x] **Migrated sixth 5 methods** - selectVertexArray(), createVertexArrayObject(), allocateBufferObject(), releaseBufferObject(), fillBufferWithData()
+- [x] **30 of 283 deprecated methods migrated** (10.6% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 25 / 283 (8.8%)
+**Methods Migrated to CommandContext Pattern**: 30 / 283 (10.6%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -226,9 +228,16 @@
 4. ✅ configureLogicOp(int) → setLogicOp(CommandContext, int) - 1 call site updated
 5. ✅ createFramebufferDSA() → createFramebuffer(CommandContext) - 1 call site updated
 
-**Total Call Sites Updated**: 76
+**Batch 6 (Completed 2026-02-16 Late Night)**:
+1. ✅ selectVertexArray(int) → bindVertexArray(CommandContext, int) - 4 call sites updated
+2. ✅ createVertexArrayObject() → createVertexArray(CommandContext) - 3 call sites updated
+3. ✅ allocateBufferObject() → createBuffer(CommandContext) - 3 call sites updated
+4. ✅ releaseBufferObject(int) → deleteBuffer(CommandContext, int) - 3 call sites updated
+5. ✅ fillBufferWithData(int, ByteBuffer, int) → bufferData(CommandContext, int, ByteBuffer, int) - 3 call sites updated
 
-**Remaining Deprecated Methods**: 258 (91.2%)
+**Total Call Sites Updated**: 92
+
+**Remaining Deprecated Methods**: 253 (89.4%)
 
 ### Blockers
 
