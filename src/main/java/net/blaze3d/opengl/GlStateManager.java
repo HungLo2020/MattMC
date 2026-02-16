@@ -267,7 +267,7 @@ public class GlStateManager {
 	public static int _glGenBuffers() {
 		RenderSystem.assertOnRenderThread();
 		incrementTrackedBuffers();
-		return net.vulkanic.VulkanicAPI.allocateBufferObject();
+		return net.vulkanic.VulkanicAPI.createBufferObject(net.vulkanic.VulkanicAPI.getImmediateContext());
 	}
 
 	public static int _glGenVertexArrays() {
@@ -316,7 +316,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		numBuffers--;
 		PLOT_BUFFERS.setValue(numBuffers);
-		net.vulkanic.VulkanicAPI.releaseBufferObject(i);
+		net.vulkanic.VulkanicAPI.deleteBuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void _glBindFramebuffer(int i, int j) {
@@ -595,7 +595,7 @@ public class GlStateManager {
 
 	public static int _getError() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.checkForErrors();
+		return net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext());
 	}
 
 	public static void clearGlErrors() {

@@ -149,7 +149,7 @@ public class GLRenderDevice implements RenderDevice {
             int handle = buffer.handle();
             buffer.invalidateHandle();
 
-            VulkanicAPI.releaseBufferObject(handle);
+            VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), handle);
         }
 
         @Override

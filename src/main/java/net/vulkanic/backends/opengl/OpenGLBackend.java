@@ -204,22 +204,27 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glScissor(x, y, width, height);
     }
     
-    // Direct State Access buffer operations
-    @Deprecated
     @Override
-    public int createBufferDSA() {
+    public int createBuffer(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateBuffers();
     }
     
-    @Deprecated
     @Override
-    public void namedBufferDataDSA(int buffer, long size, int usage) {
+    public void bufferData(CommandContext ctx, int buffer, long size, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, size, usage);
     }
     
-    @Deprecated
     @Override
-    public void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
+    public void bufferData(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, data, usage);
     }
     
@@ -360,6 +365,30 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
     }
     
+    @Override
+    public int getError(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL11.glGetError();
+    }
+    
+    @Override
+    public int createBufferObject(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL15.glGenBuffers();
+    }
+    
+    @Override
+    public void deleteBuffer(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glDeleteBuffers(buffer);
+    }
+    
     @Deprecated
     @Override
     public int checkForErrors() {
@@ -382,18 +411,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
         GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
-    }
-    
-    @Deprecated
-    @Override
-    public int allocateBufferObject() {
-        return GL15.glGenBuffers();
-    }
-    
-    @Deprecated
-    @Override
-    public void releaseBufferObject(int buf) {
-        GL15.glDeleteBuffers(buf);
     }
     
     @Deprecated

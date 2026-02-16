@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | ⚠️ Required | Complete | 0% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress | Complete | 10.6% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🔴 <1% | 100% | Critical Gap |
+| **API Vulkan Compatibility** | 🟡 10.6% | 100% | In Progress |
 
 ---
 
@@ -186,11 +186,12 @@
 - [x] **Migrated third 5 methods** - setPixelStoreMode(), attachFramebuffer(), attachBuffer(), activateTextureUnit(), configureTextureParameter()
 - [x] **Migrated fourth 5 methods** - createTexture(), removeTexture(), drawPrimitiveArrays(), drawIndexedElements(), configureBlendFunc()
 - [x] **Migrated fifth 5 methods** - attachTextureToFramebuffer(), configurePolygonMode(), configurePolygonOffset(), configureLogicOp(), createFramebufferDSA()
-- [x] **25 of 283 deprecated methods migrated** (8.8% complete)
+- [x] **Migrated sixth 5 methods** - createBufferDSA(), namedBufferDataDSA(), allocateBufferObject(), releaseBufferObject(), checkForErrors()
+- [x] **30 of 283 deprecated methods migrated** (10.6% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 25 / 283 (8.8%)
+**Methods Migrated to CommandContext Pattern**: 30 / 283 (10.6%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -226,9 +227,16 @@
 4. ✅ configureLogicOp(int) → setLogicOp(CommandContext, int) - 1 call site updated
 5. ✅ createFramebufferDSA() → createFramebuffer(CommandContext) - 1 call site updated
 
-**Total Call Sites Updated**: 76
+**Batch 6 (Completed 2026-02-16)**:
+1. ✅ createBufferDSA() → createBuffer(CommandContext) - 1 call site updated (DirectStateAccess)
+2. ✅ namedBufferDataDSA(int, long, int) & namedBufferDataDSA(int, ByteBuffer, int) → bufferData(CommandContext, int, long/ByteBuffer, int) - 3 call sites updated (DirectStateAccess)
+3. ✅ allocateBufferObject() → createBufferObject(CommandContext) - 2 call sites updated (GlStateManager, GlBuffer)
+4. ✅ releaseBufferObject(int) → deleteBuffer(CommandContext, int) - 2 call sites updated (GlStateManager, GLRenderDevice)
+5. ✅ checkForErrors() → getError(CommandContext) - 1 call site updated (GlStateManager)
 
-**Remaining Deprecated Methods**: 258 (91.2%)
+**Total Call Sites Updated**: 84
+
+**Remaining Deprecated Methods**: 253 (89.4%)
 
 ### Blockers
 

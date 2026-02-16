@@ -7,7 +7,7 @@ public abstract class GlBuffer extends GlObject {
     private GlBufferMapping activeMapping;
 
     protected GlBuffer() {
-        this.setHandle(VulkanicAPI.allocateBufferObject());
+        this.setHandle(VulkanicAPI.createBufferObject(VulkanicAPI.getImmediateContext()));
     }
 
     public GlBufferMapping getActiveMapping() {

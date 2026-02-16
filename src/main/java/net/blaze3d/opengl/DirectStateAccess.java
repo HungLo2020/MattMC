@@ -52,17 +52,17 @@ public abstract class DirectStateAccess {
 		@Override
 		int createBuffer() {
 			GlStateManager.incrementTrackedBuffers();
-			return net.vulkanic.VulkanicAPI.createBufferDSA();
+			return net.vulkanic.VulkanicAPI.createBuffer(net.vulkanic.VulkanicAPI.getImmediateContext());
 		}
 
 		@Override
 		void bufferData(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, l, GlConst.bufferUsageToGlEnum(j));
+			net.vulkanic.VulkanicAPI.bufferData(net.vulkanic.VulkanicAPI.getImmediateContext(), i, l, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			net.vulkanic.VulkanicAPI.bufferData(net.vulkanic.VulkanicAPI.getImmediateContext(), i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override

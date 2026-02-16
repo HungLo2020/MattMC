@@ -797,20 +797,16 @@ public class VulkanicAPI {
         return getBackend().createFramebuffer(ctx);
     }
     
-    // Direct State Access buffer operations
-    @Deprecated
-    public static int createBufferDSA() {
-        return getBackend().createBufferDSA();
+    public static int createBuffer(CommandContext ctx) {
+        return getBackend().createBuffer(ctx);
     }
     
-    @Deprecated
-    public static void namedBufferDataDSA(int buffer, long size, int usage) {
-        getBackend().namedBufferDataDSA(buffer, size, usage);
+    public static void bufferData(CommandContext ctx, int buffer, long size, int usage) {
+        getBackend().bufferData(ctx, buffer, size, usage);
     }
     
-    @Deprecated
-    public static void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        getBackend().namedBufferDataDSA(buffer, data, usage);
+    public static void bufferData(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        getBackend().bufferData(ctx, buffer, data, usage);
     }
     
     @Deprecated
@@ -881,6 +877,17 @@ public class VulkanicAPI {
         getBackend().setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
+    public static int getError(CommandContext ctx) {
+        return getBackend().getError(ctx);
+    }
+    
+    public static int createBufferObject(CommandContext ctx) {
+        return getBackend().createBufferObject(ctx);
+    }
+    
+    public static void deleteBuffer(CommandContext ctx, int buffer) {
+        getBackend().deleteBuffer(ctx, buffer);
+    }
     
     @Deprecated
     public static int checkForErrors() {
@@ -900,16 +907,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
         getBackend().transferTexture2DSubregionBuf(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
-    }
-    
-    @Deprecated
-    public static int allocateBufferObject() {
-        return getBackend().allocateBufferObject();
-    }
-    
-    @Deprecated
-    public static void releaseBufferObject(int buf) {
-        getBackend().releaseBufferObject(buf);
     }
     
     @Deprecated

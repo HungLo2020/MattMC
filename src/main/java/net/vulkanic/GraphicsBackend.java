@@ -222,13 +222,44 @@ public interface GraphicsBackend {
      */
     void setTextureParameter(CommandContext ctx, int target, int pname, int param);
     
-    // Direct State Access buffer operations
-    @Deprecated
-    int createBufferDSA();
-    @Deprecated
-    void namedBufferDataDSA(int buffer, long size, int usage);
-    @Deprecated
-    void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage);
+    /**
+     * Creates a new buffer object using Direct State Access.
+     * 
+     * In OpenGL: Maps to glCreateBuffers() (DSA)
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate usage flags
+     * 
+     * @param ctx Command context for recording this command
+     * @return The buffer object ID
+     */
+    int createBuffer(CommandContext ctx);
+    
+    /**
+     * Allocates and initializes buffer storage with a given size.
+     * 
+     * In OpenGL: Maps to glNamedBufferData() (DSA)
+     * In Vulkan: Maps to vkCreateBuffer() + vkAllocateMemory() + vkBindBufferMemory()
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object ID
+     * @param size Size in bytes
+     * @param usage Usage hint (e.g., GL_STATIC_DRAW, GL_DYNAMIC_DRAW)
+     */
+    void bufferData(CommandContext ctx, int buffer, long size, int usage);
+    
+    /**
+     * Allocates and initializes buffer storage with data.
+     * 
+     * In OpenGL: Maps to glNamedBufferData() (DSA)
+     * In Vulkan: Maps to vkCreateBuffer() + memory allocation + data upload
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object ID
+     * @param data Data to upload
+     * @param usage Usage hint
+     */
+    void bufferData(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage);
+    
+    // Direct State Access buffer operations (deprecated ones)
     @Deprecated
     void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data);
     @Deprecated
@@ -374,7 +405,40 @@ public interface GraphicsBackend {
      */
     int createFramebuffer(CommandContext ctx);
     
-    // Error checking
+    /**
+     * Checks for OpenGL errors and returns the error code.
+     * 
+     * In OpenGL: Maps to glGetError()
+     * In Vulkan: Returns VK_SUCCESS or appropriate error code from last operation
+     * 
+     * @param ctx Command context for recording this command
+     * @return Error code (GL_NO_ERROR/VK_SUCCESS if no error)
+     */
+    int getError(CommandContext ctx);
+    
+    /**
+     * Creates a new buffer object.
+     * 
+     * In OpenGL: Maps to glGenBuffers()
+     * In Vulkan: Maps to vkCreateBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The buffer object ID
+     */
+    int createBufferObject(CommandContext ctx);
+    
+    /**
+     * Deletes a buffer object.
+     * 
+     * In OpenGL: Maps to glDeleteBuffers()
+     * In Vulkan: Maps to vkDestroyBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object ID to delete
+     */
+    void deleteBuffer(CommandContext ctx, int buffer);
+    
+    // Error checking (deprecated)
     @Deprecated
     int checkForErrors();
     
@@ -386,11 +450,7 @@ public interface GraphicsBackend {
     @Deprecated
     void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix);
     
-    // GPU buffer lifecycle
-    @Deprecated
-    int allocateBufferObject();
-    @Deprecated
-    void releaseBufferObject(int buf);
+    // GPU buffer lifecycle (deprecated)
     @Deprecated
     void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg);
     @Deprecated
