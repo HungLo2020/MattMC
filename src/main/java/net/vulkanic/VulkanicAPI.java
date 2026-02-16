@@ -544,11 +544,6 @@ public class VulkanicAPI {
     // Convenience methods that delegate to the backend
     
     @Deprecated
-    public static void bindTexture(int textureId) {
-        getBackend().bindTexture(textureId);
-    }
-    
-    @Deprecated
     public static void bindTexture(int target, int textureId) {
         getBackend().bindTexture(target, textureId);
     }
@@ -577,21 +572,6 @@ public class VulkanicAPI {
         getBackend().setDynamicViewport(ctx, x, y, width, height);
     }
     
-    
-    @Deprecated
-    public static void setDepthTestFunction(int func) {
-        getBackend().setDepthTestFunction(func);
-    }
-    
-    @Deprecated
-    public static void setDepthWriteEnabled(boolean enabled) {
-        getBackend().setDepthWriteEnabled(enabled);
-    }
-    
-    @Deprecated
-    public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
-        getBackend().setColorWriteMask(r, g, b, a);
-    }
     
     /**
      * Sets the dynamic scissor rectangle for rendering with explicit command context.
@@ -651,6 +631,59 @@ public class VulkanicAPI {
      */
     public static void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
         getBackend().setCapabilityEnabled(ctx, cap, enabled);
+    }
+    
+    /**
+     * Binds a 2D texture to the current texture unit.
+     * 
+     * @param ctx Command context for recording this command
+     * @param textureId The texture ID to bind
+     */
+    public static void bindTexture2D(CommandContext ctx, int textureId) {
+        getBackend().bindTexture2D(ctx, textureId);
+    }
+    
+    /**
+     * Sets the depth test comparison function.
+     * 
+     * @param ctx Command context for recording this command
+     * @param func The depth comparison function
+     */
+    public static void setDepthTest(CommandContext ctx, int func) {
+        getBackend().setDepthTest(ctx, func);
+    }
+    
+    /**
+     * Sets the depth write mask.
+     * 
+     * @param ctx Command context for recording this command
+     * @param enabled True to enable depth writes, false to disable
+     */
+    public static void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+        getBackend().setDepthWriteMask(ctx, enabled);
+    }
+    
+    /**
+     * Sets the color write mask.
+     * 
+     * @param ctx Command context for recording this command
+     * @param r Red channel write enabled
+     * @param g Green channel write enabled
+     * @param b Blue channel write enabled
+     * @param a Alpha channel write enabled
+     */
+    public static void setColorMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+        getBackend().setColorMask(ctx, r, g, b, a);
+    }
+    
+    /**
+     * Generates mipmaps for a texture.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     */
+    public static void generateTextureMipmap(CommandContext ctx, int target) {
+        getBackend().generateTextureMipmap(ctx, target);
     }
     
     @Deprecated

@@ -81,7 +81,8 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != DEPTH.func) {
 			DEPTH.func = i;
-			net.vulkanic.VulkanicAPI.setDepthTestFunction(i);
+			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			net.vulkanic.VulkanicAPI.setDepthTest(ctx, i);
 		}
 	}
 
@@ -95,7 +96,8 @@ public class GlStateManager {
 		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
-			net.vulkanic.VulkanicAPI.setDepthWriteEnabled(bl);
+			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			net.vulkanic.VulkanicAPI.setDepthWriteMask(ctx, bl);
 		}
 	}
 
@@ -481,7 +483,8 @@ public class GlStateManager {
 
 	public static void _bindTexture(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.bindTexture(i);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.bindTexture2D(ctx, i);
 	}
 
 	public static void _texImage2D(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
@@ -530,7 +533,8 @@ public class GlStateManager {
 			COLOR_MASK.green = bl2;
 			COLOR_MASK.blue = bl3;
 			COLOR_MASK.alpha = bl4;
-			net.vulkanic.VulkanicAPI.setColorWriteMask(bl, bl2, bl3, bl4);
+			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			net.vulkanic.VulkanicAPI.setColorMask(ctx, bl, bl2, bl3, bl4);
 		}
 	}
 

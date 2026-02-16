@@ -19,8 +19,6 @@ public interface GraphicsBackend {
     long getGraphicsContext();
     
     @Deprecated
-    void bindTexture(int textureId);
-    @Deprecated
     void bindTexture(int target, int textureId);  // For explicit target binding
     @Deprecated
     void generateMipmap(int target);
@@ -41,16 +39,6 @@ public interface GraphicsBackend {
      * @param height The height of the viewport in pixels
      */
     void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height);
-    
-    // Depth operations
-    @Deprecated
-    void setDepthTestFunction(int func);
-    @Deprecated
-    void setDepthWriteEnabled(boolean enabled);
-    
-    // Color operations
-    @Deprecated
-    void setColorWriteMask(boolean r, boolean g, boolean b, boolean a);
     
     // Scissor operations
     
@@ -115,6 +103,64 @@ public interface GraphicsBackend {
      * @param enabled True to enable, false to disable
      */
     void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled);
+    
+    /**
+     * Binds a 2D texture to the current texture unit.
+     * 
+     * In OpenGL: Maps to glBindTexture(GL_TEXTURE_2D, texture)
+     * In Vulkan: Part of descriptor set binding
+     * 
+     * @param ctx Command context for recording this command
+     * @param textureId The texture ID to bind
+     */
+    void bindTexture2D(CommandContext ctx, int textureId);
+    
+    /**
+     * Sets the depth test comparison function.
+     * 
+     * In OpenGL: Maps to glDepthFunc()
+     * In Vulkan: Part of pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param func The depth comparison function
+     */
+    void setDepthTest(CommandContext ctx, int func);
+    
+    /**
+     * Sets the depth write mask.
+     * 
+     * In OpenGL: Maps to glDepthMask()
+     * In Vulkan: Part of pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param enabled True to enable depth writes, false to disable
+     */
+    void setDepthWriteMask(CommandContext ctx, boolean enabled);
+    
+    /**
+     * Sets the color write mask.
+     * 
+     * In OpenGL: Maps to glColorMask()
+     * In Vulkan: Part of pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param r Red channel write enabled
+     * @param g Green channel write enabled
+     * @param b Blue channel write enabled
+     * @param a Alpha channel write enabled
+     */
+    void setColorMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a);
+    
+    /**
+     * Generates mipmaps for a texture.
+     * 
+     * In OpenGL: Maps to glGenerateMipmap()
+     * In Vulkan: Requires vkCmdBlitImage or compute shader
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     */
+    void generateTextureMipmap(CommandContext ctx, int target);
     
     // Pixel operations
     @Deprecated

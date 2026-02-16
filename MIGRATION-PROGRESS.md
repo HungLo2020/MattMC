@@ -164,6 +164,7 @@
 - [x] **Verify Phase 2 completion** - Sodium, Iris, Distant Horizons using VulkanicAPI
 - [x] **Analyze API Vulkan compatibility** - CRITICAL FINDING
 - [x] **Update documentation** to reflect API incompatibility
+- [x] **Migrate 5 more deprecated methods to CommandContext pattern** - Second batch complete
 - [ ] **Design Phase 2.5 roadmap** - API redesign planning
 - [ ] **Prioritize Phase 2.5 tasks** - Command buffers, pipelines, descriptors
 
@@ -177,6 +178,30 @@
 - [x] **Researched OpenGL vs Vulkan architecture** - Identified gaps
 - [x] **Updated VULKANIC-MIGRATION.md** - Added Phase 2.5, compatibility analysis
 - [x] **Updated MIGRATION-PROGRESS.md** - Reflects API redesign requirement
+- [x] **Migrated first 5 methods** - clear(), enableBlend(), disableBlend(), useProgram(), enable()/disable()
+- [x] **Migrated second 5 methods** - bindTexture(), setDepthTestFunction(), setDepthWriteEnabled(), setColorWriteMask(), generateMipmap()
+- [x] **10 of 283 deprecated methods migrated** (3.5% complete)
+
+### Phase 2.5 Progress Update
+
+**Methods Migrated to CommandContext Pattern**: 10 / 283 (3.5%)
+
+**Batch 1 (Completed 2026-02-16 AM)**:
+1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
+2. ✅ enableBlend() & disableBlend() → setBlendEnabled(CommandContext, boolean) - 0 call sites
+3. ✅ useProgram(int) → bindShaderProgram(CommandContext, int) - 8 call sites updated
+4. ✅ enable(int) & disable(int) → setCapabilityEnabled(CommandContext, int, boolean) - 18 call sites updated
+
+**Batch 2 (Completed 2026-02-16 PM)**:
+1. ✅ bindTexture(int) → bindTexture2D(CommandContext, int) - 5 call sites updated (GL_TEXTURE_2D only)
+2. ✅ setDepthTestFunction(int) → setDepthTest(CommandContext, int) - 4 call sites updated
+3. ✅ setDepthWriteEnabled(boolean) → setDepthWriteMask(CommandContext, boolean) - 5 call sites updated
+4. ✅ setColorWriteMask(...) → setColorMask(CommandContext, ...) - 1 call site updated  
+5. ✅ generateMipmap(int) → generateTextureMipmap(CommandContext, int) - 1 call site updated
+
+**Total Call Sites Updated**: 48
+
+**Remaining Deprecated Methods**: 273 (96.5%)
 
 ### Blockers
 

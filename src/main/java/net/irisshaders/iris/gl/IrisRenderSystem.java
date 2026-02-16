@@ -11,6 +11,7 @@ import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -376,7 +377,8 @@ public class IrisRenderSystem {
 
 	public static void restoreTexture() {
 		if (lastTex != -1) {
-			VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, lastTex);
+			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			VulkanicAPI.bindTexture2D(ctx, lastTex);
 			lastTex = -1;
 		}
 	}

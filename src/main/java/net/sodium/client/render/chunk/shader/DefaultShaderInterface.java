@@ -12,6 +12,7 @@ import net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
 import net.sodium.client.util.FogParameters;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4fc;
 
@@ -77,7 +78,8 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
     private void bindTexture(ChunkShaderTextureSlot slot, GpuTextureView textureView) {
         GlTexture tex = (GlTexture) textureView.texture();
         VulkanicAPI.activateTextureUnit(VulkanicAPI.GL_TEXTURE0 + slot.ordinal());
-        VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, tex.glId());
+        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        VulkanicAPI.bindTexture2D(ctx, tex.glId());
         VulkanicAPI.configureTextureParameter(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, textureView.baseMipLevel());
         VulkanicAPI.configureTextureParameter(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
         tex.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);

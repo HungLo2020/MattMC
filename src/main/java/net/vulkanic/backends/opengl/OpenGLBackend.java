@@ -34,16 +34,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void bindTexture(int textureId) {
-        int activeTexUnit = GlStateManager.activeTexture;
-        if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
-            GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
-        }
-    }
-    
-    @Deprecated
-    @Override
     public void bindTexture(int target, int textureId) {
         GL11.glBindTexture(target, textureId);
     }
@@ -113,22 +103,49 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
     
-    @Deprecated
     @Override
-    public void setDepthTestFunction(int func) {
+    public void bindTexture2D(CommandContext ctx, int textureId) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        int activeTexUnit = GlStateManager.activeTexture;
+        if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
+            GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        }
+    }
+    
+    @Override
+    public void setDepthTest(CommandContext ctx, int func) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glDepthFunc(func);
     }
     
-    @Deprecated
     @Override
-    public void setDepthWriteEnabled(boolean enabled) {
+    public void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glDepthMask(enabled);
     }
     
-    @Deprecated
     @Override
-    public void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+    public void setColorMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glColorMask(r, g, b, a);
+    }
+    
+    @Override
+    public void generateTextureMipmap(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glGenerateMipmap(target);
     }
     
     /**
