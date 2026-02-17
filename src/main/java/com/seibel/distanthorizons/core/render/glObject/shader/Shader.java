@@ -140,7 +140,7 @@ public class Shader
 		}
 	}
 	
-	public void free() { VulkanicAPI.disposeShaderObject(this.id); }
+	public void free() { VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.id); }
 	
 	public static StringBuilder loadFile(String path, boolean absoluteFilePath, StringBuilder stringBuilder)
 	{

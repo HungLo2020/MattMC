@@ -1014,9 +1014,13 @@ public class VulkanicAPI {
         return createShader(getImmediateContext(), shaderType);
     }
     
+    public static void deleteShader(CommandContext ctx, int shader) {
+        getBackend().deleteShader(ctx, shader);
+    }
+    
     @Deprecated
     public static void disposeShaderObject(int shader) {
-        getBackend().disposeShaderObject(shader);
+        deleteShader(getImmediateContext(), shader);
     }
     
     @Deprecated
@@ -1029,9 +1033,13 @@ public class VulkanicAPI {
         return createShaderProgram(getImmediateContext());
     }
     
+    public static void deleteProgram(CommandContext ctx, int program) {
+        getBackend().deleteProgram(ctx, program);
+    }
+    
     @Deprecated
     public static void disposeProgramObject(int program) {
-        getBackend().disposeProgramObject(program);
+        deleteProgram(getImmediateContext(), program);
     }
     
     public static void attachShader(CommandContext ctx, int program, int shader) {
@@ -1114,14 +1122,22 @@ public class VulkanicAPI {
         enableVertexAttribArray(getImmediateContext(), index);
     }
     
+    public static void disableVertexAttribArray(CommandContext ctx, int index) {
+        getBackend().disableVertexAttribArray(ctx, index);
+    }
+    
     @Deprecated
     public static void deactivateVertexAttribute(int index) {
-        getBackend().deactivateVertexAttribute(index);
+        disableVertexAttribArray(getImmediateContext(), index);
+    }
+    
+    public static void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
+        getBackend().setVertexAttribDivisor(ctx, index, divisor);
     }
     
     @Deprecated
     public static void setVertexAttribDivisor(int index, int divisor) {
-        getBackend().setVertexAttribDivisor(index, divisor);
+        setVertexAttribDivisor(getImmediateContext(), index, divisor);
     }
     
     @Deprecated
@@ -1139,9 +1155,13 @@ public class VulkanicAPI {
         setUniform1i(getImmediateContext(), location, value);
     }
     
+    public static void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        getBackend().setAttributeLocation(ctx, program, index, name);
+    }
+    
     @Deprecated
     public static void bindAttributeLocation(int program, int index, CharSequence name) {
-        getBackend().bindAttributeLocation(program, index, name);
+        setAttributeLocation(getImmediateContext(), program, index, name);
     }
     
     @Deprecated

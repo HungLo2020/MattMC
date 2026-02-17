@@ -190,11 +190,12 @@
 - [x] **Migrated sixth 5 methods** - transferTexture2DImage(), transferTexture2DSubregion(), constructShaderObject(), compileShaderSource(), constructProgramObject()
 - [x] **Migrated seventh 5 methods** - attachShaderToProgram(), linkProgramBinary(), queryProgramParameter(), queryShaderParameter(), retrieveProgramInfoLog()
 - [x] **Migrated eighth 5 methods** - retrieveShaderInfoLog(), locateUniformVariable(), assignUniformInteger(), configureVertexAttribute(), activateVertexAttribute()
-- [x] **40 of 283 deprecated methods migrated** (14.1% complete)
+- [x] **Migrated ninth 5 methods** - deactivateVertexAttribute(), bindAttributeLocation(), disposeProgramObject(), disposeShaderObject(), setVertexAttribDivisor()
+- [x] **45 of 283 deprecated methods migrated** (15.9% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 40 / 283 (14.1%)
+**Methods Migrated to CommandContext Pattern**: 45 / 283 (15.9%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -252,9 +253,16 @@
 4. ✅ configureVertexAttribute(int, int, int, boolean, int, long) → setVertexAttribPointer(CommandContext, int, int, int, boolean, int, long) - 6 call sites updated (4 in Distant Horizons, 1 in Sodium, 1 in GlStateManager)
 5. ✅ activateVertexAttribute(int) → enableVertexAttribArray(CommandContext, int) - 10 call sites updated (5 in Distant Horizons, 4 in Sodium tessellation, 1 in GlStateManager)
 
-**Total Call Sites Updated**: 150
+**Batch 9 (Completed 2026-02-17 Morning)**:
+1. ✅ deactivateVertexAttribute(int) → disableVertexAttribArray(CommandContext, int) - 5 call sites updated (5 in Distant Horizons)
+2. ✅ bindAttributeLocation(int, int, CharSequence) → setAttributeLocation(CommandContext, int, int, CharSequence) - 6 call sites updated (3 in Iris, 2 in Sodium, 1 in GlStateManager)
+3. ✅ disposeProgramObject(int) → deleteProgram(CommandContext, int) - 3 call sites updated (1 in Iris, 1 in Sodium, 1 in GlStateManager)
+4. ✅ disposeShaderObject(int) → deleteShader(CommandContext, int) - 3 call sites updated (1 in Sodium, 1 in GlStateManager, 1 in Distant Horizons)
+5. ✅ setVertexAttribDivisor(int, int) → setVertexAttribDivisor(CommandContext, int, int) - 2 call sites updated (2 in Distant Horizons)
 
-**Remaining Deprecated Methods**: 243 (85.9%)
+**Total Call Sites Updated**: 169
+
+**Remaining Deprecated Methods**: 238 (84.1%)
 
 ### Blockers
 

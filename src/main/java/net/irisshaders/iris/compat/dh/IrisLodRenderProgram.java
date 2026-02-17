@@ -63,9 +63,9 @@ public class IrisLodRenderProgram {
 	private IrisLodRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
 		id = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
 
-		VulkanicAPI.bindAttributeLocation(this.id, 0, "vPosition");
-		VulkanicAPI.bindAttributeLocation(this.id, 1, "iris_color");
-		VulkanicAPI.bindAttributeLocation(this.id, 2, "irisExtra");
+		VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.id, 0, "vPosition");
+		VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.id, 1, "iris_color");
+		VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.id, 2, "irisExtra");
 
 		this.bufferBlendOverrides = bufferBlendOverrides;
 
@@ -230,7 +230,7 @@ public class IrisLodRenderProgram {
 	}
 
 	public void free() {
-		VulkanicAPI.disposeProgramObject(id);
+		VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), id);
 	}
 
 	public void fillUniformData(Matrix4fc projection, Matrix4fc modelView, int worldYOffset, float partialTicks) {

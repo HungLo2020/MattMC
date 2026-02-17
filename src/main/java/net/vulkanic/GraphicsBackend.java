@@ -707,6 +707,64 @@ public interface GraphicsBackend {
      */
     void enableVertexAttribArray(CommandContext ctx, int index);
     
+    /**
+     * Disables a vertex attribute array.
+     * 
+     * In OpenGL: Maps to glDisableVertexAttribArray()
+     * In Vulkan: Part of vertex input state in pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The attribute index to disable
+     */
+    void disableVertexAttribArray(CommandContext ctx, int index);
+    
+    /**
+     * Sets the vertex attribute divisor for instanced rendering.
+     * 
+     * In OpenGL: Maps to glVertexAttribDivisor()
+     * In Vulkan: Part of vertex input state in pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The attribute index
+     * @param divisor The divisor value (0 = per-vertex, N = per-instance every N instances)
+     */
+    void setVertexAttribDivisor(CommandContext ctx, int index, int divisor);
+    
+    /**
+     * Deletes a shader program.
+     * 
+     * In OpenGL: Maps to glDeleteProgram()
+     * In Vulkan: Maps to pipeline destruction
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID to delete
+     */
+    void deleteProgram(CommandContext ctx, int program);
+    
+    /**
+     * Deletes a shader object.
+     * 
+     * In OpenGL: Maps to glDeleteShader()
+     * In Vulkan: Maps to shader module destruction
+     * 
+     * @param ctx Command context for recording this command
+     * @param shader The shader object ID to delete
+     */
+    void deleteShader(CommandContext ctx, int shader);
+    
+    /**
+     * Binds an attribute location in a shader program.
+     * 
+     * In OpenGL: Maps to glBindAttribLocation()
+     * In Vulkan: Attributes are specified via layout qualifiers in shaders
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param index The attribute index
+     * @param name The attribute name in the shader
+     */
+    void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name);
+    
     @Deprecated
     void disposeProgramObject(int program);
     @Deprecated

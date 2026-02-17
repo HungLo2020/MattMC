@@ -46,7 +46,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
     }
 
     public void delete() {
-        VulkanicAPI.disposeProgramObject(this.handle());
+        VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), this.handle());
 
         this.invalidateHandle();
     }
@@ -142,7 +142,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         }
 
         public Builder bindAttribute(String name, int index) {
-            VulkanicAPI.bindAttributeLocation(this.program, index, name);
+            VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.program, index, name);
 
             return this;
         }

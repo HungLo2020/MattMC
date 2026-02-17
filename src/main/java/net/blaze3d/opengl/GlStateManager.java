@@ -154,7 +154,7 @@ public class GlStateManager {
 
 	public static void glDeleteShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.disposeShaderObject(i);
+		net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static int glCreateShader(int i) {
@@ -213,7 +213,7 @@ public class GlStateManager {
 
 	public static void glDeleteProgram(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.disposeProgramObject(i);
+		net.vulkanic.VulkanicAPI.deleteProgram(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void glLinkProgram(int i) {
@@ -256,7 +256,7 @@ public class GlStateManager {
 
 	public static void _glBindAttribLocation(int i, int j, CharSequence charSequence) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.bindAttributeLocation(i, j, charSequence);
+		net.vulkanic.VulkanicAPI.setAttributeLocation(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, charSequence);
 	}
 
 	public static void incrementTrackedBuffers() {

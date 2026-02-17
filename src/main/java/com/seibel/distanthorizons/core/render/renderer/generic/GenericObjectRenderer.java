@@ -554,11 +554,11 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		// Clean up
 		profiler.popPush("cleanup");
 		
-		VulkanicAPI.deactivateVertexAttribute(1);
-		VulkanicAPI.deactivateVertexAttribute(2);
-		VulkanicAPI.deactivateVertexAttribute(3);
-		VulkanicAPI.deactivateVertexAttribute(4);
-		VulkanicAPI.deactivateVertexAttribute(5);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 1);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 2);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 3);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 4);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 5);
 		
 		profiler.pop();
 	}
@@ -570,11 +570,11 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	{
 		if (this.vertexAttribDivisorSupported)
 		{
-			VulkanicAPI.setVertexAttribDivisor(index, divisor);	
+			VulkanicAPI.setVertexAttribDivisor(VulkanicAPI.getImmediateContext(), index, divisor);	
 		}
 		else if(this.instancedArraysSupported)
 		{
-			VulkanicAPI.setVertexAttribDivisor(index, divisor);
+			VulkanicAPI.setVertexAttribDivisor(VulkanicAPI.getImmediateContext(), index, divisor);
 		}
 		else
 		{

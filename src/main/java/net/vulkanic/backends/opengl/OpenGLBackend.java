@@ -553,10 +553,18 @@ public class OpenGLBackend implements GraphicsBackend {
         return createShader(VulkanicAPI.getImmediateContext(), shaderType);
     }
     
+    @Override
+    public void deleteShader(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glDeleteShader(shader);
+    }
+    
     @Deprecated
     @Override
     public void disposeShaderObject(int shader) {
-        GL20.glDeleteShader(shader);
+        deleteShader(VulkanicAPI.getImmediateContext(), shader);
     }
     
     @Deprecated
@@ -571,10 +579,18 @@ public class OpenGLBackend implements GraphicsBackend {
         return createShaderProgram(VulkanicAPI.getImmediateContext());
     }
     
+    @Override
+    public void deleteProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glDeleteProgram(program);
+    }
+    
     @Deprecated
     @Override
     public void disposeProgramObject(int program) {
-        GL20.glDeleteProgram(program);
+        deleteProgram(VulkanicAPI.getImmediateContext(), program);
     }
     
     @Override
@@ -705,16 +721,32 @@ public class OpenGLBackend implements GraphicsBackend {
         enableVertexAttribArray(VulkanicAPI.getImmediateContext(), index);
     }
     
-    @Deprecated
     @Override
-    public void deactivateVertexAttribute(int index) {
+    public void disableVertexAttribArray(CommandContext ctx, int index) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glDisableVertexAttribArray(index);
     }
     
     @Deprecated
     @Override
-    public void setVertexAttribDivisor(int index, int divisor) {
+    public void deactivateVertexAttribute(int index) {
+        disableVertexAttribArray(VulkanicAPI.getImmediateContext(), index);
+    }
+    
+    @Override
+    public void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
+    }
+    
+    @Deprecated
+    @Override
+    public void setVertexAttribDivisor(int index, int divisor) {
+        setVertexAttribDivisor(VulkanicAPI.getImmediateContext(), index, divisor);
     }
     
     @Deprecated
@@ -735,10 +767,18 @@ public class OpenGLBackend implements GraphicsBackend {
         setUniform1i(VulkanicAPI.getImmediateContext(), location, value);
     }
     
+    @Override
+    public void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glBindAttribLocation(program, index, name);
+    }
+    
     @Deprecated
     @Override
     public void bindAttributeLocation(int program, int index, CharSequence name) {
-        GL20.glBindAttribLocation(program, index, name);
+        setAttributeLocation(VulkanicAPI.getImmediateContext(), program, index, name);
     }
     
     @Deprecated

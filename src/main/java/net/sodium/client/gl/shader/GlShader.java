@@ -44,7 +44,7 @@ public class GlShader extends GlObject {
     }
 
     public void delete() {
-        VulkanicAPI.disposeShaderObject(this.handle());
+        VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.handle());
 
         this.invalidateHandle();
     }
