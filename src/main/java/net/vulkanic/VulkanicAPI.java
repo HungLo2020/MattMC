@@ -800,6 +800,67 @@ public class VulkanicAPI {
     }
     
     /**
+     * Sets the blend function for source and destination blend factors.
+     * 
+     * @param ctx Command context for recording this command
+     * @param sfactor Source blend factor
+     * @param dfactor Destination blend factor
+     */
+    public static void blendFunc(CommandContext ctx, int sfactor, int dfactor) {
+        getBackend().blendFunc(ctx, sfactor, dfactor);
+    }
+    
+    /**
+     * Queries an integer state variable.
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The parameter name to query
+     * @return The queried integer value
+     */
+    public static int getInteger(CommandContext ctx, int pname) {
+        return getBackend().getInteger(ctx, pname);
+    }
+    
+    /**
+     * Sets uniform values for a vec3 shader variable.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param v0 The first component value
+     * @param v1 The second component value
+     * @param v2 The third component value
+     */
+    public static void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2) {
+        getBackend().setUniform3f(ctx, location, v0, v1, v2);
+    }
+    
+    /**
+     * Sets the clear color value.
+     * 
+     * @param ctx Command context for recording this command
+     * @param r Red component
+     * @param g Green component
+     * @param b Blue component
+     * @param a Alpha component
+     */
+    public static void setClearColor(CommandContext ctx, float r, float g, float b, float a) {
+        getBackend().setClearColor(ctx, r, g, b, a);
+    }
+    
+    /**
+     * Sets the viewport transformation.
+     * 
+     * @param ctx Command context for recording this command
+     * @param x The lower left corner x coordinate
+     * @param y The lower left corner y coordinate
+     * @param width The viewport width
+     * @param height The viewport height
+     */
+    public static void setViewport(CommandContext ctx, int x, int y, int width, int height) {
+        getBackend().setViewport(ctx, x, y, width, height);
+    }
+    
+    /**
      * Sets the polygon rasterization mode.
      * 
      * @param ctx Command context for recording this command
@@ -1694,7 +1755,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glUniform3f(int location, float v0, float v1, float v2) {
-        getBackend().glUniform3f(location, v0, v1, v2);
+        setUniform3f(getImmediateContext(), location, v0, v1, v2);
     }
     
     @Deprecated
@@ -1899,7 +1960,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glBlendFunc(int sfactor, int dfactor) {
-        getBackend().glBlendFunc(sfactor, dfactor);
+        blendFunc(getImmediateContext(), sfactor, dfactor);
     }
     
     @Deprecated
@@ -1954,7 +2015,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static int glGetInteger(int pname) {
-        return getBackend().glGetInteger(pname);
+        return getInteger(getImmediateContext(), pname);
     }
     
     @Deprecated
@@ -1969,7 +2030,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glViewport(int x, int y, int width, int height) {
-        getBackend().glViewport(x, y, width, height);
+        setViewport(getImmediateContext(), x, y, width, height);
     }
     
     @Deprecated
@@ -2009,7 +2070,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glClearColor(float r, float g, float b, float a) {
-        getBackend().glClearColor(r, g, b, a);
+        setClearColor(getImmediateContext(), r, g, b, a);
     }
     
     @Deprecated

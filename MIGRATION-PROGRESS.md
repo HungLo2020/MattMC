@@ -2,7 +2,7 @@
 
 **Current Phase**: Phase 2.5 - API Redesign for Vulkan Compatibility  
 **Overall Progress**: Phase 1 & 2 Complete, Phase 2.5 Required  
-**Last Updated**: 2026-02-16  
+**Last Updated**: 2026-02-17  
 **Status**: ⚠️ API Incompatibility Identified - Redesign Required
 
 ---
@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (84/283) | Complete | 29.7% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (89/283) | Complete | 31.4% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 29.7% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 31.4% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 29.7% (84/283 methods migrated)
+### Overall Phase Progress: 31.4% (89/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 84 (29.7%)**
-- **Methods using immediate mode: 199 (70.3%)**
+- **Methods migrated to CommandContext: 89 (31.4%)**
+- **Methods using immediate mode: 194 (68.6%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 84 methods now support CommandContext pattern, enabling future Vulkan backend.
+**Conclusion**: API migration in progress. 89 methods now support CommandContext pattern, enabling future Vulkan backend.
 
 ### Required Work Breakdown
 
@@ -196,11 +196,11 @@
 - [x] **Migrated twelfth 5 methods** - selectVertexArray(), mapBufferRegion(), copyFramebufferRegion(), bindTexture(), generateMipmap()
 - [x] **Migrated thirteenth batch (7 DSA methods)** - createBufferDSA(), namedBufferDataDSA() x2, namedBufferSubDataDSA(), namedBufferStorageDSA() x2, createBufferStorage() x2
 - [x] **Migrated fourteenth batch (7 DSA buffer/framebuffer methods)** - mapNamedBufferRangeDSA(), unmapNamedBufferDSA(), flushMappedNamedBufferRangeDSA(), copyNamedBufferSubDataDSA(), namedFramebufferTextureDSA(), plus non-DSA versions of copyBufferSubData() and flushMappedBufferRange()
-- [x] **74 of 283 deprecated methods migrated** (26.1% complete)
+- [x] **89 of 283 deprecated methods migrated** (31.4% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 74 / 283 (26.1%)
+**Methods Migrated to CommandContext Pattern**: 89 / 283 (31.4%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -318,9 +318,16 @@
 4. ✅ glUniformMatrix4fv(int, boolean, FloatBuffer/float[]) → setUniformMatrix4fv(CommandContext, ...) [new methods] - 5 call sites (2 Iris, 2 Iris DH compat, 1 Distant Horizons)
 5. ✅ glDrawBuffers(int[]) → drawBuffers(CommandContext, int[]) [new method] - 3 call sites (1 Iris, 2 Distant Horizons)
 
-**Total Call Sites Updated**: 266 (includes 50 from Batch 16)
+**Batch 17 (Completed 2026-02-17)**:
+1. ✅ glGetInteger(int) → getInteger(CommandContext, int) [new method] - 35+ call sites (used throughout codebase via deprecated delegation)
+2. ✅ glBlendFunc(int, int) → blendFunc(CommandContext, int, int) [new method] - 14+ call sites (used throughout codebase via deprecated delegation)
+3. ✅ glUniform3f(int, float, float, float) → setUniform3f(CommandContext, int, float, float, float) [new method] - 4 call sites (used via deprecated delegation)
+4. ✅ glClearColor(float, float, float, float) → setClearColor(CommandContext, float, float, float, float) [new method] - 3 call sites (used via deprecated delegation)
+5. ✅ glViewport(int, int, int, int) → setViewport(CommandContext, int, int, int, int) [new method] - 2 call sites (used via deprecated delegation)
 
-**Remaining Deprecated Methods**: 199 (70.3%)
+**Total Call Sites Updated**: 324 (includes 58 from Batch 17)
+
+**Remaining Deprecated Methods**: 194 (68.6%)
 
 
 ### Blockers

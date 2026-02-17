@@ -408,6 +408,46 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void blendFunc(CommandContext ctx, int sfactor, int dfactor) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glBlendFunc(sfactor, dfactor);
+    }
+    
+    @Override
+    public int getInteger(CommandContext ctx, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL11.glGetInteger(pname);
+    }
+    
+    @Override
+    public void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform3f(location, v0, v1, v2);
+    }
+    
+    @Override
+    public void setClearColor(CommandContext ctx, float r, float g, float b, float a) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glClearColor(r, g, b, a);
+    }
+    
+    @Override
+    public void setViewport(CommandContext ctx, int x, int y, int width, int height) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glViewport(x, y, width, height);
+    }
+    
+    @Override
     public void setPolygonMode(CommandContext ctx, int face, int mode) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -1572,7 +1612,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glUniform3f(int location, float v0, float v1, float v2) {
-        org.lwjgl.opengl.GL32C.glUniform3f(location, v0, v1, v2);
+        setUniform3f(VulkanicAPI.getImmediateContext(), location, v0, v1, v2);
     }
     
     @Deprecated
@@ -1830,7 +1870,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBlendFunc(int sfactor, int dfactor) {
-        GL11.glBlendFunc(sfactor, dfactor);
+        blendFunc(VulkanicAPI.getImmediateContext(), sfactor, dfactor);
     }
     
     @Deprecated
@@ -1896,7 +1936,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public int glGetInteger(int pname) {
-        return org.lwjgl.opengl.GL32C.glGetInteger(pname);
+        return getInteger(VulkanicAPI.getImmediateContext(), pname);
     }
     
     @Deprecated
@@ -1914,7 +1954,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glViewport(int x, int y, int width, int height) {
-        org.lwjgl.opengl.GL11.glViewport(x, y, width, height);
+        setViewport(VulkanicAPI.getImmediateContext(), x, y, width, height);
     }
     
     @Deprecated
@@ -1962,7 +2002,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glClearColor(float r, float g, float b, float a) {
-        org.lwjgl.opengl.GL46C.glClearColor(r, g, b, a);
+        setClearColor(VulkanicAPI.getImmediateContext(), r, g, b, a);
     }
     
     @Deprecated

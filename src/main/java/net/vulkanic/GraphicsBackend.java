@@ -392,6 +392,72 @@ public interface GraphicsBackend {
     void drawBuffers(CommandContext ctx, int[] buffers);
     
     /**
+     * Sets the blend function for source and destination blend factors.
+     * 
+     * In OpenGL: Maps to glBlendFunc()
+     * In Vulkan: Part of pipeline color blend state
+     * 
+     * @param ctx Command context for recording this command
+     * @param sfactor Source blend factor
+     * @param dfactor Destination blend factor
+     */
+    void blendFunc(CommandContext ctx, int sfactor, int dfactor);
+    
+    /**
+     * Queries an integer state variable.
+     * 
+     * In OpenGL: Maps to glGetInteger()
+     * In Vulkan: Queries device state or cached pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The parameter name to query
+     * @return The queried integer value
+     */
+    int getInteger(CommandContext ctx, int pname);
+    
+    /**
+     * Sets uniform values for a vec3 shader variable.
+     * 
+     * In OpenGL: Maps to glUniform3f()
+     * In Vulkan: Updates push constants or uniform buffer data
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param v0 The first component value
+     * @param v1 The second component value
+     * @param v2 The third component value
+     */
+    void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2);
+    
+    /**
+     * Sets the clear color value.
+     * 
+     * In OpenGL: Maps to glClearColor()
+     * In Vulkan: Part of render pass clear values
+     * 
+     * @param ctx Command context for recording this command
+     * @param r Red component
+     * @param g Green component
+     * @param b Blue component
+     * @param a Alpha component
+     */
+    void setClearColor(CommandContext ctx, float r, float g, float b, float a);
+    
+    /**
+     * Sets the viewport transformation.
+     * 
+     * In OpenGL: Maps to glViewport()
+     * In Vulkan: Part of dynamic state or pipeline viewport state
+     * 
+     * @param ctx Command context for recording this command
+     * @param x The lower left corner x coordinate
+     * @param y The lower left corner y coordinate
+     * @param width The viewport width
+     * @param height The viewport height
+     */
+    void setViewport(CommandContext ctx, int x, int y, int width, int height);
+    
+    /**
      * Sets the polygon rasterization mode.
      * 
      * In OpenGL: Maps to glPolygonMode()
