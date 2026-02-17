@@ -484,6 +484,19 @@ public interface GraphicsBackend {
      */
     void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage);
     
+    /**
+     * Allocates buffer storage with specified size.
+     * 
+     * In OpenGL: Maps to glBufferData() with NULL data
+     * In Vulkan: Maps to vkCreateBuffer() with size allocation
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param size Size in bytes to allocate
+     * @param usage Usage hint (e.g., GL_STATIC_DRAW)
+     */
+    void bufferData(CommandContext ctx, int target, long size, int usage);
+    
     @Deprecated
     int allocateBufferObject();
     @Deprecated

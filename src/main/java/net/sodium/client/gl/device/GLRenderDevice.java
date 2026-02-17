@@ -137,7 +137,7 @@ public class GLRenderDevice implements RenderDevice {
         public void allocateStorage(GlMutableBuffer buffer, long bufferSize, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            VulkanicAPI.fillBufferWithSize(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
+            VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
             buffer.setSize(bufferSize);
         }
 

@@ -302,7 +302,7 @@ public class GlStateManager {
 
 	public static void _glBufferData(int i, long l, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.fillBufferWithSize(i, l, j);
+		net.vulkanic.VulkanicAPI.bufferData(net.vulkanic.VulkanicAPI.getImmediateContext(), i, l, j);
 	}
 
 	@Nullable

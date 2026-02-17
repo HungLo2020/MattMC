@@ -435,28 +435,36 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBufferData(target, data, usage);
     }
     
+    @Override
+    public void bufferData(CommandContext ctx, int target, long size, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferData(target, size, usage);
+    }
+    
     @Deprecated
     @Override
     public int allocateBufferObject() {
-        return GL15.glGenBuffers();
+        return createBuffer(VulkanicAPI.getImmediateContext());
     }
     
     @Deprecated
     @Override
     public void releaseBufferObject(int buf) {
-        GL15.glDeleteBuffers(buf);
+        deleteBuffer(VulkanicAPI.getImmediateContext(), buf);
     }
     
     @Deprecated
     @Override
     public void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        GL15.glBufferData(tgt, dat, usg);
+        bufferData(VulkanicAPI.getImmediateContext(), tgt, dat, usg);
     }
     
     @Deprecated
     @Override
     public void fillBufferWithSize(int tgt, long sz, int usg) {
-        GL15.glBufferData(tgt, sz, usg);
+        bufferData(VulkanicAPI.getImmediateContext(), tgt, sz, usg);
     }
     
     @Override
@@ -492,7 +500,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public int createVertexArrayObject() {
-        return GL30.glGenVertexArrays();
+        return createVertexArray(VulkanicAPI.getImmediateContext());
     }
     
     @Deprecated

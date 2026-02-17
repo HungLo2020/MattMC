@@ -192,11 +192,12 @@
 - [x] **Migrated eighth 5 methods** - retrieveShaderInfoLog(), locateUniformVariable(), assignUniformInteger(), configureVertexAttribute(), activateVertexAttribute()
 - [x] **Migrated ninth 5 methods** - deactivateVertexAttribute(), bindAttributeLocation(), disposeProgramObject(), disposeShaderObject(), setVertexAttribDivisor()
 - [x] **Migrated tenth 5 methods** - configureVertexAttributeInteger(), unmapBufferData(), fillBufferSubregion(), generateFramebufferObject(), destroyFramebufferObject()
-- [x] **50 of 283 deprecated methods migrated** (17.7% complete)
+- [x] **Migrated eleventh 5 methods** - allocateBufferObject(), releaseBufferObject(), fillBufferWithData(), fillBufferWithSize(), createVertexArrayObject()
+- [x] **55 of 283 deprecated methods migrated** (19.4% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 50 / 283 (17.7%)
+**Methods Migrated to CommandContext Pattern**: 55 / 283 (19.4%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -268,9 +269,16 @@
 4. ✅ generateFramebufferObject() → createFramebuffer(CommandContext) [reuses existing] - 6 call sites updated (1 in GlStateManager, 5 in Distant Horizons)
 5. ✅ destroyFramebufferObject(int) → deleteFramebuffer(CommandContext, int) - 6 call sites updated (1 in GlStateManager, 5 in Distant Horizons)
 
-**Total Call Sites Updated**: 188
+**Batch 11 (Completed 2026-02-17 Morning)**:
+1. ✅ allocateBufferObject() → createBuffer(CommandContext) [reuses existing] - 0 direct call sites (wrapper only)
+2. ✅ releaseBufferObject(int) → deleteBuffer(CommandContext, int) [reuses existing] - 0 direct call sites (wrapper only)
+3. ✅ fillBufferWithData(int, ByteBuffer, int) → bufferData(CommandContext, int, ByteBuffer, int) [reuses existing] - 0 direct call sites (wrapper only)
+4. ✅ fillBufferWithSize(int, long, int) → bufferData(CommandContext, int, long, int) [new overload added] - 2 call sites updated (1 in Sodium, 1 in GlStateManager)
+5. ✅ createVertexArrayObject() → createVertexArray(CommandContext) [reuses existing] - 0 direct call sites (wrapper only)
 
-**Remaining Deprecated Methods**: 233 (82.3%)
+**Total Call Sites Updated**: 190
+
+**Remaining Deprecated Methods**: 228 (80.6%)
 
 ### Blockers
 

@@ -929,24 +929,28 @@ public class VulkanicAPI {
         getBackend().bufferData(ctx, target, data, usage);
     }
     
+    public static void bufferData(CommandContext ctx, int target, long size, int usage) {
+        getBackend().bufferData(ctx, target, size, usage);
+    }
+    
     @Deprecated
     public static int allocateBufferObject() {
-        return getBackend().allocateBufferObject();
+        return createBuffer(getImmediateContext());
     }
     
     @Deprecated
     public static void releaseBufferObject(int buf) {
-        getBackend().releaseBufferObject(buf);
+        deleteBuffer(getImmediateContext(), buf);
     }
     
     @Deprecated
     public static void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        getBackend().fillBufferWithData(tgt, dat, usg);
+        bufferData(getImmediateContext(), tgt, dat, usg);
     }
     
     @Deprecated
     public static void fillBufferWithSize(int tgt, long sz, int usg) {
-        getBackend().fillBufferWithSize(tgt, sz, usg);
+        bufferData(getImmediateContext(), tgt, sz, usg);
     }
     
     public static void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
@@ -968,7 +972,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static int createVertexArrayObject() {
-        return getBackend().createVertexArrayObject();
+        return createVertexArray(getImmediateContext());
     }
     
     @Deprecated
