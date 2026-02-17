@@ -53,7 +53,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public <U extends GlUniform<?>> @NotNull U bindUniform(String name, IntFunction<U> factory) {
-        int index = VulkanicAPI.locateUniformVariable(this.handle(), name);
+        int index = VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.handle(), name);
 
         if (index < 0) {
             throw new NullPointerException("No uniform exists with name: " + name);
@@ -64,7 +64,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public <U extends GlUniform<?>> U bindUniformOptional(String name, IntFunction<U> factory) {
-        int index = VulkanicAPI.locateUniformVariable(this.handle(), name);
+        int index = VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.handle(), name);
 
         if (index < 0) {
             return null;

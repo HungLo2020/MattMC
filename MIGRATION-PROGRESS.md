@@ -189,11 +189,12 @@
 - [x] **Migrated fifth 5 methods** - attachTextureToFramebuffer(), configurePolygonMode(), configurePolygonOffset(), configureLogicOp(), createFramebufferDSA()
 - [x] **Migrated sixth 5 methods** - transferTexture2DImage(), transferTexture2DSubregion(), constructShaderObject(), compileShaderSource(), constructProgramObject()
 - [x] **Migrated seventh 5 methods** - attachShaderToProgram(), linkProgramBinary(), queryProgramParameter(), queryShaderParameter(), retrieveProgramInfoLog()
-- [x] **35 of 283 deprecated methods migrated** (12.4% complete)
+- [x] **Migrated eighth 5 methods** - retrieveShaderInfoLog(), locateUniformVariable(), assignUniformInteger(), configureVertexAttribute(), activateVertexAttribute()
+- [x] **40 of 283 deprecated methods migrated** (14.1% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 35 / 283 (12.4%)
+**Methods Migrated to CommandContext Pattern**: 40 / 283 (14.1%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -244,9 +245,16 @@
 4. ✅ queryShaderParameter(int, int) → getShaderParameter(CommandContext, int, int) - 4 call sites updated (2 in Distant Horizons, 1 in Iris, 1 in Sodium)
 5. ✅ retrieveProgramInfoLog(int) → getProgramInfoLog(CommandContext, int) - 4 call sites updated (1 in Iris, 1 in Sodium, 1 in GlStateManager, 1 wrapper in VulkanicAPI)
 
-**Total Call Sites Updated**: 116
+**Batch 8 (Completed 2026-02-17 Early Morning)**:
+1. ✅ retrieveShaderInfoLog(int) → getShaderInfoLog(CommandContext, int) - 4 call sites updated (1 in Sodium, 1 in GlStateManager, 2 in Distant Horizons)
+2. ✅ locateUniformVariable(int, CharSequence) → getUniformLocation(CommandContext, int, CharSequence) - 10 call sites updated (6 in GlStateManager with fallbacks, 2 in Sodium, 1 in Iris, 1 wrapper)
+3. ✅ assignUniformInteger(int, int) → setUniform1i(CommandContext, int, int) - 4 call sites updated (2 in Iris, 1 in Sodium, 1 in GlStateManager)
+4. ✅ configureVertexAttribute(int, int, int, boolean, int, long) → setVertexAttribPointer(CommandContext, int, int, int, boolean, int, long) - 6 call sites updated (4 in Distant Horizons, 1 in Sodium, 1 in GlStateManager)
+5. ✅ activateVertexAttribute(int) → enableVertexAttribArray(CommandContext, int) - 10 call sites updated (5 in Distant Horizons, 4 in Sodium tessellation, 1 in GlStateManager)
 
-**Remaining Deprecated Methods**: 248 (87.6%)
+**Total Call Sites Updated**: 150
+
+**Remaining Deprecated Methods**: 243 (85.9%)
 
 ### Blockers
 

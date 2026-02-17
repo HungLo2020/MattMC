@@ -23,7 +23,7 @@ public class GlShader extends GlObject {
         ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
         VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), handle);
 
-        String log = VulkanicAPI.retrieveShaderInfoLog(handle);
+        String log = VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), handle);
 
         if (!log.isEmpty()) {
             LOGGER.warn("Shader compilation log for {}: {}", this.name, log);

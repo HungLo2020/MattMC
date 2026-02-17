@@ -223,27 +223,27 @@ public class GlStateManager {
 
 	public static int _glGetUniformLocation(int programId, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
-		int location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, name);
+		int location = net.vulkanic.VulkanicAPI.getUniformLocation(net.vulkanic.VulkanicAPI.getImmediateContext(), programId, name);
 		
 		// Iris: Handle sampler name fallbacks for extended shaders
 		if (location == -1 && name.equals("Sampler0")) {
-			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "tex");
+			location = net.vulkanic.VulkanicAPI.getUniformLocation(net.vulkanic.VulkanicAPI.getImmediateContext(), programId, "tex");
 			
 			if (location == -1) {
-				location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "gtexture");
+				location = net.vulkanic.VulkanicAPI.getUniformLocation(net.vulkanic.VulkanicAPI.getImmediateContext(), programId, "gtexture");
 				
 				if (location == -1) {
-					location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "texture");
+					location = net.vulkanic.VulkanicAPI.getUniformLocation(net.vulkanic.VulkanicAPI.getImmediateContext(), programId, "texture");
 				}
 			}
 		}
 		
 		if (location == -1 && name.equals("Sampler1")) {
-			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "iris_overlay");
+			location = net.vulkanic.VulkanicAPI.getUniformLocation(net.vulkanic.VulkanicAPI.getImmediateContext(), programId, "iris_overlay");
 		}
 		
 		if (location == -1 && name.equals("Sampler2")) {
-			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "lightmap");
+			location = net.vulkanic.VulkanicAPI.getUniformLocation(net.vulkanic.VulkanicAPI.getImmediateContext(), programId, "lightmap");
 		}
 		
 		return location;
@@ -251,7 +251,7 @@ public class GlStateManager {
 
 	public static void _glUniform1i(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.assignUniformInteger(i, j);
+		net.vulkanic.VulkanicAPI.setUniform1i(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j);
 	}
 
 	public static void _glBindAttribLocation(int i, int j, CharSequence charSequence) {
@@ -379,7 +379,7 @@ public class GlStateManager {
 
 	public static String glGetShaderInfoLog(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.retrieveShaderInfoLog(i);
+		return net.vulkanic.VulkanicAPI.getShaderInfoLog(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static String glGetProgramInfoLog(int i, int j) {
@@ -558,7 +558,7 @@ public class GlStateManager {
 
 	public static void _vertexAttribPointer(int i, int j, int k, boolean bl, int l, long m) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configureVertexAttribute(i, j, k, bl, l, m);
+		net.vulkanic.VulkanicAPI.setVertexAttribPointer(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, bl, l, m);
 	}
 
 	public static void _vertexAttribIPointer(int i, int j, int k, int l, long m) {
@@ -568,7 +568,7 @@ public class GlStateManager {
 
 	public static void _enableVertexAttribArray(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.activateVertexAttribute(i);
+		net.vulkanic.VulkanicAPI.enableVertexAttribArray(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void _drawElements(int i, int j, int k, long l) {

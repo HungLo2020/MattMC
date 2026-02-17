@@ -518,27 +518,27 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		profiler.popPush("binding");
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceColorVbo);
-		VulkanicAPI.activateVertexAttribute(1);
-		VulkanicAPI.configureVertexAttribute(1, 4, VulkanicAPI.GL_FLOAT, false, 4 * Float.BYTES, 0);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 1);
+		VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), 1, 4, VulkanicAPI.GL_FLOAT, false, 4 * Float.BYTES, 0);
 		this.vertexAttribDivisor(1, 1);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceScaleVbo);
-		VulkanicAPI.activateVertexAttribute(2);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 2);
 		this.vertexAttribDivisor(2, 1);
-		VulkanicAPI.configureVertexAttribute(2, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), 2, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceChunkPosVbo);
-		VulkanicAPI.activateVertexAttribute(3);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 3);
 		this.vertexAttribDivisor(3, 1);
 		VulkanicAPI.configureVertexAttributeInteger(3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceSubChunkPosVbo);
-		VulkanicAPI.activateVertexAttribute(4);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 4);
 		this.vertexAttribDivisor(4, 1);
-		VulkanicAPI.configureVertexAttribute(4, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), 4, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceMaterialVbo);
-		VulkanicAPI.activateVertexAttribute(5);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 5);
 		this.vertexAttribDivisor(5, 1);
 		VulkanicAPI.configureVertexAttributeInteger(5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
 		

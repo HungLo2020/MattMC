@@ -1079,9 +1079,29 @@ public class VulkanicAPI {
         return getProgramInfoLog(getImmediateContext(), program);
     }
     
+    public static String getShaderInfoLog(CommandContext ctx, int shader) {
+        return getBackend().getShaderInfoLog(ctx, shader);
+    }
+    
+    public static int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        return getBackend().getUniformLocation(ctx, program, name);
+    }
+    
+    public static void setUniform1i(CommandContext ctx, int location, int value) {
+        getBackend().setUniform1i(ctx, location, value);
+    }
+    
+    public static void setVertexAttribPointer(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {
+        getBackend().setVertexAttribPointer(ctx, index, size, type, normalized, stride, pointer);
+    }
+    
+    public static void enableVertexAttribArray(CommandContext ctx, int index) {
+        getBackend().enableVertexAttribArray(ctx, index);
+    }
+    
     @Deprecated
     public static void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        getBackend().configureVertexAttribute(index, size, type, normalized, stride, pointer);
+        setVertexAttribPointer(getImmediateContext(), index, size, type, normalized, stride, pointer);
     }
     
     @Deprecated
@@ -1091,7 +1111,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void activateVertexAttribute(int index) {
-        getBackend().activateVertexAttribute(index);
+        enableVertexAttribArray(getImmediateContext(), index);
     }
     
     @Deprecated
@@ -1106,17 +1126,17 @@ public class VulkanicAPI {
     
     @Deprecated
     public static String retrieveShaderInfoLog(int shader) {
-        return getBackend().retrieveShaderInfoLog(shader);
+        return getShaderInfoLog(getImmediateContext(), shader);
     }
     
     @Deprecated
     public static int locateUniformVariable(int program, CharSequence name) {
-        return getBackend().locateUniformVariable(program, name);
+        return getUniformLocation(getImmediateContext(), program, name);
     }
     
     @Deprecated
     public static void assignUniformInteger(int location, int value) {
-        getBackend().assignUniformInteger(location, value);
+        setUniform1i(getImmediateContext(), location, value);
     }
     
     @Deprecated

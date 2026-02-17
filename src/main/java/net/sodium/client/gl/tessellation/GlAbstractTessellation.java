@@ -27,10 +27,10 @@ public abstract class GlAbstractTessellation implements GlTessellation {
                     VulkanicAPI.configureVertexAttributeInteger(attrib.getIndex(), attrib.getCount(), attrib.getFormat(),
                             attrib.getStride(), attrib.getPointer());
                 } else {
-                    VulkanicAPI.configureVertexAttribute(attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
+                    VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
                             attrib.getStride(), attrib.getPointer());
                 }
-                VulkanicAPI.activateVertexAttribute(attrib.getIndex());
+                VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), attrib.getIndex());
             }
         }
     }

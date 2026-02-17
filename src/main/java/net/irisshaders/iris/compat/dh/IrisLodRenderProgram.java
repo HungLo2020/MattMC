@@ -183,7 +183,7 @@ public class IrisLodRenderProgram {
 	// Noise Uniforms
 
 	public int tryGetUniformLocation2(CharSequence name) {
-		return VulkanicAPI.locateUniformVariable(this.id, name);
+		return VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.id, name);
 	}
 
 	public void setUniform(int index, Matrix4fc matrix) {

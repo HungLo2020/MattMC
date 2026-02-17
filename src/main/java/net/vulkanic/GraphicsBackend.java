@@ -643,6 +643,70 @@ public interface GraphicsBackend {
      */
     String getProgramInfoLog(CommandContext ctx, int program);
     
+    /**
+     * Retrieves the information log for a shader.
+     * 
+     * In OpenGL: Maps to glGetShaderInfoLog()
+     * In Vulkan: Maps to shader module creation messages
+     * 
+     * @param ctx Command context for recording this command
+     * @param shader The shader object ID
+     * @return The information log string
+     */
+    String getShaderInfoLog(CommandContext ctx, int shader);
+    
+    /**
+     * Locates a uniform variable in a program.
+     * 
+     * In OpenGL: Maps to glGetUniformLocation()
+     * In Vulkan: Maps to descriptor binding lookup
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param name The name of the uniform variable
+     * @return The location of the uniform variable
+     */
+    int getUniformLocation(CommandContext ctx, int program, CharSequence name);
+    
+    /**
+     * Sets an integer uniform value.
+     * 
+     * In OpenGL: Maps to glUniform1i()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param value The integer value to set
+     */
+    void setUniform1i(CommandContext ctx, int location, int value);
+    
+    /**
+     * Configures a vertex attribute pointer.
+     * 
+     * In OpenGL: Maps to glVertexAttribPointer()
+     * In Vulkan: Part of vertex input state in pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The attribute index
+     * @param size Number of components per attribute
+     * @param type Data type of each component
+     * @param normalized Whether values should be normalized
+     * @param stride Byte offset between consecutive attributes
+     * @param pointer Offset of the first component
+     */
+    void setVertexAttribPointer(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer);
+    
+    /**
+     * Enables a vertex attribute array.
+     * 
+     * In OpenGL: Maps to glEnableVertexAttribArray()
+     * In Vulkan: Part of vertex input state in pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The attribute index to enable
+     */
+    void enableVertexAttribArray(CommandContext ctx, int index);
+    
     @Deprecated
     void disposeProgramObject(int program);
     @Deprecated

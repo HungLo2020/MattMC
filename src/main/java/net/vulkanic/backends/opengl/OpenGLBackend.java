@@ -647,10 +647,50 @@ public class OpenGLBackend implements GraphicsBackend {
         return getProgramInfoLog(VulkanicAPI.getImmediateContext(), program);
     }
     
+    @Override
+    public String getShaderInfoLog(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetShaderInfoLog(shader);
+    }
+    
+    @Override
+    public int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetUniformLocation(program, name);
+    }
+    
+    @Override
+    public void setUniform1i(CommandContext ctx, int location, int value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform1i(location, value);
+    }
+    
+    @Override
+    public void setVertexAttribPointer(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    }
+    
+    @Override
+    public void enableVertexAttribArray(CommandContext ctx, int index) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glEnableVertexAttribArray(index);
+    }
+    
     @Deprecated
     @Override
     public void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+        setVertexAttribPointer(VulkanicAPI.getImmediateContext(), index, size, type, normalized, stride, pointer);
     }
     
     @Deprecated
@@ -662,7 +702,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void activateVertexAttribute(int index) {
-        GL20.glEnableVertexAttribArray(index);
+        enableVertexAttribArray(VulkanicAPI.getImmediateContext(), index);
     }
     
     @Deprecated
@@ -680,19 +720,19 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public String retrieveShaderInfoLog(int shader) {
-        return GL20.glGetShaderInfoLog(shader);
+        return getShaderInfoLog(VulkanicAPI.getImmediateContext(), shader);
     }
     
     @Deprecated
     @Override
     public int locateUniformVariable(int program, CharSequence name) {
-        return GL20.glGetUniformLocation(program, name);
+        return getUniformLocation(VulkanicAPI.getImmediateContext(), program, name);
     }
     
     @Deprecated
     @Override
     public void assignUniformInteger(int location, int value) {
-        GL20.glUniform1i(location, value);
+        setUniform1i(VulkanicAPI.getImmediateContext(), location, value);
     }
     
     @Deprecated
