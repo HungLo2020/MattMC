@@ -308,7 +308,7 @@ public class GlStateManager {
 	@Nullable
 	public static ByteBuffer _glMapBufferRange(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.mapBufferRegion(i, j, k, l);
+		return net.vulkanic.VulkanicAPI.mapBuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l);
 	}
 
 	public static void _glUnmapBuffer(int i) {
@@ -347,7 +347,7 @@ public class GlStateManager {
 
 	public static void _glBlitFrameBuffer(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.copyFramebufferRegion(i, j, k, l, m, n, o, p, q, r);
+		net.vulkanic.VulkanicAPI.blitFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, q, r);
 	}
 
 	public static void _glDeleteFramebuffers(int i) {

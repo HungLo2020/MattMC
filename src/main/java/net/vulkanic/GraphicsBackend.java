@@ -116,6 +116,18 @@ public interface GraphicsBackend {
     void bindTexture2D(CommandContext ctx, int textureId);
     
     /**
+     * Binds a texture to a specific target.
+     * 
+     * In OpenGL: Maps to glBindTexture(target, texture)
+     * In Vulkan: Part of descriptor set binding
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_CUBE_MAP)
+     * @param textureId The texture ID to bind
+     */
+    void bindTexture(CommandContext ctx, int target, int textureId);
+    
+    /**
      * Sets the depth test comparison function.
      * 
      * In OpenGL: Maps to glDepthFunc()
@@ -554,6 +566,21 @@ public interface GraphicsBackend {
     // Buffer memory mapping
     
     /**
+     * Maps a range of buffer object's data store into client memory.
+     * 
+     * In OpenGL: Maps to glMapBufferRange()
+     * In Vulkan: Maps to vkMapMemory()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param offset Starting offset within the buffer
+     * @param length Number of bytes to map
+     * @param access Access flags (e.g., GL_MAP_READ_BIT, GL_MAP_WRITE_BIT)
+     * @return A ByteBuffer representing the mapped memory region
+     */
+    java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access);
+    
+    /**
      * Unmaps a previously mapped buffer object.
      * 
      * In OpenGL: Maps to glUnmapBuffer()
@@ -581,6 +608,27 @@ public interface GraphicsBackend {
      * @param fbo The framebuffer object ID to delete
      */
     void deleteFramebuffer(CommandContext ctx, int fbo);
+    
+    /**
+     * Copies a block of pixels from one framebuffer to another (blit operation).
+     * 
+     * In OpenGL: Maps to glBlitFramebuffer()
+     * In Vulkan: Maps to vkCmdBlitImage()
+     * 
+     * @param ctx Command context for recording this command
+     * @param srcX0 Source region start X
+     * @param srcY0 Source region start Y
+     * @param srcX1 Source region end X
+     * @param srcY1 Source region end Y
+     * @param dstX0 Destination region start X
+     * @param dstY0 Destination region start Y
+     * @param dstX1 Destination region end X
+     * @param dstY1 Destination region end Y
+     * @param mask Buffer bit mask (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_STENCIL_BUFFER_BIT)
+     * @param filter Interpolation filter (GL_NEAREST, GL_LINEAR)
+     */
+    void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                         int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
     @Deprecated
     int generateFramebufferObject();

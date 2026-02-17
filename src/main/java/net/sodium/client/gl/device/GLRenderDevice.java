@@ -213,7 +213,7 @@ public class GLRenderDevice implements RenderDevice {
 
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            ByteBuffer buf = VulkanicAPI.mapBufferRegion(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), (int)offset, (int)length, flags.getBitField());
+            ByteBuffer buf = VulkanicAPI.mapBuffer(VulkanicAPI.getImmediateContext(), GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), offset, length, flags.getBitField());
 
             if (buf == null) {
                 throw new RuntimeException("Failed to map buffer");

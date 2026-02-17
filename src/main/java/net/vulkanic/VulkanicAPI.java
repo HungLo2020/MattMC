@@ -543,16 +543,6 @@ public class VulkanicAPI {
     
     // Convenience methods that delegate to the backend
     
-    @Deprecated
-    public static void bindTexture(int target, int textureId) {
-        getBackend().bindTexture(target, textureId);
-    }
-    
-    @Deprecated
-    public static void generateMipmap(int target) {
-        getBackend().generateMipmap(target);
-    }
-    
     /**
      * Sets the dynamic viewport state for rendering with explicit command context.
      * 
@@ -641,6 +631,20 @@ public class VulkanicAPI {
      */
     public static void bindTexture2D(CommandContext ctx, int textureId) {
         getBackend().bindTexture2D(ctx, textureId);
+    }
+    
+    public static void bindTexture(CommandContext ctx, int target, int textureId) {
+        getBackend().bindTexture(ctx, target, textureId);
+    }
+    
+    @Deprecated
+    public static void bindTexture(int target, int textureId) {
+        bindTexture(getImmediateContext(), target, textureId);
+    }
+    
+    @Deprecated
+    public static void generateMipmap(int target) {
+        generateTextureMipmap(getImmediateContext(), target);
     }
     
     /**
@@ -977,12 +981,16 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void selectVertexArray(int vao) {
-        getBackend().selectVertexArray(vao);
+        bindVertexArray(getImmediateContext(), vao);
+    }
+    
+    public static java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
+        return getBackend().mapBuffer(ctx, target, offset, length, access);
     }
     
     @Deprecated
     public static java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return getBackend().mapBufferRegion(tgt, off, len, acc);
+        return mapBuffer(getImmediateContext(), tgt, off, len, acc);
     }
     
     public static void unmapBuffer(CommandContext ctx, int target) {
@@ -1008,9 +1016,14 @@ public class VulkanicAPI {
         deleteFramebuffer(getImmediateContext(), fbo);
     }
     
+    public static void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                       int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
     @Deprecated
     public static void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        getBackend().copyFramebufferRegion(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+        blitFramebuffer(getImmediateContext(), srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
     }
     
     public static int createShader(CommandContext ctx, int shaderType) {

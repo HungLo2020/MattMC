@@ -372,7 +372,7 @@ public class IrisRenderSystem {
 		if (glType == VulkanicAPI.GL_TEXTURE_2D) {
 			lastTex = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 		}
-		VulkanicAPI.bindTexture(glType, glId);
+		VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), glType, glId);
 	}
 
 	public static void restoreTexture() {
@@ -761,7 +761,7 @@ public class IrisRenderSystem {
 		public void bindTextureToUnit(int target, int unit, int texture) {
 			int activeTexture = GlStateManager.activeTexture;
 			GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + unit);
-			VulkanicAPI.bindTexture(target, texture);
+			VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), target, texture);
 			if (target == VulkanicAPI.GL_TEXTURE_2D) {
 				GlStateManager.TEXTURES[unit].binding = texture;
 			}

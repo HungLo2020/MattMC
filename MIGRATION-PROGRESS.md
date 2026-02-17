@@ -193,11 +193,12 @@
 - [x] **Migrated ninth 5 methods** - deactivateVertexAttribute(), bindAttributeLocation(), disposeProgramObject(), disposeShaderObject(), setVertexAttribDivisor()
 - [x] **Migrated tenth 5 methods** - configureVertexAttributeInteger(), unmapBufferData(), fillBufferSubregion(), generateFramebufferObject(), destroyFramebufferObject()
 - [x] **Migrated eleventh 5 methods** - allocateBufferObject(), releaseBufferObject(), fillBufferWithData(), fillBufferWithSize(), createVertexArrayObject()
-- [x] **55 of 283 deprecated methods migrated** (19.4% complete)
+- [x] **Migrated twelfth 5 methods** - selectVertexArray(), mapBufferRegion(), copyFramebufferRegion(), bindTexture(), generateMipmap()
+- [x] **60 of 283 deprecated methods migrated** (21.2% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 55 / 283 (19.4%)
+**Methods Migrated to CommandContext Pattern**: 60 / 283 (21.2%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -276,9 +277,16 @@
 4. ✅ fillBufferWithSize(int, long, int) → bufferData(CommandContext, int, long, int) [new overload added] - 2 call sites updated (1 in Sodium, 1 in GlStateManager)
 5. ✅ createVertexArrayObject() → createVertexArray(CommandContext) [reuses existing] - 0 direct call sites (wrapper only)
 
-**Total Call Sites Updated**: 190
+**Batch 12 (Completed 2026-02-17 Morning)**:
+1. ✅ selectVertexArray(int) → bindVertexArray(CommandContext, int) [reuses existing] - 0 direct call sites (wrapper only)
+2. ✅ mapBufferRegion(int, int, int, int) → mapBuffer(CommandContext, int, long, long, int) [new method] - 2 call sites updated (1 in Sodium, 1 in GlStateManager)
+3. ✅ copyFramebufferRegion(...) → blitFramebuffer(CommandContext, ...) [new method] - 1 call site updated (GlStateManager)
+4. ✅ bindTexture(int, int) → bindTexture(CommandContext, int, int) [new method] - 7 call sites updated (2 in Iris, 4 in GlCommandEncoder, 1 in GlDevice)
+5. ✅ generateMipmap(int) → generateTextureMipmap(CommandContext, int) [reuses existing] - 0 direct call sites (wrapper only)
 
-**Remaining Deprecated Methods**: 228 (80.6%)
+**Total Call Sites Updated**: 200
+
+**Remaining Deprecated Methods**: 223 (78.8%)
 
 ### Blockers
 

@@ -31,14 +31,8 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void bindTexture(int target, int textureId) {
-        GL11.glBindTexture(target, textureId);
-    }
-    
-    @Deprecated
-    @Override
     public void generateMipmap(int target) {
-        GL30.glGenerateMipmap(target);
+        generateTextureMipmap(VulkanicAPI.getImmediateContext(), target);
     }
     
     /**
@@ -111,6 +105,20 @@ public class OpenGLBackend implements GraphicsBackend {
             GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
         }
+    }
+    
+    @Override
+    public void bindTexture(CommandContext ctx, int target, int textureId) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glBindTexture(target, textureId);
+    }
+    
+    @Deprecated
+    @Override
+    public void bindTexture(int target, int textureId) {
+        bindTexture(VulkanicAPI.getImmediateContext(), target, textureId);
     }
     
     @Override
@@ -506,13 +514,21 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void selectVertexArray(int vao) {
-        GL30.glBindVertexArray(vao);
+        bindVertexArray(VulkanicAPI.getImmediateContext(), vao);
+    }
+    
+    @Override
+    public java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL30.glMapBufferRange(target, offset, length, access);
     }
     
     @Deprecated
     @Override
     public java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return GL30.glMapBufferRange(tgt, off, len, acc);
+        return mapBuffer(VulkanicAPI.getImmediateContext(), tgt, off, len, acc);
     }
     
     @Override
@@ -543,6 +559,15 @@ public class OpenGLBackend implements GraphicsBackend {
         GL30.glDeleteFramebuffers(fbo);
     }
     
+    @Override
+    public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
     @Deprecated
     @Override
     public void destroyFramebufferObject(int fbo) {
@@ -552,7 +577,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+        blitFramebuffer(VulkanicAPI.getImmediateContext(), srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
     }
     
     @Override
