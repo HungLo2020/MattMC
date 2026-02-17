@@ -238,7 +238,7 @@ public class IrisRenderSystem {
 
 	public static void bindBufferBase(int target, Integer index, int buffer) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glBindBufferBase(target, index, buffer);
+		VulkanicAPI.bindBufferBase(VulkanicAPI.getImmediateContext(), target, index, buffer);
 	}
 
 	public static void vertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
@@ -248,7 +248,7 @@ public class IrisRenderSystem {
 
 	public static void detachShader(int program, int shader) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glDetachShader(program, shader);
+		VulkanicAPI.detachShader(VulkanicAPI.getImmediateContext(), program, shader);
 	}
 
 	public static void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
@@ -339,7 +339,7 @@ public class IrisRenderSystem {
 
 	public static void uniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+		VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), program, uniformBlockIndex, uniformBlockBinding);
 	}
 
 	public static void setShadowProjection(Matrix4f shadowProjection) {
@@ -404,7 +404,7 @@ public class IrisRenderSystem {
 			return;
 		}
 
-		VulkanicAPI.glBindSampler(unit, sampler);
+		VulkanicAPI.bindSampler(VulkanicAPI.getImmediateContext(), unit, sampler);
 
 		samplers[unit] = sampler;
 	}
@@ -414,7 +414,7 @@ public class IrisRenderSystem {
 		for (int i = 0; i < samplers.length; i++) {
 			if (samplers[i] != 0) {
 				usedASampler = true;
-				if (!hasMultibind) VulkanicAPI.glBindSampler(i, 0);
+				if (!hasMultibind) VulkanicAPI.bindSampler(VulkanicAPI.getImmediateContext(), i, 0);
 				samplers[i] = 0;
 			}
 		}
@@ -788,7 +788,7 @@ public class IrisRenderSystem {
 		@Override
 		public void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
 			GlStateManager._glBindFramebuffer(fbtarget, fb);
-			VulkanicAPI.glFramebufferTexture2D(fbtarget, attachment, target, texture, levels);
+			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), fbtarget, attachment, target, texture, levels);
 		}
 
 		@Override

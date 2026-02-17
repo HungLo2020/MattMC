@@ -304,9 +304,16 @@
 6. ✅ copyBufferSubData(int, int, long, long, long) → copyBufferSubData(CommandContext, ...) [new CommandContext version, deprecated delegates] - wrapper in VulkanicAPI
 7. ✅ flushMappedBufferRange(int, long, long) → flushMappedBufferRange(CommandContext, ...) [new CommandContext version, deprecated delegates] - wrapper in VulkanicAPI
 
-**Total Call Sites Updated**: 200 (DSA methods use internal delegation pattern or direct ARB calls)
+**Batch 15 (Completed 2026-02-17)**:
+1. ✅ glFramebufferTexture2D(int, int, int, int, int) → framebufferTexture2D(CommandContext, int, int, int, int, int) - 11 call sites (7 Distant Horizons, 1 Iris)
+2. ✅ glBindBufferBase(int, int, int) → bindBufferBase(CommandContext, int, int, int) - 1 call site (Iris)
+3. ✅ glUniformBlockBinding(int, int, int) → uniformBlockBinding(CommandContext, int, int, int) - 1 call site (Iris)
+4. ✅ glBindSampler(int, int) → bindSampler(CommandContext, int, int) - 2 call sites (Iris)
+5. ✅ glDetachShader(int, int) → detachShader(CommandContext, int, int) - 1 call site (Iris)
 
-**Remaining Deprecated Methods**: 209 (73.9%)
+**Total Call Sites Updated**: 216 (includes 16 from Batch 15)
+
+**Remaining Deprecated Methods**: 204 (72.1%)
 
 ### Blockers
 

@@ -115,6 +115,14 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glBindTexture(target, textureId);
     }
     
+    @Override
+    public void bindSampler(CommandContext ctx, int unit, int sampler) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL33.glBindSampler(unit, sampler);
+    }
+    
     @Deprecated
     @Override
     public void bindTexture(int target, int textureId) {
@@ -175,6 +183,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL15.glBindBuffer(target, buffer);
+    }
+    
+    @Override
+    public void bindBufferBase(CommandContext ctx, int target, int index, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glBindBufferBase(target, index, buffer);
     }
     
     @Override
@@ -369,6 +385,14 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Override
     public void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    @Override
+    public void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
@@ -730,6 +754,14 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void detachShader(CommandContext ctx, int program, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glDetachShader(program, shader);
+    }
+    
+    @Override
     public void linkProgram(CommandContext ctx, int program) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -969,6 +1001,14 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         org.lwjgl.opengl.GL20C.nglShaderSource(shader, stringCount, pointerBufferAddress, lengthsPointer);
+    }
+    
+    @Override
+    public void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
     }
     
     @Deprecated
@@ -1656,7 +1696,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBindBufferBase(int target, int index, int buffer) {
-        org.lwjgl.opengl.GL43C.glBindBufferBase(target, index, buffer);
+        bindBufferBase(VulkanicAPI.getImmediateContext(), target, index, buffer);
     }
     
     @Deprecated
@@ -1668,13 +1708,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glDetachShader(int program, int shader) {
-        org.lwjgl.opengl.GL32C.glDetachShader(program, shader);
+        detachShader(VulkanicAPI.getImmediateContext(), program, shader);
     }
     
     @Deprecated
     @Override
     public void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
-        org.lwjgl.opengl.GL32C.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+        framebufferTexture2D(VulkanicAPI.getImmediateContext(), target, attachment, textarget, texture, level);
     }
     
     @Deprecated
@@ -1776,7 +1816,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        org.lwjgl.opengl.GL32C.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+        uniformBlockBinding(VulkanicAPI.getImmediateContext(), program, uniformBlockIndex, uniformBlockBinding);
     }
     
     @Deprecated
@@ -1794,7 +1834,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBindSampler(int unit, int sampler) {
-        org.lwjgl.opengl.GL33C.glBindSampler(unit, sampler);
+        bindSampler(VulkanicAPI.getImmediateContext(), unit, sampler);
     }
     
     @Deprecated

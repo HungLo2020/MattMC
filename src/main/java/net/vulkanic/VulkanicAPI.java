@@ -637,6 +637,10 @@ public class VulkanicAPI {
         getBackend().bindTexture(ctx, target, textureId);
     }
     
+    public static void bindSampler(CommandContext ctx, int unit, int sampler) {
+        getBackend().bindSampler(ctx, unit, sampler);
+    }
+    
     @Deprecated
     public static void bindTexture(int target, int textureId) {
         bindTexture(getImmediateContext(), target, textureId);
@@ -724,6 +728,18 @@ public class VulkanicAPI {
     }
     
     /**
+     * Binds a buffer to an indexed buffer target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target
+     * @param index The index of the binding point
+     * @param buffer The buffer object ID
+     */
+    public static void bindBufferBase(CommandContext ctx, int target, int index, int buffer) {
+        getBackend().bindBufferBase(ctx, target, index, buffer);
+    }
+    
+    /**
      * Sets the active texture unit.
      * 
      * @param ctx Command context for recording this command
@@ -757,6 +773,20 @@ public class VulkanicAPI {
      */
     public static void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
         getBackend().framebufferTexture(ctx, target, attachment, textarget, texture, level);
+    }
+    
+    /**
+     * Attaches a 2D texture image to a framebuffer attachment point.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target
+     * @param attachment The attachment point
+     * @param textarget The texture target
+     * @param texture The texture object ID
+     * @param level The mipmap level
+     */
+    public static void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        getBackend().framebufferTexture2D(ctx, target, attachment, textarget, texture, level);
     }
     
     /**
@@ -1091,6 +1121,10 @@ public class VulkanicAPI {
         getBackend().attachShader(ctx, program, shader);
     }
     
+    public static void detachShader(CommandContext ctx, int program, int shader) {
+        getBackend().detachShader(ctx, program, shader);
+    }
+    
     public static void linkProgram(CommandContext ctx, int program) {
         getBackend().linkProgram(ctx, program);
     }
@@ -1271,6 +1305,10 @@ public class VulkanicAPI {
     @Deprecated
     public static void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         getBackend().uploadShaderSource(shader, pointerBufferAddress, stringCount, lengthsPointer);
+    }
+    
+    public static void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
+        getBackend().uniformBlockBinding(ctx, program, uniformBlockIndex, uniformBlockBinding);
     }
     
     @Deprecated

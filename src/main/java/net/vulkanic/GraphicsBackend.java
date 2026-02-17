@@ -128,6 +128,18 @@ public interface GraphicsBackend {
     void bindTexture(CommandContext ctx, int target, int textureId);
     
     /**
+     * Binds a sampler object to a texture unit.
+     * 
+     * In OpenGL: Maps to glBindSampler()
+     * In Vulkan: Part of descriptor set binding
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit The texture unit to bind the sampler to
+     * @param sampler The sampler object ID to bind
+     */
+    void bindSampler(CommandContext ctx, int unit, int sampler);
+    
+    /**
      * Sets the depth test comparison function.
      * 
      * In OpenGL: Maps to glDepthFunc()
@@ -209,6 +221,19 @@ public interface GraphicsBackend {
      * @param buffer The buffer object ID
      */
     void bindBuffer(CommandContext ctx, int target, int buffer);
+    
+    /**
+     * Binds a buffer to an indexed buffer target.
+     * 
+     * In OpenGL: Maps to glBindBufferBase()
+     * In Vulkan: Part of descriptor set binding
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_UNIFORM_BUFFER, GL_SHADER_STORAGE_BUFFER)
+     * @param index The index of the binding point within the array specified by target
+     * @param buffer The buffer object ID to bind
+     */
+    void bindBufferBase(CommandContext ctx, int target, int index, int buffer);
     
     /**
      * Sets the active texture unit.
@@ -339,6 +364,21 @@ public interface GraphicsBackend {
      * @param level The mipmap level
      */
     void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
+    
+    /**
+     * Attaches a 2D texture image to a framebuffer attachment point.
+     * 
+     * In OpenGL: Maps to glFramebufferTexture2D()
+     * In Vulkan: Maps to framebuffer attachment configuration
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (e.g., GL_FRAMEBUFFER)
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param textarget The texture target (e.g., GL_TEXTURE_2D)
+     * @param texture The texture object ID
+     * @param level The mipmap level
+     */
+    void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
     
     /**
      * Sets the polygon rasterization mode.
@@ -748,6 +788,18 @@ public interface GraphicsBackend {
     void attachShader(CommandContext ctx, int program, int shader);
     
     /**
+     * Detaches a shader from a program object.
+     * 
+     * In OpenGL: Maps to glDetachShader()
+     * In Vulkan: Not directly applicable (shaders are part of pipeline creation)
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param shader The shader object ID to detach
+     */
+    void detachShader(CommandContext ctx, int program, int shader);
+    
+    /**
      * Links a shader program.
      * 
      * In OpenGL: Maps to glLinkProgram()
@@ -993,6 +1045,19 @@ public interface GraphicsBackend {
     // Shader source (native)
     @Deprecated
     void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
+    
+    /**
+     * Binds a uniform block to a uniform block binding point.
+     * 
+     * In OpenGL: Maps to glUniformBlockBinding()
+     * In Vulkan: Maps to descriptor set binding
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program object ID
+     * @param uniformBlockIndex The index of the uniform block
+     * @param uniformBlockBinding The binding point to bind to
+     */
+    void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding);
     
     // Uniform block operations
     @Deprecated
