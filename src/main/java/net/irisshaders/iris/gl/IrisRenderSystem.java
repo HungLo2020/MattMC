@@ -120,7 +120,7 @@ public class IrisRenderSystem {
 
 	public static void uniform2f(int location, float v0, float v1) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniform2f(location, v0, v1);
+		VulkanicAPI.setUniform2f(VulkanicAPI.getImmediateContext(), location, v0, v1);
 	}
 
 	public static void uniform2i(int location, int v0, int v1) {
@@ -135,12 +135,12 @@ public class IrisRenderSystem {
 
 	public static void uniform3i(int location, int v0, int v1, int v2) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniform3i(location, v0, v1, v2);
+		VulkanicAPI.setUniform3i(VulkanicAPI.getImmediateContext(), location, v0, v1, v2);
 	}
 
 	public static void uniform4f(int location, float v0, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniform4f(location, v0, v1, v2, v3);
+		VulkanicAPI.setUniform4f(VulkanicAPI.getImmediateContext(), location, v0, v1, v2, v3);
 	}
 
 	public static void uniform4i(int location, int v0, int v1, int v2, int v3) {
@@ -517,12 +517,12 @@ public class IrisRenderSystem {
 
 	public static void uniformMatrix3fv(int index, boolean b, FloatBuffer buf) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniformMatrix3fv(index, b, buf);
+		VulkanicAPI.setUniformMatrix3fv(VulkanicAPI.getImmediateContext(), index, b, buf);
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, float[] buf) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniformMatrix3fv(index, b, buf);
+		VulkanicAPI.setUniformMatrix3fv(VulkanicAPI.getImmediateContext(), index, b, buf);
 	}
 
 	public static void clearColor(float v, float v1, float v2, float v3) {
@@ -531,7 +531,7 @@ public class IrisRenderSystem {
 	}
 
 	public static int getAttribLocation(int handle, String irisNormal) {
-		return VulkanicAPI.glGetAttribLocation(handle, irisNormal);
+		return VulkanicAPI.getAttributeLocation(VulkanicAPI.getImmediateContext(), handle, irisNormal);
 	}
 
 	public interface DSAAccess {

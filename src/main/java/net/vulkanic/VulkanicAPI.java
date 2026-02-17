@@ -1291,12 +1291,36 @@ public class VulkanicAPI {
         return getBackend().getUniformLocation(ctx, program, name);
     }
     
+    public static int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
+        return getBackend().getAttributeLocation(ctx, program, name);
+    }
+    
     public static void setUniform1i(CommandContext ctx, int location, int value) {
         getBackend().setUniform1i(ctx, location, value);
     }
     
     public static void setUniform1f(CommandContext ctx, int location, float value) {
         getBackend().setUniform1f(ctx, location, value);
+    }
+    
+    public static void setUniform2f(CommandContext ctx, int location, float v0, float v1) {
+        getBackend().setUniform2f(ctx, location, v0, v1);
+    }
+    
+    public static void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
+        getBackend().setUniform3i(ctx, location, v0, v1, v2);
+    }
+    
+    public static void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
+        getBackend().setUniform4f(ctx, location, v0, v1, v2, v3);
+    }
+    
+    public static void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        getBackend().setUniformMatrix3fv(ctx, location, transpose, matrix);
+    }
+    
+    public static void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        getBackend().setUniformMatrix3fv(ctx, location, transpose, matrix);
     }
     
     public static void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
@@ -1795,7 +1819,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glUniform2f(int location, float v0, float v1) {
-        getBackend().glUniform2f(location, v0, v1);
+        setUniform2f(getImmediateContext(), location, v0, v1);
     }
     
     @Deprecated
@@ -1810,12 +1834,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glUniform3i(int location, int v0, int v1, int v2) {
-        getBackend().glUniform3i(location, v0, v1, v2);
+        setUniform3i(getImmediateContext(), location, v0, v1, v2);
     }
     
     @Deprecated
     public static void glUniform4f(int location, float v0, float v1, float v2, float v3) {
-        getBackend().glUniform4f(location, v0, v1, v2, v3);
+        setUniform4f(getImmediateContext(), location, v0, v1, v2, v3);
     }
     
     @Deprecated
@@ -2110,12 +2134,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        getBackend().glUniformMatrix3fv(location, transpose, value);
+        setUniformMatrix3fv(getImmediateContext(), location, transpose, value);
     }
     
     @Deprecated
     public static void glUniformMatrix3fv(int location, boolean transpose, float[] value) {
-        getBackend().glUniformMatrix3fv(location, transpose, value);
+        setUniformMatrix3fv(getImmediateContext(), location, transpose, value);
     }
     
     @Deprecated
@@ -2125,7 +2149,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static int glGetAttribLocation(int program, CharSequence name) {
-        return getBackend().glGetAttribLocation(program, name);
+        return getAttributeLocation(getImmediateContext(), program, name);
     }
     
     @Deprecated

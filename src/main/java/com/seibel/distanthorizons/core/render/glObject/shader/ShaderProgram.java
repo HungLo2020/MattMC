@@ -112,7 +112,7 @@ public class ShaderProgram
 	 */
 	public int getAttributeLocation(CharSequence name)
 	{
-		int i = VulkanicAPI.glGetAttribLocation(id, name);
+		int i = VulkanicAPI.getAttributeLocation(VulkanicAPI.getImmediateContext(), id, name);
 		if (i == -1) throw new RuntimeException("Attribute name not found: " + name);
 		return i;
 	}
@@ -121,7 +121,7 @@ public class ShaderProgram
 	 * Returns -1 if the attribute doesn't exist or has been optimized out.
 	 */
 	public int tryGetAttributeLocation(CharSequence name)
-	{ return VulkanicAPI.glGetAttribLocation(this.id, name); }
+	{ return VulkanicAPI.getAttributeLocation(VulkanicAPI.getImmediateContext(), this.id, name); }
 	
 	/**
 	 * WARNING: Slow native call! Cache it if possible!
@@ -168,7 +168,7 @@ public class ShaderProgram
 	public void trySetUniform(int location, Vec3f value) { if (location != -1) { this.setUniform(location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, DhApiVec3i value) { VulkanicAPI.glUniform3i(location, value.x, value.y, value.z); }
+	public void setUniform(int location, DhApiVec3i value) { VulkanicAPI.setUniform3i(VulkanicAPI.getImmediateContext(), location, value.x, value.y, value.z); }
 	/** @see ShaderProgram#setUniform(int, Mat4f) */
 	public void trySetUniform(int location, DhApiVec3i value) { if (location != -1) { this.setUniform(location, value); } }
 	
@@ -191,7 +191,7 @@ public class ShaderProgram
 	 */
 	public void setUniform(int location, Color value)
 	{
-		VulkanicAPI.glUniform4f(location, 
+		VulkanicAPI.setUniform4f(VulkanicAPI.getImmediateContext(), location, 
 				value.getRed()   / 256.0f, 
 				value.getGreen() / 256.0f, 
 				value.getBlue()  / 256.0f, 

@@ -1037,6 +1037,19 @@ public interface GraphicsBackend {
     int getUniformLocation(CommandContext ctx, int program, CharSequence name);
     
     /**
+     * Locates an attribute variable in a program.
+     * 
+     * In OpenGL: Maps to glGetAttribLocation()
+     * In Vulkan: Maps to vertex input attribute binding lookup
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param name The name of the attribute variable
+     * @return The location of the attribute variable, or -1 if not found
+     */
+    int getAttributeLocation(CommandContext ctx, int program, CharSequence name);
+    
+    /**
      * Sets an integer uniform value.
      * 
      * In OpenGL: Maps to glUniform1i()
@@ -1059,6 +1072,74 @@ public interface GraphicsBackend {
      * @param value The float value to set
      */
     void setUniform1f(CommandContext ctx, int location, float value);
+    
+    /**
+     * Sets a 2-component float vector uniform value.
+     * 
+     * In OpenGL: Maps to glUniform2f()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param v0 The first component value
+     * @param v1 The second component value
+     */
+    void setUniform2f(CommandContext ctx, int location, float v0, float v1);
+    
+    /**
+     * Sets a 3-component integer vector uniform value.
+     * 
+     * In OpenGL: Maps to glUniform3i()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param v0 The first component value
+     * @param v1 The second component value
+     * @param v2 The third component value
+     */
+    void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2);
+    
+    /**
+     * Sets a 4-component float vector uniform value.
+     * 
+     * In OpenGL: Maps to glUniform4f()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param v0 The first component value
+     * @param v1 The second component value
+     * @param v2 The third component value
+     * @param v3 The fourth component value
+     */
+    void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3);
+    
+    /**
+     * Sets a 3x3 matrix uniform value.
+     * 
+     * In OpenGL: Maps to glUniformMatrix3fv()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param transpose Whether to transpose the matrix
+     * @param matrix The matrix data
+     */
+    void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix);
+    
+    /**
+     * Sets a 3x3 matrix uniform value from a float array.
+     * 
+     * In OpenGL: Maps to glUniformMatrix3fv()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param transpose Whether to transpose the matrix
+     * @param matrix The matrix data array
+     */
+    void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix);
     
     /**
      * Sets a 4x4 matrix uniform value.

@@ -79,7 +79,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		
 		if (this.gViewSizeUniform >= 0)
 		{
-			VulkanicAPI.glUniform2f(this.gViewSizeUniform,
+			VulkanicAPI.setUniform2f(VulkanicAPI.getImmediateContext(), this.gViewSizeUniform,
 					MC_RENDER.getTargetFramebufferViewportWidth(),
 					MC_RENDER.getTargetFramebufferViewportHeight());
 		}

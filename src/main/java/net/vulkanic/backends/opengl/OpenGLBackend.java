@@ -948,6 +948,14 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetAttribLocation(program, name);
+    }
+    
+    @Override
     public void setUniform1i(CommandContext ctx, int location, int value) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -961,6 +969,46 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform1f(location, value);
+    }
+    
+    @Override
+    public void setUniform2f(CommandContext ctx, int location, float v0, float v1) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform2f(location, v0, v1);
+    }
+    
+    @Override
+    public void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform3i(location, v0, v1, v2);
+    }
+    
+    @Override
+    public void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform4f(location, v0, v1, v2, v3);
+    }
+    
+    @Override
+    public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniformMatrix3fv(location, transpose, matrix);
+    }
+    
+    @Override
+    public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniformMatrix3fv(location, transpose, matrix);
     }
     
     @Override
@@ -1676,7 +1724,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glUniform2f(int location, float v0, float v1) {
-        org.lwjgl.opengl.GL32C.glUniform2f(location, v0, v1);
+        setUniform2f(VulkanicAPI.getImmediateContext(), location, v0, v1);
     }
     
     @Deprecated
@@ -1694,13 +1742,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glUniform3i(int location, int v0, int v1, int v2) {
-        org.lwjgl.opengl.GL32C.glUniform3i(location, v0, v1, v2);
+        setUniform3i(VulkanicAPI.getImmediateContext(), location, v0, v1, v2);
     }
     
     @Deprecated
     @Override
     public void glUniform4f(int location, float v0, float v1, float v2, float v3) {
-        org.lwjgl.opengl.GL32C.glUniform4f(location, v0, v1, v2, v3);
+        setUniform4f(VulkanicAPI.getImmediateContext(), location, v0, v1, v2, v3);
     }
     
     @Deprecated
@@ -2066,13 +2114,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        org.lwjgl.opengl.GL46C.glUniformMatrix3fv(location, transpose, value);
+        setUniformMatrix3fv(VulkanicAPI.getImmediateContext(), location, transpose, value);
     }
     
     @Deprecated
     @Override
     public void glUniformMatrix3fv(int location, boolean transpose, float[] value) {
-        org.lwjgl.opengl.GL46C.glUniformMatrix3fv(location, transpose, value);
+        setUniformMatrix3fv(VulkanicAPI.getImmediateContext(), location, transpose, value);
     }
     
     @Deprecated
@@ -2084,7 +2132,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public int glGetAttribLocation(int program, CharSequence name) {
-        return org.lwjgl.opengl.GL46C.glGetAttribLocation(program, name);
+        return getAttributeLocation(VulkanicAPI.getImmediateContext(), program, name);
     }
     
     @Deprecated

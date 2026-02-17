@@ -358,7 +358,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	}
 
 	private void setUniform(int index, DhApiVec3i pos) {
-		VulkanicAPI.glUniform3i(index, pos.x, pos.y, pos.z);
+		VulkanicAPI.setUniform3i(VulkanicAPI.getImmediateContext(), index, pos.x, pos.y, pos.z);
 	}
 
 }
