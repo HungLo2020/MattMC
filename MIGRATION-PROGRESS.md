@@ -194,11 +194,12 @@
 - [x] **Migrated tenth 5 methods** - configureVertexAttributeInteger(), unmapBufferData(), fillBufferSubregion(), generateFramebufferObject(), destroyFramebufferObject()
 - [x] **Migrated eleventh 5 methods** - allocateBufferObject(), releaseBufferObject(), fillBufferWithData(), fillBufferWithSize(), createVertexArrayObject()
 - [x] **Migrated twelfth 5 methods** - selectVertexArray(), mapBufferRegion(), copyFramebufferRegion(), bindTexture(), generateMipmap()
-- [x] **60 of 283 deprecated methods migrated** (21.2% complete)
+- [x] **Migrated thirteenth batch (7 DSA methods)** - createBufferDSA(), namedBufferDataDSA() x2, namedBufferSubDataDSA(), namedBufferStorageDSA() x2, createBufferStorage() x2
+- [x] **67 of 283 deprecated methods migrated** (23.7% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 60 / 283 (21.2%)
+**Methods Migrated to CommandContext Pattern**: 67 / 283 (23.7%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -284,9 +285,18 @@
 4. ✅ bindTexture(int, int) → bindTexture(CommandContext, int, int) [new method] - 7 call sites updated (2 in Iris, 4 in GlCommandEncoder, 1 in GlDevice)
 5. ✅ generateMipmap(int) → generateTextureMipmap(CommandContext, int) [reuses existing] - 0 direct call sites (wrapper only)
 
-**Total Call Sites Updated**: 200
+**Batch 13 (Completed 2026-02-17)**:
+1. ✅ createBufferDSA() → createBuffer(CommandContext) [reuses existing] - 0 direct call sites (DSA wrapper in DirectStateAccess)
+2. ✅ namedBufferDataDSA(int, long, int) → bufferData(CommandContext, int, long, int) [reuses existing] - 0 direct call sites (DSA wrapper)
+3. ✅ namedBufferDataDSA(int, ByteBuffer, int) → bufferData(CommandContext, int, ByteBuffer, int) [reuses existing] - 0 direct call sites (DSA wrapper)
+4. ✅ namedBufferSubDataDSA(int, long, ByteBuffer) → bufferSubData(CommandContext, int, long, ByteBuffer) [reuses existing] - 0 direct call sites (DSA wrapper)
+5. ✅ namedBufferStorageDSA(int, long, int) → bufferStorage(CommandContext, int, long, int) [new method] - 0 direct call sites (DSA wrapper)
+6. ✅ namedBufferStorageDSA(int, ByteBuffer, int) → bufferStorage(CommandContext, int, ByteBuffer, int) [new method] - 0 direct call sites (DSA wrapper)
+7. ✅ createBufferStorage(int, long, int) → bufferStorage(CommandContext, int, long, int) [delegates to new method] - used in DirectStateAccess.Emulated
 
-**Remaining Deprecated Methods**: 223 (78.8%)
+**Total Call Sites Updated**: 200 (DSA methods use internal delegation pattern)
+
+**Remaining Deprecated Methods**: 216 (76.3%)
 
 ### Blockers
 

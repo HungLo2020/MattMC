@@ -961,6 +961,14 @@ public class VulkanicAPI {
         getBackend().bufferSubData(ctx, target, offset, data);
     }
     
+    public static void bufferStorage(CommandContext ctx, int target, long size, int flags) {
+        getBackend().bufferStorage(ctx, target, size, flags);
+    }
+    
+    public static void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
+        getBackend().bufferStorage(ctx, target, data, flags);
+    }
+    
     @Deprecated
     public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
         bufferSubData(getImmediateContext(), tgt, off, dat);

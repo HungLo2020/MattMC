@@ -531,6 +531,32 @@ public interface GraphicsBackend {
      */
     void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data);
     
+    /**
+     * Creates immutable buffer storage.
+     * 
+     * In OpenGL: Maps to glBufferStorage() (OpenGL 4.4+)
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate usage flags
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param size Size of the buffer in bytes
+     * @param flags Storage flags (e.g., GL_DYNAMIC_STORAGE_BIT, GL_MAP_READ_BIT)
+     */
+    void bufferStorage(CommandContext ctx, int target, long size, int flags);
+    
+    /**
+     * Creates immutable buffer storage with initial data.
+     * 
+     * In OpenGL: Maps to glBufferStorage() (OpenGL 4.4+)
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate usage flags
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param data Initial data for the buffer
+     * @param flags Storage flags (e.g., GL_DYNAMIC_STORAGE_BIT, GL_MAP_READ_BIT)
+     */
+    void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags);
+    
     @Deprecated
     void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     

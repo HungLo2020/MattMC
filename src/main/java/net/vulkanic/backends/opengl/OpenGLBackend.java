@@ -216,37 +216,57 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public int createBufferDSA() {
-        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateBuffers();
+        return createBuffer(VulkanicAPI.getImmediateContext());
     }
     
     @Deprecated
     @Override
     public void namedBufferDataDSA(int buffer, long size, int usage) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, size, usage);
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferData(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, size, usage);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
     @Deprecated
     @Override
     public void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, data, usage);
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferData(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, data, usage);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
     @Deprecated
     @Override
     public void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferSubData(buffer, offset, data);
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferSubData(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, offset, data);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
     @Deprecated
     @Override
     public void namedBufferStorageDSA(int buffer, long size, int flags) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, size, flags);
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferStorage(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, size, flags);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
     @Deprecated
     @Override
     public void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, data, flags);
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferStorage(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, data, flags);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
     @Deprecated
@@ -481,6 +501,22 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL15.glBufferSubData(target, offset, data);
+    }
+    
+    @Override
+    public void bufferStorage(CommandContext ctx, int target, long size, int flags) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL44.glBufferStorage(target, size, flags);
+    }
+    
+    @Override
+    public void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL44.glBufferStorage(target, data, flags);
     }
     
     @Deprecated
@@ -1272,29 +1308,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void createBufferStorage(int target, long size, int flags) {
-        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
-        
-        if (capabilities.OpenGL44) {
-            org.lwjgl.opengl.GL44C.glBufferStorage(target, size, flags);
-        } else if (capabilities.GL_ARB_buffer_storage) {
-            org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, size, flags);
-        } else {
-            throw new UnsupportedOperationException("Buffer storage is not supported");
-        }
+        bufferStorage(VulkanicAPI.getImmediateContext(), target, size, flags);
     }
     
     @Deprecated
     @Override
     public void createBufferStorage(int target, ByteBuffer data, int flags) {
-        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
-        
-        if (capabilities.OpenGL44) {
-            org.lwjgl.opengl.GL44C.glBufferStorage(target, data, flags);
-        } else if (capabilities.GL_ARB_buffer_storage) {
-            org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, data, flags);
-        } else {
-            throw new UnsupportedOperationException("Buffer storage is not supported");
-        }
+        bufferStorage(VulkanicAPI.getImmediateContext(), target, data, flags);
     }
     
     @Deprecated
