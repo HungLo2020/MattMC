@@ -50,7 +50,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	{
 		for (int i = 0; i < this.numberOfBindingPoints; i++)
 		{
-			VulkanicAPI.glBindVertexBuffer(i, buffer, 0, this.strideSize);
+			VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), i, buffer, 0, this.strideSize);
 		}
 	}
 	
@@ -58,7 +58,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void bindBufferToBindingPoint(int buffer, int bindingPoint)
 	{
-		VulkanicAPI.glBindVertexBuffer(bindingPoint, buffer, 0, this.strideSize);
+		VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), bindingPoint, buffer, 0, this.strideSize);
 	}
 	
 	
@@ -73,7 +73,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	{
 		for (int i = 0; i < this.numberOfBindingPoints; i++)
 		{
-			VulkanicAPI.glBindVertexBuffer(i, 0, 0, 0);
+			VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), i, 0, 0, 0);
 		}
 	}
 	
@@ -81,7 +81,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void unbindBuffersFromBindingPoint(int bindingPoint)
 	{
-		VulkanicAPI.glBindVertexBuffer(bindingPoint, 0, 0, 0);
+		VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), bindingPoint, 0, 0, 0);
 	}
 	
 	
@@ -110,7 +110,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 			this.numberOfBindingPoints = bindingPoint + 1;
 		}
 		VulkanicAPI.glVertexAttribBinding(attributeIndex, bindingPoint);
-		VulkanicAPI.glEnableVertexAttribArray(attributeIndex);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), attributeIndex);
 	}
 	
 	

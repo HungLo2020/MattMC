@@ -130,7 +130,7 @@ public class IrisRenderSystem {
 
 	public static void uniform3f(int location, float v0, float v1, float v2) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniform3f(location, v0, v1, v2);
+		VulkanicAPI.setUniform3f(VulkanicAPI.getImmediateContext(), location, v0, v1, v2);
 	}
 
 	public static void uniform3i(int location, int v0, int v1, int v2) {

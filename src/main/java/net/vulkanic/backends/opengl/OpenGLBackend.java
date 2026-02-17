@@ -971,6 +971,14 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glEnableVertexAttribArray(index);
     }
     
+    @Override
+    public void bindVertexBuffer(CommandContext ctx, int bindingindex, int buffer, long offset, int stride) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL43.glBindVertexBuffer(bindingindex, buffer, offset, stride);
+    }
+    
     @Deprecated
     @Override
     public void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
@@ -1097,6 +1105,14 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
         GL11.glReadPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    @Override
+    public boolean isTexture(CommandContext ctx, int texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL11.glIsTexture(texture);
     }
     
     @Deprecated
@@ -2296,7 +2312,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void bindVertexBuffer(int bindingindex, int buffer, long offset, int stride) {
-        org.lwjgl.opengl.GL43C.glBindVertexBuffer(bindingindex, buffer, offset, stride);
+        bindVertexBuffer(VulkanicAPI.getImmediateContext(), bindingindex, buffer, offset, stride);
     }
     
     @Deprecated
@@ -2419,7 +2435,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public boolean glIsTexture(int texture) {
-        return org.lwjgl.opengl.GL11.glIsTexture(texture);
+        return isTexture(VulkanicAPI.getImmediateContext(), texture);
     }
     
     @Deprecated

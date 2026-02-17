@@ -56,7 +56,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	{
 		for (int i = 0; i < this.pointers.length; i++)
 		{
-			VulkanicAPI.glEnableVertexAttribArray(i);
+			VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), i);
 		}
 		
 		for (int i = 0; i < this.pointers.length; i++)
@@ -88,7 +88,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 		
 		for (int bindingPointIndex : bindingPointIndexes)
 		{
-			VulkanicAPI.glEnableVertexAttribArray(bindingPointIndex);
+			VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), bindingPointIndex);
 		}
 		
 		for (int bindingPointIndex : bindingPointIndexes)

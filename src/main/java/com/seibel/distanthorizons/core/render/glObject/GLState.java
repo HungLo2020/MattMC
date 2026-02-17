@@ -165,19 +165,19 @@ public class GLState
 		}
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture0) ? this.texture0 : 0);
+		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture0) ? this.texture0 : 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture1) ? this.texture1 : 0);
+		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture1) ? this.texture1 : 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture2) ? this.texture2 : 0);
+		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture2) ? this.texture2 : 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE3);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture3) ? this.texture3 : 0);
+		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture3) ? this.texture3 : 0);
 		
 		GLMC.glActiveTexture(this.activeTextureNumber);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture2D) ? this.texture2D : 0);
+		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture2D) ? this.texture2D : 0);
 		
 		// attempting to set textures on the default frame buffer (ID 0) will throw errors
 		if (frameBufferSet)

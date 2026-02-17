@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (99/283) | Complete | 35.0% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (104/283) | Complete | 35.0% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 35.0% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 36.7% | 100% | Improving |
 
 ---
 
@@ -882,6 +882,49 @@ Before committing Vulkan backend work, verify:
 
 ---
 
+### Batch 20 (2026-02-17) - ✅ COMPLETE
+
+**Methods Migrated**: 5 commonly-used methods (shader, vertex, texture operations)
+**Call Sites Updated**: 24 call sites across 8 files
+**Progress**: 99/283 → 104/283 methods (35.0% → 36.7%)
+
+#### Methods:
+1. `glAttachShader(int, int)` → `attachShader(CommandContext, int, int)` [reused existing] - 7 call sites
+2. `glIsTexture(int)` → `isTexture(CommandContext, int)` [NEW] - 5 call sites
+3. `glUniform3f(int, float, float, float)` → `setUniform3f(CommandContext, ...)` [reused existing] - 4 call sites
+4. `glEnableVertexAttribArray(int)` → `enableVertexAttribArray(CommandContext, int)` [reused existing] - 4 call sites
+5. `glBindVertexBuffer(int, int, long, int)` → `bindVertexBuffer(CommandContext, ...)` [NEW] - 4 call sites
+
+#### Implementation Details:
+- **New Methods Added**: 
+  - `isTexture(CommandContext, int)` - Check if name corresponds to a texture object
+  - `bindVertexBuffer(CommandContext, ...)` - Bind buffer to vertex buffer binding point (GL43+)
+- **Reused Methods**: 
+  - `attachShader()` - Already existed with CommandContext
+  - `setUniform3f()` - Already existed with CommandContext
+  - `enableVertexAttribArray()` - Already existed with CommandContext
+- **Call Site Migration**: Updated all 24 call sites to use new CommandContext API (NO DELEGATION!)
+- **Delegation Pattern**: All 5 deprecated methods now delegate to CommandContext versions
+- **Testing**: All 11 architectural and CommandContext tests passing
+
+#### Files Modified:
+- Core API (3 files): GraphicsBackend, OpenGLBackend, VulkanicAPI - Added 2 new methods, 2 facade methods
+- Iris Shaders (2 files):
+  - IrisRenderSystem - Updated glUniform3f → setUniform3f
+  - IrisGenericRenderProgram - Updated glAttachShader, glEnableVertexAttribArray, glUniform3f
+  - IrisLodRenderProgram - Updated glUniform3f → setUniform3f
+- Distant Horizons (5 files):
+  - ShaderProgram - Updated glAttachShader, glUniform3f
+  - GLState - Updated glIsTexture → isTexture (5 sites)
+  - VertexAttributePreGL43 - Updated glEnableVertexAttribArray
+  - VertexAttributePostGL43 - Updated glBindVertexBuffer, glEnableVertexAttribArray
+- MIGRATION-PROGRESS.md - Updated progress to 36.7%
+
+#### Key Achievement:
+**Efficient Reuse**: Leveraged 3 existing CommandContext methods, only needed to add 2 new methods. Updated 24 call sites to actively use new API instead of relying on deprecated delegation.
+
+---
+
 ### Batch 19 (2026-02-17) - ✅ COMPLETE
 
 **Methods Migrated**: 5 core methods (rendering, state, texture)
@@ -924,6 +967,17 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-17 (Update 6 - Batch 20 Complete)
+- Migrated 5 commonly-used deprecated methods to CommandContext pattern
+- Added 2 new CommandContext methods: isTexture, bindVertexBuffer
+- Reused 3 existing CommandContext methods: attachShader, setUniform3f, enableVertexAttribArray
+- Updated 24 call sites across Iris Shaders and Distant Horizons
+- Progress: 35.0% → 36.7% (104/283 methods migrated)
+- All architectural boundary tests passing
+- All CommandContext tests passing
+- Build successful with zero regressions
+- Key: Updated call sites to actively use new API, not just deprecated delegations
 
 ### 2026-02-17 (Update 5 - Batch 19 Complete)
 - Migrated 5 more deprecated methods to CommandContext pattern

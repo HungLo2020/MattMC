@@ -996,6 +996,10 @@ public class VulkanicAPI {
         getBackend().deleteTexture(ctx, texture);
     }
     
+    public static boolean isTexture(CommandContext ctx, int texture) {
+        return getBackend().isTexture(ctx, texture);
+    }
+    
     public static void drawArrays(CommandContext ctx, int mode, int first, int count) {
         getBackend().drawArrays(ctx, mode, first, count);
     }
@@ -1297,6 +1301,10 @@ public class VulkanicAPI {
     
     public static void enableVertexAttribArray(CommandContext ctx, int index) {
         getBackend().enableVertexAttribArray(ctx, index);
+    }
+    
+    public static void bindVertexBuffer(CommandContext ctx, int bindingindex, int buffer, long offset, int stride) {
+        getBackend().bindVertexBuffer(ctx, bindingindex, buffer, offset, stride);
     }
     
     @Deprecated
@@ -2327,11 +2335,11 @@ public class VulkanicAPI {
     
     /**
      * Enables a vertex attribute array.
-     * Wrapper for activateVertexAttribute.
+     * Wrapper for enableVertexAttribArray with immediate context.
      */
     @Deprecated
     public static void glEnableVertexAttribArray(int index) {
-        activateVertexAttribute(index);
+        enableVertexAttribArray(getImmediateContext(), index);
     }
     
     /**
@@ -2345,11 +2353,11 @@ public class VulkanicAPI {
     
     /**
      * Attaches a shader to a program.
-     * Wrapper for attachShaderToProgram.
+     * Wrapper for attachShader with immediate context.
      */
     @Deprecated
     public static void glAttachShader(int program, int shader) {
-        attachShaderToProgram(program, shader);
+        attachShader(getImmediateContext(), program, shader);
     }
     
     /**
@@ -2411,10 +2419,11 @@ public class VulkanicAPI {
     
     /**
      * Binds a buffer to a vertex buffer bind point (GL43+).
+     * Wrapper for bindVertexBuffer with immediate context.
      */
     @Deprecated
     public static void glBindVertexBuffer(int bindingindex, int buffer, long offset, int stride) {
-        getBackend().bindVertexBuffer(bindingindex, buffer, offset, stride);
+        bindVertexBuffer(getImmediateContext(), bindingindex, buffer, offset, stride);
     }
     
     /**
@@ -2604,10 +2613,11 @@ public class VulkanicAPI {
     
     /**
      * Determines if a name corresponds to a texture.
+     * Wrapper for isTexture with immediate context.
      */
     @Deprecated
     public static boolean glIsTexture(int texture) {
-        return getBackend().glIsTexture(texture);
+        return isTexture(getImmediateContext(), texture);
     }
     
     /**

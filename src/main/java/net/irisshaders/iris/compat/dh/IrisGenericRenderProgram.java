@@ -80,28 +80,28 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		this.bufferBlendOverrides = bufferBlendOverrides;
 
 		GlShader vert = new GlShader(ShaderType.VERTEX, name + ".vsh", vertex);
-		VulkanicAPI.glAttachShader(id, vert.getHandle());
+		VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, vert.getHandle());
 
 		GlShader tessCont = null;
 		if (tessControl != null) {
 			tessCont = new GlShader(ShaderType.TESSELATION_CONTROL, name + ".tcs", tessControl);
-			VulkanicAPI.glAttachShader(id, tessCont.getHandle());
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, tessCont.getHandle());
 		}
 
 		GlShader tessE = null;
 		if (tessEval != null) {
 			tessE = new GlShader(ShaderType.TESSELATION_EVAL, name + ".tes", tessEval);
-			VulkanicAPI.glAttachShader(id, tessE.getHandle());
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, tessE.getHandle());
 		}
 
 		GlShader geom = null;
 		if (geometry != null) {
 			geom = new GlShader(ShaderType.GEOMETRY, name + ".gsh", geometry);
-			VulkanicAPI.glAttachShader(id, geom.getHandle());
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, geom.getHandle());
 		}
 
 		GlShader frag = new GlShader(ShaderType.FRAGMENT, name + ".fsh", fragment);
-		VulkanicAPI.glAttachShader(id, frag.getHandle());
+		VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, frag.getHandle());
 
 		VulkanicAPI.glLinkProgram(this.id);
 		int status = VulkanicAPI.glGetProgrami(this.id, VulkanicAPI.GL_LINK_STATUS);
@@ -137,7 +137,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		this.va = GlStateManager._glGenVertexArrays();
 		GlStateManager._glBindVertexArray(va);
 		VulkanicAPI.glVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, 0, 0);
-		VulkanicAPI.glEnableVertexAttribArray(0);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 0);
 
 		projectionUniform = tryGetUniformLocation2("iris_ProjectionMatrix");
 		projectionInverseUniform = tryGetUniformLocation2("iris_ProjectionMatrixInverse");
@@ -354,7 +354,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	}
 
 	private void setUniform(int index, DhApiVec3f pos) {
-		VulkanicAPI.glUniform3f(index, pos.x, pos.y, pos.z);
+		VulkanicAPI.setUniform3f(VulkanicAPI.getImmediateContext(), index, pos.x, pos.y, pos.z);
 	}
 
 	private void setUniform(int index, DhApiVec3i pos) {

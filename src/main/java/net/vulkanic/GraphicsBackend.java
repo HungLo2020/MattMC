@@ -1072,6 +1072,20 @@ public interface GraphicsBackend {
     void enableVertexAttribArray(CommandContext ctx, int index);
     
     /**
+     * Binds a buffer to a vertex buffer binding point.
+     * 
+     * In OpenGL: Maps to glBindVertexBuffer() (OpenGL 4.3+)
+     * In Vulkan: Part of vkCmdBindVertexBuffers() command
+     * 
+     * @param ctx Command context for recording this command
+     * @param bindingindex The vertex buffer binding point
+     * @param buffer The buffer object to bind
+     * @param offset The offset into the buffer
+     * @param stride The stride between consecutive elements
+     */
+    void bindVertexBuffer(CommandContext ctx, int bindingindex, int buffer, long offset, int stride);
+    
+    /**
      * Configures a vertex attribute pointer for integer data.
      * 
      * In OpenGL: Maps to glVertexAttribIPointer()
@@ -1198,6 +1212,18 @@ public interface GraphicsBackend {
     void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels);
     
     // Texture queries
+    /**
+     * Checks if a name corresponds to a texture object.
+     * 
+     * In OpenGL: Maps to glIsTexture()
+     * In Vulkan: Would query internal texture registry
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The name to check
+     * @return True if texture is a texture object, false otherwise
+     */
+    boolean isTexture(CommandContext ctx, int texture);
+    
     @Deprecated
     int queryTextureLevelParameter(int target, int level, int pname);
     

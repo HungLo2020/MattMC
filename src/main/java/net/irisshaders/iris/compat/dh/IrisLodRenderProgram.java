@@ -276,7 +276,7 @@ public class IrisLodRenderProgram {
 	}
 
 	private void setUniform(int index, DhApiVec3f pos) {
-		VulkanicAPI.glUniform3f(index, pos.x, pos.y, pos.z);
+		VulkanicAPI.setUniform3f(VulkanicAPI.getImmediateContext(), index, pos.x, pos.y, pos.z);
 	}
 
 }

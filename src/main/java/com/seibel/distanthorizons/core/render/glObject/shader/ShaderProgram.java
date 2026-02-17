@@ -63,14 +63,14 @@ public class ShaderProgram
 		for (Supplier<String> vertSupplier : vertSupplierList)
 		{
 			Shader vertShader = new Shader(VulkanicAPI.GL_VERTEX_SHADER, vertSupplier.get());
-			VulkanicAPI.glAttachShader(this.id, vertShader.id);
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), this.id, vertShader.id);
 			vertShader.free(); // important!
 		}
 		
 		for (Supplier<String> fragSupplier : fragSupplierList)
 		{
 			Shader fragShader = new Shader(VulkanicAPI.GL_FRAGMENT_SHADER, fragSupplier.get());
-			VulkanicAPI.glAttachShader(this.id, fragShader.id);
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), this.id, fragShader.id);
 			fragShader.free(); // important!
 		}
 		
@@ -163,7 +163,7 @@ public class ShaderProgram
 	public void trySetUniform(int location, float value) { if (location != -1) { this.setUniform(location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, Vec3f value) { VulkanicAPI.glUniform3f(location, value.x, value.y, value.z); }
+	public void setUniform(int location, Vec3f value) { VulkanicAPI.setUniform3f(VulkanicAPI.getImmediateContext(), location, value.x, value.y, value.z); }
 	/** @see ShaderProgram#setUniform(int, Vec3f) */
 	public void trySetUniform(int location, Vec3f value) { if (location != -1) { this.setUniform(location, value); } }
 	
