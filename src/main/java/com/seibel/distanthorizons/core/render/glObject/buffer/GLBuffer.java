@@ -69,8 +69,8 @@ public class GLBuffer implements AutoCloseable
 	// Should be override by subclasses
 	public int getBufferBindingTarget() { return VulkanicAPI.GL_COPY_READ_BUFFER; }
 	
-	public void bind() { VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), this.id); }
-	public void unbind() { VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), 0); }
+	public void bind() { VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id); }
+	public void unbind() { VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), 0); }
 	
 	
 	
@@ -213,7 +213,7 @@ public class GLBuffer implements AutoCloseable
 		LodUtil.assertTrue(!this.bufferStorage, "Buffer is bufferStorage but its trying to use bufferData upload method!");
 		
 		int bbSize = bb.limit() - bb.position();
-		VulkanicAPI.glBufferData(this.getBufferBindingTarget(), bb, bufferDataHint);
+		VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), bb, bufferDataHint);
 		this.size = bbSize;
 	}
 	/** Requires the buffer to be bound */
@@ -226,7 +226,7 @@ public class GLBuffer implements AutoCloseable
 		{
 			int newSize = (int) (bbSize * BUFFER_EXPANSION_MULTIPLIER);
 			if (newSize > maxExpansionSize) newSize = maxExpansionSize;
-			VulkanicAPI.glBufferData(this.getBufferBindingTarget(), newSize, bufferDataHint);
+			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), newSize, bufferDataHint);
 			this.size = newSize;
 		}
 		VulkanicAPI.glBufferSubData(this.getBufferBindingTarget(), 0, bb);
@@ -258,13 +258,13 @@ public class GLBuffer implements AutoCloseable
 			{
 				GLMC.glDeleteBuffers(this.id);
 				this.id = GLMC.glGenBuffers();
-				VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), this.id);
-				VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), this.id);
+				VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id);
+				VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id);
 				VulkanicAPI.glBufferStorage(this.getBufferBindingTarget(), newSize, bufferHint);
 			}
 			else
 			{
-				VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, newSize, bufferHint);
+				VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, newSize, bufferHint);
 			}
 		}
 		

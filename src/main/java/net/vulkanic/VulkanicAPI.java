@@ -1038,6 +1038,14 @@ public class VulkanicAPI {
         getBackend().bufferData(ctx, target, size, usage);
     }
     
+    public static void bufferData(CommandContext ctx, int target, float[] data, int usage) {
+        getBackend().bufferData(ctx, target, data, usage);
+    }
+    
+    public static void bufferData(CommandContext ctx, int target, int[] data, int usage) {
+        getBackend().bufferData(ctx, target, data, usage);
+    }
+    
     @Deprecated
     public static int allocateBufferObject() {
         return createBuffer(getImmediateContext());
@@ -1835,22 +1843,22 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glBufferData(int target, float[] data, int usage) {
-        getBackend().glBufferData(target, data, usage);
+        bufferData(getImmediateContext(), target, data, usage);
     }
     
     @Deprecated
     public static void glBufferData(int target, int[] data, int usage) {
-        getBackend().glBufferData(target, data, usage);
+        bufferData(getImmediateContext(), target, data, usage);
     }
     
     @Deprecated
     public static void glBufferData(int target, java.nio.ByteBuffer data, int usage) {
-        getBackend().glBufferData(target, data, usage);
+        bufferData(getImmediateContext(), target, data, usage);
     }
     
     @Deprecated
     public static void glBufferData(int target, long size, int usage) {
-        getBackend().glBufferData(target, size, usage);
+        bufferData(getImmediateContext(), target, size, usage);
     }
     
     @Deprecated
@@ -2025,7 +2033,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glPolygonMode(int face, int mode) {
-        getBackend().glPolygonMode(face, mode);
+        setPolygonMode(getImmediateContext(), face, mode);
     }
     
     @Deprecated
@@ -2040,7 +2048,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glBindBuffer(int target, int buffer) {
-        getBackend().glBindBuffer(target, buffer);
+        bindBuffer(getImmediateContext(), target, buffer);
     }
     
     @Deprecated

@@ -60,11 +60,11 @@ public class FogApplyShader extends AbstractShaderRenderer
 	{
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(this.fogTexture);
-		VulkanicAPI.glUniform1i(this.colorTextureUniform, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.colorTextureUniform, 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.glUniform1i(this.depthTextureUniform, 1);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.depthTextureUniform, 1);
 		
 	}
 	

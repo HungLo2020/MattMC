@@ -63,7 +63,7 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	{
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(this.fadeTexture);
-		VulkanicAPI.glUniform1i(this.uFadeColorTextureUniform, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uFadeColorTextureUniform, 0);
 		
 	}
 	

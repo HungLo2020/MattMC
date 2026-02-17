@@ -110,7 +110,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 			this.free();
 			throw new RuntimeException(message);
 		} else {
-			VulkanicAPI.glUseProgram(this.id);
+			VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), this.id);
 		}
 
 		vert.destroy();
@@ -238,7 +238,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	// Override ShaderProgram.bind()
 	public void bind(DhApiRenderParam renderParam) {
 		GlStateManager._glBindVertexArray(va);
-		VulkanicAPI.glUseProgram(id);
+		VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), id);
 		if (blend != null) blend.apply();
 
 		for (BufferBlendOverride override : bufferBlendOverrides) {
@@ -269,7 +269,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	public void unbind() {
 		GlStateManager._glBindVertexArray(0);
-		VulkanicAPI.glUseProgram(0);
+		VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), 0);
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
 		BlendModeOverride.restore();
@@ -277,7 +277,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	@Override
 	public void bindVertexBuffer(int i) {
-		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, i);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, i);
 		VulkanicAPI.glVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, 12, 0);
 	}
 
@@ -346,7 +346,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	}
 
 	private void setUniform(int index, int value) {
-		VulkanicAPI.glUniform1i(index, value);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), index, value);
 	}
 
 	private void setUniform(int index, float value) {

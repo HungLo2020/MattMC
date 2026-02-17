@@ -87,14 +87,14 @@ public class ShaderProgram
 			this.free(); // important!
 			throw new RuntimeException(message);
 		}
-		VulkanicAPI.glUseProgram(this.id); // This HAVE to be a direct call to prevent calling the overloaded version
+		VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), this.id); // This HAVE to be a direct call to prevent calling the overloaded version
 	}
 	
 	
 	
 	
-	public void bind() { VulkanicAPI.glUseProgram(this.id); }
-	public void unbind() { VulkanicAPI.glUseProgram(0); }
+	public void bind() { VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), this.id); }
+	public void unbind() { VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), 0); }
 	
 	public void free() { VulkanicAPI.glDeleteProgram(this.id); }
 	
@@ -148,12 +148,12 @@ public class ShaderProgram
 	{ return VulkanicAPI.glGetUniformLocation(this.id, name); }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, boolean value) { VulkanicAPI.glUniform1i(location, value ? 1 : 0); }
+	public void setUniform(int location, boolean value) { VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), location, value ? 1 : 0); }
 	/** @see ShaderProgram#setUniform(int, boolean) */
 	public void trySetUniform(int location, boolean value) { if (location != -1) { this.setUniform(location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, int value) { VulkanicAPI.glUniform1i(location, value); }
+	public void setUniform(int location, int value) { VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), location, value); }
 	/** @see ShaderProgram#setUniform(int, int) */
 	public void trySetUniform(int location, int value) { if (location != -1) { this.setUniform(location, value); } }
 	

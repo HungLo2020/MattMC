@@ -626,6 +626,26 @@ public interface GraphicsBackend {
      */
     void bufferData(CommandContext ctx, int target, long size, int usage);
     
+    /**
+     * Allocates and initializes buffer object data with float array.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target
+     * @param data Float array data to copy
+     * @param usage Usage hint (e.g., GL_STATIC_DRAW)
+     */
+    void bufferData(CommandContext ctx, int target, float[] data, int usage);
+    
+    /**
+     * Allocates and initializes buffer object data with int array.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target
+     * @param data Int array data to copy
+     * @param usage Usage hint (e.g., GL_STATIC_DRAW)
+     */
+    void bufferData(CommandContext ctx, int target, int[] data, int usage);
+    
     @Deprecated
     int allocateBufferObject();
     @Deprecated

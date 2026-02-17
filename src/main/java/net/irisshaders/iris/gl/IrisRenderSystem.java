@@ -222,7 +222,7 @@ public class IrisRenderSystem {
 
 	public static void bufferData(int target, float[] data, int usage) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glBufferData(target, data, usage);
+		VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), target, data, usage);
 	}
 
 	public static int bufferStorage(int target, float[] data, int usage) {
@@ -452,7 +452,7 @@ public class IrisRenderSystem {
 	public static void setPolygonMode(int mode) {
 		if (mode != polygonMode) {
 			polygonMode = mode;
-			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, mode);
+			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, mode);
 		}
 	}
 
@@ -471,7 +471,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void bindBuffer(int target, int buffer) {
-		VulkanicAPI.glBindBuffer(target, buffer);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer);
 	}
 
 	public static int createBuffers() {

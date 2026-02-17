@@ -90,11 +90,11 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveColorTextureId());
-		VulkanicAPI.glUniform1i(this.gDhColorTextureUniform, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDhColorTextureUniform, 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.glUniform1i(this.gDepthMapUniform, 1);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 1);
 		
 		// Copy to MC's framebuffer
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, targetFrameBuffer);
@@ -145,11 +145,11 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveColorTextureId());
-		VulkanicAPI.glUniform1i(this.gDhColorTextureUniform, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDhColorTextureUniform, 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.glUniform1i(this.gDepthMapUniform, 1);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 1);
 		
 		
 		

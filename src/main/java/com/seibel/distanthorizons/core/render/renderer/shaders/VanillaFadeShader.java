@@ -158,19 +158,19 @@ public class VanillaFadeShader extends AbstractShaderRenderer
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(MC_RENDER.getDepthTextureId());
-		VulkanicAPI.glUniform1i(this.uMcDepthTexture, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uMcDepthTexture, 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(depthTextureId);
-		VulkanicAPI.glUniform1i(this.uDhDepthTexture, 1);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhDepthTexture, 1);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2);
 		GLMC.glBindTexture(MC_RENDER.getColorTextureId());
-		VulkanicAPI.glUniform1i(this.uCombinedMcDhColorTexture, 2);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uCombinedMcDhColorTexture, 2);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE3);
 		GLMC.glBindTexture(colorTextureId);
-		VulkanicAPI.glUniform1i(this.uDhColorTexture, 3);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhColorTexture, 3);
 		
 		
 		ScreenQuad.INSTANCE.render();

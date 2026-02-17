@@ -69,13 +69,13 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	{
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.glUniform1i(this.gDepthMapUniform, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(this.ssaoTexture);
-		VulkanicAPI.glUniform1i(this.gSSAOMapUniform, 1);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gSSAOMapUniform, 1);
 		
-		VulkanicAPI.glUniform1i(this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
 		
 		if (this.gViewSizeUniform >= 0)
 		{

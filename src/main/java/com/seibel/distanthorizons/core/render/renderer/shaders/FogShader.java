@@ -243,7 +243,7 @@ public class FogShader extends AbstractShaderRenderer
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.glUniform1i(this.uDepthMap, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDepthMap, 0);
 		
 		// this is necessary for Legacy OpenGL support
 		// otherwise the framebuffer isn't cleared correctly and the fog smears across the screen

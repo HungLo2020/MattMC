@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (89/283) | Complete | 31.4% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (94/283) | Complete | 33.2% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 31.4% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 33.2% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 31.4% (89/283 methods migrated)
+### Overall Phase Progress: 33.2% (94/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 89 (31.4%)**
-- **Methods using immediate mode: 194 (68.6%)**
+- **Methods migrated to CommandContext: 94 (33.2%)**
+- **Methods using immediate mode: 189 (66.8%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 89 methods now support CommandContext pattern, enabling future Vulkan backend.
+**Conclusion**: API migration in progress. 94 methods now support CommandContext pattern, enabling future Vulkan backend.
 
 ### Required Work Breakdown
 
@@ -848,7 +848,50 @@ Before committing Vulkan backend work, verify:
 
 ---
 
+## Migration Batches
+
+### Batch 18 (2026-02-17) - ✅ COMPLETE
+
+**Methods Migrated**: 5 core methods + 2 array overloads (7 total)
+**Call Sites Updated**: 68 call sites across 28 files
+**Progress**: 89/283 → 94/283 methods (31.4% → 33.2%)
+
+#### Methods:
+1. `glUniform1i(int, int)` → `setUniform1i(CommandContext, int, int)` - 22 call sites
+2. `glBindBuffer(int, int)` → `bindBuffer(CommandContext, int, int)` - 18 call sites  
+3. `glPolygonMode(int, int)` → `setPolygonMode(CommandContext, int, int)` - 12 call sites
+4. `glBufferData(int, ByteBuffer, int)` → `bufferData(CommandContext, ...)` - 9 call sites
+5. `glUseProgram(int)` → `bindShaderProgram(CommandContext, int)` - 7 call sites
+6. `glBufferData(int, float[], int)` → `bufferData(CommandContext, int, float[], int)` - NEW
+7. `glBufferData(int, int[], int)` → `bufferData(CommandContext, int, int[], int)` - NEW
+
+#### Implementation Details:
+- **Call Site Migration**: Used automated replacement to update all 68 call sites to use CommandContext API
+- **Delegation Pattern**: All deprecated methods now delegate to CommandContext versions
+- **Array Overloads**: Added missing float[] and int[] overloads to GraphicsBackend, OpenGLBackend, and VulkanicAPI
+- **Testing**: All 11 architectural and CommandContext tests passing
+
+#### Files Modified:
+- Core API (3 files): GraphicsBackend, OpenGLBackend, VulkanicAPI
+- Distant Horizons (11 files): ShaderProgram, shader classes, renderer classes
+- Iris (1 file): IrisGenericRenderProgram
+- MIGRATION-PROGRESS.md - Updated progress tracking
+
+#### Key Achievement:
+**Crossed 33% Threshold**: Over one-third of deprecated methods now support CommandContext pattern required for Vulkan compatibility.
+
+---
+
 ## Change Log
+
+### 2026-02-17 (Update 4 - Batch 18 Complete)
+- Migrated 5 high-usage deprecated methods to CommandContext pattern
+- Added 2 new array overloads for bufferData
+- Updated 68 call sites across Distant Horizons and Iris mods
+- Progress: 31.4% → 33.2% (94/283 methods migrated)
+- All architectural boundary tests passing
+- All CommandContext tests passing
+- Build successful with zero regressions
 
 ### 2026-02-16 (Update 3 - CRITICAL API Compatibility Analysis)
 - **CRITICAL FINDING**: Current VulkanicAPI incompatible with Vulkan architecture

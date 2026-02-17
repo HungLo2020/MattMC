@@ -562,6 +562,22 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBufferData(target, size, usage);
     }
     
+    @Override
+    public void bufferData(CommandContext ctx, int target, float[] data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferData(target, data, usage);
+    }
+    
+    @Override
+    public void bufferData(CommandContext ctx, int target, int[] data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferData(target, data, usage);
+    }
+    
     @Deprecated
     @Override
     public int allocateBufferObject() {
@@ -1708,25 +1724,25 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBufferData(int target, float[] data, int usage) {
-        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
+        bufferData(VulkanicAPI.getImmediateContext(), target, data, usage);
     }
     
     @Deprecated
     @Override
     public void glBufferData(int target, int[] data, int usage) {
-        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
+        bufferData(VulkanicAPI.getImmediateContext(), target, data, usage);
     }
     
     @Deprecated
     @Override
     public void glBufferData(int target, java.nio.ByteBuffer data, int usage) {
-        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
+        bufferData(VulkanicAPI.getImmediateContext(), target, data, usage);
     }
     
     @Deprecated
     @Override
     public void glBufferData(int target, long size, int usage) {
-        org.lwjgl.opengl.GL32C.glBufferData(target, size, usage);
+        bufferData(VulkanicAPI.getImmediateContext(), target, size, usage);
     }
     
     @Deprecated
@@ -1948,7 +1964,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glPolygonMode(int face, int mode) {
-        org.lwjgl.opengl.GL43C.glPolygonMode(face, mode);
+        setPolygonMode(VulkanicAPI.getImmediateContext(), face, mode);
     }
     
     @Deprecated
@@ -1966,7 +1982,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBindBuffer(int target, int buffer) {
-        org.lwjgl.opengl.GL46C.glBindBuffer(target, buffer);
+        bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer);
     }
     
     @Deprecated
