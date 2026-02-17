@@ -54,7 +54,7 @@ public class SSAORenderer
 	{
 		if (this.ssaoFramebuffer != -1)
 		{
-			VulkanicAPI.destroyFramebufferObject(this.ssaoFramebuffer);
+			VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.ssaoFramebuffer);
 			this.ssaoFramebuffer = -1;
 		}
 		
@@ -64,7 +64,7 @@ public class SSAORenderer
 			this.ssaoTexture = -1;
 		}
 		
-		this.ssaoFramebuffer = VulkanicAPI.generateFramebufferObject();
+		this.ssaoFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.ssaoFramebuffer);
 		
 		this.ssaoTexture = GLMC.glGenTextures();

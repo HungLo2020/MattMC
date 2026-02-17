@@ -492,6 +492,20 @@ public interface GraphicsBackend {
     void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg);
     @Deprecated
     void fillBufferWithSize(int tgt, long sz, int usg);
+    
+    /**
+     * Updates a subset of a buffer object's data.
+     * 
+     * In OpenGL: Maps to glBufferSubData()
+     * In Vulkan: Maps to vkCmdUpdateBuffer() or memory mapping
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param offset Offset into the buffer where data starts
+     * @param data The data to copy into the buffer
+     */
+    void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data);
+    
     @Deprecated
     void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     
@@ -525,12 +539,36 @@ public interface GraphicsBackend {
     void selectVertexArray(int vao);
     
     // Buffer memory mapping
+    
+    /**
+     * Unmaps a previously mapped buffer object.
+     * 
+     * In OpenGL: Maps to glUnmapBuffer()
+     * In Vulkan: Maps to vkUnmapMemory()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_ARRAY_BUFFER)
+     */
+    void unmapBuffer(CommandContext ctx, int target);
+    
     @Deprecated
     java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc);
     @Deprecated
     void unmapBufferData(int tgt);
     
     // Framebuffer lifecycle
+    
+    /**
+     * Deletes a framebuffer object.
+     * 
+     * In OpenGL: Maps to glDeleteFramebuffers()
+     * In Vulkan: Maps to vkDestroyFramebuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @param fbo The framebuffer object ID to delete
+     */
+    void deleteFramebuffer(CommandContext ctx, int fbo);
+    
     @Deprecated
     int generateFramebufferObject();
     @Deprecated
@@ -706,6 +744,21 @@ public interface GraphicsBackend {
      * @param index The attribute index to enable
      */
     void enableVertexAttribArray(CommandContext ctx, int index);
+    
+    /**
+     * Configures a vertex attribute pointer for integer data.
+     * 
+     * In OpenGL: Maps to glVertexAttribIPointer()
+     * In Vulkan: Part of vertex input state in pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The attribute index
+     * @param size Number of components per attribute
+     * @param type Data type of each component
+     * @param stride Byte offset between consecutive attributes
+     * @param pointer Offset of the first component
+     */
+    void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type, int stride, long pointer);
     
     /**
      * Disables a vertex attribute array.

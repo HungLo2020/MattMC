@@ -459,10 +459,18 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBufferData(tgt, sz, usg);
     }
     
+    @Override
+    public void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferSubData(target, offset, data);
+    }
+    
     @Deprecated
     @Override
     public void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        GL15.glBufferSubData(tgt, off, dat);
+        bufferSubData(VulkanicAPI.getImmediateContext(), tgt, off, dat);
     }
     
     @Override
@@ -499,22 +507,38 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL30.glMapBufferRange(tgt, off, len, acc);
     }
     
+    @Override
+    public void unmapBuffer(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glUnmapBuffer(target);
+    }
+    
     @Deprecated
     @Override
     public void unmapBufferData(int tgt) {
-        GL15.glUnmapBuffer(tgt);
+        unmapBuffer(VulkanicAPI.getImmediateContext(), tgt);
     }
     
     @Deprecated
     @Override
     public int generateFramebufferObject() {
-        return GL30.glGenFramebuffers();
+        return createFramebuffer(VulkanicAPI.getImmediateContext());
+    }
+    
+    @Override
+    public void deleteFramebuffer(CommandContext ctx, int fbo) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glDeleteFramebuffers(fbo);
     }
     
     @Deprecated
     @Override
     public void destroyFramebufferObject(int fbo) {
-        GL30.glDeleteFramebuffers(fbo);
+        deleteFramebuffer(VulkanicAPI.getImmediateContext(), fbo);
     }
     
     @Deprecated
@@ -709,10 +733,18 @@ public class OpenGLBackend implements GraphicsBackend {
         setVertexAttribPointer(VulkanicAPI.getImmediateContext(), index, size, type, normalized, stride, pointer);
     }
     
+    @Override
+    public void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
+    }
+    
     @Deprecated
     @Override
     public void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
-        org.lwjgl.opengl.GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
+        setVertexAttribIPointer(VulkanicAPI.getImmediateContext(), index, size, type, stride, pointer);
     }
     
     @Deprecated

@@ -530,7 +530,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceChunkPosVbo);
 		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 3);
 		this.vertexAttribDivisor(3, 1);
-		VulkanicAPI.configureVertexAttributeInteger(3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
+		VulkanicAPI.setVertexAttribIPointer(VulkanicAPI.getImmediateContext(), 3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceSubChunkPosVbo);
 		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 4);
@@ -540,7 +540,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceMaterialVbo);
 		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 5);
 		this.vertexAttribDivisor(5, 1);
-		VulkanicAPI.configureVertexAttributeInteger(5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
+		VulkanicAPI.setVertexAttribIPointer(VulkanicAPI.getImmediateContext(), 5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
 		
 		
 		// Draw instanced

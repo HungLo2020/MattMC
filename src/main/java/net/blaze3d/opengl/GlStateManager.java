@@ -297,7 +297,7 @@ public class GlStateManager {
 
 	public static void _glBufferSubData(int i, int j, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.fillBufferSubregion(i, (long)j, byteBuffer);
+		net.vulkanic.VulkanicAPI.bufferSubData(net.vulkanic.VulkanicAPI.getImmediateContext(), i, (long)j, byteBuffer);
 	}
 
 	public static void _glBufferData(int i, long l, int j) {
@@ -313,7 +313,7 @@ public class GlStateManager {
 
 	public static void _glUnmapBuffer(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.unmapBufferData(i);
+		net.vulkanic.VulkanicAPI.unmapBuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void _glDeleteBuffers(int i) {
@@ -352,7 +352,7 @@ public class GlStateManager {
 
 	public static void _glDeleteFramebuffers(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.destroyFramebufferObject(i);
+		net.vulkanic.VulkanicAPI.deleteFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 		if (readFbo == i) {
 			readFbo = 0;
 		}
@@ -364,7 +364,7 @@ public class GlStateManager {
 
 	public static int glGenFramebuffers() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.generateFramebufferObject();
+		return net.vulkanic.VulkanicAPI.createFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext());
 	}
 
 	public static void _glFramebufferTexture2D(int i, int j, int k, int l, int m) {
@@ -563,7 +563,7 @@ public class GlStateManager {
 
 	public static void _vertexAttribIPointer(int i, int j, int k, int l, long m) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configureVertexAttributeInteger(i, j, k, l, m);
+		net.vulkanic.VulkanicAPI.setVertexAttribIPointer(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m);
 	}
 
 	public static void _enableVertexAttribArray(int i) {

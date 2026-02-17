@@ -191,11 +191,12 @@
 - [x] **Migrated seventh 5 methods** - attachShaderToProgram(), linkProgramBinary(), queryProgramParameter(), queryShaderParameter(), retrieveProgramInfoLog()
 - [x] **Migrated eighth 5 methods** - retrieveShaderInfoLog(), locateUniformVariable(), assignUniformInteger(), configureVertexAttribute(), activateVertexAttribute()
 - [x] **Migrated ninth 5 methods** - deactivateVertexAttribute(), bindAttributeLocation(), disposeProgramObject(), disposeShaderObject(), setVertexAttribDivisor()
-- [x] **45 of 283 deprecated methods migrated** (15.9% complete)
+- [x] **Migrated tenth 5 methods** - configureVertexAttributeInteger(), unmapBufferData(), fillBufferSubregion(), generateFramebufferObject(), destroyFramebufferObject()
+- [x] **50 of 283 deprecated methods migrated** (17.7% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 45 / 283 (15.9%)
+**Methods Migrated to CommandContext Pattern**: 50 / 283 (17.7%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -260,9 +261,16 @@
 4. ✅ disposeShaderObject(int) → deleteShader(CommandContext, int) - 3 call sites updated (1 in Sodium, 1 in GlStateManager, 1 in Distant Horizons)
 5. ✅ setVertexAttribDivisor(int, int) → setVertexAttribDivisor(CommandContext, int, int) - 2 call sites updated (2 in Distant Horizons)
 
-**Total Call Sites Updated**: 169
+**Batch 10 (Completed 2026-02-17 Morning)**:
+1. ✅ configureVertexAttributeInteger(int, int, int, int, long) → setVertexAttribIPointer(CommandContext, int, int, int, int, long) - 4 call sites updated (2 in Distant Horizons, 1 in Sodium, 1 in GlStateManager)
+2. ✅ unmapBufferData(int) → unmapBuffer(CommandContext, int) - 2 call sites updated (1 in Sodium, 1 in GlStateManager)
+3. ✅ fillBufferSubregion(int, long, ByteBuffer) → bufferSubData(CommandContext, int, long, ByteBuffer) - 1 call site updated (GlStateManager)
+4. ✅ generateFramebufferObject() → createFramebuffer(CommandContext) [reuses existing] - 6 call sites updated (1 in GlStateManager, 5 in Distant Horizons)
+5. ✅ destroyFramebufferObject(int) → deleteFramebuffer(CommandContext, int) - 6 call sites updated (1 in GlStateManager, 5 in Distant Horizons)
 
-**Remaining Deprecated Methods**: 238 (84.1%)
+**Total Call Sites Updated**: 188
+
+**Remaining Deprecated Methods**: 233 (82.3%)
 
 ### Blockers
 

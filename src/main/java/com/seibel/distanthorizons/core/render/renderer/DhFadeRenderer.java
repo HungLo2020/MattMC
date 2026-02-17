@@ -61,11 +61,11 @@ public class DhFadeRenderer
 	{
 		if (this.fadeFramebuffer != -1)
 		{
-			VulkanicAPI.destroyFramebufferObject(this.fadeFramebuffer);
+			VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.fadeFramebuffer);
 			this.fadeFramebuffer = -1;
 		}
 		
-		this.fadeFramebuffer = VulkanicAPI.generateFramebufferObject();
+		this.fadeFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fadeFramebuffer);
 		
 		

@@ -949,9 +949,13 @@ public class VulkanicAPI {
         getBackend().fillBufferWithSize(tgt, sz, usg);
     }
     
+    public static void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
+        getBackend().bufferSubData(ctx, target, offset, data);
+    }
+    
     @Deprecated
     public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        getBackend().fillBufferSubregion(tgt, off, dat);
+        bufferSubData(getImmediateContext(), tgt, off, dat);
     }
     
     public static int createVertexArray(CommandContext ctx) {
@@ -977,19 +981,27 @@ public class VulkanicAPI {
         return getBackend().mapBufferRegion(tgt, off, len, acc);
     }
     
+    public static void unmapBuffer(CommandContext ctx, int target) {
+        getBackend().unmapBuffer(ctx, target);
+    }
+    
     @Deprecated
     public static void unmapBufferData(int tgt) {
-        getBackend().unmapBufferData(tgt);
+        unmapBuffer(getImmediateContext(), tgt);
     }
     
     @Deprecated
     public static int generateFramebufferObject() {
-        return getBackend().generateFramebufferObject();
+        return createFramebuffer(getImmediateContext());
+    }
+    
+    public static void deleteFramebuffer(CommandContext ctx, int fbo) {
+        getBackend().deleteFramebuffer(ctx, fbo);
     }
     
     @Deprecated
     public static void destroyFramebufferObject(int fbo) {
-        getBackend().destroyFramebufferObject(fbo);
+        deleteFramebuffer(getImmediateContext(), fbo);
     }
     
     @Deprecated
@@ -1112,9 +1124,13 @@ public class VulkanicAPI {
         setVertexAttribPointer(getImmediateContext(), index, size, type, normalized, stride, pointer);
     }
     
+    public static void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
+        getBackend().setVertexAttribIPointer(ctx, index, size, type, stride, pointer);
+    }
+    
     @Deprecated
     public static void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
-        getBackend().configureVertexAttributeInteger(index, size, type, stride, pointer);
+        setVertexAttribIPointer(getImmediateContext(), index, size, type, stride, pointer);
     }
     
     @Deprecated
