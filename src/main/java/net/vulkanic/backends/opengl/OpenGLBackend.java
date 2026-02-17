@@ -272,24 +272,38 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
-        return org.lwjgl.opengl.ARBDirectStateAccess.glMapNamedBufferRange(buffer, offset, length, access);
+        // DSA delegation pattern: bind → call CommandContext version → restore
+        int prevBinding = org.lwjgl.opengl.GL15.glGetInteger(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER_BINDING);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, buffer);
+        java.nio.ByteBuffer result = mapBuffer(VulkanicAPI.getImmediateContext(), org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, offset, length, access);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, prevBinding);
+        return result;
     }
     
     @Deprecated
     @Override
     public void unmapNamedBufferDSA(int buffer) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glUnmapNamedBuffer(buffer);
+        // DSA delegation pattern: bind → call CommandContext version → restore
+        int prevBinding = org.lwjgl.opengl.GL15.glGetInteger(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER_BINDING);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, buffer);
+        unmapBuffer(VulkanicAPI.getImmediateContext(), org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
     @Deprecated
     @Override
     public void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glFlushMappedNamedBufferRange(buffer, offset, length);
+        // DSA delegation pattern: bind → call CommandContext version → restore
+        int prevBinding = org.lwjgl.opengl.GL15.glGetInteger(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER_BINDING);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, buffer);
+        flushMappedBufferRange(VulkanicAPI.getImmediateContext(), org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, offset, length);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
     @Deprecated
     @Override
     public void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        // Use direct ARB DSA call since binding would be complex
         org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size);
     }
     
@@ -297,7 +311,12 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
+        // DSA delegation pattern: bind framebuffer → call CommandContext version → restore
+        int prevBinding = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING);
+        org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, framebuffer);
+        // For DSA, we use GL_TEXTURE_2D as the default textarget since DSA doesn't specify it
+        framebufferTexture(VulkanicAPI.getImmediateContext(), org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, attachment, org.lwjgl.opengl.GL11.GL_TEXTURE_2D, texture, level);
+        org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, prevBinding);
     }
     
     @Deprecated
@@ -517,6 +536,22 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL44.glBufferStorage(target, data, flags);
+    }
+    
+    @Override
+    public void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL31.glCopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+    
+    @Override
+    public void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL30.glFlushMappedBufferRange(target, offset, length);
     }
     
     @Deprecated
@@ -1290,7 +1325,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
-        org.lwjgl.opengl.GL31.glCopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+        copyBufferSubData(VulkanicAPI.getImmediateContext(), readTarget, writeTarget, readOffset, writeOffset, size);
     }
     
     @Deprecated
@@ -1302,7 +1337,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void flushMappedBufferRange(int target, long offset, long length) {
-        org.lwjgl.opengl.GL30.glFlushMappedBufferRange(target, offset, length);
+        flushMappedBufferRange(VulkanicAPI.getImmediateContext(), target, offset, length);
     }
     
     @Deprecated

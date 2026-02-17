@@ -195,11 +195,12 @@
 - [x] **Migrated eleventh 5 methods** - allocateBufferObject(), releaseBufferObject(), fillBufferWithData(), fillBufferWithSize(), createVertexArrayObject()
 - [x] **Migrated twelfth 5 methods** - selectVertexArray(), mapBufferRegion(), copyFramebufferRegion(), bindTexture(), generateMipmap()
 - [x] **Migrated thirteenth batch (7 DSA methods)** - createBufferDSA(), namedBufferDataDSA() x2, namedBufferSubDataDSA(), namedBufferStorageDSA() x2, createBufferStorage() x2
-- [x] **67 of 283 deprecated methods migrated** (23.7% complete)
+- [x] **Migrated fourteenth batch (7 DSA buffer/framebuffer methods)** - mapNamedBufferRangeDSA(), unmapNamedBufferDSA(), flushMappedNamedBufferRangeDSA(), copyNamedBufferSubDataDSA(), namedFramebufferTextureDSA(), plus non-DSA versions of copyBufferSubData() and flushMappedBufferRange()
+- [x] **74 of 283 deprecated methods migrated** (26.1% complete)
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 67 / 283 (23.7%)
+**Methods Migrated to CommandContext Pattern**: 74 / 283 (26.1%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -294,9 +295,18 @@
 6. ✅ namedBufferStorageDSA(int, ByteBuffer, int) → bufferStorage(CommandContext, int, ByteBuffer, int) [new method] - 0 direct call sites (DSA wrapper)
 7. ✅ createBufferStorage(int, long, int) → bufferStorage(CommandContext, int, long, int) [delegates to new method] - used in DirectStateAccess.Emulated
 
-**Total Call Sites Updated**: 200 (DSA methods use internal delegation pattern)
+**Batch 14 (Completed 2026-02-17)**:
+1. ✅ mapNamedBufferRangeDSA(int, long, long, int) → mapBuffer(CommandContext, int, long, long, int) [DSA delegation pattern] - 0 direct call sites
+2. ✅ unmapNamedBufferDSA(int) → unmapBuffer(CommandContext, int) [DSA delegation pattern] - 0 direct call sites
+3. ✅ flushMappedNamedBufferRangeDSA(int, long, long) → flushMappedBufferRange(CommandContext, int, long, long) [new method + DSA delegation] - 0 direct call sites
+4. ✅ copyNamedBufferSubDataDSA(int, int, long, long, long) → copyBufferSubData(CommandContext, int, int, long, long, long) [new method, kept DSA impl] - 0 direct call sites
+5. ✅ namedFramebufferTextureDSA(int, int, int, int) → framebufferTexture(CommandContext, int, int, int, int, int) [DSA delegation pattern] - 0 direct call sites
+6. ✅ copyBufferSubData(int, int, long, long, long) → copyBufferSubData(CommandContext, ...) [new CommandContext version, deprecated delegates] - wrapper in VulkanicAPI
+7. ✅ flushMappedBufferRange(int, long, long) → flushMappedBufferRange(CommandContext, ...) [new CommandContext version, deprecated delegates] - wrapper in VulkanicAPI
 
-**Remaining Deprecated Methods**: 216 (76.3%)
+**Total Call Sites Updated**: 200 (DSA methods use internal delegation pattern or direct ARB calls)
+
+**Remaining Deprecated Methods**: 209 (73.9%)
 
 ### Blockers
 

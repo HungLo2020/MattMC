@@ -557,6 +557,34 @@ public interface GraphicsBackend {
      */
     void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags);
     
+    /**
+     * Copies data between buffer objects.
+     * 
+     * In OpenGL: Maps to glCopyBufferSubData()
+     * In Vulkan: Maps to vkCmdCopyBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @param readTarget The source buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param writeTarget The destination buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param readOffset Offset in source buffer
+     * @param writeOffset Offset in destination buffer
+     * @param size Number of bytes to copy
+     */
+    void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size);
+    
+    /**
+     * Flushes modifications to a mapped buffer range.
+     * 
+     * In OpenGL: Maps to glFlushMappedBufferRange()
+     * In Vulkan: Maps to vkFlushMappedMemoryRanges()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param offset Starting offset of the modified range
+     * @param length Length of the modified range in bytes
+     */
+    void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length);
+    
     @Deprecated
     void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     

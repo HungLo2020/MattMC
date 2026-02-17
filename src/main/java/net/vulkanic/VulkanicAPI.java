@@ -969,6 +969,14 @@ public class VulkanicAPI {
         getBackend().bufferStorage(ctx, target, data, flags);
     }
     
+    public static void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        getBackend().copyBufferSubData(ctx, readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+    
+    public static void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
+        getBackend().flushMappedBufferRange(ctx, target, offset, length);
+    }
+    
     @Deprecated
     public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
         bufferSubData(getImmediateContext(), tgt, off, dat);
@@ -1497,7 +1505,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
-        getBackend().copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+        copyBufferSubData(getImmediateContext(), readTarget, writeTarget, readOffset, writeOffset, size);
     }
     
     @Deprecated
@@ -1507,7 +1515,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void flushMappedBufferRange(int target, long offset, long length) {
-        getBackend().flushMappedBufferRange(target, offset, length);
+        flushMappedBufferRange(getImmediateContext(), target, offset, length);
     }
     
     @Deprecated
