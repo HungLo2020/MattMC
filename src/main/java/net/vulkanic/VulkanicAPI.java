@@ -790,6 +790,16 @@ public class VulkanicAPI {
     }
     
     /**
+     * Specifies a list of color buffers to be drawn into.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffers Array of buffers to draw into
+     */
+    public static void drawBuffers(CommandContext ctx, int[] buffers) {
+        getBackend().drawBuffers(ctx, buffers);
+    }
+    
+    /**
      * Sets the polygon rasterization mode.
      * 
      * @param ctx Command context for recording this command
@@ -1176,6 +1186,18 @@ public class VulkanicAPI {
     
     public static void setUniform1i(CommandContext ctx, int location, int value) {
         getBackend().setUniform1i(ctx, location, value);
+    }
+    
+    public static void setUniform1f(CommandContext ctx, int location, float value) {
+        getBackend().setUniform1f(ctx, location, value);
+    }
+    
+    public static void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        getBackend().setUniformMatrix4fv(ctx, location, transpose, matrix);
+    }
+    
+    public static void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        getBackend().setUniformMatrix4fv(ctx, location, transpose, matrix);
     }
     
     public static void setVertexAttribPointer(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {

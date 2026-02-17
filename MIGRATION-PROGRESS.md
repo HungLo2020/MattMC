@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | ⚠️ Required | Complete | 0% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (84/283) | Complete | 29.7% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🔴 <1% | 100% | Critical Gap |
+| **API Vulkan Compatibility** | 🟡 29.7% | 100% | Improving |
 
 ---
 
@@ -71,20 +71,20 @@
 
 ---
 
-## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ REQUIRED - Current Priority)
+## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 0% (Not Started)
+### Overall Phase Progress: 29.7% (84/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods using CommandContext: 2 (<1%)**
-- **Methods using immediate mode: 211 (99%)**
+- **Methods migrated to CommandContext: 84 (29.7%)**
+- **Methods using immediate mode: 199 (70.3%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: Current API cannot support Vulkan backend without fundamental redesign.
+**Conclusion**: API migration in progress. 84 methods now support CommandContext pattern, enabling future Vulkan backend.
 
 ### Required Work Breakdown
 
@@ -311,9 +311,17 @@
 4. ✅ glBindSampler(int, int) → bindSampler(CommandContext, int, int) - 2 call sites (Iris)
 5. ✅ glDetachShader(int, int) → detachShader(CommandContext, int, int) - 1 call site (Iris)
 
-**Total Call Sites Updated**: 216 (includes 16 from Batch 15)
+**Batch 16 (Completed 2026-02-17)**:
+1. ✅ glTexParameteri(int, int, int) → setTextureParameter(CommandContext, int, int, int) [reuses existing method] - 29 call sites (18 Distant Horizons, 1 Iris)
+2. ✅ glTexImage2D(int, int, int, int, int, int, int, int, ByteBuffer) → uploadTexture2D(CommandContext, ...) [reuses existing method] - 7 call sites (1 Iris, 6 Distant Horizons)
+3. ✅ glUniform1f(int, float) → setUniform1f(CommandContext, int, float) [new method] - 6 call sites (1 Iris, 2 Iris DH compat, 3 Distant Horizons)
+4. ✅ glUniformMatrix4fv(int, boolean, FloatBuffer/float[]) → setUniformMatrix4fv(CommandContext, ...) [new methods] - 5 call sites (2 Iris, 2 Iris DH compat, 1 Distant Horizons)
+5. ✅ glDrawBuffers(int[]) → drawBuffers(CommandContext, int[]) [new method] - 3 call sites (1 Iris, 2 Distant Horizons)
 
-**Remaining Deprecated Methods**: 204 (72.1%)
+**Total Call Sites Updated**: 266 (includes 50 from Batch 16)
+
+**Remaining Deprecated Methods**: 199 (70.3%)
+
 
 ### Blockers
 

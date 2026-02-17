@@ -73,7 +73,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	public void noDrawBuffers()
 	{
 		this.bind(); 
-		VulkanicAPI.glDrawBuffers(new int[]{VulkanicAPI.GL_NONE});
+		VulkanicAPI.drawBuffers(VulkanicAPI.getImmediateContext(), new int[]{VulkanicAPI.GL_NONE});
 	}
 	
 	public void drawBuffers(int[] buffers)
@@ -97,7 +97,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		}
 		
 		this.bind(); 
-		VulkanicAPI.glDrawBuffers(new int[]{VulkanicAPI.GL_NONE});
+		VulkanicAPI.drawBuffers(VulkanicAPI.getImmediateContext(), new int[]{VulkanicAPI.GL_NONE});
 	}
 	
 	public void readBuffer(int buffer)

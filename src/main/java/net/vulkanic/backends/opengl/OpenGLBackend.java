@@ -400,6 +400,14 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void drawBuffers(CommandContext ctx, int[] buffers) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glDrawBuffers(buffers);
+    }
+    
+    @Override
     public void setPolygonMode(CommandContext ctx, int face, int mode) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -845,6 +853,30 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform1i(location, value);
+    }
+    
+    @Override
+    public void setUniform1f(CommandContext ctx, int location, float value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform1f(location, value);
+    }
+    
+    @Override
+    public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniformMatrix4fv(location, transpose, matrix);
+    }
+    
+    @Override
+    public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniformMatrix4fv(location, transpose, matrix);
     }
     
     @Override
@@ -1492,7 +1524,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        org.lwjgl.opengl.GL32C.glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
+        uploadTexture2D(VulkanicAPI.getImmediateContext(), target, level, internalformat, width, height, border, format, type, pixels);
     }
     
     @Deprecated
@@ -1504,13 +1536,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix) {
-        org.lwjgl.opengl.GL32C.glUniformMatrix4fv(location, transpose, matrix);
+        setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, transpose, matrix);
     }
     
     @Deprecated
     @Override
     public void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
-        org.lwjgl.opengl.GL32C.glUniformMatrix4fv(location, transpose, matrix);
+        setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, transpose, matrix);
     }
     
     @Deprecated
@@ -1522,7 +1554,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glUniform1f(int location, float v0) {
-        org.lwjgl.opengl.GL32C.glUniform1f(location, v0);
+        setUniform1f(VulkanicAPI.getImmediateContext(), location, v0);
     }
     
     @Deprecated
@@ -1570,7 +1602,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glTexParameteri(int target, int pname, int param) {
-        org.lwjgl.opengl.GL32C.glTexParameteri(target, pname, param);
+        setTextureParameter(VulkanicAPI.getImmediateContext(), target, pname, param);
     }
     
     @Deprecated
@@ -1594,7 +1626,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glDrawBuffers(int[] buffers) {
-        org.lwjgl.opengl.GL32C.glDrawBuffers(buffers);
+        drawBuffers(VulkanicAPI.getImmediateContext(), buffers);
     }
     
     @Deprecated

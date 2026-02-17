@@ -381,6 +381,17 @@ public interface GraphicsBackend {
     void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
     
     /**
+     * Specifies a list of color buffers to be drawn into.
+     * 
+     * In OpenGL: Maps to glDrawBuffers()
+     * In Vulkan: Part of render pass subpass configuration
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffers Array of buffers to draw into (e.g., GL_COLOR_ATTACHMENT0)
+     */
+    void drawBuffers(CommandContext ctx, int[] buffers);
+    
+    /**
      * Sets the polygon rasterization mode.
      * 
      * In OpenGL: Maps to glPolygonMode()
@@ -884,6 +895,44 @@ public interface GraphicsBackend {
      * @param value The integer value to set
      */
     void setUniform1i(CommandContext ctx, int location, int value);
+    
+    /**
+     * Sets a float uniform value.
+     * 
+     * In OpenGL: Maps to glUniform1f()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param value The float value to set
+     */
+    void setUniform1f(CommandContext ctx, int location, float value);
+    
+    /**
+     * Sets a 4x4 matrix uniform value.
+     * 
+     * In OpenGL: Maps to glUniformMatrix4fv()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param transpose Whether to transpose the matrix
+     * @param matrix The matrix data
+     */
+    void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix);
+    
+    /**
+     * Sets a 4x4 matrix uniform value from a float array.
+     * 
+     * In OpenGL: Maps to glUniformMatrix4fv()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param transpose Whether to transpose the matrix
+     * @param matrix The matrix data array
+     */
+    void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix);
     
     /**
      * Configures a vertex attribute pointer.

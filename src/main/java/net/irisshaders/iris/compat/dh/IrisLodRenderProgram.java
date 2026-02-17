@@ -194,7 +194,7 @@ public class IrisLodRenderProgram {
 			matrix.get(buffer);
 			buffer.rewind();
 
-			VulkanicAPI.glUniformMatrix4fv(index, false, buffer);
+			VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), index, false, buffer);
 		}
 	}
 
@@ -268,7 +268,7 @@ public class IrisLodRenderProgram {
 	}
 
 	private void setUniform(int index, float value) {
-		VulkanicAPI.glUniform1f(index, value);
+		VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), index, value);
 	}
 
 	public void setModelPos(DhApiVec3f modelPos) {

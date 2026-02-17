@@ -89,7 +89,7 @@ public class IrisRenderSystem {
 	public static void texImage2D(int texture, int target, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		VulkanicAPI.glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
+		VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), target, level, internalformat, width, height, border, format, type, pixels);
 	}
 
 	public static void texImage3D(int texture, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, @Nullable ByteBuffer pixels) {
@@ -100,12 +100,12 @@ public class IrisRenderSystem {
 
 	public static void uniformMatrix4fv(int location, boolean transpose, FloatBuffer matrix) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniformMatrix4fv(location, transpose, matrix);
+		VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, transpose, matrix);
 	}
 
 	public static void uniformMatrix4fv(int location, boolean transpose, float[] matrix) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniformMatrix4fv(location, transpose, matrix);
+		VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, transpose, matrix);
 	}
 
 	public static void copyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
@@ -115,7 +115,7 @@ public class IrisRenderSystem {
 
 	public static void uniform1f(int location, float v0) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniform1f(location, v0);
+		VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), location, v0);
 	}
 
 	public static void uniform2f(int location, float v0, float v1) {
@@ -695,7 +695,7 @@ public class IrisRenderSystem {
 		@Override
 		public void texParameteri(int texture, int target, int pname, int param) {
 			bindTextureForSetup(target, texture);
-			VulkanicAPI.glTexParameteri(target, pname, param);
+			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), target, pname, param);
 			restoreTexture();
 		}
 
@@ -722,7 +722,7 @@ public class IrisRenderSystem {
 		@Override
 		public void drawBuffers(int framebuffer, int[] buffers) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glDrawBuffers(buffers);
+			VulkanicAPI.drawBuffers(VulkanicAPI.getImmediateContext(), buffers);
 		}
 
 		@Override

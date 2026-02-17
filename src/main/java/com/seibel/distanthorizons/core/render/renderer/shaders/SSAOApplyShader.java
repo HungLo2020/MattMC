@@ -86,14 +86,14 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		
 		if (this.gNearUniform >= 0)
 		{
-			VulkanicAPI.glUniform1f(this.gNearUniform,
+			VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), this.gNearUniform,
 					RenderUtil.getNearClipPlaneDistanceInBlocks(partialTicks));
 		}
 		
 		if (this.gFarUniform >= 0)
 		{
 			float farClipPlane = RenderUtil.getFarClipPlaneDistanceInBlocks();
-			VulkanicAPI.glUniform1f(this.gFarUniform, farClipPlane);
+			VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), this.gFarUniform, farClipPlane);
 		}
 	}
 	

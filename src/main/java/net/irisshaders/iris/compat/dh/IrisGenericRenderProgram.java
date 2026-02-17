@@ -219,7 +219,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 			matrix.get(buffer);
 			buffer.rewind();
 
-			VulkanicAPI.glUniformMatrix4fv(index, false, buffer);
+			VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), index, false, buffer);
 		}
 	}
 
@@ -350,7 +350,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	}
 
 	private void setUniform(int index, float value) {
-		VulkanicAPI.glUniform1f(index, value);
+		VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), index, value);
 	}
 
 	private void setUniform(int index, DhApiVec3f pos) {
