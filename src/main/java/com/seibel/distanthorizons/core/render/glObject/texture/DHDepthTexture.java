@@ -14,7 +14,7 @@ public class DHDepthTexture
 	private int id;
 	public DHDepthTexture(int width, int height, EDhDepthBufferFormat format)
 	{
-		this.id = VulkanicAPI.glGenTextures();
+		this.id = VulkanicAPI.createTexture2D(VulkanicAPI.getImmediateContext());
 		
 		this.resize(width, height, format);
 		

@@ -75,6 +75,26 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (enabled) {
+            GL30.glEnablei(capability, index);
+        } else {
+            GL30.glDisablei(capability, index);
+        }
+    }
+    
+    @Override
+    public void setCullFaceMode(CommandContext ctx, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glCullFace(mode);
+    }
+    
+    @Override
     public void bindShaderProgram(CommandContext ctx, int programId) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");

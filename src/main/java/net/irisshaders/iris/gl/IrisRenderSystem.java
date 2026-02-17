@@ -311,13 +311,13 @@ public class IrisRenderSystem {
 
 	public static void disableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glDisablei(VulkanicAPI.GL_BLEND, buffer);
+		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_BLEND, buffer, false);
 		((BooleanStateExtended) GlStateManager.BLEND.mode).setUnknownState();
 	}
 
 	public static void enableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glEnablei(VulkanicAPI.GL_BLEND, buffer);
+		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_BLEND, buffer, true);
 		((BooleanStateExtended) GlStateManager.BLEND.mode).setUnknownState();
 	}
 

@@ -218,7 +218,7 @@ public class DebugRenderer
 		t.multiply(boxTransform);
 		this.basicShader.setUniform(this.basicShader.getUniformLocation("uTransform"), t);
 		this.basicShader.setUniform(this.basicShader.getUniformLocation("uColor"), box.color);
-		VulkanicAPI.glDrawElements(VulkanicAPI.GL_LINES, BOX_OUTLINE_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
+		VulkanicAPI.drawElements(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_LINES, BOX_OUTLINE_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
 	}
 	
 	

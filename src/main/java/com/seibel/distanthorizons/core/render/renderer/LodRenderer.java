@@ -643,7 +643,8 @@ public class LodRenderer
 					
 					vbo.bind();
 					shaderProgram.bindVertexBuffer(vbo.getId());
-					VulkanicAPI.glDrawElements(
+					VulkanicAPI.drawElements(
+							VulkanicAPI.getImmediateContext(),
 							VulkanicAPI.GL_TRIANGLES,
 							(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
 							this.quadIBO.getType(), 0);

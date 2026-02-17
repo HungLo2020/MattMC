@@ -603,6 +603,28 @@ public class VulkanicAPI {
     }
     
     /**
+     * Enables or disables a capability for a specific buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param capability The capability to enable/disable
+     * @param index The buffer index
+     * @param enabled True to enable, false to disable
+     */
+    public static void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled) {
+        getBackend().setIndexedEnabled(ctx, capability, index, enabled);
+    }
+    
+    /**
+     * Sets the face culling mode.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The face culling mode
+     */
+    public static void setCullFaceMode(CommandContext ctx, int mode) {
+        getBackend().setCullFaceMode(ctx, mode);
+    }
+    
+    /**
      * Binds a shader program for use.
      * 
      * @param ctx Command context for recording this command
@@ -1958,12 +1980,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glDisablei(int target, int index) {
-        getBackend().glDisablei(target, index);
+        setIndexedEnabled(getImmediateContext(), target, index, false);
     }
     
     @Deprecated
     public static void glEnablei(int target, int index) {
-        getBackend().glEnablei(target, index);
+        setIndexedEnabled(getImmediateContext(), target, index, true);
     }
     
     @Deprecated
@@ -2201,7 +2223,7 @@ public class VulkanicAPI {
     // Additional rendering operations
     @Deprecated
     public static void glDrawElements(int mode, int count, int type, long indices) {
-        getBackend().glDrawElements(mode, count, type, indices);
+        drawElements(getImmediateContext(), mode, count, type, indices);
     }
     
     @Deprecated
@@ -2625,7 +2647,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glCullFace(int mode) {
-        getBackend().glCullFace(mode);
+        setCullFaceMode(getImmediateContext(), mode);
     }
     
     /**
@@ -2633,7 +2655,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static int glGenTextures() {
-        return getBackend().glGenTextures();
+        return createTexture2D(getImmediateContext());
     }
     
     /**

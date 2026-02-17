@@ -82,6 +82,30 @@ public interface GraphicsBackend {
     void setBlendEnabled(CommandContext ctx, boolean enabled);
     
     /**
+     * Enables or disables a capability for a specific buffer.
+     * 
+     * In OpenGL: Maps to glEnablei/glDisablei()
+     * In Vulkan: Part of pipeline state configuration
+     * 
+     * @param ctx Command context for recording this command
+     * @param capability The capability to enable/disable (e.g., GL_BLEND)
+     * @param index The buffer index
+     * @param enabled True to enable, false to disable
+     */
+    void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled);
+    
+    /**
+     * Sets the face culling mode.
+     * 
+     * In OpenGL: Maps to glCullFace()
+     * In Vulkan: Part of pipeline rasterization state
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The face culling mode (GL_FRONT, GL_BACK, GL_FRONT_AND_BACK)
+     */
+    void setCullFaceMode(CommandContext ctx, int mode);
+    
+    /**
      * Binds a shader program for use.
      * 
      * In OpenGL: Maps to glUseProgram()

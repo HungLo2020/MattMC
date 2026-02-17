@@ -41,7 +41,7 @@ public class DhColorTexture
 		this.width = builder.width;
 		this.height = builder.height;
 		
-		this.id = VulkanicAPI.glGenTextures();
+		this.id = VulkanicAPI.createTexture2D(VulkanicAPI.getImmediateContext());
 		
 		boolean isPixelFormatInteger = builder.internalFormat.getPixelFormat().isInteger();
 		this.setupTexture(this.id, builder.width, builder.height, !isPixelFormatInteger); // this binds the texture

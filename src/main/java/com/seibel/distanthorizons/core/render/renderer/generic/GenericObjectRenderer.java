@@ -625,7 +625,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 			Vec3d camPos)
 	{
 		shaderProgram.fillDirectUniformData(renderEventParam, boxGroup, box, camPos);
-		VulkanicAPI.glDrawElements(VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
+		VulkanicAPI.drawElements(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
 	}
 	
 	

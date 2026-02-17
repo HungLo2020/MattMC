@@ -235,7 +235,7 @@ public class GLState
 		{
 			GLMC.disableFaceCulling();
 		}
-		VulkanicAPI.glCullFace(this.cullMode);
+		VulkanicAPI.setCullFaceMode(VulkanicAPI.getImmediateContext(), this.cullMode);
 		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, this.polyMode);
 	}
 }
