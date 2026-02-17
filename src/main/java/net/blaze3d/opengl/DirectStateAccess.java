@@ -166,7 +166,7 @@ public abstract class DirectStateAccess {
 		void bufferStorage(int i, long l, int j) {
 			int k = this.selectBufferBindTarget(j);
 			GlStateManager._glBindBuffer(k, i);
-			VulkanicAPI.createBufferStorage(k, l, GlConst.bufferUsageToGlFlag(j));
+			VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), k, l, GlConst.bufferUsageToGlFlag(j));
 			GlStateManager._glBindBuffer(k, 0);
 		}
 
@@ -174,7 +174,7 @@ public abstract class DirectStateAccess {
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
 			int k = this.selectBufferBindTarget(j);
 			GlStateManager._glBindBuffer(k, i);
-			VulkanicAPI.createBufferStorage(k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
 			GlStateManager._glBindBuffer(k, 0);
 		}
 

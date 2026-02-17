@@ -716,7 +716,7 @@ public class IrisRenderSystem {
 		@Override
 		public void readBuffer(int framebuffer, int buffer) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glReadBuffer(buffer);
+			VulkanicAPI.setReadBuffer(VulkanicAPI.getImmediateContext(), buffer);
 		}
 
 		@Override

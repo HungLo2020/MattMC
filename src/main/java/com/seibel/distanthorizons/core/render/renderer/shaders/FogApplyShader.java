@@ -78,7 +78,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 	protected void onRender()
 	{
 		GLMC.enableBlend();
-		VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
 		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.

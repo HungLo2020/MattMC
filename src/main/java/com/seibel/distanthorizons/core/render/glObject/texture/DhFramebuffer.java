@@ -103,7 +103,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	public void readBuffer(int buffer)
 	{
 		this.bind();
-		VulkanicAPI.glReadBuffer(VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
+		VulkanicAPI.setReadBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
 	}
 	
 	public int getColorAttachment(int index) { return this.attachments.get(index); }

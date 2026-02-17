@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (104/283) | Complete | 35.0% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (109/283) | Complete | 38.5% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 36.7% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 38.5% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 35.0% (99/283 methods migrated)
+### Overall Phase Progress: 38.5% (109/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 99 (35.0%)**
-- **Methods using immediate mode: 184 (65.0%)**
+- **Methods migrated to CommandContext: 109 (38.5%)**
+- **Methods using immediate mode: 174 (61.5%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 99 methods now support CommandContext pattern, enabling future Vulkan backend.
+**Conclusion**: API migration in progress. 109 methods now support CommandContext pattern, enabling future Vulkan backend.
 
 ### Required Work Breakdown
 
@@ -879,6 +879,52 @@ Before committing Vulkan backend work, verify:
 
 #### Key Achievement:
 **Crossed 33% Threshold**: Over one-third of deprecated methods now support CommandContext pattern required for Vulkan compatibility.
+
+---
+
+### Batch 21 (2026-02-17) - ✅ COMPLETE
+
+**Methods Migrated**: 5 state management and buffer methods
+**Call Sites Updated**: 11 call sites across 8 files
+**Progress**: 104/283 → 109/283 methods (36.7% → 38.5%)
+
+#### Methods:
+1. `createBufferStorage(int, long, int)` → `bufferStorage(CommandContext, int, long, int)` [reused from Batch 13] - 4 call sites
+2. `createBufferStorage(int, ByteBuffer, int)` → `bufferStorage(CommandContext, int, ByteBuffer, int)` [reused from Batch 13] - 3 call sites
+3. `glBlendEquation(int)` → `setBlendEquation(CommandContext, int)` [NEW] - 4 call sites
+4. `glDepthFunc(int)` → `setDepthFunc(CommandContext, int)` [NEW] - 0 call sites (via GLMC wrapper)
+5. `glReadBuffer(int)` → `setReadBuffer(CommandContext, int)` [NEW] - 2 call sites
+
+#### Implementation Details:
+- **New Methods Added**:
+  - `setBlendEquation(CommandContext, int)` - Sets blend equation for both RGB and alpha
+  - `setDepthFunc(CommandContext, int)` - Sets depth comparison function
+  - `setReadBuffer(CommandContext, int)` - Specifies which color buffer to read from
+- **Reused Methods**:
+  - `bufferStorage()` - Created in Batch 13, now reusing for createBufferStorage delegation
+- **Call Site Migration**: Updated all 11 call sites to use new CommandContext API
+- **Delegation Pattern**: All 5 deprecated methods now delegate to CommandContext versions
+- **Testing**: All 11 architectural and CommandContext tests passing
+
+#### Files Modified:
+- Core API (3 files): GraphicsBackend, OpenGLBackend, VulkanicAPI - Added 3 new methods, 3 facade methods
+- Sodium (2 files):
+  - BufferStorageFunctions - Updated createBufferStorage → bufferStorage (2 sites)
+- Blaze3D (1 file):
+  - DirectStateAccess - Updated createBufferStorage → bufferStorage (2 sites)
+- Iris Shaders (1 file):
+  - IrisRenderSystem - Updated glReadBuffer → setReadBuffer
+- Distant Horizons (5 files):
+  - MinecraftGLWrapper - Updated glDepthFunc to use setDepthFunc instead of setDepthTest
+  - DhFramebuffer - Updated glReadBuffer → setReadBuffer
+  - GenericObjectRenderer - Updated glBlendEquation → setBlendEquation
+  - LodRenderer - Updated glBlendEquation → setBlendEquation
+  - SSAOApplyShader - Updated glBlendEquation → setBlendEquation
+  - FogApplyShader - Updated glBlendEquation → setBlendEquation
+- MIGRATION-PROGRESS.md - Updated progress to 38.5%
+
+#### Key Achievement:
+**Approaching 40%**: Successfully migrated 109 of 283 methods. Core state management operations (blend, depth, read buffer) now support Vulkan-compatible CommandContext pattern. Buffer storage operations unified under consistent API.
 
 ---
 

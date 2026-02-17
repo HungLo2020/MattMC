@@ -375,6 +375,48 @@ public interface GraphicsBackend {
     void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
     
     /**
+     * Sets the blend equation for both RGB and alpha components.
+     * 
+     * In OpenGL: Maps to glBlendEquation()
+     * In Vulkan: Part of pipeline blend state
+     * 
+     * Controls how source and destination colors are combined after applying blend factors.
+     * Common modes include GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT, GL_MIN, GL_MAX.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The blend equation mode
+     */
+    void setBlendEquation(CommandContext ctx, int mode);
+    
+    /**
+     * Sets the depth comparison function.
+     * 
+     * In OpenGL: Maps to glDepthFunc()
+     * In Vulkan: Part of pipeline depth/stencil state
+     * 
+     * Determines how incoming fragment depth values are compared against stored depth buffer values.
+     * Common functions include GL_LESS, GL_LEQUAL, GL_GREATER, GL_EQUAL, GL_ALWAYS, GL_NEVER.
+     * 
+     * @param ctx Command context for recording this command
+     * @param func The depth comparison function
+     */
+    void setDepthFunc(CommandContext ctx, int func);
+    
+    /**
+     * Specifies which color buffer to read from for read operations.
+     * 
+     * In OpenGL: Maps to glReadBuffer()
+     * In Vulkan: Maps to framebuffer attachment selection for read operations
+     * 
+     * Controls which color buffer is used as the source for operations like glReadPixels() and glCopyTexImage2D().
+     * Common values include GL_FRONT, GL_BACK, GL_COLOR_ATTACHMENT0, etc.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The color buffer to read from
+     */
+    void setReadBuffer(CommandContext ctx, int buffer);
+    
+    /**
      * Attaches a texture to a framebuffer attachment point.
      * 
      * In OpenGL: Maps to glFramebufferTexture2D()

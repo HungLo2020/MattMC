@@ -592,7 +592,7 @@ public class LodRenderer
 		{
 			GLMC.enableBlend();
 			GLMC.enableDepthTest();
-			VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+			VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
 			GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		}
 		else

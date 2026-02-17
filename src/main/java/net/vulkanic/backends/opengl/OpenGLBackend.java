@@ -404,6 +404,30 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void setBlendEquation(CommandContext ctx, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL14.glBlendEquation(mode);
+    }
+    
+    @Override
+    public void setDepthFunc(CommandContext ctx, int func) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glDepthFunc(func);
+    }
+    
+    @Override
+    public void setReadBuffer(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glReadBuffer(buffer);
+    }
+    
+    @Override
     public void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -1724,7 +1748,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glReadBuffer(int buffer) {
-        org.lwjgl.opengl.GL32C.glReadBuffer(buffer);
+        setReadBuffer(VulkanicAPI.getImmediateContext(), buffer);
     }
     
     @Deprecated
@@ -2195,7 +2219,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glBlendEquation(int mode) {
-        org.lwjgl.opengl.GL32.glBlendEquation(mode);
+        setBlendEquation(VulkanicAPI.getImmediateContext(), mode);
     }
     
     @Deprecated

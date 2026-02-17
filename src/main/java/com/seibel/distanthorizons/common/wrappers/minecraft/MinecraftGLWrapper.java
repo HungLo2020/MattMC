@@ -93,7 +93,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	public void glDepthFunc(int func) 
 	{ 
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setDepthTest(ctx, func);
+		VulkanicAPI.setDepthFunc(ctx, func);
 		GlStateManager._depthFunc(func); 
 	}
 	

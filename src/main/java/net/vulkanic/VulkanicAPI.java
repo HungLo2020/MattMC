@@ -1012,6 +1012,18 @@ public class VulkanicAPI {
         getBackend().setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
+    public static void setBlendEquation(CommandContext ctx, int mode) {
+        getBackend().setBlendEquation(ctx, mode);
+    }
+    
+    public static void setDepthFunc(CommandContext ctx, int func) {
+        getBackend().setDepthFunc(ctx, func);
+    }
+    
+    public static void setReadBuffer(CommandContext ctx, int buffer) {
+        getBackend().setReadBuffer(ctx, buffer);
+    }
+    
     
     @Deprecated
     public static int checkForErrors() {
@@ -1679,12 +1691,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void createBufferStorage(int target, long size, int flags) {
-        getBackend().createBufferStorage(target, size, flags);
+        bufferStorage(getImmediateContext(), target, size, flags);
     }
     
     @Deprecated
     public static void createBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
-        getBackend().createBufferStorage(target, data, flags);
+        bufferStorage(getImmediateContext(), target, data, flags);
     }
     
     @Deprecated
@@ -1843,7 +1855,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glReadBuffer(int buffer) {
-        getBackend().glReadBuffer(buffer);
+        setReadBuffer(getImmediateContext(), buffer);
     }
     
     @Deprecated
@@ -2236,7 +2248,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glBlendEquation(int mode) {
-        getBackend().glBlendEquation(mode);
+        setBlendEquation(getImmediateContext(), mode);
     }
     
     @Deprecated

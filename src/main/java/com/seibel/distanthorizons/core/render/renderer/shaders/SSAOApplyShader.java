@@ -107,7 +107,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	protected void onRender()
 	{
 		GLMC.enableBlend();
-		VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
 		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_ZERO, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_ONE);
 
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
