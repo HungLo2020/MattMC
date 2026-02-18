@@ -1844,4 +1844,55 @@ public interface GraphicsBackend {
     // Additional texture methods
     @Deprecated
     int glGenTextures();
+    
+    /**
+     * Dispatches compute shader work groups.
+     * 
+     * In OpenGL: Maps to glDispatchCompute()
+     * In Vulkan: Maps to vkCmdDispatch()
+     * 
+     * @param ctx Command context for recording this command
+     * @param workX Number of work groups in X dimension
+     * @param workY Number of work groups in Y dimension  
+     * @param workZ Number of work groups in Z dimension
+     */
+    void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ);
+    
+    /**
+     * Checks if a name corresponds to a buffer object.
+     * 
+     * In OpenGL: Maps to glIsBuffer()
+     * In Vulkan: Would check buffer handle validity
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer name to check
+     * @return true if buffer is a valid buffer object name
+     */
+    boolean isBuffer(CommandContext ctx, int buffer);
+    
+    /**
+     * Sets texture parameters using an array of integers.
+     * 
+     * In OpenGL: Maps to glTexParameteriv()
+     * In Vulkan: Maps to sampler or image view creation parameters
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Texture target (GL_TEXTURE_2D, etc.)
+     * @param pname Parameter name (GL_TEXTURE_BORDER_COLOR, etc.)
+     * @param params Array of parameter values
+     */
+    void texParameteriv(CommandContext ctx, int target, int pname, int[] params);
+    
+    /**
+     * Retrieves the index of a uniform block in a shader program.
+     * 
+     * In OpenGL: Maps to glGetUniformBlockIndex()
+     * In Vulkan: Maps to descriptor set layout binding queries
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program
+     * @param uniformBlockName Name of the uniform block
+     * @return The index of the uniform block, or GL_INVALID_INDEX if not found
+     */
+    int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName);
 }

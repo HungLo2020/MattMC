@@ -188,8 +188,8 @@ public class GLState
 		}
 		
 		VulkanicAPI.glBindVertexArray(VulkanicAPI.glIsVertexArray(this.vao) ? this.vao : 0);
-		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, VulkanicAPI.glIsBuffer(this.vbo) ? this.vbo : 0);
-		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, VulkanicAPI.glIsBuffer(this.ebo) ? this.ebo: 0);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, VulkanicAPI.isBuffer(VulkanicAPI.getImmediateContext(), this.vbo) ? this.vbo : 0);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, VulkanicAPI.isBuffer(VulkanicAPI.getImmediateContext(), this.ebo) ? this.ebo: 0);
 		VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), VulkanicAPI.glIsProgram(this.program) ? this.program : 0);
 		
 		if (this.writeToDepthBuffer)

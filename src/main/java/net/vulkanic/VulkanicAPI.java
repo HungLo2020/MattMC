@@ -1849,7 +1849,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glTexParameteriv(int target, int pname, int[] params) {
-        getBackend().glTexParameteriv(target, pname, params);
+        texParameteriv(getImmediateContext(), target, pname, params);
     }
     
     @Deprecated
@@ -1954,7 +1954,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static boolean glIsBuffer(int buffer) {
-        return getBackend().glIsBuffer(buffer);
+        return isBuffer(getImmediateContext(), buffer);
     }
     
     @Deprecated
@@ -2014,7 +2014,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glDispatchCompute(int workX, int workY, int workZ) {
-        getBackend().glDispatchCompute(workX, workY, workZ);
+        dispatchCompute(getImmediateContext(), workX, workY, workZ);
     }
     
     @Deprecated
@@ -2044,7 +2044,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static int glGetUniformBlockIndex(int program, String uniformBlockName) {
-        return getBackend().glGetUniformBlockIndex(program, uniformBlockName);
+        return getUniformBlockIndex(getImmediateContext(), program, uniformBlockName);
     }
     
     @Deprecated
@@ -2710,5 +2710,54 @@ public class VulkanicAPI {
     @Deprecated
     public static void glBindTexture(int target, int texture) {
         getBackend().bindTexture(target, texture);
+    }
+    
+    // CommandContext-aware methods for Batch 23
+    
+    /**
+     * Dispatches compute shader work groups.
+     * 
+     * @param ctx Command context for recording this command
+     * @param workX Number of work groups in X dimension
+     * @param workY Number of work groups in Y dimension
+     * @param workZ Number of work groups in Z dimension
+     */
+    public static void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        getBackend().dispatchCompute(ctx, workX, workY, workZ);
+    }
+    
+    /**
+     * Checks if a name corresponds to a buffer object.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer name to check
+     * @return true if buffer is a valid buffer object name
+     */
+    public static boolean isBuffer(CommandContext ctx, int buffer) {
+        return getBackend().isBuffer(ctx, buffer);
+    }
+    
+    /**
+     * Sets texture parameters using an array of integers.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Texture target
+     * @param pname Parameter name
+     * @param params Array of parameter values
+     */
+    public static void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
+        getBackend().texParameteriv(ctx, target, pname, params);
+    }
+    
+    /**
+     * Retrieves the index of a uniform block in a shader program.
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program
+     * @param uniformBlockName Name of the uniform block
+     * @return The index of the uniform block
+     */
+    public static int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
+        return getBackend().getUniformBlockIndex(ctx, program, uniformBlockName);
     }
 }

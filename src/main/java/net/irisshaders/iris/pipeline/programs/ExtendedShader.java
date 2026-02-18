@@ -236,7 +236,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 	@Override
 	public int iris$getBlockIndex(int program, CharSequence uniformBlockName) {
-		return VulkanicAPI.glGetUniformBlockIndex(program, "iris_" + uniformBlockName);
+		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), program, "iris_" + uniformBlockName);
 	}
 
 	@Override

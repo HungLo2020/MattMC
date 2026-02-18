@@ -290,11 +290,11 @@ public class IrisRenderSystem {
 	}
 
 	public static void dispatchCompute(int workX, int workY, int workZ) {
-		VulkanicAPI.glDispatchCompute(workX, workY, workZ);
+		VulkanicAPI.dispatchCompute(VulkanicAPI.getImmediateContext(), workX, workY, workZ);
 	}
 
 	public static void dispatchCompute(Vector3i workGroups) {
-		VulkanicAPI.glDispatchCompute(workGroups.x, workGroups.y, workGroups.z);
+		VulkanicAPI.dispatchCompute(VulkanicAPI.getImmediateContext(), workGroups.x, workGroups.y, workGroups.z);
 	}
 
 	public static void memoryBarrier(int barriers) {
@@ -334,7 +334,7 @@ public class IrisRenderSystem {
 
 	public static int getUniformBlockIndex(int program, String uniformBlockName) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.glGetUniformBlockIndex(program, uniformBlockName);
+		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), program, uniformBlockName);
 	}
 
 	public static void uniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
@@ -709,7 +709,7 @@ public class IrisRenderSystem {
 		@Override
 		public void texParameteriv(int texture, int target, int pname, int[] params) {
 			bindTextureForSetup(target, texture);
-			VulkanicAPI.glTexParameteriv(target, pname, params);
+			VulkanicAPI.texParameteriv(VulkanicAPI.getImmediateContext(), target, pname, params);
 			restoreTexture();
 		}
 

@@ -135,7 +135,7 @@ public class GLBuffer implements AutoCloseable
 		{
 			// destroy the buffer if it exists,
 			// the buffer may not exist if the destroy method is called twice
-			if (VulkanicAPI.glIsBuffer(id))
+			if (VulkanicAPI.isBuffer(VulkanicAPI.getImmediateContext(), id))
 			{
 				GLMC.glDeleteBuffers(id);
 				bufferCount.decrementAndGet();

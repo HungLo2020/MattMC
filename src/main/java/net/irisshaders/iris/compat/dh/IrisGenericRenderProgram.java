@@ -136,7 +136,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 		this.va = GlStateManager._glGenVertexArrays();
 		GlStateManager._glBindVertexArray(va);
-		VulkanicAPI.glVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, 0, 0);
+		VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), 0, 3, VulkanicAPI.GL_FLOAT, false, 0, 0);
 		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 0);
 
 		projectionUniform = tryGetUniformLocation2("iris_ProjectionMatrix");
@@ -278,7 +278,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	@Override
 	public void bindVertexBuffer(int i) {
 		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, i);
-		VulkanicAPI.glVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, 12, 0);
+		VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), 0, 3, VulkanicAPI.GL_FLOAT, false, 12, 0);
 	}
 
 	@Override

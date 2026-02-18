@@ -1760,7 +1760,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glTexParameteriv(int target, int pname, int[] params) {
-        org.lwjgl.opengl.GL32C.glTexParameteriv(target, pname, params);
+        texParameteriv(VulkanicAPI.getImmediateContext(), target, pname, params);
     }
     
     @Deprecated
@@ -1886,7 +1886,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public boolean glIsBuffer(int buffer) {
-        return org.lwjgl.opengl.GL32C.glIsBuffer(buffer);
+        return isBuffer(VulkanicAPI.getImmediateContext(), buffer);
     }
     
     @Deprecated
@@ -1970,7 +1970,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glDispatchCompute(int workX, int workY, int workZ) {
-        org.lwjgl.opengl.GL45C.glDispatchCompute(workX, workY, workZ);
+        dispatchCompute(VulkanicAPI.getImmediateContext(), workX, workY, workZ);
     }
     
     @Deprecated
@@ -2006,7 +2006,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public int glGetUniformBlockIndex(int program, String uniformBlockName) {
-        return org.lwjgl.opengl.GL32C.glGetUniformBlockIndex(program, uniformBlockName);
+        return getUniformBlockIndex(VulkanicAPI.getImmediateContext(), program, uniformBlockName);
     }
     
     @Deprecated
@@ -2548,5 +2548,37 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public int glGenTextures() {
         return org.lwjgl.opengl.GL11.glGenTextures();
+    }
+    
+    @Override
+    public void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL43.glDispatchCompute(workX, workY, workZ);
+    }
+    
+    @Override
+    public boolean isBuffer(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL15.glIsBuffer(buffer);
+    }
+    
+    @Override
+    public void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glTexParameteriv(target, pname, params);
+    }
+    
+    @Override
+    public int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL31.glGetUniformBlockIndex(program, uniformBlockName);
     }
 }
