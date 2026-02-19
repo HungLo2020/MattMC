@@ -229,6 +229,22 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexParameteri(target, pname, param);
     }
     
+    @Override
+    public void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    @Override
+    public int getTexParameteri(CommandContext ctx, int target, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL11.glGetTexParameteri(target, pname);
+    }
+    
     /**
      * Sets the dynamic scissor rectangle with explicit command context.
      * This is the Vulkan-compatible implementation for scissor control.

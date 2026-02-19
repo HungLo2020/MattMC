@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (184/283) | Complete | 65.0% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (189/283) | Complete | 66.8% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟢 65.0% | 100% | **🎉 Crossed 65% milestone!** |
+| **API Vulkan Compatibility** | 🟢 66.8% | 100% | **🎉 Crossed 66% milestone!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 65.0% (184/283 methods migrated)
+### Overall Phase Progress: 66.8% (189/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 184 (65.0%)**
-- **Methods using immediate mode: 99 (35.0%)**
+- **Methods migrated to CommandContext: 189 (66.8%)**
+- **Methods using immediate mode: 94 (33.2%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 184 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 65% milestone!**
+**Conclusion**: API migration in progress. 189 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 66% milestone - Two-thirds complete!**
 
 ### Required Work Breakdown
 
@@ -1235,6 +1235,27 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-19 (Update 10 - Batch 36 Complete)
+- Migrated 5 methods (texture operations, framebuffer blitting, program creation) to CommandContext pattern
+- Added 2 NEW CommandContext methods: copyTexSubImage2D, getTexParameteri
+- Leveraged 3 EXISTING CommandContext methods: blitFramebuffer, createShaderProgram, setAttributeLocation
+- Updated 8 call sites across Iris Shaders and Distant Horizons
+- Progress: 65.0% → 66.8% (184/283 → 189/283 methods migrated)
+- **MILESTONE**: Crossed 66% threshold - texture copy operations and program setup now Vulkan-ready
+- All architectural boundary tests passing (4/4)
+- All CommandContext tests passing (7/7)
+- Build successful with zero regressions
+- Key achievements:
+  - Texture copy operations migrated (glCopyTexSubImage2D → copyTexSubImage2D)
+  - Texture parameter queries migrated (glGetTexParameteri → getTexParameteri)
+  - Framebuffer blitting updated to use CommandContext (glBlitFramebuffer → blitFramebuffer)
+  - Program creation updated to use CommandContext (glCreateProgram → createShaderProgram)
+  - Attribute location binding updated to use CommandContext (glBindAttribLocation → setAttributeLocation)
+- Files modified: 7 total (GraphicsBackend, OpenGLBackend, VulkanicAPI, IrisRenderSystem, FinalPassRenderer, IrisGenericRenderProgram, ShaderProgram)
+- **PATTERN FOLLOWED**: All deprecated methods now delegate to CommandContext versions (no direct OpenGL calls)
+- **CALL SITES UPDATED**: All call sites now use new CommandContext API directly (not deprecated delegation)
+- **EFFICIENCY**: Reused 3 existing CommandContext methods instead of adding duplicates
 
 ### 2026-02-19 (Update 9 - Batch 34 Complete)
 - Migrated 5 texture and framebuffer methods to CommandContext pattern

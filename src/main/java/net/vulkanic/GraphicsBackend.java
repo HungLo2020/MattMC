@@ -502,6 +502,37 @@ public interface GraphicsBackend {
      */
     void setTextureParameter(CommandContext ctx, int target, int pname, int param);
     
+    /**
+     * Copies a region from the framebuffer to a texture subregion.
+     * 
+     * In OpenGL: Maps to glCopyTexSubImage2D()
+     * In Vulkan: Maps to vkCmdCopyImageToBuffer followed by vkCmdCopyBufferToImage
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param level The mipmap level
+     * @param xoffset The x offset in the texture
+     * @param yoffset The y offset in the texture
+     * @param x The x coordinate in the framebuffer
+     * @param y The y coordinate in the framebuffer
+     * @param width The width of the region
+     * @param height The height of the region
+     */
+    void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
+    
+    /**
+     * Gets a texture parameter value.
+     * 
+     * In OpenGL: Maps to glGetTexParameteri()
+     * In Vulkan: Queries sampler or image view properties
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param pname The parameter name
+     * @return The parameter value
+     */
+    int getTexParameteri(CommandContext ctx, int target, int pname);
+    
     // Direct State Access buffer operations
     @Deprecated
     int createBufferDSA();

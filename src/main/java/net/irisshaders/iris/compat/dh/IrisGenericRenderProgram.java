@@ -73,9 +73,9 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	// This will bind  AbstractVertexAttribute
 	private IrisGenericRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
-		id = VulkanicAPI.glCreateProgram();
+		id = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
 
-		VulkanicAPI.glBindAttribLocation(this.id, 0, "vPosition");
+		VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.id, 0, "vPosition");
 
 		this.bufferBlendOverrides = bufferBlendOverrides;
 

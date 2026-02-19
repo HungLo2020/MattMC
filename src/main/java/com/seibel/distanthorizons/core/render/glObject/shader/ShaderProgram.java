@@ -58,7 +58,7 @@ public class ShaderProgram
 	
 	public ShaderProgram(List<Supplier<String>> vertSupplierList, List<Supplier<String>> fragSupplierList, String[] attributes)
 	{
-		this.id = VulkanicAPI.glCreateProgram();
+		this.id = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
 		
 		for (Supplier<String> vertSupplier : vertSupplierList)
 		{
@@ -76,7 +76,7 @@ public class ShaderProgram
 		
 		for (int i = 0; i < attributes.length; i++)
 		{
-			VulkanicAPI.glBindAttribLocation(this.id, i, attributes[i]);
+			VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.id, i, attributes[i]);
 		}
 		VulkanicAPI.glLinkProgram(this.id);
 		

@@ -749,14 +749,14 @@ public class IrisRenderSystem {
 		@Override
 		public int getTexParameteri(int texture, int target, int pname) {
 			bindTextureForSetup(target, texture);
-			return VulkanicAPI.glGetTexParameteri(target, pname);
+			return VulkanicAPI.getTexParameteri(VulkanicAPI.getImmediateContext(), target, pname);
 		}
 
 		@Override
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
 			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 			GlStateManager._bindTexture(destTexture);
-			VulkanicAPI.glCopyTexSubImage2D(target, i, i1, i2, i3, i4, width, height);
+			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getImmediateContext(), target, i, i1, i2, i3, i4, width, height);
 			GlStateManager._bindTexture(previous);
 		}
 
@@ -785,7 +785,7 @@ public class IrisRenderSystem {
 		public void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, source);
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, dest);
-			VulkanicAPI.glBlitFramebuffer(offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
+			VulkanicAPI.blitFramebuffer(VulkanicAPI.getImmediateContext(), offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 		}
 
 		@Override

@@ -301,7 +301,7 @@ public class FinalPassRenderer {
 			swapPass.from.bind();
 
 			GlStateManager._bindTexture(swapPass.targetTexture);
-			VulkanicAPI.glCopyTexSubImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
+			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
 		}
 
 		// Make sure to reset the viewport to how it was before... Otherwise weird issues could occur.

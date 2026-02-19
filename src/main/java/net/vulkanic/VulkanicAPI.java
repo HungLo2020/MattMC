@@ -784,6 +784,35 @@ public class VulkanicAPI {
     }
     
     /**
+     * Copies a region from the framebuffer to a texture subregion.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param level The mipmap level
+     * @param xoffset The x offset in the texture
+     * @param yoffset The y offset in the texture
+     * @param x The x coordinate in the framebuffer
+     * @param y The y coordinate in the framebuffer
+     * @param width The width of the region
+     * @param height The height of the region
+     */
+    public static void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        getBackend().copyTexSubImage2D(ctx, target, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    /**
+     * Gets a texture parameter value.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param pname The parameter name
+     * @return The parameter value
+     */
+    public static int getTexParameteri(CommandContext ctx, int target, int pname) {
+        return getBackend().getTexParameteri(ctx, target, pname);
+    }
+    
+    /**
      * Attaches a texture to a framebuffer attachment point.
      * 
      * @param ctx Command context for recording this command
@@ -1851,7 +1880,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        getBackend().glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+        copyTexSubImage2D(getImmediateContext(), target, level, xoffset, yoffset, x, y, width, height);
     }
     
     // Debug object labeling (KHRDebug/GL43)
@@ -2157,7 +2186,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static int glGetTexParameteri(int target, int pname) {
-        return getBackend().glGetTexParameteri(target, pname);
+        return getTexParameteri(getImmediateContext(), target, pname);
     }
     
     public static void bindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format) {
@@ -2415,7 +2444,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        getBackend().glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+        blitFramebuffer(getImmediateContext(), srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
     // DSA (Direct State Access) methods - ARB versions
