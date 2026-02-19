@@ -1847,7 +1847,6 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.GL32C.glGetActiveUniform(program, index, size, type, name);
     }
     
-    @Deprecated
     @Override
     public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
         if (!ctx.isImmediate()) {
