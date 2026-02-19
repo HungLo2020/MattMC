@@ -1595,49 +1595,70 @@ public class VulkanicAPI {
         return getBackend().hasVertexAttribBindingExtension();
     }
     
-    @Deprecated
-    public static void setClearDepthValue(double depth) {
-        getBackend().setClearDepthValue(depth);
+    /**
+     * Sets the depth clear value for subsequent clear operations.
+     * @param ctx Command context
+     * @param depth The depth value (0.0 to 1.0)
+     */
+    public static void setClearDepth(CommandContext ctx, double depth) {
+        getBackend().setClearDepth(ctx, depth);
     }
     
-    @Deprecated
-    public static void setClearColorValue(float red, float green, float blue, float alpha) {
-        getBackend().setClearColorValue(red, green, blue, alpha);
+    /**
+     * Specifies the color buffer to draw into.
+     * @param ctx Command context
+     * @param mode The draw buffer target
+     */
+    public static void setDrawBuffer(CommandContext ctx, int mode) {
+        getBackend().setDrawBuffer(ctx, mode);
     }
     
-    @Deprecated
-    public static void selectDrawBuffer(int mode) {
-        getBackend().selectDrawBuffer(mode);
+    /**
+     * Renders indexed primitives with instancing and a base vertex.
+     * @param ctx Command context
+     */
+    public static void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        getBackend().drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, instanceCount, baseVertex);
     }
     
-    @Deprecated
-    public static void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
-        getBackend().renderIndexedInstancedWithBase(mode, count, type, indices, instanceCount, baseVertex);
+    /**
+     * Renders indexed primitives with a base vertex offset.
+     * @param ctx Command context
+     */
+    public static void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
+        getBackend().drawIndexedBaseVertex(ctx, mode, count, type, indices, baseVertex);
     }
     
-    @Deprecated
-    public static void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
-        getBackend().renderIndexedWithBase(mode, count, type, indices, baseVertex);
+    /**
+     * Renders indexed primitives with instancing.
+     * @param ctx Command context
+     */
+    public static void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+        getBackend().drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount);
     }
     
-    @Deprecated
-    public static void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
-        getBackend().renderIndexedInstanced(mode, count, type, indices, instanceCount);
+    /**
+     * Renders primitives using array data with instancing.
+     * @param ctx Command context
+     */
+    public static void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+        getBackend().drawArraysInstanced(ctx, mode, first, count, instanceCount);
     }
     
-    @Deprecated
-    public static void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
-        getBackend().renderArraysInstanced(mode, first, count, instanceCount);
+    /**
+     * Binds a range of a buffer to a uniform buffer binding point.
+     * @param ctx Command context
+     */
+    public static void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
+        getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size);
     }
     
-    @Deprecated
-    public static void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
-        getBackend().attachUniformBufferRange(target, index, buffer, offset, size);
-    }
-    
-    @Deprecated
-    public static void attachBufferToTexture(int target, int internalFormat, int buffer) {
-        getBackend().attachBufferToTexture(target, internalFormat, buffer);
+    /**
+     * Attaches a buffer object to a texture buffer.
+     * @param ctx Command context
+     */
+    public static void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer) {
+        getBackend().texBuffer(ctx, target, internalFormat, buffer);
     }
     
     @Deprecated

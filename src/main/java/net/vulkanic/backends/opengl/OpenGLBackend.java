@@ -475,6 +475,14 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void setClearDepth(CommandContext ctx, double depth) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glClearDepth(depth);
+    }
+    
+    @Override
     public void setViewport(CommandContext ctx, int x, int y, int width, int height) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -1374,57 +1382,59 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_vertex_attrib_binding;
     }
     
-    @Deprecated
     @Override
-    public void setClearDepthValue(double depth) {
-        org.lwjgl.opengl.GL11.glClearDepth(depth);
-    }
-    
-    @Deprecated
-    @Override
-    public void setClearColorValue(float red, float green, float blue, float alpha) {
-        org.lwjgl.opengl.GL11.glClearColor(red, green, blue, alpha);
-    }
-    
-    @Deprecated
-    @Override
-    public void selectDrawBuffer(int mode) {
+    public void setDrawBuffer(CommandContext ctx, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL11.glDrawBuffer(mode);
     }
     
-    @Deprecated
     @Override
-    public void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+    public void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
     }
     
-    @Deprecated
     @Override
-    public void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
+    public void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
     }
     
-    @Deprecated
     @Override
-    public void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
+    public void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
     }
     
-    @Deprecated
     @Override
-    public void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
+    public void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
     }
     
-    @Deprecated
     @Override
-    public void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
+    public void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32.glBindBufferRange(target, index, buffer, offset, size);
     }
     
-    @Deprecated
     @Override
-    public void attachBufferToTexture(int target, int internalFormat, int buffer) {
+    public void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL31.glTexBuffer(target, internalFormat, buffer);
     }
     

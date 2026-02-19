@@ -864,6 +864,17 @@ public interface GraphicsBackend {
     void setClearColor(CommandContext ctx, float r, float g, float b, float a);
     
     /**
+     * Sets the depth clear value used by subsequent clear operations.
+     * 
+     * In OpenGL: Maps to glClearDepth()
+     * In Vulkan: Part of VkRenderPassBeginInfo / vkCmdClearDepthStencilImage
+     * 
+     * @param ctx Command context for recording this command
+     * @param depth The depth clear value (0.0 to 1.0)
+     */
+    void setClearDepth(CommandContext ctx, double depth);
+    
+    /**
      * Sets the viewport transformation.
      * 
      * In OpenGL: Maps to glViewport()
@@ -2079,31 +2090,67 @@ public interface GraphicsBackend {
     
     // ARB vertex attrib binding operations (all callers migrated to bindVertexBuffer/setVertexAttrib* ctx methods)
     
-    // Clear operations
-    @Deprecated
-    void setClearDepthValue(double depth);
-    @Deprecated
-    void setClearColorValue(float red, float green, float blue, float alpha);
-    @Deprecated
-    void selectDrawBuffer(int mode);
+    // Clear operations (setClearDepth and setClearColor already declared earlier in this interface)
+    
+    /**
+     * Specifies the color buffer to draw into.
+     * In OpenGL: Maps to glDrawBuffer()
+     * In Vulkan: Part of render pass color attachments
+     * @param ctx Command context for recording this command
+     * @param mode The draw buffer target
+     */
+    void setDrawBuffer(CommandContext ctx, int mode);
     
     // Advanced drawing operations
-    @Deprecated
-    void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex);
-    @Deprecated
-    void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex);
-    @Deprecated
-    void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount);
-    @Deprecated
-    void renderArraysInstanced(int mode, int first, int count, int instanceCount);
+    /**
+     * Renders indexed primitives with instancing and a base vertex.
+     * In OpenGL: Maps to glDrawElementsInstancedBaseVertex()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with firstVertex parameter
+     * @param ctx Command context for recording this command
+     */
+    void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex);
+    
+    /**
+     * Renders indexed primitives with a base vertex offset.
+     * In OpenGL: Maps to glDrawElementsBaseVertex()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with vertexOffset parameter
+     * @param ctx Command context for recording this command
+     */
+    void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex);
+    
+    /**
+     * Renders indexed primitives with instancing.
+     * In OpenGL: Maps to glDrawElementsInstanced()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with instanceCount parameter
+     * @param ctx Command context for recording this command
+     */
+    void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount);
+    
+    /**
+     * Renders primitives using array data with instancing.
+     * In OpenGL: Maps to glDrawArraysInstanced()
+     * In Vulkan: Maps to vkCmdDraw() with instanceCount parameter
+     * @param ctx Command context for recording this command
+     */
+    void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount);
     
     // Uniform buffer operations
-    @Deprecated
-    void attachUniformBufferRange(int target, int index, int buffer, long offset, long size);
+    /**
+     * Binds a range of a buffer object to a uniform buffer binding point.
+     * In OpenGL: Maps to glBindBufferRange() with GL_UNIFORM_BUFFER target
+     * In Vulkan: Part of VkDescriptorBufferInfo / vkUpdateDescriptorSets
+     * @param ctx Command context for recording this command
+     */
+    void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size);
     
     // Texture buffer operations
-    @Deprecated
-    void attachBufferToTexture(int target, int internalFormat, int buffer);
+    /**
+     * Attaches a buffer object to a texture buffer object.
+     * In OpenGL: Maps to glTexBuffer()
+     * In Vulkan: Implemented via VK_EXT_texel_buffer
+     * @param ctx Command context for recording this command
+     */
+    void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer);
     
     // Uniform operations (additional)
     @Deprecated

@@ -444,7 +444,7 @@ public class LodRenderer
 		boolean clearTextures = !ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeTextureClearEvent.class, renderEventParam);
 		if (clearTextures)
 		{
-			VulkanicAPI.setClearDepthValue(1.0);
+			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), 1.0);
 			
 			float[] clearColorValues = new float[4];
 			VulkanicAPI.getFloatv(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
