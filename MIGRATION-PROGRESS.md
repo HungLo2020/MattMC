@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (149/283) | Complete | 52.7% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (154/283) | Complete | 54.4% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 52.7% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 54.4% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 52.7% (149/283 methods migrated)
+### Overall Phase Progress: 54.4% (154/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 149 (52.7%)**
-- **Methods using immediate mode: 134 (47.3%)**
+- **Methods migrated to CommandContext: 154 (54.4%)**
+- **Methods using immediate mode: 129 (45.6%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 149 methods now support CommandContext pattern, enabling future Vulkan backend. **Past 50% milestone!**
+**Conclusion**: API migration in progress. 154 methods now support CommandContext pattern, enabling future Vulkan backend. **Past 50% milestone, advancing toward 60%!**
 
 ### Required Work Breakdown
 
@@ -210,11 +210,12 @@
 - [x] **Migrated twenty-sixth batch (5 methods)** - glGetProgramInfoLog(), glGetShaderInfoLog(), glGetActiveUniform(), glGenBuffers(), glDeleteBuffers()
 - [x] **Migrated twenty-seventh batch (5 methods / 6 total)** - glGetProgramiv(), glBindImageTexture(), glMemoryBarrier(), glBlendFuncSeparatei(), glGenSamplers()/glDeleteSamplers()
 - [x] **Migrated twenty-eighth batch (5 methods)** - glClearColor(), glCheckFramebufferStatus(), glDispatchComputeIndirect(), glCopyImageSubData(), glBindSamplers()
-- [x] **149 of 283 deprecated methods migrated** (52.7% complete) - **PAST 50% MILESTONE**
+- [x] **Migrated twenty-ninth batch (5 methods)** - glGenerateTextureMipmap(), glTextureParameteri(), glTextureParameterf(), glTextureParameteriv(), glGetTextureParameteri()
+- [x] **154 of 283 deprecated methods migrated** (54.4% complete) - **ADVANCING TOWARD 60%**
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 149 / 283 (52.7%)
+**Methods Migrated to CommandContext Pattern**: 154 / 283 (54.4%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -386,9 +387,16 @@ Note: Batch 25 migrated 5 deprecated method families (7 individual methods total
 4. ✅ glCopyImageSubData(...) → copyImageSubData(CommandContext, ...) [new method] - 1 call site updated (IrisRenderSystem)
 5. ✅ glBindSamplers(int, int[]) → bindSamplers(CommandContext, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Total Call Sites Updated**: 361 (includes 5 from Batch 28)
+**Batch 29 (Completed 2026-02-19)**:
+1. ✅ glGenerateTextureMipmap(int) → generateTextureMipmapDSA(CommandContext, int) [new method] - 1 call site updated (IrisRenderSystem)
+2. ✅ glTextureParameteri(int, int, int) → textureParameteri(CommandContext, int, int, int) [new method] - 1 call site updated (IrisRenderSystem)
+3. ✅ glTextureParameterf(int, int, float) → textureParameterf(CommandContext, int, int, float) [new method] - 1 call site updated (IrisRenderSystem)
+4. ✅ glTextureParameteriv(int, int, int[]) → textureParameteriv(CommandContext, int, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
+5. ✅ glGetTextureParameteri(int, int) → getTextureParameteri(CommandContext, int, int) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Remaining Deprecated Methods**: 134 (47.3%)
+**Total Call Sites Updated**: 366 (includes 5 from Batch 29)
+
+**Remaining Deprecated Methods**: 129 (45.6%)
 
 
 ### Blockers

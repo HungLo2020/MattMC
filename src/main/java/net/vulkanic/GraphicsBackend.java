@@ -301,6 +301,69 @@ public interface GraphicsBackend {
     void generateTextureMipmap(CommandContext ctx, int target);
     
     /**
+     * Generates mipmaps for a texture using Direct State Access (DSA).
+     * 
+     * In OpenGL: Maps to glGenerateTextureMipmap() (DSA)
+     * In Vulkan: Requires vkCmdBlitImage or compute shader
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture object ID
+     */
+    void generateTextureMipmapDSA(CommandContext ctx, int texture);
+    
+    /**
+     * Sets an integer texture parameter using Direct State Access (DSA).
+     * 
+     * In OpenGL: Maps to glTextureParameteri() (DSA)
+     * In Vulkan: Part of sampler or image view creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture object ID
+     * @param pname The texture parameter name (e.g., GL_TEXTURE_MIN_FILTER)
+     * @param param The parameter value
+     */
+    void textureParameteri(CommandContext ctx, int texture, int pname, int param);
+    
+    /**
+     * Sets a float texture parameter using Direct State Access (DSA).
+     * 
+     * In OpenGL: Maps to glTextureParameterf() (DSA)
+     * In Vulkan: Part of sampler or image view creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture object ID
+     * @param pname The texture parameter name (e.g., GL_TEXTURE_LOD_BIAS)
+     * @param param The parameter value
+     */
+    void textureParameterf(CommandContext ctx, int texture, int pname, float param);
+    
+    /**
+     * Sets an integer array texture parameter using Direct State Access (DSA).
+     * 
+     * In OpenGL: Maps to glTextureParameteriv() (DSA)
+     * In Vulkan: Part of sampler or image view creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture object ID
+     * @param pname The texture parameter name (e.g., GL_TEXTURE_BORDER_COLOR)
+     * @param params The parameter values
+     */
+    void textureParameteriv(CommandContext ctx, int texture, int pname, int[] params);
+    
+    /**
+     * Gets an integer texture parameter using Direct State Access (DSA).
+     * 
+     * In OpenGL: Maps to glGetTextureParameteri() (DSA)
+     * In Vulkan: Queries sampler or image view properties
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture object ID
+     * @param pname The texture parameter name
+     * @return The parameter value
+     */
+    int getTextureParameteri(CommandContext ctx, int texture, int pname);
+    
+    /**
      * Sets pixel storage mode parameters.
      * 
      * In OpenGL: Maps to glPixelStorei()

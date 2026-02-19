@@ -583,22 +583,22 @@ public class IrisRenderSystem {
 
 		@Override
 		public void generateMipmaps(int texture, int target) {
-			VulkanicAPI.glGenerateTextureMipmap(texture);
+			VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getImmediateContext(), texture);
 		}
 
 		@Override
 		public void texParameteri(int texture, int target, int pname, int param) {
-			VulkanicAPI.glTextureParameteri(texture, pname, param);
+			VulkanicAPI.textureParameteri(VulkanicAPI.getImmediateContext(), texture, pname, param);
 		}
 
 		@Override
 		public void texParameterf(int texture, int target, int pname, float param) {
-			VulkanicAPI.glTextureParameterf(texture, pname, param);
+			VulkanicAPI.textureParameterf(VulkanicAPI.getImmediateContext(), texture, pname, param);
 		}
 
 		@Override
 		public void texParameteriv(int texture, int target, int pname, int[] params) {
-			VulkanicAPI.glTextureParameteriv(texture, pname, params);
+			VulkanicAPI.textureParameteriv(VulkanicAPI.getImmediateContext(), texture, pname, params);
 		}
 
 
@@ -629,7 +629,7 @@ public class IrisRenderSystem {
 
 		@Override
 		public int getTexParameteri(int texture, int target, int pname) {
-			return VulkanicAPI.glGetTextureParameteri(texture, pname);
+			return VulkanicAPI.getTextureParameteri(VulkanicAPI.getImmediateContext(), texture, pname);
 		}
 
 		@Override

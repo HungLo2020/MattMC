@@ -2362,28 +2362,60 @@ public class OpenGLBackend implements GraphicsBackend {
     
     // DSA methods
     
-    @Deprecated
     @Override
-    public void glGenerateTextureMipmap(int texture) {
+    public void generateTextureMipmapDSA(CommandContext ctx, int texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glGenerateTextureMipmap(texture);
     }
     
     @Deprecated
     @Override
-    public void glTextureParameteri(int texture, int pname, int param) {
+    public void glGenerateTextureMipmap(int texture) {
+        generateTextureMipmapDSA(VulkanicAPI.getImmediateContext(), texture);
+    }
+    
+    @Override
+    public void textureParameteri(CommandContext ctx, int texture, int pname, int param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri(texture, pname, param);
     }
     
     @Deprecated
     @Override
-    public void glTextureParameterf(int texture, int pname, float param) {
+    public void glTextureParameteri(int texture, int pname, int param) {
+        textureParameteri(VulkanicAPI.getImmediateContext(), texture, pname, param);
+    }
+    
+    @Override
+    public void textureParameterf(CommandContext ctx, int texture, int pname, float param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameterf(texture, pname, param);
     }
     
     @Deprecated
     @Override
-    public void glTextureParameteriv(int texture, int pname, int[] params) {
+    public void glTextureParameterf(int texture, int pname, float param) {
+        textureParameterf(VulkanicAPI.getImmediateContext(), texture, pname, param);
+    }
+    
+    @Override
+    public void textureParameteriv(CommandContext ctx, int texture, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteriv(texture, pname, params);
+    }
+    
+    @Deprecated
+    @Override
+    public void glTextureParameteriv(int texture, int pname, int[] params) {
+        textureParameteriv(VulkanicAPI.getImmediateContext(), texture, pname, params);
     }
     
     @Deprecated
@@ -2416,10 +2448,18 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
     }
     
+    @Override
+    public int getTextureParameteri(CommandContext ctx, int texture, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureParameteri(texture, pname);
+    }
+    
     @Deprecated
     @Override
     public int glGetTextureParameteri(int texture, int pname) {
-        return org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureParameteri(texture, pname);
+        return getTextureParameteri(VulkanicAPI.getImmediateContext(), texture, pname);
     }
     
     @Deprecated

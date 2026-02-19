@@ -2285,24 +2285,40 @@ public class VulkanicAPI {
     
     // DSA (Direct State Access) methods - ARB versions
     
+    public static void generateTextureMipmapDSA(CommandContext ctx, int texture) {
+        getBackend().generateTextureMipmapDSA(ctx, texture);
+    }
+    
     @Deprecated
     public static void glGenerateTextureMipmap(int texture) {
-        getBackend().glGenerateTextureMipmap(texture);
+        generateTextureMipmapDSA(getImmediateContext(), texture);
+    }
+    
+    public static void textureParameteri(CommandContext ctx, int texture, int pname, int param) {
+        getBackend().textureParameteri(ctx, texture, pname, param);
     }
     
     @Deprecated
     public static void glTextureParameteri(int texture, int pname, int param) {
-        getBackend().glTextureParameteri(texture, pname, param);
+        textureParameteri(getImmediateContext(), texture, pname, param);
+    }
+    
+    public static void textureParameterf(CommandContext ctx, int texture, int pname, float param) {
+        getBackend().textureParameterf(ctx, texture, pname, param);
     }
     
     @Deprecated
     public static void glTextureParameterf(int texture, int pname, float param) {
-        getBackend().glTextureParameterf(texture, pname, param);
+        textureParameterf(getImmediateContext(), texture, pname, param);
+    }
+    
+    public static void textureParameteriv(CommandContext ctx, int texture, int pname, int[] params) {
+        getBackend().textureParameteriv(ctx, texture, pname, params);
     }
     
     @Deprecated
     public static void glTextureParameteriv(int texture, int pname, int[] params) {
-        getBackend().glTextureParameteriv(texture, pname, params);
+        textureParameteriv(getImmediateContext(), texture, pname, params);
     }
     
     @Deprecated
@@ -2330,9 +2346,13 @@ public class VulkanicAPI {
         getBackend().glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
     }
     
+    public static int getTextureParameteri(CommandContext ctx, int texture, int pname) {
+        return getBackend().getTextureParameteri(ctx, texture, pname);
+    }
+    
     @Deprecated
     public static int glGetTextureParameteri(int texture, int pname) {
-        return getBackend().glGetTextureParameteri(texture, pname);
+        return getTextureParameteri(getImmediateContext(), texture, pname);
     }
     
     @Deprecated
