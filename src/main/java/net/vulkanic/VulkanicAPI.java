@@ -2321,29 +2321,49 @@ public class VulkanicAPI {
         textureParameteriv(getImmediateContext(), texture, pname, params);
     }
     
+    public static void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
+        getBackend().namedFramebufferReadBuffer(ctx, framebuffer, mode);
+    }
+    
     @Deprecated
     public static void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
-        getBackend().glNamedFramebufferReadBuffer(framebuffer, mode);
+        namedFramebufferReadBuffer(getImmediateContext(), framebuffer, mode);
+    }
+    
+    public static void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
+        getBackend().namedFramebufferDrawBuffers(ctx, framebuffer, bufs);
     }
     
     @Deprecated
     public static void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
-        getBackend().glNamedFramebufferDrawBuffers(framebuffer, bufs);
+        namedFramebufferDrawBuffers(getImmediateContext(), framebuffer, bufs);
+    }
+    
+    public static void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value) {
+        getBackend().clearNamedFramebufferfv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
     @Deprecated
     public static void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
-        getBackend().glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, value);
+        clearNamedFramebufferfv(getImmediateContext(), framebuffer, buffer, drawbuffer, value);
+    }
+    
+    public static void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        getBackend().clearNamedFramebufferiv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
     @Deprecated
     public static void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
-        getBackend().glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, value);
+        clearNamedFramebufferiv(getImmediateContext(), framebuffer, buffer, drawbuffer, value);
+    }
+    
+    public static void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        getBackend().clearNamedFramebufferuiv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
     @Deprecated
     public static void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
-        getBackend().glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
+        clearNamedFramebufferuiv(getImmediateContext(), framebuffer, buffer, drawbuffer, value);
     }
     
     public static int getTextureParameteri(CommandContext ctx, int texture, int pname) {

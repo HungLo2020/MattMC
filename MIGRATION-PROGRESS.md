@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (154/283) | Complete | 54.4% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (159/283) | Complete | 56.2% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 54.4% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 56.2% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 54.4% (154/283 methods migrated)
+### Overall Phase Progress: 56.2% (159/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 154 (54.4%)**
-- **Methods using immediate mode: 129 (45.6%)**
+- **Methods migrated to CommandContext: 159 (56.2%)**
+- **Methods using immediate mode: 124 (43.8%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 154 methods now support CommandContext pattern, enabling future Vulkan backend. **Past 50% milestone, advancing toward 60%!**
+**Conclusion**: API migration in progress. 159 methods now support CommandContext pattern, enabling future Vulkan backend. **Past 50% milestone, advancing toward 60%!**
 
 ### Required Work Breakdown
 
@@ -211,11 +211,12 @@
 - [x] **Migrated twenty-seventh batch (5 methods / 6 total)** - glGetProgramiv(), glBindImageTexture(), glMemoryBarrier(), glBlendFuncSeparatei(), glGenSamplers()/glDeleteSamplers()
 - [x] **Migrated twenty-eighth batch (5 methods)** - glClearColor(), glCheckFramebufferStatus(), glDispatchComputeIndirect(), glCopyImageSubData(), glBindSamplers()
 - [x] **Migrated twenty-ninth batch (5 methods)** - glGenerateTextureMipmap(), glTextureParameteri(), glTextureParameterf(), glTextureParameteriv(), glGetTextureParameteri()
-- [x] **154 of 283 deprecated methods migrated** (54.4% complete) - **ADVANCING TOWARD 60%**
+- [x] **Migrated thirtieth batch (5 methods)** - glNamedFramebufferReadBuffer(), glNamedFramebufferDrawBuffers(), glClearNamedFramebufferfv(), glClearNamedFramebufferiv(), glClearNamedFramebufferuiv()
+- [x] **159 of 283 deprecated methods migrated** (56.2% complete) - **ADVANCING TOWARD 60%**
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 154 / 283 (54.4%)
+**Methods Migrated to CommandContext Pattern**: 159 / 283 (56.2%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -394,9 +395,16 @@ Note: Batch 25 migrated 5 deprecated method families (7 individual methods total
 4. ✅ glTextureParameteriv(int, int, int[]) → textureParameteriv(CommandContext, int, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
 5. ✅ glGetTextureParameteri(int, int) → getTextureParameteri(CommandContext, int, int) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Total Call Sites Updated**: 366 (includes 5 from Batch 29)
+**Batch 30 (Completed 2026-02-19)**:
+1. ✅ glNamedFramebufferReadBuffer(int, int) → namedFramebufferReadBuffer(CommandContext, int, int) [new method] - 1 call site updated (IrisRenderSystem)
+2. ✅ glNamedFramebufferDrawBuffers(int, int[]) → namedFramebufferDrawBuffers(CommandContext, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
+3. ✅ glClearNamedFramebufferfv(int, int, int, float[]) → clearNamedFramebufferfv(CommandContext, int, int, int, float[]) [new method] - 1 call site updated (IrisRenderSystem)
+4. ✅ glClearNamedFramebufferiv(int, int, int, int[]) → clearNamedFramebufferiv(CommandContext, int, int, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
+5. ✅ glClearNamedFramebufferuiv(int, int, int, int[]) → clearNamedFramebufferuiv(CommandContext, int, int, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Remaining Deprecated Methods**: 129 (45.6%)
+**Total Call Sites Updated**: 371 (includes 5 from Batch 30)
+
+**Remaining Deprecated Methods**: 124 (43.8%)
 
 
 ### Blockers

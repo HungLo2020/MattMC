@@ -604,27 +604,27 @@ public class IrisRenderSystem {
 
 		@Override
 		public void readBuffer(int framebuffer, int buffer) {
-			VulkanicAPI.glNamedFramebufferReadBuffer(framebuffer, buffer);
+			VulkanicAPI.namedFramebufferReadBuffer(VulkanicAPI.getImmediateContext(), framebuffer, buffer);
 		}
 
 		@Override
 		public void drawBuffers(int framebuffer, int[] buffers) {
-			VulkanicAPI.glNamedFramebufferDrawBuffers(framebuffer, buffers);
+			VulkanicAPI.namedFramebufferDrawBuffers(VulkanicAPI.getImmediateContext(), framebuffer, buffers);
 		}
 
 		@Override
 		public void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
-			VulkanicAPI.glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.clearNamedFramebufferfv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			VulkanicAPI.glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.clearNamedFramebufferiv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			VulkanicAPI.glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.clearNamedFramebufferuiv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override

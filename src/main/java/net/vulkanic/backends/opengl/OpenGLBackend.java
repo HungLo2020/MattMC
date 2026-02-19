@@ -2418,34 +2418,74 @@ public class OpenGLBackend implements GraphicsBackend {
         textureParameteriv(VulkanicAPI.getImmediateContext(), texture, pname, params);
     }
     
-    @Deprecated
     @Override
-    public void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
+    public void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferReadBuffer(framebuffer, mode);
     }
     
     @Deprecated
     @Override
-    public void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
+    public void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
+        namedFramebufferReadBuffer(VulkanicAPI.getImmediateContext(), framebuffer, mode);
+    }
+    
+    @Override
+    public void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferDrawBuffers(framebuffer, bufs);
     }
     
     @Deprecated
     @Override
-    public void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
+    public void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
+        namedFramebufferDrawBuffers(VulkanicAPI.getImmediateContext(), framebuffer, bufs);
+    }
+    
+    @Override
+    public void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, value);
     }
     
     @Deprecated
     @Override
-    public void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+    public void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
+        clearNamedFramebufferfv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, value);
+    }
+    
+    @Override
+    public void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, value);
     }
     
     @Deprecated
     @Override
-    public void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+    public void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+        clearNamedFramebufferiv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, value);
+    }
+    
+    @Override
+    public void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
+    }
+    
+    @Deprecated
+    @Override
+    public void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+        clearNamedFramebufferuiv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, value);
     }
     
     @Override

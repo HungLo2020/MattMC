@@ -388,6 +388,72 @@ public interface GraphicsBackend {
     void bindFramebuffer(CommandContext ctx, int target, int fbo);
     
     /**
+     * Sets the read buffer for a named framebuffer using Direct State Access.
+     * 
+     * In OpenGL: Maps to glNamedFramebufferReadBuffer() (DSA)
+     * In Vulkan: Part of render pass configuration
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object ID
+     * @param mode The read buffer mode (e.g., GL_COLOR_ATTACHMENT0)
+     */
+    void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode);
+    
+    /**
+     * Sets the draw buffers for a named framebuffer using Direct State Access.
+     * 
+     * In OpenGL: Maps to glNamedFramebufferDrawBuffers() (DSA)
+     * In Vulkan: Part of render pass configuration
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object ID
+     * @param bufs Array of draw buffer attachments
+     */
+    void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs);
+    
+    /**
+     * Clears a float buffer in a named framebuffer using Direct State Access.
+     * 
+     * In OpenGL: Maps to glClearNamedFramebufferfv() (DSA)
+     * In Vulkan: Part of vkCmdClearAttachments
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object ID
+     * @param buffer The buffer to clear (e.g., GL_COLOR, GL_DEPTH)
+     * @param drawbuffer The draw buffer index
+     * @param value The clear value
+     */
+    void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value);
+    
+    /**
+     * Clears an integer buffer in a named framebuffer using Direct State Access.
+     * 
+     * In OpenGL: Maps to glClearNamedFramebufferiv() (DSA)
+     * In Vulkan: Part of vkCmdClearAttachments
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object ID
+     * @param buffer The buffer to clear (e.g., GL_COLOR, GL_STENCIL)
+     * @param drawbuffer The draw buffer index
+     * @param value The clear value
+     */
+    void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value);
+    
+    /**
+     * Clears an unsigned integer buffer in a named framebuffer using Direct State Access.
+     * 
+     * In OpenGL: Maps to glClearNamedFramebufferuiv() (DSA)
+     * In Vulkan: Part of vkCmdClearAttachments
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object ID
+     * @param buffer The buffer to clear (e.g., GL_COLOR)
+     * @param drawbuffer The draw buffer index
+     * @param value The clear value
+     */
+    void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value);
+    
+    /**
      * Binds a buffer object to a target.
      * 
      * In OpenGL: Maps to glBindBuffer()
