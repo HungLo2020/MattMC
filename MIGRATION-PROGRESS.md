@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (134/283) | Complete | 47.3% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (139/283) | Complete | 49.1% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 47.3% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 49.1% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 47.3% (134/283 methods migrated)
+### Overall Phase Progress: 49.1% (139/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 134 (47.3%)**
-- **Methods using immediate mode: 149 (52.7%)**
+- **Methods migrated to CommandContext: 139 (49.1%)**
+- **Methods using immediate mode: 144 (50.9%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 134 methods now support CommandContext pattern, enabling future Vulkan backend.
+**Conclusion**: API migration in progress. 139 methods now support CommandContext pattern, enabling future Vulkan backend. Almost at 50% milestone!
 
 ### Required Work Breakdown
 
@@ -206,12 +206,13 @@
 - [x] **Migrated twenty-second batch (6 methods)** - glUniform2f(), glUniform3i(), glUniform4f(), glUniformMatrix3fv() x2, glGetAttribLocation()
 - [x] **Migrated twenty-third batch (5 methods)** - checkForErrors(), glUniform4i(), glReadPixels(), glGetStringi(), glGetIntegerv()
 - [x] **Migrated twenty-fourth batch (5 methods)** - glGetFloatv(), glTexImage1D(), glTexImage3D(), glCopyTexImage2D(), glUniform2i()
-- [x] **Migrated twenty-fifth batch (5 methods)** - glTexParameteriv(), glBufferStorage() x2, glVertexAttrib4f(), glSamplerParameteri/f/iv() x3
-- [x] **134 of 283 deprecated methods migrated** (47.3% complete) - **APPROACHING 50% MILESTONE**
+- [x] **Migrated twenty-fifth batch (5 method families / 7 methods)** - glTexParameteriv(), glBufferStorage() x2, glVertexAttrib4f(), glSamplerParameteri/f/iv() x3
+- [x] **Migrated twenty-sixth batch (5 methods)** - glGetProgramInfoLog(), glGetShaderInfoLog(), glGetActiveUniform(), glGenBuffers(), glDeleteBuffers()
+- [x] **139 of 283 deprecated methods migrated** (49.1% complete) - **ALMOST AT 50% MILESTONE**
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 134 / 283 (47.3%)
+**Methods Migrated to CommandContext Pattern**: 139 / 283 (49.1%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -361,9 +362,16 @@
 
 Note: Batch 25 migrated 5 deprecated method families (7 individual methods total: 3 that already had CommandContext versions + 4 new methods)
 
-**Total Call Sites Updated**: 345 (includes 6 from Batch 25)
+**Batch 26 (Completed 2026-02-19)**:
+1. ✅ glGetProgramInfoLog(int) → getProgramInfoLog(CommandContext, int) [already had CommandContext version] - 1 call site updated (IrisRenderSystem)
+2. ✅ glGetShaderInfoLog(int) → getShaderInfoLog(CommandContext, int) [already had CommandContext version] - 1 call site updated (IrisRenderSystem)
+3. ✅ glGetActiveUniform(...) → getActiveUniform(CommandContext, ...) [new method] - 1 call site updated (IrisRenderSystem)
+4. ✅ glGenBuffers(int[]) → createBuffers(CommandContext, int[]) [new method] - 1 call site updated (IrisRenderSystem)
+5. ✅ glDeleteBuffers(int) → deleteBuffer(CommandContext, int) [already had CommandContext version] - 1 call site updated (IrisRenderSystem)
 
-**Remaining Deprecated Methods**: 149 (52.7%)
+**Total Call Sites Updated**: 350 (includes 5 from Batch 26)
+
+**Remaining Deprecated Methods**: 144 (50.9%)
 
 
 ### Blockers

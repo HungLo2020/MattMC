@@ -707,6 +707,17 @@ public interface GraphicsBackend {
     int createBuffer(CommandContext ctx);
     
     /**
+     * Creates multiple buffer objects.
+     * 
+     * In OpenGL: Maps to glGenBuffers()
+     * In Vulkan: Maps to multiple vkCreateBuffer() calls
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffers Array to receive the buffer object IDs
+     */
+    void createBuffers(CommandContext ctx, int[] buffers);
+    
+    /**
      * Deletes a buffer object.
      * 
      * In OpenGL: Maps to glDeleteBuffers()
@@ -1073,6 +1084,22 @@ public interface GraphicsBackend {
      * @return The information log string
      */
     String getShaderInfoLog(CommandContext ctx, int shader);
+    
+    /**
+     * Retrieves information about an active uniform variable.
+     * 
+     * In OpenGL: Maps to glGetActiveUniform()
+     * In Vulkan: Maps to descriptor set layout queries
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param index The index of the uniform variable
+     * @param size Buffer to receive the size of the uniform
+     * @param type Buffer to receive the data type of the uniform
+     * @param name Buffer to receive the name of the uniform
+     * @return The name of the uniform variable
+     */
+    String getActiveUniform(CommandContext ctx, int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name);
     
     /**
      * Locates a uniform variable in a program.

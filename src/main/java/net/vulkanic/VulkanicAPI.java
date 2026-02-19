@@ -1908,12 +1908,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static String glGetProgramInfoLog(int program) {
-        return getBackend().glGetProgramInfoLog(program);
+        return getProgramInfoLog(getImmediateContext(), program);
     }
     
     @Deprecated
     public static String glGetShaderInfoLog(int shader) {
-        return getBackend().glGetShaderInfoLog(shader);
+        return getShaderInfoLog(getImmediateContext(), shader);
     }
     
     @Deprecated
@@ -1941,9 +1941,13 @@ public class VulkanicAPI {
         getBackend().glClearBufferuiv(buffer, drawbuffer, values);
     }
     
+    public static String getActiveUniform(CommandContext ctx, int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
+        return getBackend().getActiveUniform(ctx, program, index, size, type, name);
+    }
+    
     @Deprecated
     public static String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
-        return getBackend().glGetActiveUniform(program, index, size, type, name);
+        return getActiveUniform(getImmediateContext(), program, index, size, type, name);
     }
     
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
@@ -2049,9 +2053,13 @@ public class VulkanicAPI {
         return getBackend().glGetMaxImageUnits();
     }
     
+    public static void createBuffers(CommandContext ctx, int[] buffers) {
+        getBackend().createBuffers(ctx, buffers);
+    }
+    
     @Deprecated
     public static void glGenBuffers(int[] buffers) {
-        getBackend().glGenBuffers(buffers);
+        createBuffers(getImmediateContext(), buffers);
     }
     
     @Deprecated
@@ -2158,7 +2166,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glDeleteBuffers(int buffer) {
-        getBackend().glDeleteBuffers(buffer);
+        deleteBuffer(getImmediateContext(), buffer);
     }
     
     @Deprecated

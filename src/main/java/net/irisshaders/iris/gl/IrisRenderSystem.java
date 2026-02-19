@@ -177,12 +177,12 @@ public class IrisRenderSystem {
 
 	public static String getProgramInfoLog(int program) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.glGetProgramInfoLog(program);
+		return VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), program);
 	}
 
 	public static String getShaderInfoLog(int shader) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.glGetShaderInfoLog(shader);
+		return VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), shader);
 	}
 
 	public static void drawBuffers(int framebuffer, int[] buffers) {
@@ -212,7 +212,7 @@ public class IrisRenderSystem {
 
 	public static String getActiveUniform(int program, int index, int size, IntBuffer type, IntBuffer name) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.glGetActiveUniform(program, index, size, type, name);
+		return VulkanicAPI.getActiveUniform(VulkanicAPI.getImmediateContext(), program, index, size, type, name);
 	}
 
 	public static void readPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
@@ -278,7 +278,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void genBuffers(int[] buffers) {
-		VulkanicAPI.glGenBuffers(buffers);
+		VulkanicAPI.createBuffers(VulkanicAPI.getImmediateContext(), buffers);
 	}
 
 	public static void clearBufferSubData(int glShaderStorageBuffer, int glR8, long offset, long size, int glRed, int glByte, int[] ints) {
@@ -446,7 +446,7 @@ public class IrisRenderSystem {
 
 	public static void deleteBuffers(int glId) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glDeleteBuffers(glId);
+		VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), glId);
 	}
 
 	public static void setPolygonMode(int mode) {

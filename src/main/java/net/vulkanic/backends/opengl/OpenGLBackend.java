@@ -1842,13 +1842,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public String glGetProgramInfoLog(int program) {
-        return org.lwjgl.opengl.GL32C.glGetProgramInfoLog(program);
+        return getProgramInfoLog(VulkanicAPI.getImmediateContext(), program);
     }
     
     @Deprecated
     @Override
     public String glGetShaderInfoLog(int shader) {
-        return org.lwjgl.opengl.GL32C.glGetShaderInfoLog(shader);
+        return getShaderInfoLog(VulkanicAPI.getImmediateContext(), shader);
     }
     
     @Deprecated
@@ -1881,10 +1881,18 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL32C.glClearBufferuiv(buffer, drawbuffer, values);
     }
     
+    @Override
+    public String getActiveUniform(CommandContext ctx, int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL32C.glGetActiveUniform(program, index, size, type, name);
+    }
+    
     @Deprecated
     @Override
     public String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
-        return org.lwjgl.opengl.GL32C.glGetActiveUniform(program, index, size, type, name);
+        return getActiveUniform(VulkanicAPI.getImmediateContext(), program, index, size, type, name);
     }
     
     @Override
@@ -2029,10 +2037,18 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
     
+    @Override
+    public void createBuffers(CommandContext ctx, int[] buffers) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45C.glGenBuffers(buffers);
+    }
+    
     @Deprecated
     @Override
     public void glGenBuffers(int[] buffers) {
-        org.lwjgl.opengl.GL43C.glGenBuffers(buffers);
+        createBuffers(VulkanicAPI.getImmediateContext(), buffers);
     }
     
     @Deprecated
@@ -2170,7 +2186,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glDeleteBuffers(int buffer) {
-        org.lwjgl.opengl.GL43C.glDeleteBuffers(buffer);
+        deleteBuffer(VulkanicAPI.getImmediateContext(), buffer);
     }
     
     @Deprecated
