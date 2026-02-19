@@ -925,34 +925,59 @@ public class VulkanicAPI {
     }
     
     // Direct State Access buffer operations
+    // CommandContext versions of DSA buffer operations
+    public static int createBufferDSA(CommandContext ctx) {
+        return getBackend().createBufferDSA(ctx);
+    }
+    
+    public static void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        getBackend().namedBufferDataDSA(ctx, buffer, size, usage);
+    }
+    
+    public static void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        getBackend().namedBufferDataDSA(ctx, buffer, data, usage);
+    }
+    
+    public static void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        getBackend().namedBufferSubDataDSA(ctx, buffer, offset, data);
+    }
+    
+    public static void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
+        getBackend().namedBufferStorageDSA(ctx, buffer, size, flags);
+    }
+    
+    public static void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        getBackend().namedBufferStorageDSA(ctx, buffer, data, flags);
+    }
+    
     @Deprecated
     public static int createBufferDSA() {
-        return getBackend().createBufferDSA();
+        return createBufferDSA(getImmediateContext());
     }
     
     @Deprecated
     public static void namedBufferDataDSA(int buffer, long size, int usage) {
-        getBackend().namedBufferDataDSA(buffer, size, usage);
+        namedBufferDataDSA(getImmediateContext(), buffer, size, usage);
     }
     
     @Deprecated
     public static void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        getBackend().namedBufferDataDSA(buffer, data, usage);
+        namedBufferDataDSA(getImmediateContext(), buffer, data, usage);
     }
     
     @Deprecated
     public static void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
-        getBackend().namedBufferSubDataDSA(buffer, offset, data);
+        namedBufferSubDataDSA(getImmediateContext(), buffer, offset, data);
     }
     
     @Deprecated
     public static void namedBufferStorageDSA(int buffer, long size, int flags) {
-        getBackend().namedBufferStorageDSA(buffer, size, flags);
+        namedBufferStorageDSA(getImmediateContext(), buffer, size, flags);
     }
     
     @Deprecated
     public static void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
-        getBackend().namedBufferStorageDSA(buffer, data, flags);
+        namedBufferStorageDSA(getImmediateContext(), buffer, data, flags);
     }
     
     @Deprecated

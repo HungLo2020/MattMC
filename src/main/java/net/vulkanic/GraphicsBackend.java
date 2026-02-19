@@ -524,6 +524,49 @@ public interface GraphicsBackend {
     @Deprecated
     void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
     
+    // CommandContext versions of DSA buffer operations
+    /**
+     * Creates a buffer object using Direct State Access (DSA).
+     * In OpenGL: Maps to glCreateBuffers()
+     * In Vulkan: Creates a VkBuffer with appropriate parameters
+     */
+    int createBufferDSA(CommandContext ctx);
+    
+    /**
+     * Allocates storage for a buffer using Direct State Access (DSA).
+     * In OpenGL: Maps to glNamedBufferData()
+     * In Vulkan: Allocates and binds memory to a VkBuffer
+     */
+    void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage);
+    
+    /**
+     * Uploads data to a buffer using Direct State Access (DSA).
+     * In OpenGL: Maps to glNamedBufferData()
+     * In Vulkan: Maps memory, copies data, unmaps memory
+     */
+    void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage);
+    
+    /**
+     * Updates a subset of buffer data using Direct State Access (DSA).
+     * In OpenGL: Maps to glNamedBufferSubData()
+     * In Vulkan: Updates buffer memory region
+     */
+    void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data);
+    
+    /**
+     * Creates immutable buffer storage using Direct State Access (DSA).
+     * In OpenGL: Maps to glNamedBufferStorage()
+     * In Vulkan: Creates buffer with specific memory properties
+     */
+    void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags);
+    
+    /**
+     * Creates immutable buffer storage with data using Direct State Access (DSA).
+     * In OpenGL: Maps to glNamedBufferStorage()
+     * In Vulkan: Creates buffer with specific memory properties and initial data
+     */
+    void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags);
+    
     // Direct State Access framebuffer operations
     @Deprecated
     void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level);

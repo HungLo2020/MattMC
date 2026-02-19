@@ -2,8 +2,8 @@
 
 **Current Phase**: Phase 2.5 - API Redesign for Vulkan Compatibility  
 **Overall Progress**: Phase 1 & 2 Complete, Phase 2.5 Required  
-**Last Updated**: 2026-02-17  
-**Status**: ⚠️ API Incompatibility Identified - Redesign Required
+**Last Updated**: 2026-02-19  
+**Status**: ⚠️ API Incompatibility Identified - Redesign In Progress
 
 ---
 
@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (164/283) | Complete | 58.0% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (169/283) | Complete | 59.7% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 58.0% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 59.7% | 100% | **Almost at 60%!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 58.0% (164/283 methods migrated)
+### Overall Phase Progress: 59.7% (169/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 164 (58.0%)**
-- **Methods using immediate mode: 119 (42.0%)**
+- **Methods migrated to CommandContext: 169 (59.7%)**
+- **Methods using immediate mode: 114 (40.3%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 164 methods now support CommandContext pattern, enabling future Vulkan backend. **Advancing strongly toward 60%!**
+**Conclusion**: API migration in progress. 169 methods now support CommandContext pattern, enabling future Vulkan backend. **Almost at 60% milestone!**
 
 ### Required Work Breakdown
 
@@ -213,11 +213,12 @@
 - [x] **Migrated twenty-ninth batch (5 methods)** - glGenerateTextureMipmap(), glTextureParameteri(), glTextureParameterf(), glTextureParameteriv(), glGetTextureParameteri()
 - [x] **Migrated thirtieth batch (5 methods)** - glNamedFramebufferReadBuffer(), glNamedFramebufferDrawBuffers(), glClearNamedFramebufferfv(), glClearNamedFramebufferiv(), glClearNamedFramebufferuiv()
 - [x] **Migrated thirty-first batch (5 methods)** - glCopyTextureSubImage2D(), glBindTextureUnit(), glCreateBuffers(), glNamedBufferData(), glBlitNamedFramebuffer()
-- [x] **164 of 283 deprecated methods migrated** (58.0% complete) - **ADVANCING TOWARD 60%**
+- [x] **Migrated thirty-second batch (5 DSA buffer methods)** - createBufferDSA(), namedBufferDataDSA() x2, namedBufferSubDataDSA(), namedBufferStorageDSA() x2
+- [x] **169 of 283 deprecated methods migrated** (59.7% complete) - **ALMOST AT 60%!**
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 164 / 283 (58.0%)
+**Methods Migrated to CommandContext Pattern**: 169 / 283 (59.7%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -410,9 +411,16 @@ Note: Batch 25 migrated 5 deprecated method families (7 individual methods total
 4. ✅ glNamedBufferData(int, float[], int) → namedBufferData(CommandContext, int, float[], int) [new method] - 1 call site updated (IrisRenderSystem)
 5. ✅ glBlitNamedFramebuffer(...) → blitNamedFramebuffer(CommandContext, ...) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Total Call Sites Updated**: 378 (includes 7 from Batch 31)
+**Batch 32 (Completed 2026-02-19)**:
+1. ✅ createBufferDSA() → createBufferDSA(CommandContext) [new method] - 1 call site updated (DirectStateAccess.Core)
+2. ✅ namedBufferDataDSA(int, long, int) → namedBufferDataDSA(CommandContext, int, long, int) [new method] - 1 call site updated (DirectStateAccess.Core)
+3. ✅ namedBufferDataDSA(int, ByteBuffer, int) → namedBufferDataDSA(CommandContext, int, ByteBuffer, int) [new method] - 1 call site updated (DirectStateAccess.Core)
+4. ✅ namedBufferSubDataDSA(int, long, ByteBuffer) → namedBufferSubDataDSA(CommandContext, int, long, ByteBuffer) [new method] - 1 call site updated (DirectStateAccess.Core)
+5. ✅ namedBufferStorageDSA(int, long, int) → namedBufferStorageDSA(CommandContext, int, long, int) [new method] - 2 call sites updated (DirectStateAccess.Core)
 
-**Remaining Deprecated Methods**: 119 (42.0%)
+**Total Call Sites Updated**: 384 (includes 6 from Batch 32)
+
+**Remaining Deprecated Methods**: 114 (40.3%)
 
 
 ### Blockers

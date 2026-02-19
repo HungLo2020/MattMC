@@ -305,6 +305,57 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
+    // CommandContext versions of DSA buffer operations
+    @Override
+    public int createBufferDSA(CommandContext ctx) {
+        return createBuffer(ctx);
+    }
+    
+    @Override
+    public void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferData(ctx, GL15.GL_ARRAY_BUFFER, size, usage);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
+    }
+    
+    @Override
+    public void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferData(ctx, GL15.GL_ARRAY_BUFFER, data, usage);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
+    }
+    
+    @Override
+    public void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferSubData(ctx, GL15.GL_ARRAY_BUFFER, offset, data);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
+    }
+    
+    @Override
+    public void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferStorage(ctx, GL15.GL_ARRAY_BUFFER, size, flags);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
+    }
+    
+    @Override
+    public void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferStorage(ctx, GL15.GL_ARRAY_BUFFER, data, flags);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
+    }
+    
     @Deprecated
     @Override
     public java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
