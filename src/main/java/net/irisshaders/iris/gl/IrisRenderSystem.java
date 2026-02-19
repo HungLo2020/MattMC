@@ -266,7 +266,7 @@ public class IrisRenderSystem {
 	}
 
 	public static int getMaxImageUnits() {
-		return VulkanicAPI.glGetMaxImageUnits();
+		return VulkanicAPI.getMaxImageUnits(VulkanicAPI.getImmediateContext());
 	}
 
 	public static boolean supportsSSBO() {
@@ -282,7 +282,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void clearBufferSubData(int glShaderStorageBuffer, int glR8, long offset, long size, int glRed, int glByte, int[] ints) {
-		VulkanicAPI.glClearBufferSubData(glShaderStorageBuffer, glR8, offset, size, glRed, glByte, ints);
+		VulkanicAPI.clearBufferSubData(VulkanicAPI.getImmediateContext(), glShaderStorageBuffer, glR8, offset, size, glRed, glByte, ints);
 	}
 
 	public static void getProgramiv(int program, int value, int[] storage) {
@@ -731,19 +731,19 @@ public class IrisRenderSystem {
 		@Override
 		public void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glClearBufferfv(buffer, drawbuffer, values);
+			VulkanicAPI.clearBufferfv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glClearBufferiv(buffer, drawbuffer, values);
+			VulkanicAPI.clearBufferiv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glClearBufferuiv(buffer, drawbuffer, values);
+			VulkanicAPI.clearBufferuiv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
 		}
 
 		@Override

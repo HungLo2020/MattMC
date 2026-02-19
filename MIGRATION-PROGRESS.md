@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (179/283) | Complete | 63.3% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (184/283) | Complete | 65.0% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 63.3% | 100% | **Moving toward 65% milestone!** |
+| **API Vulkan Compatibility** | 🟢 65.0% | 100% | **🎉 Crossed 65% milestone!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 63.3% (179/283 methods migrated)
+### Overall Phase Progress: 65.0% (184/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 179 (63.3%)**
-- **Methods using immediate mode: 104 (36.7%)**
+- **Methods migrated to CommandContext: 184 (65.0%)**
+- **Methods using immediate mode: 99 (35.0%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 179 methods now support CommandContext pattern, enabling future Vulkan backend. **Moving toward 65% milestone!**
+**Conclusion**: API migration in progress. 184 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 65% milestone!**
 
 ### Required Work Breakdown
 
@@ -214,11 +214,14 @@
 - [x] **Migrated thirtieth batch (5 methods)** - glNamedFramebufferReadBuffer(), glNamedFramebufferDrawBuffers(), glClearNamedFramebufferfv(), glClearNamedFramebufferiv(), glClearNamedFramebufferuiv()
 - [x] **Migrated thirty-first batch (5 methods)** - glCopyTextureSubImage2D(), glBindTextureUnit(), glCreateBuffers(), glNamedBufferData(), glBlitNamedFramebuffer()
 - [x] **Migrated thirty-second batch (5 DSA buffer methods)** - createBufferDSA(), namedBufferDataDSA() x2, namedBufferSubDataDSA(), namedBufferStorageDSA() x2
-- [x] **169 of 283 deprecated methods migrated** (59.7% complete) - **ALMOST AT 60%!**
+- [x] **Migrated thirty-third batch (5 DSA methods)** - unmapNamedBufferDSA(), flushMappedNamedBufferRangeDSA(), copyNamedBufferSubDataDSA(), namedFramebufferTextureDSA(), blitNamedFramebufferDSA()
+- [x] **Migrated thirty-fourth batch (5 methods)** - glNamedFramebufferTexture(), glCreateFramebuffers(), glCreateTextures(), glGenerateMipmap(), glTexParameterf()
+- [x] **Migrated thirty-fifth batch (5 methods)** - glGetMaxImageUnits(), glClearBufferSubData(), glClearBufferfv(), glClearBufferiv(), glClearBufferuiv()
+- [x] **184 of 283 deprecated methods migrated** (65.0% complete) - **🎉 CROSSED 65% MILESTONE!**
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 169 / 283 (59.7%)
+**Methods Migrated to CommandContext Pattern**: 184 / 283 (65.0%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -972,6 +975,44 @@ Before committing Vulkan backend work, verify:
 
 #### Key Achievement:
 **Crossed 33% Threshold**: Over one-third of deprecated methods now support CommandContext pattern required for Vulkan compatibility.
+
+---
+
+### Batch 35 (2026-02-19) - ✅ COMPLETE
+
+**Methods Migrated**: 5 buffer clearing and query methods
+**Call Sites Updated**: 5 call sites in IrisRenderSystem
+**Progress**: 179/283 → 184/283 methods (63.3% → 65.0%)
+
+#### Methods:
+1. `glGetMaxImageUnits()` → `getMaxImageUnits(CommandContext)` [NEW] - 1 call site
+2. `glClearBufferSubData(int, int, long, long, int, int, int[])` → `clearBufferSubData(CommandContext, ...)` [NEW] - 1 call site
+3. `glClearBufferfv(int, int, float[])` → `clearBufferfv(CommandContext, int, int, float[])` [NEW] - 1 call site
+4. `glClearBufferiv(int, int, int[])` → `clearBufferiv(CommandContext, int, int, int[])` [NEW] - 1 call site
+5. `glClearBufferuiv(int, int, int[])` → `clearBufferuiv(CommandContext, int, int, int[])` [NEW] - 1 call site
+
+#### Implementation Details:
+- **New Methods Added**:
+  - `getMaxImageUnits(CommandContext)` - Queries maximum image units supported (GL42+/Vulkan physical device limits)
+  - `clearBufferSubData(CommandContext, ...)` - Clears sub-region of buffer with constant value (GL43+/vkCmdFillBuffer)
+  - `clearBufferfv(CommandContext, ...)` - Clears floating-point buffer (GL32+/vkCmdClearColorImage)
+  - `clearBufferiv(CommandContext, ...)` - Clears integer buffer (GL32+/vkCmdClearColorImage)
+  - `clearBufferuiv(CommandContext, ...)` - Clears unsigned integer buffer (GL32+/vkCmdClearColorImage)
+- **Call Site Migration**: Updated all 5 call sites in IrisRenderSystem to use new CommandContext API
+- **Delegation Pattern**: All 5 deprecated methods now delegate to CommandContext versions for backward compatibility
+- **Testing**: All 18 tests passing (architectural boundary, CommandContext, and utility tests)
+
+#### Files Modified:
+- Core API (3 files): GraphicsBackend, OpenGLBackend, VulkanicAPI - Added 5 new methods with full documentation
+- Iris Shaders (1 file):
+  - IrisRenderSystem - Updated getMaxImageUnits (1 site), clearBufferSubData (1 site), clearBuffer*v methods (3 sites)
+- MIGRATION-PROGRESS.md - Updated progress to 65.0%
+
+#### Key Achievement:
+**🎉 Crossed 65% Milestone!** Successfully migrated 184 of 283 methods (65%). Two-thirds complete! Buffer clearing operations now support Vulkan-compatible CommandContext pattern. This enables:
+- Buffer clearing ready for Vulkan (vkCmdFillBuffer, vkCmdClearColorImage)
+- Query operations compatible with Vulkan physical device limits
+- Clean separation between immediate-mode (deprecated) and CommandContext APIs
 
 ---
 

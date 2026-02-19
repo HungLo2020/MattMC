@@ -2031,19 +2031,31 @@ public class VulkanicAPI {
         setReadBuffer(getImmediateContext(), buffer);
     }
     
+    public static void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
+        getBackend().clearBufferfv(ctx, buffer, drawbuffer, values);
+    }
+    
     @Deprecated
     public static void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
-        getBackend().glClearBufferfv(buffer, drawbuffer, values);
+        clearBufferfv(getImmediateContext(), buffer, drawbuffer, values);
+    }
+    
+    public static void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        getBackend().clearBufferiv(ctx, buffer, drawbuffer, values);
     }
     
     @Deprecated
     public static void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
-        getBackend().glClearBufferiv(buffer, drawbuffer, values);
+        clearBufferiv(getImmediateContext(), buffer, drawbuffer, values);
+    }
+    
+    public static void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        getBackend().clearBufferuiv(ctx, buffer, drawbuffer, values);
     }
     
     @Deprecated
     public static void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
-        getBackend().glClearBufferuiv(buffer, drawbuffer, values);
+        clearBufferuiv(getImmediateContext(), buffer, drawbuffer, values);
     }
     
     public static String getActiveUniform(CommandContext ctx, int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
@@ -2157,9 +2169,13 @@ public class VulkanicAPI {
         bindImageTexture(getImmediateContext(), unit, texture, level, layered, layer, access, format);
     }
     
+    public static int getMaxImageUnits(CommandContext ctx) {
+        return getBackend().getMaxImageUnits(ctx);
+    }
+    
     @Deprecated
     public static int glGetMaxImageUnits() {
-        return getBackend().glGetMaxImageUnits();
+        return getMaxImageUnits(getImmediateContext());
     }
     
     public static void createBuffers(CommandContext ctx, int[] buffers) {
@@ -2171,9 +2187,13 @@ public class VulkanicAPI {
         createBuffers(getImmediateContext(), buffers);
     }
     
+    public static void clearBufferSubData(CommandContext ctx, int target, int internalformat, long offset, long size, int format, int type, int[] data) {
+        getBackend().clearBufferSubData(ctx, target, internalformat, offset, size, format, type, data);
+    }
+    
     @Deprecated
     public static void glClearBufferSubData(int target, int internalformat, long offset, long size, int format, int type, int[] data) {
-        getBackend().glClearBufferSubData(target, internalformat, offset, size, format, type, data);
+        clearBufferSubData(getImmediateContext(), target, internalformat, offset, size, format, type, data);
     }
     
     public static void getProgramiv(CommandContext ctx, int program, int pname, int[] params) {

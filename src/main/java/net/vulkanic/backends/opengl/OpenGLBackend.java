@@ -3034,4 +3034,44 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         return org.lwjgl.opengl.GL31.glGetUniformBlockIndex(program, uniformBlockName);
     }
+    
+    @Override
+    public int getMaxImageUnits(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return glGetMaxImageUnits();
+    }
+    
+    @Override
+    public void clearBufferSubData(CommandContext ctx, int target, int internalformat, long offset, long size, int format, int type, int[] data) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        glClearBufferSubData(target, internalformat, offset, size, format, type, data);
+    }
+    
+    @Override
+    public void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        glClearBufferfv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        glClearBufferiv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        glClearBufferuiv(buffer, drawbuffer, values);
+    }
 }

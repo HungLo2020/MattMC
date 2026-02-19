@@ -2618,4 +2618,71 @@ public interface GraphicsBackend {
      * @return The index of the uniform block, or GL_INVALID_INDEX if not found
      */
     int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName);
+    
+    /**
+     * Gets the maximum number of image units supported by the implementation.
+     * 
+     * In OpenGL: Maps to GL_MAX_IMAGE_UNITS query
+     * In Vulkan: Maps to VkPhysicalDeviceLimits.maxPerStageDescriptorStorageImages
+     * 
+     * @param ctx Command context for recording this command
+     * @return The maximum number of image units
+     */
+    int getMaxImageUnits(CommandContext ctx);
+    
+    /**
+     * Clears a sub-region of a buffer object's data store with a constant value.
+     * 
+     * In OpenGL: Maps to glClearBufferSubData()
+     * In Vulkan: Maps to vkCmdFillBuffer() or vkCmdUpdateBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer target (e.g., GL_ARRAY_BUFFER)
+     * @param internalformat Internal format to use for clearing
+     * @param offset Offset in bytes into the buffer
+     * @param size Size in bytes of the region to clear
+     * @param format Format of the data
+     * @param type Type of the data
+     * @param data Data to use for clearing
+     */
+    void clearBufferSubData(CommandContext ctx, int target, int internalformat, long offset, long size, int format, int type, int[] data);
+    
+    /**
+     * Clears a floating-point buffer.
+     * 
+     * In OpenGL: Maps to glClearBufferfv()
+     * In Vulkan: Maps to vkCmdClearColorImage() or render pass clear attachment
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer to clear (GL_COLOR, GL_DEPTH, etc.)
+     * @param drawbuffer Draw buffer index
+     * @param values Float values to clear with
+     */
+    void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values);
+    
+    /**
+     * Clears an integer buffer.
+     * 
+     * In OpenGL: Maps to glClearBufferiv()
+     * In Vulkan: Maps to vkCmdClearColorImage() or render pass clear attachment
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer to clear (GL_COLOR, GL_DEPTH, etc.)
+     * @param drawbuffer Draw buffer index
+     * @param values Integer values to clear with
+     */
+    void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values);
+    
+    /**
+     * Clears an unsigned integer buffer.
+     * 
+     * In OpenGL: Maps to glClearBufferuiv()
+     * In Vulkan: Maps to vkCmdClearColorImage() or render pass clear attachment
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer to clear (GL_COLOR, GL_DEPTH, etc.)
+     * @param drawbuffer Draw buffer index
+     * @param values Unsigned integer values to clear with
+     */
+    void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values);
 }
