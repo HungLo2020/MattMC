@@ -1406,6 +1406,26 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
     }
     
+    @Override
+    public void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.GL43C.glDebugMessageControl(source, type, severity, ids, enabled);
+    }
+    
+    @Override
+    public void debugMessageControlKHR(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.KHRDebug.glDebugMessageControl(source, type, severity, ids, enabled);
+    }
+    
+    @Override
+    public void debugMessageControlARB(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageControlARB(source, type, severity, ids, enabled);
+    }
+    
+    @Override
+    public void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.AMDDebugOutput.glDebugMessageEnableAMD(category, severity, ids, enabled);
+    }
+    
     @Deprecated
     @Override
     public void labelDebugObject(int identifier, int name, String label) {
@@ -2800,25 +2820,25 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
-        org.lwjgl.opengl.GL43C.glDebugMessageControl(source, type, severity, ids, enabled);
+        debugMessageControl(VulkanicAPI.getImmediateContext(), source, type, severity, ids, enabled);
     }
     
     @Deprecated
     @Override
     public void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
-        org.lwjgl.opengl.KHRDebug.glDebugMessageControl(source, type, severity, ids, enabled);
+        debugMessageControlKHR(VulkanicAPI.getImmediateContext(), source, type, severity, ids, enabled);
     }
     
     @Deprecated
     @Override
     public void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
-        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageControlARB(source, type, severity, ids, enabled);
+        debugMessageControlARB(VulkanicAPI.getImmediateContext(), source, type, severity, ids, enabled);
     }
     
     @Deprecated
     @Override
     public void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
-        org.lwjgl.opengl.AMDDebugOutput.glDebugMessageEnableAMD(category, severity, ids, enabled);
+        debugMessageEnableAMD(VulkanicAPI.getImmediateContext(), category, severity, ids, enabled);
     }
     
     // High-level debug callback wrapper implementations

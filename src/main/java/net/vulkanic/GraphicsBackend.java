@@ -1935,6 +1935,65 @@ public interface GraphicsBackend {
     @Deprecated
     void exitDebugGroup();
     
+    /**
+     * Controls debug message filtering (GL43/KHR_debug).
+     * 
+     * In OpenGL: Maps to glDebugMessageControl()
+     * In Vulkan: Controls validation layer message filtering via VK_EXT_debug_utils
+     * 
+     * @param ctx Command context for recording this command
+     * @param source Message source filter
+     * @param type Message type filter
+     * @param severity Message severity filter
+     * @param ids Array of message IDs to filter (null for all)
+     * @param enabled True to enable messages, false to disable
+     */
+    void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled);
+    
+    /**
+     * Controls debug message filtering (KHR_debug extension).
+     * 
+     * In OpenGL: Maps to glDebugMessageControl() from KHR_debug extension
+     * In Vulkan: Controls validation layer message filtering via VK_EXT_debug_utils
+     * 
+     * @param ctx Command context for recording this command
+     * @param source Message source filter
+     * @param type Message type filter
+     * @param severity Message severity filter
+     * @param ids Array of message IDs to filter (null for all)
+     * @param enabled True to enable messages, false to disable
+     */
+    void debugMessageControlKHR(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled);
+    
+    /**
+     * Controls debug message filtering (ARB_debug_output extension).
+     * 
+     * In OpenGL: Maps to glDebugMessageControlARB() from ARB_debug_output extension
+     * In Vulkan: Controls validation layer message filtering via VK_EXT_debug_utils
+     * 
+     * @param ctx Command context for recording this command
+     * @param source Message source filter
+     * @param type Message type filter
+     * @param severity Message severity filter
+     * @param ids Array of message IDs to filter (null for all)
+     * @param enabled True to enable messages, false to disable
+     */
+    void debugMessageControlARB(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled);
+    
+    /**
+     * Controls debug message filtering (AMD_debug_output extension).
+     * 
+     * In OpenGL: Maps to glDebugMessageEnableAMD() from AMD_debug_output extension
+     * In Vulkan: Controls validation layer message filtering via VK_EXT_debug_utils
+     * 
+     * @param ctx Command context for recording this command
+     * @param category Message category filter
+     * @param severity Message severity filter
+     * @param ids Array of message IDs to filter (null for all)
+     * @param enabled True to enable messages, false to disable
+     */
+    void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled);
+    
     // Debug label operations (EXT_debug_label)
     @Deprecated
     void labelObjectExt(int type, int object, String label);

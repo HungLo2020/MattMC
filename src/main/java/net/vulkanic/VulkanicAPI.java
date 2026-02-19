@@ -1682,6 +1682,22 @@ public class VulkanicAPI {
         exitDebugGroup(getImmediateContext());
     }
     
+    public static void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().debugMessageControl(ctx, source, type, severity, ids, enabled);
+    }
+    
+    public static void debugMessageControlKHR(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().debugMessageControlKHR(ctx, source, type, severity, ids, enabled);
+    }
+    
+    public static void debugMessageControlARB(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().debugMessageControlARB(ctx, source, type, severity, ids, enabled);
+    }
+    
+    public static void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled) {
+        getBackend().debugMessageEnableAMD(ctx, category, severity, ids, enabled);
+    }
+    
     @Deprecated
     public static void labelObjectExt(int type, int object, String label) {
         getBackend().labelObjectExt(type, object, label);
@@ -2728,22 +2744,22 @@ public class VulkanicAPI {
     // Note: The high-level setup methods below use Vulkanic functional interfaces
     @Deprecated
     public static void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
-        getBackend().glDebugMessageControl(source, type, severity, ids, enabled);
+        debugMessageControl(getImmediateContext(), source, type, severity, ids, enabled);
     }
     
     @Deprecated
     public static void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
-        getBackend().glDebugMessageControlKHR(source, type, severity, ids, enabled);
+        debugMessageControlKHR(getImmediateContext(), source, type, severity, ids, enabled);
     }
     
     @Deprecated
     public static void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
-        getBackend().glDebugMessageControlARB(source, type, severity, ids, enabled);
+        debugMessageControlARB(getImmediateContext(), source, type, severity, ids, enabled);
     }
     
     @Deprecated
     public static void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
-        getBackend().glDebugMessageEnableAMD(category, severity, ids, enabled);
+        debugMessageEnableAMD(getImmediateContext(), category, severity, ids, enabled);
     }
     
     // High-level debug callback wrapper methods that accept functional interfaces

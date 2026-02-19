@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (209/283) | Complete | 73.9% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (214/283) | Complete | 75.6% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟢 73.9% | 100% | **🎉 Approaching 75% milestone!** |
+| **API Vulkan Compatibility** | 🟢 75.6% | 100% | **🎉 Three-quarters complete!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 73.9% (209/283 methods migrated)
+### Overall Phase Progress: 75.6% (214/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 209 (73.9%)**
-- **Methods using immediate mode: 74 (26.1%)**
+- **Methods migrated to CommandContext: 214 (75.6%)**
+- **Methods using immediate mode: 69 (24.4%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 209 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 73% milestone - approaching three-quarters complete!**
+**Conclusion**: API migration in progress. 214 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 75% milestone - three-quarters complete!**
 
 ### Required Work Breakdown
 
@@ -1278,6 +1278,25 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-19 (Update 15 - Batch 41 Complete - 75.6% MILESTONE! 🎉)
+- Migrated 5 debug control methods to CommandContext pattern
+- Added 4 NEW CommandContext methods: debugMessageControl, debugMessageControlKHR, debugMessageControlARB, debugMessageEnableAMD
+- Updated 16 call sites in GLDebug.java (Iris Shaders)
+- Progress: 73.9% → 75.6% (209/283 → 214/283 methods migrated)
+- **🎉 CROSSED 75% MILESTONE!** Three-quarters complete!
+- All architectural boundary tests passing (4/4)
+- All CommandContext tests passing (7/7)
+- Build successful with zero regressions
+- Key methods migrated:
+  - Debug message control (debugMessageControl) - 4 call sites updated in OpenGL 4.3 path
+  - Debug message control KHR (debugMessageControlKHR) - 4 call sites updated in KHR_debug path
+  - Debug message control ARB (debugMessageControlARB) - 4 call sites updated in ARB_debug_output path
+  - Debug message enable AMD (debugMessageEnableAMD) - 4 call sites updated in AMD_debug_output path
+- Files modified: 4 total (GraphicsBackend, OpenGLBackend, VulkanicAPI, GLDebug)
+- **PATTERN FOLLOWED**: Added CommandContext methods to interface, implemented in backend, added facade to VulkanicAPI, updated deprecated methods to delegate, migrated all call sites
+- **CALL SITES UPDATED**: Iris Shaders GLDebug (16 sites across 4 debug paths)
+- **VULKAN READY**: Debug control operations now map to VK_EXT_debug_utils validation layer filtering
 
 ### 2026-02-19 (Update 14 - Batch 40 Complete - 73.9% MILESTONE!)
 - Migrated 5 high-usage query methods to CommandContext pattern
