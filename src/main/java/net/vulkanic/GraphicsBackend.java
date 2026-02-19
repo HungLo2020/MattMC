@@ -2219,6 +2219,83 @@ public interface GraphicsBackend {
     void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value);
     @Deprecated
     int glGetTextureParameteri(int texture, int pname);
+    
+    /**
+     * Copies a portion of a read framebuffer to a texture subregion using Direct State Access.
+     * 
+     * In OpenGL: Maps to glCopyTextureSubImage2D() from ARB_direct_state_access
+     * In Vulkan: Maps to vkCmdCopyImageToBuffer() + vkCmdCopyBufferToImage() sequence
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture object to copy into
+     * @param level The mipmap level to copy into
+     * @param xoffset The x offset within the texture
+     * @param yoffset The y offset within the texture
+     * @param x The x coordinate of the source framebuffer region
+     * @param y The y coordinate of the source framebuffer region
+     * @param width The width of the region to copy
+     * @param height The height of the region to copy
+     */
+    void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height);
+    
+    /**
+     * Binds a texture to a specified texture unit using Direct State Access.
+     * 
+     * In OpenGL: Maps to glBindTextureUnit() from ARB_direct_state_access
+     * In Vulkan: Maps to descriptor set binding (vkCmdBindDescriptorSets)
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit The texture unit to bind to (0-based)
+     * @param texture The texture object to bind
+     */
+    void bindTextureUnit(CommandContext ctx, int unit, int texture);
+    
+    /**
+     * Creates a new buffer object using Direct State Access.
+     * 
+     * In OpenGL: Maps to glCreateBuffers() from ARB_direct_state_access
+     * In Vulkan: Maps to vkCreateBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The buffer object ID
+     */
+    int createBuffers(CommandContext ctx);
+    
+    /**
+     * Uploads float array data to a named buffer using Direct State Access.
+     * 
+     * In OpenGL: Maps to glNamedBufferData() from ARB_direct_state_access
+     * In Vulkan: Maps to vkCmdUpdateBuffer() or buffer memory mapping
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object to update
+     * @param data The float array data to upload
+     * @param usage Usage hint for the buffer (e.g., GL_STATIC_DRAW)
+     */
+    void namedBufferData(CommandContext ctx, int buffer, float[] data, int usage);
+    
+    /**
+     * Copies a rectangular region between two named framebuffers using Direct State Access.
+     * 
+     * In OpenGL: Maps to glBlitNamedFramebuffer() from ARB_direct_state_access
+     * In Vulkan: Maps to vkCmdBlitImage()
+     * 
+     * @param ctx Command context for recording this command
+     * @param readFramebuffer The source framebuffer
+     * @param drawFramebuffer The destination framebuffer
+     * @param srcX0 Source region left coordinate
+     * @param srcY0 Source region bottom coordinate
+     * @param srcX1 Source region right coordinate
+     * @param srcY1 Source region top coordinate
+     * @param dstX0 Destination region left coordinate
+     * @param dstY0 Destination region bottom coordinate
+     * @param dstX1 Destination region right coordinate
+     * @param dstY1 Destination region top coordinate
+     * @param mask Bitfield of buffers to copy (e.g., GL_COLOR_BUFFER_BIT)
+     * @param filter Interpolation filter (GL_NEAREST or GL_LINEAR)
+     */
+    void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
+    
     @Deprecated
     void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height);
     @Deprecated

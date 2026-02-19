@@ -2375,29 +2375,69 @@ public class VulkanicAPI {
         return getTextureParameteri(getImmediateContext(), texture, pname);
     }
     
+    /**
+     * Copies a portion of a read framebuffer to a texture subregion using Direct State Access.
+     * See {@link GraphicsBackend#copyTextureSubImage2D(CommandContext, int, int, int, int, int, int, int, int)}
+     */
+    public static void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        getBackend().copyTextureSubImage2D(ctx, texture, level, xoffset, yoffset, x, y, width, height);
+    }
+    
     @Deprecated
     public static void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        getBackend().glCopyTextureSubImage2D(texture, level, xoffset, yoffset, x, y, width, height);
+        copyTextureSubImage2D(getImmediateContext(), texture, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    /**
+     * Binds a texture to a specified texture unit using Direct State Access.
+     * See {@link GraphicsBackend#bindTextureUnit(CommandContext, int, int)}
+     */
+    public static void bindTextureUnit(CommandContext ctx, int unit, int texture) {
+        getBackend().bindTextureUnit(ctx, unit, texture);
     }
     
     @Deprecated
     public static void glBindTextureUnit(int unit, int texture) {
-        getBackend().glBindTextureUnit(unit, texture);
+        bindTextureUnit(getImmediateContext(), unit, texture);
+    }
+    
+    /**
+     * Creates a new buffer object using Direct State Access.
+     * See {@link GraphicsBackend#createBuffers(CommandContext)}
+     */
+    public static int createBuffers(CommandContext ctx) {
+        return getBackend().createBuffers(ctx);
     }
     
     @Deprecated
     public static int glCreateBuffers() {
-        return getBackend().glCreateBuffers();
+        return createBuffers(getImmediateContext());
+    }
+    
+    /**
+     * Uploads float array data to a named buffer using Direct State Access.
+     * See {@link GraphicsBackend#namedBufferData(CommandContext, int, float[], int)}
+     */
+    public static void namedBufferData(CommandContext ctx, int buffer, float[] data, int usage) {
+        getBackend().namedBufferData(ctx, buffer, data, usage);
     }
     
     @Deprecated
     public static void glNamedBufferData(int buffer, float[] data, int usage) {
-        getBackend().glNamedBufferData(buffer, data, usage);
+        namedBufferData(getImmediateContext(), buffer, data, usage);
+    }
+    
+    /**
+     * Copies a rectangular region between two named framebuffers using Direct State Access.
+     * See {@link GraphicsBackend#blitNamedFramebuffer(CommandContext, int, int, int, int, int, int, int, int, int, int, int, int)}
+     */
+    public static void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().blitNamedFramebuffer(ctx, readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
     @Deprecated
     public static void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        getBackend().glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+        blitNamedFramebuffer(getImmediateContext(), readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
     @Deprecated

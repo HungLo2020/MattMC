@@ -634,7 +634,7 @@ public class IrisRenderSystem {
 
 		@Override
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
-			VulkanicAPI.glCopyTextureSubImage2D(destTexture, i, i1, i2, i3, i4, width, height);
+			VulkanicAPI.copyTextureSubImage2D(VulkanicAPI.getImmediateContext(), destTexture, i, i1, i2, i3, i4, width, height);
 		}
 
 		@Override
@@ -644,30 +644,30 @@ public class IrisRenderSystem {
 					return;
 				}
 
-				VulkanicAPI.glBindTextureUnit(unit, texture);
+				VulkanicAPI.bindTextureUnit(VulkanicAPI.getImmediateContext(), unit, texture);
 
 				// Manually fix GLStateManager bindings...
 				GlStateManager.TEXTURES[unit].binding = texture;
 			} else {
-				VulkanicAPI.glBindTextureUnit(unit, texture);
+				VulkanicAPI.bindTextureUnit(VulkanicAPI.getImmediateContext(), unit, texture);
 			}
 		}
 
 		@Override
 		public int bufferStorage(int target, float[] data, int usage) {
-			int buffer = VulkanicAPI.glCreateBuffers();
-			VulkanicAPI.glNamedBufferData(buffer, data, usage);
+			int buffer = VulkanicAPI.createBuffers(VulkanicAPI.getImmediateContext());
+			VulkanicAPI.namedBufferData(VulkanicAPI.getImmediateContext(), buffer, data, usage);
 			return buffer;
 		}
 
 		@Override
 		public int createBuffers() {
-			return VulkanicAPI.glCreateBuffers();
+			return VulkanicAPI.createBuffers(VulkanicAPI.getImmediateContext());
 		}
 
 		@Override
 		public void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
-			VulkanicAPI.glBlitNamedFramebuffer(source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
+			VulkanicAPI.blitNamedFramebuffer(VulkanicAPI.getImmediateContext(), source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 		}
 
 		@Override

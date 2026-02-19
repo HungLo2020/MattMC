@@ -2502,34 +2502,74 @@ public class OpenGLBackend implements GraphicsBackend {
         return getTextureParameteri(VulkanicAPI.getImmediateContext(), texture, pname);
     }
     
-    @Deprecated
     @Override
-    public void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+    public void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glCopyTextureSubImage2D(texture, level, xoffset, yoffset, x, y, width, height);
     }
     
     @Deprecated
     @Override
-    public void glBindTextureUnit(int unit, int texture) {
+    public void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        copyTextureSubImage2D(VulkanicAPI.getImmediateContext(), texture, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    @Override
+    public void bindTextureUnit(CommandContext ctx, int unit, int texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glBindTextureUnit(unit, texture);
     }
     
     @Deprecated
     @Override
-    public int glCreateBuffers() {
+    public void glBindTextureUnit(int unit, int texture) {
+        bindTextureUnit(VulkanicAPI.getImmediateContext(), unit, texture);
+    }
+    
+    @Override
+    public int createBuffers(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateBuffers();
     }
     
     @Deprecated
     @Override
-    public void glNamedBufferData(int buffer, float[] data, int usage) {
+    public int glCreateBuffers() {
+        return createBuffers(VulkanicAPI.getImmediateContext());
+    }
+    
+    @Override
+    public void namedBufferData(CommandContext ctx, int buffer, float[] data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL45C.glNamedBufferData(buffer, data, usage);
     }
     
     @Deprecated
     @Override
-    public void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+    public void glNamedBufferData(int buffer, float[] data, int usage) {
+        namedBufferData(VulkanicAPI.getImmediateContext(), buffer, data, usage);
+    }
+    
+    @Override
+    public void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
+    @Deprecated
+    @Override
+    public void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        blitNamedFramebuffer(VulkanicAPI.getImmediateContext(), readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
     @Deprecated

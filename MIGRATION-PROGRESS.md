@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (159/283) | Complete | 56.2% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (164/283) | Complete | 58.0% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 56.2% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 58.0% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 56.2% (159/283 methods migrated)
+### Overall Phase Progress: 58.0% (164/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 159 (56.2%)**
-- **Methods using immediate mode: 124 (43.8%)**
+- **Methods migrated to CommandContext: 164 (58.0%)**
+- **Methods using immediate mode: 119 (42.0%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 159 methods now support CommandContext pattern, enabling future Vulkan backend. **Past 50% milestone, advancing toward 60%!**
+**Conclusion**: API migration in progress. 164 methods now support CommandContext pattern, enabling future Vulkan backend. **Advancing strongly toward 60%!**
 
 ### Required Work Breakdown
 
@@ -212,11 +212,12 @@
 - [x] **Migrated twenty-eighth batch (5 methods)** - glClearColor(), glCheckFramebufferStatus(), glDispatchComputeIndirect(), glCopyImageSubData(), glBindSamplers()
 - [x] **Migrated twenty-ninth batch (5 methods)** - glGenerateTextureMipmap(), glTextureParameteri(), glTextureParameterf(), glTextureParameteriv(), glGetTextureParameteri()
 - [x] **Migrated thirtieth batch (5 methods)** - glNamedFramebufferReadBuffer(), glNamedFramebufferDrawBuffers(), glClearNamedFramebufferfv(), glClearNamedFramebufferiv(), glClearNamedFramebufferuiv()
-- [x] **159 of 283 deprecated methods migrated** (56.2% complete) - **ADVANCING TOWARD 60%**
+- [x] **Migrated thirty-first batch (5 methods)** - glCopyTextureSubImage2D(), glBindTextureUnit(), glCreateBuffers(), glNamedBufferData(), glBlitNamedFramebuffer()
+- [x] **164 of 283 deprecated methods migrated** (58.0% complete) - **ADVANCING TOWARD 60%**
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 159 / 283 (56.2%)
+**Methods Migrated to CommandContext Pattern**: 164 / 283 (58.0%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -402,9 +403,16 @@ Note: Batch 25 migrated 5 deprecated method families (7 individual methods total
 4. ✅ glClearNamedFramebufferiv(int, int, int, int[]) → clearNamedFramebufferiv(CommandContext, int, int, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
 5. ✅ glClearNamedFramebufferuiv(int, int, int, int[]) → clearNamedFramebufferuiv(CommandContext, int, int, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Total Call Sites Updated**: 371 (includes 5 from Batch 30)
+**Batch 31 (Completed 2026-02-19)**:
+1. ✅ glCopyTextureSubImage2D(int, int, int, int, int, int, int, int) → copyTextureSubImage2D(CommandContext, ...) [new method] - 1 call site updated (IrisRenderSystem)
+2. ✅ glBindTextureUnit(int, int) → bindTextureUnit(CommandContext, int, int) [new method] - 2 call sites updated (IrisRenderSystem)
+3. ✅ glCreateBuffers() → createBuffers(CommandContext) [new method] - 2 call sites updated (IrisRenderSystem)
+4. ✅ glNamedBufferData(int, float[], int) → namedBufferData(CommandContext, int, float[], int) [new method] - 1 call site updated (IrisRenderSystem)
+5. ✅ glBlitNamedFramebuffer(...) → blitNamedFramebuffer(CommandContext, ...) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Remaining Deprecated Methods**: 124 (43.8%)
+**Total Call Sites Updated**: 378 (includes 7 from Batch 31)
+
+**Remaining Deprecated Methods**: 119 (42.0%)
 
 
 ### Blockers
