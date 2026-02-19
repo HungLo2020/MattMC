@@ -2298,7 +2298,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        org.lwjgl.opengl.GL45C.glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
+        org.lwjgl.opengl.GL46C.glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
                                                     dstName, dstTarget, dstLevel, dstX, dstY, dstZ, 
                                                     width, height, depth);
     }
@@ -2315,7 +2315,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        return org.lwjgl.opengl.GL45C.glCheckFramebufferStatus(target);
+        return org.lwjgl.opengl.GL46C.glCheckFramebufferStatus(target);
     }
     
     @Deprecated
