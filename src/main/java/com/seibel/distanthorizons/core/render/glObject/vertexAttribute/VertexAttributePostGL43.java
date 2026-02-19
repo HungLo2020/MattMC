@@ -96,11 +96,11 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	{
 		if (attribute.useInteger)
 		{
-			VulkanicAPI.glVertexAttribIFormat(attributeIndex, attribute.elementCount, attribute.glType, this.strideSize);
+			VulkanicAPI.setVertexAttribIFormat(VulkanicAPI.getImmediateContext(), attributeIndex, attribute.elementCount, attribute.glType, this.strideSize);
 		}
 		else
 		{
-			VulkanicAPI.glVertexAttribFormat(attributeIndex, attribute.elementCount, attribute.glType,
+			VulkanicAPI.setVertexAttribFormat(VulkanicAPI.getImmediateContext(), attributeIndex, attribute.elementCount, attribute.glType,
 					attribute.normalized, this.strideSize); // strideSize used as relative offset here
 		}
 		
@@ -109,7 +109,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 		{
 			this.numberOfBindingPoints = bindingPoint + 1;
 		}
-		VulkanicAPI.glVertexAttribBinding(attributeIndex, bindingPoint);
+		VulkanicAPI.setVertexAttribBinding(VulkanicAPI.getImmediateContext(), attributeIndex, bindingPoint);
 		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), attributeIndex);
 	}
 	

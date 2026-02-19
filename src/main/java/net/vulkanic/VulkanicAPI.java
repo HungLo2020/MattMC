@@ -974,31 +974,6 @@ public class VulkanicAPI {
         return createBufferDSA(getImmediateContext());
     }
     
-    @Deprecated
-    public static void namedBufferDataDSA(int buffer, long size, int usage) {
-        namedBufferDataDSA(getImmediateContext(), buffer, size, usage);
-    }
-    
-    @Deprecated
-    public static void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        namedBufferDataDSA(getImmediateContext(), buffer, data, usage);
-    }
-    
-    @Deprecated
-    public static void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
-        namedBufferSubDataDSA(getImmediateContext(), buffer, offset, data);
-    }
-    
-    @Deprecated
-    public static void namedBufferStorageDSA(int buffer, long size, int flags) {
-        namedBufferStorageDSA(getImmediateContext(), buffer, size, flags);
-    }
-    
-    @Deprecated
-    public static void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
-        namedBufferStorageDSA(getImmediateContext(), buffer, data, flags);
-    }
-    
     public static java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
         return getBackend().mapNamedBufferRangeDSA(ctx, buffer, offset, length, access);
     }
@@ -1570,27 +1545,12 @@ public class VulkanicAPI {
         getBackend().labelDebugObject(ctx, identifier, name, label);
     }
     
-    @Deprecated
-    public static void labelDebugObject(int identifier, int name, String label) {
-        labelDebugObject(getImmediateContext(), identifier, name, label);
-    }
-    
     public static void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
         getBackend().enterDebugGroup(ctx, source, id, message);
     }
     
-    @Deprecated
-    public static void enterDebugGroup(int source, int id, CharSequence message) {
-        enterDebugGroup(getImmediateContext(), source, id, message);
-    }
-    
     public static void exitDebugGroup(CommandContext ctx) {
         getBackend().exitDebugGroup(ctx);
-    }
-    
-    @Deprecated
-    public static void exitDebugGroup() {
-        exitDebugGroup(getImmediateContext());
     }
     
     public static void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
@@ -2830,25 +2790,22 @@ public class VulkanicAPI {
     /**
      * Specifies the organization of vertex arrays (GL43+).
      */
-    @Deprecated
-    public static void glVertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset) {
-        getBackend().vertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
+    public static void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+        getBackend().setVertexAttribFormat(ctx, attribindex, size, type, normalized, relativeoffset);
     }
     
     /**
      * Specifies the organization of vertex arrays for integer data (GL43+).
      */
-    @Deprecated
-    public static void glVertexAttribIFormat(int attribindex, int size, int type, int relativeoffset) {
-        getBackend().vertexAttribIFormat(attribindex, size, type, relativeoffset);
+    public static void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type, int relativeoffset) {
+        getBackend().setVertexAttribIFormat(ctx, attribindex, size, type, relativeoffset);
     }
     
     /**
      * Associates a vertex attribute and a vertex buffer binding (GL43+).
      */
-    @Deprecated
-    public static void glVertexAttribBinding(int attribindex, int bindingindex) {
-        getBackend().vertexAttribBinding(attribindex, bindingindex);
+    public static void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
+        getBackend().setVertexAttribBinding(ctx, attribindex, bindingindex);
     }
     
     /**

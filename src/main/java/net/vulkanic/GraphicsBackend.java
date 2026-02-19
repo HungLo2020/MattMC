@@ -543,19 +543,6 @@ public interface GraphicsBackend {
     int getTexParameteri(CommandContext ctx, int target, int pname);
     
     // Direct State Access buffer operations
-    @Deprecated
-    int createBufferDSA();
-    @Deprecated
-    void namedBufferDataDSA(int buffer, long size, int usage);
-    @Deprecated
-    void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage);
-    @Deprecated
-    void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data);
-    @Deprecated
-    void namedBufferStorageDSA(int buffer, long size, int flags);
-    @Deprecated
-    void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags);
-    
     // CommandContext versions of DSA buffer operations
     /**
      * Creates a buffer object using Direct State Access (DSA).
@@ -2003,13 +1990,6 @@ public interface GraphicsBackend {
      */
     void exitDebugGroup(CommandContext ctx);
     
-    @Deprecated
-    void labelDebugObject(int identifier, int name, String label);
-    @Deprecated
-    void enterDebugGroup(int source, int id, CharSequence message);
-    @Deprecated
-    void exitDebugGroup();
-    
     /**
      * Controls debug message filtering (GL43/KHR_debug).
      * 
@@ -2786,12 +2766,47 @@ public interface GraphicsBackend {
     // GL43+ vertex attribute methods
     @Deprecated
     void bindVertexBuffer(int bindingindex, int buffer, long offset, int stride);
-    @Deprecated
-    void vertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset);
-    @Deprecated
-    void vertexAttribIFormat(int attribindex, int size, int type, int relativeoffset);
-    @Deprecated
-    void vertexAttribBinding(int attribindex, int bindingindex);
+    
+    /**
+     * Specifies the layout of a vertex attribute (float) using the GL43+ vertex format API.
+     * 
+     * In OpenGL: Maps to glVertexAttribFormat()
+     * In Vulkan: Part of VkPipelineVertexInputStateCreateInfo vertex attribute description
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex The attribute index
+     * @param size Number of components (1, 2, 3 or 4)
+     * @param type Data type of each component
+     * @param normalized Whether to normalize fixed-point data
+     * @param relativeoffset Offset of the first element within the attribute buffer
+     */
+    void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type, boolean normalized, int relativeoffset);
+    
+    /**
+     * Specifies the layout of an integer vertex attribute using the GL43+ vertex format API.
+     * 
+     * In OpenGL: Maps to glVertexAttribIFormat()
+     * In Vulkan: Part of VkPipelineVertexInputStateCreateInfo vertex attribute description
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex The attribute index
+     * @param size Number of components (1, 2, 3 or 4)
+     * @param type Integer data type of each component
+     * @param relativeoffset Offset of the first element within the attribute buffer
+     */
+    void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type, int relativeoffset);
+    
+    /**
+     * Associates a vertex attribute index with a vertex buffer binding point.
+     * 
+     * In OpenGL: Maps to glVertexAttribBinding()
+     * In Vulkan: Part of VkVertexInputAttributeDescription binding field
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex The attribute index
+     * @param bindingindex The vertex buffer binding point
+     */
+    void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex);
     
     // VAO methods
     @Deprecated

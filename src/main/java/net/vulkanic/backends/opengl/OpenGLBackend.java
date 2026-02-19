@@ -252,63 +252,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glScissor(x, y, width, height);
     }
     
-    // Direct State Access buffer operations
-    @Deprecated
-    @Override
-    public int createBufferDSA() {
-        return createBuffer(VulkanicAPI.getImmediateContext());
-    }
-    
-    @Deprecated
-    @Override
-    public void namedBufferDataDSA(int buffer, long size, int usage) {
-        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
-        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
-        bufferData(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, size, usage);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
-    }
-    
-    @Deprecated
-    @Override
-    public void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
-        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
-        bufferData(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, data, usage);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
-    }
-    
-    @Deprecated
-    @Override
-    public void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
-        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
-        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
-        bufferSubData(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, offset, data);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
-    }
-    
-    @Deprecated
-    @Override
-    public void namedBufferStorageDSA(int buffer, long size, int flags) {
-        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
-        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
-        bufferStorage(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, size, flags);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
-    }
-    
-    @Deprecated
-    @Override
-    public void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
-        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
-        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
-        bufferStorage(VulkanicAPI.getImmediateContext(), GL15.GL_ARRAY_BUFFER, data, flags);
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
-    }
-    
     // CommandContext versions of DSA buffer operations
     @Override
     public int createBufferDSA(CommandContext ctx) {
@@ -1348,24 +1291,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled) {
         org.lwjgl.opengl.AMDDebugOutput.glDebugMessageEnableAMD(category, severity, ids, enabled);
-    }
-    
-    @Deprecated
-    @Override
-    public void labelDebugObject(int identifier, int name, String label) {
-        labelDebugObject(VulkanicAPI.getImmediateContext(), identifier, name, label);
-    }
-    
-    @Deprecated
-    @Override
-    public void enterDebugGroup(int source, int id, CharSequence message) {
-        enterDebugGroup(VulkanicAPI.getImmediateContext(), source, id, message);
-    }
-    
-    @Deprecated
-    @Override
-    public void exitDebugGroup() {
-        exitDebugGroup(VulkanicAPI.getImmediateContext());
     }
     
     @Deprecated
@@ -2850,21 +2775,27 @@ public class OpenGLBackend implements GraphicsBackend {
         bindVertexBuffer(VulkanicAPI.getImmediateContext(), bindingindex, buffer, offset, stride);
     }
     
-    @Deprecated
     @Override
-    public void vertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+    public void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL43C.glVertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
     }
     
-    @Deprecated
     @Override
-    public void vertexAttribIFormat(int attribindex, int size, int type, int relativeoffset) {
+    public void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type, int relativeoffset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL43C.glVertexAttribIFormat(attribindex, size, type, relativeoffset);
     }
     
-    @Deprecated
     @Override
-    public void vertexAttribBinding(int attribindex, int bindingindex) {
+    public void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL43C.glVertexAttribBinding(attribindex, bindingindex);
     }
     
