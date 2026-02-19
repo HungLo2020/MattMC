@@ -18,11 +18,6 @@ public interface GraphicsBackend {
     @Deprecated
     long getGraphicsContext();
     
-    @Deprecated
-    void bindTexture(int target, int textureId);  // For explicit target binding
-    @Deprecated
-    void generateMipmap(int target);
-    
     /**
      * Sets the dynamic viewport state for rendering.
      * 
@@ -560,14 +555,6 @@ public interface GraphicsBackend {
     void namedBufferStorageDSA(int buffer, long size, int flags);
     @Deprecated
     void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags);
-    @Deprecated
-    java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access);
-    @Deprecated
-    void unmapNamedBufferDSA(int buffer);
-    @Deprecated
-    void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length);
-    @Deprecated
-    void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
     
     // CommandContext versions of DSA buffer operations
     /**
@@ -613,6 +600,21 @@ public interface GraphicsBackend {
     void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags);
     
     /**
+     * Maps a range of a buffer's data store using Direct State Access (DSA).
+     * 
+     * In OpenGL: Maps to glMapNamedBufferRange()
+     * In Vulkan: Maps to vkMapMemory() for the buffer's backing memory
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object ID to map
+     * @param offset The starting offset within the buffer's data store (bytes)
+     * @param length The length of the range to map (bytes)
+     * @param access Bitfield combining access flags (GL_MAP_READ_BIT, GL_MAP_WRITE_BIT, etc.)
+     * @return ByteBuffer pointing to the mapped memory region, or null on failure
+     */
+    java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access);
+    
+    /**
      * Unmaps a previously mapped buffer using Direct State Access (DSA).
      * In OpenGL: Maps to glUnmapNamedBuffer()
      * In Vulkan: Unmaps memory previously mapped with vkMapMemory()
@@ -634,19 +636,12 @@ public interface GraphicsBackend {
     void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
     
     // Direct State Access framebuffer operations
-    @Deprecated
-    void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level);
-    
     /**
      * Attaches a texture to a framebuffer using Direct State Access (DSA).
      * In OpenGL: Maps to glNamedFramebufferTexture()
      * In Vulkan: Part of render pass and framebuffer setup
      */
     void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level);
-    
-    @Deprecated
-    void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, 
-                                  int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
     /**
      * Blits (copies) pixels between framebuffers using Direct State Access (DSA).

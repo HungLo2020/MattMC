@@ -29,12 +29,6 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
     
-    @Deprecated
-    @Override
-    public void generateMipmap(int target) {
-        generateTextureMipmap(VulkanicAPI.getImmediateContext(), target);
-    }
-    
     /**
      * Sets the dynamic viewport state with explicit command context.
      * This is the Vulkan-compatible implementation for viewport control.
@@ -141,12 +135,6 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL33.glBindSampler(unit, sampler);
-    }
-    
-    @Deprecated
-    @Override
-    public void bindTexture(int target, int textureId) {
-        bindTexture(VulkanicAPI.getImmediateContext(), target, textureId);
     }
     
     @Override
@@ -372,48 +360,12 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
-    @Deprecated
     @Override
-    public java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
-        // DSA delegation pattern: bind → call CommandContext version → restore
-        int prevBinding = org.lwjgl.opengl.GL15.glGetInteger(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER_BINDING);
-        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, buffer);
-        java.nio.ByteBuffer result = mapBuffer(VulkanicAPI.getImmediateContext(), org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, offset, length, access);
-        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, prevBinding);
-        return result;
-    }
-    
-    @Deprecated
-    @Override
-    public void unmapNamedBufferDSA(int buffer) {
-        unmapNamedBufferDSA(VulkanicAPI.getImmediateContext(), buffer);
-    }
-    
-    @Deprecated
-    @Override
-    public void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
-        flushMappedNamedBufferRangeDSA(VulkanicAPI.getImmediateContext(), buffer, offset, length);
-    }
-    
-    @Deprecated
-    @Override
-    public void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        copyNamedBufferSubDataDSA(VulkanicAPI.getImmediateContext(), readBuffer, writeBuffer, readOffset, writeOffset, size);
-    }
-    
-    // Direct State Access framebuffer operations
-    @Deprecated
-    @Override
-    public void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
-        namedFramebufferTextureDSA(VulkanicAPI.getImmediateContext(), framebuffer, attachment, texture, level);
-    }
-    
-    @Deprecated
-    @Override
-    public void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
-                                        int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        blitNamedFramebufferDSA(VulkanicAPI.getImmediateContext(), readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
-                               dstX0, dstY0, dstX1, dstY1, mask, filter);
+    public java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL45.glMapNamedBufferRange(buffer, offset, length, access);
     }
     
     // CommandContext versions of DSA buffer operations

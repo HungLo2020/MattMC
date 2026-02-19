@@ -83,7 +83,7 @@ public abstract class DirectStateAccess {
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
-			return net.vulkanic.VulkanicAPI.mapNamedBufferRangeDSA(i, j, k, l);
+			return net.vulkanic.VulkanicAPI.mapNamedBufferRangeDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l);
 		}
 
 		@Override

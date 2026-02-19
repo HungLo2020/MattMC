@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (249/283) | Complete | 88.0% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (258/283) | Complete | 91.2% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟢 88.0% | 100% | **🎉 Crossed 88% milestone!** |
+| **API Vulkan Compatibility** | 🟢 91.2% | 100% | **🎉 Crossed 91% milestone!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 88.0% (249/283 methods migrated)
+### Overall Phase Progress: 91.2% (258/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 249 (88.0%)**
-- **Methods using immediate mode: 34 (12.0%)**
+- **Methods migrated to CommandContext: 258 (91.2%)**
+- **Methods using immediate mode: 25 (8.8%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 249 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 88% milestone!**
+**Conclusion**: API migration in progress. 258 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 91% milestone!**
 
 ### Required Work Breakdown
 
@@ -1278,6 +1278,29 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-19 (Update 21 - Batch 47 Complete - 91.2% Milestone! DELETED DSA/texture deprecated methods!)
+- **COMPLETELY DELETED** 9 deprecated methods from VulkanicAPI, GraphicsBackend, AND OpenGLBackend
+- Added 1 NEW CommandContext method: `mapNamedBufferRangeDSA(ctx, buffer, offset, length, access)`
+- Updated 1 call site in DirectStateAccess.java; all other call sites were already using ctx forms
+- Progress: 88.0% → 91.2% (249/283 → 258/283 methods migrated)
+- **🎉 CROSSED 91% MILESTONE! All DSA framebuffer ops + texture bind/mipmap ops fully removed!**
+- All architectural boundary tests passing (4/4)
+- All CommandContext tests passing (7/7)
+- Build successful with zero regressions
+- Methods COMPLETELY DELETED (removed from VulkanicAPI, GraphicsBackend, AND OpenGLBackend):
+  - `bindTexture(target, textureId)` (2-param, no-ctx) → all call sites already used `bindTexture(ctx, target, textureId)` — 0 external sites to update
+  - `generateMipmap(target)` (no-ctx) → all call sites already used `generateTextureMipmap(ctx, target)` — 0 external sites to update
+  - `mapNamedBufferRangeDSA(buffer, offset, length, access)` → call sites now use `mapNamedBufferRangeDSA(ctx, buffer, offset, length, access)` — 1 site (DirectStateAccess)
+  - `namedFramebufferTextureDSA(framebuffer, attachment, texture, level)` (no-ctx) → all call sites already used ctx form — 0 external sites to update
+  - `blitNamedFramebufferDSA(...)` (no-ctx) → all call sites already used ctx form — 0 external sites to update
+  - `glBindTexture(target, texture)` (gl-prefixed) → had no external call sites — 0 sites to update
+  - `unmapNamedBufferDSA(buffer)` (no-ctx) → all call sites already used ctx form — 0 external sites to update
+  - `flushMappedNamedBufferRangeDSA(buffer, offset, length)` (no-ctx) → all call sites already used ctx form — 0 external sites to update
+  - `copyNamedBufferSubDataDSA(...)` (no-ctx) → all call sites already used ctx form — 0 external sites to update
+- Files modified: 5 total (GraphicsBackend, OpenGLBackend, VulkanicAPI, DirectStateAccess, MIGRATION-PROGRESS.md)
+- **PATTERN ENFORCED**: Deprecated methods completely removed. No delegation wrappers remain.
+- **NOTE**: mapNamedBufferRangeDSA upgraded from bind-then-call pattern to direct GL45.glMapNamedBufferRange() — cleaner DSA implementation
 
 ### 2026-02-19 (Update 20 - Batch 46 Complete - 88.0% Milestone! DELETED GLState + Shader deprecated methods!)
 - **COMPLETELY DELETED** 7 deprecated methods from VulkanicAPI, GraphicsBackend, AND OpenGLBackend

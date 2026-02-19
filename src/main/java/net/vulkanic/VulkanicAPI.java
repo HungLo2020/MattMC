@@ -663,16 +663,6 @@ public class VulkanicAPI {
         getBackend().bindSampler(ctx, unit, sampler);
     }
     
-    @Deprecated
-    public static void bindTexture(int target, int textureId) {
-        bindTexture(getImmediateContext(), target, textureId);
-    }
-    
-    @Deprecated
-    public static void generateMipmap(int target) {
-        generateTextureMipmap(getImmediateContext(), target);
-    }
-    
     /**
      * Sets the depth test comparison function.
      * 
@@ -1009,37 +999,8 @@ public class VulkanicAPI {
         namedBufferStorageDSA(getImmediateContext(), buffer, data, flags);
     }
     
-    @Deprecated
-    public static java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
-        return getBackend().mapNamedBufferRangeDSA(buffer, offset, length, access);
-    }
-    
-    @Deprecated
-    public static void unmapNamedBufferDSA(int buffer) {
-        unmapNamedBufferDSA(getImmediateContext(), buffer);
-    }
-    
-    @Deprecated
-    public static void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
-        flushMappedNamedBufferRangeDSA(getImmediateContext(), buffer, offset, length);
-    }
-    
-    @Deprecated
-    public static void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        copyNamedBufferSubDataDSA(getImmediateContext(), readBuffer, writeBuffer, readOffset, writeOffset, size);
-    }
-    
-    // Direct State Access framebuffer operations
-    @Deprecated
-    public static void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
-        namedFramebufferTextureDSA(getImmediateContext(), framebuffer, attachment, texture, level);
-    }
-    
-    @Deprecated
-    public static void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
-                                                int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        getBackend().blitNamedFramebufferDSA(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
-                                              dstX0, dstY0, dstX1, dstY1, mask, filter);
+    public static java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
+        return getBackend().mapNamedBufferRangeDSA(ctx, buffer, offset, length, access);
     }
     
     // CommandContext versions of DSA operations
@@ -3101,14 +3062,6 @@ public class VulkanicAPI {
     @Deprecated
     public static int glGenTextures() {
         return createTexture2D(getImmediateContext());
-    }
-    
-    /**
-     * Binds a named texture to a texturing target.
-     */
-    @Deprecated
-    public static void glBindTexture(int target, int texture) {
-        getBackend().bindTexture(target, texture);
     }
     
     // CommandContext-aware methods for Batch 23
