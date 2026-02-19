@@ -1967,6 +1967,14 @@ public class OpenGLBackend implements GraphicsBackend {
         bindBufferBase(VulkanicAPI.getImmediateContext(), target, index, buffer);
     }
     
+    @Override
+    public void setVertexAttrib4f(CommandContext ctx, int index, float v0, float v1, float v2, float v3) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glVertexAttrib4f(index, v0, v1, v2, v3);
+    }
+    
     @Deprecated
     @Override
     public void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
@@ -2111,16 +2119,40 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL45C.glBindSamplers(first, samplers);
     }
     
+    @Override
+    public void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL33C.glSamplerParameteri(sampler, pname, param);
+    }
+    
     @Deprecated
     @Override
     public void glSamplerParameteri(int sampler, int pname, int param) {
         org.lwjgl.opengl.GL33C.glSamplerParameteri(sampler, pname, param);
     }
     
+    @Override
+    public void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL33C.glSamplerParameterf(sampler, pname, param);
+    }
+    
     @Deprecated
     @Override
     public void glSamplerParameterf(int sampler, int pname, float param) {
         org.lwjgl.opengl.GL33C.glSamplerParameterf(sampler, pname, param);
+    }
+    
+    @Override
+    public void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL33C.glSamplerParameteriv(sampler, pname, params);
     }
     
     @Deprecated

@@ -1879,6 +1879,10 @@ public class VulkanicAPI {
         setUniform4i(getImmediateContext(), location, v0, v1, v2, v3);
     }
     
+    public static void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
+        getBackend().texParameteriv(ctx, target, pname, params);
+    }
+    
     @Deprecated
     public static void glTexParameteriv(int target, int pname, int[] params) {
         texParameteriv(getImmediateContext(), target, pname, params);
@@ -1970,12 +1974,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glBufferStorage(int target, long size, int flags) {
-        getBackend().glBufferStorage(target, size, flags);
+        bufferStorage(getImmediateContext(), target, size, flags);
     }
     
     @Deprecated
     public static void glBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
-        getBackend().glBufferStorage(target, data, flags);
+        bufferStorage(getImmediateContext(), target, data, flags);
     }
     
     @Deprecated
@@ -1998,9 +2002,13 @@ public class VulkanicAPI {
         getBackend().glBindBufferBase(target, index, buffer);
     }
     
+    public static void setVertexAttrib4f(CommandContext ctx, int index, float v0, float v1, float v2, float v3) {
+        getBackend().setVertexAttrib4f(ctx, index, v0, v1, v2, v3);
+    }
+    
     @Deprecated
     public static void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
-        getBackend().glVertexAttrib4f(index, v0, v1, v2, v3);
+        setVertexAttrib4f(getImmediateContext(), index, v0, v1, v2, v3);
     }
     
     @Deprecated
@@ -2108,19 +2116,31 @@ public class VulkanicAPI {
         getBackend().glBindSamplers(first, samplers);
     }
     
+    public static void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
+        getBackend().setSamplerParameteri(ctx, sampler, pname, param);
+    }
+    
     @Deprecated
     public static void glSamplerParameteri(int sampler, int pname, int param) {
-        getBackend().glSamplerParameteri(sampler, pname, param);
+        setSamplerParameteri(getImmediateContext(), sampler, pname, param);
+    }
+    
+    public static void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param) {
+        getBackend().setSamplerParameterf(ctx, sampler, pname, param);
     }
     
     @Deprecated
     public static void glSamplerParameterf(int sampler, int pname, float param) {
-        getBackend().glSamplerParameterf(sampler, pname, param);
+        setSamplerParameterf(getImmediateContext(), sampler, pname, param);
+    }
+    
+    public static void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params) {
+        getBackend().setSamplerParameteriv(ctx, sampler, pname, params);
     }
     
     @Deprecated
     public static void glSamplerParameteriv(int sampler, int pname, int[] params) {
-        getBackend().glSamplerParameteriv(sampler, pname, params);
+        setSamplerParameteriv(getImmediateContext(), sampler, pname, params);
     }
     
     @Deprecated
@@ -2775,18 +2795,6 @@ public class VulkanicAPI {
      */
     public static boolean isBuffer(CommandContext ctx, int buffer) {
         return getBackend().isBuffer(ctx, buffer);
-    }
-    
-    /**
-     * Sets texture parameters using an array of integers.
-     * 
-     * @param ctx Command context for recording this command
-     * @param target Texture target
-     * @param pname Parameter name
-     * @param params Array of parameter values
-     */
-    public static void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
-        getBackend().texParameteriv(ctx, target, pname, params);
     }
     
     /**

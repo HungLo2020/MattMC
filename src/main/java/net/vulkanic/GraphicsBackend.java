@@ -164,6 +164,45 @@ public interface GraphicsBackend {
     void bindSampler(CommandContext ctx, int unit, int sampler);
     
     /**
+     * Sets an integer sampler parameter.
+     * 
+     * In OpenGL: Maps to glSamplerParameteri()
+     * In Vulkan: Part of sampler creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param sampler The sampler object
+     * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER)
+     * @param param The parameter value
+     */
+    void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param);
+    
+    /**
+     * Sets a float sampler parameter.
+     * 
+     * In OpenGL: Maps to glSamplerParameterf()
+     * In Vulkan: Part of sampler creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param sampler The sampler object
+     * @param pname The parameter name (e.g., GL_TEXTURE_MAX_ANISOTROPY)
+     * @param param The parameter value
+     */
+    void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param);
+    
+    /**
+     * Sets an integer array sampler parameter.
+     * 
+     * In OpenGL: Maps to glSamplerParameteriv()
+     * In Vulkan: Part of sampler creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param sampler The sampler object
+     * @param pname The parameter name (e.g., GL_TEXTURE_BORDER_COLOR)
+     * @param params The parameter values
+     */
+    void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params);
+    
+    /**
      * Sets the depth test comparison function.
      * 
      * In OpenGL: Maps to glDepthFunc()
@@ -1285,6 +1324,21 @@ public interface GraphicsBackend {
      * @param divisor The divisor value (0 = per-vertex, N = per-instance every N instances)
      */
     void setVertexAttribDivisor(CommandContext ctx, int index, int divisor);
+    
+    /**
+     * Sets a 4-component float vertex attribute value.
+     * 
+     * In OpenGL: Maps to glVertexAttrib4f()
+     * In Vulkan: Sets a vertex input attribute constant value
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute
+     * @param v0 The first component value
+     * @param v1 The second component value
+     * @param v2 The third component value
+     * @param v3 The fourth component value
+     */
+    void setVertexAttrib4f(CommandContext ctx, int index, float v0, float v1, float v2, float v3);
     
     /**
      * Deletes a shader program.

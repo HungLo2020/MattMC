@@ -158,7 +158,7 @@ public class IrisRenderSystem {
 	 */
 	public static void texParameterivDirect(int target, int pname, int[] params) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glTexParameteriv(target, pname, params);
+		VulkanicAPI.texParameteriv(VulkanicAPI.getImmediateContext(), target, pname, params);
 	}
 
 	public static void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
@@ -233,7 +233,7 @@ public class IrisRenderSystem {
 	public static void bufferStorage(int target, long size, int flags) {
 		RenderSystem.assertOnRenderThread();
 		// The ARB version is identical to GL44 and redirects, so this should work on ARB as well.
-		VulkanicAPI.glBufferStorage(target, size, flags);
+		VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), target, size, flags);
 	}
 
 	public static void bindBufferBase(int target, Integer index, int buffer) {
@@ -243,7 +243,7 @@ public class IrisRenderSystem {
 
 	public static void vertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glVertexAttrib4f(index, v0, v1, v2, v3);
+		VulkanicAPI.setVertexAttrib4f(VulkanicAPI.getImmediateContext(), index, v0, v1, v2, v3);
 	}
 
 	public static void detachShader(int program, int shader) {
@@ -425,15 +425,15 @@ public class IrisRenderSystem {
 
 
 	public static void samplerParameteri(int sampler, int pname, int param) {
-		VulkanicAPI.glSamplerParameteri(sampler, pname, param);
+		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getImmediateContext(), sampler, pname, param);
 	}
 
 	public static void samplerParameterf(int sampler, int pname, float param) {
-		VulkanicAPI.glSamplerParameterf(sampler, pname, param);
+		VulkanicAPI.setSamplerParameterf(VulkanicAPI.getImmediateContext(), sampler, pname, param);
 	}
 
 	public static void samplerParameteriv(int sampler, int pname, int[] params) {
-		VulkanicAPI.glSamplerParameteriv(sampler, pname, params);
+		VulkanicAPI.setSamplerParameteriv(VulkanicAPI.getImmediateContext(), sampler, pname, params);
 	}
 
 	public static long getVRAM() {
