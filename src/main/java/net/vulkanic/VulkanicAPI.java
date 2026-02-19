@@ -2151,9 +2151,13 @@ public class VulkanicAPI {
         getBackend().glBindSampler(unit, sampler);
     }
     
+    public static void bindSamplers(CommandContext ctx, int first, int[] samplers) {
+        getBackend().bindSamplers(ctx, first, samplers);
+    }
+    
     @Deprecated
     public static void glBindSamplers(int first, int[] samplers) {
-        getBackend().glBindSamplers(first, samplers);
+        bindSamplers(getImmediateContext(), first, samplers);
     }
     
     public static void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
@@ -2203,9 +2207,13 @@ public class VulkanicAPI {
         setViewport(getImmediateContext(), x, y, width, height);
     }
     
+    public static void dispatchComputeIndirect(CommandContext ctx, long offset) {
+        getBackend().dispatchComputeIndirect(ctx, offset);
+    }
+    
     @Deprecated
     public static void glDispatchComputeIndirect(long offset) {
-        getBackend().glDispatchComputeIndirect(offset);
+        dispatchComputeIndirect(getImmediateContext(), offset);
     }
     
     @Deprecated
@@ -2222,14 +2230,27 @@ public class VulkanicAPI {
         return getString(getImmediateContext(), name, index);
     }
     
+    public static void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
+                                        int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
+                                        int width, int height, int depth) {
+        getBackend().copyImageSubData(ctx, srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
+                                      dstName, dstTarget, dstLevel, dstX, dstY, dstZ, 
+                                      width, height, depth);
+    }
+    
     @Deprecated
     public static void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth) {
-        getBackend().glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+        copyImageSubData(getImmediateContext(), srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
+                        dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+    }
+    
+    public static int checkFramebufferStatus(CommandContext ctx, int target) {
+        return getBackend().checkFramebufferStatus(ctx, target);
     }
     
     @Deprecated
     public static int glCheckFramebufferStatus(int target) {
-        return getBackend().glCheckFramebufferStatus(target);
+        return checkFramebufferStatus(getImmediateContext(), target);
     }
     
     @Deprecated

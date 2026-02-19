@@ -181,6 +181,18 @@ public interface GraphicsBackend {
     void bindSampler(CommandContext ctx, int unit, int sampler);
     
     /**
+     * Binds multiple sampler objects to texture units.
+     * 
+     * In OpenGL: Maps to glBindSamplers()
+     * In Vulkan: Part of descriptor set configuration for multiple samplers
+     * 
+     * @param ctx Command context for recording this command
+     * @param first The first texture unit to bind samplers to
+     * @param samplers Array of sampler object IDs to bind
+     */
+    void bindSamplers(CommandContext ctx, int first, int[] samplers);
+    
+    /**
      * Creates a new sampler object.
      * 
      * In OpenGL: Maps to glGenSamplers()
@@ -523,6 +535,18 @@ public interface GraphicsBackend {
      * @param level The mipmap level
      */
     void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
+    
+    /**
+     * Checks the completeness status of a framebuffer.
+     * 
+     * In OpenGL: Maps to glCheckFramebufferStatus()
+     * In Vulkan: Framebuffers must be complete at creation time
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (e.g., GL_FRAMEBUFFER)
+     * @return Status code indicating framebuffer completeness
+     */
+    int checkFramebufferStatus(CommandContext ctx, int target);
     
     /**
      * Specifies a list of color buffers to be drawn into.
@@ -1833,6 +1857,33 @@ public interface GraphicsBackend {
      */
     void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border);
     
+    /**
+     * Copies a region of pixels from one image to another.
+     * 
+     * In OpenGL: Maps to glCopyImageSubData()
+     * In Vulkan: Maps to vkCmdCopyImage()
+     * 
+     * @param ctx Command context for recording this command
+     * @param srcName Source image name
+     * @param srcTarget Source image target
+     * @param srcLevel Source mipmap level
+     * @param srcX Source X coordinate
+     * @param srcY Source Y coordinate
+     * @param srcZ Source Z coordinate
+     * @param dstName Destination image name
+     * @param dstTarget Destination image target
+     * @param dstLevel Destination mipmap level
+     * @param dstX Destination X coordinate
+     * @param dstY Destination Y coordinate
+     * @param dstZ Destination Z coordinate
+     * @param width Width of the region to copy
+     * @param height Height of the region to copy
+     * @param depth Depth of the region to copy
+     */
+    void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
+                         int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
+                         int width, int height, int depth);
+    
     @Deprecated
     void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels);
     @Deprecated
@@ -2170,6 +2221,17 @@ public interface GraphicsBackend {
      * @param workZ Number of work groups in Z dimension
      */
     void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ);
+    
+    /**
+     * Dispatches compute work groups with parameters from a buffer.
+     * 
+     * In OpenGL: Maps to glDispatchComputeIndirect()
+     * In Vulkan: Maps to vkCmdDispatchIndirect()
+     * 
+     * @param ctx Command context for recording this command
+     * @param offset Offset in the buffer binding where dispatch parameters are stored
+     */
+    void dispatchComputeIndirect(CommandContext ctx, long offset);
     
     /**
      * Checks if a name corresponds to a buffer object.

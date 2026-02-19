@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (144/283) | Complete | 50.9% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (149/283) | Complete | 52.7% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 50.9% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 52.7% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 50.9% (144/283 methods migrated)
+### Overall Phase Progress: 52.7% (149/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 144 (50.9%)**
-- **Methods using immediate mode: 139 (49.1%)**
+- **Methods migrated to CommandContext: 149 (52.7%)**
+- **Methods using immediate mode: 134 (47.3%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 144 methods now support CommandContext pattern, enabling future Vulkan backend. **50% MILESTONE REACHED!**
+**Conclusion**: API migration in progress. 149 methods now support CommandContext pattern, enabling future Vulkan backend. **Past 50% milestone!**
 
 ### Required Work Breakdown
 
@@ -208,12 +208,13 @@
 - [x] **Migrated twenty-fourth batch (5 methods)** - glGetFloatv(), glTexImage1D(), glTexImage3D(), glCopyTexImage2D(), glUniform2i()
 - [x] **Migrated twenty-fifth batch (5 method families / 7 methods)** - glTexParameteriv(), glBufferStorage() x2, glVertexAttrib4f(), glSamplerParameteri/f/iv() x3
 - [x] **Migrated twenty-sixth batch (5 methods)** - glGetProgramInfoLog(), glGetShaderInfoLog(), glGetActiveUniform(), glGenBuffers(), glDeleteBuffers()
-- [x] **Migrated twenty-seventh batch (5 methods)** - glGetProgramiv(), glBindImageTexture(), glMemoryBarrier(), glBlendFuncSeparatei(), glGenSamplers()/glDeleteSamplers()
-- [x] **144 of 283 deprecated methods migrated** (50.9% complete) - **🎉 50% MILESTONE REACHED!**
+- [x] **Migrated twenty-seventh batch (5 methods / 6 total)** - glGetProgramiv(), glBindImageTexture(), glMemoryBarrier(), glBlendFuncSeparatei(), glGenSamplers()/glDeleteSamplers()
+- [x] **Migrated twenty-eighth batch (5 methods)** - glClearColor(), glCheckFramebufferStatus(), glDispatchComputeIndirect(), glCopyImageSubData(), glBindSamplers()
+- [x] **149 of 283 deprecated methods migrated** (52.7% complete) - **PAST 50% MILESTONE**
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 144 / 283 (50.9%)
+**Methods Migrated to CommandContext Pattern**: 149 / 283 (52.7%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -378,11 +379,16 @@ Note: Batch 25 migrated 5 deprecated method families (7 individual methods total
 5. ✅ glGenSamplers() → createSampler(CommandContext) [new method] - 1 call site updated (IrisRenderSystem)
 6. ✅ glDeleteSamplers(int) → deleteSampler(CommandContext, int) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Total Call Sites Updated**: 356 (includes 6 from Batch 27)
+**Batch 28 (Completed 2026-02-19)**:
+1. ✅ glClearColor(float, float, float, float) → setClearColor(CommandContext, float, float, float, float) [already had CommandContext version] - 1 call site updated (IrisRenderSystem)
+2. ✅ glCheckFramebufferStatus(int) → checkFramebufferStatus(CommandContext, int) [new method] - 1 call site updated (IrisRenderSystem)
+3. ✅ glDispatchComputeIndirect(long) → dispatchComputeIndirect(CommandContext, long) [new method] - 1 call site updated (IrisRenderSystem)
+4. ✅ glCopyImageSubData(...) → copyImageSubData(CommandContext, ...) [new method] - 1 call site updated (IrisRenderSystem)
+5. ✅ glBindSamplers(int, int[]) → bindSamplers(CommandContext, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Remaining Deprecated Methods**: 139 (49.1%)
+**Total Call Sites Updated**: 361 (includes 5 from Batch 28)
 
-🎉 **50% MILESTONE ACHIEVED!**
+**Remaining Deprecated Methods**: 134 (47.3%)
 
 
 ### Blockers

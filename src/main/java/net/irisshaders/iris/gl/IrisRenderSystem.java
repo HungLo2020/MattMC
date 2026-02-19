@@ -419,7 +419,7 @@ public class IrisRenderSystem {
 			}
 		}
 		if (usedASampler && hasMultibind) {
-			VulkanicAPI.glBindSamplers(0, emptyArray);
+			VulkanicAPI.bindSamplers(VulkanicAPI.getImmediateContext(), 0, emptyArray);
 		}
 	}
 
@@ -467,7 +467,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void dispatchComputeIndirect(long offset) {
-		VulkanicAPI.glDispatchComputeIndirect(offset);
+		VulkanicAPI.dispatchComputeIndirect(VulkanicAPI.getImmediateContext(), offset);
 	}
 
 	public static void bindBuffer(int target, int buffer) {
@@ -483,7 +483,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void copyImageSubData(int sourceTexture, int target, int mip, int srcX, int srcY, int srcZ, int destTexture, int dstTarget, int dstMip, int dstX, int dstY, int dstZ, int width, int height, int depth) {
-		VulkanicAPI.glCopyImageSubData(sourceTexture, target, mip, srcX, srcY, srcZ, destTexture, dstTarget, dstMip, dstX, dstY, dstZ, width, height, depth);
+		VulkanicAPI.copyImageSubData(VulkanicAPI.getImmediateContext(), sourceTexture, target, mip, srcX, srcY, srcZ, destTexture, dstTarget, dstMip, dstX, dstY, dstZ, width, height, depth);
   }
 
 
@@ -512,7 +512,7 @@ public class IrisRenderSystem {
 	}
 
 	public static int checkFramebufferStatus(int glFramebuffer) {
-		return VulkanicAPI.glCheckFramebufferStatus(glFramebuffer);
+		return VulkanicAPI.checkFramebufferStatus(VulkanicAPI.getImmediateContext(), glFramebuffer);
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, FloatBuffer buf) {
@@ -527,7 +527,7 @@ public class IrisRenderSystem {
 
 	public static void clearColor(float v, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glClearColor(v, v1, v2, v3);
+		VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), v, v1, v2, v3);
 	}
 
 	public static int getAttribLocation(int handle, String irisNormal) {

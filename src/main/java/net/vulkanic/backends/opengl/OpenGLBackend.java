@@ -2177,10 +2177,18 @@ public class OpenGLBackend implements GraphicsBackend {
         bindSampler(VulkanicAPI.getImmediateContext(), unit, sampler);
     }
     
+    @Override
+    public void bindSamplers(CommandContext ctx, int first, int[] samplers) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45C.glBindSamplers(first, samplers);
+    }
+    
     @Deprecated
     @Override
     public void glBindSamplers(int first, int[] samplers) {
-        org.lwjgl.opengl.GL45C.glBindSamplers(first, samplers);
+        bindSamplers(VulkanicAPI.getImmediateContext(), first, samplers);
     }
     
     @Override
@@ -2249,10 +2257,18 @@ public class OpenGLBackend implements GraphicsBackend {
         setViewport(VulkanicAPI.getImmediateContext(), x, y, width, height);
     }
     
+    @Override
+    public void dispatchComputeIndirect(CommandContext ctx, long offset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL43C.glDispatchComputeIndirect(offset);
+    }
+    
     @Deprecated
     @Override
     public void glDispatchComputeIndirect(long offset) {
-        org.lwjgl.opengl.GL43C.glDispatchComputeIndirect(offset);
+        dispatchComputeIndirect(VulkanicAPI.getImmediateContext(), offset);
     }
     
     @Deprecated
@@ -2275,16 +2291,37 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.GL46C.glGetStringi(name, index);
     }
     
+    @Override
+    public void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
+                                 int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
+                                 int width, int height, int depth) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45C.glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
+                                                    dstName, dstTarget, dstLevel, dstX, dstY, dstZ, 
+                                                    width, height, depth);
+    }
+    
     @Deprecated
     @Override
     public void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth) {
-        org.lwjgl.opengl.GL46C.glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+        copyImageSubData(VulkanicAPI.getImmediateContext(), srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
+                        dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+    }
+    
+    @Override
+    public int checkFramebufferStatus(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL45C.glCheckFramebufferStatus(target);
     }
     
     @Deprecated
     @Override
     public int glCheckFramebufferStatus(int target) {
-        return org.lwjgl.opengl.GL46C.glCheckFramebufferStatus(target);
+        return checkFramebufferStatus(VulkanicAPI.getImmediateContext(), target);
     }
     
     @Deprecated
