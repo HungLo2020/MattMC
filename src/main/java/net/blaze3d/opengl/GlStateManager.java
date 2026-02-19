@@ -600,7 +600,7 @@ public class GlStateManager {
 
 	public static int _getError() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.checkForErrors();
+		return net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext());
 	}
 
 	public static void clearGlErrors() {

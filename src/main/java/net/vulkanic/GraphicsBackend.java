@@ -570,6 +570,18 @@ public interface GraphicsBackend {
     int createFramebuffer(CommandContext ctx);
     
     // Error checking
+    
+    /**
+     * Gets the current OpenGL error code.
+     * 
+     * In OpenGL: Maps to glGetError()
+     * In Vulkan: Returns 0 (Vulkan uses validation layers for error detection)
+     * 
+     * @param ctx Command context for recording this command
+     * @return The error code, or 0 (GL_NO_ERROR) if no error has occurred
+     */
+    int getError(CommandContext ctx);
+    
     @Deprecated
     int checkForErrors();
     
@@ -1116,6 +1128,21 @@ public interface GraphicsBackend {
     void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3);
     
     /**
+     * Sets a 4-component integer vector uniform value.
+     * 
+     * In OpenGL: Maps to glUniform4i()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param v0 The first component value
+     * @param v1 The second component value
+     * @param v2 The third component value
+     * @param v3 The fourth component value
+     */
+    void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3);
+    
+    /**
      * Sets a 3x3 matrix uniform value.
      * 
      * In OpenGL: Maps to glUniformMatrix3fv()
@@ -1548,6 +1575,19 @@ public interface GraphicsBackend {
     void popDebugGroup();
     
     // Additional methods for IrisRenderSystem
+    
+    /**
+     * Returns multiple integer values from the OpenGL state.
+     * 
+     * In OpenGL: Maps to glGetIntegerv()
+     * In Vulkan: May query device limits or current state
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The state parameter to query (e.g., GL_MAX_TEXTURE_SIZE)
+     * @param params Array to receive the values
+     */
+    void getIntegerv(CommandContext ctx, int pname, int[] params);
+    
     @Deprecated
     void glGetIntegerv(int pname, int[] params);
     @Deprecated
@@ -1600,6 +1640,24 @@ public interface GraphicsBackend {
     void glClearBufferuiv(int buffer, int drawbuffer, int[] values);
     @Deprecated
     String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name);
+    
+    /**
+     * Reads pixels from the framebuffer into a float array.
+     * 
+     * In OpenGL: Maps to glReadPixels()
+     * In Vulkan: Maps to vkCmdCopyImageToBuffer() followed by buffer read
+     * 
+     * @param ctx Command context for recording this command
+     * @param x The x coordinate of the lower-left corner of the rectangular region
+     * @param y The y coordinate of the lower-left corner of the rectangular region
+     * @param width Width of the pixel rectangle
+     * @param height Height of the pixel rectangle
+     * @param format Format of the pixel data (e.g., GL_RGBA)
+     * @param type Data type of the pixel data (e.g., GL_FLOAT)
+     * @param pixels Float array to receive the pixel data
+     */
+    void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels);
+    
     @Deprecated
     void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels);
     @Deprecated
@@ -1686,6 +1744,20 @@ public interface GraphicsBackend {
     void glDispatchComputeIndirect(long offset);
     @Deprecated
     void glBindBuffer(int target, int buffer);
+    
+    /**
+     * Returns a string value from the OpenGL implementation.
+     * 
+     * In OpenGL: Maps to glGetStringi()
+     * In Vulkan: May query device properties or extension names
+     * 
+     * @param ctx Command context for recording this command
+     * @param name The symbolic constant identifying the string (e.g., GL_EXTENSIONS)
+     * @param index The index of the string to return
+     * @return The requested string
+     */
+    String getString(CommandContext ctx, int name, int index);
+    
     @Deprecated
     String glGetStringi(int name, int index);
     @Deprecated

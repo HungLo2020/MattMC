@@ -62,7 +62,7 @@ public class IrisRenderSystem {
 
 	public static void getIntegerv(int pname, int[] params) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glGetIntegerv(pname, params);
+		VulkanicAPI.getIntegerv(VulkanicAPI.getImmediateContext(), pname, params);
 	}
 
 	public static void getFloatv(int pname, float[] params) {
@@ -145,7 +145,7 @@ public class IrisRenderSystem {
 
 	public static void uniform4i(int location, int v0, int v1, int v2, int v3) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniform4i(location, v0, v1, v2, v3);
+		VulkanicAPI.setUniform4i(VulkanicAPI.getImmediateContext(), location, v0, v1, v2, v3);
 	}
 
 	public static void texParameteriv(int texture, int target, int pname, int[] params) {
@@ -217,7 +217,7 @@ public class IrisRenderSystem {
 
 	public static void readPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glReadPixels(x, y, width, height, format, type, pixels);
+		VulkanicAPI.readPixels(VulkanicAPI.getImmediateContext(), x, y, width, height, format, type, pixels);
 	}
 
 	public static void bufferData(int target, float[] data, int usage) {
@@ -479,7 +479,7 @@ public class IrisRenderSystem {
 	}
 
 	public static String getStringi(int glEnum, int index) {
-		return VulkanicAPI.glGetStringi(glEnum, index);
+		return VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), glEnum, index);
 	}
 
 	public static void copyImageSubData(int sourceTexture, int target, int mip, int srcX, int srcY, int srcZ, int destTexture, int dstTarget, int dstMip, int dstX, int dstY, int dstZ, int width, int height, int depth) {

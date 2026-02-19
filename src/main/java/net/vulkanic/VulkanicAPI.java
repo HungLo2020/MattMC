@@ -1025,9 +1025,13 @@ public class VulkanicAPI {
     }
     
     
+    public static int getError(CommandContext ctx) {
+        return getBackend().getError(ctx);
+    }
+    
     @Deprecated
     public static int checkForErrors() {
-        return getBackend().checkForErrors();
+        return getBackend().getError(getImmediateContext());
     }
     
     public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
@@ -1313,6 +1317,10 @@ public class VulkanicAPI {
     
     public static void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
         getBackend().setUniform4f(ctx, location, v0, v1, v2, v3);
+    }
+    
+    public static void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3) {
+        getBackend().setUniform4i(ctx, location, v0, v1, v2, v3);
     }
     
     public static void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
@@ -1772,9 +1780,13 @@ public class VulkanicAPI {
     
     // Additional methods for IrisRenderSystem migration
     
+    public static void getIntegerv(CommandContext ctx, int pname, int[] params) {
+        getBackend().getIntegerv(ctx, pname, params);
+    }
+    
     @Deprecated
     public static void glGetIntegerv(int pname, int[] params) {
-        getBackend().glGetIntegerv(pname, params);
+        getIntegerv(getImmediateContext(), pname, params);
     }
     
     @Deprecated
@@ -1844,7 +1856,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glUniform4i(int location, int v0, int v1, int v2, int v3) {
-        getBackend().glUniform4i(location, v0, v1, v2, v3);
+        setUniform4i(getImmediateContext(), location, v0, v1, v2, v3);
     }
     
     @Deprecated
@@ -1902,9 +1914,13 @@ public class VulkanicAPI {
         return getBackend().glGetActiveUniform(program, index, size, type, name);
     }
     
+    public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+        getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
+    }
+    
     @Deprecated
     public static void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
-        getBackend().glReadPixels(x, y, width, height, format, type, pixels);
+        readPixels(getImmediateContext(), x, y, width, height, format, type, pixels);
     }
     
     @Deprecated
@@ -2117,9 +2133,13 @@ public class VulkanicAPI {
         bindBuffer(getImmediateContext(), target, buffer);
     }
     
+    public static String getString(CommandContext ctx, int name, int index) {
+        return getBackend().getString(ctx, name, index);
+    }
+    
     @Deprecated
     public static String glGetStringi(int name, int index) {
-        return getBackend().glGetStringi(name, index);
+        return getString(getImmediateContext(), name, index);
     }
     
     @Deprecated

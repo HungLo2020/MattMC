@@ -523,6 +523,14 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
     }
     
+    @Override
+    public int getError(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL11.glGetError();
+    }
+    
     @Deprecated
     @Override
     public int checkForErrors() {
@@ -993,6 +1001,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform4f(location, v0, v1, v2, v3);
+    }
+    
+    @Override
+    public void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform4i(location, v0, v1, v2, v3);
     }
     
     @Override
@@ -1667,6 +1683,14 @@ public class OpenGLBackend implements GraphicsBackend {
     
     // Additional methods for IrisRenderSystem
     
+    @Override
+    public void getIntegerv(CommandContext ctx, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glGetIntegerv(pname, params);
+    }
+    
     @Deprecated
     @Override
     public void glGetIntegerv(int pname, int[] params) {
@@ -1821,6 +1845,15 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
         return org.lwjgl.opengl.GL32C.glGetActiveUniform(program, index, size, type, name);
+    }
+    
+    @Deprecated
+    @Override
+    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glReadPixels(x, y, width, height, format, type, pixels);
     }
     
     @Deprecated
@@ -2091,6 +2124,14 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void glBindBuffer(int target, int buffer) {
         bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer);
+    }
+    
+    @Override
+    public String getString(CommandContext ctx, int name, int index) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL46C.glGetStringi(name, index);
     }
     
     @Deprecated
