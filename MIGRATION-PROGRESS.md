@@ -1283,7 +1283,7 @@ Before committing Vulkan backend work, verify:
 - Migrated 5 high-usage query methods to CommandContext pattern
 - Added 1 NEW CommandContext method: getFramebufferAttachmentParameteri
 - Updated 4 EXISTING CommandContext methods with proper delegation: getInteger, setClearColor, bindTexture, getFloatv
-- Updated 45+ call sites across Iris Shaders and Distant Horizons
+- Updated 37 call sites across Iris Shaders and Distant Horizons
 - Progress: 72.1% → 73.9% (204/283 → 209/283 methods migrated)
 - **🎉 CROSSED 73% MILESTONE!** Three-quarters complete approaches!
 - All architectural boundary tests passing (4/4)
