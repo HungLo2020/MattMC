@@ -2171,7 +2171,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glDetachShader(int program, int shader) {
-        getBackend().glDetachShader(program, shader);
+        detachShader(getImmediateContext(), program, shader);
     }
     
     @Deprecated
