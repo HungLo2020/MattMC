@@ -88,7 +88,7 @@ public abstract class DirectStateAccess {
 
 		@Override
 		void unmapBuffer(int i, int j) {
-			net.vulkanic.VulkanicAPI.unmapNamedBufferDSA(i);
+			net.vulkanic.VulkanicAPI.unmapNamedBufferDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 		}
 
 		@Override
@@ -98,8 +98,8 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(i, 36064, j, l); // GL_COLOR_ATTACHMENT0
-			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(i, 36096, k, l); // GL_DEPTH_ATTACHMENT
+			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 36064, j, l); // GL_COLOR_ATTACHMENT0
+			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 36096, k, l); // GL_DEPTH_ATTACHMENT
 			if (m != 0) {
 				GlStateManager._glBindFramebuffer(m, i);
 			}
@@ -107,17 +107,17 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			net.vulkanic.VulkanicAPI.blitNamedFramebufferDSA(i, j, k, l, m, n, o, p, q, r, s, t);
+			net.vulkanic.VulkanicAPI.blitNamedFramebufferDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, q, r, s, t);
 		}
 
 		@Override
 		void flushMappedBufferRange(int i, int j, int k, int l) {
-			net.vulkanic.VulkanicAPI.flushMappedNamedBufferRangeDSA(i, j, k);
+			net.vulkanic.VulkanicAPI.flushMappedNamedBufferRangeDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k);
 		}
 
 		@Override
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.copyNamedBufferSubDataDSA(i, j, k, l, m);
+			net.vulkanic.VulkanicAPI.copyNamedBufferSubDataDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m);
 		}
 	}
 

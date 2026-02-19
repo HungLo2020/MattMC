@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (169/283) | Complete | 59.7% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (174/283) | Complete | 61.5% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 59.7% | 100% | **Almost at 60%!** |
+| **API Vulkan Compatibility** | 🟡 61.5% | 100% | **Crossed 60% milestone!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 59.7% (169/283 methods migrated)
+### Overall Phase Progress: 61.5% (174/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 169 (59.7%)**
-- **Methods using immediate mode: 114 (40.3%)**
+- **Methods migrated to CommandContext: 174 (61.5%)**
+- **Methods using immediate mode: 109 (38.5%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 169 methods now support CommandContext pattern, enabling future Vulkan backend. **Almost at 60% milestone!**
+**Conclusion**: API migration in progress. 174 methods now support CommandContext pattern, enabling future Vulkan backend. **Crossed 60% milestone!**
 
 ### Required Work Breakdown
 

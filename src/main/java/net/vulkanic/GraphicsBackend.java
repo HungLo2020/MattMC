@@ -567,10 +567,48 @@ public interface GraphicsBackend {
      */
     void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags);
     
+    /**
+     * Unmaps a previously mapped buffer using Direct State Access (DSA).
+     * In OpenGL: Maps to glUnmapNamedBuffer()
+     * In Vulkan: Unmaps memory previously mapped with vkMapMemory()
+     */
+    void unmapNamedBufferDSA(CommandContext ctx, int buffer);
+    
+    /**
+     * Flushes a range of a mapped buffer using Direct State Access (DSA).
+     * In OpenGL: Maps to glFlushMappedNamedBufferRange()
+     * In Vulkan: Maps to vkFlushMappedMemoryRanges()
+     */
+    void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length);
+    
+    /**
+     * Copies data between buffers using Direct State Access (DSA).
+     * In OpenGL: Maps to glCopyNamedBufferSubData()
+     * In Vulkan: Maps to vkCmdCopyBuffer()
+     */
+    void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
+    
     // Direct State Access framebuffer operations
     @Deprecated
     void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level);
+    
+    /**
+     * Attaches a texture to a framebuffer using Direct State Access (DSA).
+     * In OpenGL: Maps to glNamedFramebufferTexture()
+     * In Vulkan: Part of render pass and framebuffer setup
+     */
+    void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level);
+    
+    @Deprecated
     void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                  int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
+    
+    /**
+     * Blits (copies) pixels between framebuffers using Direct State Access (DSA).
+     * In OpenGL: Maps to glBlitNamedFramebuffer()
+     * In Vulkan: Maps to vkCmdBlitImage()
+     */
+    void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, 
                                   int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
     /**

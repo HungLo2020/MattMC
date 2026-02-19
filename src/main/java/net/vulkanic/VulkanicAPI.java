@@ -1013,6 +1013,74 @@ public class VulkanicAPI {
                                               dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
+    // CommandContext versions of DSA operations
+    /**
+     * Unmaps a previously mapped buffer using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object to unmap
+     */
+    public static void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
+        getBackend().unmapNamedBufferDSA(ctx, buffer);
+    }
+    
+    /**
+     * Flushes a range of a mapped buffer using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object
+     * @param offset Offset within the mapped buffer range
+     * @param length Length of the range to flush
+     */
+    public static void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
+        getBackend().flushMappedNamedBufferRangeDSA(ctx, buffer, offset, length);
+    }
+    
+    /**
+     * Copies data between buffers using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param readBuffer Source buffer
+     * @param writeBuffer Destination buffer
+     * @param readOffset Offset in source buffer
+     * @param writeOffset Offset in destination buffer
+     * @param size Number of bytes to copy
+     */
+    public static void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        getBackend().copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size);
+    }
+    
+    /**
+     * Attaches a texture to a framebuffer using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param texture The texture to attach
+     * @param level The mipmap level of the texture
+     */
+    public static void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        getBackend().namedFramebufferTextureDSA(ctx, framebuffer, attachment, texture, level);
+    }
+    
+    /**
+     * Blits (copies) pixels between framebuffers using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param readFramebuffer Source framebuffer
+     * @param drawFramebuffer Destination framebuffer
+     * @param srcX0 Source region left
+     * @param srcY0 Source region bottom
+     * @param srcX1 Source region right
+     * @param srcY1 Source region top
+     * @param dstX0 Destination region left
+     * @param dstY0 Destination region bottom
+     * @param dstX1 Destination region right
+     * @param dstY1 Destination region top
+     * @param mask Buffer mask (GL_COLOR_BUFFER_BIT, etc.)
+     * @param filter Interpolation filter (GL_NEAREST or GL_LINEAR)
+     */
+    public static void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
+                                                int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().blitNamedFramebufferDSA(ctx, readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+                                              dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
     public static int createTexture2D(CommandContext ctx) {
         return getBackend().createTexture2D(ctx);
     }

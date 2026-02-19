@@ -370,48 +370,77 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void unmapNamedBufferDSA(int buffer) {
-        // DSA delegation pattern: bind → call CommandContext version → restore
-        int prevBinding = org.lwjgl.opengl.GL15.glGetInteger(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER_BINDING);
-        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, buffer);
-        unmapBuffer(VulkanicAPI.getImmediateContext(), org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER);
-        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, prevBinding);
+        unmapNamedBufferDSA(VulkanicAPI.getImmediateContext(), buffer);
     }
     
     @Deprecated
     @Override
     public void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
-        // DSA delegation pattern: bind → call CommandContext version → restore
-        int prevBinding = org.lwjgl.opengl.GL15.glGetInteger(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER_BINDING);
-        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, buffer);
-        flushMappedBufferRange(VulkanicAPI.getImmediateContext(), org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, offset, length);
-        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, prevBinding);
+        flushMappedNamedBufferRangeDSA(VulkanicAPI.getImmediateContext(), buffer, offset, length);
     }
     
     @Deprecated
     @Override
     public void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        // Use direct ARB DSA call since binding would be complex
-        org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size);
+        copyNamedBufferSubDataDSA(VulkanicAPI.getImmediateContext(), readBuffer, writeBuffer, readOffset, writeOffset, size);
     }
     
     // Direct State Access framebuffer operations
     @Deprecated
     @Override
     public void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
-        // DSA delegation pattern: bind framebuffer → call CommandContext version → restore
-        int prevBinding = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING);
-        org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, framebuffer);
-        // For DSA, we use GL_TEXTURE_2D as the default textarget since DSA doesn't specify it
-        framebufferTexture(VulkanicAPI.getImmediateContext(), org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, attachment, org.lwjgl.opengl.GL11.GL_TEXTURE_2D, texture, level);
-        org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, prevBinding);
+        namedFramebufferTextureDSA(VulkanicAPI.getImmediateContext(), framebuffer, attachment, texture, level);
     }
     
     @Deprecated
     @Override
     public void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
                                         int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
-                                                                      dstX0, dstY0, dstX1, dstY1, mask, filter);
+        blitNamedFramebufferDSA(VulkanicAPI.getImmediateContext(), readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+                               dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
+    // CommandContext versions of DSA buffer operations
+    @Override
+    public void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glUnmapNamedBuffer(buffer);
+    }
+    
+    @Override
+    public void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glFlushMappedNamedBufferRange(buffer, offset, length);
+    }
+    
+    @Override
+    public void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glCopyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size);
+    }
+    
+    @Override
+    public void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
+    }
+    
+    @Override
+    public void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
+                                        int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+                                                     dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
     @Override
