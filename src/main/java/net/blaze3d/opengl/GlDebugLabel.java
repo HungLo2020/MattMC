@@ -115,28 +115,28 @@ public abstract class GlDebugLabel {
 		public void applyLabel(GlBuffer glBuffer) {
 			Supplier<String> supplier = glBuffer.label;
 			if (supplier != null) {
-				VulkanicAPI.labelObjectExt(37201, glBuffer.handle, StringUtil.truncateStringIfNecessary((String)supplier.get(), 256, true));
+				VulkanicAPI.labelObjectExt(VulkanicAPI.getImmediateContext(), 37201, glBuffer.handle, StringUtil.truncateStringIfNecessary((String)supplier.get(), 256, true));
 			}
 		}
 
 		@Override
 		public void applyLabel(GlTexture glTexture) {
-			VulkanicAPI.labelObjectExt(5890, glTexture.id, StringUtil.truncateStringIfNecessary(glTexture.getLabel(), 256, true));
+			VulkanicAPI.labelObjectExt(VulkanicAPI.getImmediateContext(), 5890, glTexture.id, StringUtil.truncateStringIfNecessary(glTexture.getLabel(), 256, true));
 		}
 
 		@Override
 		public void applyLabel(GlShaderModule glShaderModule) {
-			VulkanicAPI.labelObjectExt(35656, glShaderModule.getShaderId(), StringUtil.truncateStringIfNecessary(glShaderModule.getDebugLabel(), 256, true));
+			VulkanicAPI.labelObjectExt(VulkanicAPI.getImmediateContext(), 35656, glShaderModule.getShaderId(), StringUtil.truncateStringIfNecessary(glShaderModule.getDebugLabel(), 256, true));
 		}
 
 		@Override
 		public void applyLabel(GlProgram glProgram) {
-			VulkanicAPI.labelObjectExt(35648, glProgram.getProgramId(), StringUtil.truncateStringIfNecessary(glProgram.getDebugLabel(), 256, true));
+			VulkanicAPI.labelObjectExt(VulkanicAPI.getImmediateContext(), 35648, glProgram.getProgramId(), StringUtil.truncateStringIfNecessary(glProgram.getDebugLabel(), 256, true));
 		}
 
 		@Override
 		public void applyLabel(VertexArrayCache.VertexArray vertexArray) {
-			VulkanicAPI.labelObjectExt(32884, vertexArray.id, StringUtil.truncateStringIfNecessary(vertexArray.format.toString(), 256, true));
+			VulkanicAPI.labelObjectExt(VulkanicAPI.getImmediateContext(), 32884, vertexArray.id, StringUtil.truncateStringIfNecessary(vertexArray.format.toString(), 256, true));
 		}
 
 		@Override

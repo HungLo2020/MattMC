@@ -969,11 +969,6 @@ public class VulkanicAPI {
         getBackend().namedBufferStorageDSA(ctx, buffer, data, flags);
     }
     
-    @Deprecated
-    public static int createBufferDSA() {
-        return createBufferDSA(getImmediateContext());
-    }
-    
     public static java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
         return getBackend().mapNamedBufferRangeDSA(ctx, buffer, offset, length, access);
     }
@@ -1442,11 +1437,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void setVertexAttribDivisor(int index, int divisor) {
-        setVertexAttribDivisor(getImmediateContext(), index, divisor);
-    }
-    
-    @Deprecated
     public static String retrieveShaderInfoLog(int shader) {
         return getShaderInfoLog(getImmediateContext(), shader);
     }
@@ -1484,11 +1474,6 @@ public class VulkanicAPI {
     
     public static void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
         getBackend().clearTexImage(ctx, texture, level, format, type, data);
-    }
-    
-    @Deprecated
-    public static void clearTexImage(int texture, int level, int format, int type, int[] data) {
-        clearTexImage(getImmediateContext(), texture, level, format, type, data);
     }
     
     @Deprecated
@@ -1569,9 +1554,15 @@ public class VulkanicAPI {
         getBackend().debugMessageEnableAMD(ctx, category, severity, ids, enabled);
     }
     
-    @Deprecated
-    public static void labelObjectExt(int type, int object, String label) {
-        getBackend().labelObjectExt(type, object, label);
+    /**
+     * Labels an object using the EXT_debug_label extension.
+     * @param ctx Command context for recording this command
+     * @param type The type identifier for the object
+     * @param object The object name/handle
+     * @param label The debug label string
+     */
+    public static void labelObjectExt(CommandContext ctx, int type, int object, String label) {
+        getBackend().labelObjectExt(ctx, type, object, label);
     }
     
     @Deprecated
@@ -1602,26 +1593,6 @@ public class VulkanicAPI {
     @Deprecated
     public static boolean hasVertexAttribBindingExtension() {
         return getBackend().hasVertexAttribBindingExtension();
-    }
-    
-    @Deprecated
-    public static void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
-        getBackend().attachVertexBuffer(bindingIndex, buffer, offset, stride);
-    }
-    
-    @Deprecated
-    public static void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
-        getBackend().specifyVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
-    }
-    
-    @Deprecated
-    public static void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
-        getBackend().specifyVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    public static void associateVertexAttrib(int attribIndex, int bindingIndex) {
-        getBackend().associateVertexAttrib(attribIndex, bindingIndex);
     }
     
     @Deprecated

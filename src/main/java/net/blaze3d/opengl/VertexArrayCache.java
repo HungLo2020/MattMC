@@ -114,10 +114,10 @@ public abstract class VertexArrayCache {
 				GlStateManager._glBindVertexArray(vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
 					if (this.needsMesaWorkaround && vertexArray.lastVertexBuffer != null && vertexArray.lastVertexBuffer.handle == glBuffer.handle) {
-						VulkanicAPI.attachVertexBuffer(0, 0, 0L, 0);
+						VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), 0, 0, 0L, 0);
 					}
 
-					VulkanicAPI.attachVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+					VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), 0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
 					vertexArray.lastVertexBuffer = glBuffer;
 				}
 			} else {
@@ -134,28 +134,28 @@ public abstract class VertexArrayCache {
 							case GENERIC:
 							case UV:
 								if (vertexFormatElement.type() == VertexFormatElement.Type.FLOAT) {
-									VulkanicAPI.specifyVertexAttribFormat(
-										j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, vertexFormat.getOffset(vertexFormatElement)
+									VulkanicAPI.setVertexAttribFormat(
+										VulkanicAPI.getImmediateContext(), j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, vertexFormat.getOffset(vertexFormatElement)
 									);
 								} else {
-									VulkanicAPI.specifyVertexAttribIFormat(
-										j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), vertexFormat.getOffset(vertexFormatElement)
+									VulkanicAPI.setVertexAttribIFormat(
+										VulkanicAPI.getImmediateContext(), j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), vertexFormat.getOffset(vertexFormatElement)
 									);
 								}
 								break;
 							case NORMAL:
 							case COLOR:
-								VulkanicAPI.specifyVertexAttribFormat(
-									j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, vertexFormat.getOffset(vertexFormatElement)
+								VulkanicAPI.setVertexAttribFormat(
+									VulkanicAPI.getImmediateContext(), j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, vertexFormat.getOffset(vertexFormatElement)
 								);
 						}
 
-						VulkanicAPI.associateVertexAttrib(j, 0);
+						VulkanicAPI.setVertexAttribBinding(VulkanicAPI.getImmediateContext(), j, 0);
 					}
 				}
 
 				if (glBuffer != null) {
-					VulkanicAPI.attachVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+					VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), 0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
 				}
 
 				VertexArrayCache.VertexArray vertexArray2 = new VertexArrayCache.VertexArray(i, vertexFormat, glBuffer);

@@ -1760,8 +1760,6 @@ public interface GraphicsBackend {
     void activateVertexAttribute(int index);
     @Deprecated
     void deactivateVertexAttribute(int index);
-    @Deprecated
-    void setVertexAttribDivisor(int index, int divisor);
     
     /**
      * Issues a memory barrier to ensure memory operations are visible.
@@ -2050,8 +2048,18 @@ public interface GraphicsBackend {
     void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled);
     
     // Debug label operations (EXT_debug_label)
-    @Deprecated
-    void labelObjectExt(int type, int object, String label);
+    /**
+     * Labels an object using the EXT_debug_label extension.
+     * 
+     * In OpenGL: Maps to glLabelObjectEXT()
+     * In Vulkan: Maps to vkSetDebugUtilsObjectNameEXT()
+     * 
+     * @param ctx Command context for recording this command
+     * @param type The type identifier for the object (e.g., GL_BUFFER_OBJECT_EXT)
+     * @param object The object name/handle
+     * @param label The debug label string
+     */
+    void labelObjectExt(CommandContext ctx, int type, int object, String label);
     
     // Debug system initialization (wraps entire debug setup)
     @Deprecated
@@ -2069,15 +2077,7 @@ public interface GraphicsBackend {
     @Deprecated
     boolean hasVertexAttribBindingExtension();
     
-    // ARB vertex attrib binding operations
-    @Deprecated
-    void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride);
-    @Deprecated
-    void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset);
-    @Deprecated
-    void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset);
-    @Deprecated
-    void associateVertexAttrib(int attribIndex, int bindingIndex);
+    // ARB vertex attrib binding operations (all callers migrated to bindVertexBuffer/setVertexAttrib* ctx methods)
     
     // Clear operations
     @Deprecated

@@ -1116,12 +1116,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void setVertexAttribDivisor(int index, int divisor) {
-        setVertexAttribDivisor(VulkanicAPI.getImmediateContext(), index, divisor);
-    }
-    
-    @Deprecated
-    @Override
     public String retrieveShaderInfoLog(int shader) {
         return getShaderInfoLog(VulkanicAPI.getImmediateContext(), shader);
     }
@@ -1293,9 +1287,11 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.AMDDebugOutput.glDebugMessageEnableAMD(category, severity, ids, enabled);
     }
     
-    @Deprecated
     @Override
-    public void labelObjectExt(int type, int object, String label) {
+    public void labelObjectExt(CommandContext ctx, int type, int object, String label) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.EXTDebugLabel.glLabelObjectEXT(type, object, label);
     }
     
@@ -1376,30 +1372,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public boolean hasVertexAttribBindingExtension() {
         return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_vertex_attrib_binding;
-    }
-    
-    @Deprecated
-    @Override
-    public void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glBindVertexBuffer(bindingIndex, buffer, offset, stride);
-    }
-    
-    @Deprecated
-    @Override
-    public void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
-    }
-    
-    @Deprecated
-    @Override
-    public void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    @Override
-    public void associateVertexAttrib(int attribIndex, int bindingIndex) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribBinding(attribIndex, bindingIndex);
     }
     
     @Deprecated
