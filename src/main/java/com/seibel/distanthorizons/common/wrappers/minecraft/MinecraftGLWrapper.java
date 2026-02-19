@@ -221,7 +221,10 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 		GlStateManager._activeTexture(textureId);
 	}
 	@Override
-	public int getActiveTexture() { return VulkanicAPI.glGetInteger(VulkanicAPI.GL_TEXTURE_BINDING_2D); }
+	public int getActiveTexture() { 
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		return VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D); 
+	}
 	
 	/**
 	 * Always binds to 2D texture target

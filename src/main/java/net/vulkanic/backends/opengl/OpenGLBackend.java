@@ -2639,6 +2639,14 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL30.glGetFramebufferAttachmentParameteri(target, attachment, pname);
+    }
+    
+    @Override
     public int getTextureParameteri(CommandContext ctx, int texture, int pname) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -2786,7 +2794,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
-        return org.lwjgl.opengl.GL32.glGetFramebufferAttachmentParameteri(target, attachment, pname);
+        return getFramebufferAttachmentParameteri(VulkanicAPI.getImmediateContext(), target, attachment, pname);
     }
     
     @Deprecated

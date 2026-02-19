@@ -454,6 +454,20 @@ public interface GraphicsBackend {
     void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value);
     
     /**
+     * Queries a framebuffer attachment parameter.
+     * 
+     * In OpenGL: Maps to glGetFramebufferAttachmentParameteriv()
+     * In Vulkan: Queries framebuffer attachment properties
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (e.g., GL_FRAMEBUFFER, GL_READ_FRAMEBUFFER, GL_DRAW_FRAMEBUFFER)
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT)
+     * @param pname The parameter name to query (e.g., GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE)
+     * @return The queried parameter value
+     */
+    int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname);
+    
+    /**
      * Binds a buffer object to a target.
      * 
      * In OpenGL: Maps to glBindBuffer()

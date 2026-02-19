@@ -2707,9 +2707,21 @@ public class VulkanicAPI {
         getBackend().glClearDepth(depth);
     }
     
+    /**
+     * Queries a framebuffer attachment parameter.
+     * @param ctx Command context
+     * @param target The framebuffer target
+     * @param attachment The attachment point
+     * @param pname The parameter name to query
+     * @return The queried parameter value
+     */
+    public static int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname) {
+        return getBackend().getFramebufferAttachmentParameteri(ctx, target, attachment, pname);
+    }
+    
     @Deprecated
     public static int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
-        return getBackend().glGetFramebufferAttachmentParameteri(target, attachment, pname);
+        return getFramebufferAttachmentParameteri(getImmediateContext(), target, attachment, pname);
     }
     
     // Debug callback control methods (low-level callback control methods only)

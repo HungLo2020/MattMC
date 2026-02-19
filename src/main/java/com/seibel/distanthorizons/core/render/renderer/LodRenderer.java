@@ -435,8 +435,8 @@ public class LodRenderer
 		}
 		else
 		{
-			// get MC's color texture 
-			this.activeColorTextureId = VulkanicAPI.glGetFramebufferAttachmentParameteri(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+			// get MC's color texture
+			this.activeColorTextureId = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
 		}
 		
 		

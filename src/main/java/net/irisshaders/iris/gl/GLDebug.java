@@ -83,9 +83,9 @@ public final class GLDebug {
 			VulkanicAPI.glDebugMessageControl(4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, (int[]) null, false);
 			VulkanicAPI.glDebugMessageControl(4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, (int[]) null, false);
 			VulkanicAPI.glDebugMessageControl(4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, (int[]) null, false);
-			if ((VulkanicAPI.glGetInteger(VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
+			CommandContext ctx2 = VulkanicAPI.getImmediateContext();
+			if ((VulkanicAPI.getInteger(ctx2, VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
 				Iris.logger.warn("[GL] Warning: A non-debug context may not produce any debug output.");
-				CommandContext ctx2 = VulkanicAPI.getImmediateContext();
 				VulkanicAPI.setCapabilityEnabled(ctx2, VulkanicAPI.GL_DEBUG_OUTPUT, true);
 				return 2;
 			}
@@ -105,9 +105,9 @@ public final class GLDebug {
 			VulkanicAPI.glDebugMessageControlKHR(4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, (int[]) null, false);
 			VulkanicAPI.glDebugMessageControlKHR(4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, (int[]) null, false);
 			VulkanicAPI.glDebugMessageControlKHR(4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, (int[]) null, false);
-			if (caps.OpenGL30 && (VulkanicAPI.glGetInteger(VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
+			CommandContext ctx3 = VulkanicAPI.getImmediateContext();
+			if (caps.OpenGL30 && (VulkanicAPI.getInteger(ctx3, VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
 				Iris.logger.warn("[GL] Warning: A non-debug context may not produce any debug output.");
-				CommandContext ctx3 = VulkanicAPI.getImmediateContext();
 				VulkanicAPI.setCapabilityEnabled(ctx3, VulkanicAPI.GL_DEBUG_OUTPUT, true);
 				return 2;
 			}
@@ -156,8 +156,8 @@ public final class GLDebug {
 			return 1;
 		} else if (caps.GL_KHR_debug) {
 			VulkanicAPI.clearDebugMessageCallbackKHR();
-			if (caps.OpenGL30 && (VulkanicAPI.glGetInteger(VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
-				CommandContext ctx4 = VulkanicAPI.getImmediateContext();
+			CommandContext ctx4 = VulkanicAPI.getImmediateContext();
+			if (caps.OpenGL30 && (VulkanicAPI.getInteger(ctx4, VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
 				VulkanicAPI.setCapabilityEnabled(ctx4, VulkanicAPI.GL_DEBUG_OUTPUT, false);
 			}
 			return 1;

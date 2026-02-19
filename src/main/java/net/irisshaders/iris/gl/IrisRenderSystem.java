@@ -438,7 +438,8 @@ public class IrisRenderSystem {
 
 	public static long getVRAM() {
 		if (VulkanicAPI.getGraphicsCapabilities().GL_NVX_gpu_memory_info) {
-			return VulkanicAPI.glGetInteger(VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX) * 1024L;
+			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			return VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX) * 1024L;
 		} else {
 			return 4294967296L;
 		}
