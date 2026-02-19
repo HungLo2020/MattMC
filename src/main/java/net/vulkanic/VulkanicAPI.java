@@ -1577,26 +1577,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static int queryIntegerState(int pname) {
-        return getBackend().queryIntegerState(pname);
-    }
-    
-    @Deprecated
-    public static String queryStringInfo(int name) {
-        return getBackend().queryStringInfo(name);
-    }
-    
-    @Deprecated
-    public static int pollErrorCode() {
-        return getBackend().pollErrorCode();
-    }
-    
-    @Deprecated
-    public static void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
-        getBackend().readFramebufferPixels(x, y, width, height, format, type, pixels);
-    }
-    
-    @Deprecated
     public static int queryTextureLevelParameter(int target, int level, int pname) {
         return getBackend().queryTextureLevelParameter(target, level, pname);
     }
@@ -1608,16 +1588,6 @@ public class VulkanicAPI {
     
     public static void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
         getBackend().uniformBlockBinding(ctx, program, uniformBlockIndex, uniformBlockBinding);
-    }
-    
-    @Deprecated
-    public static int locateUniformBlock(int program, String uniformBlockName) {
-        return getBackend().locateUniformBlock(program, uniformBlockName);
-    }
-    
-    @Deprecated
-    public static void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        getBackend().bindUniformBlock(program, uniformBlockIndex, uniformBlockBinding);
     }
     
     @Deprecated
@@ -1904,16 +1874,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static String queryString(int name) {
-        return getBackend().queryString(name);
-    }
-    
-    @Deprecated
-    public static String queryStringIndexed(int name, int index) {
-        return getBackend().queryStringIndexed(name, index);
-    }
-    
-    @Deprecated
     public static void uploadShaderSourceNative(int shader, int count, long strings, long length) {
         getBackend().uploadShaderSourceNative(shader, count, strings, length);
     }
@@ -2141,6 +2101,10 @@ public class VulkanicAPI {
     }
     
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+        getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
+    }
+    
+    public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
         getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
     }
     
@@ -2422,6 +2386,10 @@ public class VulkanicAPI {
     
     public static String getString(CommandContext ctx, int name, int index) {
         return getBackend().getString(ctx, name, index);
+    }
+    
+    public static String getString(CommandContext ctx, int name) {
+        return getBackend().getString(ctx, name);
     }
     
     @Deprecated

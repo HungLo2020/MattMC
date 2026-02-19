@@ -1824,18 +1824,6 @@ public interface GraphicsBackend {
     @Deprecated
     void destroySync(long sync);
     
-    // Query operations
-    @Deprecated
-    int queryIntegerState(int pname);
-    @Deprecated
-    String queryStringInfo(int name);
-    @Deprecated
-    int pollErrorCode();
-    
-    // Pixel readback
-    @Deprecated
-    void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels);
-    
     // Texture queries
     /**
      * Checks if a name corresponds to a texture object.
@@ -1870,10 +1858,6 @@ public interface GraphicsBackend {
     void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding);
     
     // Uniform block operations
-    @Deprecated
-    int locateUniformBlock(int program, String uniformBlockName);
-    @Deprecated
-    void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding);
     @Deprecated
     String retrieveActiveUniformBlockName(int program, int uniformBlockIndex);
     
@@ -2108,12 +2092,6 @@ public interface GraphicsBackend {
     @Deprecated
     void assignUniformMatrix4fv(int location, boolean transpose, FloatBuffer value);
     
-    // String queries
-    @Deprecated
-    String queryString(int name);
-    @Deprecated
-    String queryStringIndexed(int name, int index);
-    
     // Native shader source upload
     @Deprecated
     void uploadShaderSourceNative(int shader, int count, long strings, long length);
@@ -2339,6 +2317,23 @@ public interface GraphicsBackend {
      */
     void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels);
     
+    /**
+     * Reads a block of pixels from the framebuffer into a native memory address.
+     * 
+     * In OpenGL: Maps to glReadPixels() with a native pointer offset (for PBO reads)
+     * In Vulkan: Maps to vkCmdCopyImageToBuffer with a dst buffer offset
+     * 
+     * @param ctx Command context for recording this command
+     * @param x The x coordinate of the lower-left corner of the rectangular region
+     * @param y The y coordinate of the lower-left corner of the rectangular region
+     * @param width Width of the pixel rectangle
+     * @param height Height of the pixel rectangle
+     * @param format Format of the pixel data (e.g., GL_RGBA)
+     * @param type Data type of the pixel data (e.g., GL_UNSIGNED_BYTE)
+     * @param pixels Native memory address to receive the pixel data
+     */
+    void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels);
+    
     @Deprecated
     void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels);
     @Deprecated
@@ -2438,6 +2433,18 @@ public interface GraphicsBackend {
      * @return The requested string
      */
     String getString(CommandContext ctx, int name, int index);
+    
+    /**
+     * Returns a string describing the current GL connection.
+     * 
+     * In OpenGL: Maps to glGetString()
+     * In Vulkan: May query device properties
+     * 
+     * @param ctx Command context for recording this command
+     * @param name The symbolic constant identifying the string (e.g., GL_VENDOR, GL_VERSION)
+     * @return The requested string
+     */
+    String getString(CommandContext ctx, int name);
     
     @Deprecated
     String glGetStringi(int name, int index);

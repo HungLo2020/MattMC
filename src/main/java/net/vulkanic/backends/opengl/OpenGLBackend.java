@@ -1285,30 +1285,6 @@ public class OpenGLBackend implements GraphicsBackend {
         destroySync(VulkanicAPI.getImmediateContext(), sync);
     }
     
-    @Deprecated
-    @Override
-    public int queryIntegerState(int pname) {
-        return GL11.glGetInteger(pname);
-    }
-    
-    @Deprecated
-    @Override
-    public String queryStringInfo(int name) {
-        return GL11.glGetString(name);
-    }
-    
-    @Deprecated
-    @Override
-    public int pollErrorCode() {
-        return GL11.glGetError();
-    }
-    
-    @Deprecated
-    @Override
-    public void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
-        GL11.glReadPixels(x, y, width, height, format, type, pixels);
-    }
-    
     @Override
     public boolean isTexture(CommandContext ctx, int texture) {
         if (!ctx.isImmediate()) {
@@ -1335,18 +1311,6 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
-    }
-    
-    @Deprecated
-    @Override
-    public int locateUniformBlock(int program, String uniformBlockName) {
-        return org.lwjgl.opengl.GL31.glGetUniformBlockIndex(program, uniformBlockName);
-    }
-    
-    @Deprecated
-    @Override
-    public void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        org.lwjgl.opengl.GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
     }
     
     @Deprecated
@@ -1767,18 +1731,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public String queryString(int name) {
-        return org.lwjgl.opengl.GL11C.glGetString(name);
-    }
-    
-    @Deprecated
-    @Override
-    public String queryStringIndexed(int name, int index) {
-        return org.lwjgl.opengl.GL30C.glGetStringi(name, index);
-    }
-    
-    @Deprecated
-    @Override
     public void uploadShaderSourceNative(int shader, int count, long strings, long length) {
         org.lwjgl.opengl.GL20C.nglShaderSource(shader, count, strings, length);
     }
@@ -2063,6 +2015,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL32C.glReadPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    @Override
+    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.nglReadPixels(x, y, width, height, format, type, pixels);
     }
     
     @Deprecated
@@ -2445,6 +2405,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return org.lwjgl.opengl.GL46C.glGetStringi(name, index);
+    }
+    
+    @Override
+    public String getString(CommandContext ctx, int name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL11C.glGetString(name);
     }
     
     @Deprecated

@@ -595,7 +595,7 @@ public class GlStateManager {
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.readFramebufferPixels(i, j, k, l, m, n, o);
+		VulkanicAPI.readPixels(VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o);
 	}
 
 	public static int _getError() {
@@ -606,18 +606,18 @@ public class GlStateManager {
 	public static void clearGlErrors() {
 		RenderSystem.assertOnRenderThread();
 
-		while (VulkanicAPI.pollErrorCode() != 0) {
+		while (VulkanicAPI.getError(VulkanicAPI.getImmediateContext()) != 0) {
 		}
 	}
 
 	public static String _getString(int i) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.queryStringInfo(i);
+		return VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static int _getInteger(int i) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.queryIntegerState(i);
+		return VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static long _glFenceSync(int i, int j) {
