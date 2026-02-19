@@ -1534,9 +1534,13 @@ public class VulkanicAPI {
         setAttributeLocation(getImmediateContext(), program, index, name);
     }
     
+    public static long createFenceSync(CommandContext ctx, int condition, int flags) {
+        return getBackend().createFenceSync(ctx, condition, flags);
+    }
+    
     @Deprecated
     public static long createFenceSync(int condition, int flags) {
-        return getBackend().createFenceSync(condition, flags);
+        return createFenceSync(getImmediateContext(), condition, flags);
     }
     
     @Deprecated
@@ -1544,14 +1548,22 @@ public class VulkanicAPI {
         return getBackend().waitForSync(sync, flags, timeout);
     }
     
+    public static void destroySync(CommandContext ctx, long sync) {
+        getBackend().destroySync(ctx, sync);
+    }
+    
     @Deprecated
     public static void destroySync(long sync) {
-        getBackend().destroySync(sync);
+        destroySync(getImmediateContext(), sync);
+    }
+    
+    public static void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
+        getBackend().clearTexImage(ctx, texture, level, format, type, data);
     }
     
     @Deprecated
     public static void clearTexImage(int texture, int level, int format, int type, int[] data) {
-        getBackend().clearTexImage(texture, level, format, type, data);
+        clearTexImage(getImmediateContext(), texture, level, format, type, data);
     }
     
     @Deprecated
@@ -1643,19 +1655,31 @@ public class VulkanicAPI {
         return getBackend().retrieveQueryObjectInt64(id, pname);
     }
     
+    public static void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
+        getBackend().labelDebugObject(ctx, identifier, name, label);
+    }
+    
     @Deprecated
     public static void labelDebugObject(int identifier, int name, String label) {
-        getBackend().labelDebugObject(identifier, name, label);
+        labelDebugObject(getImmediateContext(), identifier, name, label);
+    }
+    
+    public static void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
+        getBackend().enterDebugGroup(ctx, source, id, message);
     }
     
     @Deprecated
     public static void enterDebugGroup(int source, int id, CharSequence message) {
-        getBackend().enterDebugGroup(source, id, message);
+        enterDebugGroup(getImmediateContext(), source, id, message);
+    }
+    
+    public static void exitDebugGroup(CommandContext ctx) {
+        getBackend().exitDebugGroup(ctx);
     }
     
     @Deprecated
     public static void exitDebugGroup() {
-        getBackend().exitDebugGroup();
+        exitDebugGroup(getImmediateContext());
     }
     
     @Deprecated

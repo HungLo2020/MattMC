@@ -1236,6 +1236,21 @@ Before committing Vulkan backend work, verify:
 
 ## Change Log
 
+### 2026-02-19 (Update 11 - Batch 37 In Progress)
+- Migrating 5 sync and debug methods to CommandContext pattern
+- Added 6 NEW CommandContext methods: createFenceSync, destroySync, clearTexImage, labelDebugObject, enterDebugGroup, exitDebugGroup
+- Need to update 11+ call sites across Sodium, Iris, and Blaze3D
+- Progress: 66.8% → 68.6% target (189/283 → 194/283 methods migrated target)
+- **TARGET**: Approaching 70% milestone
+- Key methods:
+  - Fence sync operations (createFenceSync, destroySync) - for GPU-CPU synchronization
+  - Texture clearing (clearTexImage) - for efficient texture initialization
+  - Debug labeling (labelDebugObject) - for debugging tool integration
+  - Debug groups (enterDebugGroup, exitDebugGroup) - for hierarchical debug organization
+- Files modified so far: 3 (GraphicsBackend, OpenGLBackend, VulkanicAPI)
+- **PATTERN FOLLOWED**: All deprecated methods now delegate to CommandContext versions
+- Call sites to update: Sodium (3), Iris (5), Blaze3D (3+)
+
 ### 2026-02-19 (Update 10 - Batch 36 Complete)
 - Migrated 5 methods (texture operations, framebuffer blitting, program creation) to CommandContext pattern
 - Added 2 NEW CommandContext methods: copyTexSubImage2D, getTexParameteri

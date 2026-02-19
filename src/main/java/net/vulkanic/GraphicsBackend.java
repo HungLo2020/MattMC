@@ -1779,6 +1779,30 @@ public interface GraphicsBackend {
     void memoryBarrier(CommandContext ctx, int barriers);
     
     // Synchronization
+    /**
+     * Creates a fence sync object for GPU-CPU synchronization.
+     * 
+     * In OpenGL: Maps to glFenceSync()
+     * In Vulkan: Maps to vkCreateFence()
+     * 
+     * @param ctx Command context for recording this command
+     * @param condition Must be GL_SYNC_GPU_COMMANDS_COMPLETE
+     * @param flags Must be 0 (reserved for future use)
+     * @return Sync object handle
+     */
+    long createFenceSync(CommandContext ctx, int condition, int flags);
+    
+    /**
+     * Deletes a fence sync object.
+     * 
+     * In OpenGL: Maps to glDeleteSync()
+     * In Vulkan: Maps to vkDestroyFence()
+     * 
+     * @param ctx Command context for recording this command
+     * @param sync The sync object to delete
+     */
+    void destroySync(CommandContext ctx, long sync);
+    
     @Deprecated
     long createFenceSync(int condition, int flags);
     @Deprecated
@@ -1854,6 +1878,42 @@ public interface GraphicsBackend {
     long retrieveQueryObjectInt64(int id, int pname);
     
     // Debug label operations (KHR_debug)
+    /**
+     * Labels a debug object for easier identification in debugging tools.
+     * 
+     * In OpenGL: Maps to glObjectLabel()
+     * In Vulkan: Maps to vkSetDebugUtilsObjectNameEXT()
+     * 
+     * @param ctx Command context for recording this command
+     * @param identifier The type of object being labeled (GL_BUFFER, GL_TEXTURE, etc.)
+     * @param name The name/ID of the object
+     * @param label The debug label string
+     */
+    void labelDebugObject(CommandContext ctx, int identifier, int name, String label);
+    
+    /**
+     * Pushes a debug group for hierarchical organization of debug messages.
+     * 
+     * In OpenGL: Maps to glPushDebugGroup()
+     * In Vulkan: Maps to vkCmdBeginDebugUtilsLabelEXT()
+     * 
+     * @param ctx Command context for recording this command
+     * @param source The source of the debug group (typically GL_DEBUG_SOURCE_APPLICATION)
+     * @param id User-provided ID for the debug group
+     * @param message The debug group message
+     */
+    void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message);
+    
+    /**
+     * Pops the current debug group from the stack.
+     * 
+     * In OpenGL: Maps to glPopDebugGroup()
+     * In Vulkan: Maps to vkCmdEndDebugUtilsLabelEXT()
+     * 
+     * @param ctx Command context for recording this command
+     */
+    void exitDebugGroup(CommandContext ctx);
+    
     @Deprecated
     void labelDebugObject(int identifier, int name, String label);
     @Deprecated
@@ -1990,6 +2050,21 @@ public interface GraphicsBackend {
     void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
     
     // Clear texture image (ARB_clear_texture)
+    /**
+     * Clears a texture image to a specified value.
+     * 
+     * In OpenGL: Maps to glClearTexImage()
+     * In Vulkan: Maps to vkCmdClearColorImage() or vkCmdClearDepthStencilImage()
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture to clear
+     * @param level The mipmap level to clear
+     * @param format The format of the clear data
+     * @param type The type of the clear data
+     * @param data The clear value data (can be null for zero-fill)
+     */
+    void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data);
+    
     @Deprecated
     void clearTexImage(int texture, int level, int format, int type, int[] data);
     

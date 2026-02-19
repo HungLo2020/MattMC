@@ -1257,10 +1257,20 @@ public class OpenGLBackend implements GraphicsBackend {
         setAttributeLocation(VulkanicAPI.getImmediateContext(), program, index, name);
     }
     
+    @Override
+    public long createFenceSync(CommandContext ctx, int condition, int flags) {
+        return org.lwjgl.opengl.GL32.glFenceSync(condition, flags);
+    }
+    
+    @Override
+    public void destroySync(CommandContext ctx, long sync) {
+        org.lwjgl.opengl.GL32.glDeleteSync(sync);
+    }
+    
     @Deprecated
     @Override
     public long createFenceSync(int condition, int flags) {
-        return org.lwjgl.opengl.GL32.glFenceSync(condition, flags);
+        return createFenceSync(VulkanicAPI.getImmediateContext(), condition, flags);
     }
     
     @Deprecated
@@ -1272,7 +1282,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void destroySync(long sync) {
-        org.lwjgl.opengl.GL32.glDeleteSync(sync);
+        destroySync(VulkanicAPI.getImmediateContext(), sync);
     }
     
     @Deprecated
@@ -1381,22 +1391,37 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.ARBTimerQuery.glGetQueryObjecti64(id, pname);
     }
     
+    @Override
+    public void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
+        org.lwjgl.opengl.KHRDebug.glObjectLabel(identifier, name, label);
+    }
+    
+    @Override
+    public void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
+        org.lwjgl.opengl.KHRDebug.glPushDebugGroup(source, id, message);
+    }
+    
+    @Override
+    public void exitDebugGroup(CommandContext ctx) {
+        org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
+    }
+    
     @Deprecated
     @Override
     public void labelDebugObject(int identifier, int name, String label) {
-        org.lwjgl.opengl.KHRDebug.glObjectLabel(identifier, name, label);
+        labelDebugObject(VulkanicAPI.getImmediateContext(), identifier, name, label);
     }
     
     @Deprecated
     @Override
     public void enterDebugGroup(int source, int id, CharSequence message) {
-        org.lwjgl.opengl.KHRDebug.glPushDebugGroup(source, id, message);
+        enterDebugGroup(VulkanicAPI.getImmediateContext(), source, id, message);
     }
     
     @Deprecated
     @Override
     public void exitDebugGroup() {
-        org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
+        exitDebugGroup(VulkanicAPI.getImmediateContext());
     }
     
     @Deprecated
@@ -1744,10 +1769,15 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
     }
     
+    @Override
+    public void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
+        org.lwjgl.opengl.ARBClearTexture.glClearTexImage(texture, level, format, type, data);
+    }
+    
     @Deprecated
     @Override
     public void clearTexImage(int texture, int level, int format, int type, int[] data) {
-        org.lwjgl.opengl.ARBClearTexture.glClearTexImage(texture, level, format, type, data);
+        clearTexImage(VulkanicAPI.getImmediateContext(), texture, level, format, type, data);
     }
     
     @Deprecated
