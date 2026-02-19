@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (219/283) | Complete | 77.4% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (224/283) | Complete | 79.2% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟢 77.4% | 100% | **🎉 Approaching 80% milestone!** |
+| **API Vulkan Compatibility** | 🟢 79.2% | 100% | **🎉 Approaching 80% milestone!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 75.6% (214/283 methods migrated)
+### Overall Phase Progress: 79.2% (224/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 214 (75.6%)**
-- **Methods using immediate mode: 69 (24.4%)**
+- **Methods migrated to CommandContext: 224 (79.2%)**
+- **Methods using immediate mode: 59 (20.8%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 214 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 75% milestone - three-quarters complete!**
+**Conclusion**: API migration in progress. 224 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Nearly at 80% milestone - approaching completion!**
 
 ### Required Work Breakdown
 
@@ -1278,6 +1278,25 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-19 (Update 17 - Batch 43 Complete - 79.2% Milestone!)
+- Migrated 5 deprecated methods to use CommandContext delegation
+- Updated 5 VulkanicAPI and OpenGLBackend methods to delegate to existing CommandContext versions
+- Methods updated: assignUniformMatrix4fv, unmapNamedBufferDSA, flushMappedNamedBufferRangeDSA, copyNamedBufferSubDataDSA, namedFramebufferTextureDSA
+- Progress: 77.4% → 79.2% (219/283 → 224/283 methods migrated)
+- **Approaching 80% milestone - less than 21% remaining!**
+- All architectural boundary tests passing
+- All CommandContext tests passing (7/7)
+- Build successful with zero regressions
+- Key methods migrated:
+  - Matrix uniform assignment (assignUniformMatrix4fv → setUniformMatrix4fv) - for transformation matrices in shaders
+  - DSA buffer unmapping (unmapNamedBufferDSA) - Direct State Access buffer completion
+  - DSA buffer flush (flushMappedNamedBufferRangeDSA) - Direct State Access explicit flush
+  - DSA buffer copy (copyNamedBufferSubDataDSA) - Direct State Access buffer-to-buffer copy
+  - DSA framebuffer attachment (namedFramebufferTextureDSA) - Direct State Access framebuffer setup
+- **EFFICIENCY**: All 5 methods reused existing CommandContext versions - zero new backend code!
+- **PATTERN**: Deprecated methods in both VulkanicAPI AND OpenGLBackend now delegate to CommandContext versions
+- Files modified: VulkanicAPI.java (5 methods), OpenGLBackend.java (1 method), MIGRATION-PROGRESS.md
 
 ### 2026-02-19 (Update 16 - Batch 42 Complete - 77.4% Milestone!)
 - Migrated 5 deprecated methods to use CommandContext delegation

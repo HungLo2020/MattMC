@@ -1016,23 +1016,23 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void unmapNamedBufferDSA(int buffer) {
-        getBackend().unmapNamedBufferDSA(buffer);
+        unmapNamedBufferDSA(getImmediateContext(), buffer);
     }
     
     @Deprecated
     public static void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
-        getBackend().flushMappedNamedBufferRangeDSA(buffer, offset, length);
+        flushMappedNamedBufferRangeDSA(getImmediateContext(), buffer, offset, length);
     }
     
     @Deprecated
     public static void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        getBackend().copyNamedBufferSubDataDSA(readBuffer, writeBuffer, readOffset, writeOffset, size);
+        copyNamedBufferSubDataDSA(getImmediateContext(), readBuffer, writeBuffer, readOffset, writeOffset, size);
     }
     
     // Direct State Access framebuffer operations
     @Deprecated
     public static void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
-        getBackend().namedFramebufferTextureDSA(framebuffer, attachment, texture, level);
+        namedFramebufferTextureDSA(getImmediateContext(), framebuffer, attachment, texture, level);
     }
     
     @Deprecated
@@ -1900,7 +1900,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void assignUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        getBackend().assignUniformMatrix4fv(location, transpose, value);
+        setUniformMatrix4fv(getImmediateContext(), location, transpose, value);
     }
     
     @Deprecated

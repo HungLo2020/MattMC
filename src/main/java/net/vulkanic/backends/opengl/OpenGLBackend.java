@@ -1762,7 +1762,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void assignUniformMatrix4fv(int location, boolean transpose, FloatBuffer value) {
-        org.lwjgl.opengl.GL20C.glUniformMatrix4fv(location, transpose, value);
+        setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, transpose, value);
     }
     
     @Deprecated
