@@ -21,8 +21,8 @@ public class TimerQuery {
 		if (this.nextQueryName != 0) {
 			throw new IllegalStateException("Current profile not ended");
 		} else {
-			this.nextQueryName = VulkanicAPI.generateQueryObject();
-			VulkanicAPI.initiateQuery(35007, this.nextQueryName);
+			this.nextQueryName = VulkanicAPI.generateQueryObject(VulkanicAPI.getImmediateContext());
+			VulkanicAPI.initiateQuery(VulkanicAPI.getImmediateContext(), 35007, this.nextQueryName);
 		}
 	}
 
@@ -31,7 +31,7 @@ public class TimerQuery {
 		if (this.nextQueryName == 0) {
 			throw new IllegalStateException("endProfile called before beginProfile");
 		} else {
-			VulkanicAPI.concludeQuery(35007);
+			VulkanicAPI.concludeQuery(VulkanicAPI.getImmediateContext(), 35007);
 			TimerQuery.FrameProfile frameProfile = new TimerQuery.FrameProfile(this.nextQueryName);
 			this.nextQueryName = 0;
 			return frameProfile;
@@ -53,7 +53,7 @@ public class TimerQuery {
 			RenderSystem.assertOnRenderThread();
 			if (this.result == 0L) {
 				this.result = -1L;
-				VulkanicAPI.disposeQueryObject(this.queryName);
+				VulkanicAPI.disposeQueryObject(VulkanicAPI.getImmediateContext(), this.queryName);
 			}
 		}
 
@@ -61,9 +61,9 @@ public class TimerQuery {
 			RenderSystem.assertOnRenderThread();
 			if (this.result != 0L) {
 				return true;
-			} else if (1 == VulkanicAPI.retrieveQueryObjectInt(this.queryName, 34919)) {
-				this.result = VulkanicAPI.retrieveQueryObjectInt64(this.queryName, 34918);
-				VulkanicAPI.disposeQueryObject(this.queryName);
+			} else if (1 == VulkanicAPI.retrieveQueryObjectInt(VulkanicAPI.getImmediateContext(), this.queryName, 34919)) {
+				this.result = VulkanicAPI.retrieveQueryObjectInt64(VulkanicAPI.getImmediateContext(), this.queryName, 34918);
+				VulkanicAPI.disposeQueryObject(VulkanicAPI.getImmediateContext(), this.queryName);
 				return true;
 			} else {
 				return false;
@@ -73,8 +73,8 @@ public class TimerQuery {
 		public long get() {
 			RenderSystem.assertOnRenderThread();
 			if (this.result == 0L) {
-				this.result = VulkanicAPI.retrieveQueryObjectInt64(this.queryName, 34918);
-				VulkanicAPI.disposeQueryObject(this.queryName);
+				this.result = VulkanicAPI.retrieveQueryObjectInt64(VulkanicAPI.getImmediateContext(), this.queryName, 34918);
+				VulkanicAPI.disposeQueryObject(VulkanicAPI.getImmediateContext(), this.queryName);
 			}
 
 			return this.result;

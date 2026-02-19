@@ -40,7 +40,7 @@ public class SodiumGpuSyncHelper {
             // Because we are also waiting on the client for the FenceSync to finish, the flush is effectively treated
             // like a Finish command, where we know that once ClientWaitSync returns, it's likely that everything
             // before it has been completed by the GPU.
-            VulkanicAPI.waitForSync(fence, 1, Long.MAX_VALUE); // GL_SYNC_FLUSH_COMMANDS_BIT = 1
+            VulkanicAPI.waitForSync(VulkanicAPI.getImmediateContext(), fence, 1, Long.MAX_VALUE); // GL_SYNC_FLUSH_COMMANDS_BIT = 1
             VulkanicAPI.destroySync(VulkanicAPI.getImmediateContext(), fence);
         }
 

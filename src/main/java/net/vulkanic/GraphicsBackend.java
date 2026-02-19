@@ -1817,12 +1817,19 @@ public interface GraphicsBackend {
      */
     void destroySync(CommandContext ctx, long sync);
     
-    @Deprecated
-    long createFenceSync(int condition, int flags);
-    @Deprecated
-    int waitForSync(long sync, int flags, long timeout);
-    @Deprecated
-    void destroySync(long sync);
+    /**
+     * Waits on a fence sync object, blocking until it signals or the timeout expires.
+     * 
+     * In OpenGL: Maps to glClientWaitSync()
+     * In Vulkan: Maps to vkWaitForFences()
+     * 
+     * @param ctx Command context
+     * @param sync The sync object to wait on
+     * @param flags Bitfield controlling flush behaviour (e.g. GL_SYNC_FLUSH_COMMANDS_BIT)
+     * @param timeout Timeout in nanoseconds; Long.MAX_VALUE means wait indefinitely
+     * @return Result status (e.g. GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_TIMEOUT_EXPIRED)
+     */
+    int waitForSync(CommandContext ctx, long sync, int flags, long timeout);
     
     // Texture queries
     /**
@@ -1857,23 +1864,90 @@ public interface GraphicsBackend {
      */
     void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding);
     
-    // Uniform block operations
-    @Deprecated
-    String retrieveActiveUniformBlockName(int program, int uniformBlockIndex);
+    /**
+     * Returns the name string of an active uniform block in a shader program.
+     * 
+     * In OpenGL: Maps to glGetActiveUniformBlockName()
+     * In Vulkan: Would query descriptor set layout reflection data
+     * 
+     * @param ctx Command context
+     * @param program The shader program object ID
+     * @param uniformBlockIndex The index of the uniform block
+     * @return The name of the uniform block
+     */
+    String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex);
     
     // Timer query operations
-    @Deprecated
-    int generateQueryObject();
-    @Deprecated
-    void initiateQuery(int target, int id);
-    @Deprecated
-    void concludeQuery(int target);
-    @Deprecated
-    void disposeQueryObject(int id);
-    @Deprecated
-    int retrieveQueryObjectInt(int id, int pname);
-    @Deprecated
-    long retrieveQueryObjectInt64(int id, int pname);
+    /**
+     * Creates a new query object.
+     * 
+     * In OpenGL: Maps to glGenQueries()
+     * In Vulkan: Maps to vkCreateQueryPool()
+     * 
+     * @param ctx Command context
+     * @return The new query object name/ID
+     */
+    int generateQueryObject(CommandContext ctx);
+    
+    /**
+     * Begins a query block.
+     * 
+     * In OpenGL: Maps to glBeginQuery()
+     * In Vulkan: Maps to vkCmdBeginQuery()
+     * 
+     * @param ctx Command context
+     * @param target The query target (e.g. GL_TIME_ELAPSED)
+     * @param id The query object name/ID
+     */
+    void initiateQuery(CommandContext ctx, int target, int id);
+    
+    /**
+     * Ends a query block.
+     * 
+     * In OpenGL: Maps to glEndQuery()
+     * In Vulkan: Maps to vkCmdEndQuery()
+     * 
+     * @param ctx Command context
+     * @param target The query target
+     */
+    void concludeQuery(CommandContext ctx, int target);
+    
+    /**
+     * Deletes a query object.
+     * 
+     * In OpenGL: Maps to glDeleteQueries()
+     * In Vulkan: Maps to vkDestroyQueryPool()
+     * 
+     * @param ctx Command context
+     * @param id The query object name/ID to delete
+     */
+    void disposeQueryObject(CommandContext ctx, int id);
+    
+    /**
+     * Returns the integer value of a query object parameter.
+     * 
+     * In OpenGL: Maps to glGetQueryObjectiv()
+     * In Vulkan: Maps to vkGetQueryPoolResults()
+     * 
+     * @param ctx Command context
+     * @param id The query object name/ID
+     * @param pname The parameter to query (e.g. GL_QUERY_RESULT_AVAILABLE)
+     * @return The integer result
+     */
+    int retrieveQueryObjectInt(CommandContext ctx, int id, int pname);
+    
+    /**
+     * Returns the 64-bit integer value of a query object parameter.
+     * 
+     * In OpenGL: Maps to glGetQueryObjecti64v() (ARB_timer_query)
+     * In Vulkan: Maps to vkGetQueryPoolResults() with 64-bit flag
+     * 
+     * @param ctx Command context
+     * @param id The query object name/ID
+     * @param pname The parameter to query (e.g. GL_QUERY_RESULT)
+     * @return The 64-bit integer result
+     */
+    long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname);
     
     // Debug label operations (KHR_debug)
     /**

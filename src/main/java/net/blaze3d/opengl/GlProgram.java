@@ -140,7 +140,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 		int o = GlStateManager.glGetProgrami(this.programId, 35382);
 
 		for (int p = 0; p < o; p++) {
-			String string = VulkanicAPI.retrieveActiveUniformBlockName(this.programId, p);
+			String string = VulkanicAPI.retrieveActiveUniformBlockName(VulkanicAPI.getImmediateContext(), this.programId, p);
 			if (!this.uniformsByName.containsKey(string)) {
 				if (!list2.contains(string) && BUILT_IN_UNIFORMS.contains(string)) {
 					int n = i++;

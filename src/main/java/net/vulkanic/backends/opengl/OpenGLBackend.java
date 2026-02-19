@@ -1267,22 +1267,12 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL32.glDeleteSync(sync);
     }
     
-    @Deprecated
     @Override
-    public long createFenceSync(int condition, int flags) {
-        return createFenceSync(VulkanicAPI.getImmediateContext(), condition, flags);
-    }
-    
-    @Deprecated
-    @Override
-    public int waitForSync(long sync, int flags, long timeout) {
+    public int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL32.glClientWaitSync(sync, flags, timeout);
-    }
-    
-    @Deprecated
-    @Override
-    public void destroySync(long sync) {
-        destroySync(VulkanicAPI.getImmediateContext(), sync);
     }
     
     @Override
@@ -1313,45 +1303,59 @@ public class OpenGLBackend implements GraphicsBackend {
         GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
     }
     
-    @Deprecated
     @Override
-    public String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
+    public String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL31.glGetActiveUniformBlockName(program, uniformBlockIndex);
     }
     
-    @Deprecated
     @Override
-    public int generateQueryObject() {
+    public int generateQueryObject(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL32C.glGenQueries();
     }
     
-    @Deprecated
     @Override
-    public void initiateQuery(int target, int id) {
+    public void initiateQuery(CommandContext ctx, int target, int id) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glBeginQuery(target, id);
     }
     
-    @Deprecated
     @Override
-    public void concludeQuery(int target) {
+    public void concludeQuery(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glEndQuery(target);
     }
     
-    @Deprecated
     @Override
-    public void disposeQueryObject(int id) {
+    public void disposeQueryObject(CommandContext ctx, int id) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glDeleteQueries(id);
     }
     
-    @Deprecated
     @Override
-    public int retrieveQueryObjectInt(int id, int pname) {
+    public int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL32C.glGetQueryObjecti(id, pname);
     }
     
-    @Deprecated
     @Override
-    public long retrieveQueryObjectInt64(int id, int pname) {
+    public long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBTimerQuery.glGetQueryObjecti64(id, pname);
     }
     

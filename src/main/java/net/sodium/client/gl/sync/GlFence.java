@@ -37,7 +37,7 @@ public class GlFence {
 
     public void sync(long timeout) {
         this.checkDisposed();
-        VulkanicAPI.waitForSync(this.id, 1, timeout); // GL_SYNC_FLUSH_COMMANDS_BIT
+        VulkanicAPI.waitForSync(VulkanicAPI.getImmediateContext(), this.id, 1, timeout); // GL_SYNC_FLUSH_COMMANDS_BIT
     }
 
     public void delete() {

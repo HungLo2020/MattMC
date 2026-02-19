@@ -1538,23 +1538,12 @@ public class VulkanicAPI {
         return getBackend().createFenceSync(ctx, condition, flags);
     }
     
-    @Deprecated
-    public static long createFenceSync(int condition, int flags) {
-        return createFenceSync(getImmediateContext(), condition, flags);
-    }
-    
-    @Deprecated
-    public static int waitForSync(long sync, int flags, long timeout) {
-        return getBackend().waitForSync(sync, flags, timeout);
+    public static int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
+        return getBackend().waitForSync(ctx, sync, flags, timeout);
     }
     
     public static void destroySync(CommandContext ctx, long sync) {
         getBackend().destroySync(ctx, sync);
-    }
-    
-    @Deprecated
-    public static void destroySync(long sync) {
-        destroySync(getImmediateContext(), sync);
     }
     
     public static void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
@@ -1590,39 +1579,32 @@ public class VulkanicAPI {
         getBackend().uniformBlockBinding(ctx, program, uniformBlockIndex, uniformBlockBinding);
     }
     
-    @Deprecated
-    public static String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
-        return getBackend().retrieveActiveUniformBlockName(program, uniformBlockIndex);
+    public static String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
+        return getBackend().retrieveActiveUniformBlockName(ctx, program, uniformBlockIndex);
     }
     
-    @Deprecated
-    public static int generateQueryObject() {
-        return getBackend().generateQueryObject();
+    public static int generateQueryObject(CommandContext ctx) {
+        return getBackend().generateQueryObject(ctx);
     }
     
-    @Deprecated
-    public static void initiateQuery(int target, int id) {
-        getBackend().initiateQuery(target, id);
+    public static void initiateQuery(CommandContext ctx, int target, int id) {
+        getBackend().initiateQuery(ctx, target, id);
     }
     
-    @Deprecated
-    public static void concludeQuery(int target) {
-        getBackend().concludeQuery(target);
+    public static void concludeQuery(CommandContext ctx, int target) {
+        getBackend().concludeQuery(ctx, target);
     }
     
-    @Deprecated
-    public static void disposeQueryObject(int id) {
-        getBackend().disposeQueryObject(id);
+    public static void disposeQueryObject(CommandContext ctx, int id) {
+        getBackend().disposeQueryObject(ctx, id);
     }
     
-    @Deprecated
-    public static int retrieveQueryObjectInt(int id, int pname) {
-        return getBackend().retrieveQueryObjectInt(id, pname);
+    public static int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
+        return getBackend().retrieveQueryObjectInt(ctx, id, pname);
     }
     
-    @Deprecated
-    public static long retrieveQueryObjectInt64(int id, int pname) {
-        return getBackend().retrieveQueryObjectInt64(id, pname);
+    public static long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
+        return getBackend().retrieveQueryObjectInt64(ctx, id, pname);
     }
     
     public static void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {

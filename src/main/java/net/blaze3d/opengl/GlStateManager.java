@@ -622,17 +622,17 @@ public class GlStateManager {
 
 	public static long _glFenceSync(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.createFenceSync(i, j);
+		return net.vulkanic.VulkanicAPI.createFenceSync(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j);
 	}
 
 	public static int _glClientWaitSync(long l, int i, long m) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.waitForSync(l, i, m);
+		return net.vulkanic.VulkanicAPI.waitForSync(net.vulkanic.VulkanicAPI.getImmediateContext(), l, i, m);
 	}
 
 	public static void _glDeleteSync(long l) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.destroySync(l);
+		net.vulkanic.VulkanicAPI.destroySync(net.vulkanic.VulkanicAPI.getImmediateContext(), l);
 	}
 
 	@Environment(EnvType.CLIENT)
