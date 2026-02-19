@@ -2544,6 +2544,19 @@ public interface GraphicsBackend {
      */
     void texParameterf(CommandContext ctx, int target, int pname, float param);
     
+    /**
+     * Sets a single integer texture parameter.
+     * 
+     * In OpenGL: Maps to glTexParameteri()
+     * In Vulkan: Maps to sampler or image view creation parameters
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER, GL_TEXTURE_BASE_LEVEL)
+     * @param param The integer parameter value
+     */
+    void texParameteri(CommandContext ctx, int target, int pname, int param);
+    
     @Deprecated
     void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height);
     @Deprecated
@@ -2698,6 +2711,18 @@ public interface GraphicsBackend {
      * @return true if buffer is a valid buffer object name
      */
     boolean isBuffer(CommandContext ctx, int buffer);
+    
+    /**
+     * Tests whether a specific capability is enabled.
+     * 
+     * In OpenGL: Maps to glIsEnabled()
+     * In Vulkan: Would map to pipeline state queries or current render pass state
+     * 
+     * @param ctx Command context for recording this command
+     * @param cap The capability to test (e.g., GL_BLEND, GL_DEPTH_TEST)
+     * @return true if the capability is enabled
+     */
+    boolean isEnabled(CommandContext ctx, int cap);
     
     /**
      * Sets texture parameters using an array of integers.

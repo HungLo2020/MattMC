@@ -229,7 +229,7 @@ public class GLBuffer implements AutoCloseable
 			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), newSize, bufferDataHint);
 			this.size = newSize;
 		}
-		VulkanicAPI.glBufferSubData(this.getBufferBindingTarget(), 0, bb);
+		VulkanicAPI.bufferSubData(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), 0, bb);
 	}
 	
 	

@@ -1956,7 +1956,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public void glTexParameteri(int target, int pname, int param) {
-        setTextureParameter(VulkanicAPI.getImmediateContext(), target, pname, param);
+        texParameteri(VulkanicAPI.getImmediateContext(), target, pname, param);
     }
     
     @Override
@@ -1965,6 +1965,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL32C.glTexParameterf(target, pname, param);
+    }
+    
+    @Override
+    public void texParameteri(CommandContext ctx, int target, int pname, int param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glTexParameteri(target, pname, param);
     }
     
     @Deprecated
@@ -2994,7 +3002,7 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public boolean glIsEnabled(int cap) {
-        return org.lwjgl.opengl.GL11.glIsEnabled(cap);
+        return isEnabled(VulkanicAPI.getImmediateContext(), cap);
     }
     
     @Deprecated
@@ -3063,6 +3071,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return org.lwjgl.opengl.GL15.glIsBuffer(buffer);
+    }
+    
+    @Override
+    public boolean isEnabled(CommandContext ctx, int cap) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL11.glIsEnabled(cap);
     }
     
     @Override

@@ -92,24 +92,24 @@ public class GLState
 			this.frameBufferDepthTexture = 0;
 		}
 		
-		this.blend = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_BLEND);
-		this.scissor = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_SCISSOR_TEST);
+		this.blend = VulkanicAPI.isEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_BLEND);
+		this.scissor = VulkanicAPI.isEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SCISSOR_TEST);
 		this.blendEqRGB = VulkanicAPI.glGetInteger(VulkanicAPI.GL_BLEND_EQUATION_RGB);
 		this.blendEqAlpha = VulkanicAPI.glGetInteger(VulkanicAPI.GL_BLEND_EQUATION_ALPHA);
 		this.blendSrcColor = VulkanicAPI.glGetInteger(VulkanicAPI.GL_BLEND_SRC_RGB);
 		this.blendSrcAlpha = VulkanicAPI.glGetInteger(VulkanicAPI.GL_BLEND_SRC_ALPHA);
 		this.blendDstColor = VulkanicAPI.glGetInteger(VulkanicAPI.GL_BLEND_DST_RGB);
 		this.blendDstAlpha = VulkanicAPI.glGetInteger(VulkanicAPI.GL_BLEND_DST_ALPHA);
-		this.depth = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_DEPTH_TEST);
+		this.depth = VulkanicAPI.isEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DEPTH_TEST);
 		this.writeToDepthBuffer = VulkanicAPI.glGetInteger(VulkanicAPI.GL_DEPTH_WRITEMASK) == VulkanicAPI.GL_TRUE;
 		this.depthFunc = VulkanicAPI.glGetInteger(VulkanicAPI.GL_DEPTH_FUNC);
-		this.stencil = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_STENCIL_TEST);
+		this.stencil = VulkanicAPI.isEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_STENCIL_TEST);
 		this.stencilFunc = VulkanicAPI.glGetInteger(VulkanicAPI.GL_STENCIL_FUNC);
 		this.stencilRef = VulkanicAPI.glGetInteger(VulkanicAPI.GL_STENCIL_REF);
 		this.stencilMask = VulkanicAPI.glGetInteger(VulkanicAPI.GL_STENCIL_VALUE_MASK);
 		this.view = new int[4];
 		VulkanicAPI.glGetIntegerv(VulkanicAPI.GL_VIEWPORT, this.view);
-		this.cull = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_CULL_FACE);
+		this.cull = VulkanicAPI.isEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_CULL_FACE);
 		this.cullMode = VulkanicAPI.glGetInteger(VulkanicAPI.GL_CULL_FACE_MODE);
 		this.polyMode = VulkanicAPI.glGetInteger(VulkanicAPI.GL_POLYGON_MODE);
 	}

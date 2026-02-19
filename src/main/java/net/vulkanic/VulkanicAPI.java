@@ -2044,7 +2044,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glTexParameteri(int target, int pname, int param) {
-        getBackend().glTexParameteri(target, pname, param);
+        texParameteri(getImmediateContext(), target, pname, param);
     }
     
     /**
@@ -2057,6 +2057,10 @@ public class VulkanicAPI {
      */
     public static void texParameterf(CommandContext ctx, int target, int pname, float param) {
         getBackend().texParameterf(ctx, target, pname, param);
+    }
+    
+    public static void texParameteri(CommandContext ctx, int target, int pname, int param) {
+        getBackend().texParameteri(ctx, target, pname, param);
     }
     
     @Deprecated
@@ -2076,7 +2080,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glDrawBuffers(int[] buffers) {
-        getBackend().glDrawBuffers(buffers);
+        drawBuffers(getImmediateContext(), buffers);
     }
     
     @Deprecated
@@ -2151,7 +2155,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glBufferSubData(int target, long offset, java.nio.ByteBuffer data) {
-        getBackend().glBufferSubData(target, offset, data);
+        bufferSubData(getImmediateContext(), target, offset, data);
     }
     
     @Deprecated
@@ -2200,7 +2204,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
-        getBackend().glFramebufferTexture2D(target, attachment, textarget, texture, level);
+        framebufferTexture2D(getImmediateContext(), target, attachment, textarget, texture, level);
     }
     
     @Deprecated
@@ -3059,7 +3063,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static boolean glIsEnabled(int cap) {
-        return getBackend().glIsEnabled(cap);
+        return isEnabled(getImmediateContext(), cap);
     }
     
     /**
@@ -3158,6 +3162,10 @@ public class VulkanicAPI {
      */
     public static boolean isBuffer(CommandContext ctx, int buffer) {
         return getBackend().isBuffer(ctx, buffer);
+    }
+    
+    public static boolean isEnabled(CommandContext ctx, int cap) {
+        return getBackend().isEnabled(ctx, cap);
     }
     
     /**
