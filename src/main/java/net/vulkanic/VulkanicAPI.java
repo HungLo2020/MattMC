@@ -1789,14 +1789,22 @@ public class VulkanicAPI {
         getIntegerv(getImmediateContext(), pname, params);
     }
     
+    public static void getFloatv(CommandContext ctx, int pname, float[] params) {
+        getBackend().getFloatv(ctx, pname, params);
+    }
+    
     @Deprecated
     public static void glGetFloatv(int pname, float[] params) {
-        getBackend().glGetFloatv(pname, params);
+        getFloatv(getImmediateContext(), pname, params);
+    }
+    
+    public static void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture1D(ctx, target, level, internalformat, width, border, format, type, pixels);
     }
     
     @Deprecated
     public static void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        getBackend().glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
+        uploadTexture1D(getImmediateContext(), target, level, internalformat, width, border, format, type, pixels);
     }
     
     @Deprecated
@@ -1804,9 +1812,13 @@ public class VulkanicAPI {
         getBackend().glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
     }
     
+    public static void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture3D(ctx, target, level, internalformat, width, height, depth, border, format, type, pixels);
+    }
+    
     @Deprecated
     public static void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        getBackend().glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
+        uploadTexture3D(getImmediateContext(), target, level, internalformat, width, height, depth, border, format, type, pixels);
     }
     
     @Deprecated
@@ -1819,9 +1831,13 @@ public class VulkanicAPI {
         getBackend().glUniformMatrix4fv(location, transpose, matrix);
     }
     
+    public static void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
+        getBackend().copyTexImage2D(ctx, target, level, internalFormat, x, y, width, height, border);
+    }
+    
     @Deprecated
     public static void glCopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
-        getBackend().glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
+        copyTexImage2D(getImmediateContext(), target, level, internalFormat, x, y, width, height, border);
     }
     
     @Deprecated
@@ -1834,9 +1850,13 @@ public class VulkanicAPI {
         setUniform2f(getImmediateContext(), location, v0, v1);
     }
     
+    public static void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
+        getBackend().setUniform2i(ctx, location, v0, v1);
+    }
+    
     @Deprecated
     public static void glUniform2i(int location, int v0, int v1) {
-        getBackend().glUniform2i(location, v0, v1);
+        setUniform2i(getImmediateContext(), location, v0, v1);
     }
     
     @Deprecated

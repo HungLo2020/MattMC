@@ -1099,6 +1099,19 @@ public interface GraphicsBackend {
     void setUniform2f(CommandContext ctx, int location, float v0, float v1);
     
     /**
+     * Sets a 2-component integer vector uniform value.
+     * 
+     * In OpenGL: Maps to glUniform2i()
+     * In Vulkan: Maps to push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param v0 The first component value
+     * @param v1 The second component value
+     */
+    void setUniform2i(CommandContext ctx, int location, int v0, int v1);
+    
+    /**
      * Sets a 3-component integer vector uniform value.
      * 
      * In OpenGL: Maps to glUniform3i()
@@ -1588,10 +1601,79 @@ public interface GraphicsBackend {
      */
     void getIntegerv(CommandContext ctx, int pname, int[] params);
     
+    /**
+     * Returns multiple float values from the OpenGL state.
+     * 
+     * In OpenGL: Maps to glGetFloatv()
+     * In Vulkan: May query device limits or current state
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The state parameter to query (e.g., GL_MAX_VIEWPORT_DIMS)
+     * @param params Array to receive the values
+     */
+    void getFloatv(CommandContext ctx, int pname, float[] params);
+    
     @Deprecated
     void glGetIntegerv(int pname, int[] params);
     @Deprecated
     void glGetFloatv(int pname, float[] params);
+    
+    /**
+     * Uploads pixel data to a 1D texture.
+     * 
+     * In OpenGL: Maps to glTexImage1D()
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() after staging buffer setup
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_1D)
+     * @param level Mipmap level
+     * @param internalformat Internal format of the texture
+     * @param width Width of the texture
+     * @param border Border width (must be 0)
+     * @param format Format of the pixel data
+     * @param type Data type of the pixel data
+     * @param pixels Pixel data buffer (can be null)
+     */
+    void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels);
+    
+    /**
+     * Uploads pixel data to a 3D texture.
+     * 
+     * In OpenGL: Maps to glTexImage3D()
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() after staging buffer setup
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_3D)
+     * @param level Mipmap level
+     * @param internalformat Internal format of the texture
+     * @param width Width of the texture
+     * @param height Height of the texture
+     * @param depth Depth of the texture
+     * @param border Border width (must be 0)
+     * @param format Format of the pixel data
+     * @param type Data type of the pixel data
+     * @param pixels Pixel data buffer (can be null)
+     */
+    void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels);
+    
+    /**
+     * Copies pixels from framebuffer to a 2D texture.
+     * 
+     * In OpenGL: Maps to glCopyTexImage2D()
+     * In Vulkan: Maps to vkCmdCopyImage() or vkCmdBlitImage()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param level Mipmap level
+     * @param internalFormat Internal format of the texture
+     * @param x X coordinate of the lower-left corner of the framebuffer region
+     * @param y Y coordinate of the lower-left corner of the framebuffer region
+     * @param width Width of the texture and framebuffer region
+     * @param height Height of the texture and framebuffer region
+     * @param border Border width (must be 0)
+     */
+    void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border);
+    
     @Deprecated
     void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels);
     @Deprecated

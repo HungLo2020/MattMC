@@ -988,6 +988,14 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform2i(location, v0, v1);
+    }
+    
+    @Override
     public void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -1697,10 +1705,26 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL32C.glGetIntegerv(pname, params);
     }
     
+    @Override
+    public void getFloatv(CommandContext ctx, int pname, float[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glGetFloatv(pname, params);
+    }
+    
     @Deprecated
     @Override
     public void glGetFloatv(int pname, float[] params) {
         org.lwjgl.opengl.GL32C.glGetFloatv(pname, params);
+    }
+    
+    @Override
+    public void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL30C.glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
     }
     
     @Deprecated
@@ -1713,6 +1737,14 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
         uploadTexture2D(VulkanicAPI.getImmediateContext(), target, level, internalformat, width, height, border, format, type, pixels);
+    }
+    
+    @Override
+    public void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL30C.glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
     }
     
     @Deprecated
@@ -1731,6 +1763,14 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
         setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, transpose, matrix);
+    }
+    
+    @Override
+    public void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
     }
     
     @Deprecated

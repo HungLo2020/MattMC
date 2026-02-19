@@ -67,7 +67,7 @@ public class IrisRenderSystem {
 
 	public static void getFloatv(int pname, float[] params) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glGetFloatv(pname, params);
+		VulkanicAPI.getFloatv(VulkanicAPI.getImmediateContext(), pname, params);
 	}
 
 	public static void generateMipmaps(int texture, int mipmapTarget) {
@@ -83,7 +83,7 @@ public class IrisRenderSystem {
 	public static void texImage1D(int texture, int target, int level, int internalformat, int width, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		VulkanicAPI.glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
+		VulkanicAPI.uploadTexture1D(VulkanicAPI.getImmediateContext(), target, level, internalformat, width, border, format, type, pixels);
 	}
 
 	public static void texImage2D(int texture, int target, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
@@ -95,7 +95,7 @@ public class IrisRenderSystem {
 	public static void texImage3D(int texture, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		VulkanicAPI.glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
+		VulkanicAPI.uploadTexture3D(VulkanicAPI.getImmediateContext(), target, level, internalformat, width, height, depth, border, format, type, pixels);
 	}
 
 	public static void uniformMatrix4fv(int location, boolean transpose, FloatBuffer matrix) {
@@ -110,7 +110,7 @@ public class IrisRenderSystem {
 
 	public static void copyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
+		VulkanicAPI.copyTexImage2D(VulkanicAPI.getImmediateContext(), target, level, internalFormat, x, y, width, height, border);
 	}
 
 	public static void uniform1f(int location, float v0) {
@@ -125,7 +125,7 @@ public class IrisRenderSystem {
 
 	public static void uniform2i(int location, int v0, int v1) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniform2i(location, v0, v1);
+		VulkanicAPI.setUniform2i(VulkanicAPI.getImmediateContext(), location, v0, v1);
 	}
 
 	public static void uniform3f(int location, float v0, float v1, float v2) {
