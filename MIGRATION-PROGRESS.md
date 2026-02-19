@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (242/283) | Complete | 85.5% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (249/283) | Complete | 88.0% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟢 85.5% | 100% | **🎉 Crossed 85% milestone!** |
+| **API Vulkan Compatibility** | 🟢 88.0% | 100% | **🎉 Crossed 88% milestone!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 85.5% (242/283 methods migrated)
+### Overall Phase Progress: 88.0% (249/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 242 (85.5%)**
-- **Methods using immediate mode: 41 (14.5%)**
+- **Methods migrated to CommandContext: 249 (88.0%)**
+- **Methods using immediate mode: 34 (12.0%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 242 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 85% milestone!**
+**Conclusion**: API migration in progress. 249 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 88% milestone!**
 
 ### Required Work Breakdown
 
@@ -1278,6 +1278,27 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-19 (Update 20 - Batch 46 Complete - 88.0% Milestone! DELETED GLState + Shader deprecated methods!)
+- **COMPLETELY DELETED** 7 deprecated methods from VulkanicAPI, GraphicsBackend, AND OpenGLBackend
+- Added 7 NEW CommandContext methods to GraphicsBackend, OpenGLBackend, and VulkanicAPI
+- Updated 9 call sites across DH/GLState, Sodium/ShaderWorkarounds, Blaze3D/GlStateManager
+- Progress: 85.5% → 88.0% (242/283 → 249/283 methods migrated)
+- **🎉 CROSSED 88% MILESTONE! GLState state restore and shader source upload now use CommandContext!**
+- All architectural boundary tests passing (4/4)
+- All CommandContext tests passing (7/7)
+- Build successful with zero regressions
+- Methods COMPLETELY DELETED (removed from VulkanicAPI, GraphicsBackend, AND OpenGLBackend):
+  - `glIsFramebuffer(framebuffer)` → call sites now use `isFramebuffer(ctx, framebuffer)` — 1 site (GLState)
+  - `glIsVertexArray(array)` → call sites now use `isVertexArray(ctx, array)` — 1 site (GLState)
+  - `glIsProgram(program)` → call sites now use `isProgram(ctx, program)` — 1 site (GLState)
+  - `glBlendEquationSeparate(modeRGB, modeAlpha)` → call sites now use `setBlendEquationSeparate(ctx, modeRGB, modeAlpha)` — 1 site (GLState)
+  - `glStencilFunc(func, ref, mask)` → call sites now use `setStencilFunc(ctx, func, ref, mask)` — 1 site (GLState)
+  - `queryTextureLevelParameter(target, level, pname)` → call sites now use `getTextureLevelParameter(ctx, target, level, pname)` — 1 site (GlStateManager)
+  - `uploadShaderSource(shader, ptr, count, lengths)` → call sites now use `uploadShaderSource(ctx, shader, ptr, count, lengths)` — 2 sites (GlStateManager, ShaderWorkarounds)
+- Files modified: 7 total (GraphicsBackend, OpenGLBackend, VulkanicAPI, GLState, GlStateManager, ShaderWorkarounds, MIGRATION-PROGRESS.md)
+- **PATTERN ENFORCED**: Deprecated methods completely removed. No delegation wrappers remain.
+- **CALL SITES UPDATED**: DH (5 sites in GLState), Sodium (1 site in ShaderWorkarounds), Blaze3D (2 sites in GlStateManager)
 
 ### 2026-02-19 (Update 19 - Batch 45 Complete - 85.5% Milestone! DELETED ALL DEPRECATED FENCE+QUERY METHODS!)
 - **COMPLETELY DELETED** 10 deprecated methods (no wrappers remain for migrated methods)

@@ -1844,12 +1844,34 @@ public interface GraphicsBackend {
      */
     boolean isTexture(CommandContext ctx, int texture);
     
-    @Deprecated
-    int queryTextureLevelParameter(int target, int level, int pname);
+    /**
+     * Returns the value of a texture-level parameter.
+     * 
+     * In OpenGL: Maps to glGetTexLevelParameteriv()
+     * In Vulkan: Would query VkImage properties via vkGetImageSubresourceLayout
+     * 
+     * @param ctx Command context
+     * @param target Texture target (e.g. GL_TEXTURE_2D)
+     * @param level Mipmap level
+     * @param pname Parameter name (e.g. GL_TEXTURE_WIDTH)
+     * @return The integer parameter value
+     */
+    int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname);
     
     // Shader source (native)
-    @Deprecated
-    void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
+    /**
+     * Uploads GLSL source code to a shader object using native pointer addresses.
+     * 
+     * In OpenGL: Maps to nglShaderSource()
+     * In Vulkan: Not used – Vulkan uses SPIR-V bytecode via vkCreateShaderModule
+     * 
+     * @param ctx Command context
+     * @param shader The shader object ID
+     * @param pointerBufferAddress Native address of the string pointer array
+     * @param stringCount Number of strings
+     * @param lengthsPointer Native address of the lengths array (0 means null-terminated)
+     */
+    void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
     
     /**
      * Binds a uniform block to a uniform block binding point.
@@ -2810,21 +2832,72 @@ public interface GraphicsBackend {
     @Deprecated
     boolean glIsEnabled(int cap);
     @Deprecated
-    boolean glIsFramebuffer(int framebuffer);
-    @Deprecated
     boolean glIsTexture(int texture);
-    @Deprecated
-    boolean glIsVertexArray(int array);
-    @Deprecated
-    boolean glIsProgram(int program);
+    
+    /**
+     * Checks if a name corresponds to a framebuffer object.
+     * 
+     * In OpenGL: Maps to glIsFramebuffer()
+     * In Vulkan: Would query internal framebuffer registry
+     * 
+     * @param ctx Command context
+     * @param framebuffer The name to check
+     * @return True if the name is a framebuffer object
+     */
+    boolean isFramebuffer(CommandContext ctx, int framebuffer);
+    
+    /**
+     * Checks if a name corresponds to a vertex array object.
+     * 
+     * In OpenGL: Maps to glIsVertexArray()
+     * In Vulkan: Would query internal vertex array registry
+     * 
+     * @param ctx Command context
+     * @param array The name to check
+     * @return True if the name is a vertex array object
+     */
+    boolean isVertexArray(CommandContext ctx, int array);
+    
+    /**
+     * Checks if a name corresponds to a program object.
+     * 
+     * In OpenGL: Maps to glIsProgram()
+     * In Vulkan: Would query internal pipeline registry
+     * 
+     * @param ctx Command context
+     * @param program The name to check
+     * @return True if the name is a program object
+     */
+    boolean isProgram(CommandContext ctx, int program);
     
     // Additional GL state methods
     @Deprecated
-    void glBlendEquationSeparate(int modeRGB, int modeAlpha);
-    @Deprecated
-    void glStencilFunc(int func, int ref, int mask);
-    @Deprecated
     void glCullFace(int mode);
+    
+    /**
+     * Sets the RGB and alpha blend equations separately.
+     * 
+     * In OpenGL: Maps to glBlendEquationSeparate()
+     * In Vulkan: Configured in VkPipelineColorBlendStateCreateInfo
+     * 
+     * @param ctx Command context
+     * @param modeRGB Blend equation for RGB components
+     * @param modeAlpha Blend equation for the alpha component
+     */
+    void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha);
+    
+    /**
+     * Sets the stencil test function and reference value.
+     * 
+     * In OpenGL: Maps to glStencilFunc()
+     * In Vulkan: Maps to vkCmdSetStencilCompareMask() / vkCmdSetStencilReference()
+     * 
+     * @param ctx Command context
+     * @param func Comparison function (e.g. GL_ALWAYS, GL_EQUAL)
+     * @param ref Reference value for the stencil test
+     * @param mask Mask ANDed with both the reference and the stored stencil value
+     */
+    void setStencilFunc(CommandContext ctx, int func, int ref, int mask);
     
     // Additional texture methods
     @Deprecated

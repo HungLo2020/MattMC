@@ -173,7 +173,7 @@ public class GlStateManager {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			PointerBuffer pointerBuffer = memoryStack.mallocPointer(1);
 			pointerBuffer.put(byteBuffer);
-			VulkanicAPI.uploadShaderSource(i, pointerBuffer.address0(), 1, 0L);
+			VulkanicAPI.uploadShaderSource(VulkanicAPI.getImmediateContext(), i, pointerBuffer.address0(), 1, 0L);
 		} finally {
 			MemoryUtil.memFree(byteBuffer);
 		}
@@ -461,7 +461,7 @@ public class GlStateManager {
 	}
 
 	public static int _getTexLevelParameter(int i, int j, int k) {
-		return VulkanicAPI.queryTextureLevelParameter(i, j, k);
+		return VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), i, j, k);
 	}
 
 	public static int _genTexture() {

@@ -1565,14 +1565,12 @@ public class VulkanicAPI {
         return getBackend().getGraphicsCapabilities();
     }
     
-    @Deprecated
-    public static int queryTextureLevelParameter(int target, int level, int pname) {
-        return getBackend().queryTextureLevelParameter(target, level, pname);
+    public static int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
+        return getBackend().getTextureLevelParameter(ctx, target, level, pname);
     }
     
-    @Deprecated
-    public static void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
-        getBackend().uploadShaderSource(shader, pointerBufferAddress, stringCount, lengthsPointer);
+    public static void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        getBackend().uploadShaderSource(ctx, shader, pointerBufferAddress, stringCount, lengthsPointer);
     }
     
     public static void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
@@ -3048,9 +3046,8 @@ public class VulkanicAPI {
     /**
      * Determines if a name corresponds to a framebuffer object.
      */
-    @Deprecated
-    public static boolean glIsFramebuffer(int framebuffer) {
-        return getBackend().glIsFramebuffer(framebuffer);
+    public static boolean isFramebuffer(CommandContext ctx, int framebuffer) {
+        return getBackend().isFramebuffer(ctx, framebuffer);
     }
     
     /**
@@ -3065,33 +3062,29 @@ public class VulkanicAPI {
     /**
      * Determines if a name corresponds to a vertex array object.
      */
-    @Deprecated
-    public static boolean glIsVertexArray(int array) {
-        return getBackend().glIsVertexArray(array);
+    public static boolean isVertexArray(CommandContext ctx, int array) {
+        return getBackend().isVertexArray(ctx, array);
     }
     
     /**
      * Determines if a name corresponds to a program object.
      */
-    @Deprecated
-    public static boolean glIsProgram(int program) {
-        return getBackend().glIsProgram(program);
+    public static boolean isProgram(CommandContext ctx, int program) {
+        return getBackend().isProgram(ctx, program);
     }
     
     /**
      * Sets the RGB blend equation and the alpha blend equation separately.
      */
-    @Deprecated
-    public static void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
-        getBackend().glBlendEquationSeparate(modeRGB, modeAlpha);
+    public static void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        getBackend().setBlendEquationSeparate(ctx, modeRGB, modeAlpha);
     }
     
     /**
      * Sets the stencil test function.
      */
-    @Deprecated
-    public static void glStencilFunc(int func, int ref, int mask) {
-        getBackend().glStencilFunc(func, ref, mask);
+    public static void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        getBackend().setStencilFunc(ctx, func, ref, mask);
     }
     
     /**

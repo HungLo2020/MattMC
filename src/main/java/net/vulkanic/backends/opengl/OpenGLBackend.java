@@ -1283,15 +1283,19 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL11.glIsTexture(texture);
     }
     
-    @Deprecated
     @Override
-    public int queryTextureLevelParameter(int target, int level, int pname) {
+    public int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL11.glGetTexLevelParameteri(target, level, pname);
     }
     
-    @Deprecated
     @Override
-    public void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+    public void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL20C.nglShaderSource(shader, stringCount, pointerBufferAddress, lengthsPointer);
     }
     
@@ -3005,9 +3009,11 @@ public class OpenGLBackend implements GraphicsBackend {
         return isEnabled(VulkanicAPI.getImmediateContext(), cap);
     }
     
-    @Deprecated
     @Override
-    public boolean glIsFramebuffer(int framebuffer) {
+    public boolean isFramebuffer(CommandContext ctx, int framebuffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL30.glIsFramebuffer(framebuffer);
     }
     
@@ -3017,29 +3023,37 @@ public class OpenGLBackend implements GraphicsBackend {
         return isTexture(VulkanicAPI.getImmediateContext(), texture);
     }
     
-    @Deprecated
     @Override
-    public boolean glIsVertexArray(int array) {
+    public boolean isVertexArray(CommandContext ctx, int array) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL30.glIsVertexArray(array);
     }
     
-    @Deprecated
     @Override
-    public boolean glIsProgram(int program) {
+    public boolean isProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL20.glIsProgram(program);
     }
     
     // Additional GL state methods
     
-    @Deprecated
     @Override
-    public void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
+    public void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
     }
     
-    @Deprecated
     @Override
-    public void glStencilFunc(int func, int ref, int mask) {
+    public void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
     }
     
