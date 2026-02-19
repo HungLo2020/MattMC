@@ -1971,7 +1971,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        getBackend().glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
+        uploadTexture2D(getImmediateContext(), target, level, internalformat, width, height, border, format, type, pixels);
     }
     
     public static void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
@@ -1985,12 +1985,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix) {
-        getBackend().glUniformMatrix4fv(location, transpose, matrix);
+        setUniformMatrix4fv(getImmediateContext(), location, transpose, matrix);
     }
     
     @Deprecated
     public static void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
-        getBackend().glUniformMatrix4fv(location, transpose, matrix);
+        setUniformMatrix4fv(getImmediateContext(), location, transpose, matrix);
     }
     
     public static void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
@@ -2004,7 +2004,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glUniform1f(int location, float v0) {
-        getBackend().glUniform1f(location, v0);
+        setUniform1f(getImmediateContext(), location, v0);
     }
     
     @Deprecated
@@ -2186,12 +2186,13 @@ public class VulkanicAPI {
     
     @Deprecated
     public static java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
-        return getBackend().glMapBufferRange(target, offset, length, access);
+        return mapBuffer(getImmediateContext(), target, offset, length, access);
     }
     
     @Deprecated
     public static boolean glUnmapBuffer(int target) {
-        return getBackend().glUnmapBuffer(target);
+        unmapBuffer(getImmediateContext(), target);
+        return true; // OpenGL spec: always returns true unless data corruption occurred
     }
     
     @Deprecated

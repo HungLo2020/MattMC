@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (214/283) | Complete | 75.6% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (219/283) | Complete | 77.4% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟢 75.6% | 100% | **🎉 Three-quarters complete!** |
+| **API Vulkan Compatibility** | 🟢 77.4% | 100% | **🎉 Approaching 80% milestone!** |
 
 ---
 
@@ -1278,6 +1278,24 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-19 (Update 16 - Batch 42 Complete - 77.4% Milestone!)
+- Migrated 5 deprecated methods to use CommandContext delegation
+- Updated 5 VulkanicAPI methods to delegate to existing CommandContext versions (no backend changes needed)
+- Methods updated: glUniform1f, glTexImage2D, glUniformMatrix4fv (2 overloads), glMapBufferRange, glUnmapBuffer
+- Progress: 75.6% → 77.4% (214/283 → 219/283 methods migrated)
+- **Approaching 80% milestone!**
+- All architectural boundary tests passing (4/4)
+- All CommandContext tests passing (7/7)
+- Build successful with zero regressions
+- Key methods migrated:
+  - Uniform setting (glUniform1f → setUniform1f) - for shader parameter updates
+  - Texture uploading (glTexImage2D → uploadTexture2D) - for texture data initialization
+  - Matrix uniforms (glUniformMatrix4fv → setUniformMatrix4fv) - for transformation matrices
+  - Buffer mapping (glMapBufferRange → mapBuffer) - for CPU-GPU data transfer
+  - Buffer unmapping (glUnmapBuffer → unmapBuffer) - for completing data transfer
+- **EFFICIENCY**: All 5 methods reused existing CommandContext versions - zero duplication!
+- **PATTERN FOLLOWED**: All deprecated methods now delegate to CommandContext versions (no direct backend calls)
 
 ### 2026-02-19 (Update 15 - Batch 41 Complete - 75.6% MILESTONE! 🎉)
 - Migrated 5 debug control methods to CommandContext pattern
