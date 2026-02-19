@@ -3198,6 +3198,100 @@ public class VulkanicAPI {
     }
     
     /**
+     * Checks if a name corresponds to a framebuffer object.
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer name to check
+     * @return true if framebuffer is a valid framebuffer object name
+     */
+    public static boolean isFramebuffer(CommandContext ctx, int framebuffer) {
+        return getBackend().isFramebuffer(ctx, framebuffer);
+    }
+    
+    /**
+     * Checks if a name corresponds to a vertex array object.
+     * 
+     * @param ctx Command context for recording this command
+     * @param array The vertex array name to check
+     * @return true if array is a valid vertex array object name
+     */
+    public static boolean isVertexArray(CommandContext ctx, int array) {
+        return getBackend().isVertexArray(ctx, array);
+    }
+    
+    /**
+     * Checks if a name corresponds to a program object.
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program name to check
+     * @return true if program is a valid program object name
+     */
+    public static boolean isProgram(CommandContext ctx, int program) {
+        return getBackend().isProgram(ctx, program);
+    }
+    
+    /**
+     * Sets separate blend equations for RGB and alpha components.
+     * 
+     * @param ctx Command context for recording this command
+     * @param modeRGB Blend equation for RGB
+     * @param modeAlpha Blend equation for alpha
+     */
+    public static void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        getBackend().setBlendEquationSeparate(ctx, modeRGB, modeAlpha);
+    }
+    
+    /**
+     * Sets the stencil function and reference value.
+     * 
+     * @param ctx Command context for recording this command
+     * @param func The stencil comparison function
+     * @param ref Reference value for the stencil test
+     * @param mask Mask that is ANDed with both the reference and stored stencil value
+     */
+    public static void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        getBackend().setStencilFunc(ctx, func, ref, mask);
+    }
+    
+    /**
+     * Specifies the format of a generic integer vertex attribute.
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex Index of the generic vertex attribute
+     * @param size Number of values per vertex
+     * @param type Data type of each component
+     * @param relativeoffset Relative offset from the start of the vertex buffer binding
+     */
+    public static void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type, int relativeoffset) {
+        getBackend().setVertexAttribIFormat(ctx, attribindex, size, type, relativeoffset);
+    }
+    
+    /**
+     * Specifies the format of a generic vertex attribute.
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex Index of the generic vertex attribute
+     * @param size Number of values per vertex
+     * @param type Data type of each component
+     * @param normalized Whether fixed-point data should be normalized
+     * @param relativeoffset Relative offset from the start of the vertex buffer binding
+     */
+    public static void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+        getBackend().setVertexAttribFormat(ctx, attribindex, size, type, normalized, relativeoffset);
+    }
+    
+    /**
+     * Associates a vertex attribute with a vertex buffer binding.
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex Index of the attribute to associate with a binding
+     * @param bindingindex Index of the vertex buffer binding point
+     */
+    public static void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
+        getBackend().setVertexAttribBinding(ctx, attribindex, bindingindex);
+    }
+    
+    /**
      * Retrieves the index of a uniform block in a shader program.
      * 
      * @param ctx Command context for recording this command

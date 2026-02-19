@@ -4,6 +4,7 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -94,13 +95,14 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void setVertexAttribute(int bindingPoint, int attributeIndex, VertexPointer attribute)
 	{
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		if (attribute.useInteger)
 		{
-			VulkanicAPI.glVertexAttribIFormat(attributeIndex, attribute.elementCount, attribute.glType, this.strideSize);
+			VulkanicAPI.setVertexAttribIFormat(ctx, attributeIndex, attribute.elementCount, attribute.glType, this.strideSize);
 		}
 		else
 		{
-			VulkanicAPI.glVertexAttribFormat(attributeIndex, attribute.elementCount, attribute.glType,
+			VulkanicAPI.setVertexAttribFormat(ctx, attributeIndex, attribute.elementCount, attribute.glType,
 					attribute.normalized, this.strideSize); // strideSize used as relative offset here
 		}
 		
@@ -109,8 +111,8 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 		{
 			this.numberOfBindingPoints = bindingPoint + 1;
 		}
-		VulkanicAPI.glVertexAttribBinding(attributeIndex, bindingPoint);
-		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), attributeIndex);
+		VulkanicAPI.setVertexAttribBinding(ctx, attributeIndex, bindingPoint);
+		VulkanicAPI.enableVertexAttribArray(ctx, attributeIndex);
 	}
 	
 	

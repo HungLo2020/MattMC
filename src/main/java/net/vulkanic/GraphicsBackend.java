@@ -2798,6 +2798,108 @@ public interface GraphicsBackend {
     boolean isEnabled(CommandContext ctx, int cap);
     
     /**
+     * Checks if a name corresponds to a framebuffer object.
+     * 
+     * In OpenGL: Maps to glIsFramebuffer()
+     * In Vulkan: Would check VkFramebuffer handle validity
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer name to check
+     * @return true if framebuffer is a valid framebuffer object name
+     */
+    boolean isFramebuffer(CommandContext ctx, int framebuffer);
+    
+    /**
+     * Checks if a name corresponds to a vertex array object.
+     * 
+     * In OpenGL: Maps to glIsVertexArray()
+     * In Vulkan: Would check vertex input state validity
+     * 
+     * @param ctx Command context for recording this command
+     * @param array The vertex array name to check
+     * @return true if array is a valid vertex array object name
+     */
+    boolean isVertexArray(CommandContext ctx, int array);
+    
+    /**
+     * Checks if a name corresponds to a program object.
+     * 
+     * In OpenGL: Maps to glIsProgram()
+     * In Vulkan: Would check VkPipeline handle validity
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program name to check
+     * @return true if program is a valid program object name
+     */
+    boolean isProgram(CommandContext ctx, int program);
+    
+    /**
+     * Sets separate blend equations for RGB and alpha components.
+     * 
+     * In OpenGL: Maps to glBlendEquationSeparate()
+     * In Vulkan: Maps to VkPipelineColorBlendAttachmentState
+     * 
+     * @param ctx Command context for recording this command
+     * @param modeRGB Blend equation for RGB
+     * @param modeAlpha Blend equation for alpha
+     */
+    void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha);
+    
+    /**
+     * Sets the stencil function and reference value.
+     * 
+     * In OpenGL: Maps to glStencilFunc()
+     * In Vulkan: Maps to VkStencilOpState in pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param func The stencil comparison function
+     * @param ref Reference value for the stencil test
+     * @param mask Mask that is ANDed with both the reference and stored stencil value
+     */
+    void setStencilFunc(CommandContext ctx, int func, int ref, int mask);
+    
+    /**
+     * Specifies the format of a generic integer vertex attribute.
+     * 
+     * In OpenGL: Maps to glVertexAttribIFormat()
+     * In Vulkan: Maps to VkVertexInputAttributeDescription with integer format
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex Index of the generic vertex attribute
+     * @param size Number of values per vertex
+     * @param type Data type of each component
+     * @param relativeoffset Relative offset from the start of the vertex buffer binding
+     */
+    void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type, int relativeoffset);
+    
+    /**
+     * Specifies the format of a generic vertex attribute.
+     * 
+     * In OpenGL: Maps to glVertexAttribFormat()
+     * In Vulkan: Maps to VkVertexInputAttributeDescription
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex Index of the generic vertex attribute
+     * @param size Number of values per vertex
+     * @param type Data type of each component
+     * @param normalized Whether fixed-point data should be normalized
+     * @param relativeoffset Relative offset from the start of the vertex buffer binding
+     */
+    void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type, boolean normalized, int relativeoffset);
+    
+    /**
+     * Associates a vertex attribute with a vertex buffer binding.
+     * 
+     * In OpenGL: Maps to glVertexAttribBinding()
+     * In Vulkan: Maps to vertex input binding mapping in pipeline creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribindex Index of the attribute to associate with a binding
+     * @param bindingindex Index of the vertex buffer binding point
+     */
+    void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex);
+    
+    /**
      * Sets texture parameters using an array of integers.
      * 
      * In OpenGL: Maps to glTexParameteriv()

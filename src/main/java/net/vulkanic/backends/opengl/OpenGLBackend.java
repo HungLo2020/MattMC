@@ -3110,6 +3110,70 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public boolean isFramebuffer(CommandContext ctx, int framebuffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL30.glIsFramebuffer(framebuffer);
+    }
+    
+    @Override
+    public boolean isVertexArray(CommandContext ctx, int array) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL30.glIsVertexArray(array);
+    }
+    
+    @Override
+    public boolean isProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL20.glIsProgram(program);
+    }
+    
+    @Override
+    public void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
+    }
+    
+    @Override
+    public void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
+    }
+    
+    @Override
+    public void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type, int relativeoffset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL43.glVertexAttribIFormat(attribindex, size, type, relativeoffset);
+    }
+    
+    @Override
+    public void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL43.glVertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
+    }
+    
+    @Override
+    public void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL43.glVertexAttribBinding(attribindex, bindingindex);
+    }
+    
+    @Override
     public void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
