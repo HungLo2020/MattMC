@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (139/283) | Complete | 49.1% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (144/283) | Complete | 50.9% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 49.1% | 100% | Improving |
+| **API Vulkan Compatibility** | 🟡 50.9% | 100% | Improving |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 49.1% (139/283 methods migrated)
+### Overall Phase Progress: 50.9% (144/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 139 (49.1%)**
-- **Methods using immediate mode: 144 (50.9%)**
+- **Methods migrated to CommandContext: 144 (50.9%)**
+- **Methods using immediate mode: 139 (49.1%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 139 methods now support CommandContext pattern, enabling future Vulkan backend. Almost at 50% milestone!
+**Conclusion**: API migration in progress. 144 methods now support CommandContext pattern, enabling future Vulkan backend. **50% MILESTONE REACHED!**
 
 ### Required Work Breakdown
 
@@ -208,11 +208,12 @@
 - [x] **Migrated twenty-fourth batch (5 methods)** - glGetFloatv(), glTexImage1D(), glTexImage3D(), glCopyTexImage2D(), glUniform2i()
 - [x] **Migrated twenty-fifth batch (5 method families / 7 methods)** - glTexParameteriv(), glBufferStorage() x2, glVertexAttrib4f(), glSamplerParameteri/f/iv() x3
 - [x] **Migrated twenty-sixth batch (5 methods)** - glGetProgramInfoLog(), glGetShaderInfoLog(), glGetActiveUniform(), glGenBuffers(), glDeleteBuffers()
-- [x] **139 of 283 deprecated methods migrated** (49.1% complete) - **ALMOST AT 50% MILESTONE**
+- [x] **Migrated twenty-seventh batch (5 methods)** - glGetProgramiv(), glBindImageTexture(), glMemoryBarrier(), glBlendFuncSeparatei(), glGenSamplers()/glDeleteSamplers()
+- [x] **144 of 283 deprecated methods migrated** (50.9% complete) - **🎉 50% MILESTONE REACHED!**
 
 ### Phase 2.5 Progress Update
 
-**Methods Migrated to CommandContext Pattern**: 139 / 283 (49.1%)
+**Methods Migrated to CommandContext Pattern**: 144 / 283 (50.9%)
 
 **Batch 1 (Completed 2026-02-16 AM)**:
 1. ✅ clear(int) → clearBuffers(CommandContext, int) - 6 call sites updated
@@ -369,9 +370,19 @@ Note: Batch 25 migrated 5 deprecated method families (7 individual methods total
 4. ✅ glGenBuffers(int[]) → createBuffers(CommandContext, int[]) [new method] - 1 call site updated (IrisRenderSystem)
 5. ✅ glDeleteBuffers(int) → deleteBuffer(CommandContext, int) [already had CommandContext version] - 1 call site updated (IrisRenderSystem)
 
-**Total Call Sites Updated**: 350 (includes 5 from Batch 26)
+**Batch 27 (Completed 2026-02-19)**:
+1. ✅ glGetProgramiv(int, int, int[]) → getProgramiv(CommandContext, int, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
+2. ✅ glBindImageTexture(...) → bindImageTexture(CommandContext, ...) [new method] - 1 call site updated (IrisRenderSystem)
+3. ✅ glMemoryBarrier(int) → memoryBarrier(CommandContext, int) [new method] - 1 call site updated (IrisRenderSystem)
+4. ✅ glBlendFuncSeparatei(...) → blendFuncSeparatei(CommandContext, ...) [new method] - 1 call site updated (IrisRenderSystem)
+5. ✅ glGenSamplers() → createSampler(CommandContext) [new method] - 1 call site updated (IrisRenderSystem)
+6. ✅ glDeleteSamplers(int) → deleteSampler(CommandContext, int) [new method] - 1 call site updated (IrisRenderSystem)
 
-**Remaining Deprecated Methods**: 144 (50.9%)
+**Total Call Sites Updated**: 356 (includes 6 from Batch 27)
+
+**Remaining Deprecated Methods**: 139 (49.1%)
+
+🎉 **50% MILESTONE ACHIEVED!**
 
 
 ### Blockers

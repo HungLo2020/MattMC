@@ -152,6 +152,23 @@ public interface GraphicsBackend {
     void bindTexture(CommandContext ctx, int target, int textureId);
     
     /**
+     * Binds a level of a texture to an image unit.
+     * 
+     * In OpenGL: Maps to glBindImageTexture()
+     * In Vulkan: Part of descriptor set configuration for storage images
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit The image unit index
+     * @param texture The texture object ID
+     * @param level The mipmap level
+     * @param layered Whether the binding is layered
+     * @param layer The layer to bind (if not layered)
+     * @param access Access mode (read, write, or read-write)
+     * @param format The image format
+     */
+    void bindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format);
+    
+    /**
      * Binds a sampler object to a texture unit.
      * 
      * In OpenGL: Maps to glBindSampler()
@@ -162,6 +179,28 @@ public interface GraphicsBackend {
      * @param sampler The sampler object ID to bind
      */
     void bindSampler(CommandContext ctx, int unit, int sampler);
+    
+    /**
+     * Creates a new sampler object.
+     * 
+     * In OpenGL: Maps to glGenSamplers()
+     * In Vulkan: Maps to vkCreateSampler()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The sampler object ID
+     */
+    int createSampler(CommandContext ctx);
+    
+    /**
+     * Deletes a sampler object.
+     * 
+     * In OpenGL: Maps to glDeleteSamplers()
+     * In Vulkan: Maps to vkDestroySampler()
+     * 
+     * @param ctx Command context for recording this command
+     * @param sampler The sampler object ID to delete
+     */
+    void deleteSampler(CommandContext ctx, int sampler);
     
     /**
      * Sets an integer sampler parameter.
@@ -507,6 +546,21 @@ public interface GraphicsBackend {
      * @param dfactor Destination blend factor
      */
     void blendFunc(CommandContext ctx, int sfactor, int dfactor);
+    
+    /**
+     * Sets the blend function for a specific draw buffer.
+     * 
+     * In OpenGL: Maps to glBlendFuncSeparatei()
+     * In Vulkan: Part of pipeline color blend state per attachment
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The draw buffer index
+     * @param srcRGB Source RGB blend factor
+     * @param dstRGB Destination RGB blend factor
+     * @param srcAlpha Source alpha blend factor
+     * @param dstAlpha Destination alpha blend factor
+     */
+    void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
     
     /**
      * Queries an integer state variable.
@@ -1049,6 +1103,19 @@ public interface GraphicsBackend {
     int getProgramParameter(CommandContext ctx, int program, int pname);
     
     /**
+     * Queries multiple program parameters into an array.
+     * 
+     * In OpenGL: Maps to glGetProgramiv()
+     * In Vulkan: Maps to pipeline state queries
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param pname The parameter name to query
+     * @param params Array to receive the parameter values
+     */
+    void getProgramiv(CommandContext ctx, int program, int pname, int[] params);
+    
+    /**
      * Queries a shader parameter.
      * 
      * In OpenGL: Maps to glGetShaderiv()
@@ -1434,6 +1501,17 @@ public interface GraphicsBackend {
     void deactivateVertexAttribute(int index);
     @Deprecated
     void setVertexAttribDivisor(int index, int divisor);
+    
+    /**
+     * Issues a memory barrier to ensure memory operations are visible.
+     * 
+     * In OpenGL: Maps to glMemoryBarrier()
+     * In Vulkan: Maps to vkCmdPipelineBarrier() with memory barriers
+     * 
+     * @param ctx Command context for recording this command
+     * @param barriers Bitfield of memory barrier flags
+     */
+    void memoryBarrier(CommandContext ctx, int barriers);
     
     // Synchronization
     @Deprecated

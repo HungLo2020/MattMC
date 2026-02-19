@@ -262,7 +262,7 @@ public class IrisRenderSystem {
 
 	public static void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glBindImageTexture(unit, texture, level, layered, layer, access, format);
+		VulkanicAPI.bindImageTexture(VulkanicAPI.getImmediateContext(), unit, texture, level, layered, layer, access, format);
 	}
 
 	public static int getMaxImageUnits() {
@@ -286,7 +286,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void getProgramiv(int program, int value, int[] storage) {
-		VulkanicAPI.glGetProgramiv(program, value, storage);
+		VulkanicAPI.getProgramiv(VulkanicAPI.getImmediateContext(), program, value, storage);
 	}
 
 	public static void dispatchCompute(int workX, int workY, int workZ) {
@@ -301,7 +301,7 @@ public class IrisRenderSystem {
 		RenderSystem.assertOnRenderThread();
 
 		if (supportsCompute) {
-			VulkanicAPI.glMemoryBarrier(barriers);
+			VulkanicAPI.memoryBarrier(VulkanicAPI.getImmediateContext(), barriers);
 		}
 	}
 
@@ -323,7 +323,7 @@ public class IrisRenderSystem {
 
 	public static void blendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glBlendFuncSeparatei(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+		VulkanicAPI.blendFuncSeparatei(VulkanicAPI.getImmediateContext(), buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
 	}
 
 	// These functions are deprecated and unavailable in the core profile.
@@ -392,11 +392,11 @@ public class IrisRenderSystem {
 	}
 
 	public static int genSampler() {
-		return VulkanicAPI.glGenSamplers();
+		return VulkanicAPI.createSampler(VulkanicAPI.getImmediateContext());
 	}
 
 	public static void destroySampler(int glId) {
-		VulkanicAPI.glDeleteSamplers(glId);
+		VulkanicAPI.deleteSampler(VulkanicAPI.getImmediateContext(), glId);
 	}
 
 	public static void bindSamplerToUnit(int unit, int sampler) {

@@ -2043,9 +2043,13 @@ public class VulkanicAPI {
         return getBackend().glGetTexParameteri(target, pname);
     }
     
+    public static void bindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+        getBackend().bindImageTexture(ctx, unit, texture, level, layered, layer, access, format);
+    }
+    
     @Deprecated
     public static void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
-        getBackend().glBindImageTexture(unit, texture, level, layered, layer, access, format);
+        bindImageTexture(getImmediateContext(), unit, texture, level, layered, layer, access, format);
     }
     
     @Deprecated
@@ -2067,9 +2071,13 @@ public class VulkanicAPI {
         getBackend().glClearBufferSubData(target, internalformat, offset, size, format, type, data);
     }
     
+    public static void getProgramiv(CommandContext ctx, int program, int pname, int[] params) {
+        getBackend().getProgramiv(ctx, program, pname, params);
+    }
+    
     @Deprecated
     public static void glGetProgramiv(int program, int pname, int[] params) {
-        getBackend().glGetProgramiv(program, pname, params);
+        getProgramiv(getImmediateContext(), program, pname, params);
     }
     
     @Deprecated
@@ -2077,9 +2085,13 @@ public class VulkanicAPI {
         dispatchCompute(getImmediateContext(), workX, workY, workZ);
     }
     
+    public static void memoryBarrier(CommandContext ctx, int barriers) {
+        getBackend().memoryBarrier(ctx, barriers);
+    }
+    
     @Deprecated
     public static void glMemoryBarrier(int barriers) {
-        getBackend().glMemoryBarrier(barriers);
+        memoryBarrier(getImmediateContext(), barriers);
     }
     
     @Deprecated
@@ -2097,9 +2109,13 @@ public class VulkanicAPI {
         blendFunc(getImmediateContext(), sfactor, dfactor);
     }
     
+    public static void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        getBackend().blendFuncSeparatei(ctx, buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+    }
+    
     @Deprecated
     public static void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
-        getBackend().glBlendFuncSeparatei(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+        blendFuncSeparatei(getImmediateContext(), buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
     
     @Deprecated
@@ -2112,14 +2128,22 @@ public class VulkanicAPI {
         getBackend().glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
     }
     
+    public static int createSampler(CommandContext ctx) {
+        return getBackend().createSampler(ctx);
+    }
+    
     @Deprecated
     public static int glGenSamplers() {
-        return getBackend().glGenSamplers();
+        return createSampler(getImmediateContext());
+    }
+    
+    public static void deleteSampler(CommandContext ctx, int sampler) {
+        getBackend().deleteSampler(ctx, sampler);
     }
     
     @Deprecated
     public static void glDeleteSamplers(int sampler) {
-        getBackend().glDeleteSamplers(sampler);
+        deleteSampler(getImmediateContext(), sampler);
     }
     
     @Deprecated
