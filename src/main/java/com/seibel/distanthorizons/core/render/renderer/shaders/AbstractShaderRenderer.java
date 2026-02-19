@@ -35,7 +35,7 @@ public abstract class AbstractShaderRenderer
 		
 		int width = MC_RENDER.getTargetFramebufferViewportWidth();
 		int height = MC_RENDER.getTargetFramebufferViewportHeight();
-		VulkanicAPI.glViewport(0, 0, width, height);
+		VulkanicAPI.setViewport(VulkanicAPI.getImmediateContext(), 0, 0, width, height);
 		
 		this.onRender();
 		

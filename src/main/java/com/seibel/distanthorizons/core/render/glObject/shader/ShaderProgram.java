@@ -134,7 +134,7 @@ public class ShaderProgram
 	 */
 	public int getUniformLocation(CharSequence name) throws RuntimeException
 	{
-		int i = VulkanicAPI.glGetUniformLocation(id, name);
+		int i = VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), id, name);
 		if (i == -1)
 		{
 			throw new RuntimeException("Uniform name not found: " + name);
@@ -145,7 +145,7 @@ public class ShaderProgram
 	// Same as above but without throwing errors.
 	// Return -1 if uniform doesn't exist or has been optimized out
 	public int tryGetUniformLocation(CharSequence name)
-	{ return VulkanicAPI.glGetUniformLocation(this.id, name); }
+	{ return VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.id, name); }
 	
 	/** Requires a bound ShaderProgram. */
 	public void setUniform(int location, boolean value) { VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), location, value ? 1 : 0); }

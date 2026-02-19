@@ -208,7 +208,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	}
 
 	public int tryGetUniformLocation2(CharSequence name) {
-		return VulkanicAPI.glGetUniformLocation(this.id, name);
+		return VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.id, name);
 	}
 
 	public void setUniform(int index, Matrix4f matrix) {

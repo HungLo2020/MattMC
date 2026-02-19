@@ -2945,7 +2945,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glBindVertexArray(int array) {
-        getBackend().bindVertexArray(array);
+        bindVertexArray(getImmediateContext(), array);
     }
     
     /**

@@ -187,7 +187,7 @@ public class GLState
 			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferDepthTexture, 0);
 		}
 		
-		VulkanicAPI.glBindVertexArray(VulkanicAPI.glIsVertexArray(this.vao) ? this.vao : 0);
+		VulkanicAPI.bindVertexArray(VulkanicAPI.getImmediateContext(), VulkanicAPI.glIsVertexArray(this.vao) ? this.vao : 0);
 		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, VulkanicAPI.isBuffer(VulkanicAPI.getImmediateContext(), this.vbo) ? this.vbo : 0);
 		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, VulkanicAPI.isBuffer(VulkanicAPI.getImmediateContext(), this.ebo) ? this.ebo: 0);
 		VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), VulkanicAPI.glIsProgram(this.program) ? this.program : 0);
@@ -226,7 +226,7 @@ public class GLState
 		}
 		VulkanicAPI.glStencilFunc(this.stencilFunc, this.stencilRef, this.stencilMask);
 		
-		VulkanicAPI.glViewport(this.view[0], this.view[1], this.view[2], this.view[3]);
+		VulkanicAPI.setViewport(VulkanicAPI.getImmediateContext(), this.view[0], this.view[1], this.view[2], this.view[3]);
 		if (this.cull)
 		{
 			GLMC.enableFaceCulling();

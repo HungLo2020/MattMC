@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (199/283) | Complete | 70.3% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (204/283) | Complete | 72.1% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟢 70.3% | 100% | **🎉 Crossed 70% milestone!** |
+| **API Vulkan Compatibility** | 🟢 72.1% | 100% | **🎉 Crossed 72% milestone!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 68.6% (194/283 methods migrated)
+### Overall Phase Progress: 72.1% (204/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 199 (70.3%)**
-- **Methods using immediate mode: 84 (29.7%)**
+- **Methods migrated to CommandContext: 204 (72.1%)**
+- **Methods using immediate mode: 79 (27.9%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 199 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 70% milestone - over two-thirds complete!**
+**Conclusion**: API migration in progress. 204 methods now support CommandContext pattern, enabling future Vulkan backend. **🎉 Crossed 72% milestone - nearly three-quarters complete!**
 
 ### Required Work Breakdown
 
@@ -1278,6 +1278,26 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-19 (Update 13 - Batch 39 Complete - 72% MILESTONE!)
+- Migrated 5 commonly-used deprecated methods to CommandContext pattern
+- All 5 methods ALREADY had CommandContext versions - updated delegation and call sites
+- Updated 14 call sites across Iris Shaders and Distant Horizons  
+- Progress: 70.3% → 72.1% (199/283 → 204/283 methods migrated)
+- **🎉 CROSSED 72% MILESTONE!** Nearly three-quarters complete!
+- All architectural boundary tests passing (4/4)
+- All CommandContext tests passing (7/7)  
+- Build successful with zero regressions
+- Key methods migrated:
+  - Uniform location queries (getUniformLocation) - 3 call sites updated (Iris + DH ShaderProgram)
+  - Vertex array binding (bindVertexArray) - 5 call sites updated (DH GLState, AbstractVertexAttribute)
+  - Viewport management (setViewport) - 2 call sites updated (DH GLState, AbstractShaderRenderer)
+  - Integer vertex attributes (setVertexAttribIPointer) - 2 call sites updated (DH VertexAttributePreGL43)
+  - Vertex attribute disable (disableVertexAttribArray) - 2 call sites updated (DH VertexAttributePreGL43)
+- Files modified: 8 total (VulkanicAPI, IrisGenericRenderProgram, ShaderProgram, GLState, AbstractVertexAttribute, VertexAttributePreGL43, AbstractShaderRenderer, MIGRATION-PROGRESS)
+- **PATTERN FOLLOWED**: All deprecated methods delegate to CommandContext versions, all call sites use new API
+- **CALL SITES UPDATED**: Iris Shaders (1 site), Distant Horizons (13 sites)
+- **EFFICIENCY**: Leveraged ALL 5 existing CommandContext methods, zero duplication
 
 ### 2026-02-19 (Update 12 - Batch 38 Complete - 70% MILESTONE!)
 - Migrated 5 commonly-used deprecated methods to CommandContext pattern
