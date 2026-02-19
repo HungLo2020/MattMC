@@ -138,7 +138,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBlendFunc(int sfactor, int dfactor) 
 	{
-		VulkanicAPI.glBlendFunc(sfactor, dfactor);
+		VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), sfactor, dfactor);
 		
 	}
 	/** Sets separate blend functions for RGB and alpha */
@@ -173,7 +173,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glDeleteBuffers(int buffer)
 	{
-		VulkanicAPI.glDeleteBuffers(buffer);
+		VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), buffer);
 		
 		// MC's implementation has a bug where it will throw:
 		// GL_INVALID_OPERATION in glBufferData(immutable)

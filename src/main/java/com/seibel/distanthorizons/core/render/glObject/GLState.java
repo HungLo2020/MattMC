@@ -109,7 +109,7 @@ public class GLState
 		this.stencilRef = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_REF);
 		this.stencilMask = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_VALUE_MASK);
 		this.view = new int[4];
-		VulkanicAPI.glGetIntegerv(VulkanicAPI.GL_VIEWPORT, this.view);
+		VulkanicAPI.getIntegerv(ctx, VulkanicAPI.GL_VIEWPORT, this.view);
 		this.cull = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_CULL_FACE);
 		this.cullMode = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_CULL_FACE_MODE);
 		this.polyMode = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_POLYGON_MODE);

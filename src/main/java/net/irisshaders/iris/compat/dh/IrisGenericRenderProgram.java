@@ -103,10 +103,10 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		GlShader frag = new GlShader(ShaderType.FRAGMENT, name + ".fsh", fragment);
 		VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), id, frag.getHandle());
 
-		VulkanicAPI.glLinkProgram(this.id);
-		int status = VulkanicAPI.glGetProgrami(this.id, VulkanicAPI.GL_LINK_STATUS);
+		VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), this.id);
+		int status = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != VulkanicAPI.GL_TRUE) {
-			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.glGetProgramInfoLog(this.id);
+			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), this.id);
 			this.free();
 			throw new RuntimeException(message);
 		} else {
@@ -292,7 +292,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	}
 
 	public void free() {
-		VulkanicAPI.glDeleteProgram(id);
+		VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), id);
 	}
 
 	public void fillIndirectUniformData(DhApiRenderParam dhApiRenderParam, DhApiRenderableBoxGroupShading dhApiRenderableBoxGroupShading, IDhApiRenderableBoxGroup boxGroup, DhApiVec3d camPos) {

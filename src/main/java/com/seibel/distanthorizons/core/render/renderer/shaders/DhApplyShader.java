@@ -153,7 +153,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		
 		
-		VulkanicAPI.glFramebufferTexture(VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, targetColorTextureId, 0);
+		VulkanicAPI.framebufferTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, targetColorTextureId, 0);
 		
 		// Copy to MC's texture via MC's framebuffer
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, dhFrameBufferId);

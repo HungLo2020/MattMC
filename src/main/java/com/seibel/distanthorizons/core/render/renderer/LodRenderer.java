@@ -444,11 +444,11 @@ public class LodRenderer
 		boolean clearTextures = !ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeTextureClearEvent.class, renderEventParam);
 		if (clearTextures)
 		{
-			VulkanicAPI.glClearDepth(1.0);
+			VulkanicAPI.setClearDepthValue(1.0);
 			
 			float[] clearColorValues = new float[4];
-			VulkanicAPI.glGetFloatv(VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
-			VulkanicAPI.glClearColor(clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
+			VulkanicAPI.getFloatv(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
+			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
 			
 			if (this.usingMcFramebuffer && framebufferOverride == null)
 			{

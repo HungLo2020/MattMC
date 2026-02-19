@@ -26,7 +26,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	
 	public DhFramebuffer() 
 	{
-		this.id = VulkanicAPI.glGenFramebuffers();
+		this.id = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
 
 		this.attachments = new Int2IntArrayMap();
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
@@ -130,7 +130,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	@Override
 	public void destroy()
 	{
-		VulkanicAPI.glDeleteFramebuffers(this.id); 
+		VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.id); 
 		this.id = -1;
 	}
 	
@@ -138,7 +138,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	public int getStatus()
 	{
 		this.bind(); 
-		int status = VulkanicAPI.glCheckFramebufferStatus(VulkanicAPI.GL_FRAMEBUFFER);
+		int status = VulkanicAPI.checkFramebufferStatus(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER);
 		return status;
 	}
 	

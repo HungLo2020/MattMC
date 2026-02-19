@@ -27,7 +27,7 @@ public class DHDepthTexture
 		VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
 		VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 		
-		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, 0);
+		VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0);
 	}
 	
 	// For internal use by Iris for copying data. Do not use this in DH.
@@ -35,7 +35,7 @@ public class DHDepthTexture
 	
 	public void resize(int width, int height, EDhDepthBufferFormat format)
 	{
-		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, this.getTextureId());
+		VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, this.getTextureId());
 		VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, format.getGlInternalFormat(), width, height, 0,
 				format.getGlType(), format.getGlFormat(), (ByteBuffer) null);
 	}

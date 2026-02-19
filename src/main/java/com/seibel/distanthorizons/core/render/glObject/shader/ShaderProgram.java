@@ -78,12 +78,12 @@ public class ShaderProgram
 		{
 			VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.id, i, attributes[i]);
 		}
-		VulkanicAPI.glLinkProgram(this.id);
+		VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), this.id);
 		
-		int status = VulkanicAPI.glGetProgrami(this.id, VulkanicAPI.GL_LINK_STATUS);
+		int status = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
 		{
-			String message = "Shader Link Error. Details: " + VulkanicAPI.glGetProgramInfoLog(this.id);
+			String message = "Shader Link Error. Details: " + VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), this.id);
 			this.free(); // important!
 			throw new RuntimeException(message);
 		}
@@ -96,7 +96,7 @@ public class ShaderProgram
 	public void bind() { VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), this.id); }
 	public void unbind() { VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), 0); }
 	
-	public void free() { VulkanicAPI.glDeleteProgram(this.id); }
+	public void free() { VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), this.id); }
 	
 	
 	

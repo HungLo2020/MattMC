@@ -204,7 +204,7 @@ public class GLBuffer implements AutoCloseable
 		this.destroyAsync();
 		this.create(true);
 		this.bind();
-		VulkanicAPI.glBufferStorage(this.getBufferBindingTarget(), bb, 0);
+		VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), bb, 0);
 		this.size = bbSize;
 	}
 	/** Requires the buffer to be bound */
@@ -260,7 +260,7 @@ public class GLBuffer implements AutoCloseable
 				this.id = GLMC.glGenBuffers();
 				VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id);
 				VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id);
-				VulkanicAPI.glBufferStorage(this.getBufferBindingTarget(), newSize, bufferHint);
+				VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), newSize, bufferHint);
 			}
 			else
 			{
@@ -268,7 +268,7 @@ public class GLBuffer implements AutoCloseable
 			}
 		}
 		
-		vboBuffer = VulkanicAPI.glMapBufferRange(VulkanicAPI.GL_ARRAY_BUFFER, 0, targetSize, mapFlags);
+		vboBuffer = VulkanicAPI.mapBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, 0, targetSize, mapFlags);
 		this.isMapped = true;
 		return vboBuffer;
 	}
@@ -278,7 +278,7 @@ public class GLBuffer implements AutoCloseable
 	{
 		LodUtil.assertTrue(this.isMapped, "Buffer is not mapped");
 		this.bind();
-		VulkanicAPI.glUnmapBuffer(this.getBufferBindingTarget());
+		VulkanicAPI.unmapBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget());
 		this.isMapped = false;
 	}
 	

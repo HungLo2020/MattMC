@@ -48,7 +48,7 @@ public class DhColorTexture
 		
 		// Clean up after ourselves
 		// This is strictly defensive to ensure that other buggy code doesn't tamper with our textures
-		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, 0);
+		VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0);
 	}
 	
 	
@@ -73,7 +73,7 @@ public class DhColorTexture
 	
 	private void resizeTexture(int texture, int width, int height)
 	{
-		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, texture);
+		VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, texture);
 		VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
 	}
 	
