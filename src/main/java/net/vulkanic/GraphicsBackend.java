@@ -2377,6 +2377,67 @@ public interface GraphicsBackend {
      */
     void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
+    /**
+     * Attaches a texture to a framebuffer attachment point using Direct State Access.
+     * 
+     * In OpenGL: Maps to glNamedFramebufferTexture() from ARB_direct_state_access
+     * In Vulkan: Part of framebuffer/render pass setup (VkFramebufferCreateInfo)
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param texture The texture object to attach
+     * @param level The mipmap level of the texture to attach
+     */
+    void namedFramebufferTexture(CommandContext ctx, int framebuffer, int attachment, int texture, int level);
+    
+    /**
+     * Creates a new framebuffer object using Direct State Access.
+     * 
+     * In OpenGL: Maps to glCreateFramebuffers() from ARB_direct_state_access
+     * In Vulkan: Maps to vkCreateFramebuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The framebuffer object ID
+     */
+    int createFramebuffers(CommandContext ctx);
+    
+    /**
+     * Creates a new texture object for a specific target using Direct State Access.
+     * 
+     * In OpenGL: Maps to glCreateTextures() from ARB_direct_state_access
+     * In Vulkan: Maps to vkCreateImage()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP)
+     * @return The texture object ID
+     */
+    int createTextures(CommandContext ctx, int target);
+    
+    /**
+     * Generates mipmaps for a texture bound to the specified target.
+     * 
+     * In OpenGL: Maps to glGenerateMipmap()
+     * In Vulkan: Maps to vkCmdBlitImage() with mipmap level generation
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     */
+    void generateMipmap(CommandContext ctx, int target);
+    
+    /**
+     * Sets a floating-point texture parameter for a texture bound to the specified target.
+     * 
+     * In OpenGL: Maps to glTexParameterf()
+     * In Vulkan: Part of sampler state (VkSamplerCreateInfo)
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER)
+     * @param param The parameter value
+     */
+    void texParameterf(CommandContext ctx, int target, int pname, float param);
+    
     @Deprecated
     void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height);
     @Deprecated

@@ -1994,9 +1994,21 @@ public class VulkanicAPI {
         getBackend().glTexParameteri(target, pname, param);
     }
     
+    /**
+     * Sets a floating-point texture parameter for a texture bound to the specified target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER)
+     * @param param The parameter value
+     */
+    public static void texParameterf(CommandContext ctx, int target, int pname, float param) {
+        getBackend().texParameterf(ctx, target, pname, param);
+    }
+    
     @Deprecated
     public static void glTexParameterf(int target, int pname, float param) {
-        getBackend().glTexParameterf(target, pname, param);
+        texParameterf(getImmediateContext(), target, pname, param);
     }
     
     @Deprecated
@@ -2366,9 +2378,19 @@ public class VulkanicAPI {
         return getAttributeLocation(getImmediateContext(), program, name);
     }
     
+    /**
+     * Generates mipmaps for a texture bound to the specified target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     */
+    public static void generateMipmap(CommandContext ctx, int target) {
+        getBackend().generateMipmap(ctx, target);
+    }
+    
     @Deprecated
     public static void glGenerateMipmap(int target) {
-        getBackend().glGenerateMipmap(target);
+        generateMipmap(getImmediateContext(), target);
     }
     
     @Deprecated
@@ -2533,14 +2555,37 @@ public class VulkanicAPI {
         blitNamedFramebuffer(getImmediateContext(), readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
+    /**
+     * Attaches a texture to a framebuffer attachment point using Direct State Access.
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param texture The texture object to attach
+     * @param level The mipmap level of the texture to attach
+     */
+    public static void namedFramebufferTexture(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        getBackend().namedFramebufferTexture(ctx, framebuffer, attachment, texture, level);
+    }
+    
     @Deprecated
     public static void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
-        getBackend().glNamedFramebufferTexture(framebuffer, attachment, texture, level);
+        namedFramebufferTexture(getImmediateContext(), framebuffer, attachment, texture, level);
+    }
+    
+    /**
+     * Creates a new framebuffer object using Direct State Access.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The framebuffer object ID
+     */
+    public static int createFramebuffers(CommandContext ctx) {
+        return getBackend().createFramebuffers(ctx);
     }
     
     @Deprecated
     public static int glCreateFramebuffers() {
-        return getBackend().glCreateFramebuffers();
+        return createFramebuffers(getImmediateContext());
     }
     
     @Deprecated
@@ -2553,9 +2598,20 @@ public class VulkanicAPI {
         getBackend().destroyFramebufferObject(framebuffer);
     }
     
+    /**
+     * Creates a new texture object for a specific target using Direct State Access.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP)
+     * @return The texture object ID
+     */
+    public static int createTextures(CommandContext ctx, int target) {
+        return getBackend().createTextures(ctx, target);
+    }
+    
     @Deprecated
     public static int glCreateTextures(int target) {
-        return getBackend().glCreateTextures(target);
+        return createTextures(getImmediateContext(), target);
     }
     
     // Additional rendering operations

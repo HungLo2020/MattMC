@@ -24,10 +24,10 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | 🟡 In Progress (174/283) | Complete | 61.5% |
+| **Phase 2.5: API Redesign** | 🟡 In Progress (179/283) | Complete | 63.3% |
 | **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟡 61.5% | 100% | **Crossed 60% milestone!** |
+| **API Vulkan Compatibility** | 🟡 63.3% | 100% | **Moving toward 65% milestone!** |
 
 ---
 
@@ -73,18 +73,18 @@
 
 ## Phase 2.5: API Redesign for Vulkan Compatibility (⚠️ IN PROGRESS - Current Priority)
 
-### Overall Phase Progress: 61.5% (174/283 methods migrated)
+### Overall Phase Progress: 63.3% (179/283 methods migrated)
 
 ### Critical Findings
 
 **API Compatibility Analysis**:
 - Total GraphicsBackend methods: ~213
 - Methods marked @Deprecated: 283
-- **Methods migrated to CommandContext: 174 (61.5%)**
-- **Methods using immediate mode: 109 (38.5%)**
+- **Methods migrated to CommandContext: 179 (63.3%)**
+- **Methods using immediate mode: 104 (36.7%)**
 - **Vulkan-critical systems missing: 6+**
 
-**Conclusion**: API migration in progress. 174 methods now support CommandContext pattern, enabling future Vulkan backend. **Crossed 60% milestone!**
+**Conclusion**: API migration in progress. 179 methods now support CommandContext pattern, enabling future Vulkan backend. **Moving toward 65% milestone!**
 
 ### Required Work Breakdown
 
@@ -1194,6 +1194,25 @@ Before committing Vulkan backend work, verify:
 ---
 
 ## Change Log
+
+### 2026-02-19 (Update 9 - Batch 34 Complete)
+- Migrated 5 texture and framebuffer methods to CommandContext pattern
+- Added 5 new CommandContext methods: namedFramebufferTexture, createFramebuffers, createTextures, generateMipmap, texParameterf
+- Updated 5 call sites in Iris Shaders IrisRenderSystem
+- Progress: 61.5% → 63.3% (174/283 → 179/283 methods migrated)
+- **MILESTONE**: Crossed 63% threshold - texture creation and framebuffer operations now Vulkan-ready
+- All architectural boundary tests passing (4/4)
+- All CommandContext tests passing (7/7)
+- Build successful with zero regressions
+- Key achievements:
+  - Framebuffer texture attachment migrated (glNamedFramebufferTexture → namedFramebufferTexture)
+  - Framebuffer object creation migrated (glCreateFramebuffers → createFramebuffers)
+  - Texture object creation migrated (glCreateTextures → createTextures)
+  - Mipmap generation migrated (glGenerateMipmap → generateMipmap)
+  - Texture parameter setting migrated (glTexParameterf → texParameterf)
+- Files modified: 4 total (GraphicsBackend, OpenGLBackend, VulkanicAPI, IrisRenderSystem)
+- **PATTERN FOLLOWED**: All deprecated methods now delegate to CommandContext versions (no direct OpenGL calls)
+- **CALL SITES UPDATED**: All call sites use new CommandContext API directly (not deprecated delegation)
 
 ### 2026-02-18 (Update 8 - Batch 23 Complete)
 - Migrated 5 methods (vertex attributes, compute, buffer validation, texture params, uniform blocks) to CommandContext pattern

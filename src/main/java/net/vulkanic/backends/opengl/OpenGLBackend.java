@@ -1913,10 +1913,18 @@ public class OpenGLBackend implements GraphicsBackend {
         setTextureParameter(VulkanicAPI.getImmediateContext(), target, pname, param);
     }
     
+    @Override
+    public void texParameterf(CommandContext ctx, int target, int pname, float param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glTexParameterf(target, pname, param);
+    }
+    
     @Deprecated
     @Override
     public void glTexParameterf(int target, int pname, float param) {
-        org.lwjgl.opengl.GL32C.glTexParameterf(target, pname, param);
+        texParameterf(VulkanicAPI.getImmediateContext(), target, pname, param);
     }
     
     @Deprecated
@@ -2428,10 +2436,18 @@ public class OpenGLBackend implements GraphicsBackend {
         return getAttributeLocation(VulkanicAPI.getImmediateContext(), program, name);
     }
     
+    @Override
+    public void generateMipmap(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glGenerateMipmap(target);
+    }
+    
     @Deprecated
     @Override
     public void glGenerateMipmap(int target) {
-        org.lwjgl.opengl.GL32C.glGenerateMipmap(target);
+        generateMipmap(VulkanicAPI.getImmediateContext(), target);
     }
     
     @Deprecated
@@ -2652,22 +2668,46 @@ public class OpenGLBackend implements GraphicsBackend {
         blitNamedFramebuffer(VulkanicAPI.getImmediateContext(), readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
     @Override
-    public void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
+    public void namedFramebufferTexture(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
     }
     
     @Deprecated
     @Override
-    public int glCreateFramebuffers() {
+    public void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
+        namedFramebufferTexture(VulkanicAPI.getImmediateContext(), framebuffer, attachment, texture, level);
+    }
+    
+    @Override
+    public int createFramebuffers(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
     }
     
     @Deprecated
     @Override
-    public int glCreateTextures(int target) {
+    public int glCreateFramebuffers() {
+        return createFramebuffers(VulkanicAPI.getImmediateContext());
+    }
+    
+    @Override
+    public int createTextures(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateTextures(target);
+    }
+    
+    @Deprecated
+    @Override
+    public int glCreateTextures(int target) {
+        return createTextures(VulkanicAPI.getImmediateContext(), target);
     }
     
     // Additional rendering operations

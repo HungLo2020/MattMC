@@ -672,17 +672,17 @@ public class IrisRenderSystem {
 
 		@Override
 		public void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
-			VulkanicAPI.glNamedFramebufferTexture(fb, attachment, texture, levels);
+			VulkanicAPI.namedFramebufferTexture(VulkanicAPI.getImmediateContext(), fb, attachment, texture, levels);
 		}
 
 		@Override
 		public int createFramebuffer() {
-			return VulkanicAPI.glCreateFramebuffers();
+			return VulkanicAPI.createFramebuffers(VulkanicAPI.getImmediateContext());
 		}
 
 		@Override
 		public int createTexture(int target) {
-			return VulkanicAPI.glCreateTextures(target);
+			return VulkanicAPI.createTextures(VulkanicAPI.getImmediateContext(), target);
 		}
 	}
 
@@ -691,7 +691,7 @@ public class IrisRenderSystem {
 		public void generateMipmaps(int texture, int target) {
 			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 			GlStateManager._bindTexture(texture);
-			VulkanicAPI.glGenerateMipmap(target);
+			VulkanicAPI.generateMipmap(VulkanicAPI.getImmediateContext(), target);
 			GlStateManager._bindTexture(previous);
 		}
 
@@ -705,7 +705,7 @@ public class IrisRenderSystem {
 		@Override
 		public void texParameterf(int texture, int target, int pname, float param) {
 			bindTextureForSetup(target, texture);
-			VulkanicAPI.glTexParameterf(target, pname, param);
+			VulkanicAPI.texParameterf(VulkanicAPI.getImmediateContext(), target, pname, param);
 			restoreTexture();
 		}
 
