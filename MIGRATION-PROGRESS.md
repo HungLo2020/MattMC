@@ -351,14 +351,14 @@
 5. ✅ glUniform2i(int, int, int) → setUniform2i(CommandContext, int, int, int) - 1 call site updated (IrisRenderSystem)
 
 **Batch 25 (Completed 2026-02-19)**:
-1. ✅ glTexParameteriv(int, int, int[]) → texParameteriv(CommandContext, int, int, int[]) [reuses existing] - 1 call site updated (IrisRenderSystem)
-2. ✅ glBufferStorage(int, long, int) → bufferStorage(CommandContext, int, long, int) [reuses existing] - 1 call site updated (IrisRenderSystem)
-3. ✅ glVertexAttrib4f(int, float, float, float, float) → setVertexAttrib4f(CommandContext, int, float, float, float, float) - 1 call site updated (IrisRenderSystem)
-4. ✅ glSamplerParameteri(int, int, int) → setSamplerParameteri(CommandContext, int, int, int) - 1 call site updated (IrisRenderSystem)
-5. ✅ glSamplerParameterf(int, int, float) → setSamplerParameterf(CommandContext, int, int, float) - 1 call site updated (IrisRenderSystem)
-6. ✅ glSamplerParameteriv(int, int, int[]) → setSamplerParameteriv(CommandContext, int, int, int[]) - 1 call site updated (IrisRenderSystem)
+1. ✅ glTexParameteriv(int, int, int[]) → texParameteriv(CommandContext, int, int, int[]) [already had CommandContext version] - 1 call site updated (IrisRenderSystem)
+2. ✅ glBufferStorage(int, long, int) → bufferStorage(CommandContext, int, long, int) [already had CommandContext version] - 1 call site updated (IrisRenderSystem)
+3. ✅ glVertexAttrib4f(int, float, float, float, float) → setVertexAttrib4f(CommandContext, int, float, float, float, float) [new method] - 1 call site updated (IrisRenderSystem)
+4. ✅ glSamplerParameteri(int, int, int) → setSamplerParameteri(CommandContext, int, int, int) [new method] - 1 call site updated (IrisRenderSystem)
+5. ✅ glSamplerParameterf(int, int, float) → setSamplerParameterf(CommandContext, int, int, float) [new method] - 1 call site updated (IrisRenderSystem)
+6. ✅ glSamplerParameteriv(int, int, int[]) → setSamplerParameteriv(CommandContext, int, int, int[]) [new method] - 1 call site updated (IrisRenderSystem)
 
-Note: Batch 25 includes 6 methods total (5 primary + 1 additional glBufferStorage overload already had CommandContext version)
+Note: Batch 25 migrated 5 deprecated method families (8 individual methods total: 2 that already had CommandContext versions + 4 new methods with 3 sampler parameter variants)
 
 **Total Call Sites Updated**: 345 (includes 6 from Batch 25)
 

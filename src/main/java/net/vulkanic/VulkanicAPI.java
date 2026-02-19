@@ -1879,6 +1879,14 @@ public class VulkanicAPI {
         setUniform4i(getImmediateContext(), location, v0, v1, v2, v3);
     }
     
+    /**
+     * Sets texture parameters using an array of integers.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Texture target (GL_TEXTURE_2D, etc.)
+     * @param pname Parameter name
+     * @param params Array of parameter values
+     */
     public static void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
         getBackend().texParameteriv(ctx, target, pname, params);
     }
