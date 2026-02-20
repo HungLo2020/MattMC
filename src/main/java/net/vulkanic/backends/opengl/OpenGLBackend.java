@@ -3189,7 +3189,7 @@ public class OpenGLBackend implements GraphicsBackend {
                 toGlType(texture.getVulkanicFormat()),
                 dstOffset);
         net.blaze3d.systems.RenderSystem.queueFencedTask(onComplete);
-        GL30.glFramebufferTexture2D(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, 0, mipLevel);
+        GL30.glFramebufferTexture2D(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, 0, 0);
         GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, 0);
         GL15.glBindBuffer(GL21.GL_PIXEL_PACK_BUFFER, 0);
         int err = GL11.glGetError();

@@ -340,7 +340,6 @@ public class GlCommandEncoder implements CommandEncoder {
 			VulkanicAPI.copyVulkanicTextureToBuffer(VulkanicAPI.getImmediateContext(),
 					(net.vulkanic.resources.VulkanicTexture) gpuTexture,
 					(net.vulkanic.resources.VulkanicBuffer) gpuBuffer, i, runnable, j);
-
 		}
 	}
 

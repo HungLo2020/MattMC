@@ -780,4 +780,67 @@ public class Phase3ResourceTest {
         assertNotNull(VulkanicAPI.class.getMethod("presentVulkanicTexture",
                 CommandContext.class, VulkanicTextureView.class));
     }
+
+    // -----------------------------------------------------------------------
+    // Phase 6 — New transfer API methods
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicAPIHasClearWithRegionOverload() throws NoSuchMethodException {
+        // clearColorAndDepthTextures with a scissor-region parameter
+        assertNotNull(VulkanicAPI.class.getMethod("clearColorAndDepthTextures",
+                CommandContext.class,
+                VulkanicTexture.class, int.class,
+                VulkanicTexture.class, double.class,
+                int.class, int.class, int.class, int.class));
+    }
+
+    @Test
+    public void testVulkanicAPIHasByteBufferTextureUpload() throws NoSuchMethodException {
+        // writeToVulkanicTexture(ByteBuffer) — needed for raw pixel uploads
+        assertNotNull(VulkanicAPI.class.getMethod("writeToVulkanicTexture",
+                CommandContext.class, VulkanicTexture.class,
+                java.nio.ByteBuffer.class,
+                net.blaze3d.platform.NativeImage.Format.class,
+                int.class, int.class, int.class, int.class, int.class, int.class));
+    }
+
+    @Test
+    public void testGraphicsBackendHasClearWithRegionOverload() throws NoSuchMethodException {
+        assertNotNull(GraphicsBackend.class.getMethod("clearColorAndDepthTextures",
+                CommandContext.class,
+                VulkanicTexture.class, int.class,
+                VulkanicTexture.class, double.class,
+                int.class, int.class, int.class, int.class));
+    }
+
+    @Test
+    public void testGraphicsBackendHasByteBufferTextureUpload() throws NoSuchMethodException {
+        assertNotNull(GraphicsBackend.class.getMethod("writeToVulkanicTexture",
+                CommandContext.class, VulkanicTexture.class,
+                java.nio.ByteBuffer.class,
+                net.blaze3d.platform.NativeImage.Format.class,
+                int.class, int.class, int.class, int.class, int.class, int.class));
+    }
+
+    @Test
+    public void testGlDeviceExposesFboGetters() throws NoSuchMethodException {
+        // GlDevice now exposes encoder FBOs so OpenGLBackend can access them
+        // without calling back into GlCommandEncoder (breaking the circular dependency).
+        assertNotNull(net.blaze3d.opengl.GlDevice.class.getMethod("getEncoderDrawFbo"));
+        assertNotNull(net.blaze3d.opengl.GlDevice.class.getMethod("getEncoderReadFbo"));
+    }
+
+    @Test
+    public void testDirectStateAccessMethodsArePublic() throws NoSuchMethodException {
+        // These were package-private; made public so OpenGLBackend can call them.
+        assertNotNull(net.blaze3d.opengl.DirectStateAccess.class.getMethod(
+                "bufferSubData", int.class, int.class, java.nio.ByteBuffer.class, int.class));
+        assertNotNull(net.blaze3d.opengl.DirectStateAccess.class.getMethod(
+                "bindFrameBufferTextures", int.class, int.class, int.class, int.class, int.class));
+        assertNotNull(net.blaze3d.opengl.DirectStateAccess.class.getMethod(
+                "blitFrameBuffers",
+                int.class, int.class, int.class, int.class, int.class, int.class,
+                int.class, int.class, int.class, int.class, int.class, int.class));
+    }
 }
