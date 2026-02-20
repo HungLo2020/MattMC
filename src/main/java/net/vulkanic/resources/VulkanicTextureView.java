@@ -35,6 +35,21 @@ public interface VulkanicTextureView extends AutoCloseable {
     /** Number of mip levels exposed by this view. */
     int getMipLevelCount();
 
+    /**
+     * Returns the width (in texels) of the given mip level of the underlying texture.
+     * Mip level 0 is the full-resolution image.
+     *
+     * <p>Used to set the {@code glViewport} / {@code VkViewport} dimensions when
+     * beginning a render pass that targets this view.
+     */
+    int getWidth(int mipLevel);
+
+    /**
+     * Returns the height (in texels) of the given mip level of the underlying texture.
+     * Mip level 0 is the full-resolution image.
+     */
+    int getHeight(int mipLevel);
+
     /** Returns {@code true} if the underlying texture has been closed. */
     boolean isClosed();
 

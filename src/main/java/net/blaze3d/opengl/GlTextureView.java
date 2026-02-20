@@ -58,4 +58,14 @@ public class GlTextureView extends GpuTextureView implements VulkanicTextureView
 	public int getMipLevelCount() {
 		return super.mipLevels();
 	}
+
+	@Override
+	public int getWidth(int mipLevel) {
+		return super.getWidth(mipLevel);
+	}
+
+	@Override
+	public int getHeight(int mipLevel) {
+		return super.getHeight(mipLevel);
+	}
 }

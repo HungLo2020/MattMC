@@ -13,6 +13,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -51,31 +53,40 @@ public class FrameGraphBuilder {
 	}
 
 	public void execute(GraphicsResourceAllocator graphicsResourceAllocator, FrameGraphBuilder.Inspector inspector) {
-		BitSet bitSet = this.identifyPassesToKeep();
-		List<FrameGraphBuilder.Pass> list = new ArrayList(bitSet.cardinality());
-		BitSet bitSet2 = new BitSet(this.passes.size());
+		// Signal the Vulkanic backend about the command-buffer recording boundary.
+		// OpenGL: beginCommandBuffer() returns the singleton IMMEDIATE context (no-op).
+		// Vulkan: beginCommandBuffer() allocates a VkCommandBuffer and calls vkBeginCommandBuffer().
+		CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+		try {
+			BitSet bitSet = this.identifyPassesToKeep();
+			List<FrameGraphBuilder.Pass> list = new ArrayList(bitSet.cardinality());
+			BitSet bitSet2 = new BitSet(this.passes.size());
 
-		for (FrameGraphBuilder.Pass pass : this.passes) {
-			this.resolvePassOrder(pass, bitSet, bitSet2, list);
-		}
-
-		this.assignResourceLifetimes(list);
-
-		for (FrameGraphBuilder.Pass pass : list) {
-			for (FrameGraphBuilder.InternalVirtualResource<?> internalVirtualResource : pass.resourcesToAcquire) {
-				inspector.acquireResource(internalVirtualResource.name);
-				internalVirtualResource.acquire(graphicsResourceAllocator);
+			for (FrameGraphBuilder.Pass pass : this.passes) {
+				this.resolvePassOrder(pass, bitSet, bitSet2, list);
 			}
 
-			inspector.beforeExecutePass(pass.name);
-			pass.task.run();
-			inspector.afterExecutePass(pass.name);
+			this.assignResourceLifetimes(list);
 
-			for (int i = pass.resourcesToRelease.nextSetBit(0); i >= 0; i = pass.resourcesToRelease.nextSetBit(i + 1)) {
-				FrameGraphBuilder.InternalVirtualResource<?> internalVirtualResource = (FrameGraphBuilder.InternalVirtualResource<?>)this.internalResources.get(i);
-				inspector.releaseResource(internalVirtualResource.name);
-				internalVirtualResource.release(graphicsResourceAllocator);
+			for (FrameGraphBuilder.Pass pass : list) {
+				for (FrameGraphBuilder.InternalVirtualResource<?> internalVirtualResource : pass.resourcesToAcquire) {
+					inspector.acquireResource(internalVirtualResource.name);
+					internalVirtualResource.acquire(graphicsResourceAllocator);
+				}
+
+				inspector.beforeExecutePass(pass.name);
+				pass.task.run();
+				inspector.afterExecutePass(pass.name);
+
+				for (int i = pass.resourcesToRelease.nextSetBit(0); i >= 0; i = pass.resourcesToRelease.nextSetBit(i + 1)) {
+					FrameGraphBuilder.InternalVirtualResource<?> internalVirtualResource = (FrameGraphBuilder.InternalVirtualResource<?>)this.internalResources.get(i);
+					inspector.releaseResource(internalVirtualResource.name);
+					internalVirtualResource.release(graphicsResourceAllocator);
+				}
 			}
+		} finally {
+			// Always submit even if a pass throws — keeps the Vulkan command buffer in a valid state.
+			VulkanicAPI.submitCommandBuffer(ctx);
 		}
 	}
 

@@ -47,6 +47,25 @@ public class OpenGLTextureView implements VulkanicTextureView {
     }
 
     @Override
+    public int getWidth(int mipLevel) {
+        // Delegate to the underlying texture's full width, scaled for the mip level.
+        int w = texture.getWidth();
+        for (int i = 0; i < baseMipLevel + mipLevel; i++) w = Math.max(1, w >> 1);
+        return w;
+    }
+
+    /**
+     * Returns the height (in texels) of the given mip level of the underlying texture,
+     * accounting for the base mip offset of this view.
+     */
+    @Override
+    public int getHeight(int mipLevel) {
+        int h = texture.getHeight();
+        for (int i = 0; i < baseMipLevel + mipLevel; i++) h = Math.max(1, h >> 1);
+        return h;
+    }
+
+    @Override
     public boolean isClosed() {
         return texture.isClosed();
     }

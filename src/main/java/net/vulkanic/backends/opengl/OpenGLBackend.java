@@ -2606,17 +2606,15 @@ public class OpenGLBackend implements GraphicsBackend {
 
     @Override
     public void endRenderPass(CommandContext ctx) {
-        if (!ctx.isImmediate()) {
-            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        // Iris: don't unbind the framebuffer when safe-multiply is active — Iris
+        // manages the binding itself during that state.
+        if (!net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         }
-        // Unbind all attachments and restore the default framebuffer
-        if (renderPassFbo != 0) {
-            GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0,
-                    GL11.GL_TEXTURE_2D, 0, 0);
-            GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_ATTACHMENT,
-                    GL11.GL_TEXTURE_2D, 0, 0);
+        // Pop the debug group that was pushed in createVulkanicRenderPass().
+        if (glDevice != null) {
+            glDevice.debugLabels().popDebugGroup();
         }
-        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
     }
 
     // =========================================================================
@@ -2871,12 +2869,12 @@ public class OpenGLBackend implements GraphicsBackend {
     // =========================================================================
     // Phase 4 — Render pass (createVulkanicRenderPass)
     //
-    // Delegates to GlCommandEncoder.createRenderPass() — the existing Blaze3D
-    // implementation that handles FBO binding, Iris hooks, and viewport setup.
-    // GlRenderPass implements VulkanicRenderPass so the cast is safe.
+    // Owns ALL render-pass GL work: FBO lookup, FBO bind, clear, viewport, and
+    // Iris hooks.  GlCommandEncoder.createRenderPass() is now a thin facade that
+    // validates the call and then delegates here — no circular call.
     //
-    // A future Vulkan backend will implement this with vkCmdBeginRenderPass
-    // without any GlCommandEncoder involvement.
+    // The Vulkan backend implements this with vkCmdBeginRenderPass without any
+    // GlCommandEncoder involvement.
     // =========================================================================
 
     @Override
@@ -2895,12 +2893,57 @@ public class OpenGLBackend implements GraphicsBackend {
                                                         @Nullable VulkanicTextureView depthTarget,
                                                         OptionalDouble clearDepth) {
         requireGlDevice("createVulkanicRenderPass");
-        // Casts are safe: in the OpenGL backend every VulkanicTextureView IS a GlTextureView
-        // which extends GpuTextureView.  GlRenderPass implements VulkanicRenderPass.
-        GpuTextureView colorView = (GpuTextureView) colorTarget;
-        GpuTextureView depthView  = depthTarget != null ? (GpuTextureView) depthTarget : null;
-        return (VulkanicRenderPass) glDevice.createCommandEncoder()
-                .createRenderPass(label, colorView, clearColor, depthView, clearDepth);
+
+        // Push debug group here — popped in endRenderPass().
+        glDevice.debugLabels().pushDebugGroup(label);
+
+        // Look up (or create) the shared FBO for this color + optional depth pair.
+        // GlTexture.getFbo() caches the FBO so repeated render passes reuse the same object.
+        GlTexture colorTex = (GlTexture) colorTarget.texture();
+        net.blaze3d.textures.GpuTexture depthGpuTex =
+                depthTarget != null ? (net.blaze3d.textures.GpuTexture) depthTarget.texture() : null;
+        int fbo = colorTex.getFbo(glDevice.directStateAccess(), depthGpuTex);
+
+        // Get the singleton encoder so we can deliver the Iris FBO-tracking value
+        // (iris$tempFBO) without a circular call back into createRenderPass().
+        net.blaze3d.opengl.GlCommandEncoder encoder =
+                (net.blaze3d.opengl.GlCommandEncoder) glDevice.createCommandEncoder();
+
+        // Iris: do not change the framebuffer during shadow rendering or safe-multiply.
+        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
+                || net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
+            encoder.setIrisTempFbo(fbo);
+        } else {
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fbo);
+        }
+
+        // Clear operations (colour and/or depth) requested by the caller.
+        int clearMask = 0;
+        if (clearColor.isPresent()) {
+            int argb = clearColor.getAsInt();
+            GL11.glClearColor(net.minecraft.util.ARGB.redFloat(argb),
+                    net.minecraft.util.ARGB.greenFloat(argb),
+                    net.minecraft.util.ARGB.blueFloat(argb),
+                    net.minecraft.util.ARGB.alphaFloat(argb));
+            clearMask |= GL11.GL_COLOR_BUFFER_BIT;
+        }
+        if (depthTarget != null && clearDepth.isPresent()) {
+            GL11.glClearDepth(clearDepth.getAsDouble());
+            clearMask |= GL11.GL_DEPTH_BUFFER_BIT;
+        }
+        if (clearMask != 0) {
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            GL11.glDepthMask(true);
+            GL11.glColorMask(true, true, true, true);
+            GL11.glClear(clearMask);
+        }
+
+        // Iris: do not reset the viewport during shadow rendering.
+        if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            GL11.glViewport(0, 0, colorTarget.getWidth(0), colorTarget.getHeight(0));
+        }
+
+        return new net.blaze3d.opengl.GlRenderPass(encoder, depthTarget != null);
     }
 
     // =========================================================================

@@ -26,7 +26,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.util.ARGB;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -64,71 +63,56 @@ public class GlCommandEncoder implements CommandEncoder {
 	) {
 		if (this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before creating a new one!");
-		} else {
-			if (optionalDouble.isPresent() && gpuTextureView2 == null) {
-				LOGGER.warn("Depth clear value was provided but no depth texture is being used");
+		}
+
+		// Encoder-level validation (same checks as before, kept here so that the
+		// error messages are consistent whether the caller uses the Blaze3D or
+		// Vulkanic entry points).
+		if (optionalDouble.isPresent() && gpuTextureView2 == null) {
+			LOGGER.warn("Depth clear value was provided but no depth texture is being used");
+		}
+		if (gpuTextureView.isClosed()) {
+			throw new IllegalStateException("Color texture is closed");
+		} else if ((gpuTextureView.texture().usage() & 8) == 0) {
+			throw new IllegalStateException("Color texture must have USAGE_RENDER_ATTACHMENT");
+		} else if (gpuTextureView.texture().getDepthOrLayers() > 1) {
+			throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported as an attachment");
+		}
+		if (gpuTextureView2 != null) {
+			if (gpuTextureView2.isClosed()) {
+				throw new IllegalStateException("Depth texture is closed");
 			}
-
-			if (gpuTextureView.isClosed()) {
-				throw new IllegalStateException("Color texture is closed");
-			} else if ((gpuTextureView.texture().usage() & 8) == 0) {
-				throw new IllegalStateException("Color texture must have USAGE_RENDER_ATTACHMENT");
-			} else if (gpuTextureView.texture().getDepthOrLayers() > 1) {
+			if ((gpuTextureView2.texture().usage() & 8) == 0) {
+				throw new IllegalStateException("Depth texture must have USAGE_RENDER_ATTACHMENT");
+			}
+			if (gpuTextureView2.texture().getDepthOrLayers() > 1) {
 				throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported as an attachment");
-			} else {
-				if (gpuTextureView2 != null) {
-					if (gpuTextureView2.isClosed()) {
-						throw new IllegalStateException("Depth texture is closed");
-					}
-
-					if ((gpuTextureView2.texture().usage() & 8) == 0) {
-						throw new IllegalStateException("Depth texture must have USAGE_RENDER_ATTACHMENT");
-					}
-
-					if (gpuTextureView2.texture().getDepthOrLayers() > 1) {
-						throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported as an attachment");
-					}
-				}
-
-				this.inRenderPass = true;
-				this.device.debugLabels().pushDebugGroup(supplier);
-				int i = ((GlTexture)gpuTextureView.texture()).getFbo(this.device.directStateAccess(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
-				
-				// Iris: From MixinGlCommandEncoder - Do not change framebuffer in shadow pass or safe multiply state
-				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() || net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
-					this.iris$tempFBO = i;
-				} else {
-					GlStateManager._glBindFramebuffer(36160, i);
-				}
-				
-				int j = 0;
-				if (optionalInt.isPresent()) {
-					int k = optionalInt.getAsInt();
-					VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(k), ARGB.greenFloat(k), ARGB.blueFloat(k), ARGB.alphaFloat(k));
-					j |= 16384;
-				}
-
-				if (gpuTextureView2 != null && optionalDouble.isPresent()) {
-					VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), optionalDouble.getAsDouble());
-					j |= 256;
-				}
-
-				if (j != 0) {
-					GlStateManager._disableScissorTest();
-					GlStateManager._depthMask(true);
-					GlStateManager._colorMask(true, true, true, true);
-					GlStateManager._clear(j);
-				}
-
-				// Iris: From MixinGlCommandEncoder - Do not change viewport in shadow pass
-				if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-					GlStateManager._viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
-				}
-				
-				this.lastPipeline = null;
-				return new GlRenderPass(this, gpuTextureView2 != null);
 			}
 		}
+
+		this.inRenderPass = true;
+		this.lastPipeline = null;
+
+		// Delegate all GL work (FBO lookup, bind, clear, viewport, Iris hooks) to
+		// VulkanicAPI → OpenGLBackend.createVulkanicRenderPass().
+		// For the Vulkan backend this becomes vkCmdBeginRenderPass().
+		return (RenderPass) VulkanicAPI.createVulkanicRenderPass(
+				VulkanicAPI.getImmediateContext(),
+				supplier,
+				(net.vulkanic.resources.VulkanicTextureView) gpuTextureView,
+				optionalInt,
+				gpuTextureView2 != null ? (net.vulkanic.resources.VulkanicTextureView) gpuTextureView2 : null,
+				optionalDouble);
+	}
+
+	/**
+	 * Called by {@link net.vulkanic.backends.opengl.OpenGLBackend} during render pass
+	 * creation when the Iris shadow-rendering or safe-multiply state prevents the normal
+	 * {@code glBindFramebuffer} call.  Stores the FBO id so that {@link #trySetup} can
+	 * restore it before the first draw command.
+	 */
+	public void setIrisTempFbo(int fbo) {
+		this.iris$tempFBO = fbo;
 	}
 
 	@Override
@@ -857,18 +841,15 @@ public class GlCommandEncoder implements CommandEncoder {
 	}
 
 	public void finishRenderPass() {
-		// Iris: From MixinGlCommandEncoder - Clear IrisProgram state and unbind framebuffer conditionally
+		// Iris: Clear IrisProgram state before ending the pass.
 		iris$programsToClear.forEach(net.irisshaders.iris.pipeline.programs.IrisProgram::iris$clearState);
 		iris$programsToClear.clear();
-		
+
 		this.inRenderPass = false;
-		
-		// Don't unbind framebuffer if in safe multiply state
-		if (!net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
-			GlStateManager._glBindFramebuffer(36160, 0);
-		}
-		
-		this.device.debugLabels().popDebugGroup();
+
+		// Delegate FBO unbind and debug-group pop to VulkanicAPI → OpenGLBackend.endRenderPass().
+		// For the Vulkan backend this becomes vkCmdEndRenderPass().
+		VulkanicAPI.endRenderPass(VulkanicAPI.getImmediateContext());
 	}
 
 	protected GlDevice getDevice() {
