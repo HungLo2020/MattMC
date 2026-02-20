@@ -7,10 +7,11 @@ import java.nio.ByteBuffer;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.resources.VulkanicBuffer;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class GlBuffer extends GpuBuffer {
+public class GlBuffer extends GpuBuffer implements VulkanicBuffer {
 	protected static final MemoryPool MEMORY_POOl = TracyClient.createMemoryPool("GPU Buffers");
 	protected boolean closed;
 	@Nullable
@@ -32,6 +33,22 @@ public class GlBuffer extends GpuBuffer {
 	@Override
 	public boolean isClosed() {
 		return this.closed;
+	}
+
+	// VulkanicBuffer implementation
+	@Override
+	public long getNativeHandle() {
+		return this.handle;
+	}
+
+	@Override
+	public int getSize() {
+		return super.size();
+	}
+
+	@Override
+	public int getUsage() {
+		return super.usage();
 	}
 
 	@Override

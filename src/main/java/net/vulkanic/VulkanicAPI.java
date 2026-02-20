@@ -2,6 +2,15 @@ package net.vulkanic;
 
 import net.vulkanic.backends.opengl.OpenGLBackend;
 import net.vulkanic.backends.opengl.OpenGLCommandContext;
+import net.vulkanic.framegraph.VulkanicFrameGraphBuilder;
+import net.vulkanic.pipeline.PipelineDescriptor;
+import net.vulkanic.pipeline.PipelineHandle;
+import net.vulkanic.resources.VulkanicBuffer;
+import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureView;
+import java.nio.ByteBuffer;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
 
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
@@ -2206,5 +2215,219 @@ public class VulkanicAPI {
      */
     public static int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
         return getBackend().getUniformBlockIndex(ctx, program, uniformBlockName);
+    }
+
+    // =========================================================================
+    // Phase 3 — Buffer lifecycle (Step 1)
+    // =========================================================================
+
+    /**
+     * Allocates a GPU buffer of {@code size} bytes with the given usage flags.
+     *
+     * @param usage Usage flags (see {@link VulkanicBuffer} USAGE_* constants)
+     * @param size  Size in bytes (must be &gt; 0)
+     * @return A new {@link VulkanicBuffer}; caller must call {@code close()} when done
+     */
+    public static VulkanicBuffer createVulkanicBuffer(int usage, int size) {
+        return getBackend().createVulkanicBuffer(usage, size);
+    }
+
+    /**
+     * Allocates a GPU buffer and immediately uploads {@code data} into it.
+     *
+     * @param usage Usage flags
+     * @param data  Source data (must have {@code remaining() > 0})
+     * @return A new {@link VulkanicBuffer} populated with {@code data}
+     */
+    public static VulkanicBuffer createVulkanicBuffer(int usage, ByteBuffer data) {
+        return getBackend().createVulkanicBuffer(usage, data);
+    }
+
+    /**
+     * Frees a GPU buffer.  Equivalent to calling {@link VulkanicBuffer#close()} directly.
+     *
+     * @param buffer Buffer to free
+     */
+    public static void deleteVulkanicBuffer(VulkanicBuffer buffer) {
+        getBackend().deleteVulkanicBuffer(buffer);
+    }
+
+    // =========================================================================
+    // Phase 3 — Texture lifecycle (Step 2)
+    // =========================================================================
+
+    /**
+     * Allocates a GPU texture.
+     *
+     * @param label         Debug label (may be {@code null})
+     * @param usage         Usage flags (see {@link VulkanicTexture} USAGE_* constants)
+     * @param width         Width in texels
+     * @param height        Height in texels
+     * @param depthOrLayers Depth or layer count
+     * @param mipLevels     Number of mip levels (must be &ge; 1)
+     * @return A new {@link VulkanicTexture}
+     */
+    public static VulkanicTexture createVulkanicTexture(String label, int usage,
+                                                         int width, int height,
+                                                         int depthOrLayers, int mipLevels) {
+        return getBackend().createVulkanicTexture(label, usage, width, height, depthOrLayers, mipLevels);
+    }
+
+    /**
+     * Creates a full-range texture view (all mip levels).
+     *
+     * @param texture Source texture
+     * @return A new {@link VulkanicTextureView}
+     */
+    public static VulkanicTextureView createVulkanicTextureView(VulkanicTexture texture) {
+        return getBackend().createVulkanicTextureView(texture);
+    }
+
+    /**
+     * Creates a texture view exposing a mip-level sub-range.
+     *
+     * @param texture       Source texture
+     * @param baseMipLevel  First mip level
+     * @param mipLevelCount Number of mip levels
+     * @return A new {@link VulkanicTextureView}
+     */
+    public static VulkanicTextureView createVulkanicTextureView(VulkanicTexture texture,
+                                                                 int baseMipLevel, int mipLevelCount) {
+        return getBackend().createVulkanicTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
+    /**
+     * Frees a GPU texture.  Equivalent to calling {@link VulkanicTexture#close()} directly.
+     *
+     * @param texture Texture to free
+     */
+    public static void deleteVulkanicTexture(VulkanicTexture texture) {
+        getBackend().deleteVulkanicTexture(texture);
+    }
+
+    // =========================================================================
+    // Phase 3 — Pipeline objects (Step 3)
+    // =========================================================================
+
+    /**
+     * Compiles and links a graphics pipeline from the given descriptor.
+     *
+     * @param descriptor Pipeline configuration
+     * @return An opaque {@link PipelineHandle}
+     */
+    public static PipelineHandle createPipeline(PipelineDescriptor descriptor) {
+        return getBackend().createPipeline(descriptor);
+    }
+
+    /**
+     * Destroys a compiled pipeline.
+     *
+     * @param pipeline Pipeline to delete
+     */
+    public static void deletePipeline(PipelineHandle pipeline) {
+        getBackend().deletePipeline(pipeline);
+    }
+
+    // =========================================================================
+    // Phase 3 — Render pass (Step 4)
+    // =========================================================================
+
+    /**
+     * Begins a render pass targeting a colour attachment only.
+     *
+     * @param ctx         Command context
+     * @param colorTarget Colour attachment
+     * @param clearColor  If present, clear the colour buffer to this ARGB value
+     */
+    public static void beginRenderPass(CommandContext ctx, VulkanicTextureView colorTarget,
+                                        OptionalInt clearColor) {
+        getBackend().beginRenderPass(ctx, colorTarget, clearColor);
+    }
+
+    /**
+     * Begins a render pass with colour and optional depth attachments.
+     *
+     * @param ctx         Command context
+     * @param colorTarget Colour attachment
+     * @param clearColor  If present, clear the colour buffer
+     * @param depthTarget Depth attachment (may be {@code null})
+     * @param clearDepth  If present, clear the depth buffer to this value
+     */
+    public static void beginRenderPass(CommandContext ctx, VulkanicTextureView colorTarget,
+                                        OptionalInt clearColor,
+                                        VulkanicTextureView depthTarget, OptionalDouble clearDepth) {
+        getBackend().beginRenderPass(ctx, colorTarget, clearColor, depthTarget, clearDepth);
+    }
+
+    /**
+     * Binds a compiled pipeline for subsequent draw calls.
+     *
+     * @param ctx      Command context
+     * @param pipeline Pipeline to bind
+     */
+    public static void setPipeline(CommandContext ctx, PipelineHandle pipeline) {
+        getBackend().setPipeline(ctx, pipeline);
+    }
+
+    /**
+     * Binds a vertex buffer.
+     *
+     * @param ctx    Command context
+     * @param buffer Vertex buffer
+     * @param offset Byte offset into the buffer
+     */
+    public static void setVertexBuffer(CommandContext ctx, VulkanicBuffer buffer, long offset) {
+        getBackend().setVertexBuffer(ctx, buffer, offset);
+    }
+
+    /**
+     * Binds an index buffer.
+     *
+     * @param ctx       Command context
+     * @param buffer    Index buffer
+     * @param indexType GL_UNSIGNED_SHORT or GL_UNSIGNED_INT
+     * @param offset    Byte offset into the buffer
+     */
+    public static void setIndexBuffer(CommandContext ctx, VulkanicBuffer buffer,
+                                       int indexType, long offset) {
+        getBackend().setIndexBuffer(ctx, buffer, indexType, offset);
+    }
+
+    /**
+     * Ends the current render pass and restores the default framebuffer.
+     *
+     * @param ctx Command context
+     */
+    public static void endRenderPass(CommandContext ctx) {
+        getBackend().endRenderPass(ctx);
+    }
+
+    // =========================================================================
+    // Phase 3 — Frame graph (Step 6)
+    // =========================================================================
+
+    /**
+     * Creates a new {@link VulkanicFrameGraphBuilder} for the current frame.
+     *
+     * <pre>{@code
+     * VulkanicFrameGraphBuilder frame = VulkanicAPI.beginFrame();
+     * frame.addPass("sky",   ctx -> skyRenderer.render(ctx));
+     * frame.addPass("level", ctx -> levelRenderer.render(ctx));
+     * VulkanicAPI.executeFrame(frame);
+     * }</pre>
+     *
+     * @return A fresh frame graph builder
+     */
+    public static VulkanicFrameGraphBuilder beginFrame() {
+        return new VulkanicFrameGraphBuilder();
+    }
+
+    /**
+     * Executes all passes in the frame graph and presents the frame.
+     *
+     * @param frame Frame graph to execute (created via {@link #beginFrame()})
+     */
+    public static void executeFrame(VulkanicFrameGraphBuilder frame) {
+        getBackend().executeFrame(getImmediateContext(), frame);
     }
 }

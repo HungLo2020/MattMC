@@ -11,10 +11,11 @@ import it.unimi.dsi.fastutil.ints.IntIterator;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.resources.VulkanicTexture;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixinterface.GpuTextureInterface {
+public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixinterface.GpuTextureInterface, VulkanicTexture {
 	protected final int id;
 	private final Int2IntMap fboCache = new Int2IntOpenHashMap();
 	protected boolean closed;
@@ -102,6 +103,27 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 
 	public int glId() {
 		return this.id;
+	}
+
+	// VulkanicTexture implementation (bridge to GpuTexture superclass)
+	@Override
+	public long getNativeHandle() {
+		return this.id;
+	}
+
+	@Override
+	public int getWidth() {
+		return super.getWidth(0);
+	}
+
+	@Override
+	public int getHeight() {
+		return super.getHeight(0);
+	}
+
+	@Override
+	public int getUsage() {
+		return super.usage();
 	}
 
 	// Iris: From MixinGpuTexture - GpuTextureInterface implementation

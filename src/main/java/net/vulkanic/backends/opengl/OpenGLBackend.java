@@ -5,15 +5,49 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.framegraph.VulkanicFrameGraphBuilder;
+import net.vulkanic.pipeline.PipelineDescriptor;
+import net.vulkanic.pipeline.PipelineHandle;
+import net.vulkanic.resources.VulkanicBuffer;
+import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureView;
 import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.logging.Logger;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
  * This is the ONLY place where direct OpenGL calls should be made.
  */
 public class OpenGLBackend implements GraphicsBackend {
+
+    private static final Logger LOGGER = Logger.getLogger(OpenGLBackend.class.getName());
+
+    /**
+     * Reference to the active {@link net.blaze3d.opengl.GlDevice}.
+     *
+     * <p>Set via {@link #setGlDevice} when {@code GlDevice} initialises itself.
+     * Required so that {@link #createVulkanicBuffer} can delegate to
+     * {@code GlDevice}'s {@code BufferStorage} (which handles DSA, persistent
+     * mapping, etc.) rather than duplicating that logic here.  Also used by
+     * {@link #beginRenderPass} to look up the cached FBO from
+     * {@link net.blaze3d.opengl.GlTexture#getFbo}.
+     */
+    @org.jetbrains.annotations.Nullable
+    private net.blaze3d.opengl.GlDevice glDevice;
+
+    /**
+     * Called by {@link net.blaze3d.opengl.GlDevice} during its constructor so that
+     * this backend can delegate resource creation back to it.
+     * This is how Blaze3D registers as the concrete implementation provider
+     * while Vulkanic owns the interface.
+     */
+    public void setGlDevice(net.blaze3d.opengl.GlDevice device) {
+        this.glDevice = device;
+    }
     
     @Override
     public long getGraphicsContext() {
@@ -2156,5 +2190,309 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL32C.glClearBufferuiv(buffer, drawbuffer, values);
+    }
+
+    // =========================================================================
+    // Phase 3 — Buffer lifecycle (Step 1)
+    // =========================================================================
+
+    @Override
+    public VulkanicBuffer createVulkanicBuffer(int usage, int size) {
+        if (size <= 0) {
+            throw new IllegalArgumentException("Buffer size must be > 0, got " + size);
+        }
+        if (glDevice != null) {
+            // Delegate to GlDevice's BufferStorage — the authoritative path.
+            // BufferStorage handles DSA, persistent mapping, and immutable storage
+            // (GL_ARB_buffer_storage).  The returned GlBuffer already implements
+            // VulkanicBuffer (see GlBuffer.java).
+            return (VulkanicBuffer) glDevice.getBufferStorage()
+                    .createBuffer(glDevice.directStateAccess(), null, usage, size);
+        }
+        // Fallback: before GlDevice is initialised (tests, early startup).
+        int glHandle = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, glHandle);
+        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, size, toGlUsage(usage));
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        return new OpenGLBuffer(null, null, usage, size, glHandle, null);
+    }
+
+    @Override
+    public VulkanicBuffer createVulkanicBuffer(int usage, ByteBuffer data) {
+        if (!data.hasRemaining()) {
+            throw new IllegalArgumentException("Buffer data must not be empty");
+        }
+        int size = data.remaining();
+        if (glDevice != null) {
+            return (VulkanicBuffer) glDevice.getBufferStorage()
+                    .createBuffer(glDevice.directStateAccess(), null, usage, data);
+        }
+        int glHandle = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, glHandle);
+        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, data, toGlUsage(usage));
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        return new OpenGLBuffer(null, null, usage, size, glHandle, null);
+    }
+
+    @Override
+    public void deleteVulkanicBuffer(VulkanicBuffer buffer) {
+        buffer.close();
+    }
+
+    /** Maps a VulkanicBuffer usage bitmask to a GL buffer usage hint. */
+    private static int toGlUsage(int usage) {
+        // Prefer dynamic if either MAP_WRITE or COPY_DST is set
+        if ((usage & (VulkanicBuffer.USAGE_MAP_WRITE | VulkanicBuffer.USAGE_COPY_DST)) != 0) {
+            return GL15.GL_DYNAMIC_DRAW;
+        }
+        return GL15.GL_STATIC_DRAW;
+    }
+
+    // =========================================================================
+    // Phase 3 — Texture lifecycle (Step 2)
+    // =========================================================================
+
+    @Override
+    public VulkanicTexture createVulkanicTexture(String label, int usage,
+                                                  int width, int height,
+                                                  int depthOrLayers, int mipLevels) {
+        if (mipLevels < 1) throw new IllegalArgumentException("mipLevels must be >= 1");
+        if (width   < 1) throw new IllegalArgumentException("width must be >= 1");
+        if (height  < 1) throw new IllegalArgumentException("height must be >= 1");
+
+        int glHandle = GL11.glGenTextures();
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, glHandle);
+        // Allocate storage for each mip level (RGBA8 as a generic default).
+        // Math.max(1, ...) prevents 0-sized allocations for deep mip chains.
+        for (int mipLevel = 0; mipLevel < mipLevels; mipLevel++) {
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, mipLevel,
+                    GL11.GL_RGBA8,
+                    Math.max(1, width  >> mipLevel),
+                    Math.max(1, height >> mipLevel),
+                    0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+        }
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        return new OpenGLTexture(glHandle, usage, label, width, height, depthOrLayers, mipLevels);
+    }
+
+    @Override
+    public VulkanicTextureView createVulkanicTextureView(VulkanicTexture texture) {
+        return createVulkanicTextureView(texture, 0, texture.getMipLevels());
+    }
+
+    @Override
+    public VulkanicTextureView createVulkanicTextureView(VulkanicTexture texture,
+                                                          int baseMipLevel, int mipLevelCount) {
+        if (texture.isClosed()) {
+            throw new IllegalArgumentException("Cannot create view of closed texture");
+        }
+        if (baseMipLevel < 0 || baseMipLevel + mipLevelCount > texture.getMipLevels()) {
+            throw new IllegalArgumentException(
+                    "Mip range [" + baseMipLevel + ", " + (baseMipLevel + mipLevelCount)
+                    + ") is out of bounds for texture with " + texture.getMipLevels() + " mip levels");
+        }
+        return new OpenGLTextureView((OpenGLTexture) texture, baseMipLevel, mipLevelCount);
+    }
+
+    @Override
+    public void deleteVulkanicTexture(VulkanicTexture texture) {
+        texture.close();
+    }
+
+    // =========================================================================
+    // Phase 3 — Pipeline objects (Step 3)
+    // =========================================================================
+
+    @Override
+    public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
+        // Compile vertex shader
+        int vertexShader = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
+        GL20.glShaderSource(vertexShader, descriptor.getVertexShaderSource());
+        GL20.glCompileShader(vertexShader);
+        if (GL20.glGetShaderi(vertexShader, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
+            String log = GL20.glGetShaderInfoLog(vertexShader);
+            GL20.glDeleteShader(vertexShader);
+            logPipelineError("vertex shader", descriptor.getDebugLabel(), log);
+            return OpenGLPipeline.INVALID;
+        }
+
+        // Compile fragment shader
+        int fragmentShader = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
+        GL20.glShaderSource(fragmentShader, descriptor.getFragmentShaderSource());
+        GL20.glCompileShader(fragmentShader);
+        if (GL20.glGetShaderi(fragmentShader, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
+            String log = GL20.glGetShaderInfoLog(fragmentShader);
+            GL20.glDeleteShader(vertexShader);
+            GL20.glDeleteShader(fragmentShader);
+            logPipelineError("fragment shader", descriptor.getDebugLabel(), log);
+            return OpenGLPipeline.INVALID;
+        }
+
+        // Link program
+        int program = GL20.glCreateProgram();
+        GL20.glAttachShader(program, vertexShader);
+        GL20.glAttachShader(program, fragmentShader);
+        GL20.glLinkProgram(program);
+
+        // Shaders are no longer needed once linked
+        GL20.glDetachShader(program, vertexShader);
+        GL20.glDetachShader(program, fragmentShader);
+        GL20.glDeleteShader(vertexShader);
+        GL20.glDeleteShader(fragmentShader);
+
+        if (GL20.glGetProgrami(program, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) {
+            String log = GL20.glGetProgramInfoLog(program);
+            GL20.glDeleteProgram(program);
+            logPipelineError("program link", descriptor.getDebugLabel(), log);
+            return OpenGLPipeline.INVALID;
+        }
+
+        return new OpenGLPipeline(program, descriptor.getDebugLabel());
+    }
+
+    @Override
+    public void deletePipeline(PipelineHandle pipeline) {
+        if (pipeline instanceof OpenGLPipeline glPipeline) {
+            glPipeline.delete();
+        }
+    }
+
+    private static void logPipelineError(String stage, String label, String log) {
+        LOGGER.severe("[Vulkanic] Pipeline '" + label + "' " + stage + " failed:\n" + log);
+    }
+
+    // =========================================================================
+    // Phase 3 — Render pass (Step 4)
+    // =========================================================================
+
+    /**
+     * Fallback FBO used when the colour target is an {@link OpenGLTexture} (not a
+     * {@link net.blaze3d.opengl.GlTexture}).  Created lazily on first use.
+     * When the target IS a GlTexture/GlTextureView, we use GlTexture's own FBO
+     * cache instead (see below) to remain compatible with GlCommandEncoder.
+     */
+    private int renderPassFbo = 0;
+
+    @Override
+    public void beginRenderPass(CommandContext ctx, VulkanicTextureView colorTarget,
+                                 OptionalInt clearColor) {
+        beginRenderPass(ctx, colorTarget, clearColor, null, OptionalDouble.empty());
+    }
+
+    @Override
+    public void beginRenderPass(CommandContext ctx, VulkanicTextureView colorTarget,
+                                 OptionalInt clearColor,
+                                 VulkanicTextureView depthTarget, OptionalDouble clearDepth) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (colorTarget.isClosed()) {
+            throw new IllegalStateException("Color target texture is closed");
+        }
+
+        int fbo;
+        if (colorTarget instanceof net.blaze3d.opengl.GlTextureView glColorView && glDevice != null) {
+            // Use GlTexture's FBO cache so that GlCommandEncoder and Vulkanic
+            // render passes share the same FBO objects.  This avoids double-binding
+            // and keeps the cached FBO valid for downstream GlRenderPass operations.
+            net.blaze3d.opengl.GlTexture colorTex = glColorView.texture();
+            net.blaze3d.opengl.GlTexture depthTex =
+                    depthTarget instanceof net.blaze3d.opengl.GlTextureView dv
+                            ? dv.texture() : null;
+            fbo = colorTex.getFbo(glDevice.directStateAccess(), depthTex);
+        } else {
+            // Fallback for OpenGLTexture targets (new Vulkanic-path textures that
+            // have no GlTexture counterpart yet).
+            if (renderPassFbo == 0) {
+                renderPassFbo = GL30.glGenFramebuffers();
+            }
+            fbo = renderPassFbo;
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fbo);
+
+            int colorTexId = (int) colorTarget.getNativeHandle();
+            int colorMip   = colorTarget.getBaseMipLevel();
+            GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0,
+                    GL11.GL_TEXTURE_2D, colorTexId, colorMip);
+
+            if (depthTarget != null && !depthTarget.isClosed()) {
+                int depthTexId = (int) depthTarget.getNativeHandle();
+                int depthMip   = depthTarget.getBaseMipLevel();
+                GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_ATTACHMENT,
+                        GL11.GL_TEXTURE_2D, depthTexId, depthMip);
+            }
+        }
+
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fbo);
+
+        // Issue clears
+        if (clearColor.isPresent()) {
+            int argb = clearColor.getAsInt();
+            float a = ((argb >> 24) & 0xFF) / 255.0f;
+            float r = ((argb >> 16) & 0xFF) / 255.0f;
+            float g = ((argb >>  8) & 0xFF) / 255.0f;
+            float b = ( argb        & 0xFF) / 255.0f;
+            GL11.glClearColor(r, g, b, a);
+            int clearMask = GL11.GL_COLOR_BUFFER_BIT;
+            if (clearDepth.isPresent()) {
+                GL11.glClearDepth(clearDepth.getAsDouble());
+                clearMask |= GL11.GL_DEPTH_BUFFER_BIT;
+            }
+            GL11.glClear(clearMask);
+        } else if (clearDepth.isPresent()) {
+            GL11.glClearDepth(clearDepth.getAsDouble());
+            GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+        }
+    }
+
+    @Override
+    public void setPipeline(CommandContext ctx, PipelineHandle pipeline) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (!pipeline.isValid()) {
+            throw new IllegalArgumentException("Cannot bind an invalid pipeline");
+        }
+        GL20.glUseProgram((int) pipeline.getNativeHandle());
+    }
+
+    @Override
+    public void setVertexBuffer(CommandContext ctx, VulkanicBuffer buffer, long offset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, (int) buffer.getNativeHandle());
+        // Offset handling would be applied via glVertexAttribPointer calls by the pipeline
+    }
+
+    @Override
+    public void setIndexBuffer(CommandContext ctx, VulkanicBuffer buffer, int indexType, long offset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, (int) buffer.getNativeHandle());
+    }
+
+    @Override
+    public void endRenderPass(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        // Unbind all attachments and restore the default framebuffer
+        if (renderPassFbo != 0) {
+            GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0,
+                    GL11.GL_TEXTURE_2D, 0, 0);
+            GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_ATTACHMENT,
+                    GL11.GL_TEXTURE_2D, 0, 0);
+        }
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
+    }
+
+    // =========================================================================
+    // Phase 3 — Frame graph (Step 6)
+    // =========================================================================
+
+    @Override
+    public void executeFrame(CommandContext ctx, VulkanicFrameGraphBuilder frame) {
+        frame.execute(ctx);
     }
 }

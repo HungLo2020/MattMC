@@ -2,6 +2,14 @@ package net.vulkanic;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import net.vulkanic.framegraph.VulkanicFrameGraphBuilder;
+import net.vulkanic.pipeline.PipelineDescriptor;
+import net.vulkanic.pipeline.PipelineHandle;
+import net.vulkanic.resources.VulkanicBuffer;
+import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureView;
 
 /**
  * Interface for graphics backend implementations.
@@ -2730,4 +2738,202 @@ public interface GraphicsBackend {
      * @param values Unsigned integer values to clear with
      */
     void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values);
+
+    // =========================================================================
+    // Phase 3 — Device-level resource lifecycle (Step 1: Buffer)
+    // =========================================================================
+
+    /**
+     * Allocates a GPU buffer of {@code size} bytes with the given usage flags.
+     *
+     * <p>In OpenGL: allocates a GL buffer object (glGenBuffers + glBufferData).
+     * In Vulkan: will call vkCreateBuffer + vkAllocateMemory + vkBindBufferMemory.
+     *
+     * @param usage Usage flags bitmask (see {@link VulkanicBuffer} USAGE_* constants)
+     * @param size  Size in bytes (must be &gt; 0)
+     * @return A new {@link VulkanicBuffer}; caller is responsible for calling {@code close()}
+     */
+    VulkanicBuffer createVulkanicBuffer(int usage, int size);
+
+    /**
+     * Allocates a GPU buffer and immediately uploads {@code data} into it.
+     *
+     * @param usage Usage flags bitmask
+     * @param data  Source data (must have {@code remaining() > 0})
+     * @return A new {@link VulkanicBuffer} populated with {@code data}
+     */
+    VulkanicBuffer createVulkanicBuffer(int usage, ByteBuffer data);
+
+    /**
+     * Frees a GPU buffer previously created via {@link #createVulkanicBuffer}.
+     * Equivalent to calling {@link VulkanicBuffer#close()} directly.
+     *
+     * @param buffer Buffer to free (must not already be closed)
+     */
+    void deleteVulkanicBuffer(VulkanicBuffer buffer);
+
+    // =========================================================================
+    // Phase 3 — Device-level resource lifecycle (Step 2: Texture)
+    // =========================================================================
+
+    /**
+     * Allocates a GPU texture.
+     *
+     * <p>In OpenGL: allocates a GL texture object with the requested dimensions.
+     * In Vulkan: will create a VkImage + allocate and bind VkDeviceMemory.
+     *
+     * @param label         Human-readable label (may be {@code null})
+     * @param usage         Usage flags (see {@link VulkanicTexture} USAGE_* constants)
+     * @param width         Width in texels (must be &ge; 1)
+     * @param height        Height in texels (must be &ge; 1)
+     * @param depthOrLayers Depth for 3-D textures or layer count for arrays/cubemaps
+     * @param mipLevels     Number of mip levels (must be &ge; 1)
+     * @return A new {@link VulkanicTexture}
+     */
+    VulkanicTexture createVulkanicTexture(String label, int usage,
+                                          int width, int height,
+                                          int depthOrLayers, int mipLevels);
+
+    /**
+     * Creates a full-range texture view for the given texture (all mip levels).
+     *
+     * @param texture Source texture (must not be closed)
+     * @return A new {@link VulkanicTextureView}
+     */
+    VulkanicTextureView createVulkanicTextureView(VulkanicTexture texture);
+
+    /**
+     * Creates a texture view exposing a mip-level sub-range.
+     *
+     * @param texture      Source texture (must not be closed)
+     * @param baseMipLevel First mip level to expose
+     * @param mipLevelCount Number of mip levels to expose
+     * @return A new {@link VulkanicTextureView}
+     */
+    VulkanicTextureView createVulkanicTextureView(VulkanicTexture texture,
+                                                   int baseMipLevel, int mipLevelCount);
+
+    /**
+     * Frees a GPU texture.  All views referencing it must already be discarded.
+     * Equivalent to calling {@link VulkanicTexture#close()} directly.
+     *
+     * @param texture Texture to free (must not already be closed)
+     */
+    void deleteVulkanicTexture(VulkanicTexture texture);
+
+    // =========================================================================
+    // Phase 3 — Pipeline objects (Step 3)
+    // =========================================================================
+
+    /**
+     * Compiles and links a graphics pipeline from the given descriptor.
+     *
+     * <p>In OpenGL: compiles vertex + fragment GLSL shaders and links a GL program.
+     * In Vulkan: will compile SPIR-V and create a VkPipeline.
+     *
+     * @param descriptor Pipeline configuration (shaders, blend, depth test, etc.)
+     * @return An opaque {@link PipelineHandle}; may be {@link net.vulkanic.backends.opengl.OpenGLPipeline#INVALID}
+     *         if compilation fails
+     */
+    PipelineHandle createPipeline(PipelineDescriptor descriptor);
+
+    /**
+     * Destroys a pipeline previously created via {@link #createPipeline}.
+     *
+     * @param pipeline Pipeline to delete (must be valid)
+     */
+    void deletePipeline(PipelineHandle pipeline);
+
+    // =========================================================================
+    // Phase 3 — Render pass (Step 4)
+    // =========================================================================
+
+    /**
+     * Begins a render pass targeting a colour attachment only.
+     *
+     * <p>In OpenGL: binds an FBO with the colour texture attached.
+     * In Vulkan: will call vkCmdBeginRenderPass.
+     *
+     * @param ctx         Command context
+     * @param colorTarget Colour attachment
+     * @param clearColor  If present, the attachment is cleared to this ARGB value before rendering
+     */
+    void beginRenderPass(CommandContext ctx, VulkanicTextureView colorTarget,
+                         OptionalInt clearColor);
+
+    /**
+     * Begins a render pass with both colour and depth attachments.
+     *
+     * @param ctx          Command context
+     * @param colorTarget  Colour attachment
+     * @param clearColor   If present, clear the colour attachment
+     * @param depthTarget  Depth (or depth/stencil) attachment; may be {@code null}
+     * @param clearDepth   If present, clear the depth attachment to this value
+     */
+    void beginRenderPass(CommandContext ctx, VulkanicTextureView colorTarget,
+                         OptionalInt clearColor,
+                         VulkanicTextureView depthTarget, OptionalDouble clearDepth);
+
+    /**
+     * Binds a compiled pipeline for subsequent draw calls within the active render pass.
+     *
+     * <p>In OpenGL: calls glUseProgram and applies the rasterisation state recorded in the
+     * pipeline descriptor. In Vulkan: will call vkCmdBindPipeline.
+     *
+     * @param ctx      Command context
+     * @param pipeline Pipeline to bind (must be valid)
+     */
+    void setPipeline(CommandContext ctx, PipelineHandle pipeline);
+
+    /**
+     * Binds a vertex buffer for the current render pass.
+     *
+     * <p>In OpenGL: calls glBindBuffer(GL_ARRAY_BUFFER, ...) and configures the VAO.
+     * In Vulkan: will call vkCmdBindVertexBuffers.
+     *
+     * @param ctx    Command context
+     * @param buffer Vertex buffer to bind (must not be closed)
+     * @param offset Byte offset into the buffer
+     */
+    void setVertexBuffer(CommandContext ctx, VulkanicBuffer buffer, long offset);
+
+    /**
+     * Binds an index buffer for the current render pass.
+     *
+     * <p>In OpenGL: calls glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ...).
+     * In Vulkan: will call vkCmdBindIndexBuffer.
+     *
+     * @param ctx       Command context
+     * @param buffer    Index buffer to bind (must not be closed)
+     * @param indexType GL_UNSIGNED_SHORT or GL_UNSIGNED_INT (maps to VkIndexType)
+     * @param offset    Byte offset into the buffer
+     */
+    void setIndexBuffer(CommandContext ctx, VulkanicBuffer buffer, int indexType, long offset);
+
+    /**
+     * Ends the current render pass and restores default framebuffer state.
+     *
+     * <p>In OpenGL: unbinds the FBO (binds framebuffer 0).
+     * In Vulkan: will call vkCmdEndRenderPass.
+     *
+     * @param ctx Command context
+     */
+    void endRenderPass(CommandContext ctx);
+
+    // =========================================================================
+    // Phase 3 — Frame graph (Step 6)
+    // =========================================================================
+
+    /**
+     * Executes a fully constructed {@link VulkanicFrameGraphBuilder}.
+     *
+     * <p>Dispatches all registered passes in dependency-resolved order using the
+     * supplied command context. On the OpenGL backend this runs passes immediately
+     * in the order they were registered. On the Vulkan backend this will record
+     * all commands into a command buffer and submit it to the queue.
+     *
+     * @param ctx   Command context for this frame
+     * @param frame Frame graph to execute
+     */
+    void executeFrame(CommandContext ctx, VulkanicFrameGraphBuilder frame);
 }

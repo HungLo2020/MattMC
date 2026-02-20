@@ -75,6 +75,12 @@ public class GlDevice implements GpuDevice {
 		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getImmediateContext(), 35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
 		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
 		net.vulkanic.VulkanicAPI.setCapabilityEnabled(ctx, 34895, true); // GL_PROGRAM_POINT_SIZE
+		// Register with the OpenGLBackend so it can delegate buffer/texture
+		// creation back here (using our BufferStorage, DirectStateAccess, etc.)
+		// rather than duplicating that logic.
+		if (net.vulkanic.VulkanicAPI.getBackend() instanceof net.vulkanic.backends.opengl.OpenGLBackend openGLBackend) {
+			openGLBackend.setGlDevice(this);
+		}
 	}
 
 	public GlDebugLabel debugLabels() {
@@ -190,7 +196,12 @@ public class GlDevice implements GpuDevice {
 			throw new IllegalArgumentException("Buffer size must be greater than zero");
 		} else {
 			GlStateManager.clearGlErrors();
-			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, j);
+			// Delegate to Vulkanic — GlDevice is now a thin facade for buffer creation.
+			// VulkanicAPI dispatches to OpenGLBackend, which uses our BufferStorage
+			// (set via OpenGLBackend.setGlDevice) to create the buffer with DSA and
+			// persistent-mapping support.  The returned object is an instanceof GlBuffer
+			// so all downstream GlCommandEncoder casts continue to work.
+			GlBuffer glBuffer = (GlBuffer) net.vulkanic.VulkanicAPI.createVulkanicBuffer(i, j);
 			int k = GlStateManager._getError();
 			if (k == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + j + " for " + supplier);
@@ -210,7 +221,7 @@ public class GlDevice implements GpuDevice {
 		} else {
 			GlStateManager.clearGlErrors();
 			long l = byteBuffer.remaining();
-			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, byteBuffer);
+			GlBuffer glBuffer = (GlBuffer) net.vulkanic.VulkanicAPI.createVulkanicBuffer(i, byteBuffer);
 			int j = GlStateManager._getError();
 			if (j == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + l + " for " + supplier);
