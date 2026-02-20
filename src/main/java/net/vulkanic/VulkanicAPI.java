@@ -523,12 +523,87 @@ public class VulkanicAPI {
      * without changing the immediate execution model during the transition period.</p>
      * 
      * @return Immediate-mode command context (OpenGL singleton)
+     * @see #beginCommandBuffer() for the Vulkan-compatible alternative
      */
     public static CommandContext getImmediateContext() {
         // For now, we only have OpenGL backend, so return OpenGL immediate context
         // When Vulkan backend is added, this would check backend type
         return OpenGLCommandContext.IMMEDIATE;
     }
+
+    // -------------------------------------------------------------------------
+    // Command Buffer Lifecycle
+    //
+    // These four methods model Vulkan's explicit command-buffer recording model.
+    // With the OpenGL backend they are no-ops / pass-throughs; a future Vulkan
+    // backend will implement them with vkBeginCommandBuffer, vkEndCommandBuffer,
+    // vkQueueSubmit, and vkResetCommandBuffer respectively.
+    //
+    // Preferred rendering pattern (Vulkan-compatible):
+    //
+    //   CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+    //   VulkanicAPI.setDynamicViewport(ctx, 0, 0, width, height);
+    //   VulkanicAPI.drawIndexed(ctx, indexCount, 1, 0, 0, 0);
+    //   VulkanicAPI.endCommandBuffer(ctx);
+    //   VulkanicAPI.submitCommandBuffer(ctx);
+    //
+    // -------------------------------------------------------------------------
+
+    /**
+     * Allocates or retrieves a command buffer and begins recording commands into it.
+     *
+     * <p>In OpenGL: Returns the singleton immediate-mode context and is otherwise a
+     * no-op – commands continue to execute immediately.</p>
+     * <p>In Vulkan: Calls {@code vkBeginCommandBuffer()} and returns a
+     * {@link CommandContext} wrapping the resulting {@code VkCommandBuffer}.</p>
+     *
+     * @return A {@link CommandContext} ready to accept rendering commands
+     */
+    public static CommandContext beginCommandBuffer() {
+        return getBackend().beginCommandBuffer();
+    }
+
+    /**
+     * Finishes recording commands into the given command buffer.
+     *
+     * <p>In OpenGL: No-op – commands were already executed immediately.</p>
+     * <p>In Vulkan: Calls {@code vkEndCommandBuffer()}, transitioning the buffer
+     * to the executable state.</p>
+     *
+     * @param ctx The command context returned by {@link #beginCommandBuffer()}
+     */
+    public static void endCommandBuffer(CommandContext ctx) {
+        getBackend().endCommandBuffer(ctx);
+    }
+
+    /**
+     * Submits the recorded commands in the given command buffer for GPU execution.
+     *
+     * <p>In OpenGL: No-op – commands were already submitted at call time.</p>
+     * <p>In Vulkan: Calls {@code vkQueueSubmit()} to schedule the command buffer on
+     * the device queue.</p>
+     *
+     * @param ctx The command context that was previously ended with
+     *            {@link #endCommandBuffer(CommandContext)}
+     */
+    public static void submitCommandBuffer(CommandContext ctx) {
+        getBackend().submitCommandBuffer(ctx);
+    }
+
+    /**
+     * Resets the given command buffer so it can be re-used for a new recording pass.
+     *
+     * <p>In OpenGL: No-op – the immediate context has no persistent recorded state.</p>
+     * <p>In Vulkan: Calls {@code vkResetCommandBuffer()}, releasing all resources
+     * held by the buffer and returning it to the initial state.</p>
+     *
+     * @param ctx The command context to reset
+     */
+    public static void resetCommandBuffer(CommandContext ctx) {
+        getBackend().resetCommandBuffer(ctx);
+    }
+
+
     
     // Context operations
     /**
