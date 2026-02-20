@@ -14,47 +14,7 @@ import java.nio.FloatBuffer;
  * This is the ONLY place where direct OpenGL calls should be made.
  */
 public class OpenGLBackend implements GraphicsBackend {
-
-    // -------------------------------------------------------------------------
-    // Command Buffer Lifecycle (OpenGL stubs)
-    //
-    // OpenGL is an immediate-mode API: every call executes on the GPU immediately.
-    // There are no command buffers to begin, end, submit, or reset.  These methods
-    // therefore act as pass-throughs / no-ops so that higher-level code can be
-    // written in a Vulkan-compatible style without any OpenGL-specific branching.
-    // -------------------------------------------------------------------------
-
-    @Override
-    public CommandContext beginCommandBuffer() {
-        // OpenGL has only one implicit, always-active "command stream".
-        // Return the singleton immediate context; no recording state is needed.
-        return OpenGLCommandContext.IMMEDIATE;
-    }
-
-    @Override
-    public void endCommandBuffer(CommandContext ctx) {
-        if (!ctx.isImmediate()) {
-            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
-        }
-        // No-op: OpenGL commands execute immediately; there is nothing to finalise.
-    }
-
-    @Override
-    public void submitCommandBuffer(CommandContext ctx) {
-        if (!ctx.isImmediate()) {
-            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
-        }
-        // No-op: commands were already submitted to the GPU at call time.
-    }
-
-    @Override
-    public void resetCommandBuffer(CommandContext ctx) {
-        if (!ctx.isImmediate()) {
-            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
-        }
-        // No-op: the immediate context has no recorded state to discard.
-    }
-
+    
     @Override
     public long getGraphicsContext() {
         // Platform-specific: On Windows, return the WGL context handle

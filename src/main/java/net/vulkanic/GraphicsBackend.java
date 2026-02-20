@@ -8,83 +8,8 @@ import java.nio.FloatBuffer;
  * This interface defines the contract that all backends (OpenGL, Vulkan) must implement.
  */
 public interface GraphicsBackend {
-
-    // =========================================================================
-    // Command Buffer Lifecycle
-    //
-    // These methods model Vulkan's explicit command buffer recording model.
-    // For the OpenGL backend they are no-ops / pass-throughs because OpenGL
-    // executes commands immediately without an explicit recording step.
-    // A Vulkan backend will implement these with vkBeginCommandBuffer,
-    // vkEndCommandBuffer, vkQueueSubmit and vkResetCommandBuffer respectively.
-    // =========================================================================
-
-    /**
-     * Allocates or retrieves a command buffer and begins recording commands into it.
-     *
-     * <p>In OpenGL: Returns the singleton immediate-mode context; commands continue to
-     * execute immediately and no actual recording begins.</p>
-     * <p>In Vulkan: Calls {@code vkBeginCommandBuffer()} on a pooled command buffer and
-     * returns a {@link CommandContext} wrapping the {@code VkCommandBuffer} handle.</p>
-     *
-     * <p>The returned context <strong>must</strong> be passed to every rendering method
-     * until {@link #endCommandBuffer(CommandContext)} is called. Callers should not mix
-     * contexts across unrelated begin/end pairs.</p>
-     *
-     * @return A {@link CommandContext} ready to accept rendering commands
-     */
-    CommandContext beginCommandBuffer();
-
-    /**
-     * Finishes recording commands into the given command buffer.
-     *
-     * <p>In OpenGL: No-op – commands were already executed immediately.</p>
-     * <p>In Vulkan: Calls {@code vkEndCommandBuffer()}, transitioning the buffer from
-     * the recording state to the executable state.</p>
-     *
-     * @param ctx The command context returned by {@link #beginCommandBuffer()}
-     * @throws IllegalArgumentException if {@code ctx} is not a valid recording context
-     *         for this backend
-     */
-    void endCommandBuffer(CommandContext ctx);
-
-    /**
-     * Submits the recorded commands in the given command buffer for GPU execution.
-     *
-     * <p>In OpenGL: No-op – commands were already submitted to the GPU when they were
-     * called (immediate execution model).</p>
-     * <p>In Vulkan: Calls {@code vkQueueSubmit()} to schedule the command buffer on the
-     * appropriate device queue. After submission the buffer transitions to the pending
-     * state and must not be modified until execution completes.</p>
-     *
-     * @param ctx The command context that was previously ended with
-     *            {@link #endCommandBuffer(CommandContext)}
-     * @throws IllegalArgumentException if {@code ctx} is not a valid context for this
-     *         backend or has not been ended
-     */
-    void submitCommandBuffer(CommandContext ctx);
-
-    /**
-     * Resets the given command buffer so it can be re-used for a new recording pass.
-     *
-     * <p>In OpenGL: No-op – the immediate context has no persistent state to reset.</p>
-     * <p>In Vulkan: Calls {@code vkResetCommandBuffer()}, releasing all resources
-     * recorded into the buffer and returning it to the initial state so
-     * {@link #beginCommandBuffer()} can be called again.</p>
-     *
-     * <p>The command buffer <strong>must not</strong> be pending execution (i.e. the
-     * corresponding GPU fence must have signalled) before this method is called.</p>
-     *
-     * @param ctx The command context to reset
-     * @throws IllegalArgumentException if {@code ctx} is not a valid context for this
-     *         backend
-     */
-    void resetCommandBuffer(CommandContext ctx);
-
-    // =========================================================================
-    // Context / device queries
-    // =========================================================================
-
+    
+    // Context operations
     /**
      * Gets the current graphics context (platform-specific).
      * On Windows, this returns the WGL context handle.
