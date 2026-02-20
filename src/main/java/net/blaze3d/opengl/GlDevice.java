@@ -316,9 +316,19 @@ public class GlDevice implements GpuDevice {
 		return (GlShaderModule)this.shaderCache.computeIfAbsent(shaderCompilationKey, shaderCompilationKey2 -> this.compileShader(shaderCompilationKey, biFunction));
 	}
 
-	public GlRenderPipeline precompilePipeline(RenderPipeline renderPipeline, @Nullable BiFunction<ResourceLocation, ShaderType, String> biFunction) {
+	// Renamed to compilePipelineInternal to avoid name collision after delegation.
+	// Called directly by OpenGLBackend.precompilePipeline() to break the loop:
+	// GlDevice.precompilePipeline() → VulkanicAPI → OpenGLBackend → compilePipelineInternal().
+	public GlRenderPipeline compilePipelineInternal(RenderPipeline renderPipeline, @Nullable BiFunction<ResourceLocation, ShaderType, String> biFunction) {
 		BiFunction<ResourceLocation, ShaderType, String> biFunction2 = biFunction == null ? this.defaultShaderSource : biFunction;
 		return (GlRenderPipeline)this.pipelineCache.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, biFunction2));
+	}
+
+	@Override
+	public GlRenderPipeline precompilePipeline(RenderPipeline renderPipeline, @Nullable BiFunction<ResourceLocation, ShaderType, String> biFunction) {
+		// Delegate to Vulkanic — GlDevice is a thin facade for pipeline compilation.
+		// OpenGLBackend.precompilePipeline() calls compilePipelineInternal() above.
+		return (GlRenderPipeline) net.vulkanic.VulkanicAPI.precompilePipeline(renderPipeline, biFunction);
 	}
 
 	private GlShaderModule compileShader(GlDevice.ShaderCompilationKey shaderCompilationKey, BiFunction<ResourceLocation, ShaderType, String> biFunction) {

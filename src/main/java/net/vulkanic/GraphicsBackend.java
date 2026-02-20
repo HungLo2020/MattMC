@@ -5,14 +5,22 @@ import java.nio.FloatBuffer;
 import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.shaders.ShaderType;
+import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.framegraph.VulkanicFrameGraphBuilder;
 import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
+import net.vulkanic.pipeline.VulkanicCompiledPipeline;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicBufferSlice;
+import net.vulkanic.resources.VulkanicRenderPass;
 import net.vulkanic.resources.VulkanicTexture;
 import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Interface for graphics backend implementations.
@@ -3157,4 +3165,101 @@ public interface GraphicsBackend {
     void clearColorAndDepthTextures(CommandContext ctx,
                                      VulkanicTexture color, int argbColor,
                                      VulkanicTexture depth, double depthValue);
+
+    // =========================================================================
+    // Phase 4 — Render pass (Vulkan primary entry point)
+    //
+    // A VulkanicRenderPass encapsulates all the work done between
+    // vkCmdBeginRenderPass / vkCmdEndRenderPass on Vulkan.
+    // On OpenGL it wraps an FBO bind, pipeline program use, and draw calls.
+    //
+    // Obtaining render passes through VulkanicAPI (instead of the Blaze3D
+    // CommandEncoder) means the Vulkan backend only needs to implement this
+    // interface — it never touches GlCommandEncoder or GlRenderPass.
+    // =========================================================================
+
+    /**
+     * Creates a render pass targeting a colour attachment only.
+     *
+     * <ul>
+     *   <li>OpenGL: binds an FBO with the colour texture; optional clear via
+     *       {@code glClear(GL_COLOR_BUFFER_BIT)}; sets the viewport.</li>
+     *   <li>Vulkan: will call {@code vkCmdBeginRenderPass} with a single
+     *       colour attachment and a {@code VK_ATTACHMENT_LOAD_OP_CLEAR} /
+     *       {@code LOAD} load-op depending on {@code clearColor}.</li>
+     * </ul>
+     *
+     * @param ctx        Command context (from {@link #beginCommandBuffer()})
+     * @param label      Debug label supplier
+     * @param colorTarget Colour attachment
+     * @param clearColor  If present, clear the attachment to this ARGB value before rendering
+     * @return An active {@link VulkanicRenderPass}; must be {@link VulkanicRenderPass#close()}d
+     */
+    VulkanicRenderPass createVulkanicRenderPass(CommandContext ctx,
+                                                 Supplier<String> label,
+                                                 VulkanicTextureView colorTarget,
+                                                 OptionalInt clearColor);
+
+    /**
+     * Creates a render pass with colour and depth attachments.
+     *
+     * @param ctx         Command context
+     * @param label       Debug label supplier
+     * @param colorTarget Colour attachment
+     * @param clearColor  If present, clear the colour attachment
+     * @param depthTarget Depth (or depth/stencil) attachment; may be {@code null}
+     * @param clearDepth  If present, clear the depth attachment to this value
+     * @return An active {@link VulkanicRenderPass}
+     */
+    VulkanicRenderPass createVulkanicRenderPass(CommandContext ctx,
+                                                 Supplier<String> label,
+                                                 VulkanicTextureView colorTarget,
+                                                 OptionalInt clearColor,
+                                                 @Nullable VulkanicTextureView depthTarget,
+                                                 OptionalDouble clearDepth);
+
+    // =========================================================================
+    // Phase 4 — Pipeline compilation (Vulkan prerequisite)
+    //
+    // In Vulkan, pipeline creation (vkCreateGraphicsPipeline) is expensive and
+    // MUST be done before the first frame that uses it — it cannot be deferred
+    // to first draw time as OpenGL drivers usually permit.
+    //
+    // Adding precompilePipeline() to GraphicsBackend means:
+    //   - The Vulkan backend compiles VkPipeline objects up front when the game
+    //     calls VulkanicAPI.precompilePipeline() during load / shader-reload.
+    //   - GlDevice.precompilePipeline() becomes a thin facade, shrinking Blaze3D.
+    // =========================================================================
+
+    /**
+     * Compiles (or retrieves from cache) a render pipeline.
+     *
+     * <ul>
+     *   <li>OpenGL: compiles the GLSL vertex and fragment shaders, links the
+     *       program, and caches it by pipeline identity.</li>
+     *   <li>Vulkan: creates a {@code VkPipeline} from the pipeline's vertex format,
+     *       SPIR-V shaders, and rasterisation state; caches by pipeline identity.</li>
+     * </ul>
+     *
+     * <p>Replaces direct calls to {@code RenderSystem.getDevice().precompilePipeline(...)}.
+     *
+     * @param renderPipeline  Pipeline descriptor (vertex format, shader locations, blend state, etc.)
+     * @param shaderSource    Optional override for shader source resolution; {@code null} uses default
+     * @return The compiled pipeline result; check {@link VulkanicCompiledPipeline#isValid()}
+     */
+    VulkanicCompiledPipeline precompilePipeline(RenderPipeline renderPipeline,
+                                                  @Nullable BiFunction<ResourceLocation, ShaderType, String> shaderSource);
+
+    /**
+     * Clears the compiled pipeline cache, releasing all compiled pipelines.
+     *
+     * <ul>
+     *   <li>OpenGL: deletes all cached GL programs.</li>
+     *   <li>Vulkan: destroys all cached {@code VkPipeline} objects.</li>
+     * </ul>
+     *
+     * <p>Called by {@code ShaderManager} on shader reload.
+     * Replaces direct calls to {@code RenderSystem.getDevice().clearPipelineCache()}.
+     */
+    void clearPipelineCache();
 }

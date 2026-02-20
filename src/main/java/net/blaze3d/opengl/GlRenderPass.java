@@ -15,10 +15,14 @@ import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
+import net.vulkanic.resources.VulkanicBuffer;
+import net.vulkanic.resources.VulkanicBufferSlice;
+import net.vulkanic.resources.VulkanicRenderPass;
+import net.vulkanic.resources.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class GlRenderPass implements RenderPass {
+public class GlRenderPass implements RenderPass, VulkanicRenderPass {
 	protected static final int MAX_VERTEX_BUFFERS = 1;
 	public static final boolean VALIDATION = SharedConstants.IS_RUNNING_IN_IDE;
 	private final GlCommandEncoder encoder;
@@ -194,8 +198,44 @@ public class GlRenderPass implements RenderPass {
 			this.encoder.finishRenderPass();
 		}
 	}
-	
+
+	// =========================================================================
+	// VulkanicRenderPass — Vulkanic-typed equivalents of RenderPass methods
+	//
+	// All casts below are safe because in the OpenGL backend every VulkanicBuffer
+	// IS a GlBuffer (which extends GpuBuffer) and every VulkanicTextureView IS
+	// a GlTextureView (which extends GpuTextureView).
+	// =========================================================================
+
+	@Override
+	public void setVertexBuffer(int slot, VulkanicBuffer buffer) {
+		this.setVertexBuffer(slot, (GpuBuffer) buffer);
+	}
+
+	@Override
+	public void setIndexBuffer(VulkanicBuffer buffer, VertexFormat.IndexType indexType) {
+		this.setIndexBuffer((GpuBuffer) buffer, indexType);
+	}
+
+	@Override
+	public void setUniform(String name, VulkanicBuffer buffer) {
+		this.setUniform(name, (GpuBuffer) buffer);
+	}
+
+	@Override
+	public void setUniform(String name, VulkanicBufferSlice slice) {
+		this.setUniform(name, new GpuBufferSlice((GpuBuffer) slice.buffer(), slice.offset(), slice.length()));
+	}
+
+	@Override
+	public void bindSampler(String name, @Nullable VulkanicTextureView view) {
+		this.bindSampler(name, (GpuTextureView) view);
+	}
+
+	// =========================================================================
 	// Iris compatibility
+	// =========================================================================
+
 	private net.irisshaders.iris.mixinterface.CustomPass irisCustomPass;
 	
 	public void iris$setCustomPass(net.irisshaders.iris.mixinterface.CustomPass pass) {

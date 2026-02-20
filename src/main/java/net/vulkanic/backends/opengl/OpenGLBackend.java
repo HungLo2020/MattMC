@@ -4,7 +4,11 @@ import net.blaze3d.GpuOutOfMemoryException;
 import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.opengl.GlTextureView;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
+import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
@@ -12,15 +16,20 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.framegraph.VulkanicFrameGraphBuilder;
 import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
+import net.vulkanic.pipeline.VulkanicCompiledPipeline;
 import net.vulkanic.resources.VulkanicBuffer;
+import net.vulkanic.resources.VulkanicRenderPass;
 import net.vulkanic.resources.VulkanicTexture;
 import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 /**
@@ -2768,6 +2777,65 @@ public class OpenGLBackend implements GraphicsBackend {
                 (net.blaze3d.buffers.GpuBuffer) slice.buffer(),
                 slice.offset(),
                 slice.length());
+    }
+
+    // =========================================================================
+    // Phase 4 — Render pass (createVulkanicRenderPass)
+    //
+    // Delegates to GlCommandEncoder.createRenderPass() — the existing Blaze3D
+    // implementation that handles FBO binding, Iris hooks, and viewport setup.
+    // GlRenderPass implements VulkanicRenderPass so the cast is safe.
+    //
+    // A future Vulkan backend will implement this with vkCmdBeginRenderPass
+    // without any GlCommandEncoder involvement.
+    // =========================================================================
+
+    @Override
+    public VulkanicRenderPass createVulkanicRenderPass(CommandContext ctx,
+                                                        Supplier<String> label,
+                                                        VulkanicTextureView colorTarget,
+                                                        OptionalInt clearColor) {
+        return createVulkanicRenderPass(ctx, label, colorTarget, clearColor, null, OptionalDouble.empty());
+    }
+
+    @Override
+    public VulkanicRenderPass createVulkanicRenderPass(CommandContext ctx,
+                                                        Supplier<String> label,
+                                                        VulkanicTextureView colorTarget,
+                                                        OptionalInt clearColor,
+                                                        @Nullable VulkanicTextureView depthTarget,
+                                                        OptionalDouble clearDepth) {
+        requireGlDevice("createVulkanicRenderPass");
+        // Casts are safe: in the OpenGL backend every VulkanicTextureView IS a GlTextureView
+        // which extends GpuTextureView.  GlRenderPass implements VulkanicRenderPass.
+        GpuTextureView colorView = (GpuTextureView) colorTarget;
+        GpuTextureView depthView  = depthTarget != null ? (GpuTextureView) depthTarget : null;
+        return (VulkanicRenderPass) glDevice.createCommandEncoder()
+                .createRenderPass(label, colorView, clearColor, depthView, clearDepth);
+    }
+
+    // =========================================================================
+    // Phase 4 — Pipeline compilation
+    //
+    // precompilePipeline is the Vulkan-critical entry point.  In Vulkan,
+    // pipeline objects (VkPipeline) MUST be compiled before the first frame
+    // that uses them — deferred / on-first-draw compilation is forbidden.
+    // By routing all pipeline compilation through VulkanicAPI.precompilePipeline(),
+    // the Vulkan backend can eagerly compile VkPipeline objects at load time.
+    // =========================================================================
+
+    @Override
+    public VulkanicCompiledPipeline precompilePipeline(RenderPipeline renderPipeline,
+                                                         @Nullable BiFunction<ResourceLocation, ShaderType, String> shaderSource) {
+        requireGlDevice("precompilePipeline");
+        // Call compilePipelineInternal() directly to avoid the delegation loop:
+        // GlDevice.precompilePipeline() → VulkanicAPI.precompilePipeline() → here.
+        return (VulkanicCompiledPipeline) glDevice.compilePipelineInternal(renderPipeline, shaderSource);
+    }
+
+    @Override
+    public void clearPipelineCache() {
+        if (glDevice != null) glDevice.clearPipelineCache();
     }
 }
 

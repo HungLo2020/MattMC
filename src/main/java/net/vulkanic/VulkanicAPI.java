@@ -5,8 +5,10 @@ import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import net.vulkanic.framegraph.VulkanicFrameGraphBuilder;
 import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
+import net.vulkanic.pipeline.VulkanicCompiledPipeline;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicBufferSlice;
+import net.vulkanic.resources.VulkanicRenderPass;
 import net.vulkanic.resources.VulkanicTexture;
 import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
@@ -14,6 +16,12 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.shaders.ShaderType;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
@@ -2658,6 +2666,116 @@ public class VulkanicAPI {
                                                    VulkanicTexture color, int argbColor,
                                                    VulkanicTexture depth, double depthValue) {
         getBackend().clearColorAndDepthTextures(ctx, color, argbColor, depth, depthValue);
+    }
+
+    // =========================================================================
+    // Phase 4 — Render pass (primary Vulkan entry point for rendering)
+    //
+    // Use VulkanicAPI.createVulkanicRenderPass() instead of
+    // getDevice().createCommandEncoder().createRenderPass() to stay on the
+    // Vulkanic path. The Vulkan backend will implement this natively.
+    // =========================================================================
+
+    /**
+     * Creates a render pass targeting a colour attachment only.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().createCommandEncoder()
+     *     .createRenderPass(label, colorView, clearColor)}
+     *
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+     * try (VulkanicRenderPass pass = VulkanicAPI.createVulkanicRenderPass(
+     *         ctx, () -> "My pass", colorTarget, OptionalInt.of(0xFF000000))) {
+     *     pass.setPipeline(RenderPipelines.GUI);
+     *     pass.setVertexBuffer(0, vertexBuf);
+     *     pass.drawIndexed(0, indexCount, 0, 1);
+     * }
+     * VulkanicAPI.submitCommandBuffer(ctx);
+     * }</pre>
+     *
+     * @param ctx         Command context (from {@link #beginCommandBuffer()})
+     * @param label       Debug label supplier
+     * @param colorTarget Colour attachment (must have USAGE_RENDER_ATTACHMENT)
+     * @param clearColor  If present, clear colour as packed ARGB
+     * @return Active {@link VulkanicRenderPass}; must be closed after use
+     */
+    public static VulkanicRenderPass createVulkanicRenderPass(CommandContext ctx,
+                                                               Supplier<String> label,
+                                                               VulkanicTextureView colorTarget,
+                                                               OptionalInt clearColor) {
+        return getBackend().createVulkanicRenderPass(ctx, label, colorTarget, clearColor);
+    }
+
+    /**
+     * Creates a render pass with colour and depth attachments.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().createCommandEncoder()
+     *     .createRenderPass(label, colorView, clearColor, depthView, clearDepth)}
+     *
+     * @param ctx         Command context
+     * @param label       Debug label supplier
+     * @param colorTarget Colour attachment
+     * @param clearColor  If present, clear the colour attachment
+     * @param depthTarget Depth attachment; {@code null} for depth-less passes
+     * @param clearDepth  If present, clear the depth attachment to this value
+     * @return Active {@link VulkanicRenderPass}
+     */
+    public static VulkanicRenderPass createVulkanicRenderPass(CommandContext ctx,
+                                                               Supplier<String> label,
+                                                               VulkanicTextureView colorTarget,
+                                                               OptionalInt clearColor,
+                                                               @Nullable VulkanicTextureView depthTarget,
+                                                               OptionalDouble clearDepth) {
+        return getBackend().createVulkanicRenderPass(
+                ctx, label, colorTarget, clearColor, depthTarget, clearDepth);
+    }
+
+    // =========================================================================
+    // Phase 4 — Pipeline compilation (Vulkan-critical)
+    //
+    // In Vulkan, VkPipeline creation MUST happen before first use — deferred
+    // compilation is not allowed.  Routing all pipeline compilation through
+    // VulkanicAPI.precompilePipeline() lets the Vulkan backend eagerly compile
+    // VkPipeline objects at load time / shader-reload time.
+    //
+    // Replaces calls to: RenderSystem.getDevice().precompilePipeline(...)
+    // =========================================================================
+
+    /**
+     * Compiles (or retrieves from cache) a render pipeline.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().precompilePipeline(pipeline, src)}
+     *
+     * @param renderPipeline Pipeline descriptor
+     * @return Compiled pipeline; check {@link VulkanicCompiledPipeline#isValid()}
+     */
+    public static VulkanicCompiledPipeline precompilePipeline(RenderPipeline renderPipeline) {
+        return getBackend().precompilePipeline(renderPipeline, null);
+    }
+
+    /**
+     * Compiles a render pipeline with a custom shader source resolver.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().precompilePipeline(pipeline, shaderSource)}
+     *
+     * @param renderPipeline Pipeline descriptor
+     * @param shaderSource   Custom source resolver; {@code null} uses the default
+     * @return Compiled pipeline
+     */
+    public static VulkanicCompiledPipeline precompilePipeline(
+            RenderPipeline renderPipeline,
+            @Nullable BiFunction<ResourceLocation, ShaderType, String> shaderSource) {
+        return getBackend().precompilePipeline(renderPipeline, shaderSource);
+    }
+
+    /**
+     * Clears the compiled pipeline cache.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().clearPipelineCache()}
+     * Called by {@code ShaderManager} on shader reload.
+     */
+    public static void clearPipelineCache() {
+        getBackend().clearPipelineCache();
     }
 }
 

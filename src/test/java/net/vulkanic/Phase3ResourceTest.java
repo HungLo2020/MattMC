@@ -443,4 +443,117 @@ public class Phase3ResourceTest {
                 VulkanicTexture.class, int.class,
                 VulkanicTexture.class, double.class));
     }
+
+    // -----------------------------------------------------------------------
+    // VulkanicRenderPass interface
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicRenderPassInterfaceExists() throws ClassNotFoundException {
+        // Must be an interface in net.vulkanic.resources
+        Class<?> cls = Class.forName("net.vulkanic.resources.VulkanicRenderPass");
+        assertTrue(cls.isInterface(), "VulkanicRenderPass must be an interface");
+        assertTrue(AutoCloseable.class.isAssignableFrom(cls),
+                "VulkanicRenderPass must extend AutoCloseable (Vulkan try-with-resources)");
+    }
+
+    @Test
+    public void testVulkanicRenderPassHasCriticalMethods() throws Exception {
+        Class<?> cls = Class.forName("net.vulkanic.resources.VulkanicRenderPass");
+        // Core draw-pipeline methods
+        assertNotNull(cls.getMethod("setPipeline", net.blaze3d.pipeline.RenderPipeline.class));
+        assertNotNull(cls.getMethod("setVertexBuffer", int.class, VulkanicBuffer.class));
+        assertNotNull(cls.getMethod("setIndexBuffer",
+                VulkanicBuffer.class, net.blaze3d.vertex.VertexFormat.IndexType.class));
+        assertNotNull(cls.getMethod("setUniform", String.class, VulkanicBuffer.class));
+        assertNotNull(cls.getMethod("setUniform", String.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class));
+        assertNotNull(cls.getMethod("bindSampler", String.class, VulkanicTextureView.class));
+        // Draw calls — these map to vkCmdDrawIndexed / vkCmdDraw
+        assertNotNull(cls.getMethod("drawIndexed", int.class, int.class, int.class, int.class));
+        assertNotNull(cls.getMethod("draw", int.class, int.class));
+        // Scissor
+        assertNotNull(cls.getMethod("enableScissor", int.class, int.class, int.class, int.class));
+        assertNotNull(cls.getMethod("disableScissor"));
+        // Debug
+        assertNotNull(cls.getMethod("pushDebugGroup", java.util.function.Supplier.class));
+        assertNotNull(cls.getMethod("popDebugGroup"));
+        // Lifecycle
+        assertNotNull(cls.getMethod("close"));
+    }
+
+    @Test
+    public void testGlRenderPassImplementsVulkanicRenderPass() throws ClassNotFoundException {
+        Class<?> glRenderPass = Class.forName("net.blaze3d.opengl.GlRenderPass");
+        Class<?> vulkanicRenderPass = Class.forName("net.vulkanic.resources.VulkanicRenderPass");
+        assertTrue(vulkanicRenderPass.isAssignableFrom(glRenderPass),
+                "GlRenderPass must implement VulkanicRenderPass");
+    }
+
+    // -----------------------------------------------------------------------
+    // VulkanicCompiledPipeline interface
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicCompiledPipelineInterfaceExists() throws ClassNotFoundException {
+        Class<?> cls = Class.forName("net.vulkanic.pipeline.VulkanicCompiledPipeline");
+        assertTrue(cls.isInterface(), "VulkanicCompiledPipeline must be an interface");
+    }
+
+    @Test
+    public void testVulkanicCompiledPipelineHasRequiredMethods() throws Exception {
+        Class<?> cls = Class.forName("net.vulkanic.pipeline.VulkanicCompiledPipeline");
+        // isValid() maps to VkPipeline creation success
+        assertNotNull(cls.getMethod("isValid"));
+        // getNativePipelineHandle() returns GL program name or VkPipeline handle
+        assertNotNull(cls.getMethod("getNativePipelineHandle"));
+    }
+
+    @Test
+    public void testGlRenderPipelineImplementsVulkanicCompiledPipeline() throws ClassNotFoundException {
+        Class<?> glPipeline = Class.forName("net.blaze3d.opengl.GlRenderPipeline");
+        Class<?> vkPipeline = Class.forName("net.vulkanic.pipeline.VulkanicCompiledPipeline");
+        assertTrue(vkPipeline.isAssignableFrom(glPipeline),
+                "GlRenderPipeline must implement VulkanicCompiledPipeline");
+    }
+
+    // -----------------------------------------------------------------------
+    // GraphicsBackend — render pass and pipeline methods
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testGraphicsBackendHasRenderPassAndPipelineMethods() throws NoSuchMethodException {
+        assertNotNull(GraphicsBackend.class.getMethod("createVulkanicRenderPass",
+                CommandContext.class, java.util.function.Supplier.class,
+                VulkanicTextureView.class, java.util.OptionalInt.class));
+        assertNotNull(GraphicsBackend.class.getMethod("createVulkanicRenderPass",
+                CommandContext.class, java.util.function.Supplier.class,
+                VulkanicTextureView.class, java.util.OptionalInt.class,
+                VulkanicTextureView.class, java.util.OptionalDouble.class));
+        assertNotNull(GraphicsBackend.class.getMethod("precompilePipeline",
+                net.blaze3d.pipeline.RenderPipeline.class,
+                java.util.function.BiFunction.class));
+        assertNotNull(GraphicsBackend.class.getMethod("clearPipelineCache"));
+    }
+
+    // -----------------------------------------------------------------------
+    // VulkanicAPI — render pass and pipeline static wrappers
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicAPIHasRenderPassAndPipelineMethods() throws NoSuchMethodException {
+        assertNotNull(VulkanicAPI.class.getMethod("createVulkanicRenderPass",
+                CommandContext.class, java.util.function.Supplier.class,
+                VulkanicTextureView.class, java.util.OptionalInt.class));
+        assertNotNull(VulkanicAPI.class.getMethod("createVulkanicRenderPass",
+                CommandContext.class, java.util.function.Supplier.class,
+                VulkanicTextureView.class, java.util.OptionalInt.class,
+                VulkanicTextureView.class, java.util.OptionalDouble.class));
+        assertNotNull(VulkanicAPI.class.getMethod("precompilePipeline",
+                net.blaze3d.pipeline.RenderPipeline.class));
+        assertNotNull(VulkanicAPI.class.getMethod("precompilePipeline",
+                net.blaze3d.pipeline.RenderPipeline.class,
+                java.util.function.BiFunction.class));
+        assertNotNull(VulkanicAPI.class.getMethod("clearPipelineCache"));
+    }
 }
