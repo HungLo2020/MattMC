@@ -1051,16 +1051,21 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         byte[] bytes = source.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        java.nio.ByteBuffer buf = org.lwjgl.system.MemoryUtil.memAlloc(bytes.length + 1);
-        buf.put(bytes);
-        buf.put((byte) 0);
-        buf.flip();
-        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
-            org.lwjgl.PointerBuffer ptr = stack.mallocPointer(1);
-            ptr.put(buf);
-            org.lwjgl.opengl.GL20C.nglShaderSource(shader, 1, ptr.address0(), 0L);
+        java.nio.ByteBuffer buf = null;
+        try {
+            buf = org.lwjgl.system.MemoryUtil.memAlloc(bytes.length + 1);
+            buf.put(bytes);
+            buf.put((byte) 0);
+            buf.flip();
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                org.lwjgl.PointerBuffer ptr = stack.mallocPointer(1);
+                ptr.put(buf);
+                org.lwjgl.opengl.GL20C.nglShaderSource(shader, 1, ptr.address0(), 0L);
+            }
         } finally {
-            org.lwjgl.system.MemoryUtil.memFree(buf);
+            if (buf != null) {
+                org.lwjgl.system.MemoryUtil.memFree(buf);
+            }
         }
     }
     

@@ -233,7 +233,7 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			int n = m == 0 ? '\u8CA9' : m;
+			int n = m == 0 ? 36009 : m; // 36009 = GL_DRAW_FRAMEBUFFER
 			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 			int o = VulkanicAPI.getBoundFramebuffer(ctx, n);
 			VulkanicAPI.bindFramebuffer(ctx, n, i);
