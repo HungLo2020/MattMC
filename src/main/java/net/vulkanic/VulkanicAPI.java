@@ -6,10 +6,12 @@ import net.vulkanic.framegraph.VulkanicFrameGraphBuilder;
 import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
 import net.vulkanic.resources.VulkanicBuffer;
+import net.vulkanic.resources.VulkanicBufferSlice;
 import net.vulkanic.resources.VulkanicTexture;
 import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -2483,6 +2485,179 @@ public class VulkanicAPI {
      */
     public static void submitCommandBuffer(CommandContext ctx) {
         getBackend().submitCommandBuffer(ctx);
+    }
+
+    // =========================================================================
+    // Phase 3 — Device info (Vulkan-compatible query API)
+    // =========================================================================
+
+    /**
+     * Human-readable description of the active graphics backend and driver.
+     *
+     * <p>Suitable for system-report logs, debug overlays, and crash reporters.
+     * Replaces calls to {@code RenderSystem.getDevice().getImplementationInformation()}.
+     *
+     * <ul>
+     *   <li>OpenGL: {@code "<vendor> GL version <version>, <renderer>"}</li>
+     *   <li>Vulkan: device name + driver version + Vulkan API version</li>
+     * </ul>
+     */
+    public static String getImplementationInformation() {
+        return getBackend().getImplementationInformation();
+    }
+
+    /**
+     * Name of the active graphics backend: "OpenGL" or "Vulkan".
+     * Replaces calls to {@code RenderSystem.getDevice().getBackendName()}.
+     */
+    public static String getBackendName() {
+        return getBackend().getBackendName();
+    }
+
+    /**
+     * GPU vendor string (e.g. "NVIDIA Corporation").
+     * Replaces calls to {@code RenderSystem.getDevice().getVendor()}.
+     */
+    public static String getVendor() {
+        return getBackend().getVendor();
+    }
+
+    /**
+     * GPU renderer / device name string.
+     * Replaces calls to {@code RenderSystem.getDevice().getRenderer()}.
+     */
+    public static String getRenderer() {
+        return getBackend().getRenderer();
+    }
+
+    /**
+     * API version string.
+     * Replaces calls to {@code RenderSystem.getDevice().getVersion()}.
+     */
+    public static String getApiVersion() {
+        return getBackend().getApiVersion();
+    }
+
+    /**
+     * Maximum supported texture dimension in texels.
+     * Replaces calls to {@code RenderSystem.getDevice().getMaxTextureSize()}.
+     */
+    public static int getMaxTextureSize() {
+        return getBackend().getMaxTextureSize();
+    }
+
+    /**
+     * Returns the set of optional extensions / features that are active.
+     * Replaces calls to {@code RenderSystem.getDevice().getEnabledExtensions()}.
+     */
+    public static List<String> getEnabledExtensions() {
+        return getBackend().getEnabledExtensions();
+    }
+
+    // =========================================================================
+    // Phase 3 — Command-encoder operations (§3b migration)
+    //
+    // These are the Vulkanic-owned equivalents of Blaze3D's CommandEncoder
+    // operations. Using these instead of getDevice().createCommandEncoder().xxx()
+    // is the migration path: a future Vulkan backend will implement them natively
+    // with real VkCommandBuffer recording.
+    //
+    // All operations accept a CommandContext (obtained from beginCommandBuffer())
+    // so command recording is explicit and Vulkan-compatible.
+    // =========================================================================
+
+    /**
+     * Writes CPU-side data into a GPU buffer slice.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().createCommandEncoder().writeToBuffer(slice, data)}
+     *
+     * <pre>{@code
+     * VulkanicBufferSlice slice = VulkanicBufferSlice.whole(myBuffer);
+     * CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+     * VulkanicAPI.writeToBuffer(ctx, slice, byteBuffer);
+     * VulkanicAPI.submitCommandBuffer(ctx);
+     * }</pre>
+     *
+     * @param ctx   Command context (from {@link #beginCommandBuffer()})
+     * @param slice Destination buffer slice
+     * @param data  Source data
+     */
+    public static void writeToBuffer(CommandContext ctx, VulkanicBufferSlice slice, ByteBuffer data) {
+        getBackend().writeToBuffer(ctx, slice, data);
+    }
+
+    /**
+     * Maps a buffer slice for CPU read/write access.
+     *
+     * <p>The returned {@link ByteBuffer} is valid until {@link #unmapBuffer} is called.
+     * Replaces: {@code RenderSystem.getDevice().createCommandEncoder().mapBuffer(...).data()}
+     *
+     * @param ctx   Command context
+     * @param slice Buffer region to map
+     * @param read  Request read access
+     * @param write Request write access
+     * @return Mapped byte buffer
+     */
+    public static ByteBuffer mapBuffer(CommandContext ctx, VulkanicBufferSlice slice,
+                                        boolean read, boolean write) {
+        return getBackend().mapBuffer(ctx, slice, read, write);
+    }
+
+    /**
+     * Unmaps a previously mapped buffer.
+     *
+     * <p>Replaces the {@code close()} call on the {@code MappedView} returned by
+     * the Blaze3D CommandEncoder.
+     *
+     * @param ctx    Command context
+     * @param buffer Buffer to unmap
+     */
+    public static void unmapBuffer(CommandContext ctx, VulkanicBuffer buffer) {
+        getBackend().unmapBuffer(ctx, buffer);
+    }
+
+    /**
+     * Clears a colour texture to a solid ARGB colour.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().createCommandEncoder().clearColorTexture(tex, argb)}
+     *
+     * @param ctx       Command context
+     * @param texture   Colour texture to clear (must have USAGE_RENDER_ATTACHMENT)
+     * @param argbColor Clear colour packed as ARGB
+     */
+    public static void clearColorTexture(CommandContext ctx, VulkanicTexture texture, int argbColor) {
+        getBackend().clearColorTexture(ctx, texture, argbColor);
+    }
+
+    /**
+     * Clears a depth texture.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(tex, depth)}
+     *
+     * @param ctx     Command context
+     * @param texture Depth texture to clear (must have USAGE_RENDER_ATTACHMENT)
+     * @param depth   Clear depth value in [0.0, 1.0]
+     */
+    public static void clearDepthTexture(CommandContext ctx, VulkanicTexture texture, double depth) {
+        getBackend().clearDepthTexture(ctx, texture, depth);
+    }
+
+    /**
+     * Clears both a colour texture and a depth texture in one call.
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().createCommandEncoder()
+     *     .clearColorAndDepthTextures(color, argb, depth, depthVal)}
+     *
+     * @param ctx        Command context
+     * @param color      Colour texture
+     * @param argbColor  Clear colour
+     * @param depth      Depth texture
+     * @param depthValue Clear depth value
+     */
+    public static void clearColorAndDepthTextures(CommandContext ctx,
+                                                   VulkanicTexture color, int argbColor,
+                                                   VulkanicTexture depth, double depthValue) {
+        getBackend().clearColorAndDepthTextures(ctx, color, argbColor, depth, depthValue);
     }
 }
 

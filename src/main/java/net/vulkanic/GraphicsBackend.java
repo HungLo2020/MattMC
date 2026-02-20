@@ -2,12 +2,14 @@ package net.vulkanic;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import net.vulkanic.framegraph.VulkanicFrameGraphBuilder;
 import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
 import net.vulkanic.resources.VulkanicBuffer;
+import net.vulkanic.resources.VulkanicBufferSlice;
 import net.vulkanic.resources.VulkanicTexture;
 import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
@@ -2985,4 +2987,174 @@ public interface GraphicsBackend {
      * @param ctx The command context returned by {@link #beginCommandBuffer}
      */
     void submitCommandBuffer(CommandContext ctx);
+
+    // =========================================================================
+    // Phase 3 — Device info (Vulkan prerequisite)
+    // =========================================================================
+
+    /**
+     * Human-readable description of this backend / driver.
+     * <ul>
+     *   <li>OpenGL: vendor string, GL version, renderer string</li>
+     *   <li>Vulkan: device name, driver version, Vulkan version</li>
+     * </ul>
+     */
+    String getImplementationInformation();
+
+    /**
+     * Name of the graphics backend (e.g. "OpenGL", "Vulkan").
+     * Suitable for display in debug overlays or system-report logs.
+     */
+    String getBackendName();
+
+    /**
+     * GPU vendor string (e.g. "NVIDIA Corporation", "Intel").
+     * <ul>
+     *   <li>OpenGL: {@code glGetString(GL_VENDOR)}</li>
+     *   <li>Vulkan: {@code VkPhysicalDeviceProperties.vendorID} mapped to a name</li>
+     * </ul>
+     */
+    String getVendor();
+
+    /**
+     * GPU renderer / device name string.
+     * <ul>
+     *   <li>OpenGL: {@code glGetString(GL_RENDERER)}</li>
+     *   <li>Vulkan: {@code VkPhysicalDeviceProperties.deviceName}</li>
+     * </ul>
+     */
+    String getRenderer();
+
+    /**
+     * API version string.
+     * <ul>
+     *   <li>OpenGL: {@code glGetString(GL_VERSION)}</li>
+     *   <li>Vulkan: formatted from {@code VkPhysicalDeviceProperties.apiVersion}</li>
+     * </ul>
+     */
+    String getApiVersion();
+
+    /**
+     * Maximum supported texture dimension in texels (width or height).
+     * <ul>
+     *   <li>OpenGL: determined by probing {@code GL_MAX_TEXTURE_SIZE}</li>
+     *   <li>Vulkan: {@code VkPhysicalDeviceLimits.maxImageDimension2D}</li>
+     * </ul>
+     */
+    int getMaxTextureSize();
+
+    /**
+     * Returns the set of optional extensions / features that are active.
+     * <ul>
+     *   <li>OpenGL: extension strings that were detected and enabled</li>
+     *   <li>Vulkan: Vulkan device-feature or extension names that were requested</li>
+     * </ul>
+     */
+    List<String> getEnabledExtensions();
+
+    // =========================================================================
+    // Phase 3 — Command-encoder operations (§3b migration)
+    //
+    // These correspond to the operations in Blaze3D's CommandEncoder interface.
+    // Declaring them here in GraphicsBackend lets a Vulkan backend implement them
+    // natively (vkCmdCopyBuffer, vkMapMemory, vkCmdClearColorImage, etc.) while
+    // the OpenGL backend delegates to GlCommandEncoder as it does today.
+    //
+    // All operations take a CommandContext so that:
+    //   - OpenGL: the context identifies the current frame (immediate mode)
+    //   - Vulkan: the context wraps the VkCommandBuffer being recorded
+    // =========================================================================
+
+    /**
+     * Writes CPU-side data into a GPU buffer slice.
+     *
+     * <ul>
+     *   <li>OpenGL: {@code glBufferSubData(target, offset, data)}</li>
+     *   <li>Vulkan: uploads via a staging buffer followed by
+     *       {@code vkCmdCopyBuffer(stagingBuf, dst, ...)}</li>
+     * </ul>
+     *
+     * @param ctx   Command context
+     * @param slice Destination slice (buffer + byte offset + byte length)
+     * @param data  Source data — must have {@code remaining() <= slice.length()}
+     */
+    void writeToBuffer(CommandContext ctx, VulkanicBufferSlice slice, ByteBuffer data);
+
+    /**
+     * Maps a GPU buffer slice for CPU access and returns a view of the data.
+     *
+     * <p>The returned {@link ByteBuffer} is valid until the buffer is unmapped via
+     * {@link #unmapBuffer}.  The {@code read}/{@code write} flags correspond to
+     * {@code VkMemoryMapFlags} on Vulkan and to {@code GL_MAP_READ_BIT} /
+     * {@code GL_MAP_WRITE_BIT} on OpenGL.
+     *
+     * @param ctx   Command context
+     * @param slice Buffer region to map
+     * @param read  Whether to request read access
+     * @param write Whether to request write access
+     * @return A {@link ByteBuffer} covering the mapped region
+     */
+    ByteBuffer mapBuffer(CommandContext ctx, VulkanicBufferSlice slice, boolean read, boolean write);
+
+    /**
+     * Unmaps a previously mapped GPU buffer.
+     *
+     * <ul>
+     *   <li>OpenGL: {@code glUnmapBuffer(target)}</li>
+     *   <li>Vulkan: {@code vkUnmapMemory(device, memory)}</li>
+     * </ul>
+     *
+     * @param ctx    Command context
+     * @param buffer Buffer that was mapped; must not be closed
+     */
+    void unmapBuffer(CommandContext ctx, VulkanicBuffer buffer);
+
+    /**
+     * Clears a colour texture to a solid ARGB colour.
+     *
+     * <ul>
+     *   <li>OpenGL: binds an FBO with the texture, calls {@code glClear(GL_COLOR_BUFFER_BIT)}</li>
+     *   <li>Vulkan: {@code vkCmdClearColorImage()}</li>
+     * </ul>
+     *
+     * @param ctx      Command context
+     * @param texture  Target colour texture (must have {@code USAGE_RENDER_ATTACHMENT})
+     * @param argbColor Clear colour in packed ARGB format
+     */
+    void clearColorTexture(CommandContext ctx, VulkanicTexture texture, int argbColor);
+
+    /**
+     * Clears a depth (or depth/stencil) texture to a given depth value.
+     *
+     * <ul>
+     *   <li>OpenGL: binds an FBO with the texture, calls {@code glClear(GL_DEPTH_BUFFER_BIT)}</li>
+     *   <li>Vulkan: {@code vkCmdClearDepthStencilImage()}</li>
+     * </ul>
+     *
+     * @param ctx    Command context
+     * @param texture Target depth texture (must have {@code USAGE_RENDER_ATTACHMENT})
+     * @param depth  Clear value in [0.0, 1.0]
+     */
+    void clearDepthTexture(CommandContext ctx, VulkanicTexture texture, double depth);
+
+    /**
+     * Clears both a colour texture and a depth texture in one operation.
+     *
+     * <p>Equivalent to calling {@link #clearColorTexture} then {@link #clearDepthTexture},
+     * but may be more efficient on tile-based GPUs.
+     *
+     * <ul>
+     *   <li>OpenGL: single FBO bind + {@code glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)}</li>
+     *   <li>Vulkan: two {@code vkCmdClearXxxImage} calls or a render-pass load-op clear</li>
+     * </ul>
+     *
+     * @param ctx        Command context
+     * @param color      Colour texture to clear
+     * @param argbColor  Clear colour
+     * @param depth      Depth texture to clear
+     * @param depthValue Clear depth value
+     */
+    void clearColorAndDepthTextures(CommandContext ctx,
+                                     VulkanicTexture color, int argbColor,
+                                     VulkanicTexture depth, double depthValue);
 }

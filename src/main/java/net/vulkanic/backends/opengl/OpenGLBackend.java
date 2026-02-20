@@ -2567,4 +2567,133 @@ public class OpenGLBackend implements GraphicsBackend {
     public void submitCommandBuffer(CommandContext ctx) {
         // OpenGL: immediate mode — nothing to submit.
     }
+
+    // =========================================================================
+    // Phase 3 — Device info
+    // =========================================================================
+
+    @Override
+    public String getImplementationInformation() {
+        if (glDevice != null) return glDevice.getImplementationInformation();
+        return "OpenGL (device not yet initialised)";
+    }
+
+    @Override
+    public String getBackendName() {
+        return "OpenGL";
+    }
+
+    @Override
+    public String getVendor() {
+        if (glDevice != null) return glDevice.getVendor();
+        return "";
+    }
+
+    @Override
+    public String getRenderer() {
+        if (glDevice != null) return glDevice.getRenderer();
+        return "";
+    }
+
+    @Override
+    public String getApiVersion() {
+        if (glDevice != null) return glDevice.getVersion();
+        return "";
+    }
+
+    @Override
+    public int getMaxTextureSize() {
+        if (glDevice != null) return glDevice.getMaxTextureSize();
+        return 1024; // safe minimum before device is ready
+    }
+
+    @Override
+    public java.util.List<String> getEnabledExtensions() {
+        if (glDevice != null) return glDevice.getEnabledExtensions();
+        return java.util.Collections.emptyList();
+    }
+
+    // =========================================================================
+    // Phase 3 — Command-encoder operations (§3b migration)
+    //
+    // All operations delegate to GlDevice.createCommandEncoder() — the existing
+    // authoritative OpenGL implementation.  The VulkanicBuffer / VulkanicTexture
+    // arguments are safely cast to their Blaze3D counterparts (GlBuffer extends
+    // GpuBuffer, GlTexture extends GpuTexture) because in the OpenGL backend every
+    // VulkanicBuffer IS a GlBuffer and every VulkanicTexture IS a GlTexture.
+    // =========================================================================
+
+    @Override
+    public void writeToBuffer(CommandContext ctx, net.vulkanic.resources.VulkanicBufferSlice slice, ByteBuffer data) {
+        requireGlDevice("writeToBuffer");
+        net.blaze3d.buffers.GpuBufferSlice gpuSlice = toGpuSlice(slice);
+        glDevice.createCommandEncoder().writeToBuffer(gpuSlice, data);
+    }
+
+    @Override
+    public ByteBuffer mapBuffer(CommandContext ctx, net.vulkanic.resources.VulkanicBufferSlice slice, boolean read, boolean write) {
+        requireGlDevice("mapBuffer");
+        net.blaze3d.buffers.GpuBufferSlice gpuSlice = toGpuSlice(slice);
+        net.blaze3d.buffers.GpuBuffer.MappedView view = glDevice.createCommandEncoder().mapBuffer(gpuSlice, read, write);
+        return view.data();
+    }
+
+    @Override
+    public void unmapBuffer(CommandContext ctx, VulkanicBuffer buffer) {
+        requireGlDevice("unmapBuffer");
+        // Route through the same GL call path that GlCommandEncoder's MappedView.close() uses.
+        // GL_ARRAY_BUFFER (34962) is a safe general-purpose binding target for unmapping.
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, (int) buffer.getNativeHandle());
+        GL15.glUnmapBuffer(GL15.GL_ARRAY_BUFFER);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+    }
+
+    @Override
+    public void clearColorTexture(CommandContext ctx, VulkanicTexture texture, int argbColor) {
+        requireGlDevice("clearColorTexture");
+        glDevice.createCommandEncoder().clearColorTexture((net.blaze3d.textures.GpuTexture) texture, argbColor);
+    }
+
+    @Override
+    public void clearDepthTexture(CommandContext ctx, VulkanicTexture texture, double depth) {
+        requireGlDevice("clearDepthTexture");
+        glDevice.createCommandEncoder().clearDepthTexture((net.blaze3d.textures.GpuTexture) texture, depth);
+    }
+
+    @Override
+    public void clearColorAndDepthTextures(CommandContext ctx,
+                                            VulkanicTexture color, int argbColor,
+                                            VulkanicTexture depth, double depthValue) {
+        requireGlDevice("clearColorAndDepthTextures");
+        glDevice.createCommandEncoder().clearColorAndDepthTextures(
+                (net.blaze3d.textures.GpuTexture) color, argbColor,
+                (net.blaze3d.textures.GpuTexture) depth, depthValue);
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private void requireGlDevice(String operation) {
+        if (glDevice == null) {
+            throw new IllegalStateException(
+                    "VulkanicAPI." + operation + "() called before GlDevice was initialised");
+        }
+    }
+
+    /**
+     * Converts a {@link net.vulkanic.resources.VulkanicBufferSlice} to a Blaze3D
+     * {@link net.blaze3d.buffers.GpuBufferSlice} for delegation to
+     * {@code GlCommandEncoder}.
+     *
+     * <p>This cast is safe because every {@code VulkanicBuffer} in the OpenGL backend
+     * IS a {@code GlBuffer extends GpuBuffer}.
+     */
+    private static net.blaze3d.buffers.GpuBufferSlice toGpuSlice(net.vulkanic.resources.VulkanicBufferSlice slice) {
+        return new net.blaze3d.buffers.GpuBufferSlice(
+                (net.blaze3d.buffers.GpuBuffer) slice.buffer(),
+                slice.offset(),
+                slice.length());
+    }
 }
+

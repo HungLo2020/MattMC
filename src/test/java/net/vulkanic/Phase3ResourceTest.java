@@ -287,4 +287,160 @@ public class Phase3ResourceTest {
         assertNotNull(GraphicsBackend.class.getMethod("executeFrame",
                 CommandContext.class, VulkanicFrameGraphBuilder.class));
     }
+
+    // -----------------------------------------------------------------------
+    // Device info methods (VulkanicAPI.getBackendName, getVendor, etc.)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testGraphicsBackendHasDeviceInfoMethods() throws NoSuchMethodException {
+        // Verify the interface declares all device-info methods needed for Vulkan parity.
+        assertNotNull(GraphicsBackend.class.getMethod("getImplementationInformation"));
+        assertNotNull(GraphicsBackend.class.getMethod("getBackendName"));
+        assertNotNull(GraphicsBackend.class.getMethod("getVendor"));
+        assertNotNull(GraphicsBackend.class.getMethod("getRenderer"));
+        assertNotNull(GraphicsBackend.class.getMethod("getApiVersion"));
+        assertNotNull(GraphicsBackend.class.getMethod("getMaxTextureSize"));
+        assertNotNull(GraphicsBackend.class.getMethod("getEnabledExtensions"));
+    }
+
+    @Test
+    public void testVulkanicAPIHasDeviceInfoMethods() throws NoSuchMethodException {
+        // VulkanicAPI must expose each device-info method as a static wrapper.
+        assertNotNull(VulkanicAPI.class.getMethod("getImplementationInformation"));
+        assertNotNull(VulkanicAPI.class.getMethod("getBackendName"));
+        assertNotNull(VulkanicAPI.class.getMethod("getVendor"));
+        assertNotNull(VulkanicAPI.class.getMethod("getRenderer"));
+        assertNotNull(VulkanicAPI.class.getMethod("getApiVersion"));
+        assertNotNull(VulkanicAPI.class.getMethod("getMaxTextureSize"));
+        assertNotNull(VulkanicAPI.class.getMethod("getEnabledExtensions"));
+    }
+
+    @Test
+    public void testOpenGLBackendReturnsOpenGLBackendName() {
+        VulkanicAPI.initialize();
+        assertEquals("OpenGL", VulkanicAPI.getBackendName(),
+                "OpenGL backend must self-identify as 'OpenGL'");
+    }
+
+    @Test
+    public void testGetEnabledExtensionsNotNull() {
+        VulkanicAPI.initialize();
+        assertNotNull(VulkanicAPI.getEnabledExtensions(),
+                "getEnabledExtensions() must never return null (empty list before device ready)");
+    }
+
+    @Test
+    public void testGetMaxTextureSizePositiveBeforeDevice() {
+        VulkanicAPI.initialize();
+        assertTrue(VulkanicAPI.getMaxTextureSize() > 0,
+                "getMaxTextureSize() must return a positive value even before the GL device is ready");
+    }
+
+    // -----------------------------------------------------------------------
+    // VulkanicBufferSlice
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicBufferSliceWholeFactory() {
+        // Use a mock VulkanicBuffer for testing without a GL context.
+        VulkanicBuffer stub = new VulkanicBuffer() {
+            @Override public long getNativeHandle() { return 0; }
+            @Override public int  getSize()         { return 256; }
+            @Override public int  getUsage()        { return USAGE_COPY_DST; }
+            @Override public boolean isClosed()     { return false; }
+            @Override public void close()           {}
+        };
+        net.vulkanic.resources.VulkanicBufferSlice slice =
+                net.vulkanic.resources.VulkanicBufferSlice.whole(stub);
+        assertEquals(0,   slice.offset());
+        assertEquals(256, slice.length());
+        assertSame(stub,  slice.buffer());
+    }
+
+    @Test
+    public void testVulkanicBufferSliceSubSlice() {
+        VulkanicBuffer stub = new VulkanicBuffer() {
+            @Override public long getNativeHandle() { return 0; }
+            @Override public int  getSize()         { return 512; }
+            @Override public int  getUsage()        { return USAGE_COPY_DST; }
+            @Override public boolean isClosed()     { return false; }
+            @Override public void close()           {}
+        };
+        net.vulkanic.resources.VulkanicBufferSlice parent =
+                new net.vulkanic.resources.VulkanicBufferSlice(stub, 64, 128);
+        net.vulkanic.resources.VulkanicBufferSlice child  = parent.subSlice(16, 32);
+        assertEquals(80, child.offset());   // 64 + 16
+        assertEquals(32, child.length());
+    }
+
+    @Test
+    public void testVulkanicBufferSliceRejectsInvalidRange() {
+        VulkanicBuffer stub = new VulkanicBuffer() {
+            @Override public long getNativeHandle() { return 0; }
+            @Override public int  getSize()         { return 64; }
+            @Override public int  getUsage()        { return 0; }
+            @Override public boolean isClosed()     { return false; }
+            @Override public void close()           {}
+        };
+        // offset + length > buffer.getSize() → should throw
+        assertThrows(IllegalArgumentException.class,
+                () -> new net.vulkanic.resources.VulkanicBufferSlice(stub, 48, 32));
+        // negative length → should throw
+        assertThrows(IllegalArgumentException.class,
+                () -> new net.vulkanic.resources.VulkanicBufferSlice(stub, 0, -1));
+        // zero-length is valid (Vulkan-compatible no-op) → must NOT throw
+        assertDoesNotThrow(
+                () -> new net.vulkanic.resources.VulkanicBufferSlice(stub, 0, 0));
+    }
+
+    // -----------------------------------------------------------------------
+    // GraphicsBackend interface: command-encoder operations exist
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testGraphicsBackendHasEncoderOperations() throws NoSuchMethodException {
+        // Verify that all §3b encoder operations exist on the interface.
+        assertNotNull(GraphicsBackend.class.getMethod("writeToBuffer",
+                CommandContext.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class,
+                java.nio.ByteBuffer.class));
+        assertNotNull(GraphicsBackend.class.getMethod("mapBuffer",
+                CommandContext.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class,
+                boolean.class, boolean.class));
+        assertNotNull(GraphicsBackend.class.getMethod("unmapBuffer",
+                CommandContext.class, VulkanicBuffer.class));
+        assertNotNull(GraphicsBackend.class.getMethod("clearColorTexture",
+                CommandContext.class, VulkanicTexture.class, int.class));
+        assertNotNull(GraphicsBackend.class.getMethod("clearDepthTexture",
+                CommandContext.class, VulkanicTexture.class, double.class));
+        assertNotNull(GraphicsBackend.class.getMethod("clearColorAndDepthTextures",
+                CommandContext.class,
+                VulkanicTexture.class, int.class,
+                VulkanicTexture.class, double.class));
+    }
+
+    @Test
+    public void testVulkanicAPIHasEncoderOperations() throws NoSuchMethodException {
+        // VulkanicAPI must expose each encoder operation as a static method.
+        assertNotNull(VulkanicAPI.class.getMethod("writeToBuffer",
+                CommandContext.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class,
+                java.nio.ByteBuffer.class));
+        assertNotNull(VulkanicAPI.class.getMethod("mapBuffer",
+                CommandContext.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class,
+                boolean.class, boolean.class));
+        assertNotNull(VulkanicAPI.class.getMethod("unmapBuffer",
+                CommandContext.class, VulkanicBuffer.class));
+        assertNotNull(VulkanicAPI.class.getMethod("clearColorTexture",
+                CommandContext.class, VulkanicTexture.class, int.class));
+        assertNotNull(VulkanicAPI.class.getMethod("clearDepthTexture",
+                CommandContext.class, VulkanicTexture.class, double.class));
+        assertNotNull(VulkanicAPI.class.getMethod("clearColorAndDepthTextures",
+                CommandContext.class,
+                VulkanicTexture.class, int.class,
+                VulkanicTexture.class, double.class));
+    }
 }
