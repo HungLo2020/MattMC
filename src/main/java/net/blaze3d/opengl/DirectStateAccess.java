@@ -26,7 +26,7 @@ public abstract class DirectStateAccess {
 
 	abstract void bufferData(int i, ByteBuffer byteBuffer, int j);
 
-	abstract void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k);
+	public abstract void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k);
 
 	abstract void bufferStorage(int i, long l, int j);
 
@@ -39,9 +39,9 @@ public abstract class DirectStateAccess {
 
 	abstract int createFrameBufferObject();
 
-	abstract void bindFrameBufferTextures(int i, int j, int k, int l, int m);
+	public abstract void bindFrameBufferTextures(int i, int j, int k, int l, int m);
 
-	abstract void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t);
+	public abstract void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t);
 
 	abstract void flushMappedBufferRange(int i, int j, int k, int l);
 
@@ -66,7 +66,7 @@ public abstract class DirectStateAccess {
 		}
 
 		@Override
-		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
+		public void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
 			net.vulkanic.VulkanicAPI.namedBufferSubDataDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, (long)j, byteBuffer);
 		}
 
@@ -155,7 +155,7 @@ public abstract class DirectStateAccess {
 		}
 
 		@Override
-		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
+		public void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
 			int l = this.selectBufferBindTarget(k);
 			GlStateManager._glBindBuffer(l, i);
 			GlStateManager._glBufferSubData(l, j, byteBuffer);

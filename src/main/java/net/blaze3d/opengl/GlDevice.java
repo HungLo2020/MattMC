@@ -57,6 +57,10 @@ public class GlDevice implements GpuDevice {
 	private final int uniformOffsetAlignment;
 	// Iris: Track missing shaders to avoid log spam
 	private Set<RenderPipeline> missingShaders = new HashSet();
+	// FBOs shared with OpenGLBackend — stored here so OpenGLBackend can access them
+	// for the GL implementations of clearColorTexture, copyTextureToBuffer, etc.
+	private int encoderDrawFbo;
+	private int encoderReadFbo;
 
 	public GlDevice(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		GLFW.glfwMakeContextCurrent(l);
@@ -71,6 +75,8 @@ public class GlDevice implements GpuDevice {
 		this.directStateAccess = DirectStateAccess.create(gLCapabilities, this.enabledExtensions, graphicsWorkarounds);
 		this.maxSupportedTextureSize = j;
 		this.defaultShaderSource = biFunction;
+		this.encoderDrawFbo = this.directStateAccess.createFrameBufferObject();
+		this.encoderReadFbo = this.directStateAccess.createFrameBufferObject();
 		this.encoder = new GlCommandEncoder(this);
 		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getImmediateContext(), 35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
 		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
@@ -273,6 +279,23 @@ public class GlDevice implements GpuDevice {
 
 	public DirectStateAccess directStateAccess() {
 		return this.directStateAccess;
+	}
+
+	/**
+	 * Returns the draw FBO used by {@link net.vulkanic.backends.opengl.OpenGLBackend}
+	 * for clear/copy/present operations. Stored here (not in GlCommandEncoder) so
+	 * OpenGLBackend can access it without creating a circular callback chain.
+	 */
+	public int getEncoderDrawFbo() {
+		return this.encoderDrawFbo;
+	}
+
+	/**
+	 * Returns the read FBO used by OpenGLBackend for readback operations such as
+	 * copyTextureToBuffer. Mirrors the role of the read FBO in GlCommandEncoder.
+	 */
+	public int getEncoderReadFbo() {
+		return this.encoderReadFbo;
 	}
 
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {

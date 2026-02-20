@@ -9,6 +9,7 @@ import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ARGB;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
@@ -2713,8 +2714,22 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void writeToBuffer(CommandContext ctx, net.vulkanic.resources.VulkanicBufferSlice slice, ByteBuffer data) {
         requireGlDevice("writeToBuffer");
-        net.blaze3d.buffers.GpuBufferSlice gpuSlice = toGpuSlice(slice);
-        glDevice.createCommandEncoder().writeToBuffer(gpuSlice, data);
+        net.blaze3d.opengl.GlBuffer glBuffer = (net.blaze3d.opengl.GlBuffer) slice.buffer();
+        if (glBuffer.isClosed())
+            throw new IllegalStateException("Buffer already closed");
+        if ((glBuffer.usage() & 8) == 0)
+            throw new IllegalStateException("Buffer needs USAGE_COPY_DST to be a destination for a copy");
+        int remaining = data.remaining();
+        if (remaining > slice.length())
+            throw new IllegalArgumentException(
+                "Cannot write more data than the slice allows (attempting to write " + remaining
+                    + " bytes into a slice of length " + slice.length() + ")");
+        if (slice.length() + slice.offset() > glBuffer.size())
+            throw new IllegalArgumentException(
+                "Cannot write more data than this buffer can hold (attempting to write " + remaining
+                    + " bytes at offset " + slice.offset() + " to " + glBuffer.size() + " size buffer)");
+        // Direct GL path — no callback into GlCommandEncoder.
+        glDevice.directStateAccess().bufferSubData((int) glBuffer.getNativeHandle(), (int) slice.offset(), data, glBuffer.usage());
     }
 
     @Override
@@ -2738,13 +2753,51 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void clearColorTexture(CommandContext ctx, VulkanicTexture texture, int argbColor) {
         requireGlDevice("clearColorTexture");
-        glDevice.createCommandEncoder().clearColorTexture((net.blaze3d.textures.GpuTexture) texture, argbColor);
+        if (!texture.getVulkanicFormat().hasColorAspect())
+            throw new IllegalStateException("Trying to clear a non-colour texture as colour");
+        if (texture.isClosed())
+            throw new IllegalStateException("Colour texture is closed");
+        if ((texture.getUsage() & VulkanicTexture.USAGE_RENDER_ATTACHMENT) == 0)
+            throw new IllegalStateException("Colour texture must have USAGE_RENDER_ATTACHMENT");
+        if (texture.getDepthOrLayers() > 1)
+            throw new UnsupportedOperationException("Clearing a texture with multiple layers or depths is not yet supported");
+        // Direct GL — bind draw FBO, clear, unbind.  No callback into GlCommandEncoder.
+        int texId = (int) texture.getNativeHandle();
+        int drawFbo = glDevice.getEncoderDrawFbo();
+        glDevice.directStateAccess().bindFrameBufferTextures(drawFbo, texId, 0, 0, GL30.GL_DRAW_FRAMEBUFFER);
+        float r = ARGB.redFloat(argbColor), g = ARGB.greenFloat(argbColor),
+              b = ARGB.blueFloat(argbColor), a = ARGB.alphaFloat(argbColor);
+        GL11.glClearColor(r, g, b, a);
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        GL11.glColorMask(true, true, true, true);
+        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+        GL30.glFramebufferTexture2D(GL30.GL_DRAW_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, 0, 0);
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0);
     }
 
     @Override
     public void clearDepthTexture(CommandContext ctx, VulkanicTexture texture, double depth) {
         requireGlDevice("clearDepthTexture");
-        glDevice.createCommandEncoder().clearDepthTexture((net.blaze3d.textures.GpuTexture) texture, depth);
+        if (!texture.getVulkanicFormat().hasDepthAspect())
+            throw new IllegalStateException("Trying to clear a non-depth texture as depth");
+        if (texture.isClosed())
+            throw new IllegalStateException("Depth texture is closed");
+        if ((texture.getUsage() & VulkanicTexture.USAGE_RENDER_ATTACHMENT) == 0)
+            throw new IllegalStateException("Depth texture must have USAGE_RENDER_ATTACHMENT");
+        if (texture.getDepthOrLayers() > 1)
+            throw new UnsupportedOperationException("Clearing a texture with multiple layers or depths is not yet supported");
+        int texId = (int) texture.getNativeHandle();
+        int drawFbo = glDevice.getEncoderDrawFbo();
+        // Attach depth, suppress colour draw, clear, restore.
+        glDevice.directStateAccess().bindFrameBufferTextures(drawFbo, 0, texId, 0, GL30.GL_DRAW_FRAMEBUFFER);
+        GL11.glDrawBuffer(GL11.GL_NONE);  // no colour attachment active
+        GL11.glClearDepth(depth);
+        GL11.glDepthMask(true);
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+        GL11.glDrawBuffer(GL30.GL_COLOR_ATTACHMENT0);
+        GL30.glFramebufferTexture2D(GL30.GL_DRAW_FRAMEBUFFER, GL30.GL_DEPTH_ATTACHMENT, GL11.GL_TEXTURE_2D, 0, 0);
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0);
     }
 
     @Override
@@ -2752,9 +2805,41 @@ public class OpenGLBackend implements GraphicsBackend {
                                             VulkanicTexture color, int argbColor,
                                             VulkanicTexture depth, double depthValue) {
         requireGlDevice("clearColorAndDepthTextures");
-        glDevice.createCommandEncoder().clearColorAndDepthTextures(
-                (net.blaze3d.textures.GpuTexture) color, argbColor,
-                (net.blaze3d.textures.GpuTexture) depth, depthValue);
+        // Use GlTexture.getFbo() which caches the shared FBO for this color+depth pair.
+        net.blaze3d.opengl.GlTexture colorTex = (net.blaze3d.opengl.GlTexture) color;
+        int fbo = colorTex.getFbo(glDevice.directStateAccess(), (net.blaze3d.textures.GpuTexture) depth);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fbo);
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        GL11.glClearDepth(depthValue);
+        float r = ARGB.redFloat(argbColor), g = ARGB.greenFloat(argbColor),
+              b = ARGB.blueFloat(argbColor), a = ARGB.alphaFloat(argbColor);
+        GL11.glClearColor(r, g, b, a);
+        GL11.glDepthMask(true);
+        GL11.glColorMask(true, true, true, true);
+        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
+    }
+
+    @Override
+    public void clearColorAndDepthTextures(CommandContext ctx,
+                                            VulkanicTexture color, int argbColor,
+                                            VulkanicTexture depth, double depthValue,
+                                            int regionX, int regionY,
+                                            int regionWidth, int regionHeight) {
+        requireGlDevice("clearColorAndDepthTextures");
+        net.blaze3d.opengl.GlTexture colorTex = (net.blaze3d.opengl.GlTexture) color;
+        int fbo = colorTex.getFbo(glDevice.directStateAccess(), (net.blaze3d.textures.GpuTexture) depth);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fbo);
+        GL11.glScissor(regionX, regionY, regionWidth, regionHeight);
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glClearDepth(depthValue);
+        float r = ARGB.redFloat(argbColor), g = ARGB.greenFloat(argbColor),
+              b = ARGB.blueFloat(argbColor), a = ARGB.alphaFloat(argbColor);
+        GL11.glClearColor(r, g, b, a);
+        GL11.glDepthMask(true);
+        GL11.glColorMask(true, true, true, true);
+        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
     }
 
     // -----------------------------------------------------------------------
@@ -2998,7 +3083,9 @@ public class OpenGLBackend implements GraphicsBackend {
                                         VulkanicTexture texture,
                                         net.blaze3d.platform.NativeImage image) {
         requireGlDevice("writeToVulkanicTexture");
-        glDevice.createCommandEncoder().writeToTexture((net.blaze3d.textures.GpuTexture) texture, image);
+        // Full-texture upload at mip 0, layer 0 — delegate to sub-region overload.
+        writeToVulkanicTexture(ctx, texture, image, 0, 0,
+                0, 0, 0, 0, image.getWidth(), image.getHeight());
     }
 
     @Override
@@ -3010,9 +3097,62 @@ public class OpenGLBackend implements GraphicsBackend {
                                         int srcX, int srcY,
                                         int width, int height) {
         requireGlDevice("writeToVulkanicTexture");
-        glDevice.createCommandEncoder().writeToTexture(
-                (net.blaze3d.textures.GpuTexture) texture, image,
-                mipLevel, layer, dstX, dstY, srcX, srcY, width, height);
+        int texId = (int) texture.getNativeHandle();
+        // Choose texture target: cubemap face vs 2D.
+        int target;
+        if ((texture.getUsage() & VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE) != 0) {
+            target = net.blaze3d.opengl.GlConst.CUBEMAP_TARGETS[layer % 6];
+            VulkanicAPI.bindTexture(ctx, GL13.GL_TEXTURE_CUBE_MAP, texId);
+        } else {
+            target = GL11.GL_TEXTURE_2D;
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId);
+        }
+        // Pixel-store parameters control the source rectangle within the image.
+        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH,    image.getWidth());
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS,   srcX);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS,     srcY);
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT,     image.format().components());
+        GL11.glTexSubImage2D(target, mipLevel, dstX, dstY, width, height,
+                net.blaze3d.opengl.GlConst.toGl(image.format()),
+                GL11.GL_UNSIGNED_BYTE,
+                image.getPointer());
+        // Restore defaults.
+        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH,  0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS,   0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT,   4);
+    }
+
+    @Override
+    public void writeToVulkanicTexture(CommandContext ctx,
+                                        VulkanicTexture texture,
+                                        java.nio.ByteBuffer data,
+                                        net.blaze3d.platform.NativeImage.Format format,
+                                        int mipLevel, int layer,
+                                        int dstX, int dstY,
+                                        int width, int height) {
+        requireGlDevice("writeToVulkanicTexture(ByteBuffer)");
+        int texId = (int) texture.getNativeHandle();
+        int target;
+        if ((texture.getUsage() & VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE) != 0) {
+            target = net.blaze3d.opengl.GlConst.CUBEMAP_TARGETS[layer % 6];
+            VulkanicAPI.bindTexture(ctx, GL13.GL_TEXTURE_CUBE_MAP, texId);
+        } else {
+            target = GL11.GL_TEXTURE_2D;
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId);
+        }
+        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH,  width);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS,   0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT,   format.components());
+        GL11.glTexSubImage2D(target, mipLevel, dstX, dstY, width, height,
+                net.blaze3d.opengl.GlConst.toGl(format),
+                GL11.GL_UNSIGNED_BYTE,
+                data);
+        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH,  0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS,   0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT,   4);
     }
 
     @Override
@@ -3023,10 +3163,8 @@ public class OpenGLBackend implements GraphicsBackend {
                                              Runnable onComplete,
                                              int mipLevel) {
         requireGlDevice("copyVulkanicTextureToBuffer");
-        glDevice.createCommandEncoder().copyTextureToBuffer(
-                (net.blaze3d.textures.GpuTexture) texture,
-                (net.blaze3d.buffers.GpuBuffer) buffer,
-                dstOffset, onComplete, mipLevel);
+        copyVulkanicTextureToBuffer(ctx, texture, buffer, dstOffset, onComplete, mipLevel,
+                0, 0, texture.getWidth(), texture.getHeight());
     }
 
     @Override
@@ -3039,10 +3177,24 @@ public class OpenGLBackend implements GraphicsBackend {
                                              int srcX, int srcY,
                                              int width, int height) {
         requireGlDevice("copyVulkanicTextureToBuffer");
-        glDevice.createCommandEncoder().copyTextureToBuffer(
-                (net.blaze3d.textures.GpuTexture) texture,
-                (net.blaze3d.buffers.GpuBuffer) buffer,
-                dstOffset, onComplete, mipLevel, srcX, srcY, width, height);
+        int texId = (int) texture.getNativeHandle();
+        int bufId = (int) buffer.getNativeHandle();
+        int readFbo = glDevice.getEncoderReadFbo();
+        // Bind the texture into the read FBO, then use a PBO (pixel pack buffer) to readback.
+        glDevice.directStateAccess().bindFrameBufferTextures(readFbo, texId, 0, mipLevel, GL30.GL_READ_FRAMEBUFFER);
+        GL15.glBindBuffer(GL21.GL_PIXEL_PACK_BUFFER, bufId);
+        GL11.glPixelStorei(GL11.GL_PACK_ROW_LENGTH, width);
+        GL11.glReadPixels(srcX, srcY, width, height,
+                toGlExternalId(texture.getVulkanicFormat()),
+                toGlType(texture.getVulkanicFormat()),
+                dstOffset);
+        net.blaze3d.systems.RenderSystem.queueFencedTask(onComplete);
+        GL30.glFramebufferTexture2D(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, 0, mipLevel);
+        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, 0);
+        GL15.glBindBuffer(GL21.GL_PIXEL_PACK_BUFFER, 0);
+        int err = GL11.glGetError();
+        if (err != 0)
+            throw new IllegalStateException("copyVulkanicTextureToBuffer GL error " + err + " for " + texture.getLabel());
     }
 
     @Override
@@ -3054,16 +3206,40 @@ public class OpenGLBackend implements GraphicsBackend {
                                               int srcX, int srcY,
                                               int width, int height) {
         requireGlDevice("copyVulkanicTextureToTexture");
-        glDevice.createCommandEncoder().copyTextureToTexture(
-                (net.blaze3d.textures.GpuTexture) src,
-                (net.blaze3d.textures.GpuTexture) dst,
-                mipLevel, dstX, dstY, srcX, srcY, width, height);
+        int srcId = (int) src.getNativeHandle();
+        int dstId = (int) dst.getNativeHandle();
+        boolean isDepth = src.getVulkanicFormat().hasDepthAspect();
+        int readFbo = glDevice.getEncoderReadFbo();
+        int drawFbo = glDevice.getEncoderDrawFbo();
+        // Bind source and destination textures to their respective FBOs, then blit.
+        glDevice.directStateAccess().bindFrameBufferTextures(readFbo, isDepth ? 0 : srcId, isDepth ? srcId : 0, 0, 0);
+        glDevice.directStateAccess().bindFrameBufferTextures(drawFbo, isDepth ? 0 : dstId, isDepth ? dstId : 0, 0, 0);
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        glDevice.directStateAccess().blitFrameBuffers(readFbo, drawFbo,
+                srcX, srcY, width, height,
+                dstX, dstY, width, height,
+                isDepth ? GL11.GL_DEPTH_BUFFER_BIT : GL11.GL_COLOR_BUFFER_BIT,
+                GL11.GL_NEAREST);
+        int err = GL11.glGetError();
+        if (err != 0)
+            throw new IllegalStateException("copyVulkanicTextureToTexture GL error " + err
+                + " from " + src.getLabel() + " to " + dst.getLabel());
     }
 
     @Override
     public void presentVulkanicTexture(CommandContext ctx, VulkanicTextureView target) {
         requireGlDevice("presentVulkanicTexture");
-        glDevice.createCommandEncoder().presentTexture((net.blaze3d.textures.GpuTextureView) target);
+        int w = target.texture().getWidth();
+        int h = target.texture().getHeight();
+        int texId = (int) target.texture().getNativeHandle();
+        int drawFbo = glDevice.getEncoderDrawFbo();
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        GL11.glViewport(0, 0, w, h);
+        GL11.glDepthMask(true);
+        GL11.glColorMask(true, true, true, true);
+        glDevice.directStateAccess().bindFrameBufferTextures(drawFbo, texId, 0, 0, 0);
+        glDevice.directStateAccess().blitFrameBuffers(drawFbo, 0, 0, 0, w, h, 0, 0, w, h,
+                GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
     }
 }
 

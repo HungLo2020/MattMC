@@ -3169,6 +3169,31 @@ public interface GraphicsBackend {
                                      VulkanicTexture color, int argbColor,
                                      VulkanicTexture depth, double depthValue);
 
+    /**
+     * Clears both a colour texture and a depth texture within a scissor region.
+     *
+     * <ul>
+     *   <li>OpenGL: binds an FBO, enables scissor, calls
+     *       {@code glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)}.</li>
+     *   <li>Vulkan: {@code vkCmdClearAttachments} with a {@code VkClearRect}.</li>
+     * </ul>
+     *
+     * @param ctx         Command context
+     * @param color       Colour texture to clear
+     * @param argbColor   Clear colour in packed ARGB format
+     * @param depth       Depth texture to clear
+     * @param depthValue  Clear depth value in [0.0, 1.0]
+     * @param regionX     Scissor region X (pixels)
+     * @param regionY     Scissor region Y (pixels)
+     * @param regionWidth Scissor region width (pixels)
+     * @param regionHeight Scissor region height (pixels)
+     */
+    void clearColorAndDepthTextures(CommandContext ctx,
+                                     VulkanicTexture color, int argbColor,
+                                     VulkanicTexture depth, double depthValue,
+                                     int regionX, int regionY,
+                                     int regionWidth, int regionHeight);
+
     // =========================================================================
     // Phase 4 — Render pass (Vulkan primary entry point)
     //
@@ -3440,6 +3465,34 @@ public interface GraphicsBackend {
                                  int mipLevel, int layer,
                                  int dstX, int dstY,
                                  int srcX, int srcY,
+                                 int width, int height);
+
+    /**
+     * Uploads a sub-region of a CPU-side {@link java.nio.ByteBuffer} into a texture mip level.
+     *
+     * <ul>
+     *   <li>OpenGL: calls {@code glTexSubImage2D} with pixel-store parameters.</li>
+     *   <li>Vulkan: {@code vkCmdCopyBufferToImage} (staging buffer upload path).</li>
+     * </ul>
+     *
+     * <p>Replaces: {@code createCommandEncoder().writeToTexture(gpuTexture, byteBuffer, format, ...)}
+     *
+     * @param ctx      Command context
+     * @param texture  Destination texture (must have {@code USAGE_COPY_DST})
+     * @param data     Source data buffer
+     * @param format   Pixel format of the source data
+     * @param mipLevel Destination mip level
+     * @param layer    Destination array layer or cubemap face
+     * @param dstX     Destination X offset within the mip level
+     * @param dstY     Destination Y offset within the mip level
+     * @param width    Width of the region to copy
+     * @param height   Height of the region to copy
+     */
+    void writeToVulkanicTexture(CommandContext ctx, VulkanicTexture texture,
+                                 java.nio.ByteBuffer data,
+                                 net.blaze3d.platform.NativeImage.Format format,
+                                 int mipLevel, int layer,
+                                 int dstX, int dstY,
                                  int width, int height);
 
     /**
