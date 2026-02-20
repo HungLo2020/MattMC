@@ -49,7 +49,7 @@ public abstract class AbstractVertexAttribute
 	public void unbind() { VulkanicAPI.bindVertexArray(VulkanicAPI.getImmediateContext(), 0); }
 	
 	/** Always remember to always free your resources! */
-	public void free() { VulkanicAPI.deleteVertexArray(this.id); }
+	public void free() { VulkanicAPI.deleteVertexArrays(VulkanicAPI.getImmediateContext(), this.id); }
 	
 	
 	

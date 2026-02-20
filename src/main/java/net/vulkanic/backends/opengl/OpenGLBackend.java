@@ -680,11 +680,6 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return mapBuffer(VulkanicAPI.getImmediateContext(), tgt, off, len, acc);
-    }
-    
-    @Override
     public void unmapBuffer(CommandContext ctx, int target) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
@@ -1266,44 +1261,52 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     
-    
     @Override
-    public void assignUniformFloat2v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform2fv(location, value);
-    }
-    
-    
-    @Override
-    public void assignUniformFloat3v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform3fv(location, value);
-    }
-    
-    
-    @Override
-    public void assignUniformFloat4v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform4fv(location, value);
+    public void setUniform2fv(CommandContext ctx, int location, float[] value) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL20C.glUniform2fv(location, value);
     }
     
     @Override
-    public void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
-        org.lwjgl.opengl.GL30C.glUniformMatrix4fv(location, false, matrix);
+    public void setUniform3fv(CommandContext ctx, int location, float[] value) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL20C.glUniform3fv(location, value);
     }
     
     @Override
-    public void bindUniformBufferBase(int bindingPoint, int bufferId) {
+    public void setUniform4fv(CommandContext ctx, int location, float[] value) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL20C.glUniform4fv(location, value);
+    }
+    
+    @Override
+    public void bindUniformBufferBase(CommandContext ctx, int bindingPoint, int bufferId) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         org.lwjgl.opengl.GL32C.glBindBufferBase(org.lwjgl.opengl.GL32C.GL_UNIFORM_BUFFER, bindingPoint, bufferId);
     }
     
     @Override
-    public void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
+    public void bindFragDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         org.lwjgl.opengl.GL30C.glBindFragDataLocation(program, colorNumber, name);
     }
     
     @Override
-    public int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
-        // glGetSynci returns the sync value and writes to length buffer
-        // the number of values returned (should be 1 for single integer queries)
+    public int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         return org.lwjgl.opengl.GL32C.glGetSynci(sync, pname, length);
+    }
+    
+    @Override
+    public void deleteVertexArrays(CommandContext ctx, int vertexArray) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL30C.glDeleteVertexArrays(vertexArray);
+    }
+    
+    @Override
+    public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
     
     /**
@@ -1349,26 +1352,6 @@ public class OpenGLBackend implements GraphicsBackend {
         } catch (Exception e) {
             return false;
         }
-    }
-    
-    
-    @Override
-    public void deleteVertexArray(int vertexArray) {
-        org.lwjgl.opengl.GL30.glDeleteVertexArrays(vertexArray);
-    }
-    
-    
-    
-    
-    @Override
-    public void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
-        org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
-    }
-    
-    
-    @Override
-    public void uploadShaderSourceNative(int shader, int count, long strings, long length) {
-        org.lwjgl.opengl.GL20C.nglShaderSource(shader, count, strings, length);
     }
     
     

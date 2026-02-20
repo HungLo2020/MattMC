@@ -1517,35 +1517,28 @@ public class VulkanicAPI {
     }
     
     
-    
-    public static void assignUniformFloat2v(int location, float[] value) {
-        getBackend().assignUniformFloat2v(location, value);
+    public static void setUniform2fv(CommandContext ctx, int location, float[] value) {
+        getBackend().setUniform2fv(ctx, location, value);
     }
     
-    
-    public static void assignUniformFloat3v(int location, float[] value) {
-        getBackend().assignUniformFloat3v(location, value);
+    public static void setUniform3fv(CommandContext ctx, int location, float[] value) {
+        getBackend().setUniform3fv(ctx, location, value);
     }
     
-    
-    public static void assignUniformFloat4v(int location, float[] value) {
-        getBackend().assignUniformFloat4v(location, value);
+    public static void setUniform4fv(CommandContext ctx, int location, float[] value) {
+        getBackend().setUniform4fv(ctx, location, value);
     }
     
-    public static void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
-        getBackend().assignUniformMatrix4f(location, matrix);
+    public static void bindUniformBufferBase(CommandContext ctx, int bindingPoint, int bufferId) {
+        getBackend().bindUniformBufferBase(ctx, bindingPoint, bufferId);
     }
     
-    public static void bindUniformBufferBase(int bindingPoint, int bufferId) {
-        getBackend().bindUniformBufferBase(bindingPoint, bufferId);
+    public static void bindFragDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name) {
+        getBackend().bindFragDataLocation(ctx, program, colorNumber, name);
     }
     
-    public static void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
-        getBackend().bindFragmentDataLocation(program, colorNumber, name);
-    }
-    
-    public static int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
-        return getBackend().querySyncStatus(sync, pname, length);
+    public static int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
+        return getBackend().getSynci(ctx, sync, pname, length);
     }
     
     public static GraphicsCapabilities obtainGraphicsCapabilities() {
@@ -1560,25 +1553,14 @@ public class VulkanicAPI {
         return getBackend().checkFunctionAvailable(functionName);
     }
     
-    
-    public static void deleteVertexArray(int vertexArray) {
-        getBackend().deleteVertexArray(vertexArray);
+    public static void deleteVertexArrays(CommandContext ctx, int vertexArray) {
+        getBackend().deleteVertexArrays(ctx, vertexArray);
     }
     
-    
-    
-    
-    public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
-        getBackend().multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
+    public static void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+        getBackend().multiDrawElementsBaseVertex(ctx, mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
-    
-    
-    public static void uploadShaderSourceNative(int shader, int count, long strings, long length) {
-        getBackend().uploadShaderSourceNative(shader, count, strings, length);
-    }
-    
-    
-    
+
     
     
     // Additional methods for IrisRenderSystem migration

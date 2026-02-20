@@ -13,7 +13,7 @@ public class GlUniformFloat3v extends GlUniform<float[]> {
             throw new IllegalArgumentException("value.length != 3");
         }
 
-        VulkanicAPI.assignUniformFloat3v(this.index, value);
+        VulkanicAPI.setUniform3fv(VulkanicAPI.getImmediateContext(), this.index, value);
     }
 
     public void set(float x, float y, float z) {

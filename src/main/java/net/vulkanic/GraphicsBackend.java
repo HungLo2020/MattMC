@@ -1213,8 +1213,6 @@ public interface GraphicsBackend {
      */
     void unmapBuffer(CommandContext ctx, int target);
     
-    java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc);
-    
     // Framebuffer lifecycle
     
     /**
@@ -2078,18 +2076,17 @@ public interface GraphicsBackend {
      */
     void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer);
     
-    // Uniform operations (additional)
-    void assignUniformFloat2v(int location, float[] value);
-    void assignUniformFloat3v(int location, float[] value);
-    void assignUniformFloat4v(int location, float[] value);
-    void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix);
-    void bindUniformBufferBase(int bindingPoint, int bufferId);
+    // Uniform operations (additional, all with CommandContext)
+    void setUniform2fv(CommandContext ctx, int location, float[] value);
+    void setUniform3fv(CommandContext ctx, int location, float[] value);
+    void setUniform4fv(CommandContext ctx, int location, float[] value);
+    void bindUniformBufferBase(CommandContext ctx, int bindingPoint, int bufferId);
     
     // Program fragment data binding
-    void bindFragmentDataLocation(int program, int colorNumber, CharSequence name);
+    void bindFragDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name);
     
     // Sync query operations
-    int querySyncStatus(long sync, int pname, java.nio.IntBuffer length);
+    int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length);
     
     // Graphics Capabilities
     GraphicsCapabilities obtainGraphicsCapabilities();
@@ -2097,17 +2094,10 @@ public interface GraphicsBackend {
     boolean checkFunctionAvailable(String functionName);
     
     // Additional buffer operations for Sodium
-    void deleteVertexArray(int vertexArray);
-    
-    // Buffer storage operations
+    void deleteVertexArrays(CommandContext ctx, int vertexArray);
     
     // Multi-draw operations
-    void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
-    
-    // Uniform matrix operations
-    
-    // Native shader source upload
-    void uploadShaderSourceNative(int shader, int count, long strings, long length);
+    void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
     
     // Texture operations
     

@@ -20,7 +20,7 @@ public class GlFence {
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer length = stack.callocInt(1);
-            result = VulkanicAPI.querySyncStatus(this.id, 37140, length); // GL_SYNC_STATUS = 0x9114
+            result = VulkanicAPI.getSynci(VulkanicAPI.getImmediateContext(), this.id, 37140, length); // GL_SYNC_STATUS = 0x9114
             
             // The length buffer should contain the number of values written (should be 1)
             // However, some drivers may not write to this buffer at all, so we'll just

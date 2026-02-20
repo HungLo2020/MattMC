@@ -148,7 +148,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         }
 
         public Builder bindFragmentData(String name, int index) {
-            VulkanicAPI.bindFragmentDataLocation(this.program, index, name);
+            VulkanicAPI.bindFragDataLocation(VulkanicAPI.getImmediateContext(), this.program, index, name);
 
             return this;
         }

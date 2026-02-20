@@ -163,7 +163,7 @@ public class GLRenderDevice implements RenderDevice {
             int handle = vertexArray.handle();
             vertexArray.invalidateHandle();
 
-            VulkanicAPI.deleteVertexArray(handle);
+            VulkanicAPI.deleteVertexArrays(VulkanicAPI.getImmediateContext(), handle);
         }
 
         @Override
@@ -299,7 +299,7 @@ public class GLRenderDevice implements RenderDevice {
                 ? VulkanicAPI.GL_PATCHES
                 : primitiveType.getId();
 
-            VulkanicAPI.multiDrawElementsBaseVertex(primitiveId,
+            VulkanicAPI.multiDrawElementsBaseVertex(VulkanicAPI.getImmediateContext(), primitiveId,
                     batch.pElementCount,
                     indexType.getFormatId(),
                     batch.pElementPointer,
