@@ -12,7 +12,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.resources.VulkanicTexture;
-import net.vulkanic.resources.VulkanicTextureFormat;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -22,13 +21,24 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	protected boolean closed;
 	protected boolean modesDirty = true;
 	private int views;
-	
+	// Vulkanic format — set at construction time by OpenGLBackend so that
+	// getVulkanicFormat() does not need a switch over TextureFormat (keeping
+	// the conversion logic inside the Vulkanic layer, not in Blaze3D).
+	private final net.vulkanic.resources.VulkanicTextureFormat vulkanicFormat;
+
 	// Iris: From MixinGpuTexture - mipmap non-linear flag
 	private boolean iris$mipmapNonLinear;
 
-	protected GlTexture(int i, String string, TextureFormat textureFormat, int j, int k, int l, int m, int n) {
+	/** Legacy constructor — used by Blaze3D code that has a {@link TextureFormat}. */
+	public GlTexture(int i, String string, TextureFormat textureFormat, int j, int k, int l, int m, int n) {
 		super(i, string, textureFormat, j, k, l, m);
 		this.id = n;
+		this.vulkanicFormat = switch (textureFormat) {
+			case RGBA8   -> net.vulkanic.resources.VulkanicTextureFormat.RGBA8;
+			case RED8    -> net.vulkanic.resources.VulkanicTextureFormat.RED8;
+			case RED8I   -> net.vulkanic.resources.VulkanicTextureFormat.RED8I;
+			case DEPTH32 -> net.vulkanic.resources.VulkanicTextureFormat.DEPTH32;
+		};
 	}
 
 	@Override
@@ -128,13 +138,8 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	}
 
 	@Override
-	public VulkanicTextureFormat getVulkanicFormat() {
-		return switch (super.getFormat()) {
-			case RGBA8   -> VulkanicTextureFormat.RGBA8;
-			case RED8    -> VulkanicTextureFormat.RED8;
-			case RED8I   -> VulkanicTextureFormat.RED8I;
-			case DEPTH32 -> VulkanicTextureFormat.DEPTH32;
-		};
+	public net.vulkanic.resources.VulkanicTextureFormat getVulkanicFormat() {
+		return this.vulkanicFormat;
 	}
 
 	// Iris: From MixinGpuTexture - GpuTextureInterface implementation

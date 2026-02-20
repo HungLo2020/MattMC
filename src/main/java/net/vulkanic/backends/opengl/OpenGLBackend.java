@@ -1,6 +1,10 @@
 package net.vulkanic.backends.opengl;
 
+import net.blaze3d.GpuOutOfMemoryException;
 import net.blaze3d.opengl.GlStateManager;
+import net.blaze3d.opengl.GlTexture;
+import net.blaze3d.opengl.GlTextureView;
+import net.blaze3d.textures.TextureFormat;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
@@ -2251,6 +2255,11 @@ public class OpenGLBackend implements GraphicsBackend {
 
     // =========================================================================
     // Phase 3 — Texture lifecycle (Step 2)
+    //
+    // createVulkanicTexture is the AUTHORITATIVE texture allocation point.
+    // All GL texture allocation logic lives here — in the Vulkanic backend —
+    // not in GlDevice.  GlDevice.createTexture() is a thin façade that
+    // converts TextureFormat → VulkanicTextureFormat and delegates here.
     // =========================================================================
 
     @Override
@@ -2258,29 +2267,94 @@ public class OpenGLBackend implements GraphicsBackend {
                                                    VulkanicTextureFormat format,
                                                    int width, int height,
                                                    int depthOrLayers, int mipLevels) {
-        if (glDevice != null) {
-            // Delegate to GlDevice.createGlTexture() — the authoritative implementation.
-            // This handles cubemaps, mip validation, depth-mode parameters, and OOM detection.
-            // The returned GlTexture already implements VulkanicTexture (see GlTexture.java).
-            return glDevice.createGlTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
-        }
-        // Fallback: before GlDevice is initialised (tests / early startup).
-        if (mipLevels < 1) throw new IllegalArgumentException("mipLevels must be >= 1");
-        if (width     < 1) throw new IllegalArgumentException("width must be >= 1");
-        if (height    < 1) throw new IllegalArgumentException("height must be >= 1");
+        if (mipLevels < 1)     throw new IllegalArgumentException("mipLevels must be at least 1");
+        if (depthOrLayers < 1) throw new IllegalArgumentException("depthOrLayers must be at least 1");
+        if (width < 1)         throw new IllegalArgumentException("width must be >= 1");
+        if (height < 1)        throw new IllegalArgumentException("height must be >= 1");
 
-        int target   = GL11.GL_TEXTURE_2D;
-        int glHandle = GL11.glGenTextures();
-        GL11.glBindTexture(target, glHandle);
-        for (int mipLevel = 0; mipLevel < mipLevels; mipLevel++) {
-            GL11.glTexImage2D(target, mipLevel,
-                    toGlInternalId(format),
-                    Math.max(1, width  >> mipLevel),
-                    Math.max(1, height >> mipLevel),
-                    0, toGlExternalId(format), toGlType(format), (ByteBuffer) null);
+        boolean cubemap = (usage & 16) != 0;
+        if (cubemap) {
+            if (width != height) {
+                throw new IllegalArgumentException(
+                        "Cubemap textures must be square, but size is " + width + "x" + height);
+            }
+            if (depthOrLayers % 6 != 0) {
+                throw new IllegalArgumentException(
+                        "Cubemap textures must have layer count divisible by 6, was " + depthOrLayers);
+            }
+            if (depthOrLayers > 6) {
+                throw new UnsupportedOperationException("Array textures are not yet supported");
+            }
+        } else if (depthOrLayers > 1) {
+            throw new UnsupportedOperationException("Array or 3D textures are not yet supported");
         }
-        GL11.glBindTexture(target, 0);
-        return new OpenGLTexture(glHandle, usage, format, label, width, height, depthOrLayers, mipLevels);
+
+        GlStateManager.clearGlErrors();
+        int n = GlStateManager._genTexture();
+        if (label == null) label = String.valueOf(n);
+
+        int target;
+        if (cubemap) {
+            // Cubemap textures must be bound to GL_TEXTURE_CUBE_MAP (34067) so that
+            // glTexParameter and glTexImage2D calls apply to the correct target.
+            // GlStateManager._bindTexture binds to GL_TEXTURE_2D; we route through
+            // VulkanicAPI.bindTexture which accepts an explicit target.
+            VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067, n);
+            target = 34067; // GL_TEXTURE_CUBE_MAP
+        } else {
+            GlStateManager._bindTexture(n);
+            target = 3553; // GL_TEXTURE_2D
+        }
+
+        // Set mip-level range on the texture object:
+        //   33085 = GL_TEXTURE_MAX_LEVEL  — highest accessible mip level
+        //   33082 = GL_TEXTURE_MIN_LOD    — minimum LOD clamp (0 = base level)
+        //   33083 = GL_TEXTURE_MAX_LOD    — maximum LOD clamp
+        GlStateManager._texParameter(target, 33085, mipLevels - 1); // GL_TEXTURE_MAX_LEVEL
+        GlStateManager._texParameter(target, 33082, 0);              // GL_TEXTURE_MIN_LOD
+        GlStateManager._texParameter(target, 33083, mipLevels - 1); // GL_TEXTURE_MAX_LOD
+        if (format.hasDepthAspect()) {
+            GlStateManager._texParameter(target, 34892, 0);          // GL_TEXTURE_COMPARE_MODE = GL_NONE
+        }
+
+        int internalFmt = toGlInternalId(format);
+        int externalFmt = toGlExternalId(format);
+        int glType      = toGlType(format);
+
+        if (cubemap) {
+            for (int face : net.blaze3d.opengl.GlConst.CUBEMAP_TARGETS) {
+                for (int mip = 0; mip < mipLevels; mip++) {
+                    GlStateManager._texImage2D(face, mip, internalFmt,
+                            Math.max(1, width >> mip), Math.max(1, height >> mip),
+                            0, externalFmt, glType, null);
+                }
+            }
+        } else {
+            for (int mip = 0; mip < mipLevels; mip++) {
+                GlStateManager._texImage2D(target, mip, internalFmt,
+                        Math.max(1, width >> mip), Math.max(1, height >> mip),
+                        0, externalFmt, glType, null);
+            }
+        }
+
+        int err = GlStateManager._getError();
+        if (err == 1285) {
+            throw new GpuOutOfMemoryException(
+                    "Could not allocate texture of " + width + "x" + height + " for " + label);
+        } else if (err != 0) {
+            throw new IllegalStateException("OpenGL error " + err);
+        }
+
+        // Map back to the legacy TextureFormat that GlTexture's superclass constructor needs.
+        TextureFormat legacyFmt = switch (format) {
+            case RGBA8   -> TextureFormat.RGBA8;
+            case RED8    -> TextureFormat.RED8;
+            case RED8I   -> TextureFormat.RED8I;
+            case DEPTH32 -> TextureFormat.DEPTH32;
+        };
+        GlTexture glTexture = new GlTexture(usage, label, legacyFmt, width, height, depthOrLayers, mipLevels, n);
+        if (glDevice != null) glDevice.debugLabels().applyLabel(glTexture);
+        return glTexture;
     }
 
     @Override
@@ -2299,10 +2373,11 @@ public class OpenGLBackend implements GraphicsBackend {
                     "Mip range [" + baseMipLevel + ", " + (baseMipLevel + mipLevelCount)
                     + ") is out of bounds for texture with " + texture.getMipLevels() + " mip levels");
         }
-        if (texture instanceof net.blaze3d.opengl.GlTexture glTex) {
-            // GlTexture implements VulkanicTexture; return a GlTextureView (also VulkanicTextureView).
-            return new net.blaze3d.opengl.GlTextureView(glTex, baseMipLevel, mipLevelCount);
+        // createVulkanicTexture always produces a GlTexture; GlTextureView implements VulkanicTextureView.
+        if (texture instanceof GlTexture glTex) {
+            return new GlTextureView(glTex, baseMipLevel, mipLevelCount);
         }
+        // Fallback for OpenGLTexture instances created via the direct Vulkanic-only path.
         return new OpenGLTextureView((OpenGLTexture) texture, baseMipLevel, mipLevelCount);
     }
 
@@ -2312,9 +2387,8 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     // -----------------------------------------------------------------------
-    // GL format helpers (VulkanicTextureFormat → GL constants)
-    // Used by the fallback path when glDevice is not yet available.
-    // The authoritative path (via GlDevice.createGlTexture) uses GlConst.
+    // GL format helpers (VulkanicTextureFormat → GL constants).
+    // These live here — in the OpenGL backend — not in Blaze3D's GlConst.
     // -----------------------------------------------------------------------
 
     static int toGlInternalId(VulkanicTextureFormat fmt) {

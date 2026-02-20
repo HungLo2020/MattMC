@@ -12,7 +12,6 @@ import net.blaze3d.vertex.VertexFormat;
 import net.blaze3d.vertex.VertexFormatElement;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.vulkanic.resources.VulkanicTextureFormat;
 
 @Environment(EnvType.CLIENT)
 public class GlConst {
@@ -268,35 +267,6 @@ public class GlConst {
 			case RED8 -> 5121;
 			case RED8I -> 5121;
 			case DEPTH32 -> 5126;
-		};
-	}
-
-	// VulkanicTextureFormat → GL constant mappings.
-	// These are used by GlDevice.createGlTexture() so that it works with the
-	// Vulkanic-owned format type without duplicating the constant table.
-
-	public static int toGlInternalId(VulkanicTextureFormat format) {
-		return switch (format) {
-			case RGBA8   -> 32856; // GL_RGBA8
-			case RED8    -> 33321; // GL_R8
-			case RED8I   -> 33329; // GL_R8I
-			case DEPTH32 -> 33191; // GL_DEPTH_COMPONENT32
-		};
-	}
-
-	public static int toGlExternalId(VulkanicTextureFormat format) {
-		return switch (format) {
-			case RGBA8            -> 6408; // GL_RGBA
-			case RED8, RED8I      -> 6403; // GL_RED
-			case DEPTH32          -> 6402; // GL_DEPTH_COMPONENT
-		};
-	}
-
-	public static int toGlType(VulkanicTextureFormat format) {
-		return switch (format) {
-			case RGBA8, RED8 -> 5121; // GL_UNSIGNED_BYTE
-			case RED8I       -> 5120; // GL_BYTE (signed integer)
-			case DEPTH32     -> 5126; // GL_FLOAT
 		};
 	}
 
