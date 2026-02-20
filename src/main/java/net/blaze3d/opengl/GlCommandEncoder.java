@@ -329,47 +329,15 @@ public class GlCommandEncoder implements CommandEncoder {
 		if (this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
 		} else {
-			GlBuffer glBuffer = (GlBuffer)gpuBufferSlice.buffer();
-			if (glBuffer.closed) {
-				throw new IllegalStateException("Source buffer already closed");
-			} else if ((glBuffer.usage() & 16) == 0) {
-				throw new IllegalStateException("Source buffer needs USAGE_COPY_SRC to be a source for a copy");
-			} else {
-				GlBuffer glBuffer2 = (GlBuffer)gpuBufferSlice2.buffer();
-				if (glBuffer2.closed) {
-					throw new IllegalStateException("Target buffer already closed");
-				} else if ((glBuffer2.usage() & 8) == 0) {
-					throw new IllegalStateException("Target buffer needs USAGE_COPY_DST to be a destination for a copy");
-				} else if (gpuBufferSlice.length() != gpuBufferSlice2.length()) {
-					throw new IllegalArgumentException(
-						"Cannot copy from slice of size " + gpuBufferSlice.length() + " to slice of size " + gpuBufferSlice2.length() + ", they must be equal"
-					);
-				} else if (gpuBufferSlice.offset() + gpuBufferSlice.length() > glBuffer.size()) {
-					throw new IllegalArgumentException(
-						"Cannot copy more data than the source buffer holds (attempting to copy "
-							+ gpuBufferSlice.length()
-							+ " bytes at offset "
-							+ gpuBufferSlice.offset()
-							+ " from "
-							+ glBuffer.size()
-							+ " size buffer)"
-					);
-				} else if (gpuBufferSlice2.offset() + gpuBufferSlice2.length() > glBuffer2.size()) {
-					throw new IllegalArgumentException(
-						"Cannot copy more data than the target buffer can hold (attempting to copy "
-							+ gpuBufferSlice2.length()
-							+ " bytes at offset "
-							+ gpuBufferSlice2.offset()
-							+ " to "
-							+ glBuffer2.size()
-							+ " size buffer)"
-					);
-				} else {
-					this.device
-						.directStateAccess()
-						.copyBufferSubData(glBuffer.handle, glBuffer2.handle, gpuBufferSlice.offset(), gpuBufferSlice2.offset(), gpuBufferSlice.length());
-				}
-			}
+			// Delegate to VulkanicAPI — GlCommandEncoder is a thin facade for buffer copies.
+			// GpuBufferSlice → VulkanicBufferSlice: GlBuffer implements VulkanicBuffer; safe cast.
+			net.vulkanic.resources.VulkanicBufferSlice src = new net.vulkanic.resources.VulkanicBufferSlice(
+					(net.vulkanic.resources.VulkanicBuffer) gpuBufferSlice.buffer(),
+					gpuBufferSlice.offset(), gpuBufferSlice.length());
+			net.vulkanic.resources.VulkanicBufferSlice dst = new net.vulkanic.resources.VulkanicBufferSlice(
+					(net.vulkanic.resources.VulkanicBuffer) gpuBufferSlice2.buffer(),
+					gpuBufferSlice2.offset(), gpuBufferSlice2.length());
+			net.vulkanic.VulkanicAPI.copyVulkanicBuffers(net.vulkanic.VulkanicAPI.getImmediateContext(), src, dst);
 		}
 	}
 
@@ -663,7 +631,9 @@ public class GlCommandEncoder implements CommandEncoder {
 		if (this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
 		} else {
-			return new GlFence();
+			// Delegate to VulkanicAPI — GlCommandEncoder is a thin facade for fence creation.
+			// GlFence implements both GpuFence and VulkanicFence; cast is safe.
+			return (GpuFence) net.vulkanic.VulkanicAPI.createFence(net.vulkanic.VulkanicAPI.getImmediateContext());
 		}
 	}
 

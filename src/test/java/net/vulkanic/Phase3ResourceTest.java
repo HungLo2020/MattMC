@@ -556,4 +556,228 @@ public class Phase3ResourceTest {
                 java.util.function.BiFunction.class));
         assertNotNull(VulkanicAPI.class.getMethod("clearPipelineCache"));
     }
+
+    // -----------------------------------------------------------------------
+    // VulkanicFence
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicFenceInterfaceExists() throws ClassNotFoundException {
+        Class<?> cls = Class.forName("net.vulkanic.resources.VulkanicFence");
+        assertTrue(cls.isInterface(), "VulkanicFence must be an interface");
+        assertTrue(AutoCloseable.class.isAssignableFrom(cls),
+                "VulkanicFence must extend AutoCloseable (maps to VkFence lifecycle)");
+    }
+
+    @Test
+    public void testVulkanicFenceHasRequiredMethods() throws Exception {
+        Class<?> cls = Class.forName("net.vulkanic.resources.VulkanicFence");
+        // awaitCompletion maps to vkWaitForFences(timeout)
+        assertNotNull(cls.getMethod("awaitCompletion", long.class));
+        // close maps to vkDestroyFence
+        assertNotNull(cls.getMethod("close"));
+    }
+
+    @Test
+    public void testGlFenceImplementsVulkanicFence() throws ClassNotFoundException {
+        Class<?> glFence = Class.forName("net.blaze3d.opengl.GlFence");
+        Class<?> vkFence = Class.forName("net.vulkanic.resources.VulkanicFence");
+        assertTrue(vkFence.isAssignableFrom(glFence),
+                "GlFence must implement VulkanicFence");
+    }
+
+    @Test
+    public void testGraphicsBackendHasCreateFence() throws NoSuchMethodException {
+        assertNotNull(GraphicsBackend.class.getMethod("createFence", CommandContext.class));
+    }
+
+    @Test
+    public void testVulkanicAPIHasCreateFence() throws NoSuchMethodException {
+        assertNotNull(VulkanicAPI.class.getMethod("createFence", CommandContext.class));
+    }
+
+    // -----------------------------------------------------------------------
+    // VulkanicAddressMode + VulkanicFilterMode
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicAddressModeExists() throws ClassNotFoundException {
+        Class<?> cls = Class.forName("net.vulkanic.resources.VulkanicAddressMode");
+        assertTrue(cls.isEnum(), "VulkanicAddressMode must be an enum");
+        // Verify Vulkan-required values are present
+        Enum<?>[] constants = (Enum<?>[]) cls.getEnumConstants();
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (Enum<?> c : constants) names.add(c.name());
+        assertTrue(names.contains("REPEAT"),        "Must have REPEAT → VK_SAMPLER_ADDRESS_MODE_REPEAT");
+        assertTrue(names.contains("CLAMP_TO_EDGE"), "Must have CLAMP_TO_EDGE → VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE");
+    }
+
+    @Test
+    public void testVulkanicFilterModeExists() throws ClassNotFoundException {
+        Class<?> cls = Class.forName("net.vulkanic.resources.VulkanicFilterMode");
+        assertTrue(cls.isEnum(), "VulkanicFilterMode must be an enum");
+        Enum<?>[] constants = (Enum<?>[]) cls.getEnumConstants();
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (Enum<?> c : constants) names.add(c.name());
+        assertTrue(names.contains("NEAREST"), "Must have NEAREST → VK_FILTER_NEAREST");
+        assertTrue(names.contains("LINEAR"),  "Must have LINEAR → VK_FILTER_LINEAR");
+    }
+
+    @Test
+    public void testAddressModeFromBlaze3dBridgeRoundTrips() throws Exception {
+        // REPEAT
+        net.vulkanic.resources.VulkanicAddressMode repeat =
+                net.vulkanic.resources.VulkanicAddressMode.fromBlaze3d(net.blaze3d.textures.AddressMode.REPEAT);
+        assertEquals(net.vulkanic.resources.VulkanicAddressMode.REPEAT, repeat);
+        // CLAMP_TO_EDGE
+        net.vulkanic.resources.VulkanicAddressMode clamp =
+                net.vulkanic.resources.VulkanicAddressMode.fromBlaze3d(net.blaze3d.textures.AddressMode.CLAMP_TO_EDGE);
+        assertEquals(net.vulkanic.resources.VulkanicAddressMode.CLAMP_TO_EDGE, clamp);
+    }
+
+    @Test
+    public void testFilterModeFromBlaze3dBridgeRoundTrips() throws Exception {
+        net.vulkanic.resources.VulkanicFilterMode nearest =
+                net.vulkanic.resources.VulkanicFilterMode.fromBlaze3d(net.blaze3d.textures.FilterMode.NEAREST);
+        assertEquals(net.vulkanic.resources.VulkanicFilterMode.NEAREST, nearest);
+        net.vulkanic.resources.VulkanicFilterMode linear =
+                net.vulkanic.resources.VulkanicFilterMode.fromBlaze3d(net.blaze3d.textures.FilterMode.LINEAR);
+        assertEquals(net.vulkanic.resources.VulkanicFilterMode.LINEAR, linear);
+    }
+
+    // -----------------------------------------------------------------------
+    // VulkanicSamplerDescriptor + VulkanicSampler
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicSamplerDescriptorBuilderDefaults() {
+        net.vulkanic.resources.VulkanicSamplerDescriptor desc =
+                net.vulkanic.resources.VulkanicSamplerDescriptor.builder().build();
+        assertEquals(net.vulkanic.resources.VulkanicFilterMode.NEAREST, desc.getMinFilter());
+        assertEquals(net.vulkanic.resources.VulkanicFilterMode.NEAREST, desc.getMagFilter());
+        assertEquals(net.vulkanic.resources.VulkanicFilterMode.NEAREST, desc.getMipmapMode());
+        assertEquals(net.vulkanic.resources.VulkanicAddressMode.REPEAT, desc.getAddressU());
+        assertEquals(net.vulkanic.resources.VulkanicAddressMode.REPEAT, desc.getAddressV());
+        assertEquals(net.vulkanic.resources.VulkanicAddressMode.REPEAT, desc.getAddressW());
+        assertEquals(0.0f,         desc.getMipLodBias());
+        assertEquals(1.0f,         desc.getMaxAnisotropy());
+        assertEquals(0.0f,         desc.getMinLod());
+        assertEquals(Float.MAX_VALUE, desc.getMaxLod());
+    }
+
+    @Test
+    public void testVulkanicSamplerDescriptorBuilderCustomValues() {
+        net.vulkanic.resources.VulkanicSamplerDescriptor desc =
+                net.vulkanic.resources.VulkanicSamplerDescriptor.builder()
+                        .minFilter(net.vulkanic.resources.VulkanicFilterMode.LINEAR)
+                        .magFilter(net.vulkanic.resources.VulkanicFilterMode.LINEAR)
+                        .addressU(net.vulkanic.resources.VulkanicAddressMode.CLAMP_TO_EDGE)
+                        .maxAnisotropy(16.0f)
+                        .minLod(0.0f)
+                        .maxLod(4.0f)
+                        .debugLabel("trilinear_clamp")
+                        .build();
+        assertEquals(net.vulkanic.resources.VulkanicFilterMode.LINEAR,        desc.getMinFilter());
+        assertEquals(net.vulkanic.resources.VulkanicAddressMode.CLAMP_TO_EDGE, desc.getAddressU());
+        assertEquals(16.0f, desc.getMaxAnisotropy());
+        assertEquals(4.0f,  desc.getMaxLod());
+        assertEquals("trilinear_clamp", desc.getDebugLabel());
+    }
+
+    @Test
+    public void testVulkanicSamplerInterfaceExists() throws ClassNotFoundException {
+        Class<?> cls = Class.forName("net.vulkanic.resources.VulkanicSampler");
+        assertTrue(cls.isInterface(), "VulkanicSampler must be an interface");
+    }
+
+    @Test
+    public void testVulkanicSamplerHasRequiredMethods() throws Exception {
+        Class<?> cls = Class.forName("net.vulkanic.resources.VulkanicSampler");
+        // getNativeHandle — GL sampler ID or VkSampler handle
+        assertNotNull(cls.getMethod("getNativeHandle"));
+        // isValid — was the sampler successfully created?
+        assertNotNull(cls.getMethod("isValid"));
+        // getDescriptor — for debugging / recreation
+        assertNotNull(cls.getMethod("getDescriptor"));
+    }
+
+    @Test
+    public void testGraphicsBackendHasSamplerMethods() throws NoSuchMethodException {
+        assertNotNull(GraphicsBackend.class.getMethod("createSampler",
+                CommandContext.class, net.vulkanic.resources.VulkanicSamplerDescriptor.class));
+        assertNotNull(GraphicsBackend.class.getMethod("deleteSampler",
+                CommandContext.class, net.vulkanic.resources.VulkanicSampler.class));
+    }
+
+    @Test
+    public void testVulkanicAPIHasSamplerMethods() throws NoSuchMethodException {
+        assertNotNull(VulkanicAPI.class.getMethod("createSampler",
+                CommandContext.class, net.vulkanic.resources.VulkanicSamplerDescriptor.class));
+        assertNotNull(VulkanicAPI.class.getMethod("deleteSampler",
+                CommandContext.class, net.vulkanic.resources.VulkanicSampler.class));
+    }
+
+    // -----------------------------------------------------------------------
+    // Transfer operations — GraphicsBackend + VulkanicAPI method signatures
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testGraphicsBackendHasTransferOperations() throws NoSuchMethodException {
+        // copyVulkanicBuffers → vkCmdCopyBuffer
+        assertNotNull(GraphicsBackend.class.getMethod("copyVulkanicBuffers",
+                CommandContext.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class));
+        // writeToVulkanicTexture (full) → vkCmdCopyBufferToImage
+        assertNotNull(GraphicsBackend.class.getMethod("writeToVulkanicTexture",
+                CommandContext.class, VulkanicTexture.class,
+                net.blaze3d.platform.NativeImage.class));
+        // writeToVulkanicTexture (sub-region) → vkCmdCopyBufferToImage with offset
+        assertNotNull(GraphicsBackend.class.getMethod("writeToVulkanicTexture",
+                CommandContext.class, VulkanicTexture.class,
+                net.blaze3d.platform.NativeImage.class,
+                int.class, int.class, int.class, int.class, int.class, int.class, int.class, int.class));
+        // copyVulkanicTextureToBuffer → vkCmdCopyImageToBuffer
+        assertNotNull(GraphicsBackend.class.getMethod("copyVulkanicTextureToBuffer",
+                CommandContext.class, VulkanicTexture.class,
+                VulkanicBuffer.class, int.class, Runnable.class, int.class));
+        assertNotNull(GraphicsBackend.class.getMethod("copyVulkanicTextureToBuffer",
+                CommandContext.class, VulkanicTexture.class,
+                VulkanicBuffer.class, int.class, Runnable.class,
+                int.class, int.class, int.class, int.class, int.class));
+        // copyVulkanicTextureToTexture → vkCmdCopyImage
+        assertNotNull(GraphicsBackend.class.getMethod("copyVulkanicTextureToTexture",
+                CommandContext.class, VulkanicTexture.class, VulkanicTexture.class,
+                int.class, int.class, int.class, int.class, int.class, int.class, int.class));
+        // presentVulkanicTexture → vkQueuePresentKHR
+        assertNotNull(GraphicsBackend.class.getMethod("presentVulkanicTexture",
+                CommandContext.class, VulkanicTextureView.class));
+    }
+
+    @Test
+    public void testVulkanicAPIHasTransferOperations() throws NoSuchMethodException {
+        assertNotNull(VulkanicAPI.class.getMethod("copyVulkanicBuffers",
+                CommandContext.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class,
+                net.vulkanic.resources.VulkanicBufferSlice.class));
+        assertNotNull(VulkanicAPI.class.getMethod("writeToVulkanicTexture",
+                CommandContext.class, VulkanicTexture.class,
+                net.blaze3d.platform.NativeImage.class));
+        assertNotNull(VulkanicAPI.class.getMethod("writeToVulkanicTexture",
+                CommandContext.class, VulkanicTexture.class,
+                net.blaze3d.platform.NativeImage.class,
+                int.class, int.class, int.class, int.class, int.class, int.class, int.class, int.class));
+        assertNotNull(VulkanicAPI.class.getMethod("copyVulkanicTextureToBuffer",
+                CommandContext.class, VulkanicTexture.class,
+                VulkanicBuffer.class, int.class, Runnable.class, int.class));
+        assertNotNull(VulkanicAPI.class.getMethod("copyVulkanicTextureToBuffer",
+                CommandContext.class, VulkanicTexture.class,
+                VulkanicBuffer.class, int.class, Runnable.class,
+                int.class, int.class, int.class, int.class, int.class));
+        assertNotNull(VulkanicAPI.class.getMethod("copyVulkanicTextureToTexture",
+                CommandContext.class, VulkanicTexture.class, VulkanicTexture.class,
+                int.class, int.class, int.class, int.class, int.class, int.class, int.class));
+        assertNotNull(VulkanicAPI.class.getMethod("presentVulkanicTexture",
+                CommandContext.class, VulkanicTextureView.class));
+    }
 }

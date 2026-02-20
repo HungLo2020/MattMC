@@ -16,7 +16,10 @@ import net.vulkanic.pipeline.PipelineHandle;
 import net.vulkanic.pipeline.VulkanicCompiledPipeline;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicBufferSlice;
+import net.vulkanic.resources.VulkanicFence;
 import net.vulkanic.resources.VulkanicRenderPass;
+import net.vulkanic.resources.VulkanicSampler;
+import net.vulkanic.resources.VulkanicSamplerDescriptor;
 import net.vulkanic.resources.VulkanicTexture;
 import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
@@ -3262,4 +3265,273 @@ public interface GraphicsBackend {
      * Replaces direct calls to {@code RenderSystem.getDevice().clearPipelineCache()}.
      */
     void clearPipelineCache();
+
+    // =========================================================================
+    // Phase 5 — GPU/CPU fence synchronisation
+    //
+    // Fences are the primary GPU/CPU synchronisation primitive in Vulkan.
+    // vkQueueSubmit accepts a VkFence that the GPU signals when all submitted
+    // commands have completed.  The CPU then calls vkWaitForFences.
+    //
+    // In OpenGL the equivalent is a GL sync object (glFenceSync).  The OpenGL
+    // backend wraps this in a VulkanicFence so callers are backend-agnostic.
+    //
+    // Having createFence() in GraphicsBackend means:
+    //   - Game code (MappableRingBuffer) can hold VulkanicFence references
+    //     instead of GpuFence references.
+    //   - The Vulkan backend creates a VkFence object when createFence() is
+    //     called.  No GlFence objects are involved.
+    //   - GlCommandEncoder.createFence() delegates to VulkanicAPI.createFence()
+    //     — Blaze3D shrinks.
+    // =========================================================================
+
+    /**
+     * Creates a fence that signals when all previously submitted GPU commands
+     * have completed execution.
+     *
+     * <ul>
+     *   <li>OpenGL: inserts a GL sync object ({@code glFenceSync(
+     *       GL_SYNC_GPU_COMMANDS_COMPLETE, 0)}) and wraps it in a
+     *       {@link VulkanicFence}.</li>
+     *   <li>Vulkan: creates a {@code VkFence} with
+     *       {@code VK_FENCE_CREATE_FLAGS_NONE} and calls
+     *       {@code vkQueueSubmit} with it so that it signals when the
+     *       corresponding batch completes.</li>
+     * </ul>
+     *
+     * @param ctx Command context in which the fence is inserted
+     * @return A {@link VulkanicFence}; must be {@link VulkanicFence#close()}d
+     *         when no longer needed
+     */
+    VulkanicFence createFence(CommandContext ctx);
+
+    // =========================================================================
+    // Phase 5 — Sampler objects
+    //
+    // In Vulkan, sampler state is a first-class object (VkSampler) that is
+    // created separately from images and passed to descriptor sets.  This is
+    // the opposite of the OpenGL model where sampler parameters (filter,
+    // address mode, LOD) are stored on the texture object itself.
+    //
+    // Introducing VulkanicSampler into GraphicsBackend now means:
+    //   - The Vulkan backend creates a VkSampler during createSampler() and
+    //     binds it when the sampler is used in a render pass.
+    //   - The OpenGL backend uses GL_ARB_sampler_objects (core since 3.3)
+    //     to create a real GL sampler object, OR stores descriptor state and
+    //     applies it at bind time — the implementation is backend-local.
+    //   - Call sites never touch Blaze3D AddressMode or FilterMode; they use
+    //     VulkanicAddressMode and VulkanicFilterMode.
+    // =========================================================================
+
+    /**
+     * Creates a sampler object from the given descriptor.
+     *
+     * <ul>
+     *   <li>OpenGL: creates a GL sampler object ({@code glGenSamplers}) and
+     *       applies all descriptor state ({@code glSamplerParameteri},
+     *       {@code glSamplerParameterf}).</li>
+     *   <li>Vulkan: calls {@code vkCreateSampler} with a
+     *       {@code VkSamplerCreateInfo} populated from the descriptor.</li>
+     * </ul>
+     *
+     * @param ctx        Command context
+     * @param descriptor Sampler configuration
+     * @return An opaque {@link VulkanicSampler}; release via
+     *         {@link #deleteSampler(CommandContext, VulkanicSampler)}
+     */
+    VulkanicSampler createSampler(CommandContext ctx, VulkanicSamplerDescriptor descriptor);
+
+    /**
+     * Destroys a sampler object previously created via
+     * {@link #createSampler(CommandContext, VulkanicSamplerDescriptor)}.
+     *
+     * <ul>
+     *   <li>OpenGL: calls {@code glDeleteSamplers}.</li>
+     *   <li>Vulkan: calls {@code vkDestroySampler}.</li>
+     * </ul>
+     *
+     * @param ctx     Command context
+     * @param sampler Sampler to destroy (must be valid)
+     */
+    void deleteSampler(CommandContext ctx, VulkanicSampler sampler);
+
+    // =========================================================================
+    // Phase 5 — Transfer operations (buffer ↔ buffer, texture ↔ buffer,
+    //            texture ↔ texture, present)
+    //
+    // These are the CommandEncoder operations that move data between GPU
+    // resources.  They map 1:1 to Vulkan transfer commands:
+    //
+    //   copyVulkanicBuffers        → vkCmdCopyBuffer
+    //   writeToVulkanicTexture     → vkCmdCopyBufferToImage   (CPU→GPU upload)
+    //   copyVulkanicTextureToBuffer → vkCmdCopyImageToBuffer  (GPU→CPU readback)
+    //   copyVulkanicTextureToTexture → vkCmdCopyImage / vkCmdBlitImage
+    //   presentVulkanicTexture     → vkQueuePresentKHR
+    //
+    // Currently these operations exist ONLY inside GlCommandEncoder (Blaze3D).
+    // Moving them to GraphicsBackend means:
+    //   1. A Vulkan backend can implement GPU data transfer natively.
+    //   2. GlCommandEncoder.copyToBuffer() can delegate to VulkanicAPI —
+    //      Blaze3D shrinks.
+    //   3. Mod code (Sodium, Iris, DH) can bypass GlCommandEncoder entirely.
+    // =========================================================================
+
+    /**
+     * Copies data from one buffer region to another.
+     *
+     * <ul>
+     *   <li>OpenGL: {@code glCopyBufferSubData}.</li>
+     *   <li>Vulkan: {@code vkCmdCopyBuffer}.</li>
+     * </ul>
+     *
+     * <p>Both slices must have the same {@link VulkanicBufferSlice#length()}.
+     * Source must have {@code USAGE_COPY_SRC}; destination must have
+     * {@code USAGE_COPY_DST}.
+     *
+     * @param ctx Source and destination share the same command context
+     * @param src Source buffer region
+     * @param dst Destination buffer region (same length as {@code src})
+     */
+    void copyVulkanicBuffers(CommandContext ctx, VulkanicBufferSlice src, VulkanicBufferSlice dst);
+
+    /**
+     * Uploads pixel data from a CPU-side {@link net.blaze3d.platform.NativeImage}
+     * into a GPU texture.
+     *
+     * <ul>
+     *   <li>OpenGL: {@code glTexSubImage2D}.</li>
+     *   <li>Vulkan: records a {@code vkCmdCopyBufferToImage}
+     *       (after staging the CPU data into a staging buffer).</li>
+     * </ul>
+     *
+     * <p>Replaces: {@code RenderSystem.getDevice().createCommandEncoder()
+     *     .writeToTexture(gpuTexture, nativeImage)}
+     *
+     * @param ctx     Command context
+     * @param texture Destination texture (must have {@code USAGE_COPY_DST})
+     * @param image   Source CPU image (dimensions must match texture level 0)
+     */
+    void writeToVulkanicTexture(CommandContext ctx, VulkanicTexture texture,
+                                 net.blaze3d.platform.NativeImage image);
+
+    /**
+     * Uploads a sub-region of a CPU-side image into a texture mip level.
+     *
+     * <ul>
+     *   <li>OpenGL: {@code glTexSubImage2D} with pixel-store parameters.</li>
+     *   <li>Vulkan: {@code vkCmdCopyBufferToImage} with a
+     *       {@code VkBufferImageCopy} specifying the sub-region.</li>
+     * </ul>
+     *
+     * @param ctx      Command context
+     * @param texture  Destination texture
+     * @param image    Source image
+     * @param mipLevel Destination mip level
+     * @param layer    Destination array layer or cubemap face
+     * @param dstX     Destination X offset within the mip level
+     * @param dstY     Destination Y offset within the mip level
+     * @param srcX     Source X offset within the image
+     * @param srcY     Source Y offset within the image
+     * @param width    Width of the region to copy
+     * @param height   Height of the region to copy
+     */
+    void writeToVulkanicTexture(CommandContext ctx, VulkanicTexture texture,
+                                 net.blaze3d.platform.NativeImage image,
+                                 int mipLevel, int layer,
+                                 int dstX, int dstY,
+                                 int srcX, int srcY,
+                                 int width, int height);
+
+    /**
+     * Reads back a mip-level region of a texture into a GPU buffer.
+     *
+     * <ul>
+     *   <li>OpenGL: binds an FBO, then calls {@code glReadPixels} into a
+     *       PBO ({@code GL_PIXEL_PACK_BUFFER}).</li>
+     *   <li>Vulkan: records {@code vkCmdCopyImageToBuffer}.</li>
+     * </ul>
+     *
+     * <p>Replaces: {@code createCommandEncoder().copyTextureToBuffer(...)}
+     *
+     * @param ctx       Command context
+     * @param texture   Source texture (must have {@code USAGE_COPY_SRC})
+     * @param buffer    Destination buffer (must have {@code USAGE_COPY_DST})
+     * @param dstOffset Byte offset into the buffer
+     * @param onComplete Callback invoked after the copy is complete (may be async)
+     * @param mipLevel  Mip level to read
+     */
+    void copyVulkanicTextureToBuffer(CommandContext ctx,
+                                      VulkanicTexture texture,
+                                      VulkanicBuffer buffer,
+                                      int dstOffset,
+                                      Runnable onComplete,
+                                      int mipLevel);
+
+    /**
+     * Reads back a sub-region of a texture mip level into a GPU buffer.
+     *
+     * @param ctx       Command context
+     * @param texture   Source texture (must have {@code USAGE_COPY_SRC})
+     * @param buffer    Destination buffer (must have {@code USAGE_COPY_DST})
+     * @param dstOffset Byte offset into the buffer
+     * @param onComplete Callback invoked after the copy is complete
+     * @param mipLevel  Mip level to read
+     * @param srcX      Source X offset within the mip level
+     * @param srcY      Source Y offset within the mip level
+     * @param width     Width of the region to copy
+     * @param height    Height of the region to copy
+     */
+    void copyVulkanicTextureToBuffer(CommandContext ctx,
+                                      VulkanicTexture texture,
+                                      VulkanicBuffer buffer,
+                                      int dstOffset,
+                                      Runnable onComplete,
+                                      int mipLevel,
+                                      int srcX, int srcY,
+                                      int width, int height);
+
+    /**
+     * Copies a region from one texture to another at the same mip level.
+     *
+     * <ul>
+     *   <li>OpenGL: {@code glBlitFramebuffer}.</li>
+     *   <li>Vulkan: {@code vkCmdCopyImage} or {@code vkCmdBlitImage}.</li>
+     * </ul>
+     *
+     * <p>Replaces: {@code createCommandEncoder().copyTextureToTexture(...)}
+     *
+     * @param ctx      Command context
+     * @param src      Source texture (must have {@code USAGE_COPY_SRC})
+     * @param dst      Destination texture (must have {@code USAGE_COPY_DST})
+     * @param mipLevel Mip level to copy within both textures
+     * @param dstX     Destination X offset
+     * @param dstY     Destination Y offset
+     * @param srcX     Source X offset
+     * @param srcY     Source Y offset
+     * @param width    Width of the copied region
+     * @param height   Height of the copied region
+     */
+    void copyVulkanicTextureToTexture(CommandContext ctx,
+                                       VulkanicTexture src,
+                                       VulkanicTexture dst,
+                                       int mipLevel,
+                                       int dstX, int dstY,
+                                       int srcX, int srcY,
+                                       int width, int height);
+
+    /**
+     * Presents a rendered texture to the display.
+     *
+     * <ul>
+     *   <li>OpenGL: blits the texture to the default framebuffer (framebuffer 0)
+     *       via {@code glBlitFramebuffer}.</li>
+     *   <li>Vulkan: calls {@code vkQueuePresentKHR} with the swapchain image
+     *       that backs this texture view.  This is the final step in every
+     *       rendered frame.</li>
+     * </ul>
+     *
+     * @param ctx    Command context
+     * @param target Texture view to present (must cover mip 0, layer 0)
+     */
+    void presentVulkanicTexture(CommandContext ctx, VulkanicTextureView target);
 }

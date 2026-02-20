@@ -3,9 +3,10 @@ package net.blaze3d.opengl;
 import net.blaze3d.buffers.GpuFence;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.resources.VulkanicFence;
 
 @Environment(EnvType.CLIENT)
-public class GlFence implements GpuFence {
+public class GlFence implements GpuFence, VulkanicFence {
 	private long handle = GlStateManager._glFenceSync(37143, 0);
 
 	@Override

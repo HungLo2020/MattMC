@@ -18,7 +18,11 @@ import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
 import net.vulkanic.pipeline.VulkanicCompiledPipeline;
 import net.vulkanic.resources.VulkanicBuffer;
+import net.vulkanic.resources.VulkanicBufferSlice;
+import net.vulkanic.resources.VulkanicFence;
 import net.vulkanic.resources.VulkanicRenderPass;
+import net.vulkanic.resources.VulkanicSampler;
+import net.vulkanic.resources.VulkanicSamplerDescriptor;
 import net.vulkanic.resources.VulkanicTexture;
 import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
@@ -2836,6 +2840,230 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void clearPipelineCache() {
         if (glDevice != null) glDevice.clearPipelineCache();
+    }
+
+    // =========================================================================
+    // Phase 5 — VulkanicFence
+    //
+    // Delegates to GlCommandEncoder.createFence(), which returns a GlFence.
+    // GlFence implements VulkanicFence, so the cast is safe.
+    // GlCommandEncoder.createFence() is then made to delegate to
+    // VulkanicAPI.createFence() so Blaze3D shrinks.
+    // =========================================================================
+
+    @Override
+    public VulkanicFence createFence(CommandContext ctx) {
+        requireGlDevice("createFence");
+        // GlFence implements VulkanicFence — cast is safe.
+        return (VulkanicFence) glDevice.createCommandEncoder().createFence();
+    }
+
+    // =========================================================================
+    // Phase 5 — VulkanicSampler
+    //
+    // Creates a GL sampler object (GL_ARB_sampler_objects, core since 3.3)
+    // and applies all descriptor fields.  The Vulkan backend will call
+    // vkCreateSampler with a VkSamplerCreateInfo populated from the same
+    // VulkanicSamplerDescriptor — no Blaze3D types needed.
+    // =========================================================================
+
+    // GL sampler parameter constants (GL_ARB_sampler_objects / OpenGL 3.3+)
+    private static final int GL_TEXTURE_MIN_FILTER  = 0x2801;
+    private static final int GL_TEXTURE_MAG_FILTER  = 0x2800;
+    private static final int GL_TEXTURE_WRAP_S      = 0x2802;
+    private static final int GL_TEXTURE_WRAP_T      = 0x2803;
+    private static final int GL_TEXTURE_WRAP_R      = 0x8072;
+    private static final int GL_NEAREST             = 0x2600;
+    private static final int GL_LINEAR              = 0x2601;
+    private static final int GL_NEAREST_MIPMAP_NEAREST = 0x2700;
+    private static final int GL_NEAREST_MIPMAP_LINEAR  = 0x2702;
+    private static final int GL_LINEAR_MIPMAP_NEAREST  = 0x2701;
+    private static final int GL_LINEAR_MIPMAP_LINEAR   = 0x2703;
+    private static final int GL_REPEAT              = 0x2901;
+    private static final int GL_CLAMP_TO_EDGE       = 0x812F;
+    private static final int GL_TEXTURE_LOD_BIAS    = 0x8501;
+    private static final int GL_TEXTURE_MAX_ANISOTROPY = 0x84FE;
+    private static final int GL_TEXTURE_MIN_LOD     = 0x813A;
+    private static final int GL_TEXTURE_MAX_LOD     = 0x813B;
+    /**
+     * OpenGL requires GL_TEXTURE_MAX_LOD to be a finite float.
+     * {@code Float.MAX_VALUE} would cause undefined behaviour on some drivers.
+     * Per the OpenGL spec the default max LOD is 1000.0, so we use that as
+     * the "unclamped" sentinel when the caller passes {@code Float.MAX_VALUE}.
+     */
+    private static final float GL_DEFAULT_MAX_LOD   = 1000.0f;
+
+    @Override
+    public VulkanicSampler createSampler(CommandContext ctx, VulkanicSamplerDescriptor descriptor) {
+        // glGenSamplers — core since OpenGL 3.3
+        int handle = GL33.glGenSamplers();
+
+        // Minification filter — combine filter + mipmap mode
+        int minFilter = toGlMinFilter(descriptor.getMinFilter(), descriptor.getMipmapMode());
+        GL33.glSamplerParameteri(handle, GL_TEXTURE_MIN_FILTER, minFilter);
+
+        // Magnification filter
+        int magFilter = descriptor.getMagFilter() == net.vulkanic.resources.VulkanicFilterMode.LINEAR
+                ? GL_LINEAR : GL_NEAREST;
+        GL33.glSamplerParameteri(handle, GL_TEXTURE_MAG_FILTER, magFilter);
+
+        // Address modes
+        GL33.glSamplerParameteri(handle, GL_TEXTURE_WRAP_S, toGlAddressMode(descriptor.getAddressU()));
+        GL33.glSamplerParameteri(handle, GL_TEXTURE_WRAP_T, toGlAddressMode(descriptor.getAddressV()));
+        GL33.glSamplerParameteri(handle, GL_TEXTURE_WRAP_R, toGlAddressMode(descriptor.getAddressW()));
+
+        // LOD bias, anisotropy, LOD clamp
+        GL33.glSamplerParameterf(handle, GL_TEXTURE_LOD_BIAS,    descriptor.getMipLodBias());
+        GL33.glSamplerParameterf(handle, GL_TEXTURE_MAX_ANISOTROPY, descriptor.getMaxAnisotropy());
+        GL33.glSamplerParameterf(handle, GL_TEXTURE_MIN_LOD,     descriptor.getMinLod());
+        GL33.glSamplerParameterf(handle, GL_TEXTURE_MAX_LOD,
+                descriptor.getMaxLod() == Float.MAX_VALUE ? GL_DEFAULT_MAX_LOD : descriptor.getMaxLod());
+
+        return new OpenGLSampler(descriptor, handle);
+    }
+
+    @Override
+    public void deleteSampler(CommandContext ctx, VulkanicSampler sampler) {
+        if (sampler instanceof OpenGLSampler s) {
+            GL33.glDeleteSamplers((int) s.getNativeHandle());
+            s.invalidate();
+        }
+    }
+
+    private static int toGlMinFilter(net.vulkanic.resources.VulkanicFilterMode min,
+                                     net.vulkanic.resources.VulkanicFilterMode mipmap) {
+        if (min == net.vulkanic.resources.VulkanicFilterMode.NEAREST) {
+            return mipmap == net.vulkanic.resources.VulkanicFilterMode.NEAREST
+                    ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST_MIPMAP_LINEAR;
+        } else {
+            return mipmap == net.vulkanic.resources.VulkanicFilterMode.NEAREST
+                    ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_LINEAR;
+        }
+    }
+
+    private static int toGlAddressMode(net.vulkanic.resources.VulkanicAddressMode mode) {
+        return switch (mode) {
+            case REPEAT        -> GL_REPEAT;
+            case CLAMP_TO_EDGE -> GL_CLAMP_TO_EDGE;
+        };
+    }
+
+    // =========================================================================
+    // Phase 5 — Transfer operations
+    //
+    // Delegates to GlCommandEncoder for the OpenGL path.  Each method maps 1:1
+    // to a Vulkan transfer command; the Vulkan backend will implement natively.
+    // After adding these, GlCommandEncoder.copyToBuffer() can delegate back to
+    // VulkanicAPI — Blaze3D shrinks.
+    // =========================================================================
+
+    @Override
+    public void copyVulkanicBuffers(CommandContext ctx,
+                                     VulkanicBufferSlice src,
+                                     VulkanicBufferSlice dst) {
+        requireGlDevice("copyVulkanicBuffers");
+        // Validate before touching GL — keeps error messages clear regardless of backend.
+        if (src.length() != dst.length()) {
+            throw new IllegalArgumentException(
+                    "Cannot copy from slice of size " + src.length() +
+                    " to slice of size " + dst.length() + ", they must be equal");
+        }
+        if ((src.buffer().getUsage() & VulkanicBuffer.USAGE_COPY_SRC) == 0) {
+            throw new IllegalStateException("Source buffer needs USAGE_COPY_SRC");
+        }
+        if ((dst.buffer().getUsage() & VulkanicBuffer.USAGE_COPY_DST) == 0) {
+            throw new IllegalStateException("Destination buffer needs USAGE_COPY_DST");
+        }
+        if (src.offset() + src.length() > src.buffer().getSize()) {
+            throw new IllegalArgumentException(
+                    "Source slice (" + src.offset() + "+" + src.length() +
+                    ") exceeds source buffer size (" + src.buffer().getSize() + ")");
+        }
+        if (dst.offset() + dst.length() > dst.buffer().getSize()) {
+            throw new IllegalArgumentException(
+                    "Destination slice (" + dst.offset() + "+" + dst.length() +
+                    ") exceeds destination buffer size (" + dst.buffer().getSize() + ")");
+        }
+        // Use copyNamedBufferSubDataDSA to copy by GL handle ID — avoids the delegation
+        // loop that would occur if we called GlCommandEncoder.copyToBuffer() (which
+        // itself now delegates back to VulkanicAPI.copyVulkanicBuffers).
+        int srcHandle = (int) src.buffer().getNativeHandle();
+        int dstHandle = (int) dst.buffer().getNativeHandle();
+        VulkanicAPI.copyNamedBufferSubDataDSA(ctx, srcHandle, dstHandle,
+                src.offset(), dst.offset(), src.length());
+    }
+
+    @Override
+    public void writeToVulkanicTexture(CommandContext ctx,
+                                        VulkanicTexture texture,
+                                        net.blaze3d.platform.NativeImage image) {
+        requireGlDevice("writeToVulkanicTexture");
+        glDevice.createCommandEncoder().writeToTexture((net.blaze3d.textures.GpuTexture) texture, image);
+    }
+
+    @Override
+    public void writeToVulkanicTexture(CommandContext ctx,
+                                        VulkanicTexture texture,
+                                        net.blaze3d.platform.NativeImage image,
+                                        int mipLevel, int layer,
+                                        int dstX, int dstY,
+                                        int srcX, int srcY,
+                                        int width, int height) {
+        requireGlDevice("writeToVulkanicTexture");
+        glDevice.createCommandEncoder().writeToTexture(
+                (net.blaze3d.textures.GpuTexture) texture, image,
+                mipLevel, layer, dstX, dstY, srcX, srcY, width, height);
+    }
+
+    @Override
+    public void copyVulkanicTextureToBuffer(CommandContext ctx,
+                                             VulkanicTexture texture,
+                                             VulkanicBuffer buffer,
+                                             int dstOffset,
+                                             Runnable onComplete,
+                                             int mipLevel) {
+        requireGlDevice("copyVulkanicTextureToBuffer");
+        glDevice.createCommandEncoder().copyTextureToBuffer(
+                (net.blaze3d.textures.GpuTexture) texture,
+                (net.blaze3d.buffers.GpuBuffer) buffer,
+                dstOffset, onComplete, mipLevel);
+    }
+
+    @Override
+    public void copyVulkanicTextureToBuffer(CommandContext ctx,
+                                             VulkanicTexture texture,
+                                             VulkanicBuffer buffer,
+                                             int dstOffset,
+                                             Runnable onComplete,
+                                             int mipLevel,
+                                             int srcX, int srcY,
+                                             int width, int height) {
+        requireGlDevice("copyVulkanicTextureToBuffer");
+        glDevice.createCommandEncoder().copyTextureToBuffer(
+                (net.blaze3d.textures.GpuTexture) texture,
+                (net.blaze3d.buffers.GpuBuffer) buffer,
+                dstOffset, onComplete, mipLevel, srcX, srcY, width, height);
+    }
+
+    @Override
+    public void copyVulkanicTextureToTexture(CommandContext ctx,
+                                              VulkanicTexture src,
+                                              VulkanicTexture dst,
+                                              int mipLevel,
+                                              int dstX, int dstY,
+                                              int srcX, int srcY,
+                                              int width, int height) {
+        requireGlDevice("copyVulkanicTextureToTexture");
+        glDevice.createCommandEncoder().copyTextureToTexture(
+                (net.blaze3d.textures.GpuTexture) src,
+                (net.blaze3d.textures.GpuTexture) dst,
+                mipLevel, dstX, dstY, srcX, srcY, width, height);
+    }
+
+    @Override
+    public void presentVulkanicTexture(CommandContext ctx, VulkanicTextureView target) {
+        requireGlDevice("presentVulkanicTexture");
+        glDevice.createCommandEncoder().presentTexture((net.blaze3d.textures.GpuTextureView) target);
     }
 }
 
