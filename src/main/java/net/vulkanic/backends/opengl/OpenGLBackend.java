@@ -15,6 +15,11 @@ import java.nio.FloatBuffer;
  */
 public class OpenGLBackend implements GraphicsBackend {
     
+    /** Tracks the currently bound read framebuffer (GL_READ_FRAMEBUFFER = 36008) */
+    private int boundReadFbo = 0;
+    /** Tracks the currently bound draw framebuffer (GL_DRAW_FRAMEBUFFER = 36009) */
+    private int boundDrawFbo = 0;
+    
     @Override
     public long getGraphicsContext() {
         // Platform-specific: On Windows, return the WGL context handle
@@ -182,6 +187,22 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL30.glBindFramebuffer(target, fbo);
+        // Update internal state tracking so getBoundFramebuffer can answer without GL queries
+        if (target == 36160 /* GL_FRAMEBUFFER */ || target == 36008 /* GL_READ_FRAMEBUFFER */) {
+            boundReadFbo = fbo;
+        }
+        if (target == 36160 /* GL_FRAMEBUFFER */ || target == 36009 /* GL_DRAW_FRAMEBUFFER */) {
+            boundDrawFbo = fbo;
+        }
+    }
+
+    @Override
+    public int getBoundFramebuffer(CommandContext ctx, int target) {
+        if (target == 36008 /* GL_READ_FRAMEBUFFER */) {
+            return boundReadFbo;
+        }
+        // GL_DRAW_FRAMEBUFFER (36009) or GL_FRAMEBUFFER (36160) — return draw binding
+        return boundDrawFbo;
     }
     
     @Override
@@ -1022,6 +1043,25 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL20C.nglShaderSource(shader, stringCount, pointerBufferAddress, lengthsPointer);
+    }
+
+    @Override
+    public void uploadShaderSource(CommandContext ctx, int shader, String source) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        byte[] bytes = source.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        java.nio.ByteBuffer buf = org.lwjgl.system.MemoryUtil.memAlloc(bytes.length + 1);
+        buf.put(bytes);
+        buf.put((byte) 0);
+        buf.flip();
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            org.lwjgl.PointerBuffer ptr = stack.mallocPointer(1);
+            ptr.put(buf);
+            org.lwjgl.opengl.GL20C.nglShaderSource(shader, 1, ptr.address0(), 0L);
+        } finally {
+            org.lwjgl.system.MemoryUtil.memFree(buf);
+        }
     }
     
     @Override

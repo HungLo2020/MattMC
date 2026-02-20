@@ -39,7 +39,10 @@
 
 | Component | Status | Achievement |
 |-----------|--------|-------------|
-| **GlStateManager** | ✅ Complete | All methods use VulkanicAPI |
+| **GlStateManager** | ✅ Complete | All methods delegate to VulkanicAPI |
+| **GlCommandEncoder** | ✅ Complete | Zero GlStateManager calls — all VulkanicAPI direct |
+| **GlDevice** | ✅ Complete | Zero GlStateManager calls — all VulkanicAPI direct |
+| **DirectStateAccess** | ✅ Complete | Zero GlStateManager calls — all VulkanicAPI direct |
 | **State Management** | ✅ Complete | Full abstraction |
 | **Rendering Operations** | ✅ Complete | Full abstraction |
 | **Shader System** | ✅ Complete | Full abstraction |
@@ -47,8 +50,9 @@
 
 **Verification**: 
 - ✅ Architectural boundary tests passing
-- ✅ No direct OpenGL imports in GlStateManager
-- ✅ All game code using Vulkanic API
+- ✅ No direct OpenGL imports in GlStateManager, GlCommandEncoder, GlDevice, DirectStateAccess
+- ✅ GlCommandEncoder calls VulkanicAPI directly (VulkanicAPI is the boundary, not blaze3d)
+- ✅ Framebuffer state tracking moved to OpenGLBackend (getBoundFramebuffer)
 
 ---
 

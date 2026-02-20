@@ -18,8 +18,8 @@ import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
 public class GlStateManager {
-	private static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
-	private static int numTextures = 0;
+	static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
+	static int numTextures = 0;
 	
 	// Iris: State update notification support
 	private static Runnable blendFuncListener;
@@ -27,8 +27,8 @@ public class GlStateManager {
 	static {
 		net.irisshaders.iris.gl.state.StateUpdateNotifiers.blendFuncNotifier = listener -> blendFuncListener = listener;
 	}
-	private static final Plot PLOT_BUFFERS = TracyClient.createPlot("GPU Buffers");
-	private static int numBuffers = 0;
+	static final Plot PLOT_BUFFERS = TracyClient.createPlot("GPU Buffers");
+	static int numBuffers = 0;
 	public static final GlStateManager.BlendState BLEND = new GlStateManager.BlendState(); // Made public for Iris shader mod integration
 	public static final GlStateManager.DepthState DEPTH = new GlStateManager.DepthState(); // Made public for Iris shader mod integration
 	private static final GlStateManager.CullState CULL = new GlStateManager.CullState();
@@ -41,9 +41,6 @@ public class GlStateManager {
 		.mapToObj(i -> new GlStateManager.TextureState())
 		.toArray(GlStateManager.TextureState[]::new); // Made public for Iris shader mod integration
 	public static final GlStateManager.ColorMask COLOR_MASK = new GlStateManager.ColorMask(); // Made public for Iris shader mod integration
-	private static int readFbo;
-	private static int writeFbo;
-	
 	// Iris: From MixinGlStateManager_FramebufferBinding - program and viewport state tracking
 	private static int iris$program;
 	private static int iris$viewportX;
@@ -326,23 +323,11 @@ public class GlStateManager {
 
 	public static void _glBindFramebuffer(int i, int j) {
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		if ((i == 36008 || i == 36160) && readFbo != j) {
-			net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, 36008, j);
-			readFbo = j;
-		}
-
-		if ((i == 36009 || i == 36160) && writeFbo != j) {
-			net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, 36009, j);
-			writeFbo = j;
-		}
+		VulkanicAPI.bindFramebuffer(ctx, i, j);
 	}
 
 	public static int getFrameBuffer(int i) {
-		if (i == 36008) {
-			return readFbo;
-		} else {
-			return i == 36009 ? writeFbo : 0;
-		}
+		return VulkanicAPI.getBoundFramebuffer(VulkanicAPI.getImmediateContext(), i);
 	}
 
 	public static void _glBlitFrameBuffer(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r) {
@@ -353,13 +338,6 @@ public class GlStateManager {
 	public static void _glDeleteFramebuffers(int i) {
 		RenderSystem.assertOnRenderThread();
 		net.vulkanic.VulkanicAPI.deleteFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
-		if (readFbo == i) {
-			readFbo = 0;
-		}
-
-		if (writeFbo == i) {
-			writeFbo = 0;
-		}
 	}
 
 	public static int glGenFramebuffers() {

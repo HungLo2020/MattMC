@@ -726,6 +726,17 @@ public class VulkanicAPI {
     public static void bindFramebuffer(CommandContext ctx, int target, int fbo) {
         getBackend().bindFramebuffer(ctx, target, fbo);
     }
+
+    /**
+     * Returns the currently bound framebuffer object ID for the given target.
+     *
+     * @param ctx Command context
+     * @param target GL_READ_FRAMEBUFFER (36008), GL_DRAW_FRAMEBUFFER (36009), or GL_FRAMEBUFFER (36160)
+     * @return The currently bound framebuffer ID, or 0 for the default framebuffer
+     */
+    public static int getBoundFramebuffer(CommandContext ctx, int target) {
+        return getBackend().getBoundFramebuffer(ctx, target);
+    }
     
     /**
      * Binds a buffer object to a target.
@@ -1353,6 +1364,18 @@ public class VulkanicAPI {
     
     public static void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         getBackend().uploadShaderSource(ctx, shader, pointerBufferAddress, stringCount, lengthsPointer);
+    }
+
+    /**
+     * Uploads GLSL source code to a shader object from a Java String.
+     * Convenience overload that handles the native memory allocation internally.
+     *
+     * @param ctx Command context
+     * @param shader The shader object ID
+     * @param source The GLSL source code
+     */
+    public static void uploadShaderSource(CommandContext ctx, int shader, String source) {
+        getBackend().uploadShaderSource(ctx, shader, source);
     }
     
     public static void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {

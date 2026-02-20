@@ -380,6 +380,18 @@ public interface GraphicsBackend {
      * @param fbo The framebuffer object ID
      */
     void bindFramebuffer(CommandContext ctx, int target, int fbo);
+
+    /**
+     * Returns the currently bound framebuffer object ID for the given target.
+     *
+     * In OpenGL: reads the internal binding state (no GL call needed)
+     * In Vulkan: returns the active render pass attachment
+     *
+     * @param ctx Command context
+     * @param target GL_READ_FRAMEBUFFER (36008), GL_DRAW_FRAMEBUFFER (36009), or GL_FRAMEBUFFER (36160)
+     * @return The currently bound framebuffer ID, or 0 for the default framebuffer
+     */
+    int getBoundFramebuffer(CommandContext ctx, int target);
     
     /**
      * Sets the read buffer for a named framebuffer using Direct State Access.
@@ -1793,6 +1805,16 @@ public interface GraphicsBackend {
      * @param lengthsPointer Native address of the lengths array (0 means null-terminated)
      */
     void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
+
+    /**
+     * Uploads GLSL source code to a shader object from a Java String.
+     * Convenience overload that handles the native memory allocation internally.
+     *
+     * @param ctx Command context
+     * @param shader The shader object ID
+     * @param source The GLSL source code
+     */
+    void uploadShaderSource(CommandContext ctx, int shader, String source);
     
     /**
      * Binds a uniform block to a uniform block binding point.

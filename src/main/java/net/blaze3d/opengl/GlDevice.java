@@ -32,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
+import net.vulkanic.VulkanicAPI;
 
 @Environment(EnvType.CLIENT)
 public class GlDevice implements GpuDevice {
@@ -115,45 +116,48 @@ public class GlDevice implements GpuDevice {
 				throw new UnsupportedOperationException("Array or 3D textures are not yet supported");
 			}
 
-			GlStateManager.clearGlErrors();
-			int n = GlStateManager._genTexture();
+			while (VulkanicAPI.getError(VulkanicAPI.getImmediateContext()) != 0) {}
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			int n = VulkanicAPI.createTexture2D(ctx);
+			GlStateManager.numTextures++;
+			GlStateManager.PLOT_TEXTURES.setValue(GlStateManager.numTextures);
 			if (string == null) {
 				string = String.valueOf(n);
 			}
 
 			int o;
 			if (bl) {
-				net.vulkanic.VulkanicAPI.bindTexture(net.vulkanic.VulkanicAPI.getImmediateContext(), 34067, n); // GL_TEXTURE_CUBE_MAP
+				VulkanicAPI.bindTexture(ctx, 34067, n); // GL_TEXTURE_CUBE_MAP
 				o = 34067;
 			} else {
-				GlStateManager._bindTexture(n);
+				VulkanicAPI.bindTexture2D(ctx, n);
 				o = 3553;
 			}
 
-			GlStateManager._texParameter(o, 33085, m - 1);
-			GlStateManager._texParameter(o, 33082, 0);
-			GlStateManager._texParameter(o, 33083, m - 1);
+			VulkanicAPI.setTextureParameter(ctx, o, 33085, m - 1);
+			VulkanicAPI.setTextureParameter(ctx, o, 33082, 0);
+			VulkanicAPI.setTextureParameter(ctx, o, 33083, m - 1);
 			if (textureFormat.hasDepthAspect()) {
-				GlStateManager._texParameter(o, 34892, 0);
+				VulkanicAPI.setTextureParameter(ctx, o, 34892, 0);
 			}
 
 			if (bl) {
 				for (int p : GlConst.CUBEMAP_TARGETS) {
 					for (int q = 0; q < m; q++) {
-						GlStateManager._texImage2D(
-							p, q, GlConst.toGlInternalId(textureFormat), j >> q, k >> q, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
+						VulkanicAPI.uploadTexture2D(
+							ctx, p, q, GlConst.toGlInternalId(textureFormat), j >> q, k >> q, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), (ByteBuffer) null
 						);
 					}
 				}
 			} else {
 				for (int r = 0; r < m; r++) {
-					GlStateManager._texImage2D(
-						o, r, GlConst.toGlInternalId(textureFormat), j >> r, k >> r, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
+					VulkanicAPI.uploadTexture2D(
+						ctx, o, r, GlConst.toGlInternalId(textureFormat), j >> r, k >> r, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), (ByteBuffer) null
 					);
 				}
 			}
 
-			int r = GlStateManager._getError();
+			int r = VulkanicAPI.getError(ctx);
 			if (r == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate texture of " + j + "x" + k + " for " + string);
 			} else if (r != 0) {
@@ -189,9 +193,10 @@ public class GlDevice implements GpuDevice {
 		if (j <= 0) {
 			throw new IllegalArgumentException("Buffer size must be greater than zero");
 		} else {
-			GlStateManager.clearGlErrors();
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			while (VulkanicAPI.getError(ctx) != 0) {}
 			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, j);
-			int k = GlStateManager._getError();
+			int k = VulkanicAPI.getError(ctx);
 			if (k == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + j + " for " + supplier);
 			} else if (k != 0) {
@@ -208,10 +213,11 @@ public class GlDevice implements GpuDevice {
 		if (!byteBuffer.hasRemaining()) {
 			throw new IllegalArgumentException("Buffer source must not be empty");
 		} else {
-			GlStateManager.clearGlErrors();
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			while (VulkanicAPI.getError(ctx) != 0) {}
 			long l = byteBuffer.remaining();
 			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, byteBuffer);
-			int j = GlStateManager._getError();
+			int j = VulkanicAPI.getError(ctx);
 			if (j == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + l + " for " + supplier);
 			} else if (j != 0) {
@@ -225,9 +231,9 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getImplementationInformation() {
-		return GLFW.glfwGetCurrentContext() == 0L
-			? "NO CONTEXT"
-			: GlStateManager._getString(7937) + " GL version " + GlStateManager._getString(7938) + ", " + GlStateManager._getString(7936);
+		if (GLFW.glfwGetCurrentContext() == 0L) return "NO CONTEXT";
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		return VulkanicAPI.getString(ctx, 7937) + " GL version " + VulkanicAPI.getString(ctx, 7938) + ", " + VulkanicAPI.getString(ctx, 7936);
 	}
 
 	@Override
@@ -242,12 +248,12 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getRenderer() {
-		return GlStateManager._getString(7937);
+		return VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), 7937);
 	}
 
 	@Override
 	public String getVendor() {
-		return GlStateManager._getString(7936);
+		return VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), 7936);
 	}
 
 	@Override
@@ -257,15 +263,16 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getVersion() {
-		return GlStateManager._getString(7938);
+		return VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), 7938);
 	}
 
 	private static int getMaxSupportedTextureSize() {
-		int i = GlStateManager._getInteger(3379);
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		int i = VulkanicAPI.getInteger(ctx, 3379);
 
 		for (int j = Math.max(32768, i); j >= 1024; j >>= 1) {
-			GlStateManager._texImage2D(32868, 0, 6408, j, j, 0, 6408, 5121, null);
-			int k = GlStateManager._getTexLevelParameter(32868, 0, 4096);
+			VulkanicAPI.uploadTexture2D(ctx, 32868, 0, 6408, j, j, 0, 6408, 5121, (ByteBuffer) null);
+			int k = VulkanicAPI.getTextureLevelParameter(ctx, 32868, 0, 4096);
 			if (k != 0) {
 				return j;
 			}
@@ -303,18 +310,19 @@ public class GlDevice implements GpuDevice {
 		}
 
 		this.shaderCache.clear();
-		String string = GlStateManager._getString(7937);
+		String string = VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), 7937);
 		if (string.contains("AMD")) {
 			sacrificeShaderToOpenGlAndAmd();
 		}
 	}
 
 	private static void sacrificeShaderToOpenGlAndAmd() {
-		int i = GlStateManager.glCreateShader(35633);
-		int j = GlStateManager.glCreateProgram();
-		GlStateManager.glAttachShader(j, i);
-		GlStateManager.glDeleteShader(i);
-		GlStateManager.glDeleteProgram(j);
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		int i = VulkanicAPI.createShader(ctx, 35633);
+		int j = VulkanicAPI.createShaderProgram(ctx);
+		VulkanicAPI.attachShader(ctx, j, i);
+		VulkanicAPI.deleteShader(ctx, i);
+		VulkanicAPI.deleteProgram(ctx, j);
 	}
 
 	@Override
@@ -383,12 +391,13 @@ public class GlDevice implements GpuDevice {
 			LOGGER.error("Couldn't find source for {} shader ({})", shaderCompilationKey.type, shaderCompilationKey.id);
 			return GlShaderModule.INVALID_SHADER;
 		} else {
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 			String string2 = GlslPreprocessor.injectDefines(string, shaderCompilationKey.defines);
-			int i = GlStateManager.glCreateShader(GlConst.toGl(shaderCompilationKey.type));
-			GlStateManager.glShaderSource(i, string2);
-			GlStateManager.glCompileShader(i);
-			if (GlStateManager.glGetShaderi(i, 35713) == 0) {
-				String string3 = StringUtils.trim(GlStateManager.glGetShaderInfoLog(i, 32768));
+			int i = VulkanicAPI.createShader(ctx, GlConst.toGl(shaderCompilationKey.type));
+			VulkanicAPI.uploadShaderSource(ctx, i, string2);
+			VulkanicAPI.compileShader(ctx, i);
+			if (VulkanicAPI.getShaderParameter(ctx, i, 35713) == 0) {
+				String string3 = StringUtils.trim(VulkanicAPI.getShaderInfoLog(ctx, i));
 				LOGGER.error("Couldn't compile {} shader ({}): {}", shaderCompilationKey.type.getName(), shaderCompilationKey.id, string3);
 				return GlShaderModule.INVALID_SHADER;
 			} else {
