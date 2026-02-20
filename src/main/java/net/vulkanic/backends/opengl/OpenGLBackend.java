@@ -2731,11 +2731,29 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
-    public ByteBuffer mapBuffer(CommandContext ctx, net.vulkanic.resources.VulkanicBufferSlice slice, boolean read, boolean write) {
+    public net.vulkanic.resources.VulkanicMapView mapBuffer(CommandContext ctx, net.vulkanic.resources.VulkanicBufferSlice slice, boolean read, boolean write) {
         requireGlDevice("mapBuffer");
-        net.blaze3d.buffers.GpuBufferSlice gpuSlice = toGpuSlice(slice);
-        net.blaze3d.buffers.GpuBuffer.MappedView view = glDevice.createCommandEncoder().mapBuffer(gpuSlice, read, write);
-        return view.data();
+        net.blaze3d.opengl.GlBuffer glBuffer = (net.blaze3d.opengl.GlBuffer) slice.buffer();
+        if (glBuffer.isClosed())
+            throw new IllegalStateException("Buffer already closed");
+        if (!read && !write)
+            throw new IllegalArgumentException("At least read or write must be true");
+        if (read && (glBuffer.usage() & net.blaze3d.buffers.GpuBuffer.USAGE_MAP_READ) == 0)
+            throw new IllegalStateException("Buffer is not readable");
+        if (write && (glBuffer.usage() & net.blaze3d.buffers.GpuBuffer.USAGE_MAP_WRITE) == 0)
+            throw new IllegalStateException("Buffer is not writable");
+        if ((long) slice.offset() + slice.length() > glBuffer.size())
+            throw new IllegalArgumentException(
+                "Cannot map more data than this buffer can hold (attempting to map "
+                    + slice.length() + " bytes at offset " + slice.offset()
+                    + " from " + glBuffer.size() + " size buffer)");
+        int flags = 0;
+        if (read)  flags |= GL30.GL_MAP_READ_BIT;
+        if (write) flags |= GL30.GL_MAP_WRITE_BIT | GL30.GL_MAP_UNSYNCHRONIZED_BIT;
+        // Direct GL work — no callback into GlCommandEncoder (breaks circular dependency)
+        return (net.vulkanic.resources.VulkanicMapView)
+            glDevice.getBufferStorage().mapBuffer(glDevice.directStateAccess(), glBuffer,
+                slice.offset(), slice.length(), flags);
     }
 
     @Override

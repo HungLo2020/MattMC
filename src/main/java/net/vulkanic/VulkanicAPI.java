@@ -9,6 +9,7 @@ import net.vulkanic.pipeline.VulkanicCompiledPipeline;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicBufferSlice;
 import net.vulkanic.resources.VulkanicFence;
+import net.vulkanic.resources.VulkanicMapView;
 import net.vulkanic.resources.VulkanicRenderPass;
 import net.vulkanic.resources.VulkanicSampler;
 import net.vulkanic.resources.VulkanicSamplerDescriptor;
@@ -2601,17 +2602,19 @@ public class VulkanicAPI {
     /**
      * Maps a buffer slice for CPU read/write access.
      *
-     * <p>The returned {@link ByteBuffer} is valid until {@link #unmapBuffer} is called.
-     * Replaces: {@code RenderSystem.getDevice().createCommandEncoder().mapBuffer(...).data()}
+     * <p>The returned {@link VulkanicMapView} wraps the mapped memory and is valid until
+     * {@link VulkanicMapView#close()} is called.
+     * Replaces: {@code RenderSystem.getDevice().createCommandEncoder().mapBuffer(...)}
+     * — callers no longer need to go through a {@code GpuDevice} or {@code CommandEncoder}.
      *
      * @param ctx   Command context
      * @param slice Buffer region to map
      * @param read  Request read access
      * @param write Request write access
-     * @return Mapped byte buffer
+     * @return {@link VulkanicMapView} over the mapped region
      */
-    public static ByteBuffer mapBuffer(CommandContext ctx, VulkanicBufferSlice slice,
-                                        boolean read, boolean write) {
+    public static VulkanicMapView mapBuffer(CommandContext ctx, VulkanicBufferSlice slice,
+                                            boolean read, boolean write) {
         return getBackend().mapBuffer(ctx, slice, read, write);
     }
 

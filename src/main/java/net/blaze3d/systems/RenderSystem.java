@@ -402,7 +402,18 @@ public class RenderSystem {
 	}
 
 	public static void queueFencedTask(Runnable runnable) {
-		PENDING_FENCES.addLast(new RenderSystem.GpuAsyncTask(runnable, getDevice().createCommandEncoder().createFence()));
+		// Delegate fence creation to Vulkanic — removes the GpuDevice/CommandEncoder chain.
+		// For the OpenGL backend, VulkanicAPI.createFence() returns GlFence which implements
+		// both GpuFence and VulkanicFence; the cast is safe for all backends that need to
+		// integrate with Blaze3D's GpuFence contract.
+		net.vulkanic.resources.VulkanicFence vkFence =
+			net.vulkanic.VulkanicAPI.createFence(net.vulkanic.VulkanicAPI.getImmediateContext());
+		if (!(vkFence instanceof GpuFence fence)) {
+			throw new IllegalStateException(
+				"VulkanicAPI.createFence() returned a VulkanicFence that does not implement "
+					+ "GpuFence; the active backend must return a type that satisfies both.");
+		}
+		PENDING_FENCES.addLast(new RenderSystem.GpuAsyncTask(runnable, fence));
 	}
 
 	public static void executePendingTasks() {
@@ -515,7 +526,7 @@ public class RenderSystem {
 						this.buffer.close();
 					}
 
-					this.buffer = RenderSystem.getDevice().createBuffer(() -> "Auto Storage index buffer", 64, byteBuffer);
+					this.buffer = (GpuBuffer) net.vulkanic.VulkanicAPI.createVulkanicBuffer(64, byteBuffer);
 				} finally {
 					MemoryUtil.memFree(byteBuffer);
 				}

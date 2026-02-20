@@ -178,39 +178,14 @@ public class GlCommandEncoder implements CommandEncoder {
 	public GpuBuffer.MappedView mapBuffer(GpuBufferSlice gpuBufferSlice, boolean bl, boolean bl2) {
 		if (this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
-		} else {
-			GlBuffer glBuffer = (GlBuffer)gpuBufferSlice.buffer();
-			if (glBuffer.closed) {
-				throw new IllegalStateException("Buffer already closed");
-			} else if (!bl && !bl2) {
-				throw new IllegalArgumentException("At least read or write must be true");
-			} else if (bl && (glBuffer.usage() & 1) == 0) {
-				throw new IllegalStateException("Buffer is not readable");
-			} else if (bl2 && (glBuffer.usage() & 2) == 0) {
-				throw new IllegalStateException("Buffer is not writable");
-			} else if (gpuBufferSlice.offset() + gpuBufferSlice.length() > glBuffer.size()) {
-				throw new IllegalArgumentException(
-					"Cannot map more data than this buffer can hold (attempting to map "
-						+ gpuBufferSlice.length()
-						+ " bytes at offset "
-						+ gpuBufferSlice.offset()
-						+ " from "
-						+ glBuffer.size()
-						+ " size buffer)"
-				);
-			} else {
-				int i = 0;
-				if (bl) {
-					i |= 1;
-				}
-
-				if (bl2) {
-					i |= 34;
-				}
-
-				return this.device.getBufferStorage().mapBuffer(this.device.directStateAccess(), glBuffer, gpuBufferSlice.offset(), gpuBufferSlice.length(), i);
-			}
 		}
+		// Delegate to Vulkanic — validation + GL mapping logic now lives in
+		// OpenGLBackend.mapBuffer(), which calls BufferStorage.mapBuffer() directly.
+		// GpuBuffer.MappedView extends VulkanicMapView so the cast is safe.
+		net.vulkanic.resources.VulkanicBufferSlice vkSlice = new net.vulkanic.resources.VulkanicBufferSlice(
+			(net.vulkanic.resources.VulkanicBuffer) gpuBufferSlice.buffer(),
+			gpuBufferSlice.offset(), gpuBufferSlice.length());
+		return (GpuBuffer.MappedView) VulkanicAPI.mapBuffer(VulkanicAPI.getImmediateContext(), vkSlice, bl, bl2);
 	}
 
 	@Override

@@ -48,7 +48,7 @@ public abstract class GpuBuffer implements AutoCloseable {
 	}
 
 	@Environment(EnvType.CLIENT)
-	public interface MappedView extends AutoCloseable {
+	public interface MappedView extends net.vulkanic.resources.VulkanicMapView {
 		ByteBuffer data();
 
 		void close();

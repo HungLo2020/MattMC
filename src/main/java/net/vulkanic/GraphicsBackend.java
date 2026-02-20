@@ -17,6 +17,7 @@ import net.vulkanic.pipeline.VulkanicCompiledPipeline;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicBufferSlice;
 import net.vulkanic.resources.VulkanicFence;
+import net.vulkanic.resources.VulkanicMapView;
 import net.vulkanic.resources.VulkanicRenderPass;
 import net.vulkanic.resources.VulkanicSampler;
 import net.vulkanic.resources.VulkanicSamplerDescriptor;
@@ -3092,20 +3093,20 @@ public interface GraphicsBackend {
     void writeToBuffer(CommandContext ctx, VulkanicBufferSlice slice, ByteBuffer data);
 
     /**
-     * Maps a GPU buffer slice for CPU access and returns a view of the data.
+     * Maps a GPU buffer slice for CPU access and returns a view of the mapped region.
      *
-     * <p>The returned {@link ByteBuffer} is valid until the buffer is unmapped via
-     * {@link #unmapBuffer}.  The {@code read}/{@code write} flags correspond to
-     * {@code VkMemoryMapFlags} on Vulkan and to {@code GL_MAP_READ_BIT} /
-     * {@code GL_MAP_WRITE_BIT} on OpenGL.
+     * <p>The returned {@link VulkanicMapView} is valid until {@link VulkanicMapView#close()} is
+     * called. {@link #unmapBuffer} is also valid for explicit unmapping.
+     * The {@code read}/{@code write} flags correspond to {@code VkMemoryMapFlags} on
+     * Vulkan and to {@code GL_MAP_READ_BIT} / {@code GL_MAP_WRITE_BIT} on OpenGL.
      *
      * @param ctx   Command context
      * @param slice Buffer region to map
      * @param read  Whether to request read access
      * @param write Whether to request write access
-     * @return A {@link ByteBuffer} covering the mapped region
+     * @return A {@link VulkanicMapView} covering the mapped region
      */
-    ByteBuffer mapBuffer(CommandContext ctx, VulkanicBufferSlice slice, boolean read, boolean write);
+    VulkanicMapView mapBuffer(CommandContext ctx, VulkanicBufferSlice slice, boolean read, boolean write);
 
     /**
      * Unmaps a previously mapped GPU buffer.
