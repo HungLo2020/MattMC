@@ -7,6 +7,7 @@ import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
 import org.junit.jupiter.api.Test;
 
@@ -153,7 +154,8 @@ public class Phase3ResourceTest {
     @Test
     public void testVulkanicAPIHasPhase3TextureMethods() throws NoSuchMethodException {
         assertNotNull(VulkanicAPI.class.getMethod("createVulkanicTexture",
-                String.class, int.class, int.class, int.class, int.class, int.class));
+                String.class, int.class, VulkanicTextureFormat.class,
+                int.class, int.class, int.class, int.class));
         assertNotNull(VulkanicAPI.class.getMethod("createVulkanicTextureView", VulkanicTexture.class));
         assertNotNull(VulkanicAPI.class.getMethod("createVulkanicTextureView",
                 VulkanicTexture.class, int.class, int.class));
@@ -188,14 +190,96 @@ public class Phase3ResourceTest {
     }
 
     // -----------------------------------------------------------------------
-    // GraphicsBackend interface completeness
+    // VulkanicTextureFormat semantics
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testVulkanicTextureFormatValues() {
+        assertEquals(4, VulkanicTextureFormat.RGBA8.pixelSize());
+        assertEquals(1, VulkanicTextureFormat.RED8.pixelSize());
+        assertEquals(1, VulkanicTextureFormat.RED8I.pixelSize());
+        assertEquals(4, VulkanicTextureFormat.DEPTH32.pixelSize());
+    }
+
+    @Test
+    public void testVulkanicTextureFormatColorAspect() {
+        assertTrue(VulkanicTextureFormat.RGBA8.hasColorAspect());
+        assertTrue(VulkanicTextureFormat.RED8.hasColorAspect());
+        assertTrue(VulkanicTextureFormat.RED8I.hasColorAspect());
+        assertFalse(VulkanicTextureFormat.DEPTH32.hasColorAspect());
+    }
+
+    @Test
+    public void testVulkanicTextureFormatDepthAspect() {
+        assertFalse(VulkanicTextureFormat.RGBA8.hasDepthAspect());
+        assertFalse(VulkanicTextureFormat.RED8.hasDepthAspect());
+        assertFalse(VulkanicTextureFormat.RED8I.hasDepthAspect());
+        assertTrue(VulkanicTextureFormat.DEPTH32.hasDepthAspect());
+    }
+
+    @Test
+    public void testVulkanicTextureFormatHasAllFourValues() {
+        // Validates that the enum has exactly the four formats required to cover
+        // all Blaze3D TextureFormat values — important for the mapping in GlDevice.
+        VulkanicTextureFormat[] values = VulkanicTextureFormat.values();
+        assertEquals(4, values.length,
+                "VulkanicTextureFormat must have exactly 4 values to cover RGBA8, RED8, RED8I, DEPTH32");
+    }
+
+    // -----------------------------------------------------------------------
+    // beginCommandBuffer / submitCommandBuffer (Vulkan prerequisite)
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testBeginCommandBufferReturnsImmediateContext() {
+        VulkanicAPI.initialize();
+        CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+        assertNotNull(ctx, "beginCommandBuffer() must never return null");
+        assertTrue(ctx.isImmediate(),
+                "OpenGL backend: beginCommandBuffer() must return the immediate context");
+        assertSame(OpenGLCommandContext.IMMEDIATE, ctx,
+                "OpenGL backend: beginCommandBuffer() must return the IMMEDIATE singleton");
+    }
+
+    @Test
+    public void testSubmitCommandBufferIsNoopForOpenGL() {
+        VulkanicAPI.initialize();
+        CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+        // submitCommandBuffer() is a no-op for OpenGL — must not throw.
+        assertDoesNotThrow(() -> VulkanicAPI.submitCommandBuffer(ctx));
+    }
+
+    @Test
+    public void testBeginSubmitCommandBufferRoundTrip() {
+        // Verifies the full frame idiom compiles and runs without error on the OpenGL backend.
+        VulkanicAPI.initialize();
+        CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+        // (draw calls would go here in a real frame)
+        assertDoesNotThrow(() -> VulkanicAPI.submitCommandBuffer(ctx));
+    }
+
+    @Test
+    public void testVulkanicAPIHasCommandBufferMethods() throws NoSuchMethodException {
+        assertNotNull(VulkanicAPI.class.getMethod("beginCommandBuffer"));
+        assertNotNull(VulkanicAPI.class.getMethod("submitCommandBuffer", CommandContext.class));
+    }
+
+    @Test
+    public void testGraphicsBackendHasCommandBufferMethods() throws NoSuchMethodException {
+        assertNotNull(GraphicsBackend.class.getMethod("beginCommandBuffer"));
+        assertNotNull(GraphicsBackend.class.getMethod("submitCommandBuffer", CommandContext.class));
+    }
+
+    // -----------------------------------------------------------------------
+    // GraphicsBackend interface completeness (updated for new signatures)
     // -----------------------------------------------------------------------
 
     @Test
     public void testGraphicsBackendHasPhase3Methods() throws NoSuchMethodException {
         assertNotNull(GraphicsBackend.class.getMethod("createVulkanicBuffer", int.class, int.class));
         assertNotNull(GraphicsBackend.class.getMethod("createVulkanicTexture",
-                String.class, int.class, int.class, int.class, int.class, int.class));
+                String.class, int.class, VulkanicTextureFormat.class,
+                int.class, int.class, int.class, int.class));
         assertNotNull(GraphicsBackend.class.getMethod("createPipeline", PipelineDescriptor.class));
         assertNotNull(GraphicsBackend.class.getMethod("beginRenderPass",
                 CommandContext.class, VulkanicTextureView.class, java.util.OptionalInt.class));

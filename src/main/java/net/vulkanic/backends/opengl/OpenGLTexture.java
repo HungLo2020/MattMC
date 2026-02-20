@@ -1,6 +1,7 @@
 package net.vulkanic.backends.opengl;
 
 import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -13,6 +14,7 @@ public class OpenGLTexture implements VulkanicTexture {
 
     private final int glHandle;
     private final int usage;
+    private final VulkanicTextureFormat format;
     private final int width;
     private final int height;
     private final int depthOrLayers;
@@ -20,10 +22,11 @@ public class OpenGLTexture implements VulkanicTexture {
     private final String label;
     private boolean closed;
 
-    OpenGLTexture(int glHandle, int usage, String label,
+    OpenGLTexture(int glHandle, int usage, VulkanicTextureFormat format, String label,
                   int width, int height, int depthOrLayers, int mipLevels) {
         this.glHandle      = glHandle;
         this.usage         = usage;
+        this.format        = format;
         this.label         = label != null ? label : String.valueOf(glHandle);
         this.width         = width;
         this.height        = height;
@@ -32,14 +35,19 @@ public class OpenGLTexture implements VulkanicTexture {
         this.closed        = false;
     }
 
-    @Override public long getNativeHandle()   { return glHandle; }
-    @Override public int  getWidth()          { return width; }
-    @Override public int  getHeight()         { return height; }
-    @Override public int  getDepthOrLayers()  { return depthOrLayers; }
-    @Override public int  getMipLevels()      { return mipLevels; }
-    @Override public int  getUsage()          { return usage; }
-    @Override public String getLabel()        { return label; }
-    @Override public boolean isClosed()       { return closed; }
+    @Override public long getNativeHandle()           { return glHandle; }
+    @Override public int  getWidth()                  { return width; }
+    @Override public int  getHeight()                 { return height; }
+    @Override public int  getDepthOrLayers()          { return depthOrLayers; }
+    @Override public int  getMipLevels()              { return mipLevels; }
+    @Override public int  getUsage()                  { return usage; }
+    @Override public String getLabel()                { return label; }
+    @Override public boolean isClosed()               { return closed; }
+    public VulkanicTextureFormat getFormat()          { return format; }
+
+    /** Implements {@link net.vulkanic.resources.VulkanicTexture#getVulkanicFormat()}. */
+    @Override
+    public VulkanicTextureFormat getVulkanicFormat()  { return format; }
 
     @Override
     public void close() {
@@ -51,7 +59,7 @@ public class OpenGLTexture implements VulkanicTexture {
 
     @Override
     public String toString() {
-        return "OpenGLTexture{handle=" + glHandle + ", " + width + "x" + height
+        return "OpenGLTexture{handle=" + glHandle + ", " + format + ", " + width + "x" + height
                 + ", mips=" + mipLevels + ", closed=" + closed + "}";
     }
 }

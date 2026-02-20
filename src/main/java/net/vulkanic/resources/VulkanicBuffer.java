@@ -42,7 +42,6 @@ public interface VulkanicBuffer extends AutoCloseable {
 
     /** Usage flags bitmask (see {@code USAGE_*} constants). */
     int getUsage();
-
     /** Returns {@code true} if this buffer has been closed/freed. */
     boolean isClosed();
 

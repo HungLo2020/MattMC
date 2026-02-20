@@ -7,6 +7,7 @@ import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
 import java.nio.ByteBuffer;
 import java.util.OptionalDouble;
@@ -2257,10 +2258,14 @@ public class VulkanicAPI {
     // =========================================================================
 
     /**
-     * Allocates a GPU texture.
+     * Allocates a GPU texture with an explicit pixel format.
+     *
+     * <p>This is the canonical texture-creation path. Blaze3D's {@code GpuDevice.createTexture()}
+     * delegates here so that the allocation is owned by the Vulkanic backend.
      *
      * @param label         Debug label (may be {@code null})
      * @param usage         Usage flags (see {@link VulkanicTexture} USAGE_* constants)
+     * @param format        Pixel format (see {@link VulkanicTextureFormat})
      * @param width         Width in texels
      * @param height        Height in texels
      * @param depthOrLayers Depth or layer count
@@ -2268,9 +2273,10 @@ public class VulkanicAPI {
      * @return A new {@link VulkanicTexture}
      */
     public static VulkanicTexture createVulkanicTexture(String label, int usage,
+                                                         VulkanicTextureFormat format,
                                                          int width, int height,
                                                          int depthOrLayers, int mipLevels) {
-        return getBackend().createVulkanicTexture(label, usage, width, height, depthOrLayers, mipLevels);
+        return getBackend().createVulkanicTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
     }
 
     /**
@@ -2430,4 +2436,53 @@ public class VulkanicAPI {
     public static void executeFrame(VulkanicFrameGraphBuilder frame) {
         getBackend().executeFrame(getImmediateContext(), frame);
     }
+
+    // =========================================================================
+    // Phase 3 — Command buffer lifecycle (Vulkan prerequisite)
+    // =========================================================================
+
+    /**
+     * Begins recording a new command buffer and returns a context wrapping it.
+     *
+     * <p>This is the Vulkan-idiomatic way to begin a frame of GPU work. Use the
+     * returned context for all subsequent Vulkanic API calls in this frame,
+     * then end the frame with {@link #submitCommandBuffer}.
+     *
+     * <ul>
+     *   <li><b>OpenGL backend:</b> returns the singleton {@code IMMEDIATE} context —
+     *       OpenGL is immediate-mode so no actual command buffer is needed.</li>
+     *   <li><b>Vulkan backend (future):</b> allocates from the command pool,
+     *       calls {@code vkBeginCommandBuffer()}, and returns a context whose
+     *       {@link CommandContext#getHandle()} carries the {@code VkCommandBuffer} address.</li>
+     * </ul>
+     *
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+     * VulkanicAPI.beginRenderPass(ctx, colorView, OptionalInt.empty());
+     * // ... draw calls ...
+     * VulkanicAPI.endRenderPass(ctx);
+     * VulkanicAPI.submitCommandBuffer(ctx);
+     * }</pre>
+     *
+     * @return A {@link CommandContext} ready to record commands
+     */
+    public static CommandContext beginCommandBuffer() {
+        return getBackend().beginCommandBuffer();
+    }
+
+    /**
+     * Ends and submits a command buffer opened with {@link #beginCommandBuffer}.
+     *
+     * <ul>
+     *   <li><b>OpenGL backend:</b> no-op — commands already executed.</li>
+     *   <li><b>Vulkan backend (future):</b> calls {@code vkEndCommandBuffer()} then
+     *       {@code vkQueueSubmit()} to dispatch work to the GPU.</li>
+     * </ul>
+     *
+     * @param ctx The context returned by {@link #beginCommandBuffer}
+     */
+    public static void submitCommandBuffer(CommandContext ctx) {
+        getBackend().submitCommandBuffer(ctx);
+    }
 }
+

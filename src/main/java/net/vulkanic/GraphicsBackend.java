@@ -9,6 +9,7 @@ import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
 
 /**
@@ -2777,13 +2778,14 @@ public interface GraphicsBackend {
     // =========================================================================
 
     /**
-     * Allocates a GPU texture.
+     * Allocates a GPU texture with an explicit format.
      *
-     * <p>In OpenGL: allocates a GL texture object with the requested dimensions.
-     * In Vulkan: will create a VkImage + allocate and bind VkDeviceMemory.
+     * <p>In OpenGL: allocates a GL texture object with the requested dimensions and format.
+     * In Vulkan: will create a {@code VkImage} + allocate and bind {@code VkDeviceMemory}.
      *
      * @param label         Human-readable label (may be {@code null})
      * @param usage         Usage flags (see {@link VulkanicTexture} USAGE_* constants)
+     * @param format        Pixel format (see {@link VulkanicTextureFormat})
      * @param width         Width in texels (must be &ge; 1)
      * @param height        Height in texels (must be &ge; 1)
      * @param depthOrLayers Depth for 3-D textures or layer count for arrays/cubemaps
@@ -2791,8 +2793,9 @@ public interface GraphicsBackend {
      * @return A new {@link VulkanicTexture}
      */
     VulkanicTexture createVulkanicTexture(String label, int usage,
-                                          int width, int height,
-                                          int depthOrLayers, int mipLevels);
+                                           VulkanicTextureFormat format,
+                                           int width, int height,
+                                           int depthOrLayers, int mipLevels);
 
     /**
      * Creates a full-range texture view for the given texture (all mip levels).
@@ -2936,4 +2939,50 @@ public interface GraphicsBackend {
      * @param frame Frame graph to execute
      */
     void executeFrame(CommandContext ctx, VulkanicFrameGraphBuilder frame);
+
+    // =========================================================================
+    // Phase 3 — Command buffer lifecycle (Vulkan prerequisite)
+    // =========================================================================
+
+    /**
+     * Begins recording a new command buffer and returns a context wrapping it.
+     *
+     * <p>This is the Vulkan-idiomatic way to start a frame of work.  All subsequent
+     * Vulkanic rendering calls should use the returned context until
+     * {@link #submitCommandBuffer} is called.
+     *
+     * <ul>
+     *   <li><b>OpenGL backend:</b> returns the singleton {@code IMMEDIATE} context —
+     *       OpenGL executes commands immediately so no actual "begin" step is needed.</li>
+     *   <li><b>Vulkan backend (future):</b> allocates a command buffer from the pool,
+     *       calls {@code vkBeginCommandBuffer()}, and returns a context whose
+     *       {@link CommandContext#getHandle()} is the {@code VkCommandBuffer} handle.</li>
+     * </ul>
+     *
+     * <p>Usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+     * VulkanicAPI.beginRenderPass(ctx, colorTarget, OptionalInt.empty());
+     * VulkanicAPI.setPipeline(ctx, pipeline);
+     * VulkanicAPI.drawIndexed(ctx, indexCount, 1, 0, 0, 0);
+     * VulkanicAPI.endRenderPass(ctx);
+     * VulkanicAPI.submitCommandBuffer(ctx);
+     * }</pre>
+     *
+     * @return A {@link CommandContext} ready for recording commands
+     */
+    CommandContext beginCommandBuffer();
+
+    /**
+     * Ends and submits a command buffer previously opened with {@link #beginCommandBuffer}.
+     *
+     * <ul>
+     *   <li><b>OpenGL backend:</b> no-op — commands were already executed immediately.</li>
+     *   <li><b>Vulkan backend (future):</b> calls {@code vkEndCommandBuffer()},
+     *       then {@code vkQueueSubmit()} to dispatch work to the GPU queue.</li>
+     * </ul>
+     *
+     * @param ctx The command context returned by {@link #beginCommandBuffer}
+     */
+    void submitCommandBuffer(CommandContext ctx);
 }

@@ -47,6 +47,12 @@ public interface VulkanicTexture extends AutoCloseable {
     /** Usage flags bitmask (see {@code USAGE_*} constants). */
     int getUsage();
 
+    /**
+     * Returns the pixel format of this texture.
+     * In Vulkan this corresponds to the {@code VkFormat} used when creating the {@code VkImage}.
+     */
+    VulkanicTextureFormat getVulkanicFormat();
+
     /** Human-readable label (used for debug output). */
     String getLabel();
 

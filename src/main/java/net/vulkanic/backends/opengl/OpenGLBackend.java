@@ -10,6 +10,7 @@ import net.vulkanic.pipeline.PipelineDescriptor;
 import net.vulkanic.pipeline.PipelineHandle;
 import net.vulkanic.resources.VulkanicBuffer;
 import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import net.vulkanic.resources.VulkanicTextureView;
 import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
@@ -2254,25 +2255,32 @@ public class OpenGLBackend implements GraphicsBackend {
 
     @Override
     public VulkanicTexture createVulkanicTexture(String label, int usage,
-                                                  int width, int height,
-                                                  int depthOrLayers, int mipLevels) {
+                                                   VulkanicTextureFormat format,
+                                                   int width, int height,
+                                                   int depthOrLayers, int mipLevels) {
+        if (glDevice != null) {
+            // Delegate to GlDevice.createGlTexture() — the authoritative implementation.
+            // This handles cubemaps, mip validation, depth-mode parameters, and OOM detection.
+            // The returned GlTexture already implements VulkanicTexture (see GlTexture.java).
+            return glDevice.createGlTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
+        }
+        // Fallback: before GlDevice is initialised (tests / early startup).
         if (mipLevels < 1) throw new IllegalArgumentException("mipLevels must be >= 1");
-        if (width   < 1) throw new IllegalArgumentException("width must be >= 1");
-        if (height  < 1) throw new IllegalArgumentException("height must be >= 1");
+        if (width     < 1) throw new IllegalArgumentException("width must be >= 1");
+        if (height    < 1) throw new IllegalArgumentException("height must be >= 1");
 
+        int target   = GL11.GL_TEXTURE_2D;
         int glHandle = GL11.glGenTextures();
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, glHandle);
-        // Allocate storage for each mip level (RGBA8 as a generic default).
-        // Math.max(1, ...) prevents 0-sized allocations for deep mip chains.
+        GL11.glBindTexture(target, glHandle);
         for (int mipLevel = 0; mipLevel < mipLevels; mipLevel++) {
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, mipLevel,
-                    GL11.GL_RGBA8,
+            GL11.glTexImage2D(target, mipLevel,
+                    toGlInternalId(format),
                     Math.max(1, width  >> mipLevel),
                     Math.max(1, height >> mipLevel),
-                    0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+                    0, toGlExternalId(format), toGlType(format), (ByteBuffer) null);
         }
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-        return new OpenGLTexture(glHandle, usage, label, width, height, depthOrLayers, mipLevels);
+        GL11.glBindTexture(target, 0);
+        return new OpenGLTexture(glHandle, usage, format, label, width, height, depthOrLayers, mipLevels);
     }
 
     @Override
@@ -2282,7 +2290,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
     @Override
     public VulkanicTextureView createVulkanicTextureView(VulkanicTexture texture,
-                                                          int baseMipLevel, int mipLevelCount) {
+                                                           int baseMipLevel, int mipLevelCount) {
         if (texture.isClosed()) {
             throw new IllegalArgumentException("Cannot create view of closed texture");
         }
@@ -2291,6 +2299,10 @@ public class OpenGLBackend implements GraphicsBackend {
                     "Mip range [" + baseMipLevel + ", " + (baseMipLevel + mipLevelCount)
                     + ") is out of bounds for texture with " + texture.getMipLevels() + " mip levels");
         }
+        if (texture instanceof net.blaze3d.opengl.GlTexture glTex) {
+            // GlTexture implements VulkanicTexture; return a GlTextureView (also VulkanicTextureView).
+            return new net.blaze3d.opengl.GlTextureView(glTex, baseMipLevel, mipLevelCount);
+        }
         return new OpenGLTextureView((OpenGLTexture) texture, baseMipLevel, mipLevelCount);
     }
 
@@ -2298,6 +2310,38 @@ public class OpenGLBackend implements GraphicsBackend {
     public void deleteVulkanicTexture(VulkanicTexture texture) {
         texture.close();
     }
+
+    // -----------------------------------------------------------------------
+    // GL format helpers (VulkanicTextureFormat → GL constants)
+    // Used by the fallback path when glDevice is not yet available.
+    // The authoritative path (via GlDevice.createGlTexture) uses GlConst.
+    // -----------------------------------------------------------------------
+
+    static int toGlInternalId(VulkanicTextureFormat fmt) {
+        return switch (fmt) {
+            case RGBA8   -> 0x8058; // GL_RGBA8
+            case RED8    -> 0x8229; // GL_R8
+            case RED8I   -> 0x8231; // GL_R8I
+            case DEPTH32 -> 0x8167; // GL_DEPTH_COMPONENT32
+        };
+    }
+
+    static int toGlExternalId(VulkanicTextureFormat fmt) {
+        return switch (fmt) {
+            case RGBA8            -> 0x1908; // GL_RGBA
+            case RED8, RED8I      -> 0x1903; // GL_RED
+            case DEPTH32          -> 0x1902; // GL_DEPTH_COMPONENT
+        };
+    }
+
+    static int toGlType(VulkanicTextureFormat fmt) {
+        return switch (fmt) {
+            case RGBA8, RED8 -> 0x1401; // GL_UNSIGNED_BYTE
+            case RED8I       -> 0x1400; // GL_BYTE (signed integer)
+            case DEPTH32     -> 0x1406; // GL_FLOAT
+        };
+    }
+
 
     // =========================================================================
     // Phase 3 — Pipeline objects (Step 3)
@@ -2494,5 +2538,33 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void executeFrame(CommandContext ctx, VulkanicFrameGraphBuilder frame) {
         frame.execute(ctx);
+    }
+
+    // =========================================================================
+    // Phase 3 — Command buffer lifecycle (Vulkan prerequisite)
+    // =========================================================================
+
+    /**
+     * OpenGL backend: returns the singleton {@code IMMEDIATE} context.
+     *
+     * <p>OpenGL executes commands immediately — there is no command buffer to begin.
+     * For the Vulkan backend this method will allocate a command buffer from the
+     * pool and call {@code vkBeginCommandBuffer()}.
+     */
+    @Override
+    public CommandContext beginCommandBuffer() {
+        return OpenGLCommandContext.IMMEDIATE;
+    }
+
+    /**
+     * OpenGL backend: no-op.
+     *
+     * <p>OpenGL commands are already executed by the time this is called.
+     * For the Vulkan backend this method will call {@code vkEndCommandBuffer()}
+     * followed by {@code vkQueueSubmit()}.
+     */
+    @Override
+    public void submitCommandBuffer(CommandContext ctx) {
+        // OpenGL: immediate mode — nothing to submit.
     }
 }

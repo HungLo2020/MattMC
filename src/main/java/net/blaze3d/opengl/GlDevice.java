@@ -28,6 +28,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -94,78 +95,104 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public GpuTexture createTexture(@Nullable Supplier<String> supplier, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
-		return this.createTexture(this.debugLabels.exists() && supplier != null ? (String)supplier.get() : null, i, textureFormat, j, k, l, m);
+		String label = this.debugLabels.exists() && supplier != null ? supplier.get() : null;
+		return this.createTexture(label, i, textureFormat, j, k, l, m);
 	}
 
 	@Override
-	public GpuTexture createTexture(@Nullable String string, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
-		if (m < 1) {
+	public GpuTexture createTexture(@Nullable String label, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
+		// Delegate to Vulkanic — GlDevice is a thin facade for texture creation.
+		// VulkanicAPI dispatches to OpenGLBackend which calls createGlTexture() below.
+		VulkanicTextureFormat vkFmt = switch (textureFormat) {
+			case RGBA8   -> VulkanicTextureFormat.RGBA8;
+			case RED8    -> VulkanicTextureFormat.RED8;
+			case RED8I   -> VulkanicTextureFormat.RED8I;
+			case DEPTH32 -> VulkanicTextureFormat.DEPTH32;
+		};
+		return (GpuTexture) net.vulkanic.VulkanicAPI.createVulkanicTexture(label, i, vkFmt, j, k, l, m);
+	}
+
+	/**
+	 * Raw GL texture allocation called by {@link net.vulkanic.backends.opengl.OpenGLBackend}
+	 * to avoid a circular call through {@link net.vulkanic.VulkanicAPI}.
+	 *
+	 * <p>This method is intentionally kept accessible so that only the
+	 * OpenGL backend can reach it.
+	 */
+	public GlTexture createGlTexture(@Nullable String label, int usage, VulkanicTextureFormat format,
+	                                   int width, int height, int depthOrLayers, int mipLevels) {
+		if (mipLevels < 1) {
 			throw new IllegalArgumentException("mipLevels must be at least 1");
-		} else if (l < 1) {
+		} else if (depthOrLayers < 1) {
 			throw new IllegalArgumentException("depthOrLayers must be at least 1");
 		} else {
-			boolean bl = (i & 16) != 0;
-			if (bl) {
-				if (j != k) {
-					throw new IllegalArgumentException("Cubemap compatible textures must be square, but size is " + j + "x" + k);
+			boolean cubemap = (usage & 16) != 0;
+			if (cubemap) {
+				if (width != height) {
+					throw new IllegalArgumentException("Cubemap compatible textures must be square, but size is " + width + "x" + height);
 				}
-
-				if (l % 6 != 0) {
-					throw new IllegalArgumentException("Cubemap compatible textures must have a layer count with a multiple of 6, was " + l);
+				if (depthOrLayers % 6 != 0) {
+					throw new IllegalArgumentException("Cubemap compatible textures must have a layer count with a multiple of 6, was " + depthOrLayers);
 				}
-
-				if (l > 6) {
+				if (depthOrLayers > 6) {
 					throw new UnsupportedOperationException("Array textures are not yet supported");
 				}
-			} else if (l > 1) {
+			} else if (depthOrLayers > 1) {
 				throw new UnsupportedOperationException("Array or 3D textures are not yet supported");
 			}
 
 			GlStateManager.clearGlErrors();
 			int n = GlStateManager._genTexture();
-			if (string == null) {
-				string = String.valueOf(n);
+			if (label == null) {
+				label = String.valueOf(n);
 			}
 
-			int o;
-			if (bl) {
-				net.vulkanic.VulkanicAPI.bindTexture(net.vulkanic.VulkanicAPI.getImmediateContext(), 34067, n); // GL_TEXTURE_CUBE_MAP
-				o = 34067;
+			int target;
+			if (cubemap) {
+				net.vulkanic.VulkanicAPI.bindTexture(net.vulkanic.VulkanicAPI.getImmediateContext(), 34067, n);
+				target = 34067; // GL_TEXTURE_CUBE_MAP
 			} else {
 				GlStateManager._bindTexture(n);
-				o = 3553;
+				target = 3553; // GL_TEXTURE_2D
 			}
 
-			GlStateManager._texParameter(o, 33085, m - 1);
-			GlStateManager._texParameter(o, 33082, 0);
-			GlStateManager._texParameter(o, 33083, m - 1);
-			if (textureFormat.hasDepthAspect()) {
-				GlStateManager._texParameter(o, 34892, 0);
+			GlStateManager._texParameter(target, 33085, mipLevels - 1);
+			GlStateManager._texParameter(target, 33082, 0);
+			GlStateManager._texParameter(target, 33083, mipLevels - 1);
+			if (format.hasDepthAspect()) {
+				GlStateManager._texParameter(target, 34892, 0);
 			}
 
-			if (bl) {
-				for (int p : GlConst.CUBEMAP_TARGETS) {
-					for (int q = 0; q < m; q++) {
-						GlStateManager._texImage2D(
-							p, q, GlConst.toGlInternalId(textureFormat), j >> q, k >> q, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
-						);
+			int internalFmt = GlConst.toGlInternalId(format);
+			int externalFmt = GlConst.toGlExternalId(format);
+			int glType      = GlConst.toGlType(format);
+
+			if (cubemap) {
+				for (int face : GlConst.CUBEMAP_TARGETS) {
+					for (int mip = 0; mip < mipLevels; mip++) {
+						GlStateManager._texImage2D(face, mip, internalFmt, width >> mip, height >> mip, 0, externalFmt, glType, null);
 					}
 				}
 			} else {
-				for (int r = 0; r < m; r++) {
-					GlStateManager._texImage2D(
-						o, r, GlConst.toGlInternalId(textureFormat), j >> r, k >> r, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
-					);
+				for (int mip = 0; mip < mipLevels; mip++) {
+					GlStateManager._texImage2D(target, mip, internalFmt, width >> mip, height >> mip, 0, externalFmt, glType, null);
 				}
 			}
 
-			int r = GlStateManager._getError();
-			if (r == 1285) {
-				throw new GpuOutOfMemoryException("Could not allocate texture of " + j + "x" + k + " for " + string);
-			} else if (r != 0) {
-				throw new IllegalStateException("OpenGL error " + r);
+			int err = GlStateManager._getError();
+			if (err == 1285) {
+				throw new GpuOutOfMemoryException("Could not allocate texture of " + width + "x" + height + " for " + label);
+			} else if (err != 0) {
+				throw new IllegalStateException("OpenGL error " + err);
 			} else {
-				GlTexture glTexture = new GlTexture(i, string, textureFormat, j, k, l, m, n);
+				// Map VulkanicTextureFormat back to the legacy TextureFormat that GlTexture requires.
+				TextureFormat legacyFmt = switch (format) {
+					case RGBA8   -> TextureFormat.RGBA8;
+					case RED8    -> TextureFormat.RED8;
+					case RED8I   -> TextureFormat.RED8I;
+					case DEPTH32 -> TextureFormat.DEPTH32;
+				};
+				GlTexture glTexture = new GlTexture(usage, label, legacyFmt, width, height, depthOrLayers, mipLevels, n);
 				this.debugLabels.applyLabel(glTexture);
 				return glTexture;
 			}
@@ -174,21 +201,16 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public GpuTextureView createTextureView(GpuTexture gpuTexture) {
-		return this.createTextureView(gpuTexture, 0, gpuTexture.getMipLevels());
+		return (GpuTextureView) net.vulkanic.VulkanicAPI.createVulkanicTextureView(
+				(net.vulkanic.resources.VulkanicTexture) gpuTexture);
 	}
 
 	@Override
 	public GpuTextureView createTextureView(GpuTexture gpuTexture, int i, int j) {
-		if (gpuTexture.isClosed()) {
-			throw new IllegalArgumentException("Can't create texture view with closed texture");
-		} else if (i >= 0 && i + j <= gpuTexture.getMipLevels()) {
-			return new GlTextureView((GlTexture)gpuTexture, i, j);
-		} else {
-			throw new IllegalArgumentException(
-				j + " mip levels starting from " + i + " would be out of range for texture with only " + gpuTexture.getMipLevels() + " mip levels"
-			);
-		}
+		return (GpuTextureView) net.vulkanic.VulkanicAPI.createVulkanicTextureView(
+				(net.vulkanic.resources.VulkanicTexture) gpuTexture, i, j);
 	}
+
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int i, int j) {

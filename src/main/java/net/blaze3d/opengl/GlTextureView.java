@@ -10,7 +10,7 @@ import net.vulkanic.resources.VulkanicTextureView;
 public class GlTextureView extends GpuTextureView implements VulkanicTextureView {
 	private boolean closed;
 
-	protected GlTextureView(GlTexture glTexture, int i, int j) {
+	public GlTextureView(GlTexture glTexture, int i, int j) {
 		super(glTexture, i, j);
 		glTexture.addViews();
 	}

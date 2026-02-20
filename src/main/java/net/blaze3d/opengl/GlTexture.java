@@ -12,6 +12,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.resources.VulkanicTexture;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -124,6 +125,16 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	@Override
 	public int getUsage() {
 		return super.usage();
+	}
+
+	@Override
+	public VulkanicTextureFormat getVulkanicFormat() {
+		return switch (super.getFormat()) {
+			case RGBA8   -> VulkanicTextureFormat.RGBA8;
+			case RED8    -> VulkanicTextureFormat.RED8;
+			case RED8I   -> VulkanicTextureFormat.RED8I;
+			case DEPTH32 -> VulkanicTextureFormat.DEPTH32;
+		};
 	}
 
 	// Iris: From MixinGpuTexture - GpuTextureInterface implementation
