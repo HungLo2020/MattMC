@@ -15,7 +15,6 @@ public interface GraphicsBackend {
      * On Windows, this returns the WGL context handle.
      * Returns 0 or NULL if no context is current.
      */
-    @Deprecated
     long getGraphicsContext();
     
     /**
@@ -947,8 +946,6 @@ public interface GraphicsBackend {
      */
     int getError(CommandContext ctx);
     
-    @Deprecated
-    int checkForErrors();
     
     // Texture pixel data transfer
     
@@ -1012,12 +1009,6 @@ public interface GraphicsBackend {
     void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
                                   int width, int height, int format, int type, java.nio.ByteBuffer pixels);
     
-    @Deprecated
-    void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
-    @Deprecated
-    void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix);
-    @Deprecated
-    void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix);
     
     // GPU buffer lifecycle
     
@@ -1100,14 +1091,6 @@ public interface GraphicsBackend {
      */
     void bufferData(CommandContext ctx, int target, int[] data, int usage);
     
-    @Deprecated
-    int allocateBufferObject();
-    @Deprecated
-    void releaseBufferObject(int buf);
-    @Deprecated
-    void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg);
-    @Deprecated
-    void fillBufferWithSize(int tgt, long sz, int usg);
     
     /**
      * Updates a subset of a buffer object's data.
@@ -1176,8 +1159,6 @@ public interface GraphicsBackend {
      */
     void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length);
     
-    @Deprecated
-    void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     
     // Vertex array objects
     
@@ -1203,10 +1184,6 @@ public interface GraphicsBackend {
      */
     void bindVertexArray(CommandContext ctx, int vao);
     
-    @Deprecated
-    int createVertexArrayObject();
-    @Deprecated
-    void selectVertexArray(int vao);
     
     // Buffer memory mapping
     
@@ -1236,10 +1213,7 @@ public interface GraphicsBackend {
      */
     void unmapBuffer(CommandContext ctx, int target);
     
-    @Deprecated
     java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc);
-    @Deprecated
-    void unmapBufferData(int tgt);
     
     // Framebuffer lifecycle
     
@@ -1275,12 +1249,6 @@ public interface GraphicsBackend {
     void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
                          int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
-    @Deprecated
-    int generateFramebufferObject();
-    @Deprecated
-    void destroyFramebufferObject(int fbo);
-    @Deprecated
-    void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt);
     
     // Shader pipeline
     
@@ -1318,14 +1286,6 @@ public interface GraphicsBackend {
      */
     int createShaderProgram(CommandContext ctx);
     
-    @Deprecated
-    int constructShaderObject(int shaderType);
-    @Deprecated
-    void disposeShaderObject(int shader);
-    @Deprecated
-    void compileShaderSource(int shader);
-    @Deprecated
-    int constructProgramObject();
     /**
      * Attaches a shader to a program object.
      * 
@@ -1741,36 +1701,8 @@ public interface GraphicsBackend {
      */
     void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name);
     
-    @Deprecated
-    void disposeProgramObject(int program);
-    @Deprecated
-    void linkProgramBinary(int program);
-    @Deprecated
-    void attachShaderToProgram(int program, int shader);
-    @Deprecated
-    int queryProgramParameter(int program, int pname);
-    @Deprecated
-    int queryShaderParameter(int shader, int pname);
-    @Deprecated
-    String retrieveProgramInfoLog(int program);
-    @Deprecated
-    String retrieveShaderInfoLog(int shader);
-    @Deprecated
-    int locateUniformVariable(int program, CharSequence name);
-    @Deprecated
-    void assignUniformInteger(int location, int value);
-    @Deprecated
-    void bindAttributeLocation(int program, int index, CharSequence name);
     
     // Vertex attributes
-    @Deprecated
-    void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer);
-    @Deprecated
-    void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer);
-    @Deprecated
-    void activateVertexAttribute(int index);
-    @Deprecated
-    void deactivateVertexAttribute(int index);
     
     /**
      * Issues a memory barrier to ensure memory operations are visible.
@@ -2073,19 +2005,13 @@ public interface GraphicsBackend {
     void labelObjectExt(CommandContext ctx, int type, int object, String label);
     
     // Debug system initialization (wraps entire debug setup)
-    @Deprecated
     boolean supportsKhrDebug();
-    @Deprecated
     boolean supportsArbDebugOutput();
-    @Deprecated
     void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
-    @Deprecated
     void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
     
     // Extension capability checking
-    @Deprecated
     boolean hasBufferStorageExtension();
-    @Deprecated
     boolean hasVertexAttribBindingExtension();
     
     // ARB vertex attrib binding operations (all callers migrated to bindVertexBuffer/setVertexAttrib* ctx methods)
@@ -2153,70 +2079,37 @@ public interface GraphicsBackend {
     void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer);
     
     // Uniform operations (additional)
-    @Deprecated
-    void assignUniformFloat(int location, float value);
-    @Deprecated
-    void assignUniformFloat2(int location, float x, float y);
-    @Deprecated
     void assignUniformFloat2v(int location, float[] value);
-    @Deprecated
-    void assignUniformFloat3(int location, float x, float y, float z);
-    @Deprecated
     void assignUniformFloat3v(int location, float[] value);
-    @Deprecated
-    void assignUniformFloat4(int location, float x, float y, float z, float w);
-    @Deprecated
     void assignUniformFloat4v(int location, float[] value);
-    @Deprecated
     void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix);
-    @Deprecated
     void bindUniformBufferBase(int bindingPoint, int bufferId);
     
     // Program fragment data binding
-    @Deprecated
     void bindFragmentDataLocation(int program, int colorNumber, CharSequence name);
     
     // Sync query operations
-    @Deprecated
     int querySyncStatus(long sync, int pname, java.nio.IntBuffer length);
     
     // Graphics Capabilities
-    @Deprecated
     GraphicsCapabilities obtainGraphicsCapabilities();
-    @Deprecated
     GraphicsCapabilities initializeGraphicsCapabilities();
-    @Deprecated
     boolean checkFunctionAvailable(String functionName);
     
     // Additional buffer operations for Sodium
-    @Deprecated
-    void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size);
-    @Deprecated
     void deleteVertexArray(int vertexArray);
-    @Deprecated
-    void flushMappedBufferRange(int target, long offset, long length);
     
     // Buffer storage operations
-    @Deprecated
-    void createBufferStorage(int target, long size, int flags);
-    @Deprecated
-    void createBufferStorage(int target, ByteBuffer data, int flags);
     
     // Multi-draw operations
-    @Deprecated
     void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
     
     // Uniform matrix operations
-    @Deprecated
-    void assignUniformMatrix4fv(int location, boolean transpose, FloatBuffer value);
     
     // Native shader source upload
-    @Deprecated
     void uploadShaderSourceNative(int shader, int count, long strings, long length);
     
     // Texture operations
-    @Deprecated
-    void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
     
     // Clear texture image (ARB_clear_texture)
     /**
@@ -2234,26 +2127,16 @@ public interface GraphicsBackend {
      */
     void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data);
     
-    @Deprecated
-    void clearTexImage(int texture, int level, int format, int type, int[] data);
     
     // Parallel shader compile (KHR/ARB)
-    @Deprecated
     void setMaxShaderCompilerThreads(int count);
     
     // Capabilities
-    @Deprecated
     GraphicsCapabilities getGraphicsCapabilities();
     
     // Debug object labeling
-    @Deprecated
-    void labelObject(int identifier, int name, String label);
     
     // Debug group push/pop
-    @Deprecated
-    void pushDebugGroup(int source, int id, String message);
-    @Deprecated
-    void popDebugGroup();
     
     // Additional methods for IrisRenderSystem
     
@@ -2281,10 +2164,6 @@ public interface GraphicsBackend {
      */
     void getFloatv(CommandContext ctx, int pname, float[] params);
     
-    @Deprecated
-    void glGetIntegerv(int pname, int[] params);
-    @Deprecated
-    void glGetFloatv(int pname, float[] params);
     
     /**
      * Uploads pixel data to a 1D texture.
@@ -2369,54 +2248,6 @@ public interface GraphicsBackend {
                          int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
                          int width, int height, int depth);
     
-    @Deprecated
-    void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels);
-    @Deprecated
-    void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels);
-    @Deprecated
-    void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels);
-    @Deprecated
-    void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix);
-    @Deprecated
-    void glUniformMatrix4fv(int location, boolean transpose, float[] matrix);
-    @Deprecated
-    void glCopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border);
-    @Deprecated
-    void glUniform1f(int location, float v0);
-    @Deprecated
-    void glUniform2f(int location, float v0, float v1);
-    @Deprecated
-    void glUniform2i(int location, int v0, int v1);
-    @Deprecated
-    void glUniform3f(int location, float v0, float v1, float v2);
-    @Deprecated
-    void glUniform3i(int location, int v0, int v1, int v2);
-    @Deprecated
-    void glUniform4f(int location, float v0, float v1, float v2, float v3);
-    @Deprecated
-    void glUniform4i(int location, int v0, int v1, int v2, int v3);
-    @Deprecated
-    void glTexParameteriv(int target, int pname, int[] params);
-    @Deprecated
-    void glTexParameteri(int target, int pname, int param);
-    @Deprecated
-    void glTexParameterf(int target, int pname, float param);
-    @Deprecated
-    String glGetProgramInfoLog(int program);
-    @Deprecated
-    String glGetShaderInfoLog(int shader);
-    @Deprecated
-    void glDrawBuffers(int[] buffers);
-    @Deprecated
-    void glReadBuffer(int buffer);
-    @Deprecated
-    void glClearBufferfv(int buffer, int drawbuffer, float[] values);
-    @Deprecated
-    void glClearBufferiv(int buffer, int drawbuffer, int[] values);
-    @Deprecated
-    void glClearBufferuiv(int buffer, int drawbuffer, int[] values);
-    @Deprecated
-    String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name);
     
     /**
      * Reads pixels from the framebuffer into a float array.
@@ -2452,93 +2283,6 @@ public interface GraphicsBackend {
      */
     void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels);
     
-    @Deprecated
-    void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels);
-    @Deprecated
-    void glBufferData(int target, float[] data, int usage);
-    @Deprecated
-    void glBufferData(int target, int[] data, int usage);
-    @Deprecated
-    void glBufferData(int target, java.nio.ByteBuffer data, int usage);
-    @Deprecated
-    void glBufferData(int target, long size, int usage);
-    @Deprecated
-    void glBufferSubData(int target, long offset, java.nio.ByteBuffer data);
-    @Deprecated
-    void glBufferStorage(int target, long size, int flags);
-    @Deprecated
-    void glBufferStorage(int target, java.nio.ByteBuffer data, int flags);
-    @Deprecated
-    java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access);
-    @Deprecated
-    boolean glUnmapBuffer(int target);
-    @Deprecated
-    boolean glIsBuffer(int buffer);
-    @Deprecated
-    void glBindBufferBase(int target, int index, int buffer);
-    @Deprecated
-    void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3);
-    @Deprecated
-    void glDetachShader(int program, int shader);
-    @Deprecated
-    void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level);
-    @Deprecated
-    void glFramebufferTexture(int target, int attachment, int texture, int level);
-    @Deprecated
-    int glGetTexParameteri(int target, int pname);
-    @Deprecated
-    void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format);
-    @Deprecated
-    int glGetMaxImageUnits();
-    @Deprecated
-    void glGenBuffers(int[] buffers);
-    @Deprecated
-    void glClearBufferSubData(int target, int internalformat, long offset, long size, int format, int type, int[] data);
-    @Deprecated
-    void glGetProgramiv(int program, int pname, int[] params);
-    @Deprecated
-    void glDispatchCompute(int workX, int workY, int workZ);
-    @Deprecated
-    void glMemoryBarrier(int barriers);
-    @Deprecated
-    void glDisablei(int target, int index);
-    @Deprecated
-    void glEnablei(int target, int index);
-    @Deprecated
-    void glBlendFunc(int sfactor, int dfactor);
-    @Deprecated
-    void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
-    @Deprecated
-    int glGetUniformBlockIndex(int program, String uniformBlockName);
-    @Deprecated
-    void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding);
-    @Deprecated
-    int glGenSamplers();
-    @Deprecated
-    void glDeleteSamplers(int sampler);
-    @Deprecated
-    void glBindSampler(int unit, int sampler);
-    @Deprecated
-    void glBindSamplers(int first, int[] samplers);
-    @Deprecated
-    void glSamplerParameteri(int sampler, int pname, int param);
-    @Deprecated
-    void glSamplerParameterf(int sampler, int pname, float param);
-    @Deprecated
-    void glSamplerParameteriv(int sampler, int pname, int[] params);
-    @Deprecated
-    int glGetInteger(int pname);
-    @Deprecated
-    void glDeleteBuffers(int buffer);
-    @Deprecated
-    void glPolygonMode(int face, int mode);
-    @Deprecated
-    void glViewport(int x, int y, int width, int height);
-    @Deprecated
-    void glDispatchComputeIndirect(long offset);
-    @Deprecated
-    void glBindBuffer(int target, int buffer);
-    
     /**
      * Returns a string value from the OpenGL implementation.
      * 
@@ -2564,46 +2308,8 @@ public interface GraphicsBackend {
      */
     String getString(CommandContext ctx, int name);
     
-    @Deprecated
-    String glGetStringi(int name, int index);
-    @Deprecated
-    void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth);
-    @Deprecated
-    int glCheckFramebufferStatus(int target);
-    @Deprecated
-    void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value);
-    @Deprecated
-    void glUniformMatrix3fv(int location, boolean transpose, float[] value);
-    @Deprecated
-    void glClearColor(float r, float g, float b, float a);
-    @Deprecated
-    int glGetAttribLocation(int program, CharSequence name);
-    @Deprecated
-    void glGenerateMipmap(int target);
-    @Deprecated
-    void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
     // DSA methods
-    @Deprecated
-    void glGenerateTextureMipmap(int texture);
-    @Deprecated
-    void glTextureParameteri(int texture, int pname, int param);
-    @Deprecated
-    void glTextureParameterf(int texture, int pname, float param);
-    @Deprecated
-    void glTextureParameteriv(int texture, int pname, int[] params);
-    @Deprecated
-    void glNamedFramebufferReadBuffer(int framebuffer, int mode);
-    @Deprecated
-    void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs);
-    @Deprecated
-    void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value);
-    @Deprecated
-    void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value);
-    @Deprecated
-    void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value);
-    @Deprecated
-    int glGetTextureParameteri(int texture, int pname);
     
     /**
      * Copies a portion of a read framebuffer to a texture subregion using Direct State Access.
@@ -2755,64 +2461,22 @@ public interface GraphicsBackend {
      */
     void texParameteri(CommandContext ctx, int target, int pname, int param);
     
-    @Deprecated
-    void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height);
-    @Deprecated
-    void glBindTextureUnit(int unit, int texture);
-    @Deprecated
-    int glCreateBuffers();
-    @Deprecated
-    void glNamedBufferData(int buffer, float[] data, int usage);
-    @Deprecated
-    void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
-    @Deprecated
-    void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level);
-    @Deprecated
-    int glCreateFramebuffers();
-    @Deprecated
-    int glCreateTextures(int target);
     
     // Additional rendering operations
-    @Deprecated
-    void glDrawElements(int mode, int count, int type, long indices);
-    @Deprecated
-    void glBlendEquation(int mode);
-    @Deprecated
-    void glClearDepth(double depth);
-    @Deprecated
-    int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname);
     
     // Debug callback methods (low-level control methods only)
-    @Deprecated
-    void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled);
-    @Deprecated
-    void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled);
-    @Deprecated
-    void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled);
-    @Deprecated
-    void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled);
     
     // High-level debug callback wrapper methods
-    @Deprecated
     void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallback callback);
-    @Deprecated
     void setupDebugMessageCallbackKHR(VulkanicAPI.DebugMessageCallback callback);
-    @Deprecated
     void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallbackARB callback);
-    @Deprecated
     void setupDebugMessageCallbackAMD(VulkanicAPI.DebugMessageCallbackAMD callback);
-    @Deprecated
     void clearDebugMessageCallback();
-    @Deprecated
     void clearDebugMessageCallbackKHR();
-    @Deprecated
     void clearDebugMessageCallbackARB();
-    @Deprecated
     void clearDebugMessageCallbackAMD();
     
     // GL43+ vertex attribute methods
-    @Deprecated
-    void bindVertexBuffer(int bindingindex, int buffer, long offset, int stride);
     
     /**
      * Specifies the layout of a vertex attribute (float) using the GL43+ vertex format API.
@@ -2856,40 +2520,20 @@ public interface GraphicsBackend {
     void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex);
     
     // VAO methods
-    @Deprecated
-    int genVertexArrays();
-    @Deprecated
-    void bindVertexArray(int array);
-    @Deprecated
-    void deleteVertexArrays(int array);
     
     // GL context capabilities
-    @Deprecated
     Object getGLCapabilities();
-    @Deprecated
     void setupDebugMessageCallback(java.io.PrintStream stream);
     
     // Capability checking methods (to avoid casting GLCapabilities outside backends/opengl)
-    @Deprecated
     boolean checkOpenGL32Support();
-    @Deprecated
     boolean checkOpenGL33Support();
-    @Deprecated
     boolean checkARBInstancedArraysSupport();
-    @Deprecated
     long getNamedBufferDataPointer();
-    @Deprecated
     long getBufferStoragePointer();
-    @Deprecated
     long getBindVertexBufferPointer();
-    @Deprecated
-    long getVertexAttribBindingPointer();
     
     // Additional GL query and state methods
-    @Deprecated
-    boolean glIsEnabled(int cap);
-    @Deprecated
-    boolean glIsTexture(int texture);
     
     /**
      * Checks if a name corresponds to a framebuffer object.
@@ -2928,8 +2572,6 @@ public interface GraphicsBackend {
     boolean isProgram(CommandContext ctx, int program);
     
     // Additional GL state methods
-    @Deprecated
-    void glCullFace(int mode);
     
     /**
      * Sets the RGB and alpha blend equations separately.
@@ -2957,8 +2599,6 @@ public interface GraphicsBackend {
     void setStencilFunc(CommandContext ctx, int func, int ref, int mask);
     
     // Additional texture methods
-    @Deprecated
-    int glGenTextures();
     
     /**
      * Dispatches compute shader work groups.

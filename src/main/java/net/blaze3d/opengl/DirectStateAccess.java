@@ -200,7 +200,7 @@ public abstract class DirectStateAccess {
 		void flushMappedBufferRange(int i, int j, int k, int l) {
 			int m = this.selectBufferBindTarget(l);
 			GlStateManager._glBindBuffer(m, i);
-			VulkanicAPI.flushMappedBufferRange(m, j, k);
+			VulkanicAPI.flushMappedBufferRange(VulkanicAPI.getImmediateContext(), m, j, k);
 			GlStateManager._glBindBuffer(m, 0);
 		}
 
@@ -208,7 +208,7 @@ public abstract class DirectStateAccess {
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
 			GlStateManager._glBindBuffer(36662, i);
 			GlStateManager._glBindBuffer(36663, j);
-			VulkanicAPI.copyBufferSubData(36662, 36663, k, l, m);
+			VulkanicAPI.copyBufferSubData(VulkanicAPI.getImmediateContext(), 36662, 36663, k, l, m);
 			GlStateManager._glBindBuffer(36662, 0);
 			GlStateManager._glBindBuffer(36663, 0);
 		}

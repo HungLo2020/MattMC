@@ -66,7 +66,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 		int ALPHA_TEST_VALUE = GlStateManager._glGetUniformLocation(programId, "AlphaTestValue");
 
 		if (ALPHA_TEST_VALUE > -1) {
-			VulkanicAPI.assignUniformFloat(ALPHA_TEST_VALUE, alphaValue);
+			VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), ALPHA_TEST_VALUE, alphaValue);
 		}
 	}
 
@@ -100,10 +100,10 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 			float fogDensity = CapturedRenderingState.INSTANCE.getFogDensity();
 
 			if (fogDensity >= 0.0) {
-				VulkanicAPI.assignUniformFloat(FOG_DENSITY, fogDensity);
+				VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), FOG_DENSITY, fogDensity);
 				VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), FOG_IS_EXP2, 1);
 			} else {
-				VulkanicAPI.assignUniformFloat(FOG_DENSITY, 0.0f);
+				VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), FOG_DENSITY, 0.0f);
 				VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), FOG_IS_EXP2, 0);
 			}
 		}

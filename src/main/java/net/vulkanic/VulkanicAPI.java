@@ -536,7 +536,6 @@ public class VulkanicAPI {
      * On Windows, this returns the WGL context handle.
      * Returns 0 or NULL if no context is current.
      */
-    @Deprecated
     public static long getGraphicsContext() {
         return getBackend().getGraphicsContext();
     }
@@ -1082,10 +1081,6 @@ public class VulkanicAPI {
         return getBackend().getError(ctx);
     }
     
-    @Deprecated
-    public static int checkForErrors() {
-        return getBackend().getError(getImmediateContext());
-    }
     
     public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
                                         int border, int format, int type, java.nio.ByteBuffer pixels) {
@@ -1102,20 +1097,8 @@ public class VulkanicAPI {
         getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
-    @Deprecated
-    public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
-        uploadTexture2D(getImmediateContext(), tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
-    }
     
-    @Deprecated
-    public static void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        uploadTexture2DSubImage(getImmediateContext(), tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
-    }
     
-    @Deprecated
-    public static void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        uploadTexture2DSubImage(getImmediateContext(), tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
-    }
     
     public static int createBuffer(CommandContext ctx) {
         return getBackend().createBuffer(ctx);
@@ -1141,25 +1124,9 @@ public class VulkanicAPI {
         getBackend().bufferData(ctx, target, data, usage);
     }
     
-    @Deprecated
-    public static int allocateBufferObject() {
-        return createBuffer(getImmediateContext());
-    }
     
-    @Deprecated
-    public static void releaseBufferObject(int buf) {
-        deleteBuffer(getImmediateContext(), buf);
-    }
     
-    @Deprecated
-    public static void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        bufferData(getImmediateContext(), tgt, dat, usg);
-    }
     
-    @Deprecated
-    public static void fillBufferWithSize(int tgt, long sz, int usg) {
-        bufferData(getImmediateContext(), tgt, sz, usg);
-    }
     
     public static void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
         getBackend().bufferSubData(ctx, target, offset, data);
@@ -1181,10 +1148,6 @@ public class VulkanicAPI {
         getBackend().flushMappedBufferRange(ctx, target, offset, length);
     }
     
-    @Deprecated
-    public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        bufferSubData(getImmediateContext(), tgt, off, dat);
-    }
     
     public static int createVertexArray(CommandContext ctx) {
         return getBackend().createVertexArray(ctx);
@@ -1194,57 +1157,29 @@ public class VulkanicAPI {
         getBackend().bindVertexArray(ctx, vao);
     }
     
-    @Deprecated
-    public static int createVertexArrayObject() {
-        return createVertexArray(getImmediateContext());
-    }
     
-    @Deprecated
-    public static void selectVertexArray(int vao) {
-        bindVertexArray(getImmediateContext(), vao);
-    }
     
     public static java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
         return getBackend().mapBuffer(ctx, target, offset, length, access);
     }
     
-    @Deprecated
-    public static java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return mapBuffer(getImmediateContext(), tgt, off, len, acc);
-    }
     
     public static void unmapBuffer(CommandContext ctx, int target) {
         getBackend().unmapBuffer(ctx, target);
     }
     
-    @Deprecated
-    public static void unmapBufferData(int tgt) {
-        unmapBuffer(getImmediateContext(), tgt);
-    }
     
-    @Deprecated
-    public static int generateFramebufferObject() {
-        return createFramebuffer(getImmediateContext());
-    }
     
     public static void deleteFramebuffer(CommandContext ctx, int fbo) {
         getBackend().deleteFramebuffer(ctx, fbo);
     }
     
-    @Deprecated
-    public static void destroyFramebufferObject(int fbo) {
-        deleteFramebuffer(getImmediateContext(), fbo);
-    }
     
     public static void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
                                        int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         getBackend().blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    public static void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        blitFramebuffer(getImmediateContext(), srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
-    }
     
     public static int createShader(CommandContext ctx, int shaderType) {
         return getBackend().createShader(ctx, shaderType);
@@ -1258,38 +1193,18 @@ public class VulkanicAPI {
         return getBackend().createShaderProgram(ctx);
     }
     
-    @Deprecated
-    public static int constructShaderObject(int shaderType) {
-        return createShader(getImmediateContext(), shaderType);
-    }
     
     public static void deleteShader(CommandContext ctx, int shader) {
         getBackend().deleteShader(ctx, shader);
     }
     
-    @Deprecated
-    public static void disposeShaderObject(int shader) {
-        deleteShader(getImmediateContext(), shader);
-    }
     
-    @Deprecated
-    public static void compileShaderSource(int shader) {
-        compileShader(getImmediateContext(), shader);
-    }
     
-    @Deprecated
-    public static int constructProgramObject() {
-        return createShaderProgram(getImmediateContext());
-    }
     
     public static void deleteProgram(CommandContext ctx, int program) {
         getBackend().deleteProgram(ctx, program);
     }
     
-    @Deprecated
-    public static void disposeProgramObject(int program) {
-        deleteProgram(getImmediateContext(), program);
-    }
     
     public static void attachShader(CommandContext ctx, int program, int shader) {
         getBackend().attachShader(ctx, program, shader);
@@ -1315,30 +1230,10 @@ public class VulkanicAPI {
         return getBackend().getProgramInfoLog(ctx, program);
     }
     
-    @Deprecated
-    public static void linkProgramBinary(int program) {
-        linkProgram(getImmediateContext(), program);
-    }
     
-    @Deprecated
-    public static void attachShaderToProgram(int program, int shader) {
-        attachShader(getImmediateContext(), program, shader);
-    }
     
-    @Deprecated
-    public static int queryProgramParameter(int program, int pname) {
-        return getProgramParameter(getImmediateContext(), program, pname);
-    }
     
-    @Deprecated
-    public static int queryShaderParameter(int shader, int pname) {
-        return getShaderParameter(getImmediateContext(), shader, pname);
-    }
     
-    @Deprecated
-    public static String retrieveProgramInfoLog(int program) {
-        return getProgramInfoLog(getImmediateContext(), program);
-    }
     
     public static String getShaderInfoLog(CommandContext ctx, int shader) {
         return getBackend().getShaderInfoLog(ctx, shader);
@@ -1404,61 +1299,29 @@ public class VulkanicAPI {
         getBackend().bindVertexBuffer(ctx, bindingindex, buffer, offset, stride);
     }
     
-    @Deprecated
-    public static void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        setVertexAttribPointer(getImmediateContext(), index, size, type, normalized, stride, pointer);
-    }
     
     public static void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
         getBackend().setVertexAttribIPointer(ctx, index, size, type, stride, pointer);
     }
     
-    @Deprecated
-    public static void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
-        setVertexAttribIPointer(getImmediateContext(), index, size, type, stride, pointer);
-    }
     
-    @Deprecated
-    public static void activateVertexAttribute(int index) {
-        enableVertexAttribArray(getImmediateContext(), index);
-    }
     
     public static void disableVertexAttribArray(CommandContext ctx, int index) {
         getBackend().disableVertexAttribArray(ctx, index);
     }
     
-    @Deprecated
-    public static void deactivateVertexAttribute(int index) {
-        disableVertexAttribArray(getImmediateContext(), index);
-    }
     
     public static void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
         getBackend().setVertexAttribDivisor(ctx, index, divisor);
     }
     
-    @Deprecated
-    public static String retrieveShaderInfoLog(int shader) {
-        return getShaderInfoLog(getImmediateContext(), shader);
-    }
     
-    @Deprecated
-    public static int locateUniformVariable(int program, CharSequence name) {
-        return getUniformLocation(getImmediateContext(), program, name);
-    }
     
-    @Deprecated
-    public static void assignUniformInteger(int location, int value) {
-        setUniform1i(getImmediateContext(), location, value);
-    }
     
     public static void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
         getBackend().setAttributeLocation(ctx, program, index, name);
     }
     
-    @Deprecated
-    public static void bindAttributeLocation(int program, int index, CharSequence name) {
-        setAttributeLocation(getImmediateContext(), program, index, name);
-    }
     
     public static long createFenceSync(CommandContext ctx, int condition, int flags) {
         return getBackend().createFenceSync(ctx, condition, flags);
@@ -1476,12 +1339,10 @@ public class VulkanicAPI {
         getBackend().clearTexImage(ctx, texture, level, format, type, data);
     }
     
-    @Deprecated
     public static void setMaxShaderCompilerThreads(int count) {
         getBackend().setMaxShaderCompilerThreads(count);
     }
     
-    @Deprecated
     public static GraphicsCapabilities getGraphicsCapabilities() {
         return getBackend().getGraphicsCapabilities();
     }
@@ -1565,32 +1426,26 @@ public class VulkanicAPI {
         getBackend().labelObjectExt(ctx, type, object, label);
     }
     
-    @Deprecated
     public static boolean supportsKhrDebug() {
         return getBackend().supportsKhrDebug();
     }
     
-    @Deprecated
     public static boolean supportsArbDebugOutput() {
         return getBackend().supportsArbDebugOutput();
     }
     
-    @Deprecated
     public static void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupKhrDebugSystem(verbosityLevel, synchronous, messageHandler);
     }
     
-    @Deprecated
     public static void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupArbDebugSystem(verbosityLevel, synchronous, messageHandler);
     }
     
-    @Deprecated
     public static boolean hasBufferStorageExtension() {
         return getBackend().hasBufferStorageExtension();
     }
     
-    @Deprecated
     public static boolean hasVertexAttribBindingExtension() {
         return getBackend().hasVertexAttribBindingExtension();
     }
@@ -1661,137 +1516,70 @@ public class VulkanicAPI {
         getBackend().texBuffer(ctx, target, internalFormat, buffer);
     }
     
-    @Deprecated
-    public static void assignUniformFloat(int location, float value) {
-        getBackend().assignUniformFloat(location, value);
-    }
     
-    @Deprecated
-    public static void assignUniformFloat2(int location, float x, float y) {
-        getBackend().assignUniformFloat2(location, x, y);
-    }
     
-    @Deprecated
     public static void assignUniformFloat2v(int location, float[] value) {
         getBackend().assignUniformFloat2v(location, value);
     }
     
-    @Deprecated
-    public static void assignUniformFloat3(int location, float x, float y, float z) {
-        getBackend().assignUniformFloat3(location, x, y, z);
-    }
     
-    @Deprecated
     public static void assignUniformFloat3v(int location, float[] value) {
         getBackend().assignUniformFloat3v(location, value);
     }
     
-    @Deprecated
-    public static void assignUniformFloat4(int location, float x, float y, float z, float w) {
-        getBackend().assignUniformFloat4(location, x, y, z, w);
-    }
     
-    @Deprecated
     public static void assignUniformFloat4v(int location, float[] value) {
         getBackend().assignUniformFloat4v(location, value);
     }
     
-    @Deprecated
     public static void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
         getBackend().assignUniformMatrix4f(location, matrix);
     }
     
-    @Deprecated
     public static void bindUniformBufferBase(int bindingPoint, int bufferId) {
         getBackend().bindUniformBufferBase(bindingPoint, bufferId);
     }
     
-    @Deprecated
     public static void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
         getBackend().bindFragmentDataLocation(program, colorNumber, name);
     }
     
-    @Deprecated
     public static int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
         return getBackend().querySyncStatus(sync, pname, length);
     }
     
-    @Deprecated
     public static GraphicsCapabilities obtainGraphicsCapabilities() {
         return getBackend().obtainGraphicsCapabilities();
     }
     
-    @Deprecated
     public static GraphicsCapabilities initializeGraphicsCapabilities() {
         return getBackend().initializeGraphicsCapabilities();
     }
     
-    @Deprecated
     public static boolean checkFunctionAvailable(String functionName) {
         return getBackend().checkFunctionAvailable(functionName);
     }
     
-    @Deprecated
-    public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
-        copyBufferSubData(getImmediateContext(), readTarget, writeTarget, readOffset, writeOffset, size);
-    }
     
-    @Deprecated
     public static void deleteVertexArray(int vertexArray) {
         getBackend().deleteVertexArray(vertexArray);
     }
     
-    @Deprecated
-    public static void flushMappedBufferRange(int target, long offset, long length) {
-        flushMappedBufferRange(getImmediateContext(), target, offset, length);
-    }
     
-    @Deprecated
-    public static void createBufferStorage(int target, long size, int flags) {
-        bufferStorage(getImmediateContext(), target, size, flags);
-    }
     
-    @Deprecated
-    public static void createBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
-        bufferStorage(getImmediateContext(), target, data, flags);
-    }
     
-    @Deprecated
     public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         getBackend().multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
     
-    @Deprecated
-    public static void assignUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        setUniformMatrix4fv(getImmediateContext(), location, transpose, value);
-    }
     
-    @Deprecated
     public static void uploadShaderSourceNative(int shader, int count, long strings, long length) {
         getBackend().uploadShaderSourceNative(shader, count, strings, length);
     }
     
-    @Deprecated
-    public static void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        copyTexSubImage2D(getImmediateContext(), target, level, xoffset, yoffset, x, y, width, height);
-    }
     
-    // Debug object labeling (KHRDebug/GL43)
-    @Deprecated
-    public static void labelObject(int identifier, int name, String label) {
-        getBackend().labelObject(identifier, name, label);
-    }
     
-    // Debug group push/pop (KHRDebug/GL43)
-    @Deprecated
-    public static void pushDebugGroup(int source, int id, String message) {
-        getBackend().pushDebugGroup(source, id, message);
-    }
     
-    @Deprecated
-    public static void popDebugGroup() {
-        getBackend().popDebugGroup();
-    }
     
     // Additional methods for IrisRenderSystem migration
     
@@ -1799,100 +1587,40 @@ public class VulkanicAPI {
         getBackend().getIntegerv(ctx, pname, params);
     }
     
-    @Deprecated
-    public static void glGetIntegerv(int pname, int[] params) {
-        getIntegerv(getImmediateContext(), pname, params);
-    }
     
     public static void getFloatv(CommandContext ctx, int pname, float[] params) {
         getBackend().getFloatv(ctx, pname, params);
     }
     
-    @Deprecated
-    public static void glGetFloatv(int pname, float[] params) {
-        getFloatv(getImmediateContext(), pname, params);
-    }
     
     public static void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
         getBackend().uploadTexture1D(ctx, target, level, internalformat, width, border, format, type, pixels);
     }
     
-    @Deprecated
-    public static void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        uploadTexture1D(getImmediateContext(), target, level, internalformat, width, border, format, type, pixels);
-    }
     
-    @Deprecated
-    public static void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        uploadTexture2D(getImmediateContext(), target, level, internalformat, width, height, border, format, type, pixels);
-    }
     
     public static void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
         getBackend().uploadTexture3D(ctx, target, level, internalformat, width, height, depth, border, format, type, pixels);
     }
     
-    @Deprecated
-    public static void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        uploadTexture3D(getImmediateContext(), target, level, internalformat, width, height, depth, border, format, type, pixels);
-    }
     
-    @Deprecated
-    public static void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix) {
-        setUniformMatrix4fv(getImmediateContext(), location, transpose, matrix);
-    }
     
-    @Deprecated
-    public static void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
-        setUniformMatrix4fv(getImmediateContext(), location, transpose, matrix);
-    }
     
     public static void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
         getBackend().copyTexImage2D(ctx, target, level, internalFormat, x, y, width, height, border);
     }
     
-    @Deprecated
-    public static void glCopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
-        copyTexImage2D(getImmediateContext(), target, level, internalFormat, x, y, width, height, border);
-    }
     
-    @Deprecated
-    public static void glUniform1f(int location, float v0) {
-        setUniform1f(getImmediateContext(), location, v0);
-    }
     
-    @Deprecated
-    public static void glUniform2f(int location, float v0, float v1) {
-        setUniform2f(getImmediateContext(), location, v0, v1);
-    }
     
     public static void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
         getBackend().setUniform2i(ctx, location, v0, v1);
     }
     
-    @Deprecated
-    public static void glUniform2i(int location, int v0, int v1) {
-        setUniform2i(getImmediateContext(), location, v0, v1);
-    }
     
-    @Deprecated
-    public static void glUniform3f(int location, float v0, float v1, float v2) {
-        setUniform3f(getImmediateContext(), location, v0, v1, v2);
-    }
     
-    @Deprecated
-    public static void glUniform3i(int location, int v0, int v1, int v2) {
-        setUniform3i(getImmediateContext(), location, v0, v1, v2);
-    }
     
-    @Deprecated
-    public static void glUniform4f(int location, float v0, float v1, float v2, float v3) {
-        setUniform4f(getImmediateContext(), location, v0, v1, v2, v3);
-    }
     
-    @Deprecated
-    public static void glUniform4i(int location, int v0, int v1, int v2, int v3) {
-        setUniform4i(getImmediateContext(), location, v0, v1, v2, v3);
-    }
     
     /**
      * Sets texture parameters using an array of integers.
@@ -1906,15 +1634,7 @@ public class VulkanicAPI {
         getBackend().texParameteriv(ctx, target, pname, params);
     }
     
-    @Deprecated
-    public static void glTexParameteriv(int target, int pname, int[] params) {
-        texParameteriv(getImmediateContext(), target, pname, params);
-    }
     
-    @Deprecated
-    public static void glTexParameteri(int target, int pname, int param) {
-        texParameteri(getImmediateContext(), target, pname, param);
-    }
     
     /**
      * Sets a floating-point texture parameter for a texture bound to the specified target.
@@ -1932,66 +1652,30 @@ public class VulkanicAPI {
         getBackend().texParameteri(ctx, target, pname, param);
     }
     
-    @Deprecated
-    public static void glTexParameterf(int target, int pname, float param) {
-        texParameterf(getImmediateContext(), target, pname, param);
-    }
     
-    @Deprecated
-    public static String glGetProgramInfoLog(int program) {
-        return getProgramInfoLog(getImmediateContext(), program);
-    }
     
-    @Deprecated
-    public static String glGetShaderInfoLog(int shader) {
-        return getShaderInfoLog(getImmediateContext(), shader);
-    }
     
-    @Deprecated
-    public static void glDrawBuffers(int[] buffers) {
-        drawBuffers(getImmediateContext(), buffers);
-    }
     
-    @Deprecated
-    public static void glReadBuffer(int buffer) {
-        setReadBuffer(getImmediateContext(), buffer);
-    }
     
     public static void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
         getBackend().clearBufferfv(ctx, buffer, drawbuffer, values);
     }
     
-    @Deprecated
-    public static void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
-        clearBufferfv(getImmediateContext(), buffer, drawbuffer, values);
-    }
     
     public static void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
         getBackend().clearBufferiv(ctx, buffer, drawbuffer, values);
     }
     
-    @Deprecated
-    public static void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
-        clearBufferiv(getImmediateContext(), buffer, drawbuffer, values);
-    }
     
     public static void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
         getBackend().clearBufferuiv(ctx, buffer, drawbuffer, values);
     }
     
-    @Deprecated
-    public static void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
-        clearBufferuiv(getImmediateContext(), buffer, drawbuffer, values);
-    }
     
     public static String getActiveUniform(CommandContext ctx, int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
         return getBackend().getActiveUniform(ctx, program, index, size, type, name);
     }
     
-    @Deprecated
-    public static String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
-        return getActiveUniform(getImmediateContext(), program, index, size, type, name);
-    }
     
     public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
         getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
@@ -2001,281 +1685,108 @@ public class VulkanicAPI {
         getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
     }
     
-    @Deprecated
-    public static void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
-        readPixels(getImmediateContext(), x, y, width, height, format, type, pixels);
-    }
     
-    @Deprecated
-    public static void glBufferData(int target, float[] data, int usage) {
-        bufferData(getImmediateContext(), target, data, usage);
-    }
     
-    @Deprecated
-    public static void glBufferData(int target, int[] data, int usage) {
-        bufferData(getImmediateContext(), target, data, usage);
-    }
     
-    @Deprecated
-    public static void glBufferData(int target, java.nio.ByteBuffer data, int usage) {
-        bufferData(getImmediateContext(), target, data, usage);
-    }
     
-    @Deprecated
-    public static void glBufferData(int target, long size, int usage) {
-        bufferData(getImmediateContext(), target, size, usage);
-    }
     
-    @Deprecated
-    public static void glBufferSubData(int target, long offset, java.nio.ByteBuffer data) {
-        bufferSubData(getImmediateContext(), target, offset, data);
-    }
     
-    @Deprecated
-    public static void glBufferStorage(int target, long size, int flags) {
-        bufferStorage(getImmediateContext(), target, size, flags);
-    }
     
-    @Deprecated
-    public static void glBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
-        bufferStorage(getImmediateContext(), target, data, flags);
-    }
     
-    @Deprecated
-    public static java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
-        return mapBuffer(getImmediateContext(), target, offset, length, access);
-    }
     
-    @Deprecated
-    public static boolean glUnmapBuffer(int target) {
-        unmapBuffer(getImmediateContext(), target);
-        return true; // OpenGL spec: always returns true unless data corruption occurred
-    }
     
-    @Deprecated
-    public static boolean glIsBuffer(int buffer) {
-        return isBuffer(getImmediateContext(), buffer);
-    }
     
-    @Deprecated
-    public static void glBindBufferBase(int target, int index, int buffer) {
-        getBackend().glBindBufferBase(target, index, buffer);
-    }
     
     public static void setVertexAttrib4f(CommandContext ctx, int index, float v0, float v1, float v2, float v3) {
         getBackend().setVertexAttrib4f(ctx, index, v0, v1, v2, v3);
     }
     
-    @Deprecated
-    public static void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
-        setVertexAttrib4f(getImmediateContext(), index, v0, v1, v2, v3);
-    }
     
-    @Deprecated
-    public static void glDetachShader(int program, int shader) {
-        detachShader(getImmediateContext(), program, shader);
-    }
     
-    @Deprecated
-    public static void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
-        framebufferTexture2D(getImmediateContext(), target, attachment, textarget, texture, level);
-    }
     
-    @Deprecated
-    public static void glFramebufferTexture(int target, int attachment, int texture, int level) {
-        getBackend().glFramebufferTexture(target, attachment, texture, level);
-    }
     
-    @Deprecated
-    public static int glGetTexParameteri(int target, int pname) {
-        return getTexParameteri(getImmediateContext(), target, pname);
-    }
     
     public static void bindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format) {
         getBackend().bindImageTexture(ctx, unit, texture, level, layered, layer, access, format);
     }
     
-    @Deprecated
-    public static void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
-        bindImageTexture(getImmediateContext(), unit, texture, level, layered, layer, access, format);
-    }
     
     public static int getMaxImageUnits(CommandContext ctx) {
         return getBackend().getMaxImageUnits(ctx);
     }
     
-    @Deprecated
-    public static int glGetMaxImageUnits() {
-        return getMaxImageUnits(getImmediateContext());
-    }
     
     public static void createBuffers(CommandContext ctx, int[] buffers) {
         getBackend().createBuffers(ctx, buffers);
     }
     
-    @Deprecated
-    public static void glGenBuffers(int[] buffers) {
-        createBuffers(getImmediateContext(), buffers);
-    }
     
     public static void clearBufferSubData(CommandContext ctx, int target, int internalformat, long offset, long size, int format, int type, int[] data) {
         getBackend().clearBufferSubData(ctx, target, internalformat, offset, size, format, type, data);
     }
     
-    @Deprecated
-    public static void glClearBufferSubData(int target, int internalformat, long offset, long size, int format, int type, int[] data) {
-        clearBufferSubData(getImmediateContext(), target, internalformat, offset, size, format, type, data);
-    }
     
     public static void getProgramiv(CommandContext ctx, int program, int pname, int[] params) {
         getBackend().getProgramiv(ctx, program, pname, params);
     }
     
-    @Deprecated
-    public static void glGetProgramiv(int program, int pname, int[] params) {
-        getProgramiv(getImmediateContext(), program, pname, params);
-    }
     
-    @Deprecated
-    public static void glDispatchCompute(int workX, int workY, int workZ) {
-        dispatchCompute(getImmediateContext(), workX, workY, workZ);
-    }
     
     public static void memoryBarrier(CommandContext ctx, int barriers) {
         getBackend().memoryBarrier(ctx, barriers);
     }
     
-    @Deprecated
-    public static void glMemoryBarrier(int barriers) {
-        memoryBarrier(getImmediateContext(), barriers);
-    }
     
-    @Deprecated
-    public static void glDisablei(int target, int index) {
-        setIndexedEnabled(getImmediateContext(), target, index, false);
-    }
     
-    @Deprecated
-    public static void glEnablei(int target, int index) {
-        setIndexedEnabled(getImmediateContext(), target, index, true);
-    }
     
-    @Deprecated
-    public static void glBlendFunc(int sfactor, int dfactor) {
-        blendFunc(getImmediateContext(), sfactor, dfactor);
-    }
     
     public static void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
         getBackend().blendFuncSeparatei(ctx, buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
     
-    @Deprecated
-    public static void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
-        blendFuncSeparatei(getImmediateContext(), buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
-    }
     
-    @Deprecated
-    public static int glGetUniformBlockIndex(int program, String uniformBlockName) {
-        return getUniformBlockIndex(getImmediateContext(), program, uniformBlockName);
-    }
     
-    @Deprecated
-    public static void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        getBackend().glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
-    }
     
     public static int createSampler(CommandContext ctx) {
         return getBackend().createSampler(ctx);
     }
     
-    @Deprecated
-    public static int glGenSamplers() {
-        return createSampler(getImmediateContext());
-    }
     
     public static void deleteSampler(CommandContext ctx, int sampler) {
         getBackend().deleteSampler(ctx, sampler);
     }
     
-    @Deprecated
-    public static void glDeleteSamplers(int sampler) {
-        deleteSampler(getImmediateContext(), sampler);
-    }
     
-    @Deprecated
-    public static void glBindSampler(int unit, int sampler) {
-        getBackend().glBindSampler(unit, sampler);
-    }
     
     public static void bindSamplers(CommandContext ctx, int first, int[] samplers) {
         getBackend().bindSamplers(ctx, first, samplers);
     }
     
-    @Deprecated
-    public static void glBindSamplers(int first, int[] samplers) {
-        bindSamplers(getImmediateContext(), first, samplers);
-    }
     
     public static void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
         getBackend().setSamplerParameteri(ctx, sampler, pname, param);
     }
     
-    @Deprecated
-    public static void glSamplerParameteri(int sampler, int pname, int param) {
-        setSamplerParameteri(getImmediateContext(), sampler, pname, param);
-    }
     
     public static void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param) {
         getBackend().setSamplerParameterf(ctx, sampler, pname, param);
     }
     
-    @Deprecated
-    public static void glSamplerParameterf(int sampler, int pname, float param) {
-        setSamplerParameterf(getImmediateContext(), sampler, pname, param);
-    }
     
     public static void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params) {
         getBackend().setSamplerParameteriv(ctx, sampler, pname, params);
     }
     
-    @Deprecated
-    public static void glSamplerParameteriv(int sampler, int pname, int[] params) {
-        setSamplerParameteriv(getImmediateContext(), sampler, pname, params);
-    }
     
-    @Deprecated
-    public static int glGetInteger(int pname) {
-        return getInteger(getImmediateContext(), pname);
-    }
     
-    @Deprecated
-    public static void glDeleteBuffers(int buffer) {
-        deleteBuffer(getImmediateContext(), buffer);
-    }
     
-    @Deprecated
-    public static void glPolygonMode(int face, int mode) {
-        setPolygonMode(getImmediateContext(), face, mode);
-    }
     
-    @Deprecated
-    public static void glViewport(int x, int y, int width, int height) {
-        setViewport(getImmediateContext(), x, y, width, height);
-    }
     
     public static void dispatchComputeIndirect(CommandContext ctx, long offset) {
         getBackend().dispatchComputeIndirect(ctx, offset);
     }
     
-    @Deprecated
-    public static void glDispatchComputeIndirect(long offset) {
-        dispatchComputeIndirect(getImmediateContext(), offset);
-    }
     
-    @Deprecated
-    public static void glBindBuffer(int target, int buffer) {
-        bindBuffer(getImmediateContext(), target, buffer);
-    }
     
     public static String getString(CommandContext ctx, int name, int index) {
         return getBackend().getString(ctx, name, index);
@@ -2285,10 +1796,6 @@ public class VulkanicAPI {
         return getBackend().getString(ctx, name);
     }
     
-    @Deprecated
-    public static String glGetStringi(int name, int index) {
-        return getString(getImmediateContext(), name, index);
-    }
     
     public static void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
                                         int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
@@ -2298,40 +1805,15 @@ public class VulkanicAPI {
                                       width, height, depth);
     }
     
-    @Deprecated
-    public static void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth) {
-        copyImageSubData(getImmediateContext(), srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
-                        dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
-    }
     
     public static int checkFramebufferStatus(CommandContext ctx, int target) {
         return getBackend().checkFramebufferStatus(ctx, target);
     }
     
-    @Deprecated
-    public static int glCheckFramebufferStatus(int target) {
-        return checkFramebufferStatus(getImmediateContext(), target);
-    }
     
-    @Deprecated
-    public static void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        setUniformMatrix3fv(getImmediateContext(), location, transpose, value);
-    }
     
-    @Deprecated
-    public static void glUniformMatrix3fv(int location, boolean transpose, float[] value) {
-        setUniformMatrix3fv(getImmediateContext(), location, transpose, value);
-    }
     
-    @Deprecated
-    public static void glClearColor(float r, float g, float b, float a) {
-        setClearColor(getImmediateContext(), r, g, b, a);
-    }
     
-    @Deprecated
-    public static int glGetAttribLocation(int program, CharSequence name) {
-        return getAttributeLocation(getImmediateContext(), program, name);
-    }
     
     /**
      * Generates mipmaps for a texture bound to the specified target.
@@ -2343,15 +1825,7 @@ public class VulkanicAPI {
         getBackend().generateMipmap(ctx, target);
     }
     
-    @Deprecated
-    public static void glGenerateMipmap(int target) {
-        generateMipmap(getImmediateContext(), target);
-    }
     
-    @Deprecated
-    public static void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        blitFramebuffer(getImmediateContext(), srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
-    }
     
     // DSA (Direct State Access) methods - ARB versions
     
@@ -2359,91 +1833,51 @@ public class VulkanicAPI {
         getBackend().generateTextureMipmapDSA(ctx, texture);
     }
     
-    @Deprecated
-    public static void glGenerateTextureMipmap(int texture) {
-        generateTextureMipmapDSA(getImmediateContext(), texture);
-    }
     
     public static void textureParameteri(CommandContext ctx, int texture, int pname, int param) {
         getBackend().textureParameteri(ctx, texture, pname, param);
     }
     
-    @Deprecated
-    public static void glTextureParameteri(int texture, int pname, int param) {
-        textureParameteri(getImmediateContext(), texture, pname, param);
-    }
     
     public static void textureParameterf(CommandContext ctx, int texture, int pname, float param) {
         getBackend().textureParameterf(ctx, texture, pname, param);
     }
     
-    @Deprecated
-    public static void glTextureParameterf(int texture, int pname, float param) {
-        textureParameterf(getImmediateContext(), texture, pname, param);
-    }
     
     public static void textureParameteriv(CommandContext ctx, int texture, int pname, int[] params) {
         getBackend().textureParameteriv(ctx, texture, pname, params);
     }
     
-    @Deprecated
-    public static void glTextureParameteriv(int texture, int pname, int[] params) {
-        textureParameteriv(getImmediateContext(), texture, pname, params);
-    }
     
     public static void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
         getBackend().namedFramebufferReadBuffer(ctx, framebuffer, mode);
     }
     
-    @Deprecated
-    public static void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
-        namedFramebufferReadBuffer(getImmediateContext(), framebuffer, mode);
-    }
     
     public static void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
         getBackend().namedFramebufferDrawBuffers(ctx, framebuffer, bufs);
     }
     
-    @Deprecated
-    public static void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
-        namedFramebufferDrawBuffers(getImmediateContext(), framebuffer, bufs);
-    }
     
     public static void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value) {
         getBackend().clearNamedFramebufferfv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
-    public static void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
-        clearNamedFramebufferfv(getImmediateContext(), framebuffer, buffer, drawbuffer, value);
-    }
     
     public static void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
         getBackend().clearNamedFramebufferiv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
-    public static void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
-        clearNamedFramebufferiv(getImmediateContext(), framebuffer, buffer, drawbuffer, value);
-    }
     
     public static void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
         getBackend().clearNamedFramebufferuiv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
-    public static void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
-        clearNamedFramebufferuiv(getImmediateContext(), framebuffer, buffer, drawbuffer, value);
-    }
     
     public static int getTextureParameteri(CommandContext ctx, int texture, int pname) {
         return getBackend().getTextureParameteri(ctx, texture, pname);
     }
     
-    @Deprecated
-    public static int glGetTextureParameteri(int texture, int pname) {
-        return getTextureParameteri(getImmediateContext(), texture, pname);
-    }
     
     /**
      * Copies a portion of a read framebuffer to a texture subregion using Direct State Access.
@@ -2453,10 +1887,6 @@ public class VulkanicAPI {
         getBackend().copyTextureSubImage2D(ctx, texture, level, xoffset, yoffset, x, y, width, height);
     }
     
-    @Deprecated
-    public static void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        copyTextureSubImage2D(getImmediateContext(), texture, level, xoffset, yoffset, x, y, width, height);
-    }
     
     /**
      * Binds a texture to a specified texture unit using Direct State Access.
@@ -2466,10 +1896,6 @@ public class VulkanicAPI {
         getBackend().bindTextureUnit(ctx, unit, texture);
     }
     
-    @Deprecated
-    public static void glBindTextureUnit(int unit, int texture) {
-        bindTextureUnit(getImmediateContext(), unit, texture);
-    }
     
     /**
      * Creates a new buffer object using Direct State Access.
@@ -2479,10 +1905,6 @@ public class VulkanicAPI {
         return getBackend().createBuffers(ctx);
     }
     
-    @Deprecated
-    public static int glCreateBuffers() {
-        return createBuffers(getImmediateContext());
-    }
     
     /**
      * Uploads float array data to a named buffer using Direct State Access.
@@ -2492,10 +1914,6 @@ public class VulkanicAPI {
         getBackend().namedBufferData(ctx, buffer, data, usage);
     }
     
-    @Deprecated
-    public static void glNamedBufferData(int buffer, float[] data, int usage) {
-        namedBufferData(getImmediateContext(), buffer, data, usage);
-    }
     
     /**
      * Copies a rectangular region between two named framebuffers using Direct State Access.
@@ -2505,10 +1923,6 @@ public class VulkanicAPI {
         getBackend().blitNamedFramebuffer(ctx, readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    public static void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        blitNamedFramebuffer(getImmediateContext(), readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
-    }
     
     /**
      * Attaches a texture to a framebuffer attachment point using Direct State Access.
@@ -2523,10 +1937,6 @@ public class VulkanicAPI {
         getBackend().namedFramebufferTexture(ctx, framebuffer, attachment, texture, level);
     }
     
-    @Deprecated
-    public static void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
-        namedFramebufferTexture(getImmediateContext(), framebuffer, attachment, texture, level);
-    }
     
     /**
      * Creates a new framebuffer object using Direct State Access.
@@ -2538,20 +1948,8 @@ public class VulkanicAPI {
         return getBackend().createFramebuffers(ctx);
     }
     
-    @Deprecated
-    public static int glCreateFramebuffers() {
-        return createFramebuffers(getImmediateContext());
-    }
     
-    @Deprecated
-    public static int glGenFramebuffers() {
-        return getBackend().generateFramebufferObject();
-    }
     
-    @Deprecated
-    public static void glDeleteFramebuffers(int framebuffer) {
-        getBackend().destroyFramebufferObject(framebuffer);
-    }
     
     /**
      * Creates a new texture object for a specific target using Direct State Access.
@@ -2564,26 +1962,9 @@ public class VulkanicAPI {
         return getBackend().createTextures(ctx, target);
     }
     
-    @Deprecated
-    public static int glCreateTextures(int target) {
-        return createTextures(getImmediateContext(), target);
-    }
     
-    // Additional rendering operations
-    @Deprecated
-    public static void glDrawElements(int mode, int count, int type, long indices) {
-        drawElements(getImmediateContext(), mode, count, type, indices);
-    }
     
-    @Deprecated
-    public static void glBlendEquation(int mode) {
-        setBlendEquation(getImmediateContext(), mode);
-    }
     
-    @Deprecated
-    public static void glClearDepth(double depth) {
-        getBackend().glClearDepth(depth);
-    }
     
     /**
      * Queries a framebuffer attachment parameter.
@@ -2597,70 +1978,40 @@ public class VulkanicAPI {
         return getBackend().getFramebufferAttachmentParameteri(ctx, target, attachment, pname);
     }
     
-    @Deprecated
-    public static int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
-        return getFramebufferAttachmentParameteri(getImmediateContext(), target, attachment, pname);
-    }
     
-    // Debug callback control methods (low-level callback control methods only)
-    // Note: The high-level setup methods below use Vulkanic functional interfaces
-    @Deprecated
-    public static void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
-        debugMessageControl(getImmediateContext(), source, type, severity, ids, enabled);
-    }
     
-    @Deprecated
-    public static void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
-        debugMessageControlKHR(getImmediateContext(), source, type, severity, ids, enabled);
-    }
     
-    @Deprecated
-    public static void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
-        debugMessageControlARB(getImmediateContext(), source, type, severity, ids, enabled);
-    }
     
-    @Deprecated
-    public static void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
-        debugMessageEnableAMD(getImmediateContext(), category, severity, ids, enabled);
-    }
     
     // High-level debug callback wrapper methods that accept functional interfaces
-    @Deprecated
     public static void setupDebugMessageCallback(DebugMessageCallback callback) {
         getBackend().setupDebugMessageCallback(callback);
     }
     
-    @Deprecated
     public static void setupDebugMessageCallbackKHR(DebugMessageCallback callback) {
         getBackend().setupDebugMessageCallbackKHR(callback);
     }
     
-    @Deprecated
     public static void setupDebugMessageCallbackARB(DebugMessageCallbackARB callback) {
         getBackend().setupDebugMessageCallbackARB(callback);
     }
     
-    @Deprecated
     public static void setupDebugMessageCallbackAMD(DebugMessageCallbackAMD callback) {
         getBackend().setupDebugMessageCallbackAMD(callback);
     }
     
-    @Deprecated
     public static void clearDebugMessageCallback() {
         getBackend().clearDebugMessageCallback();
     }
     
-    @Deprecated
     public static void clearDebugMessageCallbackKHR() {
         getBackend().clearDebugMessageCallbackKHR();
     }
     
-    @Deprecated
     public static void clearDebugMessageCallbackARB() {
         getBackend().clearDebugMessageCallbackARB();
     }
     
-    @Deprecated
     public static void clearDebugMessageCallbackAMD() {
         getBackend().clearDebugMessageCallbackAMD();
     }
@@ -2668,116 +2019,19 @@ public class VulkanicAPI {
     // GL-style wrapper methods for backward compatibility
     // These delegate to the abstracted methods above
     
-    /**
-     * Binds a vertex attribute to a specific location in a shader program.
-     * Wrapper for bindAttributeLocation.
-     */
-    @Deprecated
-    public static void glBindAttribLocation(int program, int index, CharSequence name) {
-        bindAttributeLocation(program, index, name);
-    }
     
-    /**
-     * Configures a vertex attribute pointer.
-     * Wrapper for configureVertexAttribute.
-     */
-    @Deprecated
-    public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        configureVertexAttribute(index, size, type, normalized, stride, pointer);
-    }
     
-    /**
-     * Enables a vertex attribute array.
-     * Wrapper for enableVertexAttribArray with immediate context.
-     */
-    @Deprecated
-    public static void glEnableVertexAttribArray(int index) {
-        enableVertexAttribArray(getImmediateContext(), index);
-    }
     
-    /**
-     * Creates a new shader program object.
-     * Wrapper for constructProgramObject.
-     */
-    @Deprecated
-    public static int glCreateProgram() {
-        return constructProgramObject();
-    }
     
-    /**
-     * Attaches a shader to a program.
-     * Wrapper for attachShader with immediate context.
-     */
-    @Deprecated
-    public static void glAttachShader(int program, int shader) {
-        attachShader(getImmediateContext(), program, shader);
-    }
     
-    /**
-     * Links a program object.
-     * Wrapper for linkProgramBinary.
-     */
-    @Deprecated
-    public static void glLinkProgram(int program) {
-        linkProgramBinary(program);
-    }
     
-    /**
-     * Returns a parameter from a program object.
-     * Wrapper for queryProgramParameter.
-     */
-    @Deprecated
-    public static int glGetProgrami(int program, int pname) {
-        return queryProgramParameter(program, pname);
-    }
     
-    /**
-     * Installs a program object as part of current rendering state.
-     * Wrapper for bindShaderProgram.
-     */
-    @Deprecated
-    public static void glUseProgram(int program) {
-        CommandContext ctx = getImmediateContext();
-        bindShaderProgram(ctx, program);
-    }
     
-    /**
-     * Deletes a program object.
-     * Wrapper for disposeProgramObject.
-     */
-    @Deprecated
-    public static void glDeleteProgram(int program) {
-        disposeProgramObject(program);
-    }
     
-    /**
-     * Returns the location of a uniform variable.
-     * Wrapper for locateUniformVariable.
-     */
-    @Deprecated
-    public static int glGetUniformLocation(int program, CharSequence name) {
-        return locateUniformVariable(program, name);
-    }
     
-    /**
-     * Sets the value of a uniform variable.
-     * Wrapper for assignUniformInteger.
-     */
-    @Deprecated
-    public static void glUniform1i(int location, int value) {
-        assignUniformInteger(location, value);
-    }
     
     // GL43+ Vertex Attribute methods
     
-    /**
-     * Binds a buffer to a vertex buffer bind point (GL43+).
-     * Wrapper for bindVertexBuffer with immediate context.
-     */
-    @Deprecated
-    public static void glBindVertexBuffer(int bindingindex, int buffer, long offset, int stride) {
-        bindVertexBuffer(getImmediateContext(), bindingindex, buffer, offset, stride);
-    }
     
     /**
      * Specifies the organization of vertex arrays (GL43+).
@@ -2800,48 +2054,12 @@ public class VulkanicAPI {
         getBackend().setVertexAttribBinding(ctx, attribindex, bindingindex);
     }
     
-    /**
-     * Disables a generic vertex attribute array.
-     */
-    @Deprecated
-    public static void glDisableVertexAttribArray(int index) {
-        deactivateVertexAttribute(index);
-    }
     
-    /**
-     * Defines an array of generic vertex attribute data with integer data (GL20+).
-     * Specifies the data format for integer vertex attributes.
-     */
-    @Deprecated
-    public static void glVertexAttribIPointer(int index, int size, int type, int stride, long pointer) {
-        configureVertexAttributeInteger(index, size, type, stride, pointer);
-    }
     
     // VAO methods
     
-    /**
-     * Generates vertex array object names.
-     */
-    @Deprecated
-    public static int glGenVertexArrays() {
-        return getBackend().genVertexArrays();
-    }
     
-    /**
-     * Binds a vertex array object.
-     */
-    @Deprecated
-    public static void glBindVertexArray(int array) {
-        bindVertexArray(getImmediateContext(), array);
-    }
     
-    /**
-     * Deletes vertex array objects.
-     */
-    @Deprecated
-    public static void glDeleteVertexArrays(int array) {
-        getBackend().deleteVertexArrays(array);
-    }
     
     // GL.getCapabilities() and GLUtil support
     
@@ -2852,7 +2070,6 @@ public class VulkanicAPI {
      * 
      * @return Platform-specific capabilities object (cast to GLCapabilities for OpenGL backend)
      */
-    @Deprecated
     public static Object getGLCapabilities() {
         return getBackend().getGLCapabilities();
     }
@@ -2861,7 +2078,6 @@ public class VulkanicAPI {
      * Sets up debug message callback using GLUtil-style callback.
      * @param stream The PrintStream to write debug messages to
      */
-    @Deprecated
     public static void setupDebugMessageCallback(java.io.PrintStream stream) {
         getBackend().setupDebugMessageCallback(stream);
     }
@@ -2872,7 +2088,6 @@ public class VulkanicAPI {
      * Checks if OpenGL 3.2 is supported.
      * @return true if OpenGL 3.2 is supported
      */
-    @Deprecated
     public static boolean checkOpenGL32Support() {
         return getBackend().checkOpenGL32Support();
     }
@@ -2881,7 +2096,6 @@ public class VulkanicAPI {
      * Checks if OpenGL 3.3 is supported.
      * @return true if OpenGL 3.3 is supported
      */
-    @Deprecated
     public static boolean checkOpenGL33Support() {
         return getBackend().checkOpenGL33Support();
     }
@@ -2890,7 +2104,6 @@ public class VulkanicAPI {
      * Checks if ARB_instanced_arrays extension is supported.
      * @return true if ARB_instanced_arrays is supported
      */
-    @Deprecated
     public static boolean checkARBInstancedArraysSupport() {
         return getBackend().checkARBInstancedArraysSupport();
     }
@@ -2899,7 +2112,6 @@ public class VulkanicAPI {
      * Gets the function pointer for glNamedBufferData.
      * @return function pointer, or 0 if not available
      */
-    @Deprecated
     public static long getNamedBufferDataPointer() {
         return getBackend().getNamedBufferDataPointer();
     }
@@ -2908,7 +2120,6 @@ public class VulkanicAPI {
      * Gets the function pointer for glBufferStorage.
      * @return function pointer, or 0 if not available
      */
-    @Deprecated
     public static long getBufferStoragePointer() {
         return getBackend().getBufferStoragePointer();
     }
@@ -2917,41 +2128,24 @@ public class VulkanicAPI {
      * Gets the function pointer for glBindVertexBuffer.
      * @return function pointer, or 0 if not available
      */
-    @Deprecated
     public static long getBindVertexBufferPointer() {
         return getBackend().getBindVertexBufferPointer();
     }
     
-    /**
-     * Gets the function pointer for glVertexAttribBinding.
-     * @return function pointer, or 0 if not available
-     */
-    @Deprecated
-    public static long getVertexAttribBindingPointer() {
-        return getBackend().getVertexAttribBindingPointer();
-    }
     
     /**
      * Gets capability information as a formatted string for debugging.
      * @return formatted capability information
      */
-    @Deprecated
     public static String getCapabilityDebugInfo() {
         return "Your OpenGL support:\n" +
                 "openGL version 3.2+: [" + checkOpenGL32Support() + "] <- REQUIRED\n" +
-                "Vertex Attribute Buffer Binding: [" + (getVertexAttribBindingPointer() != 0) + "] <- optional improvement\n" +
+                "Vertex Attribute Buffer Binding: [" + (getBindVertexBufferPointer() != 0) + "] <- optional improvement\n" +
                 "Buffer Storage: [" + (getBufferStoragePointer() != 0) + "] <- optional improvement\n";
     }
     
     // Additional GL query and state methods
     
-    /**
-     * Tests whether a capability is enabled.
-     */
-    @Deprecated
-    public static boolean glIsEnabled(int cap) {
-        return isEnabled(getImmediateContext(), cap);
-    }
     
     /**
      * Determines if a name corresponds to a framebuffer object.
@@ -2960,14 +2154,6 @@ public class VulkanicAPI {
         return getBackend().isFramebuffer(ctx, framebuffer);
     }
     
-    /**
-     * Determines if a name corresponds to a texture.
-     * Wrapper for isTexture with immediate context.
-     */
-    @Deprecated
-    public static boolean glIsTexture(int texture) {
-        return isTexture(getImmediateContext(), texture);
-    }
     
     /**
      * Determines if a name corresponds to a vertex array object.
@@ -2997,21 +2183,7 @@ public class VulkanicAPI {
         getBackend().setStencilFunc(ctx, func, ref, mask);
     }
     
-    /**
-     * Specifies whether front- or back-facing polygons can be culled.
-     */
-    @Deprecated
-    public static void glCullFace(int mode) {
-        setCullFaceMode(getImmediateContext(), mode);
-    }
     
-    /**
-     * Generates a single texture name.
-     */
-    @Deprecated
-    public static int glGenTextures() {
-        return createTexture2D(getImmediateContext());
-    }
     
     // CommandContext-aware methods for Batch 23
     

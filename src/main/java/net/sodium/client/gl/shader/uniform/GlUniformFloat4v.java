@@ -17,6 +17,6 @@ public class GlUniformFloat4v extends GlUniform<float[]> {
     }
 
     public void set(float x, float y, float z, float w) {
-        VulkanicAPI.assignUniformFloat4(this.index, x, y, z, w);
+        VulkanicAPI.setUniform4f(VulkanicAPI.getImmediateContext(), this.index, x, y, z, w);
     }
 }
