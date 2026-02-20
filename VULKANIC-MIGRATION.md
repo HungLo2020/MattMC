@@ -1,267 +1,304 @@
 # Vulkanic Graphics Abstraction Layer — Migration Guide
 
 **Last Updated:** 2026-02-20  
-**Status:** Phase 1 & 2 complete · Phase 2.5 deprecated-method migration complete · Phase 3 not yet started
+**Status:** Phase 1 & 2 complete · Phase 2.5 deprecated-method migration complete · Phase 3 planning
 
 ---
 
-## 1 · Executive Summary
+## 1 · Goal
 
-Vulkanic is MattMC's graphics abstraction layer. Its goal is to decouple all game and mod code from OpenGL so that a Vulkan backend can be added later without changing any rendering logic above the abstraction boundary.
+**Vulkanic is the backend.** Its job is to own both the OpenGL implementation and the future Vulkan implementation. Everything — game code, mod code, and Blaze3D — must flow through Vulkanic so that swapping in the Vulkan backend requires zero changes above the Vulkanic boundary.
 
-**What has been achieved so far:**
-
-- No code outside `net/vulkanic/backends/opengl/` imports `org.lwjgl.opengl.*` — enforced by `ArchitecturalBoundaryTest`.
-- All 283 previously-deprecated VulkanicAPI methods have been replaced with `CommandContext`-aware signatures. Zero `@Deprecated` annotations remain.
-- Blaze3D (`GlStateManager`, `GlCommandEncoder`, `GlDevice`, etc.) calls VulkanicAPI exclusively — no direct LWJGL OpenGL calls anywhere outside the backend.
-- Sodium, Iris, and Distant Horizons all call VulkanicAPI; none import `org.lwjgl.opengl.*` directly.
-
-**What the previous Migration Guide got wrong:**
-
-The old document claimed Phase 2.5 required 270-400 hours to design "command buffer infrastructure, pipeline management, descriptor sets" etc. from scratch. That analysis was incorrect because it overlooked a critical fact: **Blaze3D already has a modern, Vulkan-shaped rendering architecture built in.** The work required is not to design those abstractions — they already exist. The work is to route the remaining bypass call sites through them.
+The Vulkan backend lives in `net.vulkanic.backends.vulkan`. It does not live in Blaze3D.
 
 ---
 
-## 2 · The Real Architecture (As It Exists Today)
+## 2 · The Architectural Problem
 
-Understanding the actual call chain is essential before planning any further work.
+### 2.1 · Two Competing Abstraction Layers
 
-### 2.1 · The Modern Path (Vulkan-Ready)
+The codebase currently has two separate abstraction layers that serve overlapping roles:
+
+**Layer A — Blaze3D** (`net.blaze3d.systems`, `net.blaze3d.opengl`, `net.blaze3d.pipeline`)
+```
+GpuDevice → CommandEncoder → RenderPass → RenderPipeline
+```
+Blaze3D defined its own device/command/pipeline model. `GlDevice`, `GlCommandEncoder`, and `GlRenderPass` are the OpenGL implementations. These are used by core Minecraft rendering (LevelRenderer, GuiRenderer, SkyRenderer, etc.).
+
+**Layer B — Vulkanic** (`net.vulkanic`)
+```
+VulkanicAPI → GraphicsBackend → OpenGLBackend
+```
+Vulkanic is the intended backend abstraction. All 570 VulkanicAPI methods dispatch through `GraphicsBackend` to `OpenGLBackend`. `OpenGLBackend` is the only file that may import `org.lwjgl.opengl.*`.
+
+### 2.2 · How They Interact Today
+
+Currently, Blaze3D's OpenGL backend classes (`GlCommandEncoder`, `GlStateManager`, `GlDevice`) call Vulkanic internally:
 
 ```
-Game / mod rendering code (LevelRenderer, GuiRenderer, SkyRenderer, etc.)
-    ↓  calls
-RenderSystem.getDevice()                     [net.blaze3d.systems.GpuDevice interface]
-    ↓  returns
-GlDevice                                     [net.blaze3d.opengl.GlDevice implements GpuDevice]
-    ↓  .createCommandEncoder() returns
-GlCommandEncoder                             [implements CommandEncoder]
-    ↓  .createRenderPass(...) returns
-GlRenderPass                                 [implements RenderPass]
-    ↓  .setPipeline() / .drawIndexed() etc.
-GlCommandEncoder.executeDraw()               ← calls VulkanicAPI.drawIndexedInstanced(getImmediateContext(), ...)
-GlCommandEncoder.applyPipelineState()        ← calls GlStateManager._enableDepthTest() etc.
-    ↓
-GlStateManager                               ← calls VulkanicAPI.setCapabilityEnabled(getImmediateContext(), ...)
-    ↓
-VulkanicAPI.*(getImmediateContext(), ...)     [net.vulkanic.VulkanicAPI]
-    ↓
-OpenGLBackend                                [net.vulkanic.backends.opengl.OpenGLBackend]
-    ↓
-LWJGL GL11/GL20/GL30/etc.                   [only here, in the backend]
+Game code → RenderSystem.getDevice() → GlDevice
+                                           ↓ calls GlCommandEncoder
+                                              ↓ calls GlStateManager
+                                                 ↓ calls VulkanicAPI.*(getImmediateContext(), ...)
+                                                    ↓
+                                                  OpenGLBackend → LWJGL
 ```
 
-**Key insight:** The `GpuDevice → CommandEncoder → RenderPass → RenderPipeline` stack in Blaze3D is already the Vulkan-compatible architecture. For the majority of Minecraft's core rendering (world, chunks, particles, sky, weather, GUI, post-processing) this path is already in use today.
+This is backwards from the goal. Blaze3D is calling Vulkanic — meaning Blaze3D is a consumer of Vulkanic, not a peer. When it comes time to add a Vulkan backend, **the backend needs to be in Vulkanic**, but the current code would require implementing `VkDevice implements GpuDevice` in Blaze3D, which is not owned by this project and cannot be cleanly controlled.
 
-Adding a Vulkan backend at the Blaze3D level means:
+### 2.3 · What Needs to Change
 
-1. Implementing `VkDevice implements GpuDevice`
-2. Implementing `VkCommandEncoder implements CommandEncoder`
-3. Implementing `VkRenderPass implements RenderPass`
-4. `GlDevice` → `VkDevice` selected at startup based on config
+The Blaze3D concepts of `GpuDevice`, `CommandEncoder`, `RenderPass`, `RenderPipeline`, and `FrameGraphBuilder` are sound abstractions — they model the Vulkan execution model well. The problem is where they live.
 
-The `GlCommandEncoder` and `GlStateManager` VulkanicAPI calls are **backend implementation details** — they are correct, intentional, and will stay calling VulkanicAPI even in a Vulkan world (just through a different backend).
-
-### 2.2 · The Bypass Paths (Work Remaining)
-
-Three subsystems still call `VulkanicAPI.getImmediateContext()` directly from rendering logic instead of going through the `GpuDevice → CommandEncoder → RenderPass` stack:
-
-| Subsystem | Bypass call sites | Notes |
-|---|---|---|
-| **Iris Shaders** | 161 | `IrisRenderSystem`, `GLDebug`, `IrisGenericRenderProgram`, `IrisLodRenderProgram`, Iris pipeline renderers |
-| **Distant Horizons** | 252 | `GLState`, `GLBuffer`, `LodRenderer`, `ShaderProgram`, texture/framebuffer wrappers, all renderers |
-| **Sodium** | 66 | `GLRenderDevice`, `GlProgram`, `GlShader`, uniform wrappers, `GlFence`, `GlVertexArray`, `GlBuffer` |
-| **VoxelMap** | 1 | `CompressibleGLBufferedImage` (mipmap generation) |
-
-**Total bypass calls outside Blaze3D and Vulkanic layer:** 480
-
-These calls are safe and correct on the OpenGL backend today. The problem is that when a Vulkan backend exists, these bypass calls will not be routed through it — they will either break or require each subsystem to be updated individually to speak Vulkan.
-
-The Blaze3D `getDevice()` path was designed precisely so subsystems do not need to know which backend is running.
-
-### 2.3 · The Vulkanic Layer's Role
-
-`VulkanicAPI` and `GraphicsBackend` sit between Blaze3D's OpenGL backend classes and the LWJGL bindings. They serve two purposes:
-
-1. **Isolation**: Keep raw `org.lwjgl.opengl.*` imports confined to `OpenGLBackend.java`.
-2. **Runtime dispatch**: Allow a future Vulkan backend to be swapped in by changing which `GraphicsBackend` implementation is registered.
-
-`VulkanicAPI` is **not** the user-facing high-level API for game/mod rendering. That role belongs to the Blaze3D `GpuDevice / CommandEncoder / RenderPass / RenderPipeline` stack. VulkanicAPI is the **low-level bridge** that Blaze3D's OpenGL implementation calls internally.
+**The correct direction:**
+- The `GpuDevice / CommandEncoder / RenderPass / RenderPipeline` abstraction layer moves **into Vulkanic**.
+- Blaze3D's `GlDevice`, `GlCommandEncoder`, `GlRenderPass` either:
+  - Become thin delegating facades that call Vulkanic (not the other way around), or
+  - Are replaced entirely by Vulkanic's own implementations.
+- The Vulkan backend is then added in `net.vulkanic.backends.vulkan` as a full implementation of the same Vulkanic interfaces.
+- `VulkanicAPI.initialize(BackendType.VULKAN)` selects the Vulkan path. Everything above it is unchanged.
 
 ---
 
-## 3 · What Was Actually Accomplished
+## 3 · The Target Architecture
 
-### Phase 1: Blaze3D / GlStateManager ✅ Complete
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  Game / mod rendering code (Minecraft, Iris, Sodium, DH, etc.)   │
+│  Imports from net.vulkanic.* ONLY                                  │
+└───────────────────────────────┬────────────────────────────────────┘
+                                │
+                                ▼
+┌────────────────────────────────────────────────────────────────────┐
+│  Vulkanic Frontend API  (net.vulkanic)                            │
+│  VulkanicAPI  — 570+ static methods                                │
+│  GraphicsBackend — the complete interface (device + pipeline +     │
+│                    command buffer + render pass + resource mgmt)   │
+│  CommandContext — wraps VkCommandBuffer or OpenGL immediate ctx    │
+└──────────────────────────┬────────────────────────────────────────┘
+              ┌────────────┴────────────┐
+              ▼                          ▼
+┌─────────────────────────┐  ┌──────────────────────────────┐
+│  OpenGLBackend          │  │  VulkanBackend  (future)     │
+│  net.vulkanic.backends  │  │  net.vulkanic.backends       │
+│  .opengl.OpenGLBackend  │  │  .vulkan.VulkanBackend       │
+│                         │  │                              │
+│  Only file that may     │  │  Only file that may          │
+│  import lwjgl.opengl.*  │  │  import lwjgl.vulkan.*       │
+└─────────────────────────┘  └──────────────────────────────┘
+```
 
-All methods in `GlStateManager`, `GlCommandEncoder`, `GlDevice`, `GlDebugLabel`, `DirectStateAccess`, `VertexArrayCache`, and related Blaze3D classes were migrated from direct LWJGL calls to VulkanicAPI calls. The `ArchitecturalBoundaryTest` enforces no regressions.
+Blaze3D (`GlDevice`, `GlCommandEncoder`, `GlRenderPass`) in this final state is either:
+- A thin facade layer that calls `VulkanicAPI` for everything (delegating upward instead of downward), or
+- Phased out as game code is migrated to call `VulkanicAPI` directly.
 
-### Phase 2: Mod Integration ✅ Complete
+---
 
-Sodium, Iris, and Distant Horizons no longer import `org.lwjgl.opengl.*`. All their rendering calls flow through VulkanicAPI. The architectural boundary test passes.
+## 4 · What Was Accomplished
+
+### Phase 1: Blaze3D Uses VulkanicAPI ✅ Complete
+
+All rendering operations in `GlStateManager`, `GlCommandEncoder`, `GlDevice`, `GlDebugLabel`, `DirectStateAccess`, and related Blaze3D classes call `VulkanicAPI`. No `org.lwjgl.opengl.*` imports exist outside `OpenGLBackend`. The `ArchitecturalBoundaryTest` enforces this.
+
+### Phase 2: Mods Use VulkanicAPI ✅ Complete
+
+Sodium, Iris, and Distant Horizons all call VulkanicAPI. None import `org.lwjgl.opengl.*` directly.
 
 ### Phase 2.5: CommandContext Migration ✅ Complete
 
-All 283 previously-deprecated VulkanicAPI methods have been replaced with `CommandContext`-aware signatures. `GraphicsBackend` now has 212 rendering methods that all accept a `CommandContext` parameter, following the design intent where a Vulkan backend would pass a `VkCommandBuffer` handle through the `getHandle()` method. Zero `@Deprecated` annotations remain in VulkanicAPI, GraphicsBackend, or OpenGLBackend.
+All 283 previously-deprecated VulkanicAPI methods replaced with `CommandContext`-aware signatures. `GraphicsBackend` now has 212 rendering methods that all accept `CommandContext`. Zero `@Deprecated` annotations remain in VulkanicAPI, GraphicsBackend, or OpenGLBackend. The `CommandContext.getHandle()` method is designed to carry a `VkCommandBuffer` handle when the Vulkan backend is active.
 
 ---
 
-## 4 · What Actually Needs to Happen Next
+## 5 · What Needs to Happen Next
 
-The old roadmap described building new abstractions. The correct roadmap is about **routing existing code through existing abstractions**.
+### Phase 3: Elevate Vulkanic to Own the Full Abstraction
 
-### Phase 3: Route Bypass Callers Through GpuDevice (Current Priority)
+**Goal:** Grow `GraphicsBackend` to encompass the `GpuDevice / CommandEncoder / RenderPass / RenderPipeline` concepts that currently live in Blaze3D. Then make Blaze3D delegate *to* Vulkanic rather than vice versa.
 
-**Goal:** Eliminate the 480 bypass `getImmediateContext()` calls in Iris, DH, Sodium, and VoxelMap by making them use the `GpuDevice → CommandEncoder → RenderPass` path that Blaze3D already provides.
+This is the step that puts Vulkanic in the position where adding a Vulkan backend requires only implementing a new `GraphicsBackend`.
 
-**Why this is the right next step:**
-- OpenGL backend stays 100% functional at every sub-step (GlCommandEncoder just calls GlStateManager as before).
-- Each subsystem migration is isolated — one subsystem at a time, one feature category at a time.
-- When done, a Vulkan backend only requires implementing `GpuDevice / CommandEncoder / RenderPass` interfaces — no game or mod code changes needed.
-- The architectural boundary test already validates the import rules; adding a "no raw getImmediateContext() in mod code" test rule would allow automated regression prevention.
+#### 3a — Migrate the Device-Level Concepts into GraphicsBackend
 
-**Ordering (least risky first):**
+The `GpuDevice` interface in Blaze3D defines:
+- `createCommandEncoder()` — returns a `CommandEncoder`
+- `createTexture(...)` — allocates a GPU texture
+- `createBuffer(...)` — allocates a GPU buffer
+- `precompilePipeline(RenderPipeline)` — compiles shaders and bakes pipeline state
 
-#### 3a · VoxelMap (1 call) — Trivial
+These all belong in `GraphicsBackend`. The goal is that `VulkanicAPI.createTexture(...)`, `VulkanicAPI.createBuffer(...)`, `VulkanicAPI.beginCommandBuffer()`, etc. dispatch through `GraphicsBackend` to either `OpenGLBackend` or `VulkanBackend`.
 
-`CompressibleGLBufferedImage` calls `generateTextureMipmap` and `bindTexture2D` directly. This is one call site and can be replaced with a Blaze3D `CommandEncoder` call or moved to be triggered from the proper Blaze3D texture update path.
+For the OpenGL backend, these methods delegate to the existing `GlDevice` / `GlCommandEncoder` implementations. Nothing changes in behavior; the ownership of the interface shifts.
 
-#### 3b · Sodium (66 calls) — Straightforward
+#### 3b — Migrate the Command-Encoder / Render-Pass Concepts
 
-Sodium already partially uses the Blaze3D path:
-- `ShaderChunkRenderer` already calls `RenderSystem.getDevice().createCommandEncoder().applyPipelineState()`.
-- `SodiumGameOptionPages` already uses `RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures()`.
+The `CommandEncoder` and `RenderPass` interfaces define:
+- `createRenderPass(textureView, clearColor, ...)` → begin rendering to a target
+- `setPipeline(RenderPipeline)` → bind a compiled pipeline
+- `setVertexBuffer / setIndexBuffer` → bind geometry
+- `drawIndexed / draw` → issue a draw call
+- `close()` → end the render pass
 
-The remaining 66 bypass calls are in:
-- `GlBuffer` / `GlVertexArray` — buffer management that maps to `GpuBuffer` / `CommandEncoder.mapBuffer()`.
-- `GlProgram` / `GlShader` / uniform wrappers — shader compilation and uniform upload; map to `GpuDevice.precompilePipeline()` and `RenderPass.setUniform()`.
-- `GlFence` — GPU synchronization; maps to `CommandEncoder.createFence()` and `GpuFence`.
-- `GLRenderDevice` — Sodium's own `RenderDevice` abstraction; its `CommandList` and `DrawCommandList` wrappers could be re-implemented using the Blaze3D `CommandEncoder`/`RenderPass` APIs.
+These map directly to Vulkan:
+- `vkCmdBeginRenderPass`
+- `vkCmdBindPipeline`
+- `vkCmdBindVertexBuffers / vkCmdBindIndexBuffer`
+- `vkCmdDrawIndexed`
+- `vkCmdEndRenderPass`
 
-#### 3c · Iris Shaders (161 calls) — Medium
+The Vulkanic `CommandContext` already carries the `getHandle()` method intended to wrap a `VkCommandBuffer`. Extending `GraphicsBackend` with `beginRenderPass(ctx, target, ...)`, `setPipeline(ctx, pipeline)`, `drawIndexed(ctx, ...)`, `endRenderPass(ctx)` gives Vulkanic complete ownership of this model.
 
-Iris already uses `RenderSystem.getDevice().createCommandEncoder().createRenderPass()` in several places (`CompositeRenderer`, `FinalPassRenderer`, `ShadowCompositeRenderer`, `HorizonRenderer`, `CenterDepthSampler`). The remaining 161 bypass calls are concentrated in:
-- `IrisRenderSystem` (95 calls) — Iris's own GL abstraction layer; most of these are thin wrappers that delegate to `VulkanicAPI` and should instead delegate to a `CommandEncoder` obtained from `RenderSystem.getDevice()`.
-- `IrisLodRenderProgram` / `IrisGenericRenderProgram` (45 calls) — DH-Iris compatibility shaders; these mirror the DH `ShaderProgram` pattern and should use `GpuDevice.precompilePipeline()`.
-- `GLDebug` / `FinalPassRenderer` / uniform classes — scattered uses of compute, image bindings, and state manipulation.
+`OpenGLBackend` implements these by calling `GlCommandEncoder` (as it currently does). `VulkanBackend` implements them natively with Vulkan API calls.
 
-The Iris `CustomPass` interface already extends `RenderPassInterface` which hooks into `GlRenderPass`. This is the integration point for Iris's custom rendering — extending it rather than bypassing it is the correct direction.
+#### 3c — Migrate the Pipeline / Shader Concepts
 
-#### 3d · Distant Horizons (252 calls) — Largest effort
+`RenderPipeline` in Blaze3D is a descriptor-style object (vertex shader, fragment shader, blend function, depth test, cull mode, vertex format, etc.). `GpuDevice.precompilePipeline()` compiles it into a `CompiledRenderPipeline` (`GlRenderPipeline` today; a `VkPipeline` future).
 
-DH maintains its own parallel rendering stack (`GLBuffer`, `DhFramebuffer`, `DhColorTexture`, `ShaderProgram`, vertex attribute objects, multiple renderers). This stack maps cleanly onto the Blaze3D model:
+This pipeline concept belongs in Vulkanic as:
+- `VulkanicAPI.createPipeline(PipelineDescriptor)` → returns an opaque `PipelineHandle`
+- `OpenGLBackend.createPipeline(...)` → compiles shaders, links programs, caches state
+- `VulkanBackend.createPipeline(...)` → compiles SPIR-V, creates `VkPipeline`
 
-| DH class | Blaze3D equivalent |
-|---|---|
-| `GLBuffer` | `GpuBuffer` (via `GpuDevice.createBuffer()`) |
-| `DhFramebuffer` / `DhColorTexture` / `DHDepthTexture` | `GpuTexture` / `GpuTextureView` (via `GpuDevice.createTexture()`) |
-| `ShaderProgram` / `Shader` | `RenderPipeline` (via `GpuDevice.precompilePipeline()`) |
-| `AbstractVertexAttribute` | `VertexFormat` / `VertexArrayCache` (inside GlCommandEncoder) |
-| `LodRenderer` / `FogRenderer` / `SSAORenderer` etc. | `FramePass` in a `FrameGraphBuilder` |
-| `GLState` (state save/restore) | Managed by `GlCommandEncoder.applyPipelineState()` per `RenderPipeline` |
-| `GenericObjectRenderer` | `RenderPass.drawMultipleIndexed()` |
+#### 3d — Migrate the Resource Types
 
-The recommended approach for DH is to have its renderers participate in the Blaze3D `FrameGraphBuilder` — registering their work as `FramePass` entries alongside Minecraft's sky/main/particle passes. `LodRenderer.renderLod()` would become a `FramePass` lambda that obtains a `CommandEncoder` from `RenderSystem.getDevice()` and creates a `RenderPass` for each draw.
+`GpuBuffer` and `GpuTexture`/`GpuTextureView` are currently Blaze3D types. They need Vulkanic equivalents:
+- `VulkanicBuffer` — wraps `GlBuffer` (OpenGL) or `VkBuffer` (Vulkan)
+- `VulkanicTexture` / `VulkanicTextureView` — wraps `GlTexture` (OpenGL) or `VkImage`/`VkImageView` (Vulkan)
 
----
+Once these types live in Vulkanic, game code that currently holds `GpuBuffer` references would hold `VulkanicBuffer` references instead.
 
-## 5 · What a Vulkan Backend Looks Like from Here
+#### 3e — Migrate the FrameGraph
 
-Once all bypass callers are routed through `GpuDevice → CommandEncoder → RenderPass`, the Vulkan backend becomes a clean, isolated implementation task:
+`FrameGraphBuilder` and `FramePass` define the per-frame render graph (sky pass, main pass, particle pass, etc.) and manage resource lifetimes. This is a Vulkan-compatible design (render passes, resource barriers, dependency ordering). It belongs in Vulkanic as a portable scheduler above the `CommandEncoder`/`RenderPass` model.
 
-```
-VkDevice implements GpuDevice
-    → createCommandEncoder() returns VkCommandEncoder
-    → createTexture() allocates VkImage + VkImageView
-    → createBuffer() allocates VkBuffer
-
-VkCommandEncoder implements CommandEncoder
-    → createRenderPass() begins a VkRenderPass via vkCmdBeginRenderPass
-    → clearColorTexture() maps to vkCmdClearColorImage
-    → writeToBuffer() maps to vkCmdUpdateBuffer or staging buffer copy
-
-VkRenderPass implements RenderPass
-    → setPipeline() binds VkPipeline via vkCmdBindPipeline
-    → bindSampler() updates a descriptor set
-    → setVertexBuffer() calls vkCmdBindVertexBuffers
-    → setIndexBuffer() calls vkCmdBindIndexBuffer
-    → drawIndexed() calls vkCmdDrawIndexed
-    → close() calls vkCmdEndRenderPass
-```
-
-The `FrameGraphBuilder.execute()` loop already enforces resource acquisition and release ordering — this maps naturally to Vulkan's render pass attachments and image layout transitions. The `FramePass` dependency graph maps to Vulkan's subpass dependencies or explicit pipeline barriers between render passes.
-
-`VulkanicAPI.initialize(BackendType.VULKAN)` would register a `VkDevice` instead of `GlDevice`, and every call that flows through `RenderSystem.getDevice()` would then go to Vulkan natively. The Blaze3D interface layer is already Vulkan-compatible by design.
+Once in Vulkanic, `LevelRenderer` would use `VulkanicAPI.beginFrame()` → register `FramePass` entries → `VulkanicAPI.executeFrame()`, and the backend manages command buffer submission, synchronization, and resource lifetime.
 
 ---
 
-## 6 · Architecture Diagram (Current State)
+## 6 · Ordering and Backward Compatibility
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│  Core Minecraft Rendering (LevelRenderer, GuiRenderer, etc.)  │
-│  FrameGraphBuilder + FramePass                                  │
-│                    ↓ RenderSystem.getDevice()                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  GpuDevice / CommandEncoder / RenderPass / RenderPipeline│  │
-│  │  (Blaze3D - net.blaze3d.systems / net.blaze3d.pipeline)  │  │
-│  │  Implemented by: GlDevice / GlCommandEncoder / GlRenderPass│ │
-│  │               ↓ via GlStateManager / VulkanicAPI calls   │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                ↓ (correct path)                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  VulkanicAPI / GraphicsBackend / CommandContext          │  │
-│  │  (net.vulkanic)                                          │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                ↓                                │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  OpenGLBackend  (net.vulkanic.backends.opengl)           │  │
-│  │  ONLY file allowed to import org.lwjgl.opengl.*          │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  ⚠️  Bypass paths still exist (480 calls total):               │
-│     Iris (161) ──┐                                              │
-│     DH    (252) ─┼──→ VulkanicAPI directly (skips GpuDevice)  │
-│     Sodium (66) ─┘                                              │
-│     VoxelMap (1)                                                │
-└────────────────────────────────────────────────────────────────┘
-```
+**Every step must leave the OpenGL backend 100% functional.**
+
+The migration proceeds by expanding `GraphicsBackend` one concept at a time, implementing each new method in `OpenGLBackend` by delegating to existing `GlDevice`/`GlCommandEncoder` code, then updating Blaze3D to call `VulkanicAPI` for that concept instead of using its own implementation.
+
+Recommended order (each step builds on the previous):
+
+1. **Buffer lifecycle** — `createBuffer` / `deleteBuffer` / `mapBuffer` / `unmapBuffer` into `GraphicsBackend`. These have the most bypass callers (DH, Sodium) and are self-contained.
+
+2. **Texture lifecycle** — `createTexture` / `deleteTexture` / `uploadTexture` into `GraphicsBackend`. Needed before render pass attachments can be expressed in Vulkanic.
+
+3. **Pipeline objects** — `createPipeline(PipelineDescriptor)` into `GraphicsBackend`. Replaces the scattered state-setting calls with a compiled, opaque handle.
+
+4. **Render pass** — `beginRenderPass(ctx, target, pipeline, ...)` / `endRenderPass(ctx)` into `GraphicsBackend`. This is the key command-buffer recording step.
+
+5. **Draw calls** — `draw(ctx, ...)` / `drawIndexed(ctx, ...)` into `GraphicsBackend` render-pass scope. These already exist as standalone `VulkanicAPI` methods; they gain render-pass context here.
+
+6. **Frame graph** — Migrate `FrameGraphBuilder`/`FramePass` into Vulkanic to manage per-frame submission, synchronization, and resource lifetime.
+
+At any point in this sequence, the OpenGL backend works exactly as before (it delegates to the same `GlDevice`/`GlCommandEncoder` implementations), and the Vulkan backend gains a new foothold.
 
 ---
 
-## 7 · Key Metrics
+## 7 · Current State vs Target: Bypass Call Inventory
+
+These are the call sites that currently bypass the intended path and need to move as part of Phase 3:
+
+| Subsystem | Bypass `getImmediateContext()` calls | Category |
+|---|---|---|
+| **Distant Horizons** | 252 | Buffer, texture, shader, draw, state |
+| **Iris Shaders** | 161 | Shader setup, compute, image bindings, state |
+| **Sodium** | 66 | Buffer, VAO, shader, uniform, fence |
+| **VoxelMap** | 1 | Mipmap generation |
+| **Blaze3D opengl** | 146 | Intentional — correct internal backend calls |
+| **Blaze3D systems** | 9 | Intentional — timer query etc. |
+
+The 480 non-Blaze3D bypass calls are the concrete migration target. Each call eliminated either:
+- Moves to use a higher-level `VulkanicAPI` device/pipeline/renderpass method (Phase 3 work above), or
+- Is already served by an existing `VulkanicAPI` method with a proper `CommandContext` parameter.
+
+---
+
+## 8 · What Adding the Vulkan Backend Looks Like
+
+Once `GraphicsBackend` owns the full abstraction (device + pipeline + renderpass + resources + framegraph), adding the Vulkan backend is:
+
+```java
+// net.vulkanic.backends.vulkan.VulkanBackend
+public class VulkanBackend implements GraphicsBackend {
+
+    // Device
+    @Override
+    public VulkanicBuffer createBuffer(int usage, long size) {
+        // vkCreateBuffer + vkAllocateMemory + vkBindBufferMemory
+    }
+
+    // Pipeline
+    @Override
+    public PipelineHandle createPipeline(PipelineDescriptor desc) {
+        // Compile SPIR-V shaders, vkCreateGraphicsPipeline
+    }
+
+    // Command buffer / render pass
+    @Override
+    public CommandContext beginCommandBuffer() {
+        // vkBeginCommandBuffer → return CommandContext wrapping VkCommandBuffer handle
+    }
+
+    @Override
+    public void beginRenderPass(CommandContext ctx, VulkanicTexture colorTarget, ...) {
+        // vkCmdBeginRenderPass
+    }
+
+    @Override
+    public void drawIndexed(CommandContext ctx, int count, int firstIndex, int baseVertex) {
+        // vkCmdDrawIndexed
+    }
+
+    @Override
+    public void endRenderPass(CommandContext ctx) {
+        // vkCmdEndRenderPass
+    }
+
+    @Override
+    public void submitCommandBuffer(CommandContext ctx) {
+        // vkQueueSubmit
+    }
+}
+```
+
+Selecting the backend:
+```java
+VulkanicAPI.initialize(BackendType.VULKAN);
+// Every VulkanicAPI call now dispatches to VulkanBackend
+```
+
+No game code, mod code, or Blaze3D facade code changes. The backend switches transparently.
+
+---
+
+## 9 · Key Metrics (Current State)
 
 | Metric | Value |
 |---|---|
 | `@Deprecated` annotations remaining in Vulkanic layer | **0** |
-| GraphicsBackend rendering methods with `CommandContext` param | **212** |
-| Total VulkanicAPI static methods | **570** |
-| `getImmediateContext()` calls — Blaze3D backend (intentional) | **146** |
-| `getImmediateContext()` calls — Iris, DH, Sodium, VoxelMap (bypass, to eliminate) | **480** |
-| Files using `RenderSystem.getDevice()` (correct path) | **62** |
-| Files using `createRenderPass()` (fully modern path) | **23** |
-| Architectural boundary test | ✅ Passing |
+| `GraphicsBackend` methods with `CommandContext` param | **212** |
+| Total `VulkanicAPI` static methods | **570** |
+| Bypass `getImmediateContext()` calls to migrate (non-Blaze3D) | **480** |
+| Blaze3D `GpuDevice/CommandEncoder` concepts still in Blaze3D | **Must move to Vulkanic** |
+| `ArchitecturalBoundaryTest` | ✅ Passing |
 
 ---
 
-## 8 · Rules That Must Be Maintained at Every Step
+## 10 · Rules at Every Step
 
-1. **OpenGL backend stays 100% functional.** Every sub-step must be testable and releasable. Never break the OpenGL path to make progress on abstraction.
+1. **OpenGL backend stays 100% functional.** Every sub-step must pass all tests.
 
-2. **`org.lwjgl.opengl.*` imports stay confined to `net/vulkanic/backends/opengl/`.** The `ArchitecturalBoundaryTest` enforces this and must continue to pass.
+2. **`org.lwjgl.opengl.*` imports stay in `OpenGLBackend` only.**
 
-3. **`net.vulkanic.backends.*` imports stay confined to `net/vulkanic/`.** Same test.
+3. **`org.lwjgl.vulkan.*` imports stay in `VulkanBackend` only** (future).
 
-4. **Game and mod code should use `RenderSystem.getDevice()` to get a `CommandEncoder`, not call `VulkanicAPI.getImmediateContext()` directly.** Each bypass call eliminated is a direct step toward Vulkan compatibility.
+4. **The Vulkan backend is implemented in `net.vulkanic.backends.vulkan`, not in Blaze3D.**
 
-5. **`VulkanicAPI` and `GraphicsBackend` are the low-level backend bridge, not the game-facing rendering API.** The game-facing API is the Blaze3D `GpuDevice / CommandEncoder / RenderPass / RenderPipeline` stack.
+5. **Blaze3D delegates to Vulkanic — not the other way around.** After each migration step, Blaze3D's GL classes should be calling `VulkanicAPI` for the migrated concept, not providing their own independent implementation.
 
----
-
-## 9 · Non-Goals (Clarified)
-
-- **Designing new pipeline/descriptor/renderpass abstractions** — Blaze3D already has these. We adopt and route through them; we do not duplicate them.
-- **Changing `VulkanicAPI` method signatures** — The 570 static methods are stable. Future changes are additions, not removals.
-- **Removing OpenGL support** — OpenGL remains a supported, first-class backend indefinitely.
-- **Performance optimization** — Correctness and backend-independence come first; optimization is Phase 4.
-- **Immediate Vulkan implementation** — A Vulkan backend cannot be added safely until the bypass path calls are eliminated.
+6. **Concepts migrate from Blaze3D into Vulkanic, not the reverse.** When Blaze3D has a useful abstraction (GpuBuffer, RenderPipeline, FrameGraph), the move is to bring the concept into `GraphicsBackend` and then make `GlDevice`/`GlCommandEncoder` delegate to `VulkanicAPI` for it.
