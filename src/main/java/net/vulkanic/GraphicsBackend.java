@@ -3056,6 +3056,15 @@ public interface GraphicsBackend {
     int getMaxTextureSize();
 
     /**
+     * Returns the required alignment in bytes for the offset of a uniform buffer binding.
+     * <ul>
+     *   <li>OpenGL: {@code GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT}</li>
+     *   <li>Vulkan: {@code VkPhysicalDeviceLimits.minUniformBufferOffsetAlignment}</li>
+     * </ul>
+     */
+    int getUniformOffsetAlignment();
+
+    /**
      * Returns the set of optional extensions / features that are active.
      * <ul>
      *   <li>OpenGL: extension strings that were detected and enabled</li>

@@ -6,7 +6,9 @@ import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.AddressMode;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
-import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.textures.GpuTextureView;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.api.EnvType;
@@ -65,8 +67,8 @@ public class MainTarget extends RenderTarget {
 			this.colorTexture = this.allocateColorAttachment(dimension);
 			this.depthTexture = this.allocateDepthAttachment(dimension);
 			if (this.colorTexture != null && this.depthTexture != null) {
-				this.colorTextureView = RenderSystem.getDevice().createTextureView(this.colorTexture);
-				this.depthTextureView = RenderSystem.getDevice().createTextureView(this.depthTexture);
+				this.colorTextureView = (GpuTextureView) VulkanicAPI.createVulkanicTextureView(this.colorTexture);
+				this.depthTextureView = (GpuTextureView) VulkanicAPI.createVulkanicTextureView(this.depthTexture);
 				return dimension;
 			}
 		}
@@ -83,7 +85,7 @@ public class MainTarget extends RenderTarget {
 	@Nullable
 	private GpuTexture allocateColorAttachment(MainTarget.Dimension dimension) {
 		try {
-			return RenderSystem.getDevice().createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, dimension.width, dimension.height, 1, 1);
+			return (GpuTexture) VulkanicAPI.createVulkanicTexture(() -> this.label + " / Color", 15, VulkanicTextureFormat.RGBA8, dimension.width, dimension.height, 1, 1);
 		} catch (GpuOutOfMemoryException var3) {
 			return null;
 		}
@@ -92,7 +94,7 @@ public class MainTarget extends RenderTarget {
 	@Nullable
 	private GpuTexture allocateDepthAttachment(MainTarget.Dimension dimension) {
 		try {
-			return RenderSystem.getDevice().createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, dimension.width, dimension.height, 1, 1);
+			return (GpuTexture) VulkanicAPI.createVulkanicTexture(() -> this.label + " / Depth", 15, VulkanicTextureFormat.DEPTH32, dimension.width, dimension.height, 1, 1);
 		} catch (GpuOutOfMemoryException var3) {
 			return null;
 		}
@@ -110,7 +112,7 @@ public class MainTarget extends RenderTarget {
 
 		static List<MainTarget.Dimension> listWithFallback(int i, int j) {
 			RenderSystem.assertOnRenderThread();
-			int k = RenderSystem.getDevice().getMaxTextureSize();
+			int k = VulkanicAPI.getMaxTextureSize();
 			return i > 0 && i <= k && j > 0 && j <= k
 				? ImmutableList.of(new MainTarget.Dimension(i, j), MainTarget.DEFAULT_DIMENSIONS)
 				: ImmutableList.of(MainTarget.DEFAULT_DIMENSIONS);

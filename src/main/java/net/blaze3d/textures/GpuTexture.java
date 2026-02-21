@@ -4,7 +4,8 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
-public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.GpuTextureInterface {
+public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.GpuTextureInterface,
+		net.vulkanic.resources.VulkanicTexture {
 	public static final int USAGE_COPY_DST = 1;
 	public static final int USAGE_COPY_SRC = 2;
 	public static final int USAGE_TEXTURE_BINDING = 4;
@@ -56,6 +57,45 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 	public int usage() {
 		return this.usage;
 	}
+
+	// VulkanicTexture bridge methods — allow GpuTexture to be used anywhere
+	// a VulkanicTexture is expected without casting.
+
+	/** Returns the width of the base mip level (mip 0). */
+	@Override
+	public int getWidth() {
+		return getWidth(0);
+	}
+
+	/** Returns the height of the base mip level (mip 0). */
+	@Override
+	public int getHeight() {
+		return getHeight(0);
+	}
+
+	/** Returns the usage flags bitmask for this texture. */
+	@Override
+	public int getUsage() {
+		return usage();
+	}
+
+	/**
+	 * Returns the backend-native handle for this texture.
+	 * <ul>
+	 *   <li>OpenGL: GL texture object name</li>
+	 *   <li>Vulkan: VkImage handle</li>
+	 * </ul>
+	 */
+	@Override
+	public abstract long getNativeHandle();
+
+	/**
+	 * Returns the Vulkanic pixel format for this texture.
+	 * Subclasses map the Blaze3D {@link TextureFormat} to the equivalent
+	 * {@link net.vulkanic.resources.VulkanicTextureFormat}.
+	 */
+	@Override
+	public abstract net.vulkanic.resources.VulkanicTextureFormat getVulkanicFormat();
 
 	public void setAddressMode(AddressMode addressMode) {
 		this.setAddressMode(addressMode, addressMode);

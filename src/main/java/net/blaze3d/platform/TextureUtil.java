@@ -1,9 +1,11 @@
 package net.blaze3d.platform;
 
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.resources.VulkanicBufferSlice;
+import net.vulkanic.resources.VulkanicMapView;
 import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,10 +59,11 @@ public class TextureUtil {
 			j += gpuTexture.getFormat().pixelSize() * gpuTexture.getWidth(k) * gpuTexture.getHeight(k);
 		}
 
-		GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(() -> "Texture output buffer", 9, j);
-		CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+		GpuBuffer gpuBuffer = (GpuBuffer) VulkanicAPI.createVulkanicBuffer(9, j);
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 		Runnable runnable = () -> {
-			try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(gpuBuffer, true, false)) {
+			try (VulkanicMapView mappedView = VulkanicAPI.mapBuffer(ctx,
+					new VulkanicBufferSlice(gpuBuffer, 0, gpuBuffer.size()), true, false)) {
 				int jx = 0;
 
 				for (int k = 0; k <= i; k++) {
@@ -92,7 +95,7 @@ public class TextureUtil {
 		int l = 0;
 
 		for (int m = 0; m <= i; m++) {
-			commandEncoder.copyTextureToBuffer(gpuTexture, gpuBuffer, l, () -> {
+			VulkanicAPI.copyVulkanicTextureToBuffer(ctx, gpuTexture, gpuBuffer, l, () -> {
 				if (atomicInteger.getAndIncrement() == i) {
 					runnable.run();
 				}

@@ -4,15 +4,12 @@ import net.blaze3d.opengl.GlConst;
 import net.blaze3d.opengl.GlDevice;
 import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.GlTexture;
-import net.blaze3d.systems.GpuDevice;
-import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.AddressMode;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
-import net.blaze3d.textures.TextureFormat;
-import java.util.OptionalInt;
+import net.vulkanic.VulkanicAPI;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -83,26 +80,27 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		} else if (renderTarget.depthTexture == null) {
 			throw new IllegalStateException("Trying to copy depth texture from a RenderTarget without a depth texture");
 		} else {
-			RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(renderTarget.depthTexture, this.depthTexture, 0, 0, 0, 0, 0, this.width, this.height);
+			VulkanicAPI.copyVulkanicTextureToTexture(VulkanicAPI.getImmediateContext(), renderTarget.depthTexture, this.depthTexture, 0, 0, 0, 0, 0, this.width, this.height);
 		}
 	}
 
 	public void createBuffers(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		int k = gpuDevice.getMaxTextureSize();
+		int k = VulkanicAPI.getMaxTextureSize();
 		if (i > 0 && i <= k && j > 0 && j <= k) {
 			this.width = i;
 			this.height = j;
 			if (this.useDepth) {
-				this.depthTexture = gpuDevice.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, i, j, 1, 1);
-				this.depthTextureView = gpuDevice.createTextureView(this.depthTexture);
+				this.depthTexture = (GpuTexture) VulkanicAPI.createVulkanicTexture(() -> this.label + " / Depth", 15,
+					net.vulkanic.resources.VulkanicTextureFormat.DEPTH32, i, j, 1, 1);
+				this.depthTextureView = (GpuTextureView) VulkanicAPI.createVulkanicTextureView(this.depthTexture);
 				this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);
 				this.depthTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 			}
 
-			this.colorTexture = gpuDevice.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, i, j, 1, 1);
-			this.colorTextureView = gpuDevice.createTextureView(this.colorTexture);
+			this.colorTexture = (GpuTexture) VulkanicAPI.createVulkanicTexture(() -> this.label + " / Color", 15,
+				net.vulkanic.resources.VulkanicTextureFormat.RGBA8, i, j, 1, 1);
+			this.colorTextureView = (GpuTextureView) VulkanicAPI.createVulkanicTextureView(this.colorTexture);
 			this.colorTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 			this.setFilterMode(FilterMode.NEAREST, true);
 		} else {
@@ -129,18 +127,21 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		if (this.colorTexture == null) {
 			throw new IllegalStateException("Can't blit to screen, color texture doesn't exist yet");
 		} else {
-			RenderSystem.getDevice().createCommandEncoder().presentTexture(this.colorTextureView);
+			VulkanicAPI.presentVulkanicTexture(VulkanicAPI.getImmediateContext(), this.colorTextureView);
 		}
 	}
 
 	public void blitAndBlendToTexture(GpuTextureView gpuTextureView) {
 		RenderSystem.assertOnRenderThread();
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "Blit render target", gpuTextureView, OptionalInt.empty())) {
+		try (net.vulkanic.resources.VulkanicRenderPass renderPass = VulkanicAPI.createVulkanicRenderPass(
+				VulkanicAPI.getImmediateContext(), () -> "Blit render target", gpuTextureView, java.util.OptionalInt.empty())) {
 			renderPass.setPipeline(RenderPipelines.ENTITY_OUTLINE_BLIT);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			// Transitional cast: bindDefaultUniforms takes RenderPass (Blaze3D) and passes GpuBufferSlice
+			// to setUniform(). GpuBufferSlice is not yet a subtype of VulkanicBufferSlice, so we cannot
+			// change the signature to VulkanicRenderPass yet. The underlying GlRenderPass implements
+			// both interfaces, so the cast is always safe.
+			RenderSystem.bindDefaultUniforms((net.blaze3d.systems.RenderPass) renderPass);
 			renderPass.bindSampler("InSampler", this.colorTextureView);
 			renderPass.draw(0, 3);
 		}

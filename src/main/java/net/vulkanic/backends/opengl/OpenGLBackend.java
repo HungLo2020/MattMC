@@ -2694,6 +2694,12 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
+    public int getUniformOffsetAlignment() {
+        if (glDevice != null) return glDevice.getUniformOffsetAlignment();
+        return 256; // Vulkan minimum guaranteed alignment
+    }
+
+    @Override
     public java.util.List<String> getEnabledExtensions() {
         if (glDevice != null) return glDevice.getEnabledExtensions();
         return java.util.Collections.emptyList();

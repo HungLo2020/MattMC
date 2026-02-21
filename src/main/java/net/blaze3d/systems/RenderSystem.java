@@ -264,7 +264,7 @@ public class RenderSystem {
 
 	public static void initRenderer(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		DEVICE = new GlDevice(l, i, bl, biFunction, bl2);
-		apiDescription = getDevice().getImplementationInformation();
+		apiDescription = net.vulkanic.VulkanicAPI.getImplementationInformation();
 		dynamicUniforms = new DynamicUniforms();
 		
 		// Sodium: Post-context initialization (from RenderSystemMixin)

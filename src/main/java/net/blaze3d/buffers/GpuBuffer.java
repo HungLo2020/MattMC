@@ -5,7 +5,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
-public abstract class GpuBuffer implements AutoCloseable {
+public abstract class GpuBuffer implements AutoCloseable, net.vulkanic.resources.VulkanicBuffer {
 	public static final int USAGE_MAP_READ = 1;
 	public static final int USAGE_MAP_WRITE = 2;
 	public static final int USAGE_HINT_CLIENT_STORAGE = 4;
@@ -31,8 +31,35 @@ public abstract class GpuBuffer implements AutoCloseable {
 		return this.usage;
 	}
 
+	// VulkanicBuffer bridge methods — allow GpuBuffer to be used anywhere a
+	// VulkanicBuffer is expected without a cast.
+
+	/** Returns the size of the buffer in bytes. */
+	@Override
+	public int getSize() {
+		return size();
+	}
+
+	/** Returns the usage flags bitmask. */
+	@Override
+	public int getUsage() {
+		return usage();
+	}
+
+	/**
+	 * Returns the backend-native handle for this buffer.
+	 * <ul>
+	 *   <li>OpenGL: GL buffer object name</li>
+	 *   <li>Vulkan: VkBuffer handle</li>
+	 * </ul>
+	 */
+	@Override
+	public abstract long getNativeHandle();
+
+	@Override
 	public abstract boolean isClosed();
 
+	@Override
 	public abstract void close();
 
 	public GpuBufferSlice slice(int i, int j) {

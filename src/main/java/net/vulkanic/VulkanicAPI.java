@@ -2295,6 +2295,17 @@ public class VulkanicAPI {
     }
 
     /**
+     * Convenience overload that accepts a label supplier (evaluated lazily).
+     * Mirrors {@code GpuDevice.createTexture(Supplier<String>, ...)}.
+     */
+    public static VulkanicTexture createVulkanicTexture(java.util.function.Supplier<String> labelSupplier, int usage,
+                                                         VulkanicTextureFormat format,
+                                                         int width, int height,
+                                                         int depthOrLayers, int mipLevels) {
+        return createVulkanicTexture(labelSupplier.get(), usage, format, width, height, depthOrLayers, mipLevels);
+    }
+
+    /**
      * Creates a full-range texture view (all mip levels).
      *
      * @param texture Source texture
@@ -2557,6 +2568,18 @@ public class VulkanicAPI {
      */
     public static int getMaxTextureSize() {
         return getBackend().getMaxTextureSize();
+    }
+
+    /**
+     * Returns the required alignment in bytes for the offset of a uniform buffer binding.
+     * <ul>
+     *   <li>OpenGL: {@code GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT}</li>
+     *   <li>Vulkan: {@code VkPhysicalDeviceLimits.minUniformBufferOffsetAlignment}</li>
+     * </ul>
+     * Replaces calls to {@code RenderSystem.getDevice().getUniformOffsetAlignment()}.
+     */
+    public static int getUniformOffsetAlignment() {
+        return getBackend().getUniformOffsetAlignment();
     }
 
     /**

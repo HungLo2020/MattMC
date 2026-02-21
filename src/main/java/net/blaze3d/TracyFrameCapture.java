@@ -2,13 +2,11 @@ package net.blaze3d;
 
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.systems.CommandEncoder;
-import net.blaze3d.systems.GpuDevice;
-import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
-import net.blaze3d.textures.TextureFormat;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.resources.VulkanicBufferSlice;
+import net.vulkanic.resources.VulkanicTextureFormat;
 import com.mojang.jtracy.TracyClient;
 import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
@@ -34,10 +32,9 @@ public class TracyFrameCapture implements AutoCloseable {
 	public TracyFrameCapture() {
 		this.width = 320;
 		this.height = 180;
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		this.frameBuffer = gpuDevice.createTexture("Tracy Frame Capture", 10, TextureFormat.RGBA8, this.width, this.height, 1, 1);
-		this.frameBufferView = gpuDevice.createTextureView(this.frameBuffer);
-		this.pixelbuffer = gpuDevice.createBuffer(() -> "Tracy Frame Capture buffer", 9, this.width * this.height * 4);
+		this.frameBuffer = (GpuTexture) VulkanicAPI.createVulkanicTexture("Tracy Frame Capture", 10, VulkanicTextureFormat.RGBA8, this.width, this.height, 1, 1);
+		this.frameBufferView = (GpuTextureView) VulkanicAPI.createVulkanicTextureView(this.frameBuffer);
+		this.pixelbuffer = (GpuBuffer) VulkanicAPI.createVulkanicBuffer(9, this.width * this.height * 4);
 	}
 
 	private void resize(int i, int j) {
@@ -57,13 +54,12 @@ public class TracyFrameCapture implements AutoCloseable {
 		if (this.width != i || this.height != j) {
 			this.width = i;
 			this.height = j;
-			GpuDevice gpuDevice = RenderSystem.getDevice();
 			this.frameBuffer.close();
-			this.frameBuffer = gpuDevice.createTexture("Tracy Frame Capture", 10, TextureFormat.RGBA8, i, j, 1, 1);
+			this.frameBuffer = (GpuTexture) VulkanicAPI.createVulkanicTexture("Tracy Frame Capture", 10, VulkanicTextureFormat.RGBA8, i, j, 1, 1);
 			this.frameBufferView.close();
-			this.frameBufferView = gpuDevice.createTextureView(this.frameBuffer);
+			this.frameBufferView = (GpuTextureView) VulkanicAPI.createVulkanicTextureView(this.frameBuffer);
 			this.pixelbuffer.close();
-			this.pixelbuffer = gpuDevice.createBuffer(() -> "Tracy Frame Capture buffer", 9, i * j * 4);
+			this.pixelbuffer = (GpuBuffer) VulkanicAPI.createVulkanicBuffer(9, i * j * 4);
 		}
 	}
 
@@ -77,15 +73,17 @@ public class TracyFrameCapture implements AutoCloseable {
 			}
 
 			this.status = TracyFrameCapture.Status.WAITING_FOR_COPY;
-			CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 
-			try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Tracy blit", this.frameBufferView, OptionalInt.empty())) {
+			try (net.vulkanic.resources.VulkanicRenderPass renderPass = VulkanicAPI.createVulkanicRenderPass(
+					ctx, () -> "Tracy blit", this.frameBufferView, OptionalInt.empty())) {
 				renderPass.setPipeline(RenderPipelines.TRACY_BLIT);
 				renderPass.bindSampler("InSampler", renderTarget.getColorTextureView());
 				renderPass.draw(0, 3);
 			}
 
-			commandEncoder.copyTextureToBuffer(this.frameBuffer, this.pixelbuffer, 0, () -> this.status = TracyFrameCapture.Status.WAITING_FOR_UPLOAD, 0);
+			VulkanicAPI.copyVulkanicTextureToBuffer(ctx, this.frameBuffer, this.pixelbuffer, 0,
+				() -> this.status = TracyFrameCapture.Status.WAITING_FOR_UPLOAD, 0);
 			this.lastCaptureDelay = 0;
 		}
 	}
@@ -94,7 +92,9 @@ public class TracyFrameCapture implements AutoCloseable {
 		if (this.status == TracyFrameCapture.Status.WAITING_FOR_UPLOAD) {
 			this.status = TracyFrameCapture.Status.WAITING_FOR_CAPTURE;
 
-			try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.pixelbuffer, true, false)) {
+			try (net.vulkanic.resources.VulkanicMapView mappedView = VulkanicAPI.mapBuffer(
+					VulkanicAPI.getImmediateContext(),
+					new VulkanicBufferSlice(this.pixelbuffer, 0, this.pixelbuffer.size()), true, false)) {
 				TracyClient.frameImage(mappedView.data(), this.width, this.height, this.lastCaptureDelay, true);
 			}
 		}

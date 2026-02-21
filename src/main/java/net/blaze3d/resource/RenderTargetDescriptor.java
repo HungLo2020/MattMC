@@ -2,9 +2,9 @@ package net.blaze3d.resource;
 
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.pipeline.TextureTarget;
-import net.blaze3d.systems.RenderSystem;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 
 @Environment(EnvType.CLIENT)
 public record RenderTargetDescriptor(int width, int height, boolean useDepth, int clearColor) implements ResourceDescriptor<RenderTarget> {
@@ -14,11 +14,13 @@ public record RenderTargetDescriptor(int width, int height, boolean useDepth, in
 
 	public void prepare(RenderTarget renderTarget) {
 		if (this.useDepth) {
-			RenderSystem.getDevice()
-				.createCommandEncoder()
-				.clearColorAndDepthTextures(renderTarget.getColorTexture(), this.clearColor, renderTarget.getDepthTexture(), 1.0);
+			VulkanicAPI.clearColorAndDepthTextures(
+				VulkanicAPI.getImmediateContext(),
+				renderTarget.getColorTexture(), this.clearColor,
+				renderTarget.getDepthTexture(), 1.0
+			);
 		} else {
-			RenderSystem.getDevice().createCommandEncoder().clearColorTexture(renderTarget.getColorTexture(), this.clearColor);
+			VulkanicAPI.clearColorTexture(VulkanicAPI.getImmediateContext(), renderTarget.getColorTexture(), this.clearColor);
 		}
 	}
 

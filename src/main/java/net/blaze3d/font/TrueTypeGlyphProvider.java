@@ -1,7 +1,6 @@
 package net.blaze3d.font;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -193,7 +192,9 @@ public class TrueTypeGlyphProvider implements GlyphProvider {
 
 					try (NativeImage nativeImage = new NativeImage(NativeImage.Format.LUMINANCE, Glyph.this.width, Glyph.this.height, false)) {
 						if (nativeImage.copyFromFont(fT_Face, Glyph.this.index)) {
-							RenderSystem.getDevice().createCommandEncoder().writeToTexture(gpuTexture, nativeImage, 0, 0, i, j, Glyph.this.width, Glyph.this.height, 0, 0);
+							net.vulkanic.VulkanicAPI.writeToVulkanicTexture(
+								net.vulkanic.VulkanicAPI.getImmediateContext(),
+								gpuTexture, nativeImage, 0, 0, i, j, Glyph.this.width, Glyph.this.height, 0, 0);
 						}
 					}
 				}
