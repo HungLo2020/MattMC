@@ -89,6 +89,9 @@ public class OpenGLTexture extends VulkanicTexture {
     public void close() {
         if (!closed) {
             closed = true;
+            // Clear any accumulated GL errors before deletion to avoid false positives
+            // when the caller later checks for errors from unrelated operations.
+            GL11.glGetError();
             GL11.glDeleteTextures(glHandle);
         }
     }

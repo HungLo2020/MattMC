@@ -1,6 +1,7 @@
 package net.vulkanic.backends.opengl;
 
 import net.vulkanic.VulkanicBuffer;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 
 import java.nio.ByteBuffer;
@@ -59,6 +60,9 @@ public class OpenGLBuffer extends VulkanicBuffer {
     public void close() {
         if (!closed) {
             closed = true;
+            // Clear any accumulated GL errors before deletion to avoid false positives
+            // when the caller later checks for errors from unrelated operations.
+            GL11.glGetError();
             GL15.glDeleteBuffers(glHandle);
         }
     }

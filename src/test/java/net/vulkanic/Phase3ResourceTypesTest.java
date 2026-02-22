@@ -120,13 +120,14 @@ public class Phase3ResourceTypesTest {
 
     @Test
     public void testOpenGLTextureMipDimensions() {
+        // Texture is 256 wide; each mip level halves the dimension
         OpenGLTexture tex = new OpenGLTexture(1, VulkanicTexture.USAGE_TEXTURE_BINDING,
             VulkanicTextureFormat.RGBA8, 256, 128, 1, 4, "tex");
 
-        assertEquals(256, tex.getWidth(0));
-        assertEquals(128, tex.getWidth(1));
-        assertEquals(64,  tex.getWidth(2));
-        assertEquals(32,  tex.getWidth(3));
+        assertEquals(256, tex.getWidth(0)); // mip 0 = full resolution
+        assertEquals(128, tex.getWidth(1)); // mip 1 = 256 >> 1
+        assertEquals(64,  tex.getWidth(2)); // mip 2 = 256 >> 2
+        assertEquals(32,  tex.getWidth(3)); // mip 3 = 256 >> 3
     }
 
     // ---- OpenGLTextureView tests --------------------------------------------
