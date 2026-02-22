@@ -75,6 +75,9 @@ public class GlDevice implements GpuDevice {
 		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getImmediateContext(), 35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
 		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
 		net.vulkanic.VulkanicAPI.setCapabilityEnabled(ctx, 34895, true); // GL_PROGRAM_POINT_SIZE
+		// Register this device with the Vulkanic backend so it can delegate
+		// device-level operations (pipeline compilation, etc.) back to this GlDevice.
+		net.vulkanic.VulkanicAPI.registerDevice(this);
 	}
 
 	public GlDebugLabel debugLabels() {

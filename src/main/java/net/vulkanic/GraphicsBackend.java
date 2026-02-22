@@ -2,6 +2,9 @@ package net.vulkanic;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.function.Supplier;
 
 /**
  * Interface for graphics backend implementations.
@@ -2730,4 +2733,125 @@ public interface GraphicsBackend {
      * @param values Unsigned integer values to clear with
      */
     void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values);
+
+    // =========================================================================
+    // Phase 3a: Buffer Lifecycle
+    // =========================================================================
+
+    /**
+     * Creates a new GPU buffer with the given usage flags and size.
+     *
+     * <p>In OpenGL: Calls glGenBuffers + glBufferData (or glBufferStorage if available).
+     * In Vulkan: Calls vkCreateBuffer + vkAllocateMemory + vkBindBufferMemory.
+     *
+     * @param label debug label for the buffer (may be null)
+     * @param usage usage flags (VulkanicBuffer.USAGE_* constants)
+     * @param size  size in bytes (must be > 0)
+     * @return a new VulkanicBuffer ready for use
+     */
+    VulkanicBuffer createManagedBuffer(Supplier<String> label, int usage, int size);
+
+    /**
+     * Creates a new GPU buffer initialized with the given data.
+     *
+     * @param label       debug label for the buffer (may be null)
+     * @param usage       usage flags (VulkanicBuffer.USAGE_* constants)
+     * @param initialData ByteBuffer containing the initial data (must have remaining bytes)
+     * @return a new VulkanicBuffer containing the uploaded data
+     */
+    VulkanicBuffer createManagedBuffer(Supplier<String> label, int usage, java.nio.ByteBuffer initialData);
+
+    /**
+     * Maps a managed buffer for CPU access.
+     *
+     * <p>The returned MappedView must be closed when done to unmap the buffer.
+     *
+     * @param buffer    the buffer to map
+     * @param read      true if the mapping will be used for reading
+     * @param write     true if the mapping will be used for writing
+     * @return a MappedView providing CPU access to the buffer's memory
+     */
+    VulkanicBuffer.MappedView mapManagedBuffer(VulkanicBuffer buffer, boolean read, boolean write);
+
+    // =========================================================================
+    // Phase 3b: Texture Lifecycle
+    // =========================================================================
+
+    /**
+     * Creates a new GPU texture with the given parameters.
+     *
+     * <p>In OpenGL: Calls glGenTextures + glTexImage2D (or glTexStorage2D).
+     * In Vulkan: Calls vkCreateImage + vkAllocateMemory + vkBindImageMemory.
+     *
+     * @param label         debug label (may be null)
+     * @param usage         usage flags (VulkanicTexture.USAGE_* constants)
+     * @param format        texture format
+     * @param width         width in pixels
+     * @param height        height in pixels
+     * @param depthOrLayers depth for 3D textures, layer count for arrays (usually 1)
+     * @param mipLevels     number of mip levels (at least 1)
+     * @return a new VulkanicTexture ready for use
+     */
+    VulkanicTexture createManagedTexture(String label, int usage, VulkanicTextureFormat format,
+                                          int width, int height, int depthOrLayers, int mipLevels);
+
+    /**
+     * Creates a view of the given texture covering all its mip levels.
+     *
+     * @param texture the parent texture
+     * @return a texture view covering all mip levels
+     */
+    VulkanicTextureView createManagedTextureView(VulkanicTexture texture);
+
+    /**
+     * Creates a view of the given texture covering a specific mip range.
+     *
+     * @param texture       the parent texture
+     * @param baseMipLevel  first mip level to expose
+     * @param mipLevelCount number of mip levels to expose
+     * @return a texture view covering the specified mip range
+     */
+    VulkanicTextureView createManagedTextureView(VulkanicTexture texture, int baseMipLevel, int mipLevelCount);
+
+    // =========================================================================
+    // Phase 3c: Pipeline Objects
+    // =========================================================================
+
+    /**
+     * Creates (or retrieves a cached) compiled render pipeline from the given descriptor.
+     *
+     * <p>In OpenGL: Compiles and links vertex + fragment shaders into a GL program.
+     * In Vulkan: Compiles SPIR-V shaders and creates a VkPipeline object.
+     *
+     * <p>Use {@link PipelineDescriptor#fromRenderPipeline} to create a descriptor from
+     * an existing Blaze3D {@code RenderPipeline}.
+     *
+     * @param descriptor pipeline descriptor
+     * @return a PipelineHandle for the compiled pipeline
+     */
+    PipelineHandle createPipeline(PipelineDescriptor descriptor);
+
+    // =========================================================================
+    // Phase 3d: Command Buffer Lifecycle
+    // =========================================================================
+
+    /**
+     * Begins a new command buffer for recording rendering commands.
+     *
+     * <p>In OpenGL: Returns the singleton immediate-mode context (no recording needed).
+     * In Vulkan: Calls vkBeginCommandBuffer and returns a CommandContext wrapping the handle.
+     *
+     * @return a CommandContext for recording commands
+     */
+    CommandContext beginCommandBuffer();
+
+    /**
+     * Submits a completed command buffer for GPU execution.
+     *
+     * <p>In OpenGL: No-op — commands execute immediately.
+     * In Vulkan: Calls vkQueueSubmit to submit the recorded commands.
+     *
+     * @param ctx the command context returned by {@link #beginCommandBuffer()}
+     */
+    void submitCommandBuffer(CommandContext ctx);
 }

@@ -2207,4 +2207,157 @@ public class VulkanicAPI {
     public static int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
         return getBackend().getUniformBlockIndex(ctx, program, uniformBlockName);
     }
+
+    // =========================================================================
+    // Phase 3a: Buffer Lifecycle — high-level managed buffer operations
+    // =========================================================================
+
+    /**
+     * Creates a new GPU buffer managed by the Vulkanic abstraction layer.
+     *
+     * @param label debug label for the buffer (may be null)
+     * @param usage usage flags (VulkanicBuffer.USAGE_* constants)
+     * @param size  size in bytes (must be > 0)
+     * @return a new VulkanicBuffer
+     */
+    public static VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size) {
+        return getBackend().createManagedBuffer(label, usage, size);
+    }
+
+    /**
+     * Creates a new GPU buffer initialized with the given data.
+     *
+     * @param label       debug label (may be null)
+     * @param usage       usage flags (VulkanicBuffer.USAGE_* constants)
+     * @param initialData initial contents (must have remaining bytes)
+     * @return a new VulkanicBuffer containing the uploaded data
+     */
+    public static VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage,
+                                                      java.nio.ByteBuffer initialData) {
+        return getBackend().createManagedBuffer(label, usage, initialData);
+    }
+
+    /**
+     * Maps a managed buffer for CPU access.
+     *
+     * @param buffer the buffer to map
+     * @param read   true if the mapping is used for reading
+     * @param write  true if the mapping is used for writing
+     * @return a MappedView providing CPU-side access; must be closed when done
+     */
+    public static VulkanicBuffer.MappedView mapManagedBuffer(VulkanicBuffer buffer, boolean read, boolean write) {
+        return getBackend().mapManagedBuffer(buffer, read, write);
+    }
+
+    // =========================================================================
+    // Phase 3b: Texture Lifecycle — high-level managed texture operations
+    // =========================================================================
+
+    /**
+     * Creates a new GPU texture managed by the Vulkanic abstraction layer.
+     *
+     * @param label         debug label (may be null)
+     * @param usage         usage flags (VulkanicTexture.USAGE_* constants)
+     * @param format        texture format
+     * @param width         width in pixels
+     * @param height        height in pixels
+     * @param depthOrLayers depth (3D) or layer count (array); usually 1
+     * @param mipLevels     number of mip levels (at least 1)
+     * @return a new VulkanicTexture
+     */
+    public static VulkanicTexture createManagedTexture(String label, int usage,
+            VulkanicTextureFormat format, int width, int height, int depthOrLayers, int mipLevels) {
+        return getBackend().createManagedTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
+    }
+
+    /**
+     * Creates a view of the given texture covering all its mip levels.
+     *
+     * @param texture the parent texture
+     * @return a VulkanicTextureView
+     */
+    public static VulkanicTextureView createManagedTextureView(VulkanicTexture texture) {
+        return getBackend().createManagedTextureView(texture);
+    }
+
+    /**
+     * Creates a view of the given texture covering a specific mip range.
+     *
+     * @param texture       the parent texture
+     * @param baseMipLevel  first mip level to expose
+     * @param mipLevelCount number of mip levels to expose
+     * @return a VulkanicTextureView
+     */
+    public static VulkanicTextureView createManagedTextureView(VulkanicTexture texture,
+                                                                int baseMipLevel, int mipLevelCount) {
+        return getBackend().createManagedTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
+    // =========================================================================
+    // Phase 3c: Pipeline Objects
+    // =========================================================================
+
+    /**
+     * Creates (or retrieves a cached) compiled render pipeline.
+     *
+     * @param descriptor the pipeline descriptor
+     * @return a PipelineHandle for the compiled pipeline
+     */
+    public static PipelineHandle createPipeline(PipelineDescriptor descriptor) {
+        return getBackend().createPipeline(descriptor);
+    }
+
+    /**
+     * Convenience overload: creates a pipeline directly from a Blaze3D RenderPipeline.
+     *
+     * @param pipeline the RenderPipeline to compile
+     * @return a PipelineHandle for the compiled pipeline
+     */
+    public static PipelineHandle createPipeline(net.blaze3d.pipeline.RenderPipeline pipeline) {
+        return getBackend().createPipeline(PipelineDescriptor.fromRenderPipeline(pipeline));
+    }
+
+    // =========================================================================
+    // Phase 3d: Command Buffer Lifecycle
+    // =========================================================================
+
+    /**
+     * Begins a new command buffer for recording rendering commands.
+     *
+     * <p>In OpenGL: Returns the singleton immediate-mode context.
+     * In Vulkan: Allocates and begins a new VkCommandBuffer.
+     *
+     * @return a CommandContext for recording commands
+     */
+    public static CommandContext beginCommandBuffer() {
+        return getBackend().beginCommandBuffer();
+    }
+
+    /**
+     * Submits a completed command buffer for GPU execution.
+     *
+     * <p>In OpenGL: No-op — commands already executed immediately.
+     * In Vulkan: Calls vkQueueSubmit.
+     *
+     * @param ctx the command context returned by {@link #beginCommandBuffer()}
+     */
+    public static void submitCommandBuffer(CommandContext ctx) {
+        getBackend().submitCommandBuffer(ctx);
+    }
+
+    /**
+     * Registers the GlDevice with the active backend (OpenGL backend only).
+     *
+     * <p>This is called from GlDevice's constructor once the device is initialized.
+     * It allows the OpenGLBackend to delegate device-level operations
+     * (pipeline compilation, resource management) to the GlDevice.
+     *
+     * <p>Has no effect if the current backend is not an OpenGLBackend.
+     */
+    public static void registerDevice(net.blaze3d.opengl.GlDevice device) {
+        GraphicsBackend b = getBackend();
+        if (b instanceof net.vulkanic.backends.opengl.OpenGLBackend openGLBackend) {
+            openGLBackend.setGlDevice(device);
+        }
+    }
 }

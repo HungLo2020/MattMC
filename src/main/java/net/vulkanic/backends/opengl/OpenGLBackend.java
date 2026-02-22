@@ -14,6 +14,30 @@ import java.nio.FloatBuffer;
  * This is the ONLY place where direct OpenGL calls should be made.
  */
 public class OpenGLBackend implements GraphicsBackend {
+
+    /**
+     * Reference to the GlDevice, set after device initialization.
+     * Used for delegating device-level operations (pipeline compilation, etc.)
+     * that require access to the device's shader cache and DirectStateAccess.
+     */
+    private volatile net.blaze3d.opengl.GlDevice glDevice;
+
+    /**
+     * Registers the GlDevice with this backend.
+     * Called from GlDevice's constructor after the device is fully initialized.
+     *
+     * @param device the newly created GlDevice
+     */
+    public void setGlDevice(net.blaze3d.opengl.GlDevice device) {
+        this.glDevice = device;
+    }
+
+    /**
+     * Returns the registered GlDevice, or null if not yet initialized.
+     */
+    public net.blaze3d.opengl.GlDevice getGlDevice() {
+        return glDevice;
+    }
     
     @Override
     public long getGraphicsContext() {
@@ -2156,5 +2180,213 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL32C.glClearBufferuiv(buffer, drawbuffer, values);
+    }
+
+    // =========================================================================
+    // Phase 3a: Buffer Lifecycle
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size) {
+        if (size <= 0) {
+            throw new IllegalArgumentException("Buffer size must be greater than zero, got: " + size);
+        }
+        CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        int handle = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, handle);
+        if (hasBufferStorageExtension()) {
+            int flags = 0;
+            if ((usage & net.vulkanic.VulkanicBuffer.USAGE_MAP_READ) != 0) flags |= org.lwjgl.opengl.GL44.GL_MAP_READ_BIT;
+            if ((usage & net.vulkanic.VulkanicBuffer.USAGE_MAP_WRITE) != 0) flags |= org.lwjgl.opengl.GL44.GL_MAP_WRITE_BIT | org.lwjgl.opengl.GL44.GL_DYNAMIC_STORAGE_BIT;
+            bufferStorage(ctx, GL15.GL_ARRAY_BUFFER, (long) size, flags);
+        } else {
+            bufferData(ctx, GL15.GL_ARRAY_BUFFER, (long) size, GL15.GL_DYNAMIC_DRAW);
+        }
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        int error = net.blaze3d.opengl.GlStateManager._getError();
+        if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
+            throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate buffer of size " + size);
+        } else if (error != 0) {
+            throw new IllegalStateException("OpenGL error " + error + " while creating managed buffer");
+        }
+        return new OpenGLBuffer(handle, usage, size);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, java.nio.ByteBuffer initialData) {
+        if (initialData == null || !initialData.hasRemaining()) {
+            throw new IllegalArgumentException("initialData must be non-null and have remaining bytes");
+        }
+        int size = initialData.remaining();
+        CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        int handle = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, handle);
+        if (hasBufferStorageExtension()) {
+            int flags = 0;
+            if ((usage & net.vulkanic.VulkanicBuffer.USAGE_MAP_READ) != 0) flags |= org.lwjgl.opengl.GL44.GL_MAP_READ_BIT;
+            if ((usage & net.vulkanic.VulkanicBuffer.USAGE_MAP_WRITE) != 0) flags |= org.lwjgl.opengl.GL44.GL_MAP_WRITE_BIT | org.lwjgl.opengl.GL44.GL_DYNAMIC_STORAGE_BIT;
+            bufferStorage(ctx, GL15.GL_ARRAY_BUFFER, initialData, flags);
+        } else {
+            bufferData(ctx, GL15.GL_ARRAY_BUFFER, initialData, GL15.GL_DYNAMIC_DRAW);
+        }
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        int error = net.blaze3d.opengl.GlStateManager._getError();
+        if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
+            throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate buffer of size " + size);
+        } else if (error != 0) {
+            throw new IllegalStateException("OpenGL error " + error + " while creating managed buffer");
+        }
+        return new OpenGLBuffer(handle, usage, size);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicBuffer.MappedView mapManagedBuffer(net.vulkanic.VulkanicBuffer buffer, boolean read, boolean write) {
+        if (!(buffer instanceof OpenGLBuffer openGLBuffer)) {
+            throw new IllegalArgumentException("Expected OpenGLBuffer, got: " + buffer.getClass());
+        }
+        if (openGLBuffer.isClosed()) {
+            throw new IllegalStateException("Cannot map a closed buffer");
+        }
+        int accessFlags = 0;
+        if (read)  accessFlags |= org.lwjgl.opengl.GL30.GL_MAP_READ_BIT;
+        if (write) accessFlags |= org.lwjgl.opengl.GL30.GL_MAP_WRITE_BIT;
+        if (accessFlags == 0) {
+            throw new IllegalArgumentException("At least one of read or write must be true");
+        }
+        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, openGLBuffer.getGlHandle());
+        java.nio.ByteBuffer mapped = org.lwjgl.opengl.GL30.glMapBufferRange(
+            GL15.GL_ARRAY_BUFFER, 0, openGLBuffer.size(), accessFlags);
+        if (mapped == null) {
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+            throw new IllegalStateException("glMapBufferRange returned null, GL error: " +
+                net.blaze3d.opengl.GlStateManager._getError());
+        }
+        int glHandle = openGLBuffer.getGlHandle();
+        return new OpenGLBuffer.OpenGLMappedView(
+            () -> {
+                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, glHandle);
+                org.lwjgl.opengl.GL15.glUnmapBuffer(GL15.GL_ARRAY_BUFFER);
+                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+            },
+            mapped
+        );
+    }
+
+    // =========================================================================
+    // Phase 3b: Texture Lifecycle
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicTexture createManagedTexture(String label, int usage,
+            net.vulkanic.VulkanicTextureFormat format, int width, int height, int depthOrLayers, int mipLevels) {
+        if (mipLevels < 1) throw new IllegalArgumentException("mipLevels must be at least 1");
+        if (depthOrLayers < 1) throw new IllegalArgumentException("depthOrLayers must be at least 1");
+        if (depthOrLayers > 1) throw new UnsupportedOperationException("Array/3D textures not yet supported in managed API");
+        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        int handle = GL11.glGenTextures();
+        if (label == null) label = String.valueOf(handle);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, handle);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL12.GL_TEXTURE_BASE_LEVEL, 0);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL12.GL_TEXTURE_MAX_LEVEL, mipLevels - 1);
+        int[] internalFmt = toGlInternalFormat(format);
+        int externalFmt = toGlExternalFormat(format);
+        int glType = toGlType(format);
+        for (int mip = 0; mip < mipLevels; mip++) {
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, mip, internalFmt[0], Math.max(1, width >> mip),
+                Math.max(1, height >> mip), 0, externalFmt, glType, (java.nio.ByteBuffer) null);
+        }
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        int error = net.blaze3d.opengl.GlStateManager._getError();
+        if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
+            throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate texture " + width + "x" + height);
+        } else if (error != 0) {
+            throw new IllegalStateException("OpenGL error " + error + " while creating managed texture");
+        }
+        return new OpenGLTexture(handle, usage, format, width, height, depthOrLayers, mipLevels, label);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicTextureView createManagedTextureView(net.vulkanic.VulkanicTexture texture) {
+        return createManagedTextureView(texture, 0, texture.getMipLevels());
+    }
+
+    @Override
+    public net.vulkanic.VulkanicTextureView createManagedTextureView(net.vulkanic.VulkanicTexture texture,
+            int baseMipLevel, int mipLevelCount) {
+        if (!(texture instanceof OpenGLTexture openGLTexture)) {
+            throw new IllegalArgumentException("Expected OpenGLTexture, got: " + texture.getClass());
+        }
+        if (texture.isClosed()) {
+            throw new IllegalArgumentException("Cannot create a view of a closed texture");
+        }
+        return new OpenGLTextureView(openGLTexture, baseMipLevel, mipLevelCount);
+    }
+
+    private static int[] toGlInternalFormat(net.vulkanic.VulkanicTextureFormat format) {
+        return switch (format) {
+            case RGBA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
+            case RED8   -> new int[]{org.lwjgl.opengl.GL30.GL_R8};
+            case RED8I  -> new int[]{org.lwjgl.opengl.GL30.GL_R8I};
+            case DEPTH32 -> new int[]{org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT32};
+        };
+    }
+
+    private static int toGlExternalFormat(net.vulkanic.VulkanicTextureFormat format) {
+        return switch (format) {
+            case RGBA8  -> org.lwjgl.opengl.GL11.GL_RGBA;
+            case RED8, RED8I -> org.lwjgl.opengl.GL30.GL_RED;
+            case DEPTH32 -> org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT;
+        };
+    }
+
+    private static int toGlType(net.vulkanic.VulkanicTextureFormat format) {
+        return switch (format) {
+            case RGBA8, RED8  -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+            case RED8I        -> org.lwjgl.opengl.GL11.GL_BYTE;
+            case DEPTH32      -> org.lwjgl.opengl.GL11.GL_FLOAT;
+        };
+    }
+
+    // =========================================================================
+    // Phase 3c: Pipeline Objects
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.PipelineHandle createPipeline(net.vulkanic.PipelineDescriptor descriptor) {
+        if (glDevice == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. " +
+                "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        Object native_ = descriptor.getNativeDescriptor();
+        if (!(native_ instanceof net.blaze3d.pipeline.RenderPipeline renderPipeline)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend expects a RenderPipeline in PipelineDescriptor, got: " +
+                (native_ == null ? "null" : native_.getClass().getName()));
+        }
+        net.blaze3d.opengl.GlRenderPipeline glPipeline = glDevice.precompilePipeline(renderPipeline, null);
+        return new OpenGLPipelineHandle(glPipeline);
+    }
+
+    // =========================================================================
+    // Phase 3d: Command Buffer Lifecycle
+    // =========================================================================
+
+    @Override
+    public CommandContext beginCommandBuffer() {
+        // OpenGL is immediate-mode: return the singleton immediate context.
+        return OpenGLCommandContext.IMMEDIATE;
+    }
+
+    @Override
+    public void submitCommandBuffer(CommandContext ctx) {
+        // OpenGL is immediate-mode: commands already executed; nothing to submit.
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException(
+                "OpenGL backend only supports immediate-mode contexts; got: " + ctx);
+        }
     }
 }
