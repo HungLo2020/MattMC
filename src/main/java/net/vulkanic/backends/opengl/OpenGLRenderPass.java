@@ -42,6 +42,11 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
         return fbo;
     }
 
+    /** Marks this render pass as closed without issuing any GL calls. Used in unit tests only. */
+    public void markClosedForTesting() {
+        closed = true;
+    }
+
     private void checkNotClosed() {
         if (closed) {
             throw new IllegalStateException("This render pass has been closed");

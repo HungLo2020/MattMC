@@ -1,8 +1,5 @@
 package net.vulkanic;
 
-import java.util.function.Supplier;
-import org.jetbrains.annotations.Nullable;
-
 /**
  * Scoped handle for recording rendering commands within a single render pass.
  *

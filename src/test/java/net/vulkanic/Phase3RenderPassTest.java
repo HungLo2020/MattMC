@@ -190,17 +190,9 @@ public class Phase3RenderPassTest {
 
     @Test
     public void testOpenGLRenderPassMethodsThrowWhenClosed() {
-        OpenGLRenderPass pass = new OpenGLRenderPass(1, OpenGLCommandContext.IMMEDIATE) {
-            @Override public void close() {
-                // mark as closed without GL calls
-                try {
-                    var f = OpenGLRenderPass.class.getDeclaredField("closed");
-                    f.setAccessible(true);
-                    f.set(this, true);
-                } catch (Exception e) { throw new RuntimeException(e); }
-            }
-        };
-        pass.close(); // mark closed
+        OpenGLRenderPass pass = new OpenGLRenderPass(1, OpenGLCommandContext.IMMEDIATE);
+        // Mark closed using the package-private test helper (same package as OpenGLRenderPass)
+        pass.markClosedForTesting();
 
         OpenGLBuffer dummyBuffer = new OpenGLBuffer(1, VulkanicBuffer.USAGE_VERTEX, 64);
 
