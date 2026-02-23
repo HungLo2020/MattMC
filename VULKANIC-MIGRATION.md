@@ -1,7 +1,7 @@
 # Vulkanic Graphics Abstraction Layer — Migration Guide
 
-**Last Updated:** 2026-02-20  
-**Status:** Phase 1 & 2 complete · Phase 2.5 deprecated-method migration complete · Phase 3 planning
+**Last Updated:** 2026-02-23  
+**Status:** Phase 1 & 2 complete · Phase 2.5 deprecated-method migration complete · Phase 3 in progress (3a–3b done, draw path wired, one bypass migrated)
 
 ---
 
@@ -107,6 +107,45 @@ Sodium, Iris, and Distant Horizons all call VulkanicAPI. None import `org.lwjgl.
 ### Phase 2.5: CommandContext Migration ✅ Complete
 
 All 283 previously-deprecated VulkanicAPI methods replaced with `CommandContext`-aware signatures. `GraphicsBackend` now has 212 rendering methods that all accept `CommandContext`. Zero `@Deprecated` annotations remain in VulkanicAPI, GraphicsBackend, or OpenGLBackend. The `CommandContext.getHandle()` method is designed to carry a `VkCommandBuffer` handle when the Vulkan backend is active.
+
+### Phase 3a: Resource Types & Device Lifecycle ✅ Complete
+
+New abstract types in `net.vulkanic`: `VulkanicBuffer` / `VulkanicBufferSlice`, `VulkanicTexture` / `VulkanicTextureView` / `VulkanicTextureFormat`, `PipelineHandle` / `PipelineDescriptor`. All have `net.vulkanic.backends.opengl` implementations. `GraphicsBackend` now has `createManagedBuffer`, `createManagedTexture`, `createManagedTextureView`, `createPipeline`, `beginCommandBuffer`, `submitCommandBuffer`. `GlDevice` registers with `VulkanicAPI` on construction.
+
+### Phase 3b: Render-Pass Abstraction ✅ Complete
+
+`VulkanicRenderPass` interface (`setPipeline`, `setVertexBuffer`, `setIndexBuffer`, `drawIndexed`, `draw`, `close`) added to `net.vulkanic`. `GraphicsBackend.beginRenderPass(ctx, label, colorTarget, clearColor[, depthTarget, clearDepth])` is the interface entry point. `OpenGLBackend.beginRenderPass` creates an FBO, attaches textures, clears, sets viewport, and returns an `OpenGLRenderPass`.
+
+`GlCommandEncoder.createRenderPass` now delegates FBO lifecycle to `VulkanicAPI.beginRenderPass` for the normal rendering path (Iris shadow/safeMultiply paths keep their own FBO handling).
+
+`createTextureViewFromGlHandle` is a **live transitional bridge** used every frame by `GlCommandEncoder.createRenderPass`. It cannot be removed until `GlDevice.createTexture` returns `VulkanicTexture` directly. The Javadoc explains exactly what step would allow its removal.
+
+### Phase 3 — Draw Path Wiring ✅ Complete
+
+`GlCommandEncoder.drawFromBuffers` now routes ALL draw calls explicitly through `VulkanicAPI` rather than through `GlStateManager` wrappers:
+
+- `GlStateManager._glBindBuffer(34963, ...)` → `VulkanicAPI.bindBuffer(ctx, GL_ELEMENT_ARRAY_BUFFER, ...)`
+- `GlStateManager._drawElements(...)` → `VulkanicAPI.drawElements(ctx, ...)` (with Iris tessellation override preserved inline)
+- `GlStateManager._drawArrays(...)` → `VulkanicAPI.drawArrays(ctx, ...)`
+
+The method now obtains a single `CommandContext` at entry and shares it across all VulkanicAPI calls, matching Vulkan's command-buffer recording model.
+
+`GlCommandEncoder.getActiveVulkanicRenderPass()` accessor added, making the active `VulkanicRenderPass` available for future code paths without casting to `GlCommandEncoder`.
+
+### Phase 3 — First Bypass Migration ✅ Complete
+
+`VoxelMap CompressibleGLBufferedImage.uploadToTexture` was using a bind-then-generate pattern:
+```java
+// Before — mutates global GL texture bind state
+VulkanicAPI.bindTexture2D(ctx, glId);
+VulkanicAPI.generateTextureMipmap(ctx, GL_TEXTURE_2D);
+```
+Migrated to the DSA (Direct State Access) form:
+```java
+// After — no global state mutation, one call
+VulkanicAPI.generateTextureMipmapDSA(ctx, glId);
+```
+This reduces VoxelMap's bypass call count from **1** to **0**, bringing the total non-Blaze3D bypass count from 480 to **479**.
 
 ---
 
@@ -283,9 +322,12 @@ No game code, mod code, or Blaze3D facade code changes. The backend switches tra
 | `@Deprecated` annotations remaining in Vulkanic layer | **0** |
 | `GraphicsBackend` methods with `CommandContext` param | **212** |
 | Total `VulkanicAPI` static methods | **570** |
-| Bypass `getImmediateContext()` calls to migrate (non-Blaze3D) | **480** |
+| Bypass `getImmediateContext()` calls to migrate (non-Blaze3D) | **479** (was 480; VoxelMap migrated) |
+| VoxelMap bypass calls | **0** (migrated to DSA in Phase 3) |
+| `drawFromBuffers` calls routing through `GlStateManager` for draws | **0** (all now via `VulkanicAPI` directly) |
 | Blaze3D `GpuDevice/CommandEncoder` concepts still in Blaze3D | **Must move to Vulkanic** |
 | `ArchitecturalBoundaryTest` | ✅ Passing |
+| `createTextureViewFromGlHandle` transitional bridge | **Live — removal requires `GlDevice.createTexture` → `VulkanicTexture`** |
 
 ---
 

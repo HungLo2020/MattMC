@@ -2904,23 +2904,32 @@ public interface GraphicsBackend {
     // =========================================================================
 
     /**
-     * [Transitional bridge] Creates a <em>non-owning</em> {@link VulkanicTextureView} that
-     * wraps an existing OpenGL texture handle.
+     * [Transitional bridge — NOT dead code, do NOT remove] Creates a <em>non-owning</em>
+     * {@link VulkanicTextureView} that wraps an existing raw OpenGL texture handle.
      *
-     * <p>This method exists to support the migration of Blaze3D GL classes from managing
-     * their own framebuffer objects to delegating render-pass creation to Vulkanic. It
-     * allows {@code GlCommandEncoder.createRenderPass()} to convert a {@code GlTextureView}
-     * (which holds a {@code GlTexture} GL handle) into a {@code VulkanicTextureView} that
-     * can be passed to {@link #beginRenderPass}.
+     * <p><b>Why this exists (and must stay for now):</b><br>
+     * {@code GlCommandEncoder.createRenderPass()} is the live render-pass creation entry point for
+     * all game and mod code that calls {@code RenderSystem.getDevice().createCommandEncoder().createRenderPass(...)}.
+     * That call path supplies a Blaze3D {@code GlTextureView} (wrapping a {@code GlTexture} whose GPU
+     * resource is a raw OpenGL texture object ID). To delegate FBO lifecycle to the Vulkanic
+     * {@link #beginRenderPass} abstraction, the encoder needs to convert those Blaze3D views into
+     * {@code VulkanicTextureView} instances. This bridge is how that conversion happens.
+     *
+     * <p><b>How to eventually remove this method:</b><br>
+     * The root cause is that {@code GlDevice.createTexture(...)} returns a Blaze3D {@code GpuTexture}
+     * rather than a {@code VulkanicTexture}. Once {@code GlDevice.createTexture} is changed to return
+     * a {@link VulkanicTexture} directly (routing through {@link #createManagedTexture}), all callers
+     * will already hold a {@code VulkanicTexture} and no bridge is needed. At that point this method
+     * and {@code GlCommandEncoder.toVulkanicTextureView()} can both be deleted.
      *
      * <p>The returned view is <strong>non-owning</strong>: closing it does not delete the
      * underlying GL texture. The caller (i.e. the Blaze3D {@code GlTexture}) remains
      * responsible for the texture lifetime.
      *
      * <p><b>OpenGL backend:</b> creates a non-owning {@code OpenGLTexture} + {@code OpenGLTextureView}.
-     * <p><b>Vulkan backend (future):</b> should throw {@link UnsupportedOperationException} —
-     * a Vulkan backend will never hold OpenGL texture handles. This method is expected to be
-     * removed once {@code GlCommandEncoder} is replaced by a full Vulkanic command encoder.
+     * <p><b>Vulkan backend (future):</b> must throw {@link UnsupportedOperationException} —
+     * a Vulkan backend will never hold raw OpenGL texture handles. This is intentional;
+     * a proper Vulkan path will have {@code VulkanicTexture} instances from the start.
      *
      * @param ctx           command context
      * @param glHandle      the GL texture object name (from glGenTextures / glCreateTextures)

@@ -805,25 +805,37 @@ public class GlCommandEncoder implements CommandEncoder {
 		GlRenderPass glRenderPass, int i, int j, int k, @Nullable VertexFormat.IndexType indexType, GlRenderPipeline glRenderPipeline, int l
 	) {
 		this.device.vertexArrayCache().bindVertexArray(glRenderPipeline.info().getVertexFormat(), (GlBuffer)glRenderPass.vertexBuffers[0]);
+		// Obtain a single context for all VulkanicAPI calls in this draw — avoids repeated singleton lookups
+		// and makes explicit that every draw operation flows through VulkanicAPI → OpenGLBackend.
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		if (indexType != null) {
-			GlStateManager._glBindBuffer(34963, ((GlBuffer)glRenderPass.indexBuffer).handle);
+			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.
+			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, ((GlBuffer)glRenderPass.indexBuffer).handle);
+			int glIndexType = GlConst.toGl(indexType);
+			long indexOffset = (long)j * indexType.bytes;
 			if (l > 1) {
 				if (i > 0) {
-					VulkanicAPI.drawIndexedInstancedBaseVertex(
-						VulkanicAPI.getImmediateContext(), GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, l, i
-					);
+					VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, glPrimitiveMode, k, glIndexType, indexOffset, l, i);
 				} else {
-					VulkanicAPI.drawIndexedInstanced(VulkanicAPI.getImmediateContext(), GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, l);
+					VulkanicAPI.drawIndexedInstanced(ctx, glPrimitiveMode, k, glIndexType, indexOffset, l);
 				}
 			} else if (i > 0) {
-				VulkanicAPI.drawIndexedBaseVertex(VulkanicAPI.getImmediateContext(), GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, i);
+				VulkanicAPI.drawIndexedBaseVertex(ctx, glPrimitiveMode, k, glIndexType, indexOffset, i);
 			} else {
-				GlStateManager._drawElements(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes);
+				// Route non-instanced indexed draw through VulkanicAPI.
+				// Iris: apply tessellation mode override for the non-instanced path, matching the
+				// GlStateManager._drawElements Iris override that this replaces.
+				int drawMode = (glPrimitiveMode == VulkanicAPI.GL_TRIANGLES
+						&& net.irisshaders.iris.vertices.ImmediateState.usingTessellation)
+					? VulkanicAPI.GL_PATCHES : glPrimitiveMode;
+				VulkanicAPI.drawElements(ctx, drawMode, k, glIndexType, indexOffset);
 			}
 		} else if (l > 1) {
-			VulkanicAPI.drawArraysInstanced(VulkanicAPI.getImmediateContext(), GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), i, k, l);
+			VulkanicAPI.drawArraysInstanced(ctx, glPrimitiveMode, i, k, l);
 		} else {
-			GlStateManager._drawArrays(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), i, k);
+			// Route non-instanced non-indexed draw through VulkanicAPI rather than the GlStateManager wrapper.
+			VulkanicAPI.drawArrays(ctx, glPrimitiveMode, i, k);
 		}
 	}
 
@@ -1108,6 +1120,20 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		this.device.debugLabels().popDebugGroup();
+	}
+
+	/**
+	 * Returns the active {@link net.vulkanic.VulkanicRenderPass} for the current render pass,
+	 * or {@code null} when no render pass is active or when Iris is managing the FBO directly
+	 * (shadow rendering / safeMultiply path).
+	 *
+	 * <p>This accessor exists so that future code paths can interact with the Vulkanic
+	 * render-pass abstraction during an active render pass without casting or coupling to
+	 * {@link GlCommandEncoder} internals.
+	 */
+	@Nullable
+	public net.vulkanic.VulkanicRenderPass getActiveVulkanicRenderPass() {
+		return activeVulkanicRenderPass;
 	}
 
 	protected GlDevice getDevice() {
