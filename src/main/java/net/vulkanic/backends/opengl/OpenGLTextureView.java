@@ -12,7 +12,7 @@ import net.vulkanic.VulkanicTextureView;
  */
 public class OpenGLTextureView extends VulkanicTextureView {
 
-    private final OpenGLTexture texture;
+    private final VulkanicTexture texture;
     private final int baseMipLevel;
     private final int mipLevelCount;
     private boolean closed;
@@ -20,11 +20,17 @@ public class OpenGLTextureView extends VulkanicTextureView {
     /**
      * Creates a texture view over the given texture and mip range.
      *
+     * <p>The texture may be any {@link VulkanicTexture} — including {@code OpenGLTexture}
+     * (the normal Vulkanic path) or a Blaze3D {@code GlTexture} (which implements
+     * {@code VulkanicTexture} via {@code GpuTexture}). This allows
+     * {@code GlCommandEncoder.createRenderPass} to create views without the
+     * {@code createTextureViewFromGlHandle} bridge.
+     *
      * @param texture      the backing texture
      * @param baseMipLevel first mip level exposed by this view
      * @param mipLevelCount number of mip levels exposed by this view
      */
-    public OpenGLTextureView(OpenGLTexture texture, int baseMipLevel, int mipLevelCount) {
+    public OpenGLTextureView(VulkanicTexture texture, int baseMipLevel, int mipLevelCount) {
         if (baseMipLevel < 0 || mipLevelCount < 1 || baseMipLevel + mipLevelCount > texture.getMipLevels()) {
             throw new IllegalArgumentException(
                 "Invalid mip range [" + baseMipLevel + ", " + (baseMipLevel + mipLevelCount) +
@@ -41,9 +47,17 @@ public class OpenGLTextureView extends VulkanicTextureView {
         return texture;
     }
 
-    /** Returns the backing OpenGL texture (with the GL handle). */
+    /**
+     * Returns the backing texture cast to {@link OpenGLTexture}, or {@code null} if the
+     * backing texture is not an {@code OpenGLTexture} (e.g. it is a Blaze3D {@code GlTexture}
+     * held via the {@code VulkanicTexture} interface).
+     *
+     * <p>Callers that need the native GL handle of any backing texture should call
+     * {@code texture()} and use the {@code VulkanicTexture} interface methods instead.
+     */
+    @org.jetbrains.annotations.Nullable
     public OpenGLTexture openGLTexture() {
-        return texture;
+        return texture instanceof OpenGLTexture o ? o : null;
     }
 
     @Override

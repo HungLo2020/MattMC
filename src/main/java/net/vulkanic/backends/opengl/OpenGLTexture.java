@@ -11,7 +11,7 @@ import org.lwjgl.opengl.GL11;
  * Resources are freed when {@link #close()} is called (calls glDeleteTextures),
  * unless this is a <em>non-owning</em> instance created via {@link #nonOwning}.
  */
-public class OpenGLTexture extends VulkanicTexture {
+public class OpenGLTexture implements VulkanicTexture {
 
     private final int glHandle;
     private final int usage;
@@ -101,6 +101,18 @@ public class OpenGLTexture extends VulkanicTexture {
     }
 
     @Override
+    public VulkanicTextureFormat getVulkanicFormat() {
+        return format;
+    }
+
+    /**
+     * Returns the Vulkanic format of this texture.
+     *
+     * <p>Alias for {@link #getVulkanicFormat()} kept for backward compatibility with
+     * existing tests and code that calls {@code .getFormat()} on an {@code OpenGLTexture}
+     * reference directly. Prefer {@code getVulkanicFormat()} when coding against the
+     * {@link VulkanicTexture} interface.
+     */
     public VulkanicTextureFormat getFormat() {
         return format;
     }

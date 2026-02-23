@@ -2413,28 +2413,4 @@ public class VulkanicAPI {
         return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor,
             depthTarget, clearDepth);
     }
-
-    // =========================================================================
-    // Phase 3b: Transitional bridge — GL texture handle → VulkanicTextureView
-    // =========================================================================
-
-    /**
-     * [Transitional bridge] Creates a non-owning {@link VulkanicTextureView} from an existing
-     * OpenGL texture handle.
-     *
-     * <p>Used by {@code GlCommandEncoder} during the Blaze3D → Vulkanic migration to convert
-     * a {@code GlTextureView} (holding a GL texture handle) into a {@code VulkanicTextureView}
-     * that can be passed to {@link #beginRenderPass}.
-     *
-     * <p>The returned view does NOT own the GL texture; closing it is a no-op.
-     *
-     * @see GraphicsBackend#createTextureViewFromGlHandle
-     */
-    public static VulkanicTextureView createTextureViewFromGlHandle(CommandContext ctx,
-            int glHandle, VulkanicTextureFormat format,
-            int width, int height, int depthOrLayers, int mipLevels, int usage,
-            int baseMipLevel, int mipLevelCount) {
-        return getBackend().createTextureViewFromGlHandle(ctx, glHandle, format,
-            width, height, depthOrLayers, mipLevels, usage, baseMipLevel, mipLevelCount);
-    }
 }

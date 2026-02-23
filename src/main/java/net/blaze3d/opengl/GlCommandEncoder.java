@@ -151,35 +151,18 @@ public class GlCommandEncoder implements CommandEncoder {
 	}
 
 	/**
-	 * Converts a Blaze3D {@link GlTextureView} to a non-owning {@link net.vulkanic.VulkanicTextureView}
-	 * by extracting the GL texture handle and bridging through VulkanicAPI.
-	 * Used exclusively by {@link #createRenderPass} to feed existing GlTextures into the
-	 * Vulkanic render-pass abstraction without duplicating or transferring ownership.
+	 * Wraps a Blaze3D {@link GlTextureView} as a {@link net.vulkanic.VulkanicTextureView}.
+	 *
+	 * <p>Now that {@code GlTexture} implements {@code VulkanicTexture} (via {@code GpuTexture}),
+	 * no GL-handle bridge object is needed. An {@code OpenGLTextureView} is constructed
+	 * directly from the {@code GlTexture} and the view's mip range. This is a lightweight
+	 * descriptor with no new GPU allocations, and {@link net.vulkanic.backends.opengl.OpenGLTextureView#close()}
+	 * does not delete the underlying texture (the caller remains the owner).
 	 */
 	private net.vulkanic.VulkanicTextureView toVulkanicTextureView(GlTextureView view) {
-		GlTexture glTex = view.texture();
-		return VulkanicAPI.createTextureViewFromGlHandle(
-			VulkanicAPI.getImmediateContext(),
-			glTex.id,
-			toVulkanicFormat(glTex.getFormat()),
-			glTex.getWidth(0),
-			glTex.getHeight(0),
-			glTex.getDepthOrLayers(),
-			glTex.getMipLevels(),
-			glTex.usage(),
-			view.baseMipLevel(),
-			view.mipLevels()
+		return new net.vulkanic.backends.opengl.OpenGLTextureView(
+			view.texture(), view.baseMipLevel(), view.mipLevels()
 		);
-	}
-
-	/** Maps a Blaze3D TextureFormat to its Vulkanic equivalent. */
-	private static net.vulkanic.VulkanicTextureFormat toVulkanicFormat(net.blaze3d.textures.TextureFormat fmt) {
-		return switch (fmt) {
-			case RGBA8   -> net.vulkanic.VulkanicTextureFormat.RGBA8;
-			case RED8    -> net.vulkanic.VulkanicTextureFormat.RED8;
-			case RED8I   -> net.vulkanic.VulkanicTextureFormat.RED8I;
-			case DEPTH32 -> net.vulkanic.VulkanicTextureFormat.DEPTH32;
-		};
 	}
 
 	@Override

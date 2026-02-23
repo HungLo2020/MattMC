@@ -1,7 +1,7 @@
 # Vulkanic Graphics Abstraction Layer — Migration Guide
 
 **Last Updated:** 2026-02-23  
-**Status:** Phase 1 & 2 complete · Phase 2.5 deprecated-method migration complete · Phase 3 in progress (3a–3b done, draw path wired, one bypass migrated)
+**Status:** Phase 1 & 2 complete · Phase 2.5 deprecated-method migration complete · Phase 3 in progress (3a–3b done, draw path wired, type hierarchy unified, bridge method removed)
 
 ---
 
@@ -120,7 +120,27 @@ New abstract types in `net.vulkanic`: `VulkanicBuffer` / `VulkanicBufferSlice`, 
 
 `createTextureViewFromGlHandle` is a **live transitional bridge** used every frame by `GlCommandEncoder.createRenderPass`. It cannot be removed until `GlDevice.createTexture` returns `VulkanicTexture` directly. The Javadoc explains exactly what step would allow its removal.
 
-### Phase 3 — Draw Path Wiring ✅ Complete
+### Phase 3 — Type Hierarchy Unification ✅ Complete
+
+`VulkanicTexture` converted from abstract class to **interface**. This allows `GpuTexture` (Blaze3D's abstract texture base) to implement `VulkanicTexture` directly:
+
+```java
+// Before: two separate hierarchies
+GlTexture extends GpuTexture   // Blaze3D hierarchy
+OpenGLTexture extends VulkanicTexture  // Vulkanic hierarchy
+
+// After: unified
+GlTexture extends GpuTexture implements VulkanicTexture  // one hierarchy
+OpenGLTexture implements VulkanicTexture
+```
+
+`VulkanicTexture.getFormat()` renamed to `getVulkanicFormat()` to avoid a return-type conflict with `GpuTexture.getFormat()` (which returns the Blaze3D `TextureFormat` enum). `GpuTexture.getVulkanicFormat()` converts `TextureFormat → VulkanicTextureFormat` via a switch expression. `OpenGLTexture.getFormat()` is kept as a backward-compat alias for tests.
+
+`OpenGLTextureView` constructor widened from `OpenGLTexture` to `VulkanicTexture` — it now wraps any `VulkanicTexture` (including `GlTexture`).
+
+**`createTextureViewFromGlHandle` bridge removed** from `GraphicsBackend`, `VulkanicAPI`, and `OpenGLBackend` (17 lines deleted across 3 files). `GlCommandEncoder.toVulkanicTextureView` now creates an `OpenGLTextureView` directly from the `GlTexture` (since it is now a `VulkanicTexture`), without allocating a non-owning `OpenGLTexture` wrapper object. The `toVulkanicFormat()` helper in `GlCommandEncoder` also removed (superseded by `GpuTexture.getVulkanicFormat()`).
+
+---
 
 `GlCommandEncoder.drawFromBuffers` now routes ALL draw calls explicitly through `VulkanicAPI` rather than through `GlStateManager` wrappers:
 
@@ -327,7 +347,10 @@ No game code, mod code, or Blaze3D facade code changes. The backend switches tra
 | `drawFromBuffers` calls routing through `GlStateManager` for draws | **0** (all now via `VulkanicAPI` directly) |
 | Blaze3D `GpuDevice/CommandEncoder` concepts still in Blaze3D | **Must move to Vulkanic** |
 | `ArchitecturalBoundaryTest` | ✅ Passing |
-| `createTextureViewFromGlHandle` transitional bridge | **Live — removal requires `GlDevice.createTexture` → `VulkanicTexture`** |
+| `createTextureViewFromGlHandle` transitional bridge | **REMOVED** — `GpuTexture` now implements `VulkanicTexture` |
+| `VulkanicTexture` type | **Interface** (converted from abstract class) |
+| `GpuTexture` implements `VulkanicTexture` | ✅ Yes |
+| `GlTexture` IS-A `VulkanicTexture` | ✅ Yes (via `GpuTexture`) |
 
 ---
 

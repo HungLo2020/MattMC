@@ -119,20 +119,29 @@ public class Phase3DrawPathTest {
         assertNotNull(m);
     }
 
-    // ── Task 2: createTextureViewFromGlHandle documentation check ────────────
+    // ── Task 2: createTextureViewFromGlHandle bridge removal ─────────────
 
     @Test
-    public void testCreateTextureViewFromGlHandleDocumentedAsNotDead() throws IOException {
+    public void testCreateTextureViewFromGlHandleRemovedFromGraphicsBackend() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
         String source = Files.readString(file);
 
-        // The method javadoc must explain WHY it still exists (not dead) and how to remove it
-        assertTrue(source.contains("NOT dead code"),
-            "createTextureViewFromGlHandle javadoc must state it is NOT dead code");
-        assertTrue(source.contains("GlDevice.createTexture"),
-            "javadoc must explain the removal path (GlDevice.createTexture returning VulkanicTexture)");
-        assertTrue(source.contains("UnsupportedOperationException"),
-            "javadoc must document that the Vulkan backend must throw UnsupportedOperationException");
+        // The bridge method has been removed: GpuTexture now implements VulkanicTexture,
+        // so no GL-handle bridge is needed.
+        assertFalse(source.contains("createTextureViewFromGlHandle"),
+            "createTextureViewFromGlHandle bridge must be removed from GraphicsBackend — " +
+            "GpuTexture now implements VulkanicTexture, making the bridge unnecessary");
+    }
+
+    @Test
+    public void testGpuTextureImplementsVulkanicTextureInSource() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java");
+        String source = Files.readString(file);
+
+        assertTrue(source.contains("implements") && source.contains("VulkanicTexture"),
+            "GpuTexture must implement VulkanicTexture");
+        assertTrue(source.contains("getVulkanicFormat"),
+            "GpuTexture must provide getVulkanicFormat() implementing the interface method");
     }
 
     // ── Task 3: VoxelMap bypass migrated to DSA ───────────────────────────────

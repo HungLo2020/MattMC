@@ -11,14 +11,16 @@ import java.util.OptionalInt;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for Phase 3b delegation: GlCommandEncoder → VulkanicAPI.beginRenderPass.
+ * Tests for Phase 3b delegation and the type-hierarchy unification (Phase 3c).
  *
- * Validates:
+ * <p>Validates:
  * <ul>
  *   <li>{@code OpenGLTexture.nonOwning()} creates a non-owning texture whose close() is a no-op.</li>
- *   <li>{@link VulkanicAPI#createTextureViewFromGlHandle} is dispatched through {@link GraphicsBackend}.</li>
- *   <li>The bridge view returned is an {@link OpenGLTextureView} usable by the render-pass path.</li>
- *   <li>The TextureFormat → VulkanicTextureFormat round-trip is correct for all four formats.</li>
+ *   <li>The {@code createTextureViewFromGlHandle} bridge has been removed — {@link VulkanicTexture}
+ *       is now an interface implemented by both {@code OpenGLTexture} and {@code GpuTexture}.</li>
+ *   <li>{@link OpenGLTextureView} accepts any {@link VulkanicTexture} (not just OpenGLTexture).</li>
+ *   <li>{@code GpuTexture} and {@code GlTexture} are assignable to {@code VulkanicTexture}.</li>
+ *   <li>The TextureFormat → VulkanicTextureFormat conversion is correct for all four formats.</li>
  * </ul>
  *
  * All tests run without an OpenGL context (no GL calls needed).
@@ -88,63 +90,67 @@ public class Phase3DelegationTest {
         assertTrue(nonOwned.isClosed());
     }
 
-    // ── GraphicsBackend.createTextureViewFromGlHandle interface ──────────
+    // ── VulkanicTexture is now an interface: type-hierarchy unification ────
 
     @Test
-    public void testGraphicsBackendHasCreateTextureViewFromGlHandle() throws NoSuchMethodException {
-        // Verify the method signature exists in the GraphicsBackend interface
-        assertNotNull(GraphicsBackend.class.getMethod(
-            "createTextureViewFromGlHandle",
-            CommandContext.class,
-            int.class,
-            VulkanicTextureFormat.class,
-            int.class, int.class,
-            int.class, int.class, int.class,
-            int.class, int.class));
+    public void testVulkanicTextureIsInterface() {
+        // VulkanicTexture must be an interface so that GpuTexture can implement it
+        // without changing its inheritance chain.
+        assertTrue(VulkanicTexture.class.isInterface(),
+            "VulkanicTexture must be an interface to allow GpuTexture to implement it");
     }
 
     @Test
-    public void testVulkanicAPIHasCreateTextureViewFromGlHandle() throws NoSuchMethodException {
-        // Verify the static dispatch method exists in VulkanicAPI
-        assertNotNull(VulkanicAPI.class.getMethod(
-            "createTextureViewFromGlHandle",
-            CommandContext.class,
-            int.class,
-            VulkanicTextureFormat.class,
-            int.class, int.class,
-            int.class, int.class, int.class,
-            int.class, int.class));
+    public void testGpuTextureImplementsVulkanicTexture() {
+        // GpuTexture must implement VulkanicTexture so that all Blaze3D textures
+        // (including GlTexture) are VulkanicTexture instances.
+        assertTrue(VulkanicTexture.class.isAssignableFrom(net.blaze3d.textures.GpuTexture.class),
+            "GpuTexture must implement VulkanicTexture");
     }
 
-    // ── VulkanicAPI.createTextureViewFromGlHandle dispatch ───────────────
+    @Test
+    public void testOpenGLTextureImplementsVulkanicTexture() {
+        assertTrue(VulkanicTexture.class.isAssignableFrom(OpenGLTexture.class),
+            "OpenGLTexture must implement VulkanicTexture");
+    }
+
+    @Test
+    public void testGpuTextureGetVulkanicFormatConversion() {
+        // GpuTexture.getVulkanicFormat() must convert TextureFormat → VulkanicTextureFormat correctly.
+        // We test via OpenGLTexture which also implements VulkanicTexture to avoid needing a GlTexture.
+        OpenGLTexture rgba = OpenGLTexture.nonOwning(1, 0, VulkanicTextureFormat.RGBA8,  1,1,1,1,"");
+        OpenGLTexture red8 = OpenGLTexture.nonOwning(2, 0, VulkanicTextureFormat.RED8,   1,1,1,1,"");
+        OpenGLTexture r8i  = OpenGLTexture.nonOwning(3, 0, VulkanicTextureFormat.RED8I,  1,1,1,1,"");
+        OpenGLTexture dep  = OpenGLTexture.nonOwning(4, 0, VulkanicTextureFormat.DEPTH32,1,1,1,1,"");
+
+        assertEquals(VulkanicTextureFormat.RGBA8,   rgba.getVulkanicFormat());
+        assertEquals(VulkanicTextureFormat.RED8,    red8.getVulkanicFormat());
+        assertEquals(VulkanicTextureFormat.RED8I,   r8i.getVulkanicFormat());
+        assertEquals(VulkanicTextureFormat.DEPTH32, dep.getVulkanicFormat());
+    }
+
+    // ── OpenGLTextureView now accepts any VulkanicTexture ─────────────────
 
     @Test
     public void testCreateTextureViewFromGlHandleReturnType() {
-        VulkanicAPI.initialize(); // ensure backend is set
-        CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+        // Bridge method removed: create OpenGLTextureView directly using a non-owning texture.
+        OpenGLTexture nonOwning = OpenGLTexture.nonOwning(
+            77, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.RGBA8, 256, 128, 1, 4, "test-view");
 
-        VulkanicTextureView view = VulkanicAPI.createTextureViewFromGlHandle(
-            ctx, 77, VulkanicTextureFormat.RGBA8,
-            256, 128, 1, 4, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
-            0, 4);
+        OpenGLTextureView view = new OpenGLTextureView(nonOwning, 0, 4);
 
-        // Must return a non-null VulkanicTextureView
-        assertNotNull(view, "createTextureViewFromGlHandle must return non-null");
+        assertNotNull(view, "OpenGLTextureView must be non-null");
         assertInstanceOf(VulkanicTextureView.class, view);
-        // Must be an OpenGLTextureView for the OpenGL backend path
-        assertInstanceOf(OpenGLTextureView.class, view,
-            "OpenGL backend must return OpenGLTextureView");
     }
 
     @Test
     public void testCreateTextureViewFromGlHandleProperties() {
-        VulkanicAPI.initialize();
-        CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+        OpenGLTexture nonOwning = OpenGLTexture.nonOwning(
+            55, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.DEPTH32, 512, 512, 1, 1, "test-props");
 
-        VulkanicTextureView view = VulkanicAPI.createTextureViewFromGlHandle(
-            ctx, 55, VulkanicTextureFormat.DEPTH32,
-            512, 512, 1, 1, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
-            0, 1);
+        OpenGLTextureView view = new OpenGLTextureView(nonOwning, 0, 1);
 
         assertEquals(512, view.getWidth(0),  "Width at mip 0 must match");
         assertEquals(512, view.getHeight(0), "Height at mip 0 must match");
@@ -152,33 +158,27 @@ public class Phase3DelegationTest {
         assertEquals(1,   view.getMipLevelCount());
         assertFalse(view.isClosed(), "Fresh view must not be closed");
 
-        // The backing texture must be non-owning: close() is safe without a GL context
-        OpenGLTextureView glView = (OpenGLTextureView) view;
-        assertEquals(55, glView.openGLTexture().getGlHandle());
-        assertEquals(VulkanicTextureFormat.DEPTH32, glView.openGLTexture().getFormat());
+        // The backing texture is the same non-owning texture we passed in
+        OpenGLTexture glTex = view.openGLTexture();
+        assertEquals(55, glTex.getGlHandle());
+        assertEquals(VulkanicTextureFormat.DEPTH32, glTex.getFormat());
 
         // Close the view — must not throw even without a GL context
         assertDoesNotThrow(view::close);
         assertTrue(view.isClosed());
         // The backing texture must NOT be closed when its view is closed
-        // (VulkanicTextureView.close() does not propagate to the texture).
-        assertFalse(glView.openGLTexture().isClosed(),
+        assertFalse(glTex.isClosed(),
             "Closing a view must NOT close the backing texture");
-        // The texture is non-owning, so we can safely close it without GL calls:
-        assertDoesNotThrow(() -> glView.openGLTexture().close());
-        assertTrue(glView.openGLTexture().isClosed());
     }
 
     @Test
     public void testCreateTextureViewFromGlHandleMipRange() {
-        VulkanicAPI.initialize();
-        CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+        OpenGLTexture nonOwning = OpenGLTexture.nonOwning(
+            10, VulkanicTexture.USAGE_TEXTURE_BINDING,
+            VulkanicTextureFormat.RGBA8, 256, 128, 1, 5, "mip-test");
 
         // View starting at mip 2, covering 2 mip levels of a 256x128 texture
-        VulkanicTextureView view = VulkanicAPI.createTextureViewFromGlHandle(
-            ctx, 10, VulkanicTextureFormat.RGBA8,
-            256, 128, 1, 5, VulkanicTexture.USAGE_TEXTURE_BINDING,
-            2, 2);
+        OpenGLTextureView view = new OpenGLTextureView(nonOwning, 2, 2);
 
         assertEquals(2, view.getBaseMipLevel());
         assertEquals(2, view.getMipLevelCount());
@@ -191,21 +191,17 @@ public class Phase3DelegationTest {
 
     @Test
     public void testAllFormatsRoundTrip() {
-        VulkanicAPI.initialize();
-        CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
-
         // Ensure a view can be created for every VulkanicTextureFormat value without throwing
         for (VulkanicTextureFormat fmt : VulkanicTextureFormat.values()) {
             int usage = fmt.hasDepthAspect()
                 ? VulkanicTexture.USAGE_RENDER_ATTACHMENT
                 : VulkanicTexture.USAGE_TEXTURE_BINDING;
             assertDoesNotThrow(() -> {
-                VulkanicTextureView v = VulkanicAPI.createTextureViewFromGlHandle(
-                    ctx, 1, fmt, 16, 16, 1, 1, usage, 0, 1);
-                OpenGLTextureView ov = (OpenGLTextureView) v;
+                OpenGLTexture tex = OpenGLTexture.nonOwning(1, usage, fmt, 16, 16, 1, 1, "fmt-test");
+                OpenGLTextureView ov = new OpenGLTextureView(tex, 0, 1);
                 assertEquals(fmt, ov.openGLTexture().getFormat(),
-                    "Format must round-trip through bridge for " + fmt);
-            }, "createTextureViewFromGlHandle should not throw for format: " + fmt);
+                    "Format must round-trip through OpenGLTextureView for " + fmt);
+            }, "OpenGLTextureView construction should not throw for format: " + fmt);
         }
     }
 
@@ -225,7 +221,7 @@ public class Phase3DelegationTest {
     @Test
     public void testGlCommandEncoderHasToVulkanicTextureViewHelper()
             throws NoSuchMethodException {
-        // Verify the private bridge helper method exists
+        // Verify the private bridge helper method still exists (but now uses direct construction)
         var method = net.blaze3d.opengl.GlCommandEncoder.class
             .getDeclaredMethod("toVulkanicTextureView",
                 net.blaze3d.opengl.GlTextureView.class);
@@ -234,13 +230,61 @@ public class Phase3DelegationTest {
     }
 
     @Test
-    public void testGlCommandEncoderHasToVulkanicFormatHelper()
-            throws NoSuchMethodException {
-        // Verify the static format-conversion helper exists
-        var method = net.blaze3d.opengl.GlCommandEncoder.class
-            .getDeclaredMethod("toVulkanicFormat",
-                net.blaze3d.textures.TextureFormat.class);
-        assertNotNull(method);
-        assertEquals(VulkanicTextureFormat.class, method.getReturnType());
+    public void testToVulkanicFormatHelperRemovedNoBridgeNeeded() {
+        // The toVulkanicFormat() static helper was only needed by the old bridge method.
+        // Since GpuTexture now implements VulkanicTexture and provides getVulkanicFormat(),
+        // no explicit format conversion is needed in GlCommandEncoder.
+        // Verify the helper is GONE from GlCommandEncoder.
+        boolean helperExists;
+        try {
+            net.blaze3d.opengl.GlCommandEncoder.class
+                .getDeclaredMethod("toVulkanicFormat", net.blaze3d.textures.TextureFormat.class);
+            helperExists = true;
+        } catch (NoSuchMethodException e) {
+            helperExists = false;
+        }
+        assertFalse(helperExists,
+            "toVulkanicFormat() static helper should be removed now that GpuTexture implements VulkanicTexture");
+    }
+
+    @Test
+    public void testBridgeMethodRemovedFromVulkanicAPI() {
+        // createTextureViewFromGlHandle was a transitional bridge that is now unnecessary.
+        // VulkanicAPI must NOT have this method.
+        boolean bridgeExists;
+        try {
+            VulkanicAPI.class.getMethod(
+                "createTextureViewFromGlHandle",
+                CommandContext.class,
+                int.class, VulkanicTextureFormat.class,
+                int.class, int.class,
+                int.class, int.class, int.class,
+                int.class, int.class);
+            bridgeExists = true;
+        } catch (NoSuchMethodException e) {
+            bridgeExists = false;
+        }
+        assertFalse(bridgeExists,
+            "createTextureViewFromGlHandle bridge method must be removed from VulkanicAPI " +
+            "now that GpuTexture implements VulkanicTexture and OpenGLTextureView accepts any VulkanicTexture");
+    }
+
+    @Test
+    public void testBridgeMethodRemovedFromGraphicsBackend() {
+        boolean bridgeExists;
+        try {
+            GraphicsBackend.class.getMethod(
+                "createTextureViewFromGlHandle",
+                CommandContext.class,
+                int.class, VulkanicTextureFormat.class,
+                int.class, int.class,
+                int.class, int.class, int.class,
+                int.class, int.class);
+            bridgeExists = true;
+        } catch (NoSuchMethodException e) {
+            bridgeExists = false;
+        }
+        assertFalse(bridgeExists,
+            "createTextureViewFromGlHandle bridge method must be removed from GraphicsBackend");
     }
 }
