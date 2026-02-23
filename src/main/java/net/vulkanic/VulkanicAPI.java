@@ -2360,4 +2360,57 @@ public class VulkanicAPI {
             openGLBackend.setGlDevice(device);
         }
     }
+
+    // =========================================================================
+    // Phase 3b: Render Pass
+    // =========================================================================
+
+    /**
+     * Begins a render pass that targets the given color attachment.
+     *
+     * <p>Dispatches to {@link GraphicsBackend#beginRenderPass(CommandContext, java.util.function.Supplier, VulkanicTextureView, java.util.OptionalInt)}.
+     *
+     * <p>Typical usage with try-with-resources:
+     * <pre>
+     * CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+     * try (VulkanicRenderPass pass = VulkanicAPI.beginRenderPass(
+     *         ctx, () -> "terrain", colorView, OptionalInt.of(0))) {
+     *     pass.setPipeline(pipeline);
+     *     pass.setVertexBuffer(0, vbo);
+     *     pass.draw(0, 36);
+     * }
+     * VulkanicAPI.submitCommandBuffer(ctx);
+     * </pre>
+     *
+     * @param ctx         command context (from {@link #beginCommandBuffer()})
+     * @param label       debug label for profiling (may be null supplier)
+     * @param colorTarget color attachment texture view
+     * @param clearColor  if present, ARGB clear color applied before the first draw
+     * @return an active {@link VulkanicRenderPass}
+     */
+    public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            VulkanicTextureView colorTarget, java.util.OptionalInt clearColor) {
+        return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor);
+    }
+
+    /**
+     * Begins a render pass that targets a color and optional depth attachment.
+     *
+     * @param ctx         command context (from {@link #beginCommandBuffer()})
+     * @param label       debug label (may be null supplier)
+     * @param colorTarget color attachment texture view
+     * @param clearColor  if present, ARGB clear color applied before the first draw
+     * @param depthTarget depth attachment texture view (may be null — depth not used)
+     * @param clearDepth  if present, depth value to clear the depth attachment with
+     * @return an active {@link VulkanicRenderPass}
+     */
+    public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            VulkanicTextureView colorTarget, java.util.OptionalInt clearColor,
+            @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
+            java.util.OptionalDouble clearDepth) {
+        return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor,
+            depthTarget, clearDepth);
+    }
 }

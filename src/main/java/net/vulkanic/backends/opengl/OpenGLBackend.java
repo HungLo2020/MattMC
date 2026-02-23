@@ -2389,4 +2389,96 @@ public class OpenGLBackend implements GraphicsBackend {
                 "OpenGL backend only supports immediate-mode contexts; got: " + ctx);
         }
     }
+
+    // =========================================================================
+    // Phase 3b: Render Pass
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor) {
+        return beginRenderPass(ctx, label, colorTarget, clearColor, null, java.util.OptionalDouble.empty());
+    }
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor,
+            @org.jetbrains.annotations.Nullable net.vulkanic.VulkanicTextureView depthTarget,
+            java.util.OptionalDouble clearDepth) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires immediate-mode CommandContext for beginRenderPass");
+        }
+        if (colorTarget == null) {
+            throw new IllegalArgumentException("colorTarget must not be null");
+        }
+        if (!(colorTarget instanceof OpenGLTextureView colorView)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLTextureView for colorTarget, got: " +
+                colorTarget.getClass().getName());
+        }
+        if (depthTarget != null && !(depthTarget instanceof OpenGLTextureView)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLTextureView for depthTarget, got: " +
+                depthTarget.getClass().getName());
+        }
+
+        // 1. Create a new FBO for this render pass
+        int fbo = net.vulkanic.VulkanicAPI.createFramebuffer(ctx);
+
+        // 2. Bind the FBO
+        net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER, fbo);
+
+        // 3. Attach the color texture at mip level 0 of the view's base mip
+        int colorHandle = colorView.openGLTexture().getGlHandle();
+        int colorMip = colorView.getBaseMipLevel();
+        net.vulkanic.VulkanicAPI.framebufferTexture(ctx,
+            net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER,
+            net.vulkanic.VulkanicAPI.GL_COLOR_ATTACHMENT0,
+            net.vulkanic.VulkanicAPI.GL_TEXTURE_2D,
+            colorHandle, colorMip);
+
+        // 4. Attach the depth texture if provided
+        if (depthTarget != null) {
+            OpenGLTextureView depthView = (OpenGLTextureView) depthTarget;
+            int depthHandle = depthView.openGLTexture().getGlHandle();
+            int depthMip = depthView.getBaseMipLevel();
+            net.vulkanic.VulkanicAPI.framebufferTexture(ctx,
+                net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER,
+                net.vulkanic.VulkanicAPI.GL_DEPTH_ATTACHMENT,
+                net.vulkanic.VulkanicAPI.GL_TEXTURE_2D,
+                depthHandle, depthMip);
+        }
+
+        // 5. Optionally clear color
+        int clearMask = 0;
+        if (clearColor.isPresent()) {
+            int argb = clearColor.getAsInt();
+            float a = ((argb >> 24) & 0xFF) / 255.0f;
+            float r = ((argb >> 16) & 0xFF) / 255.0f;
+            float g = ((argb >>  8) & 0xFF) / 255.0f;
+            float b = ( argb        & 0xFF) / 255.0f;
+            net.vulkanic.VulkanicAPI.setClearColor(ctx, r, g, b, a);
+            clearMask |= net.vulkanic.VulkanicAPI.GL_COLOR_BUFFER_BIT;
+        }
+
+        // 6. Optionally clear depth
+        if (depthTarget != null && clearDepth.isPresent()) {
+            net.vulkanic.VulkanicAPI.setClearDepth(ctx, clearDepth.getAsDouble());
+            clearMask |= net.vulkanic.VulkanicAPI.GL_DEPTH_BUFFER_BIT;
+        }
+
+        if (clearMask != 0) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, clearMask);
+        }
+
+        // 7. Set the viewport to the color attachment's dimensions
+        int width  = colorTarget.getWidth(0);
+        int height = colorTarget.getHeight(0);
+        net.vulkanic.VulkanicAPI.setDynamicViewport(ctx, 0, 0, width, height);
+
+        return new OpenGLRenderPass(fbo, ctx);
+    }
 }

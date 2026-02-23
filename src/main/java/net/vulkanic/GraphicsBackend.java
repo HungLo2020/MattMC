@@ -2854,4 +2854,48 @@ public interface GraphicsBackend {
      * @param ctx the command context returned by {@link #beginCommandBuffer()}
      */
     void submitCommandBuffer(CommandContext ctx);
+
+    // =========================================================================
+    // Phase 3b: Render Pass
+    // =========================================================================
+
+    /**
+     * Begins a new render pass targeting the given color attachment.
+     *
+     * <p>In OpenGL: creates and binds a framebuffer object with {@code colorTarget}
+     * attached, optionally clears it, and sets the viewport to the texture dimensions.
+     * In Vulkan: records {@code vkCmdBeginRenderPass} into the command buffer
+     * identified by {@code ctx}.
+     *
+     * <p>The returned {@link VulkanicRenderPass} must be closed (e.g. via
+     * try-with-resources) to end the render pass and release GPU resources.
+     *
+     * @param ctx         command context (immediate-mode for OpenGL; VkCommandBuffer for Vulkan)
+     * @param label       debug label for profiling tools (may be null)
+     * @param colorTarget texture view to use as the color attachment
+     * @param clearColor  if present, the ARGB color to clear the attachment before rendering
+     * @return an active render pass for recording draw commands
+     */
+    VulkanicRenderPass beginRenderPass(CommandContext ctx, Supplier<String> label,
+                                        VulkanicTextureView colorTarget, OptionalInt clearColor);
+
+    /**
+     * Begins a new render pass targeting a color and optional depth attachment.
+     *
+     * <p>In OpenGL: creates and binds an FBO with color and depth attachments,
+     * optionally clears them, and sets the viewport.
+     * In Vulkan: records {@code vkCmdBeginRenderPass}.
+     *
+     * @param ctx         command context
+     * @param label       debug label (may be null)
+     * @param colorTarget texture view for the color attachment
+     * @param clearColor  if present, ARGB clear color
+     * @param depthTarget texture view for the depth attachment (may be null)
+     * @param clearDepth  if present, depth value to clear the depth attachment with
+     * @return an active render pass for recording draw commands
+     */
+    VulkanicRenderPass beginRenderPass(CommandContext ctx, Supplier<String> label,
+                                        VulkanicTextureView colorTarget, OptionalInt clearColor,
+                                        @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
+                                        OptionalDouble clearDepth);
 }
