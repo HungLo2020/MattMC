@@ -2898,4 +2898,46 @@ public interface GraphicsBackend {
                                         VulkanicTextureView colorTarget, OptionalInt clearColor,
                                         @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
                                         OptionalDouble clearDepth);
+
+    // =========================================================================
+    // Phase 3b: Transitional bridge — GL texture handle → VulkanicTextureView
+    // =========================================================================
+
+    /**
+     * [Transitional bridge] Creates a <em>non-owning</em> {@link VulkanicTextureView} that
+     * wraps an existing OpenGL texture handle.
+     *
+     * <p>This method exists to support the migration of Blaze3D GL classes from managing
+     * their own framebuffer objects to delegating render-pass creation to Vulkanic. It
+     * allows {@code GlCommandEncoder.createRenderPass()} to convert a {@code GlTextureView}
+     * (which holds a {@code GlTexture} GL handle) into a {@code VulkanicTextureView} that
+     * can be passed to {@link #beginRenderPass}.
+     *
+     * <p>The returned view is <strong>non-owning</strong>: closing it does not delete the
+     * underlying GL texture. The caller (i.e. the Blaze3D {@code GlTexture}) remains
+     * responsible for the texture lifetime.
+     *
+     * <p><b>OpenGL backend:</b> creates a non-owning {@code OpenGLTexture} + {@code OpenGLTextureView}.
+     * <p><b>Vulkan backend (future):</b> should throw {@link UnsupportedOperationException} —
+     * a Vulkan backend will never hold OpenGL texture handles. This method is expected to be
+     * removed once {@code GlCommandEncoder} is replaced by a full Vulkanic command encoder.
+     *
+     * @param ctx           command context
+     * @param glHandle      the GL texture object name (from glGenTextures / glCreateTextures)
+     * @param format        the texture's format
+     * @param width         width in pixels at mip level 0
+     * @param height        height in pixels at mip level 0
+     * @param depthOrLayers depth (3D) or layer count (array); usually 1
+     * @param mipLevels     total number of mip levels in the texture
+     * @param usage         usage flags (VulkanicTexture.USAGE_* constants)
+     * @param baseMipLevel  the first mip level this view exposes
+     * @param mipLevelCount the number of mip levels this view exposes
+     * @return a non-owning VulkanicTextureView pointing at the given GL texture handle
+     */
+    VulkanicTextureView createTextureViewFromGlHandle(CommandContext ctx,
+                                                       int glHandle,
+                                                       VulkanicTextureFormat format,
+                                                       int width, int height,
+                                                       int depthOrLayers, int mipLevels, int usage,
+                                                       int baseMipLevel, int mipLevelCount);
 }

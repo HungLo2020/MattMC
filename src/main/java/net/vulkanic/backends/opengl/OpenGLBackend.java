@@ -2481,4 +2481,21 @@ public class OpenGLBackend implements GraphicsBackend {
 
         return new OpenGLRenderPass(fbo, ctx);
     }
+
+    // =========================================================================
+    // Phase 3b: Transitional bridge — GL texture handle → VulkanicTextureView
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicTextureView createTextureViewFromGlHandle(CommandContext ctx,
+            int glHandle, net.vulkanic.VulkanicTextureFormat format,
+            int width, int height, int depthOrLayers, int mipLevels, int usage,
+            int baseMipLevel, int mipLevelCount) {
+        // Create a non-owning OpenGLTexture wrapping the existing GL handle.
+        // close() on this texture is a no-op; the caller manages the GL object's lifetime.
+        OpenGLTexture texture = OpenGLTexture.nonOwning(
+            glHandle, usage, format, width, height, depthOrLayers, mipLevels,
+            "gl-bridge-" + glHandle);
+        return new OpenGLTextureView(texture, baseMipLevel, mipLevelCount);
+    }
 }
