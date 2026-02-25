@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # --- Config you can tweak ---
-ONEDRIVE_DIR="/home/matt/OneDrive/Apps/Programming/MattMC"
+ONEDRIVE_DIR="/mnt/storage/OneDrive/Apps/Programming/MattMC"
 DOWNLOADS_DIR="${HOME}/Downloads"
 COPY_TO_DOWNLOADS=false   # set to true if you want a copy in Downloads as well
 
