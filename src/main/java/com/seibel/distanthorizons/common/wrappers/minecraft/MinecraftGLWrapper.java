@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 
@@ -46,14 +47,16 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableScissorTest() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_SCISSOR_TEST);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, true);
 		GlStateManager._enableScissorTest(); 
 	}
 	/** Disables scissor testing */
 	@Override
 	public void disableScissorTest() 
-	{ 
-		VulkanicAPI.disable(VulkanicAPI.GL_SCISSOR_TEST);
+	{
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, false);
 		GlStateManager._disableScissorTest(); 
 	}
 	
@@ -72,14 +75,16 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableDepthTest() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_DEPTH_TEST);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_DEPTH_TEST, true);
 		GlStateManager._enableDepthTest(); 
 	}
 	/** Disables depth testing */
 	@Override
 	public void disableDepthTest() 
 	{
-		VulkanicAPI.disable(VulkanicAPI.GL_DEPTH_TEST);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_DEPTH_TEST, false);
 		GlStateManager._disableDepthTest(); 
 	}
 	
@@ -87,7 +92,8 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glDepthFunc(int func) 
 	{ 
-		VulkanicAPI.setDepthTestFunction(func);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setDepthFunc(ctx, func);
 		GlStateManager._depthFunc(func); 
 	}
 	
@@ -95,14 +101,16 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableDepthMask() 
 	{
-		VulkanicAPI.setDepthWriteEnabled(true);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setDepthWriteMask(ctx, true);
 		GlStateManager._depthMask(true); 
 	}
 	/** Disables depth buffer writing */
 	@Override
 	public void disableDepthMask() 
 	{
-		VulkanicAPI.setDepthWriteEnabled(false);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setDepthWriteMask(ctx, false);
 		GlStateManager._depthMask(false); 
 	}
 	
@@ -113,14 +121,16 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableBlend() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_BLEND);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND, true);
 		GlStateManager._enableBlend();
 	}
 	/** Disables blending */
 	@Override
 	public void disableBlend() 
 	{
-		VulkanicAPI.disable(VulkanicAPI.GL_BLEND);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND, false);
 		GlStateManager._disableBlend(); 
 	}
 	
@@ -128,14 +138,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBlendFunc(int sfactor, int dfactor) 
 	{
-		VulkanicAPI.glBlendFunc(sfactor, dfactor);
+		VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), sfactor, dfactor);
 		
 	}
 	/** Sets separate blend functions for RGB and alpha */
 	@Override
 	public void glBlendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha) 
 	{
-		VulkanicAPI.configureBlendFunc(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
+		VulkanicAPI.setBlendFunction(net.vulkanic.VulkanicAPI.getImmediateContext(), sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
 		GlStateManager._blendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha); 
 	}
 	
@@ -146,8 +156,9 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBindFramebuffer(int target, int framebuffer) 
 	{
-		VulkanicAPI.attachFramebuffer(target, framebuffer);
-		GlStateManager._glBindFramebuffer(target, framebuffer); 
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.bindFramebuffer(ctx, target, framebuffer);
+		GlStateManager._glBindFramebuffer(target, framebuffer);
 	}
 	
 	
@@ -162,7 +173,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glDeleteBuffers(int buffer)
 	{
-		VulkanicAPI.glDeleteBuffers(buffer);
+		VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), buffer);
 		
 		// MC's implementation has a bug where it will throw:
 		// GL_INVALID_OPERATION in glBufferData(immutable)
@@ -178,14 +189,16 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableFaceCulling() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_CULL_FACE);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_CULL_FACE, true);
 		GlStateManager._enableCull(); 
 	}
 	/** Disables face culling */
 	@Override
 	public void disableFaceCulling() 
 	{
-		VulkanicAPI.disable(VulkanicAPI.GL_CULL_FACE);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_CULL_FACE, false);
 		GlStateManager._disableCull(); 
 	}
 	
@@ -202,12 +215,16 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	/** Sets the active texture unit */
 	@Override
 	public void glActiveTexture(int textureId) 
-	{ 
-		VulkanicAPI.activateTextureUnit(textureId);
+	{
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setActiveTextureUnit(ctx, textureId);
 		GlStateManager._activeTexture(textureId);
 	}
 	@Override
-	public int getActiveTexture() { return VulkanicAPI.glGetInteger(VulkanicAPI.GL_TEXTURE_BINDING_2D); }
+	public int getActiveTexture() { 
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		return VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D); 
+	}
 	
 	/**
 	 * Always binds to 2D texture target
@@ -215,7 +232,8 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBindTexture(int texture) 
 	{
-		VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, texture);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.bindTexture2D(ctx, texture);
 		GlStateManager._bindTexture(texture);
 	}
 	

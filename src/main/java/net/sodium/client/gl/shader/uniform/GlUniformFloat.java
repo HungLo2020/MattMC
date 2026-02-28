@@ -13,6 +13,6 @@ public class GlUniformFloat extends GlUniform<Float> {
     }
 
     public void setFloat(float value) {
-        VulkanicAPI.assignUniformFloat(this.index, value);
+        VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), this.index, value);
     }
 }

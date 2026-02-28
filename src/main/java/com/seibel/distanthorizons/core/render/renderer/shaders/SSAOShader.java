@@ -104,7 +104,7 @@ public class SSAOShader extends AbstractShaderRenderer
 		Number bias = Config.Client.Advanced.Graphics.Ssao.bias.get();
 		this.shader.setUniform(this.uBias, bias.floatValue());
 		
-		VulkanicAPI.glUniform1i(this.uDepthMap, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDepthMap, 0);
 		
 		float fadeDistanceInBlocks = Config.Client.Advanced.Graphics.Ssao.fadeDistanceInBlocks.get().floatValue();
 		fadeDistanceInBlocks = MathUtil.clamp(0.0f, fadeDistanceInBlocks, Float.MAX_VALUE); // clamp to prevent accidentally setting a negative number

@@ -129,15 +129,15 @@ public class DhFadeShader extends AbstractShaderRenderer
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(depthTextureId);
-		VulkanicAPI.glUniform1i(this.uDhDepthTexture, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhDepthTexture, 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(MC_RENDER.getColorTextureId());
-		VulkanicAPI.glUniform1i(this.uMcColorTexture, 1);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uMcColorTexture, 1);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2);
 		GLMC.glBindTexture(colorTextureId);
-		VulkanicAPI.glUniform1i(this.uDhColorTexture, 2);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhColorTexture, 2);
 		
 		
 		ScreenQuad.INSTANCE.render();

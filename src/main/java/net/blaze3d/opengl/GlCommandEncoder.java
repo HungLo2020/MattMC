@@ -47,6 +47,14 @@ public class GlCommandEncoder implements CommandEncoder {
 	private int iris$tempFBO;
 	private java.util.List<net.irisshaders.iris.pipeline.programs.IrisProgram> iris$programsToClear = new java.util.ArrayList<>();
 	private static GlRenderPass iris$lastPass;
+	/**
+	 * The active Vulkanic render pass created by the normal (non-Iris-shadow) code path.
+	 * Non-null when a render pass was begun by delegating to {@link VulkanicAPI#beginRenderPass};
+	 * null in the Iris shadow/safeMultiply path where the old GlTexture FBO cache is used.
+	 * Closed by {@link #finishRenderPass()}.
+	 */
+	@Nullable
+	private net.vulkanic.VulkanicRenderPass activeVulkanicRenderPass;
 
 	protected GlCommandEncoder(GlDevice glDevice) {
 		this.device = glDevice;
@@ -93,43 +101,68 @@ public class GlCommandEncoder implements CommandEncoder {
 
 				this.inRenderPass = true;
 				this.device.debugLabels().pushDebugGroup(supplier);
-				int i = ((GlTexture)gpuTextureView.texture()).getFbo(this.device.directStateAccess(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
-				
-				// Iris: From MixinGlCommandEncoder - Do not change framebuffer in shadow pass or safe multiply state
-				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() || net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
+
+				// Iris: In shadow rendering or safe-multiply state, Iris manages the FBO
+				// directly. We must NOT delegate FBO creation to VulkanicAPI in this path
+				// because Iris intercepts the FBO handle for special handling.
+				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
+						|| net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
+					// Iris shadow/safeMultiply path: use GlTexture's cached FBO but do not bind it.
+					int i = ((GlTexture)gpuTextureView.texture()).getFbo(this.device.directStateAccess(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
 					this.iris$tempFBO = i;
+					this.activeVulkanicRenderPass = null;
+
+					// Perform requested clears on whatever FBO is currently bound
+					int j = 0;
+					if (optionalInt.isPresent()) {
+						int k = optionalInt.getAsInt();
+						VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(k), ARGB.greenFloat(k), ARGB.blueFloat(k), ARGB.alphaFloat(k));
+						j |= 16384;
+					}
+					if (gpuTextureView2 != null && optionalDouble.isPresent()) {
+						VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), optionalDouble.getAsDouble());
+						j |= 256;
+					}
+					if (j != 0) {
+						GlStateManager._disableScissorTest();
+						GlStateManager._depthMask(true);
+						GlStateManager._colorMask(true, true, true, true);
+						GlStateManager._clear(j);
+					}
+					if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+						GlStateManager._viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
+					}
 				} else {
-					GlStateManager._glBindFramebuffer(36160, i);
-				}
-				
-				int j = 0;
-				if (optionalInt.isPresent()) {
-					int k = optionalInt.getAsInt();
-					VulkanicAPI.setClearColorValue(ARGB.redFloat(k), ARGB.greenFloat(k), ARGB.blueFloat(k), ARGB.alphaFloat(k));
-					j |= 16384;
-				}
-
-				if (gpuTextureView2 != null && optionalDouble.isPresent()) {
-					VulkanicAPI.setClearDepthValue(optionalDouble.getAsDouble());
-					j |= 256;
+					// Normal path: delegate FBO creation, attachment, clear and viewport to VulkanicAPI.
+					// VulkanicAPI.beginRenderPass() routes through GraphicsBackend → OpenGLBackend,
+					// which creates a fresh FBO, attaches the textures, clears, and sets the viewport.
+					this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(
+						VulkanicAPI.getImmediateContext(), supplier,
+						toVulkanicTextureView((GlTextureView) gpuTextureView), optionalInt,
+						gpuTextureView2 != null ? toVulkanicTextureView((GlTextureView) gpuTextureView2) : null,
+						optionalDouble
+					);
 				}
 
-				if (j != 0) {
-					GlStateManager._disableScissorTest();
-					GlStateManager._depthMask(true);
-					GlStateManager._colorMask(true, true, true, true);
-					GlStateManager._clear(j);
-				}
-
-				// Iris: From MixinGlCommandEncoder - Do not change viewport in shadow pass
-				if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-					GlStateManager._viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
-				}
-				
 				this.lastPipeline = null;
 				return new GlRenderPass(this, gpuTextureView2 != null);
 			}
 		}
+	}
+
+	/**
+	 * Wraps a Blaze3D {@link GlTextureView} as a {@link net.vulkanic.VulkanicTextureView}.
+	 *
+	 * <p>Now that {@code GlTexture} implements {@code VulkanicTexture} (via {@code GpuTexture}),
+	 * no GL-handle bridge object is needed. An {@code OpenGLTextureView} is constructed
+	 * directly from the {@code GlTexture} and the view's mip range. This is a lightweight
+	 * descriptor with no new GPU allocations, and {@link net.vulkanic.backends.opengl.OpenGLTextureView#close()}
+	 * does not delete the underlying texture (the caller remains the owner).
+	 */
+	private net.vulkanic.VulkanicTextureView toVulkanicTextureView(GlTextureView view) {
+		return new net.vulkanic.backends.opengl.OpenGLTextureView(
+			view.texture(), view.baseMipLevel(), view.mipLevels()
+		);
 	}
 
 	@Override
@@ -139,7 +172,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyColorTexture(gpuTexture);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTexture).id, 0, 0, 36160);
-			VulkanicAPI.setClearColorValue(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			GlStateManager._disableScissorTest();
 			GlStateManager._colorMask(true, true, true, true);
 			GlStateManager._clear(16384);
@@ -158,8 +191,8 @@ public class GlCommandEncoder implements CommandEncoder {
 			int j = ((GlTexture)gpuTexture).getFbo(this.device.directStateAccess(), gpuTexture2);
 			GlStateManager._glBindFramebuffer(36160, j);
 			GlStateManager._disableScissorTest();
-			VulkanicAPI.setClearDepthValue(d);
-			VulkanicAPI.setClearColorValue(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
+			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			GlStateManager._depthMask(true);
 			GlStateManager._colorMask(true, true, true, true);
 			GlStateManager._clear(16640);
@@ -179,8 +212,8 @@ public class GlCommandEncoder implements CommandEncoder {
 			GlStateManager._glBindFramebuffer(36160, n);
 			GlStateManager._scissorBox(j, k, l, m);
 			GlStateManager._enableScissorTest();
-			VulkanicAPI.setClearDepthValue(d);
-			VulkanicAPI.setClearColorValue(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
+			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			GlStateManager._depthMask(true);
 			GlStateManager._colorMask(true, true, true, true);
 			GlStateManager._clear(16640);
@@ -211,12 +244,12 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyDepthTexture(gpuTexture);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, 0, ((GlTexture)gpuTexture).id, 0, 36160);
-			VulkanicAPI.selectDrawBuffer(0);
-			VulkanicAPI.setClearDepthValue(d);
+			VulkanicAPI.setDrawBuffer(VulkanicAPI.getImmediateContext(), 0);
+			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
 			GlStateManager._depthMask(true);
 			GlStateManager._disableScissorTest();
 			GlStateManager._clear(256);
-			VulkanicAPI.selectDrawBuffer(36064);
+			VulkanicAPI.setDrawBuffer(VulkanicAPI.getImmediateContext(), 36064);
 			GlStateManager._glFramebufferTexture2D(36160, 36096, 3553, 0, 0);
 			GlStateManager._glBindFramebuffer(36160, 0);
 		}
@@ -425,7 +458,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				int q;
 				if ((gpuTexture.usage() & 16) != 0) {
 					q = GlConst.CUBEMAP_TARGETS[j % 6];
-					VulkanicAPI.bindTexture(34067, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067, ((GlTexture)gpuTexture).id);
 				} else {
 					q = 3553;
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
@@ -477,7 +510,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				int o;
 				if ((gpuTexture.usage() & 16) != 0) {
 					o = GlConst.CUBEMAP_TARGETS[j % 6];
-					VulkanicAPI.bindTexture(34067, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067, ((GlTexture)gpuTexture).id);
 				} else {
 					o = 3553;
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
@@ -706,7 +739,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (biConsumer != null) {
 					biConsumer.accept(object, (RenderPass.UniformUploader)(string, gpuBufferSlice) -> {
 						if (glRenderPass.pipeline.program().getUniform(string) instanceof Uniform.Ubo(int i)) {
-							VulkanicAPI.attachUniformBufferRange(35345, i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
+							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), 35345, i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
 						}
 					});
 				}
@@ -755,25 +788,37 @@ public class GlCommandEncoder implements CommandEncoder {
 		GlRenderPass glRenderPass, int i, int j, int k, @Nullable VertexFormat.IndexType indexType, GlRenderPipeline glRenderPipeline, int l
 	) {
 		this.device.vertexArrayCache().bindVertexArray(glRenderPipeline.info().getVertexFormat(), (GlBuffer)glRenderPass.vertexBuffers[0]);
+		// Obtain a single context for all VulkanicAPI calls in this draw — avoids repeated singleton lookups
+		// and makes explicit that every draw operation flows through VulkanicAPI → OpenGLBackend.
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		if (indexType != null) {
-			GlStateManager._glBindBuffer(34963, ((GlBuffer)glRenderPass.indexBuffer).handle);
+			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.
+			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, ((GlBuffer)glRenderPass.indexBuffer).handle);
+			int glIndexType = GlConst.toGl(indexType);
+			long indexOffset = (long)j * indexType.bytes;
 			if (l > 1) {
 				if (i > 0) {
-					VulkanicAPI.renderIndexedInstancedWithBase(
-						GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, l, i
-					);
+					VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, glPrimitiveMode, k, glIndexType, indexOffset, l, i);
 				} else {
-					VulkanicAPI.renderIndexedInstanced(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, l);
+					VulkanicAPI.drawIndexedInstanced(ctx, glPrimitiveMode, k, glIndexType, indexOffset, l);
 				}
 			} else if (i > 0) {
-				VulkanicAPI.renderIndexedWithBase(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, i);
+				VulkanicAPI.drawIndexedBaseVertex(ctx, glPrimitiveMode, k, glIndexType, indexOffset, i);
 			} else {
-				GlStateManager._drawElements(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes);
+				// Route non-instanced indexed draw through VulkanicAPI.
+				// Iris: apply tessellation mode override for the non-instanced path, matching the
+				// GlStateManager._drawElements Iris override that this replaces.
+				int drawMode = (glPrimitiveMode == VulkanicAPI.GL_TRIANGLES
+						&& net.irisshaders.iris.vertices.ImmediateState.usingTessellation)
+					? VulkanicAPI.GL_PATCHES : glPrimitiveMode;
+				VulkanicAPI.drawElements(ctx, drawMode, k, glIndexType, indexOffset);
 			}
 		} else if (l > 1) {
-			VulkanicAPI.renderArraysInstanced(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), i, k, l);
+			VulkanicAPI.drawArraysInstanced(ctx, glPrimitiveMode, i, k, l);
 		} else {
-			GlStateManager._drawArrays(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), i, k);
+			// Route non-instanced non-indexed draw through VulkanicAPI rather than the GlStateManager wrapper.
+			VulkanicAPI.drawArrays(ctx, glPrimitiveMode, i, k);
 		}
 	}
 
@@ -922,7 +967,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					int var39 = var61;
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice2 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-						VulkanicAPI.attachUniformBufferRange(35345, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
+						VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), 35345, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
 					}
 					break;
 				case Uniform.Utb(int var41, int var42, TextureFormat var43, int var59):
@@ -932,10 +977,10 @@ public class GlCommandEncoder implements CommandEncoder {
 					}
 
 					GlStateManager._activeTexture(33984 + var42);
-					VulkanicAPI.bindTexture(35882, var44);
+					VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 35882, var44);
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice3 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-						VulkanicAPI.attachBufferToTexture(35882, GlConst.toGlInternalId(var43), ((GlBuffer)gpuBufferSlice3.buffer()).handle);
+						VulkanicAPI.texBuffer(VulkanicAPI.getImmediateContext(), 35882, GlConst.toGlInternalId(var43), ((GlBuffer)gpuBufferSlice3.buffer()).handle);
 					}
 					break;
 				case Uniform.Sampler(int glTextureView2, int var51):
@@ -954,7 +999,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					int o;
 					if ((glTexture.usage() & 16) != 0) {
 						o = 34067;
-						VulkanicAPI.bindTexture(34067, glTexture.id);
+						VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067, glTexture.id);
 					} else {
 						o = 3553;
 						GlStateManager._bindTexture(glTexture.id);
@@ -1041,18 +1086,37 @@ public class GlCommandEncoder implements CommandEncoder {
 	}
 
 	public void finishRenderPass() {
-		// Iris: From MixinGlCommandEncoder - Clear IrisProgram state and unbind framebuffer conditionally
+		// Iris: From MixinGlCommandEncoder - Clear IrisProgram state
 		iris$programsToClear.forEach(net.irisshaders.iris.pipeline.programs.IrisProgram::iris$clearState);
 		iris$programsToClear.clear();
-		
+
 		this.inRenderPass = false;
-		
-		// Don't unbind framebuffer if in safe multiply state
-		if (!net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
+
+		if (this.activeVulkanicRenderPass != null) {
+			// Normal path: VulkanicRenderPass.close() unbinds and deletes the FBO it created.
+			this.activeVulkanicRenderPass.close();
+			this.activeVulkanicRenderPass = null;
+		} else if (!net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
+			// Iris shadow/safeMultiply path: manually unbind the GlTexture cached FBO.
+			// Don't unbind when in safe-multiply state (Iris manages that separately).
 			GlStateManager._glBindFramebuffer(36160, 0);
 		}
-		
+
 		this.device.debugLabels().popDebugGroup();
+	}
+
+	/**
+	 * Returns the active {@link net.vulkanic.VulkanicRenderPass} for the current render pass,
+	 * or {@code null} when no render pass is active or when Iris is managing the FBO directly
+	 * (shadow rendering / safeMultiply path).
+	 *
+	 * <p>This accessor exists so that future code paths can interact with the Vulkanic
+	 * render-pass abstraction during an active render pass without casting or coupling to
+	 * {@link GlCommandEncoder} internals.
+	 */
+	@Nullable
+	public net.vulkanic.VulkanicRenderPass getActiveVulkanicRenderPass() {
+		return activeVulkanicRenderPass;
 	}
 
 	protected GlDevice getDevice() {

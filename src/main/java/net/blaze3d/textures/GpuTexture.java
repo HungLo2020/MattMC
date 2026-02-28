@@ -2,9 +2,11 @@ package net.blaze3d.textures;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicTexture;
+import net.vulkanic.VulkanicTextureFormat;
 
 @Environment(EnvType.CLIENT)
-public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.GpuTextureInterface {
+public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.GpuTextureInterface, VulkanicTexture {
 	public static final int USAGE_COPY_DST = 1;
 	public static final int USAGE_COPY_SRC = 2;
 	public static final int USAGE_TEXTURE_BINDING = 4;
@@ -51,6 +53,26 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 
 	public TextureFormat getFormat() {
 		return this.format;
+	}
+
+	/**
+	 * Returns the Vulkanic equivalent of this texture's format.
+	 *
+	 * <p>Implements {@link VulkanicTexture#getVulkanicFormat()} by converting from the
+	 * Blaze3D {@link TextureFormat}. Both enums carry identical values; the two types
+	 * coexist only during the Blaze3D → Vulkanic migration period.
+	 *
+	 * <p>This default implementation is concrete so that all subclasses (including
+	 * {@code GlTexture}) inherit it without any changes.
+	 */
+	@Override
+	public VulkanicTextureFormat getVulkanicFormat() {
+		return switch (this.format) {
+			case RGBA8   -> VulkanicTextureFormat.RGBA8;
+			case RED8    -> VulkanicTextureFormat.RED8;
+			case RED8I   -> VulkanicTextureFormat.RED8I;
+			case DEPTH32 -> VulkanicTextureFormat.DEPTH32;
+		};
 	}
 
 	public int usage() {

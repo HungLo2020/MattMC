@@ -379,17 +379,17 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
 		{
-			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
+			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
 			GLMC.disableFaceCulling();
 		}
 		else
 		{
-			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 			GLMC.enableFaceCulling();
 		}
 		
 		GLMC.enableBlend();
-		VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
 		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		IDhApiGenericObjectShaderProgram shaderProgram = useInstancedRendering ? this.instancedShaderProgram : this.directShaderProgram;
@@ -476,7 +476,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		if (renderWireframe)
 		{
 			// default back to GL_FILL since all other rendering uses it 
-			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 			GLMC.enableFaceCulling();
 		}
 		
@@ -517,48 +517,48 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		// Bind instance data //
 		profiler.popPush("binding");
 		
-		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceColorVbo);
-		VulkanicAPI.activateVertexAttribute(1);
-		VulkanicAPI.configureVertexAttribute(1, 4, VulkanicAPI.GL_FLOAT, false, 4 * Float.BYTES, 0);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceColorVbo);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 1);
+		VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), 1, 4, VulkanicAPI.GL_FLOAT, false, 4 * Float.BYTES, 0);
 		this.vertexAttribDivisor(1, 1);
 		
-		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceScaleVbo);
-		VulkanicAPI.activateVertexAttribute(2);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceScaleVbo);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 2);
 		this.vertexAttribDivisor(2, 1);
-		VulkanicAPI.configureVertexAttribute(2, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), 2, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
 		
-		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceChunkPosVbo);
-		VulkanicAPI.activateVertexAttribute(3);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceChunkPosVbo);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 3);
 		this.vertexAttribDivisor(3, 1);
-		VulkanicAPI.configureVertexAttributeInteger(3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
+		VulkanicAPI.setVertexAttribIPointer(VulkanicAPI.getImmediateContext(), 3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
 		
-		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceSubChunkPosVbo);
-		VulkanicAPI.activateVertexAttribute(4);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceSubChunkPosVbo);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 4);
 		this.vertexAttribDivisor(4, 1);
-		VulkanicAPI.configureVertexAttribute(4, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), 4, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
 		
-		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceMaterialVbo);
-		VulkanicAPI.activateVertexAttribute(5);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceMaterialVbo);
+		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), 5);
 		this.vertexAttribDivisor(5, 1);
-		VulkanicAPI.configureVertexAttributeInteger(5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
+		VulkanicAPI.setVertexAttribIPointer(VulkanicAPI.getImmediateContext(), 5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
 		
 		
 		// Draw instanced
 		profiler.popPush("render");
 		if (boxGroup.uploadedBoxCount > 0)
 		{
-			VulkanicAPI.renderIndexedInstanced(VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0, boxGroup.uploadedBoxCount);
+			VulkanicAPI.drawIndexedInstanced(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0, boxGroup.uploadedBoxCount);
 		}
 		
 		
 		// Clean up
 		profiler.popPush("cleanup");
 		
-		VulkanicAPI.deactivateVertexAttribute(1);
-		VulkanicAPI.deactivateVertexAttribute(2);
-		VulkanicAPI.deactivateVertexAttribute(3);
-		VulkanicAPI.deactivateVertexAttribute(4);
-		VulkanicAPI.deactivateVertexAttribute(5);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 1);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 2);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 3);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 4);
+		VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), 5);
 		
 		profiler.pop();
 	}
@@ -570,11 +570,11 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	{
 		if (this.vertexAttribDivisorSupported)
 		{
-			VulkanicAPI.setVertexAttribDivisor(index, divisor);	
+			VulkanicAPI.setVertexAttribDivisor(VulkanicAPI.getImmediateContext(), index, divisor);	
 		}
 		else if(this.instancedArraysSupported)
 		{
-			VulkanicAPI.setVertexAttribDivisor(index, divisor);
+			VulkanicAPI.setVertexAttribDivisor(VulkanicAPI.getImmediateContext(), index, divisor);
 		}
 		else
 		{
@@ -625,7 +625,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 			Vec3d camPos)
 	{
 		shaderProgram.fillDirectUniformData(renderEventParam, boxGroup, box, camPos);
-		VulkanicAPI.glDrawElements(VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
+		VulkanicAPI.drawElements(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
 	}
 	
 	

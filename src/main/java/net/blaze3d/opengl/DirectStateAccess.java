@@ -52,54 +52,54 @@ public abstract class DirectStateAccess {
 		@Override
 		int createBuffer() {
 			GlStateManager.incrementTrackedBuffers();
-			return net.vulkanic.VulkanicAPI.createBufferDSA();
+			return net.vulkanic.VulkanicAPI.createBufferDSA(net.vulkanic.VulkanicAPI.getImmediateContext());
 		}
 
 		@Override
 		void bufferData(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, l, GlConst.bufferUsageToGlEnum(j));
+			net.vulkanic.VulkanicAPI.namedBufferDataDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, l, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			net.vulkanic.VulkanicAPI.namedBufferDataDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
-			net.vulkanic.VulkanicAPI.namedBufferSubDataDSA(i, (long)j, byteBuffer);
+			net.vulkanic.VulkanicAPI.namedBufferSubDataDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, (long)j, byteBuffer);
 		}
 
 		@Override
 		void bufferStorage(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(i, l, GlConst.bufferUsageToGlFlag(j));
+			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, l, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Override
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
-			return net.vulkanic.VulkanicAPI.mapNamedBufferRangeDSA(i, j, k, l);
+			return net.vulkanic.VulkanicAPI.mapNamedBufferRangeDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l);
 		}
 
 		@Override
 		void unmapBuffer(int i, int j) {
-			net.vulkanic.VulkanicAPI.unmapNamedBufferDSA(i);
+			net.vulkanic.VulkanicAPI.unmapNamedBufferDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
 		}
 
 		@Override
 		public int createFrameBufferObject() {
-			return net.vulkanic.VulkanicAPI.createFramebufferDSA();
+			return net.vulkanic.VulkanicAPI.createFramebuffer(net.vulkanic.VulkanicAPI.getImmediateContext());
 		}
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(i, 36064, j, l); // GL_COLOR_ATTACHMENT0
-			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(i, 36096, k, l); // GL_DEPTH_ATTACHMENT
+			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 36064, j, l); // GL_COLOR_ATTACHMENT0
+			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 36096, k, l); // GL_DEPTH_ATTACHMENT
 			if (m != 0) {
 				GlStateManager._glBindFramebuffer(m, i);
 			}
@@ -107,17 +107,17 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			net.vulkanic.VulkanicAPI.blitNamedFramebufferDSA(i, j, k, l, m, n, o, p, q, r, s, t);
+			net.vulkanic.VulkanicAPI.blitNamedFramebufferDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, q, r, s, t);
 		}
 
 		@Override
 		void flushMappedBufferRange(int i, int j, int k, int l) {
-			net.vulkanic.VulkanicAPI.flushMappedNamedBufferRangeDSA(i, j, k);
+			net.vulkanic.VulkanicAPI.flushMappedNamedBufferRangeDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k);
 		}
 
 		@Override
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.copyNamedBufferSubDataDSA(i, j, k, l, m);
+			net.vulkanic.VulkanicAPI.copyNamedBufferSubDataDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m);
 		}
 	}
 
@@ -166,7 +166,7 @@ public abstract class DirectStateAccess {
 		void bufferStorage(int i, long l, int j) {
 			int k = this.selectBufferBindTarget(j);
 			GlStateManager._glBindBuffer(k, i);
-			VulkanicAPI.createBufferStorage(k, l, GlConst.bufferUsageToGlFlag(j));
+			VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), k, l, GlConst.bufferUsageToGlFlag(j));
 			GlStateManager._glBindBuffer(k, 0);
 		}
 
@@ -174,7 +174,7 @@ public abstract class DirectStateAccess {
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
 			int k = this.selectBufferBindTarget(j);
 			GlStateManager._glBindBuffer(k, i);
-			VulkanicAPI.createBufferStorage(k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
 			GlStateManager._glBindBuffer(k, 0);
 		}
 
@@ -200,7 +200,7 @@ public abstract class DirectStateAccess {
 		void flushMappedBufferRange(int i, int j, int k, int l) {
 			int m = this.selectBufferBindTarget(l);
 			GlStateManager._glBindBuffer(m, i);
-			VulkanicAPI.flushMappedBufferRange(m, j, k);
+			VulkanicAPI.flushMappedBufferRange(VulkanicAPI.getImmediateContext(), m, j, k);
 			GlStateManager._glBindBuffer(m, 0);
 		}
 
@@ -208,7 +208,7 @@ public abstract class DirectStateAccess {
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
 			GlStateManager._glBindBuffer(36662, i);
 			GlStateManager._glBindBuffer(36663, j);
-			VulkanicAPI.copyBufferSubData(36662, 36663, k, l, m);
+			VulkanicAPI.copyBufferSubData(VulkanicAPI.getImmediateContext(), 36662, 36663, k, l, m);
 			GlStateManager._glBindBuffer(36662, 0);
 			GlStateManager._glBindBuffer(36663, 0);
 		}

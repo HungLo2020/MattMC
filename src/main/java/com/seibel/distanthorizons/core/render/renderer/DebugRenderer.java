@@ -179,7 +179,7 @@ public class DebugRenderer
 		
 		this.init();
 		
-		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
+		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
 		GLMC.enableDepthTest();
 		
 		this.basicShader.bind();
@@ -203,7 +203,7 @@ public class DebugRenderer
 		
 		
 		// box rendering
-		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 		for (BoxParticle particle : this.particles)
 		{
 			this.renderBox(particle.getBox());
@@ -218,7 +218,7 @@ public class DebugRenderer
 		t.multiply(boxTransform);
 		this.basicShader.setUniform(this.basicShader.getUniformLocation("uTransform"), t);
 		this.basicShader.setUniform(this.basicShader.getUniformLocation("uColor"), box.color);
-		VulkanicAPI.glDrawElements(VulkanicAPI.GL_LINES, BOX_OUTLINE_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
+		VulkanicAPI.drawElements(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_LINES, BOX_OUTLINE_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
 	}
 	
 	

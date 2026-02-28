@@ -101,8 +101,9 @@ public class CompressibleGLBufferedImage {
         ByteBuffer outBuffer = MemoryUtil.memByteBuffer(this.texture.getPixels().getPointer(), imageBytes);
         MemoryUtil.memCopy(buffer, outBuffer);
         this.texture.upload();
-        VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, ((GlTexture) this.texture.getTexture()).glId());
-        VulkanicAPI.generateMipmap(VulkanicAPI.GL_TEXTURE_2D);
+        // Use DSA mipmap generation — avoids mutating the global GL texture bind state
+        // and requires only a single VulkanicAPI call instead of a bind + generate pair.
+        VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getImmediateContext(), ((GlTexture) this.texture.getTexture()).glId());
         this.compress();
     }
 

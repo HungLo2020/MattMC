@@ -20,7 +20,7 @@ public class GlFence {
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer length = stack.callocInt(1);
-            result = VulkanicAPI.querySyncStatus(this.id, 37140, length); // GL_SYNC_STATUS = 0x9114
+            result = VulkanicAPI.getSynci(VulkanicAPI.getImmediateContext(), this.id, 37140, length); // GL_SYNC_STATUS = 0x9114
             
             // The length buffer should contain the number of values written (should be 1)
             // However, some drivers may not write to this buffer at all, so we'll just
@@ -37,11 +37,11 @@ public class GlFence {
 
     public void sync(long timeout) {
         this.checkDisposed();
-        VulkanicAPI.waitForSync(this.id, 1, timeout); // GL_SYNC_FLUSH_COMMANDS_BIT
+        VulkanicAPI.waitForSync(VulkanicAPI.getImmediateContext(), this.id, 1, timeout); // GL_SYNC_FLUSH_COMMANDS_BIT
     }
 
     public void delete() {
-        VulkanicAPI.destroySync(this.id);
+        VulkanicAPI.destroySync(VulkanicAPI.getImmediateContext(), this.id);
         this.disposed = true;
     }
 

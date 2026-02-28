@@ -63,7 +63,7 @@ public class ScreenQuad
 		this.va.bind();
 		this.va.bindBufferToAllBindingPoints(this.boxBuffer.getId());
 		
-		VulkanicAPI.drawPrimitiveArrays(VulkanicAPI.GL_TRIANGLES, 0, 6);
+		VulkanicAPI.drawArrays(net.vulkanic.VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TRIANGLES, 0, 6);
 	}
 	
 	private void createBuffer()

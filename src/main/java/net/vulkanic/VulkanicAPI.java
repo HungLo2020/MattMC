@@ -536,27 +536,11 @@ public class VulkanicAPI {
      * On Windows, this returns the WGL context handle.
      * Returns 0 or NULL if no context is current.
      */
-    @Deprecated
     public static long getGraphicsContext() {
         return getBackend().getGraphicsContext();
     }
     
     // Convenience methods that delegate to the backend
-    
-    @Deprecated
-    public static void bindTexture(int textureId) {
-        getBackend().bindTexture(textureId);
-    }
-    
-    @Deprecated
-    public static void bindTexture(int target, int textureId) {
-        getBackend().bindTexture(target, textureId);
-    }
-    
-    @Deprecated
-    public static void generateMipmap(int target) {
-        getBackend().generateMipmap(target);
-    }
     
     /**
      * Sets the dynamic viewport state for rendering with explicit command context.
@@ -577,50 +561,6 @@ public class VulkanicAPI {
         getBackend().setDynamicViewport(ctx, x, y, width, height);
     }
     
-    @Deprecated
-    public static void clear(int mask) {
-        getBackend().clear(mask);
-    }
-    
-    @Deprecated
-    public static void enableBlend() {
-        getBackend().enableBlend();
-    }
-    
-    @Deprecated
-    public static void disableBlend() {
-        getBackend().disableBlend();
-    }
-    
-    @Deprecated
-    public static void useProgram(int programId) {
-        getBackend().useProgram(programId);
-    }
-    
-    @Deprecated
-    public static void enable(int cap) {
-        getBackend().enable(cap);
-    }
-    
-    @Deprecated
-    public static void disable(int cap) {
-        getBackend().disable(cap);
-    }
-    
-    @Deprecated
-    public static void setDepthTestFunction(int func) {
-        getBackend().setDepthTestFunction(func);
-    }
-    
-    @Deprecated
-    public static void setDepthWriteEnabled(boolean enabled) {
-        getBackend().setDepthWriteEnabled(enabled);
-    }
-    
-    @Deprecated
-    public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
-        getBackend().setColorWriteMask(r, g, b, a);
-    }
     
     /**
      * Sets the dynamic scissor rectangle for rendering with explicit command context.
@@ -641,1256 +581,1419 @@ public class VulkanicAPI {
         getBackend().setDynamicScissor(ctx, x, y, width, height);
     }
     
-    @Deprecated
-    public static void setPixelStoreMode(int pname, int value) {
-        getBackend().setPixelStoreMode(pname, value);
+    /**
+     * Clears buffers to preset values.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mask Bitwise OR of masks (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, etc.)
+     */
+    public static void clearBuffers(CommandContext ctx, int mask) {
+        getBackend().clearBuffers(ctx, mask);
     }
     
-    @Deprecated
-    public static void attachFramebuffer(int target, int fbo) {
-        getBackend().attachFramebuffer(target, fbo);
+    /**
+     * Sets blending enabled or disabled.
+     * 
+     * @param ctx Command context for recording this command
+     * @param enabled True to enable, false to disable
+     */
+    public static void setBlendEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setBlendEnabled(ctx, enabled);
     }
     
-    @Deprecated
-    public static void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
-        getBackend().attachTextureToFramebuffer(target, attachment, textarget, texture, level);
+    /**
+     * Enables or disables a capability for a specific buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param capability The capability to enable/disable
+     * @param index The buffer index
+     * @param enabled True to enable, false to disable
+     */
+    public static void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled) {
+        getBackend().setIndexedEnabled(ctx, capability, index, enabled);
     }
     
-    @Deprecated
-    public static void attachBuffer(int target, int buffer) {
-        getBackend().attachBuffer(target, buffer);
+    /**
+     * Sets the face culling mode.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The face culling mode
+     */
+    public static void setCullFaceMode(CommandContext ctx, int mode) {
+        getBackend().setCullFaceMode(ctx, mode);
+    }
+    
+    /**
+     * Binds a shader program for use.
+     * 
+     * @param ctx Command context for recording this command
+     * @param programId The shader program ID
+     */
+    public static void bindShaderProgram(CommandContext ctx, int programId) {
+        getBackend().bindShaderProgram(ctx, programId);
+    }
+    
+    /**
+     * Sets a capability enabled or disabled.
+     * 
+     * @param ctx Command context for recording this command
+     * @param cap The capability
+     * @param enabled True to enable, false to disable
+     */
+    public static void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, cap, enabled);
+    }
+    
+    /**
+     * Binds a 2D texture to the current texture unit.
+     * 
+     * @param ctx Command context for recording this command
+     * @param textureId The texture ID to bind
+     */
+    public static void bindTexture2D(CommandContext ctx, int textureId) {
+        getBackend().bindTexture2D(ctx, textureId);
+    }
+    
+    public static void bindTexture(CommandContext ctx, int target, int textureId) {
+        getBackend().bindTexture(ctx, target, textureId);
+    }
+    
+    public static void bindSampler(CommandContext ctx, int unit, int sampler) {
+        getBackend().bindSampler(ctx, unit, sampler);
+    }
+    
+    /**
+     * Sets the depth test comparison function.
+     * 
+     * @param ctx Command context for recording this command
+     * @param func The depth comparison function
+     */
+    public static void setDepthTest(CommandContext ctx, int func) {
+        getBackend().setDepthTest(ctx, func);
+    }
+    
+    /**
+     * Sets the depth write mask.
+     * 
+     * @param ctx Command context for recording this command
+     * @param enabled True to enable depth writes, false to disable
+     */
+    public static void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+        getBackend().setDepthWriteMask(ctx, enabled);
+    }
+    
+    /**
+     * Sets the color write mask.
+     * 
+     * @param ctx Command context for recording this command
+     * @param r Red channel write enabled
+     * @param g Green channel write enabled
+     * @param b Blue channel write enabled
+     * @param a Alpha channel write enabled
+     */
+    public static void setColorMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+        getBackend().setColorMask(ctx, r, g, b, a);
+    }
+    
+    /**
+     * Generates mipmaps for a texture.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     */
+    public static void generateTextureMipmap(CommandContext ctx, int target) {
+        getBackend().generateTextureMipmap(ctx, target);
+    }
+    
+    /**
+     * Sets pixel storage mode parameters.
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The pixel storage parameter to set
+     * @param value The value to set
+     */
+    public static void setPixelStore(CommandContext ctx, int pname, int value) {
+        getBackend().setPixelStore(ctx, pname, value);
+    }
+    
+    /**
+     * Binds a framebuffer object.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (read, draw, or both)
+     * @param fbo The framebuffer object ID
+     */
+    public static void bindFramebuffer(CommandContext ctx, int target, int fbo) {
+        getBackend().bindFramebuffer(ctx, target, fbo);
+    }
+    
+    /**
+     * Binds a buffer object to a target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target
+     * @param buffer The buffer object ID
+     */
+    public static void bindBuffer(CommandContext ctx, int target, int buffer) {
+        getBackend().bindBuffer(ctx, target, buffer);
+    }
+    
+    /**
+     * Binds a buffer to an indexed buffer target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target
+     * @param index The index of the binding point
+     * @param buffer The buffer object ID
+     */
+    public static void bindBufferBase(CommandContext ctx, int target, int index, int buffer) {
+        getBackend().bindBufferBase(ctx, target, index, buffer);
+    }
+    
+    /**
+     * Sets the active texture unit.
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit The texture unit to activate
+     */
+    public static void setActiveTextureUnit(CommandContext ctx, int unit) {
+        getBackend().setActiveTextureUnit(ctx, unit);
+    }
+    
+    /**
+     * Sets a texture parameter.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param pname The parameter name
+     * @param param The parameter value
+     */
+    public static void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        getBackend().setTextureParameter(ctx, target, pname, param);
+    }
+    
+    /**
+     * Copies a region from the framebuffer to a texture subregion.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param level The mipmap level
+     * @param xoffset The x offset in the texture
+     * @param yoffset The y offset in the texture
+     * @param x The x coordinate in the framebuffer
+     * @param y The y coordinate in the framebuffer
+     * @param width The width of the region
+     * @param height The height of the region
+     */
+    public static void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        getBackend().copyTexSubImage2D(ctx, target, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    /**
+     * Gets a texture parameter value.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target
+     * @param pname The parameter name
+     * @return The parameter value
+     */
+    public static int getTexParameteri(CommandContext ctx, int target, int pname) {
+        return getBackend().getTexParameteri(ctx, target, pname);
+    }
+    
+    /**
+     * Attaches a texture to a framebuffer attachment point.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target
+     * @param attachment The attachment point
+     * @param textarget The texture target
+     * @param texture The texture object ID
+     * @param level The mipmap level
+     */
+    public static void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        getBackend().framebufferTexture(ctx, target, attachment, textarget, texture, level);
+    }
+    
+    /**
+     * Attaches a 2D texture image to a framebuffer attachment point.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target
+     * @param attachment The attachment point
+     * @param textarget The texture target
+     * @param texture The texture object ID
+     * @param level The mipmap level
+     */
+    public static void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        getBackend().framebufferTexture2D(ctx, target, attachment, textarget, texture, level);
+    }
+    
+    /**
+     * Specifies a list of color buffers to be drawn into.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffers Array of buffers to draw into
+     */
+    public static void drawBuffers(CommandContext ctx, int[] buffers) {
+        getBackend().drawBuffers(ctx, buffers);
+    }
+    
+    /**
+     * Sets the blend function for source and destination blend factors.
+     * 
+     * @param ctx Command context for recording this command
+     * @param sfactor Source blend factor
+     * @param dfactor Destination blend factor
+     */
+    public static void blendFunc(CommandContext ctx, int sfactor, int dfactor) {
+        getBackend().blendFunc(ctx, sfactor, dfactor);
+    }
+    
+    /**
+     * Queries an integer state variable.
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The parameter name to query
+     * @return The queried integer value
+     */
+    public static int getInteger(CommandContext ctx, int pname) {
+        return getBackend().getInteger(ctx, pname);
+    }
+    
+    /**
+     * Sets uniform values for a vec3 shader variable.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param v0 The first component value
+     * @param v1 The second component value
+     * @param v2 The third component value
+     */
+    public static void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2) {
+        getBackend().setUniform3f(ctx, location, v0, v1, v2);
+    }
+    
+    /**
+     * Sets the clear color value.
+     * 
+     * @param ctx Command context for recording this command
+     * @param r Red component
+     * @param g Green component
+     * @param b Blue component
+     * @param a Alpha component
+     */
+    public static void setClearColor(CommandContext ctx, float r, float g, float b, float a) {
+        getBackend().setClearColor(ctx, r, g, b, a);
+    }
+    
+    /**
+     * Sets the viewport transformation.
+     * 
+     * @param ctx Command context for recording this command
+     * @param x The lower left corner x coordinate
+     * @param y The lower left corner y coordinate
+     * @param width The viewport width
+     * @param height The viewport height
+     */
+    public static void setViewport(CommandContext ctx, int x, int y, int width, int height) {
+        getBackend().setViewport(ctx, x, y, width, height);
+    }
+    
+    /**
+     * Sets the polygon rasterization mode.
+     * 
+     * @param ctx Command context for recording this command
+     * @param face Which polygons the mode applies to
+     * @param mode The rasterization mode
+     */
+    public static void setPolygonMode(CommandContext ctx, int face, int mode) {
+        getBackend().setPolygonMode(ctx, face, mode);
+    }
+    
+    /**
+     * Sets the polygon offset parameters for depth offset calculation.
+     * 
+     * @param ctx Command context for recording this command
+     * @param factor Scale factor for variable depth offset
+     * @param units Scale factor for constant depth offset
+     */
+    public static void setPolygonOffset(CommandContext ctx, float factor, float units) {
+        getBackend().setPolygonOffset(ctx, factor, units);
+    }
+    
+    /**
+     * Sets the logical operation for color blending.
+     * 
+     * @param ctx Command context for recording this command
+     * @param opcode The logical operation
+     */
+    public static void setLogicOp(CommandContext ctx, int opcode) {
+        getBackend().setLogicOp(ctx, opcode);
+    }
+    
+    /**
+     * Creates a new framebuffer object.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The framebuffer object ID
+     */
+    public static int createFramebuffer(CommandContext ctx) {
+        return getBackend().createFramebuffer(ctx);
     }
     
     // Direct State Access buffer operations
-    @Deprecated
-    public static int createBufferDSA() {
-        return getBackend().createBufferDSA();
+    // CommandContext versions of DSA buffer operations
+    public static int createBufferDSA(CommandContext ctx) {
+        return getBackend().createBufferDSA(ctx);
     }
     
-    @Deprecated
-    public static void namedBufferDataDSA(int buffer, long size, int usage) {
-        getBackend().namedBufferDataDSA(buffer, size, usage);
+    public static void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        getBackend().namedBufferDataDSA(ctx, buffer, size, usage);
     }
     
-    @Deprecated
-    public static void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        getBackend().namedBufferDataDSA(buffer, data, usage);
+    public static void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        getBackend().namedBufferDataDSA(ctx, buffer, data, usage);
     }
     
-    @Deprecated
-    public static void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
-        getBackend().namedBufferSubDataDSA(buffer, offset, data);
+    public static void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        getBackend().namedBufferSubDataDSA(ctx, buffer, offset, data);
     }
     
-    @Deprecated
-    public static void namedBufferStorageDSA(int buffer, long size, int flags) {
-        getBackend().namedBufferStorageDSA(buffer, size, flags);
+    public static void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
+        getBackend().namedBufferStorageDSA(ctx, buffer, size, flags);
     }
     
-    @Deprecated
-    public static void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
-        getBackend().namedBufferStorageDSA(buffer, data, flags);
+    public static void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        getBackend().namedBufferStorageDSA(ctx, buffer, data, flags);
     }
     
-    @Deprecated
-    public static java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
-        return getBackend().mapNamedBufferRangeDSA(buffer, offset, length, access);
+    public static java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
+        return getBackend().mapNamedBufferRangeDSA(ctx, buffer, offset, length, access);
     }
     
-    @Deprecated
-    public static void unmapNamedBufferDSA(int buffer) {
-        getBackend().unmapNamedBufferDSA(buffer);
+    // CommandContext versions of DSA operations
+    /**
+     * Unmaps a previously mapped buffer using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object to unmap
+     */
+    public static void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
+        getBackend().unmapNamedBufferDSA(ctx, buffer);
     }
     
-    @Deprecated
-    public static void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
-        getBackend().flushMappedNamedBufferRangeDSA(buffer, offset, length);
+    /**
+     * Flushes a range of a mapped buffer using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer object
+     * @param offset Offset within the mapped buffer range
+     * @param length Length of the range to flush
+     */
+    public static void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
+        getBackend().flushMappedNamedBufferRangeDSA(ctx, buffer, offset, length);
     }
     
-    @Deprecated
-    public static void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        getBackend().copyNamedBufferSubDataDSA(readBuffer, writeBuffer, readOffset, writeOffset, size);
+    /**
+     * Copies data between buffers using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param readBuffer Source buffer
+     * @param writeBuffer Destination buffer
+     * @param readOffset Offset in source buffer
+     * @param writeOffset Offset in destination buffer
+     * @param size Number of bytes to copy
+     */
+    public static void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        getBackend().copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size);
     }
     
-    // Direct State Access framebuffer operations
-    @Deprecated
-    public static int createFramebufferDSA() {
-        return getBackend().createFramebufferDSA();
+    /**
+     * Attaches a texture to a framebuffer using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param texture The texture to attach
+     * @param level The mipmap level of the texture
+     */
+    public static void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        getBackend().namedFramebufferTextureDSA(ctx, framebuffer, attachment, texture, level);
     }
     
-    @Deprecated
-    public static void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
-        getBackend().namedFramebufferTextureDSA(framebuffer, attachment, texture, level);
-    }
-    
-    @Deprecated
-    public static void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
+    /**
+     * Blits (copies) pixels between framebuffers using Direct State Access (DSA).
+     * @param ctx Command context for recording this command
+     * @param readFramebuffer Source framebuffer
+     * @param drawFramebuffer Destination framebuffer
+     * @param srcX0 Source region left
+     * @param srcY0 Source region bottom
+     * @param srcX1 Source region right
+     * @param srcY1 Source region top
+     * @param dstX0 Destination region left
+     * @param dstY0 Destination region bottom
+     * @param dstX1 Destination region right
+     * @param dstY1 Destination region top
+     * @param mask Buffer mask (GL_COLOR_BUFFER_BIT, etc.)
+     * @param filter Interpolation filter (GL_NEAREST or GL_LINEAR)
+     */
+    public static void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
                                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        getBackend().blitNamedFramebufferDSA(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+        getBackend().blitNamedFramebufferDSA(ctx, readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
                                               dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    public static void activateTextureUnit(int unit) {
-        getBackend().activateTextureUnit(unit);
+    public static int createTexture2D(CommandContext ctx) {
+        return getBackend().createTexture2D(ctx);
     }
     
-    @Deprecated
-    public static void configureTextureParameter(int target, int pname, int param) {
-        getBackend().configureTextureParameter(target, pname, param);
+    public static void deleteTexture(CommandContext ctx, int texture) {
+        getBackend().deleteTexture(ctx, texture);
     }
     
-    @Deprecated
-    public static int createTexture() {
-        return getBackend().createTexture();
+    public static boolean isTexture(CommandContext ctx, int texture) {
+        return getBackend().isTexture(ctx, texture);
     }
     
-    @Deprecated
-    public static void removeTexture(int texture) {
-        getBackend().removeTexture(texture);
+    public static void drawArrays(CommandContext ctx, int mode, int first, int count) {
+        getBackend().drawArrays(ctx, mode, first, count);
     }
     
-    @Deprecated
-    public static void configurePolygonMode(int face, int mode) {
-        getBackend().configurePolygonMode(face, mode);
+    public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        getBackend().drawElements(ctx, mode, count, type, indices);
     }
     
-    @Deprecated
-    public static void configurePolygonOffset(float factor, float units) {
-        getBackend().configurePolygonOffset(factor, units);
+    public static void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        getBackend().setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
-    @Deprecated
-    public static void configureLogicOp(int opcode) {
-        getBackend().configureLogicOp(opcode);
+    public static void setBlendEquation(CommandContext ctx, int mode) {
+        getBackend().setBlendEquation(ctx, mode);
     }
     
-    @Deprecated
-    public static void drawPrimitiveArrays(int mode, int first, int count) {
-        getBackend().drawPrimitiveArrays(mode, first, count);
-    }
-
-    @Deprecated
-    public static void drawIndexedElements(int mode, int count, int type, long indices) {
-        getBackend().drawIndexedElements(mode, count, type, indices);
+    public static void setDepthFunc(CommandContext ctx, int func) {
+        getBackend().setDepthFunc(ctx, func);
     }
     
-    @Deprecated
-    public static void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        getBackend().configureBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
+    public static void setReadBuffer(CommandContext ctx, int buffer) {
+        getBackend().setReadBuffer(ctx, buffer);
     }
     
-    @Deprecated
-    public static int checkForErrors() {
-        return getBackend().checkForErrors();
+    
+    public static int getError(CommandContext ctx) {
+        return getBackend().getError(ctx);
     }
     
-    @Deprecated
-    public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
-        getBackend().transferTexture2DImage(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+    
+    public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
+                                        int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture2D(ctx, target, level, internalFormat, width, height, border, format, type, pixels);
     }
     
-    @Deprecated
-    public static void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        getBackend().transferTexture2DSubregion(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                                int width, int height, int format, int type, long pixels) {
+        getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
-    @Deprecated
-    public static void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        getBackend().transferTexture2DSubregionBuf(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                                int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
-    @Deprecated
-    public static int allocateBufferObject() {
-        return getBackend().allocateBufferObject();
+    
+    
+    
+    public static int createBuffer(CommandContext ctx) {
+        return getBackend().createBuffer(ctx);
     }
     
-    @Deprecated
-    public static void releaseBufferObject(int buf) {
-        getBackend().releaseBufferObject(buf);
+    public static void deleteBuffer(CommandContext ctx, int buffer) {
+        getBackend().deleteBuffer(ctx, buffer);
     }
     
-    @Deprecated
-    public static void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        getBackend().fillBufferWithData(tgt, dat, usg);
+    public static void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage) {
+        getBackend().bufferData(ctx, target, data, usage);
     }
     
-    @Deprecated
-    public static void fillBufferWithSize(int tgt, long sz, int usg) {
-        getBackend().fillBufferWithSize(tgt, sz, usg);
+    public static void bufferData(CommandContext ctx, int target, long size, int usage) {
+        getBackend().bufferData(ctx, target, size, usage);
     }
     
-    @Deprecated
-    public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        getBackend().fillBufferSubregion(tgt, off, dat);
+    public static void bufferData(CommandContext ctx, int target, float[] data, int usage) {
+        getBackend().bufferData(ctx, target, data, usage);
     }
     
-    @Deprecated
-    public static int createVertexArrayObject() {
-        return getBackend().createVertexArrayObject();
+    public static void bufferData(CommandContext ctx, int target, int[] data, int usage) {
+        getBackend().bufferData(ctx, target, data, usage);
     }
     
-    @Deprecated
-    public static void selectVertexArray(int vao) {
-        getBackend().selectVertexArray(vao);
+    
+    
+    
+    
+    public static void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
+        getBackend().bufferSubData(ctx, target, offset, data);
     }
     
-    @Deprecated
-    public static java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return getBackend().mapBufferRegion(tgt, off, len, acc);
+    public static void bufferStorage(CommandContext ctx, int target, long size, int flags) {
+        getBackend().bufferStorage(ctx, target, size, flags);
     }
     
-    @Deprecated
-    public static void unmapBufferData(int tgt) {
-        getBackend().unmapBufferData(tgt);
+    public static void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
+        getBackend().bufferStorage(ctx, target, data, flags);
     }
     
-    @Deprecated
-    public static int generateFramebufferObject() {
-        return getBackend().generateFramebufferObject();
+    public static void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        getBackend().copyBufferSubData(ctx, readTarget, writeTarget, readOffset, writeOffset, size);
     }
     
-    @Deprecated
-    public static void destroyFramebufferObject(int fbo) {
-        getBackend().destroyFramebufferObject(fbo);
+    public static void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
+        getBackend().flushMappedBufferRange(ctx, target, offset, length);
     }
     
-    @Deprecated
-    public static void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        getBackend().copyFramebufferRegion(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+    
+    public static int createVertexArray(CommandContext ctx) {
+        return getBackend().createVertexArray(ctx);
     }
     
-    @Deprecated
-    public static int constructShaderObject(int shaderType) {
-        return getBackend().constructShaderObject(shaderType);
+    public static void bindVertexArray(CommandContext ctx, int vao) {
+        getBackend().bindVertexArray(ctx, vao);
     }
     
-    @Deprecated
-    public static void disposeShaderObject(int shader) {
-        getBackend().disposeShaderObject(shader);
+    
+    
+    public static java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
+        return getBackend().mapBuffer(ctx, target, offset, length, access);
     }
     
-    @Deprecated
-    public static void compileShaderSource(int shader) {
-        getBackend().compileShaderSource(shader);
+    
+    public static void unmapBuffer(CommandContext ctx, int target) {
+        getBackend().unmapBuffer(ctx, target);
     }
     
-    @Deprecated
-    public static int constructProgramObject() {
-        return getBackend().constructProgramObject();
+    
+    
+    public static void deleteFramebuffer(CommandContext ctx, int fbo) {
+        getBackend().deleteFramebuffer(ctx, fbo);
     }
     
-    @Deprecated
-    public static void disposeProgramObject(int program) {
-        getBackend().disposeProgramObject(program);
+    
+    public static void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                       int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    public static void linkProgramBinary(int program) {
-        getBackend().linkProgramBinary(program);
+    
+    public static int createShader(CommandContext ctx, int shaderType) {
+        return getBackend().createShader(ctx, shaderType);
     }
     
-    @Deprecated
-    public static void attachShaderToProgram(int program, int shader) {
-        getBackend().attachShaderToProgram(program, shader);
+    public static void compileShader(CommandContext ctx, int shader) {
+        getBackend().compileShader(ctx, shader);
     }
     
-    @Deprecated
-    public static int queryProgramParameter(int program, int pname) {
-        return getBackend().queryProgramParameter(program, pname);
+    public static int createShaderProgram(CommandContext ctx) {
+        return getBackend().createShaderProgram(ctx);
     }
     
-    @Deprecated
-    public static int queryShaderParameter(int shader, int pname) {
-        return getBackend().queryShaderParameter(shader, pname);
+    
+    public static void deleteShader(CommandContext ctx, int shader) {
+        getBackend().deleteShader(ctx, shader);
     }
     
-    @Deprecated
-    public static void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        getBackend().configureVertexAttribute(index, size, type, normalized, stride, pointer);
+    
+    
+    
+    public static void deleteProgram(CommandContext ctx, int program) {
+        getBackend().deleteProgram(ctx, program);
     }
     
-    @Deprecated
-    public static void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
-        getBackend().configureVertexAttributeInteger(index, size, type, stride, pointer);
+    
+    public static void attachShader(CommandContext ctx, int program, int shader) {
+        getBackend().attachShader(ctx, program, shader);
     }
     
-    @Deprecated
-    public static void activateVertexAttribute(int index) {
-        getBackend().activateVertexAttribute(index);
+    public static void detachShader(CommandContext ctx, int program, int shader) {
+        getBackend().detachShader(ctx, program, shader);
     }
     
-    @Deprecated
-    public static void deactivateVertexAttribute(int index) {
-        getBackend().deactivateVertexAttribute(index);
+    public static void linkProgram(CommandContext ctx, int program) {
+        getBackend().linkProgram(ctx, program);
     }
     
-    @Deprecated
-    public static void setVertexAttribDivisor(int index, int divisor) {
-        getBackend().setVertexAttribDivisor(index, divisor);
+    public static int getProgramParameter(CommandContext ctx, int program, int pname) {
+        return getBackend().getProgramParameter(ctx, program, pname);
     }
     
-    @Deprecated
-    public static String retrieveProgramInfoLog(int program) {
-        return getBackend().retrieveProgramInfoLog(program);
+    public static int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        return getBackend().getShaderParameter(ctx, shader, pname);
     }
     
-    @Deprecated
-    public static String retrieveShaderInfoLog(int shader) {
-        return getBackend().retrieveShaderInfoLog(shader);
+    public static String getProgramInfoLog(CommandContext ctx, int program) {
+        return getBackend().getProgramInfoLog(ctx, program);
     }
     
-    @Deprecated
-    public static int locateUniformVariable(int program, CharSequence name) {
-        return getBackend().locateUniformVariable(program, name);
+    
+    
+    
+    
+    
+    public static String getShaderInfoLog(CommandContext ctx, int shader) {
+        return getBackend().getShaderInfoLog(ctx, shader);
     }
     
-    @Deprecated
-    public static void assignUniformInteger(int location, int value) {
-        getBackend().assignUniformInteger(location, value);
+    public static int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        return getBackend().getUniformLocation(ctx, program, name);
     }
     
-    @Deprecated
-    public static void bindAttributeLocation(int program, int index, CharSequence name) {
-        getBackend().bindAttributeLocation(program, index, name);
+    public static int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
+        return getBackend().getAttributeLocation(ctx, program, name);
     }
     
-    @Deprecated
-    public static long createFenceSync(int condition, int flags) {
-        return getBackend().createFenceSync(condition, flags);
+    public static void setUniform1i(CommandContext ctx, int location, int value) {
+        getBackend().setUniform1i(ctx, location, value);
     }
     
-    @Deprecated
-    public static int waitForSync(long sync, int flags, long timeout) {
-        return getBackend().waitForSync(sync, flags, timeout);
+    public static void setUniform1f(CommandContext ctx, int location, float value) {
+        getBackend().setUniform1f(ctx, location, value);
     }
     
-    @Deprecated
-    public static void destroySync(long sync) {
-        getBackend().destroySync(sync);
+    public static void setUniform2f(CommandContext ctx, int location, float v0, float v1) {
+        getBackend().setUniform2f(ctx, location, v0, v1);
     }
     
-    @Deprecated
-    public static void clearTexImage(int texture, int level, int format, int type, int[] data) {
-        getBackend().clearTexImage(texture, level, format, type, data);
+    public static void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
+        getBackend().setUniform3i(ctx, location, v0, v1, v2);
     }
     
-    @Deprecated
+    public static void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
+        getBackend().setUniform4f(ctx, location, v0, v1, v2, v3);
+    }
+    
+    public static void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3) {
+        getBackend().setUniform4i(ctx, location, v0, v1, v2, v3);
+    }
+    
+    public static void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        getBackend().setUniformMatrix3fv(ctx, location, transpose, matrix);
+    }
+    
+    public static void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        getBackend().setUniformMatrix3fv(ctx, location, transpose, matrix);
+    }
+    
+    public static void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        getBackend().setUniformMatrix4fv(ctx, location, transpose, matrix);
+    }
+    
+    public static void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        getBackend().setUniformMatrix4fv(ctx, location, transpose, matrix);
+    }
+    
+    public static void setVertexAttribPointer(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {
+        getBackend().setVertexAttribPointer(ctx, index, size, type, normalized, stride, pointer);
+    }
+    
+    public static void enableVertexAttribArray(CommandContext ctx, int index) {
+        getBackend().enableVertexAttribArray(ctx, index);
+    }
+    
+    public static void bindVertexBuffer(CommandContext ctx, int bindingindex, int buffer, long offset, int stride) {
+        getBackend().bindVertexBuffer(ctx, bindingindex, buffer, offset, stride);
+    }
+    
+    
+    public static void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
+        getBackend().setVertexAttribIPointer(ctx, index, size, type, stride, pointer);
+    }
+    
+    
+    
+    public static void disableVertexAttribArray(CommandContext ctx, int index) {
+        getBackend().disableVertexAttribArray(ctx, index);
+    }
+    
+    
+    public static void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
+        getBackend().setVertexAttribDivisor(ctx, index, divisor);
+    }
+    
+    
+    
+    
+    public static void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        getBackend().setAttributeLocation(ctx, program, index, name);
+    }
+    
+    
+    public static long createFenceSync(CommandContext ctx, int condition, int flags) {
+        return getBackend().createFenceSync(ctx, condition, flags);
+    }
+    
+    public static int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
+        return getBackend().waitForSync(ctx, sync, flags, timeout);
+    }
+    
+    public static void destroySync(CommandContext ctx, long sync) {
+        getBackend().destroySync(ctx, sync);
+    }
+    
+    public static void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
+        getBackend().clearTexImage(ctx, texture, level, format, type, data);
+    }
+    
     public static void setMaxShaderCompilerThreads(int count) {
         getBackend().setMaxShaderCompilerThreads(count);
     }
     
-    @Deprecated
     public static GraphicsCapabilities getGraphicsCapabilities() {
         return getBackend().getGraphicsCapabilities();
     }
     
-    @Deprecated
-    public static int queryIntegerState(int pname) {
-        return getBackend().queryIntegerState(pname);
+    public static int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
+        return getBackend().getTextureLevelParameter(ctx, target, level, pname);
     }
     
-    @Deprecated
-    public static String queryStringInfo(int name) {
-        return getBackend().queryStringInfo(name);
+    public static void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        getBackend().uploadShaderSource(ctx, shader, pointerBufferAddress, stringCount, lengthsPointer);
     }
     
-    @Deprecated
-    public static int pollErrorCode() {
-        return getBackend().pollErrorCode();
+    public static void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
+        getBackend().uniformBlockBinding(ctx, program, uniformBlockIndex, uniformBlockBinding);
     }
     
-    @Deprecated
-    public static void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
-        getBackend().readFramebufferPixels(x, y, width, height, format, type, pixels);
+    public static String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
+        return getBackend().retrieveActiveUniformBlockName(ctx, program, uniformBlockIndex);
     }
     
-    @Deprecated
-    public static int queryTextureLevelParameter(int target, int level, int pname) {
-        return getBackend().queryTextureLevelParameter(target, level, pname);
+    public static int generateQueryObject(CommandContext ctx) {
+        return getBackend().generateQueryObject(ctx);
     }
     
-    @Deprecated
-    public static void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
-        getBackend().uploadShaderSource(shader, pointerBufferAddress, stringCount, lengthsPointer);
+    public static void initiateQuery(CommandContext ctx, int target, int id) {
+        getBackend().initiateQuery(ctx, target, id);
     }
     
-    @Deprecated
-    public static int locateUniformBlock(int program, String uniformBlockName) {
-        return getBackend().locateUniformBlock(program, uniformBlockName);
+    public static void concludeQuery(CommandContext ctx, int target) {
+        getBackend().concludeQuery(ctx, target);
     }
     
-    @Deprecated
-    public static void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        getBackend().bindUniformBlock(program, uniformBlockIndex, uniformBlockBinding);
+    public static void disposeQueryObject(CommandContext ctx, int id) {
+        getBackend().disposeQueryObject(ctx, id);
     }
     
-    @Deprecated
-    public static String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
-        return getBackend().retrieveActiveUniformBlockName(program, uniformBlockIndex);
+    public static int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
+        return getBackend().retrieveQueryObjectInt(ctx, id, pname);
     }
     
-    @Deprecated
-    public static int generateQueryObject() {
-        return getBackend().generateQueryObject();
+    public static long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
+        return getBackend().retrieveQueryObjectInt64(ctx, id, pname);
     }
     
-    @Deprecated
-    public static void initiateQuery(int target, int id) {
-        getBackend().initiateQuery(target, id);
+    public static void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
+        getBackend().labelDebugObject(ctx, identifier, name, label);
     }
     
-    @Deprecated
-    public static void concludeQuery(int target) {
-        getBackend().concludeQuery(target);
+    public static void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
+        getBackend().enterDebugGroup(ctx, source, id, message);
     }
     
-    @Deprecated
-    public static void disposeQueryObject(int id) {
-        getBackend().disposeQueryObject(id);
+    public static void exitDebugGroup(CommandContext ctx) {
+        getBackend().exitDebugGroup(ctx);
     }
     
-    @Deprecated
-    public static int retrieveQueryObjectInt(int id, int pname) {
-        return getBackend().retrieveQueryObjectInt(id, pname);
+    public static void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().debugMessageControl(ctx, source, type, severity, ids, enabled);
     }
     
-    @Deprecated
-    public static long retrieveQueryObjectInt64(int id, int pname) {
-        return getBackend().retrieveQueryObjectInt64(id, pname);
+    public static void debugMessageControlKHR(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().debugMessageControlKHR(ctx, source, type, severity, ids, enabled);
     }
     
-    @Deprecated
-    public static void labelDebugObject(int identifier, int name, String label) {
-        getBackend().labelDebugObject(identifier, name, label);
+    public static void debugMessageControlARB(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().debugMessageControlARB(ctx, source, type, severity, ids, enabled);
     }
     
-    @Deprecated
-    public static void enterDebugGroup(int source, int id, CharSequence message) {
-        getBackend().enterDebugGroup(source, id, message);
+    public static void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled) {
+        getBackend().debugMessageEnableAMD(ctx, category, severity, ids, enabled);
     }
     
-    @Deprecated
-    public static void exitDebugGroup() {
-        getBackend().exitDebugGroup();
+    /**
+     * Labels an object using the EXT_debug_label extension.
+     * @param ctx Command context for recording this command
+     * @param type The type identifier for the object
+     * @param object The object name/handle
+     * @param label The debug label string
+     */
+    public static void labelObjectExt(CommandContext ctx, int type, int object, String label) {
+        getBackend().labelObjectExt(ctx, type, object, label);
     }
     
-    @Deprecated
-    public static void labelObjectExt(int type, int object, String label) {
-        getBackend().labelObjectExt(type, object, label);
-    }
-    
-    @Deprecated
     public static boolean supportsKhrDebug() {
         return getBackend().supportsKhrDebug();
     }
     
-    @Deprecated
     public static boolean supportsArbDebugOutput() {
         return getBackend().supportsArbDebugOutput();
     }
     
-    @Deprecated
     public static void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupKhrDebugSystem(verbosityLevel, synchronous, messageHandler);
     }
     
-    @Deprecated
     public static void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupArbDebugSystem(verbosityLevel, synchronous, messageHandler);
     }
     
-    @Deprecated
     public static boolean hasBufferStorageExtension() {
         return getBackend().hasBufferStorageExtension();
     }
     
-    @Deprecated
     public static boolean hasVertexAttribBindingExtension() {
         return getBackend().hasVertexAttribBindingExtension();
     }
     
-    @Deprecated
-    public static void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
-        getBackend().attachVertexBuffer(bindingIndex, buffer, offset, stride);
+    /**
+     * Sets the depth clear value for subsequent clear operations.
+     * @param ctx Command context
+     * @param depth The depth value (0.0 to 1.0)
+     */
+    public static void setClearDepth(CommandContext ctx, double depth) {
+        getBackend().setClearDepth(ctx, depth);
     }
     
-    @Deprecated
-    public static void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
-        getBackend().specifyVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
+    /**
+     * Specifies the color buffer to draw into.
+     * @param ctx Command context
+     * @param mode The draw buffer target
+     */
+    public static void setDrawBuffer(CommandContext ctx, int mode) {
+        getBackend().setDrawBuffer(ctx, mode);
     }
     
-    @Deprecated
-    public static void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
-        getBackend().specifyVertexAttribIFormat(attribIndex, size, type, relativeOffset);
+    /**
+     * Renders indexed primitives with instancing and a base vertex.
+     * @param ctx Command context
+     */
+    public static void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        getBackend().drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, instanceCount, baseVertex);
     }
     
-    @Deprecated
-    public static void associateVertexAttrib(int attribIndex, int bindingIndex) {
-        getBackend().associateVertexAttrib(attribIndex, bindingIndex);
+    /**
+     * Renders indexed primitives with a base vertex offset.
+     * @param ctx Command context
+     */
+    public static void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
+        getBackend().drawIndexedBaseVertex(ctx, mode, count, type, indices, baseVertex);
     }
     
-    @Deprecated
-    public static void setClearDepthValue(double depth) {
-        getBackend().setClearDepthValue(depth);
+    /**
+     * Renders indexed primitives with instancing.
+     * @param ctx Command context
+     */
+    public static void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+        getBackend().drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount);
     }
     
-    @Deprecated
-    public static void setClearColorValue(float red, float green, float blue, float alpha) {
-        getBackend().setClearColorValue(red, green, blue, alpha);
+    /**
+     * Renders primitives using array data with instancing.
+     * @param ctx Command context
+     */
+    public static void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+        getBackend().drawArraysInstanced(ctx, mode, first, count, instanceCount);
     }
     
-    @Deprecated
-    public static void selectDrawBuffer(int mode) {
-        getBackend().selectDrawBuffer(mode);
+    /**
+     * Binds a range of a buffer to a uniform buffer binding point.
+     * @param ctx Command context
+     */
+    public static void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
+        getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size);
     }
     
-    @Deprecated
-    public static void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
-        getBackend().renderIndexedInstancedWithBase(mode, count, type, indices, instanceCount, baseVertex);
+    /**
+     * Attaches a buffer object to a texture buffer.
+     * @param ctx Command context
+     */
+    public static void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer) {
+        getBackend().texBuffer(ctx, target, internalFormat, buffer);
     }
     
-    @Deprecated
-    public static void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
-        getBackend().renderIndexedWithBase(mode, count, type, indices, baseVertex);
+    
+    public static void setUniform2fv(CommandContext ctx, int location, float[] value) {
+        getBackend().setUniform2fv(ctx, location, value);
     }
     
-    @Deprecated
-    public static void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
-        getBackend().renderIndexedInstanced(mode, count, type, indices, instanceCount);
+    public static void setUniform3fv(CommandContext ctx, int location, float[] value) {
+        getBackend().setUniform3fv(ctx, location, value);
     }
     
-    @Deprecated
-    public static void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
-        getBackend().renderArraysInstanced(mode, first, count, instanceCount);
+    public static void setUniform4fv(CommandContext ctx, int location, float[] value) {
+        getBackend().setUniform4fv(ctx, location, value);
     }
     
-    @Deprecated
-    public static void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
-        getBackend().attachUniformBufferRange(target, index, buffer, offset, size);
+    public static void bindUniformBufferBase(CommandContext ctx, int bindingPoint, int bufferId) {
+        getBackend().bindUniformBufferBase(ctx, bindingPoint, bufferId);
     }
     
-    @Deprecated
-    public static void attachBufferToTexture(int target, int internalFormat, int buffer) {
-        getBackend().attachBufferToTexture(target, internalFormat, buffer);
+    public static void bindFragDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name) {
+        getBackend().bindFragDataLocation(ctx, program, colorNumber, name);
     }
     
-    @Deprecated
-    public static void assignUniformFloat(int location, float value) {
-        getBackend().assignUniformFloat(location, value);
+    public static int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
+        return getBackend().getSynci(ctx, sync, pname, length);
     }
     
-    @Deprecated
-    public static void assignUniformFloat2(int location, float x, float y) {
-        getBackend().assignUniformFloat2(location, x, y);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat2v(int location, float[] value) {
-        getBackend().assignUniformFloat2v(location, value);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat3(int location, float x, float y, float z) {
-        getBackend().assignUniformFloat3(location, x, y, z);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat3v(int location, float[] value) {
-        getBackend().assignUniformFloat3v(location, value);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat4(int location, float x, float y, float z, float w) {
-        getBackend().assignUniformFloat4(location, x, y, z, w);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat4v(int location, float[] value) {
-        getBackend().assignUniformFloat4v(location, value);
-    }
-    
-    @Deprecated
-    public static void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
-        getBackend().assignUniformMatrix4f(location, matrix);
-    }
-    
-    @Deprecated
-    public static void bindUniformBufferBase(int bindingPoint, int bufferId) {
-        getBackend().bindUniformBufferBase(bindingPoint, bufferId);
-    }
-    
-    @Deprecated
-    public static void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
-        getBackend().bindFragmentDataLocation(program, colorNumber, name);
-    }
-    
-    @Deprecated
-    public static int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
-        return getBackend().querySyncStatus(sync, pname, length);
-    }
-    
-    @Deprecated
     public static GraphicsCapabilities obtainGraphicsCapabilities() {
         return getBackend().obtainGraphicsCapabilities();
     }
     
-    @Deprecated
     public static GraphicsCapabilities initializeGraphicsCapabilities() {
         return getBackend().initializeGraphicsCapabilities();
     }
     
-    @Deprecated
     public static boolean checkFunctionAvailable(String functionName) {
         return getBackend().checkFunctionAvailable(functionName);
     }
     
-    @Deprecated
-    public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
-        getBackend().copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+    public static void deleteVertexArrays(CommandContext ctx, int vertexArray) {
+        getBackend().deleteVertexArrays(ctx, vertexArray);
     }
     
-    @Deprecated
-    public static void deleteVertexArray(int vertexArray) {
-        getBackend().deleteVertexArray(vertexArray);
+    public static void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+        getBackend().multiDrawElementsBaseVertex(ctx, mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
+
     
-    @Deprecated
-    public static void flushMappedBufferRange(int target, long offset, long length) {
-        getBackend().flushMappedBufferRange(target, offset, length);
-    }
-    
-    @Deprecated
-    public static void createBufferStorage(int target, long size, int flags) {
-        getBackend().createBufferStorage(target, size, flags);
-    }
-    
-    @Deprecated
-    public static void createBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
-        getBackend().createBufferStorage(target, data, flags);
-    }
-    
-    @Deprecated
-    public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
-        getBackend().multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
-    }
-    
-    @Deprecated
-    public static void assignUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        getBackend().assignUniformMatrix4fv(location, transpose, value);
-    }
-    
-    @Deprecated
-    public static String queryString(int name) {
-        return getBackend().queryString(name);
-    }
-    
-    @Deprecated
-    public static String queryStringIndexed(int name, int index) {
-        return getBackend().queryStringIndexed(name, index);
-    }
-    
-    @Deprecated
-    public static void uploadShaderSourceNative(int shader, int count, long strings, long length) {
-        getBackend().uploadShaderSourceNative(shader, count, strings, length);
-    }
-    
-    @Deprecated
-    public static void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        getBackend().glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
-    }
-    
-    // Debug object labeling (KHRDebug/GL43)
-    @Deprecated
-    public static void labelObject(int identifier, int name, String label) {
-        getBackend().labelObject(identifier, name, label);
-    }
-    
-    // Debug group push/pop (KHRDebug/GL43)
-    @Deprecated
-    public static void pushDebugGroup(int source, int id, String message) {
-        getBackend().pushDebugGroup(source, id, message);
-    }
-    
-    @Deprecated
-    public static void popDebugGroup() {
-        getBackend().popDebugGroup();
-    }
     
     // Additional methods for IrisRenderSystem migration
     
-    @Deprecated
-    public static void glGetIntegerv(int pname, int[] params) {
-        getBackend().glGetIntegerv(pname, params);
+    public static void getIntegerv(CommandContext ctx, int pname, int[] params) {
+        getBackend().getIntegerv(ctx, pname, params);
     }
     
-    @Deprecated
-    public static void glGetFloatv(int pname, float[] params) {
-        getBackend().glGetFloatv(pname, params);
-    }
     
-    @Deprecated
-    public static void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        getBackend().glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
+    public static void getFloatv(CommandContext ctx, int pname, float[] params) {
+        getBackend().getFloatv(ctx, pname, params);
     }
     
-    @Deprecated
-    public static void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        getBackend().glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
-    }
     
-    @Deprecated
-    public static void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        getBackend().glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
+    public static void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture1D(ctx, target, level, internalformat, width, border, format, type, pixels);
     }
     
-    @Deprecated
-    public static void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix) {
-        getBackend().glUniformMatrix4fv(location, transpose, matrix);
-    }
     
-    @Deprecated
-    public static void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
-        getBackend().glUniformMatrix4fv(location, transpose, matrix);
-    }
     
-    @Deprecated
-    public static void glCopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
-        getBackend().glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
+    public static void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture3D(ctx, target, level, internalformat, width, height, depth, border, format, type, pixels);
     }
     
-    @Deprecated
-    public static void glUniform1f(int location, float v0) {
-        getBackend().glUniform1f(location, v0);
-    }
     
-    @Deprecated
-    public static void glUniform2f(int location, float v0, float v1) {
-        getBackend().glUniform2f(location, v0, v1);
-    }
     
-    @Deprecated
-    public static void glUniform2i(int location, int v0, int v1) {
-        getBackend().glUniform2i(location, v0, v1);
-    }
     
-    @Deprecated
-    public static void glUniform3f(int location, float v0, float v1, float v2) {
-        getBackend().glUniform3f(location, v0, v1, v2);
+    public static void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
+        getBackend().copyTexImage2D(ctx, target, level, internalFormat, x, y, width, height, border);
     }
     
-    @Deprecated
-    public static void glUniform3i(int location, int v0, int v1, int v2) {
-        getBackend().glUniform3i(location, v0, v1, v2);
-    }
     
-    @Deprecated
-    public static void glUniform4f(int location, float v0, float v1, float v2, float v3) {
-        getBackend().glUniform4f(location, v0, v1, v2, v3);
-    }
     
-    @Deprecated
-    public static void glUniform4i(int location, int v0, int v1, int v2, int v3) {
-        getBackend().glUniform4i(location, v0, v1, v2, v3);
-    }
     
-    @Deprecated
-    public static void glTexParameteriv(int target, int pname, int[] params) {
-        getBackend().glTexParameteriv(target, pname, params);
+    public static void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
+        getBackend().setUniform2i(ctx, location, v0, v1);
     }
     
-    @Deprecated
-    public static void glTexParameteri(int target, int pname, int param) {
-        getBackend().glTexParameteri(target, pname, param);
-    }
     
-    @Deprecated
-    public static void glTexParameterf(int target, int pname, float param) {
-        getBackend().glTexParameterf(target, pname, param);
-    }
     
-    @Deprecated
-    public static String glGetProgramInfoLog(int program) {
-        return getBackend().glGetProgramInfoLog(program);
-    }
     
-    @Deprecated
-    public static String glGetShaderInfoLog(int shader) {
-        return getBackend().glGetShaderInfoLog(shader);
-    }
     
-    @Deprecated
-    public static void glDrawBuffers(int[] buffers) {
-        getBackend().glDrawBuffers(buffers);
-    }
     
-    @Deprecated
-    public static void glReadBuffer(int buffer) {
-        getBackend().glReadBuffer(buffer);
+    /**
+     * Sets texture parameters using an array of integers.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Texture target (GL_TEXTURE_2D, etc.)
+     * @param pname Parameter name
+     * @param params Array of parameter values
+     */
+    public static void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
+        getBackend().texParameteriv(ctx, target, pname, params);
     }
     
-    @Deprecated
-    public static void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
-        getBackend().glClearBufferfv(buffer, drawbuffer, values);
-    }
     
-    @Deprecated
-    public static void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
-        getBackend().glClearBufferiv(buffer, drawbuffer, values);
-    }
     
-    @Deprecated
-    public static void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
-        getBackend().glClearBufferuiv(buffer, drawbuffer, values);
+    /**
+     * Sets a floating-point texture parameter for a texture bound to the specified target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER)
+     * @param param The parameter value
+     */
+    public static void texParameterf(CommandContext ctx, int target, int pname, float param) {
+        getBackend().texParameterf(ctx, target, pname, param);
     }
     
-    @Deprecated
-    public static String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
-        return getBackend().glGetActiveUniform(program, index, size, type, name);
+    public static void texParameteri(CommandContext ctx, int target, int pname, int param) {
+        getBackend().texParameteri(ctx, target, pname, param);
     }
     
-    @Deprecated
-    public static void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
-        getBackend().glReadPixels(x, y, width, height, format, type, pixels);
-    }
     
-    @Deprecated
-    public static void glBufferData(int target, float[] data, int usage) {
-        getBackend().glBufferData(target, data, usage);
-    }
     
-    @Deprecated
-    public static void glBufferData(int target, int[] data, int usage) {
-        getBackend().glBufferData(target, data, usage);
-    }
     
-    @Deprecated
-    public static void glBufferData(int target, java.nio.ByteBuffer data, int usage) {
-        getBackend().glBufferData(target, data, usage);
-    }
     
-    @Deprecated
-    public static void glBufferData(int target, long size, int usage) {
-        getBackend().glBufferData(target, size, usage);
-    }
     
-    @Deprecated
-    public static void glBufferSubData(int target, long offset, java.nio.ByteBuffer data) {
-        getBackend().glBufferSubData(target, offset, data);
+    public static void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
+        getBackend().clearBufferfv(ctx, buffer, drawbuffer, values);
     }
     
-    @Deprecated
-    public static void glBufferStorage(int target, long size, int flags) {
-        getBackend().glBufferStorage(target, size, flags);
-    }
     
-    @Deprecated
-    public static void glBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
-        getBackend().glBufferStorage(target, data, flags);
+    public static void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        getBackend().clearBufferiv(ctx, buffer, drawbuffer, values);
     }
     
-    @Deprecated
-    public static java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
-        return getBackend().glMapBufferRange(target, offset, length, access);
-    }
     
-    @Deprecated
-    public static boolean glUnmapBuffer(int target) {
-        return getBackend().glUnmapBuffer(target);
+    public static void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        getBackend().clearBufferuiv(ctx, buffer, drawbuffer, values);
     }
     
-    @Deprecated
-    public static boolean glIsBuffer(int buffer) {
-        return getBackend().glIsBuffer(buffer);
-    }
     
-    @Deprecated
-    public static void glBindBufferBase(int target, int index, int buffer) {
-        getBackend().glBindBufferBase(target, index, buffer);
+    public static String getActiveUniform(CommandContext ctx, int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
+        return getBackend().getActiveUniform(ctx, program, index, size, type, name);
     }
     
-    @Deprecated
-    public static void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
-        getBackend().glVertexAttrib4f(index, v0, v1, v2, v3);
-    }
     
-    @Deprecated
-    public static void glDetachShader(int program, int shader) {
-        getBackend().glDetachShader(program, shader);
+    public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+        getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
     }
     
-    @Deprecated
-    public static void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
-        getBackend().glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    public static void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+        getBackend().readPixels(ctx, x, y, width, height, format, type, pixels);
     }
     
-    @Deprecated
-    public static void glFramebufferTexture(int target, int attachment, int texture, int level) {
-        getBackend().glFramebufferTexture(target, attachment, texture, level);
-    }
     
-    @Deprecated
-    public static int glGetTexParameteri(int target, int pname) {
-        return getBackend().glGetTexParameteri(target, pname);
-    }
     
-    @Deprecated
-    public static void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
-        getBackend().glBindImageTexture(unit, texture, level, layered, layer, access, format);
-    }
     
-    @Deprecated
-    public static int glGetMaxImageUnits() {
-        return getBackend().glGetMaxImageUnits();
-    }
     
-    @Deprecated
-    public static void glGenBuffers(int[] buffers) {
-        getBackend().glGenBuffers(buffers);
-    }
     
-    @Deprecated
-    public static void glClearBufferSubData(int target, int internalformat, long offset, long size, int format, int type, int[] data) {
-        getBackend().glClearBufferSubData(target, internalformat, offset, size, format, type, data);
-    }
     
-    @Deprecated
-    public static void glGetProgramiv(int program, int pname, int[] params) {
-        getBackend().glGetProgramiv(program, pname, params);
-    }
     
-    @Deprecated
-    public static void glDispatchCompute(int workX, int workY, int workZ) {
-        getBackend().glDispatchCompute(workX, workY, workZ);
-    }
     
-    @Deprecated
-    public static void glMemoryBarrier(int barriers) {
-        getBackend().glMemoryBarrier(barriers);
-    }
     
-    @Deprecated
-    public static void glDisablei(int target, int index) {
-        getBackend().glDisablei(target, index);
-    }
     
-    @Deprecated
-    public static void glEnablei(int target, int index) {
-        getBackend().glEnablei(target, index);
-    }
     
-    @Deprecated
-    public static void glBlendFunc(int sfactor, int dfactor) {
-        getBackend().glBlendFunc(sfactor, dfactor);
-    }
     
-    @Deprecated
-    public static void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
-        getBackend().glBlendFuncSeparatei(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+    public static void setVertexAttrib4f(CommandContext ctx, int index, float v0, float v1, float v2, float v3) {
+        getBackend().setVertexAttrib4f(ctx, index, v0, v1, v2, v3);
     }
     
-    @Deprecated
-    public static int glGetUniformBlockIndex(int program, String uniformBlockName) {
-        return getBackend().glGetUniformBlockIndex(program, uniformBlockName);
-    }
     
-    @Deprecated
-    public static void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        getBackend().glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
-    }
     
-    @Deprecated
-    public static int glGenSamplers() {
-        return getBackend().glGenSamplers();
-    }
     
-    @Deprecated
-    public static void glDeleteSamplers(int sampler) {
-        getBackend().glDeleteSamplers(sampler);
-    }
     
-    @Deprecated
-    public static void glBindSampler(int unit, int sampler) {
-        getBackend().glBindSampler(unit, sampler);
-    }
     
-    @Deprecated
-    public static void glBindSamplers(int first, int[] samplers) {
-        getBackend().glBindSamplers(first, samplers);
+    public static void bindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+        getBackend().bindImageTexture(ctx, unit, texture, level, layered, layer, access, format);
     }
     
-    @Deprecated
-    public static void glSamplerParameteri(int sampler, int pname, int param) {
-        getBackend().glSamplerParameteri(sampler, pname, param);
+    
+    public static int getMaxImageUnits(CommandContext ctx) {
+        return getBackend().getMaxImageUnits(ctx);
     }
+    
     
-    @Deprecated
-    public static void glSamplerParameterf(int sampler, int pname, float param) {
-        getBackend().glSamplerParameterf(sampler, pname, param);
+    public static void createBuffers(CommandContext ctx, int[] buffers) {
+        getBackend().createBuffers(ctx, buffers);
     }
     
-    @Deprecated
-    public static void glSamplerParameteriv(int sampler, int pname, int[] params) {
-        getBackend().glSamplerParameteriv(sampler, pname, params);
+    
+    public static void clearBufferSubData(CommandContext ctx, int target, int internalformat, long offset, long size, int format, int type, int[] data) {
+        getBackend().clearBufferSubData(ctx, target, internalformat, offset, size, format, type, data);
     }
     
-    @Deprecated
-    public static int glGetInteger(int pname) {
-        return getBackend().glGetInteger(pname);
+    
+    public static void getProgramiv(CommandContext ctx, int program, int pname, int[] params) {
+        getBackend().getProgramiv(ctx, program, pname, params);
     }
+    
     
-    @Deprecated
-    public static void glDeleteBuffers(int buffer) {
-        getBackend().glDeleteBuffers(buffer);
+    
+    public static void memoryBarrier(CommandContext ctx, int barriers) {
+        getBackend().memoryBarrier(ctx, barriers);
     }
+    
+    
+    
+    
     
-    @Deprecated
-    public static void glPolygonMode(int face, int mode) {
-        getBackend().glPolygonMode(face, mode);
+    public static void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        getBackend().blendFuncSeparatei(ctx, buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
     
-    @Deprecated
-    public static void glViewport(int x, int y, int width, int height) {
-        getBackend().glViewport(x, y, width, height);
+    
+    
+    
+    public static int createSampler(CommandContext ctx) {
+        return getBackend().createSampler(ctx);
     }
     
-    @Deprecated
-    public static void glDispatchComputeIndirect(long offset) {
-        getBackend().glDispatchComputeIndirect(offset);
+    
+    public static void deleteSampler(CommandContext ctx, int sampler) {
+        getBackend().deleteSampler(ctx, sampler);
     }
+    
     
-    @Deprecated
-    public static void glBindBuffer(int target, int buffer) {
-        getBackend().glBindBuffer(target, buffer);
+    
+    public static void bindSamplers(CommandContext ctx, int first, int[] samplers) {
+        getBackend().bindSamplers(ctx, first, samplers);
     }
+    
     
-    @Deprecated
-    public static String glGetStringi(int name, int index) {
-        return getBackend().glGetStringi(name, index);
+    public static void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
+        getBackend().setSamplerParameteri(ctx, sampler, pname, param);
     }
     
-    @Deprecated
-    public static void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth) {
-        getBackend().glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+    
+    public static void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param) {
+        getBackend().setSamplerParameterf(ctx, sampler, pname, param);
     }
     
-    @Deprecated
-    public static int glCheckFramebufferStatus(int target) {
-        return getBackend().glCheckFramebufferStatus(target);
+    
+    public static void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params) {
+        getBackend().setSamplerParameteriv(ctx, sampler, pname, params);
     }
+    
     
-    @Deprecated
-    public static void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        getBackend().glUniformMatrix3fv(location, transpose, value);
+    
+    
+    
+    
+    public static void dispatchComputeIndirect(CommandContext ctx, long offset) {
+        getBackend().dispatchComputeIndirect(ctx, offset);
     }
+    
     
-    @Deprecated
-    public static void glUniformMatrix3fv(int location, boolean transpose, float[] value) {
-        getBackend().glUniformMatrix3fv(location, transpose, value);
+    
+    public static String getString(CommandContext ctx, int name, int index) {
+        return getBackend().getString(ctx, name, index);
     }
     
-    @Deprecated
-    public static void glClearColor(float r, float g, float b, float a) {
-        getBackend().glClearColor(r, g, b, a);
+    public static String getString(CommandContext ctx, int name) {
+        return getBackend().getString(ctx, name);
     }
+    
     
-    @Deprecated
-    public static int glGetAttribLocation(int program, CharSequence name) {
-        return getBackend().glGetAttribLocation(program, name);
+    public static void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
+                                        int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
+                                        int width, int height, int depth) {
+        getBackend().copyImageSubData(ctx, srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
+                                      dstName, dstTarget, dstLevel, dstX, dstY, dstZ, 
+                                      width, height, depth);
     }
     
-    @Deprecated
-    public static void glGenerateMipmap(int target) {
-        getBackend().glGenerateMipmap(target);
+    
+    public static int checkFramebufferStatus(CommandContext ctx, int target) {
+        return getBackend().checkFramebufferStatus(ctx, target);
     }
+    
+    
     
-    @Deprecated
-    public static void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        getBackend().glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    
+    
+    
+    /**
+     * Generates mipmaps for a texture bound to the specified target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     */
+    public static void generateMipmap(CommandContext ctx, int target) {
+        getBackend().generateMipmap(ctx, target);
     }
+    
+    
     
     // DSA (Direct State Access) methods - ARB versions
     
-    @Deprecated
-    public static void glGenerateTextureMipmap(int texture) {
-        getBackend().glGenerateTextureMipmap(texture);
+    public static void generateTextureMipmapDSA(CommandContext ctx, int texture) {
+        getBackend().generateTextureMipmapDSA(ctx, texture);
     }
     
-    @Deprecated
-    public static void glTextureParameteri(int texture, int pname, int param) {
-        getBackend().glTextureParameteri(texture, pname, param);
+    
+    public static void textureParameteri(CommandContext ctx, int texture, int pname, int param) {
+        getBackend().textureParameteri(ctx, texture, pname, param);
     }
     
-    @Deprecated
-    public static void glTextureParameterf(int texture, int pname, float param) {
-        getBackend().glTextureParameterf(texture, pname, param);
+    
+    public static void textureParameterf(CommandContext ctx, int texture, int pname, float param) {
+        getBackend().textureParameterf(ctx, texture, pname, param);
     }
     
-    @Deprecated
-    public static void glTextureParameteriv(int texture, int pname, int[] params) {
-        getBackend().glTextureParameteriv(texture, pname, params);
+    
+    public static void textureParameteriv(CommandContext ctx, int texture, int pname, int[] params) {
+        getBackend().textureParameteriv(ctx, texture, pname, params);
     }
     
-    @Deprecated
-    public static void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
-        getBackend().glNamedFramebufferReadBuffer(framebuffer, mode);
+    
+    public static void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
+        getBackend().namedFramebufferReadBuffer(ctx, framebuffer, mode);
     }
     
-    @Deprecated
-    public static void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
-        getBackend().glNamedFramebufferDrawBuffers(framebuffer, bufs);
+    
+    public static void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
+        getBackend().namedFramebufferDrawBuffers(ctx, framebuffer, bufs);
     }
     
-    @Deprecated
-    public static void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
-        getBackend().glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, value);
+    
+    public static void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value) {
+        getBackend().clearNamedFramebufferfv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
-    public static void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
-        getBackend().glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, value);
+    
+    public static void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        getBackend().clearNamedFramebufferiv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
-    public static void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
-        getBackend().glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
+    
+    public static void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        getBackend().clearNamedFramebufferuiv(ctx, framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
-    public static int glGetTextureParameteri(int texture, int pname) {
-        return getBackend().glGetTextureParameteri(texture, pname);
+    
+    public static int getTextureParameteri(CommandContext ctx, int texture, int pname) {
+        return getBackend().getTextureParameteri(ctx, texture, pname);
     }
     
-    @Deprecated
-    public static void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        getBackend().glCopyTextureSubImage2D(texture, level, xoffset, yoffset, x, y, width, height);
+    
+    /**
+     * Copies a portion of a read framebuffer to a texture subregion using Direct State Access.
+     * See {@link GraphicsBackend#copyTextureSubImage2D(CommandContext, int, int, int, int, int, int, int, int)}
+     */
+    public static void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        getBackend().copyTextureSubImage2D(ctx, texture, level, xoffset, yoffset, x, y, width, height);
     }
     
-    @Deprecated
-    public static void glBindTextureUnit(int unit, int texture) {
-        getBackend().glBindTextureUnit(unit, texture);
+    
+    /**
+     * Binds a texture to a specified texture unit using Direct State Access.
+     * See {@link GraphicsBackend#bindTextureUnit(CommandContext, int, int)}
+     */
+    public static void bindTextureUnit(CommandContext ctx, int unit, int texture) {
+        getBackend().bindTextureUnit(ctx, unit, texture);
     }
     
-    @Deprecated
-    public static int glCreateBuffers() {
-        return getBackend().glCreateBuffers();
+    
+    /**
+     * Creates a new buffer object using Direct State Access.
+     * See {@link GraphicsBackend#createBuffers(CommandContext)}
+     */
+    public static int createBuffers(CommandContext ctx) {
+        return getBackend().createBuffers(ctx);
     }
     
-    @Deprecated
-    public static void glNamedBufferData(int buffer, float[] data, int usage) {
-        getBackend().glNamedBufferData(buffer, data, usage);
+    
+    /**
+     * Uploads float array data to a named buffer using Direct State Access.
+     * See {@link GraphicsBackend#namedBufferData(CommandContext, int, float[], int)}
+     */
+    public static void namedBufferData(CommandContext ctx, int buffer, float[] data, int usage) {
+        getBackend().namedBufferData(ctx, buffer, data, usage);
     }
     
-    @Deprecated
-    public static void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        getBackend().glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    
+    /**
+     * Copies a rectangular region between two named framebuffers using Direct State Access.
+     * See {@link GraphicsBackend#blitNamedFramebuffer(CommandContext, int, int, int, int, int, int, int, int, int, int, int, int)}
+     */
+    public static void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().blitNamedFramebuffer(ctx, readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    public static void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
-        getBackend().glNamedFramebufferTexture(framebuffer, attachment, texture, level);
+    
+    /**
+     * Attaches a texture to a framebuffer attachment point using Direct State Access.
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer The framebuffer object
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param texture The texture object to attach
+     * @param level The mipmap level of the texture to attach
+     */
+    public static void namedFramebufferTexture(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        getBackend().namedFramebufferTexture(ctx, framebuffer, attachment, texture, level);
     }
     
-    @Deprecated
-    public static int glCreateFramebuffers() {
-        return getBackend().glCreateFramebuffers();
+    
+    /**
+     * Creates a new framebuffer object using Direct State Access.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The framebuffer object ID
+     */
+    public static int createFramebuffers(CommandContext ctx) {
+        return getBackend().createFramebuffers(ctx);
     }
     
-    @Deprecated
-    public static int glGenFramebuffers() {
-        return getBackend().generateFramebufferObject();
+    
+    
+    
+    /**
+     * Creates a new texture object for a specific target using Direct State Access.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP)
+     * @return The texture object ID
+     */
+    public static int createTextures(CommandContext ctx, int target) {
+        return getBackend().createTextures(ctx, target);
     }
     
-    @Deprecated
-    public static void glDeleteFramebuffers(int framebuffer) {
-        getBackend().destroyFramebufferObject(framebuffer);
+    
+    
+    
+    
+    /**
+     * Queries a framebuffer attachment parameter.
+     * @param ctx Command context
+     * @param target The framebuffer target
+     * @param attachment The attachment point
+     * @param pname The parameter name to query
+     * @return The queried parameter value
+     */
+    public static int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname) {
+        return getBackend().getFramebufferAttachmentParameteri(ctx, target, attachment, pname);
     }
     
-    @Deprecated
-    public static int glCreateTextures(int target) {
-        return getBackend().glCreateTextures(target);
-    }
     
-    // Additional rendering operations
-    @Deprecated
-    public static void glDrawElements(int mode, int count, int type, long indices) {
-        getBackend().glDrawElements(mode, count, type, indices);
-    }
     
-    @Deprecated
-    public static void glBlendEquation(int mode) {
-        getBackend().glBlendEquation(mode);
-    }
     
-    @Deprecated
-    public static void glClearDepth(double depth) {
-        getBackend().glClearDepth(depth);
-    }
     
-    @Deprecated
-    public static int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
-        return getBackend().glGetFramebufferAttachmentParameteri(target, attachment, pname);
-    }
-    
-    // Debug callback control methods (low-level callback control methods only)
-    // Note: The high-level setup methods below use Vulkanic functional interfaces
-    @Deprecated
-    public static void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
-        getBackend().glDebugMessageControl(source, type, severity, ids, enabled);
-    }
-    
-    @Deprecated
-    public static void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
-        getBackend().glDebugMessageControlKHR(source, type, severity, ids, enabled);
-    }
-    
-    @Deprecated
-    public static void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
-        getBackend().glDebugMessageControlARB(source, type, severity, ids, enabled);
-    }
-    
-    @Deprecated
-    public static void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
-        getBackend().glDebugMessageEnableAMD(category, severity, ids, enabled);
-    }
     
     // High-level debug callback wrapper methods that accept functional interfaces
-    @Deprecated
     public static void setupDebugMessageCallback(DebugMessageCallback callback) {
         getBackend().setupDebugMessageCallback(callback);
     }
     
-    @Deprecated
     public static void setupDebugMessageCallbackKHR(DebugMessageCallback callback) {
         getBackend().setupDebugMessageCallbackKHR(callback);
     }
     
-    @Deprecated
     public static void setupDebugMessageCallbackARB(DebugMessageCallbackARB callback) {
         getBackend().setupDebugMessageCallbackARB(callback);
     }
     
-    @Deprecated
     public static void setupDebugMessageCallbackAMD(DebugMessageCallbackAMD callback) {
         getBackend().setupDebugMessageCallbackAMD(callback);
     }
     
-    @Deprecated
     public static void clearDebugMessageCallback() {
         getBackend().clearDebugMessageCallback();
     }
     
-    @Deprecated
     public static void clearDebugMessageCallbackKHR() {
         getBackend().clearDebugMessageCallbackKHR();
     }
     
-    @Deprecated
     public static void clearDebugMessageCallbackARB() {
         getBackend().clearDebugMessageCallbackARB();
     }
     
-    @Deprecated
     public static void clearDebugMessageCallbackAMD() {
         getBackend().clearDebugMessageCallbackAMD();
     }
@@ -1898,181 +2001,47 @@ public class VulkanicAPI {
     // GL-style wrapper methods for backward compatibility
     // These delegate to the abstracted methods above
     
-    /**
-     * Binds a vertex attribute to a specific location in a shader program.
-     * Wrapper for bindAttributeLocation.
-     */
-    @Deprecated
-    public static void glBindAttribLocation(int program, int index, CharSequence name) {
-        bindAttributeLocation(program, index, name);
-    }
     
-    /**
-     * Configures a vertex attribute pointer.
-     * Wrapper for configureVertexAttribute.
-     */
-    @Deprecated
-    public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        configureVertexAttribute(index, size, type, normalized, stride, pointer);
-    }
     
-    /**
-     * Enables a vertex attribute array.
-     * Wrapper for activateVertexAttribute.
-     */
-    @Deprecated
-    public static void glEnableVertexAttribArray(int index) {
-        activateVertexAttribute(index);
-    }
     
-    /**
-     * Creates a new shader program object.
-     * Wrapper for constructProgramObject.
-     */
-    @Deprecated
-    public static int glCreateProgram() {
-        return constructProgramObject();
-    }
     
-    /**
-     * Attaches a shader to a program.
-     * Wrapper for attachShaderToProgram.
-     */
-    @Deprecated
-    public static void glAttachShader(int program, int shader) {
-        attachShaderToProgram(program, shader);
-    }
     
-    /**
-     * Links a program object.
-     * Wrapper for linkProgramBinary.
-     */
-    @Deprecated
-    public static void glLinkProgram(int program) {
-        linkProgramBinary(program);
-    }
     
-    /**
-     * Returns a parameter from a program object.
-     * Wrapper for queryProgramParameter.
-     */
-    @Deprecated
-    public static int glGetProgrami(int program, int pname) {
-        return queryProgramParameter(program, pname);
-    }
     
-    /**
-     * Installs a program object as part of current rendering state.
-     * Wrapper for useProgram.
-     */
-    @Deprecated
-    public static void glUseProgram(int program) {
-        useProgram(program);
-    }
     
-    /**
-     * Deletes a program object.
-     * Wrapper for disposeProgramObject.
-     */
-    @Deprecated
-    public static void glDeleteProgram(int program) {
-        disposeProgramObject(program);
-    }
     
-    /**
-     * Returns the location of a uniform variable.
-     * Wrapper for locateUniformVariable.
-     */
-    @Deprecated
-    public static int glGetUniformLocation(int program, CharSequence name) {
-        return locateUniformVariable(program, name);
-    }
     
-    /**
-     * Sets the value of a uniform variable.
-     * Wrapper for assignUniformInteger.
-     */
-    @Deprecated
-    public static void glUniform1i(int location, int value) {
-        assignUniformInteger(location, value);
-    }
     
     // GL43+ Vertex Attribute methods
     
-    /**
-     * Binds a buffer to a vertex buffer bind point (GL43+).
-     */
-    @Deprecated
-    public static void glBindVertexBuffer(int bindingindex, int buffer, long offset, int stride) {
-        getBackend().bindVertexBuffer(bindingindex, buffer, offset, stride);
-    }
     
     /**
      * Specifies the organization of vertex arrays (GL43+).
      */
-    @Deprecated
-    public static void glVertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset) {
-        getBackend().vertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
+    public static void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+        getBackend().setVertexAttribFormat(ctx, attribindex, size, type, normalized, relativeoffset);
     }
     
     /**
      * Specifies the organization of vertex arrays for integer data (GL43+).
      */
-    @Deprecated
-    public static void glVertexAttribIFormat(int attribindex, int size, int type, int relativeoffset) {
-        getBackend().vertexAttribIFormat(attribindex, size, type, relativeoffset);
+    public static void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type, int relativeoffset) {
+        getBackend().setVertexAttribIFormat(ctx, attribindex, size, type, relativeoffset);
     }
     
     /**
      * Associates a vertex attribute and a vertex buffer binding (GL43+).
      */
-    @Deprecated
-    public static void glVertexAttribBinding(int attribindex, int bindingindex) {
-        getBackend().vertexAttribBinding(attribindex, bindingindex);
+    public static void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
+        getBackend().setVertexAttribBinding(ctx, attribindex, bindingindex);
     }
     
-    /**
-     * Disables a generic vertex attribute array.
-     */
-    @Deprecated
-    public static void glDisableVertexAttribArray(int index) {
-        deactivateVertexAttribute(index);
-    }
     
-    /**
-     * Defines an array of generic vertex attribute data with integer data (GL20+).
-     * Specifies the data format for integer vertex attributes.
-     */
-    @Deprecated
-    public static void glVertexAttribIPointer(int index, int size, int type, int stride, long pointer) {
-        configureVertexAttributeInteger(index, size, type, stride, pointer);
-    }
     
     // VAO methods
     
-    /**
-     * Generates vertex array object names.
-     */
-    @Deprecated
-    public static int glGenVertexArrays() {
-        return getBackend().genVertexArrays();
-    }
     
-    /**
-     * Binds a vertex array object.
-     */
-    @Deprecated
-    public static void glBindVertexArray(int array) {
-        getBackend().bindVertexArray(array);
-    }
     
-    /**
-     * Deletes vertex array objects.
-     */
-    @Deprecated
-    public static void glDeleteVertexArrays(int array) {
-        getBackend().deleteVertexArrays(array);
-    }
     
     // GL.getCapabilities() and GLUtil support
     
@@ -2083,7 +2052,6 @@ public class VulkanicAPI {
      * 
      * @return Platform-specific capabilities object (cast to GLCapabilities for OpenGL backend)
      */
-    @Deprecated
     public static Object getGLCapabilities() {
         return getBackend().getGLCapabilities();
     }
@@ -2092,7 +2060,6 @@ public class VulkanicAPI {
      * Sets up debug message callback using GLUtil-style callback.
      * @param stream The PrintStream to write debug messages to
      */
-    @Deprecated
     public static void setupDebugMessageCallback(java.io.PrintStream stream) {
         getBackend().setupDebugMessageCallback(stream);
     }
@@ -2103,7 +2070,6 @@ public class VulkanicAPI {
      * Checks if OpenGL 3.2 is supported.
      * @return true if OpenGL 3.2 is supported
      */
-    @Deprecated
     public static boolean checkOpenGL32Support() {
         return getBackend().checkOpenGL32Support();
     }
@@ -2112,7 +2078,6 @@ public class VulkanicAPI {
      * Checks if OpenGL 3.3 is supported.
      * @return true if OpenGL 3.3 is supported
      */
-    @Deprecated
     public static boolean checkOpenGL33Support() {
         return getBackend().checkOpenGL33Support();
     }
@@ -2121,7 +2086,6 @@ public class VulkanicAPI {
      * Checks if ARB_instanced_arrays extension is supported.
      * @return true if ARB_instanced_arrays is supported
      */
-    @Deprecated
     public static boolean checkARBInstancedArraysSupport() {
         return getBackend().checkARBInstancedArraysSupport();
     }
@@ -2130,7 +2094,6 @@ public class VulkanicAPI {
      * Gets the function pointer for glNamedBufferData.
      * @return function pointer, or 0 if not available
      */
-    @Deprecated
     public static long getNamedBufferDataPointer() {
         return getBackend().getNamedBufferDataPointer();
     }
@@ -2139,7 +2102,6 @@ public class VulkanicAPI {
      * Gets the function pointer for glBufferStorage.
      * @return function pointer, or 0 if not available
      */
-    @Deprecated
     public static long getBufferStoragePointer() {
         return getBackend().getBufferStoragePointer();
     }
@@ -2148,111 +2110,307 @@ public class VulkanicAPI {
      * Gets the function pointer for glBindVertexBuffer.
      * @return function pointer, or 0 if not available
      */
-    @Deprecated
     public static long getBindVertexBufferPointer() {
         return getBackend().getBindVertexBufferPointer();
     }
     
-    /**
-     * Gets the function pointer for glVertexAttribBinding.
-     * @return function pointer, or 0 if not available
-     */
-    @Deprecated
-    public static long getVertexAttribBindingPointer() {
-        return getBackend().getVertexAttribBindingPointer();
-    }
     
     /**
      * Gets capability information as a formatted string for debugging.
      * @return formatted capability information
      */
-    @Deprecated
     public static String getCapabilityDebugInfo() {
         return "Your OpenGL support:\n" +
                 "openGL version 3.2+: [" + checkOpenGL32Support() + "] <- REQUIRED\n" +
-                "Vertex Attribute Buffer Binding: [" + (getVertexAttribBindingPointer() != 0) + "] <- optional improvement\n" +
+                "Vertex Attribute Buffer Binding: [" + (getBindVertexBufferPointer() != 0) + "] <- optional improvement\n" +
                 "Buffer Storage: [" + (getBufferStoragePointer() != 0) + "] <- optional improvement\n";
     }
     
     // Additional GL query and state methods
     
-    /**
-     * Tests whether a capability is enabled.
-     */
-    @Deprecated
-    public static boolean glIsEnabled(int cap) {
-        return getBackend().glIsEnabled(cap);
-    }
     
     /**
      * Determines if a name corresponds to a framebuffer object.
      */
-    @Deprecated
-    public static boolean glIsFramebuffer(int framebuffer) {
-        return getBackend().glIsFramebuffer(framebuffer);
+    public static boolean isFramebuffer(CommandContext ctx, int framebuffer) {
+        return getBackend().isFramebuffer(ctx, framebuffer);
     }
     
-    /**
-     * Determines if a name corresponds to a texture.
-     */
-    @Deprecated
-    public static boolean glIsTexture(int texture) {
-        return getBackend().glIsTexture(texture);
-    }
     
     /**
      * Determines if a name corresponds to a vertex array object.
      */
-    @Deprecated
-    public static boolean glIsVertexArray(int array) {
-        return getBackend().glIsVertexArray(array);
+    public static boolean isVertexArray(CommandContext ctx, int array) {
+        return getBackend().isVertexArray(ctx, array);
     }
     
     /**
      * Determines if a name corresponds to a program object.
      */
-    @Deprecated
-    public static boolean glIsProgram(int program) {
-        return getBackend().glIsProgram(program);
+    public static boolean isProgram(CommandContext ctx, int program) {
+        return getBackend().isProgram(ctx, program);
     }
     
     /**
      * Sets the RGB blend equation and the alpha blend equation separately.
      */
-    @Deprecated
-    public static void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
-        getBackend().glBlendEquationSeparate(modeRGB, modeAlpha);
+    public static void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        getBackend().setBlendEquationSeparate(ctx, modeRGB, modeAlpha);
     }
     
     /**
      * Sets the stencil test function.
      */
-    @Deprecated
-    public static void glStencilFunc(int func, int ref, int mask) {
-        getBackend().glStencilFunc(func, ref, mask);
+    public static void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        getBackend().setStencilFunc(ctx, func, ref, mask);
+    }
+    
+    
+    
+    // CommandContext-aware methods for Batch 23
+    
+    /**
+     * Dispatches compute shader work groups.
+     * 
+     * @param ctx Command context for recording this command
+     * @param workX Number of work groups in X dimension
+     * @param workY Number of work groups in Y dimension
+     * @param workZ Number of work groups in Z dimension
+     */
+    public static void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        getBackend().dispatchCompute(ctx, workX, workY, workZ);
     }
     
     /**
-     * Specifies whether front- or back-facing polygons can be culled.
+     * Checks if a name corresponds to a buffer object.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer name to check
+     * @return true if buffer is a valid buffer object name
      */
-    @Deprecated
-    public static void glCullFace(int mode) {
-        getBackend().glCullFace(mode);
+    public static boolean isBuffer(CommandContext ctx, int buffer) {
+        return getBackend().isBuffer(ctx, buffer);
+    }
+    
+    public static boolean isEnabled(CommandContext ctx, int cap) {
+        return getBackend().isEnabled(ctx, cap);
     }
     
     /**
-     * Generates a single texture name.
+     * Retrieves the index of a uniform block in a shader program.
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program
+     * @param uniformBlockName Name of the uniform block
+     * @return The index of the uniform block
      */
-    @Deprecated
-    public static int glGenTextures() {
-        return getBackend().glGenTextures();
+    public static int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
+        return getBackend().getUniformBlockIndex(ctx, program, uniformBlockName);
     }
-    
+
+    // =========================================================================
+    // Phase 3a: Buffer Lifecycle — high-level managed buffer operations
+    // =========================================================================
+
     /**
-     * Binds a named texture to a texturing target.
+     * Creates a new GPU buffer managed by the Vulkanic abstraction layer.
+     *
+     * @param label debug label for the buffer (may be null)
+     * @param usage usage flags (VulkanicBuffer.USAGE_* constants)
+     * @param size  size in bytes (must be > 0)
+     * @return a new VulkanicBuffer
      */
-    @Deprecated
-    public static void glBindTexture(int target, int texture) {
-        getBackend().bindTexture(target, texture);
+    public static VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size) {
+        return getBackend().createManagedBuffer(label, usage, size);
+    }
+
+    /**
+     * Creates a new GPU buffer initialized with the given data.
+     *
+     * @param label       debug label (may be null)
+     * @param usage       usage flags (VulkanicBuffer.USAGE_* constants)
+     * @param initialData initial contents (must have remaining bytes)
+     * @return a new VulkanicBuffer containing the uploaded data
+     */
+    public static VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage,
+                                                      java.nio.ByteBuffer initialData) {
+        return getBackend().createManagedBuffer(label, usage, initialData);
+    }
+
+    /**
+     * Maps a managed buffer for CPU access.
+     *
+     * @param buffer the buffer to map
+     * @param read   true if the mapping is used for reading
+     * @param write  true if the mapping is used for writing
+     * @return a MappedView providing CPU-side access; must be closed when done
+     */
+    public static VulkanicBuffer.MappedView mapManagedBuffer(VulkanicBuffer buffer, boolean read, boolean write) {
+        return getBackend().mapManagedBuffer(buffer, read, write);
+    }
+
+    // =========================================================================
+    // Phase 3b: Texture Lifecycle — high-level managed texture operations
+    // =========================================================================
+
+    /**
+     * Creates a new GPU texture managed by the Vulkanic abstraction layer.
+     *
+     * @param label         debug label (may be null)
+     * @param usage         usage flags (VulkanicTexture.USAGE_* constants)
+     * @param format        texture format
+     * @param width         width in pixels
+     * @param height        height in pixels
+     * @param depthOrLayers depth (3D) or layer count (array); usually 1
+     * @param mipLevels     number of mip levels (at least 1)
+     * @return a new VulkanicTexture
+     */
+    public static VulkanicTexture createManagedTexture(String label, int usage,
+            VulkanicTextureFormat format, int width, int height, int depthOrLayers, int mipLevels) {
+        return getBackend().createManagedTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
+    }
+
+    /**
+     * Creates a view of the given texture covering all its mip levels.
+     *
+     * @param texture the parent texture
+     * @return a VulkanicTextureView
+     */
+    public static VulkanicTextureView createManagedTextureView(VulkanicTexture texture) {
+        return getBackend().createManagedTextureView(texture);
+    }
+
+    /**
+     * Creates a view of the given texture covering a specific mip range.
+     *
+     * @param texture       the parent texture
+     * @param baseMipLevel  first mip level to expose
+     * @param mipLevelCount number of mip levels to expose
+     * @return a VulkanicTextureView
+     */
+    public static VulkanicTextureView createManagedTextureView(VulkanicTexture texture,
+                                                                int baseMipLevel, int mipLevelCount) {
+        return getBackend().createManagedTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
+    // =========================================================================
+    // Phase 3c: Pipeline Objects
+    // =========================================================================
+
+    /**
+     * Creates (or retrieves a cached) compiled render pipeline.
+     *
+     * @param descriptor the pipeline descriptor
+     * @return a PipelineHandle for the compiled pipeline
+     */
+    public static PipelineHandle createPipeline(PipelineDescriptor descriptor) {
+        return getBackend().createPipeline(descriptor);
+    }
+
+    /**
+     * Convenience overload: creates a pipeline directly from a Blaze3D RenderPipeline.
+     *
+     * @param pipeline the RenderPipeline to compile
+     * @return a PipelineHandle for the compiled pipeline
+     */
+    public static PipelineHandle createPipeline(net.blaze3d.pipeline.RenderPipeline pipeline) {
+        return getBackend().createPipeline(PipelineDescriptor.fromRenderPipeline(pipeline));
+    }
+
+    // =========================================================================
+    // Phase 3d: Command Buffer Lifecycle
+    // =========================================================================
+
+    /**
+     * Begins a new command buffer for recording rendering commands.
+     *
+     * <p>In OpenGL: Returns the singleton immediate-mode context.
+     * In Vulkan: Allocates and begins a new VkCommandBuffer.
+     *
+     * @return a CommandContext for recording commands
+     */
+    public static CommandContext beginCommandBuffer() {
+        return getBackend().beginCommandBuffer();
+    }
+
+    /**
+     * Submits a completed command buffer for GPU execution.
+     *
+     * <p>In OpenGL: No-op — commands already executed immediately.
+     * In Vulkan: Calls vkQueueSubmit.
+     *
+     * @param ctx the command context returned by {@link #beginCommandBuffer()}
+     */
+    public static void submitCommandBuffer(CommandContext ctx) {
+        getBackend().submitCommandBuffer(ctx);
+    }
+
+    /**
+     * Registers the GlDevice with the active backend (OpenGL backend only).
+     *
+     * <p>This is called from GlDevice's constructor once the device is initialized.
+     * It allows the OpenGLBackend to delegate device-level operations
+     * (pipeline compilation, resource management) to the GlDevice.
+     *
+     * <p>Has no effect if the current backend is not an OpenGLBackend.
+     */
+    public static void registerDevice(net.blaze3d.opengl.GlDevice device) {
+        GraphicsBackend b = getBackend();
+        if (b instanceof net.vulkanic.backends.opengl.OpenGLBackend openGLBackend) {
+            openGLBackend.setGlDevice(device);
+        }
+    }
+
+    // =========================================================================
+    // Phase 3b: Render Pass
+    // =========================================================================
+
+    /**
+     * Begins a render pass that targets the given color attachment.
+     *
+     * <p>Dispatches to {@link GraphicsBackend#beginRenderPass(CommandContext, java.util.function.Supplier, VulkanicTextureView, java.util.OptionalInt)}.
+     *
+     * <p>Typical usage with try-with-resources:
+     * <pre>
+     * CommandContext ctx = VulkanicAPI.beginCommandBuffer();
+     * try (VulkanicRenderPass pass = VulkanicAPI.beginRenderPass(
+     *         ctx, () -> "terrain", colorView, OptionalInt.of(0))) {
+     *     pass.setPipeline(pipeline);
+     *     pass.setVertexBuffer(0, vbo);
+     *     pass.draw(0, 36);
+     * }
+     * VulkanicAPI.submitCommandBuffer(ctx);
+     * </pre>
+     *
+     * @param ctx         command context (from {@link #beginCommandBuffer()})
+     * @param label       debug label for profiling (may be null supplier)
+     * @param colorTarget color attachment texture view
+     * @param clearColor  if present, ARGB clear color applied before the first draw
+     * @return an active {@link VulkanicRenderPass}
+     */
+    public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            VulkanicTextureView colorTarget, java.util.OptionalInt clearColor) {
+        return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor);
+    }
+
+    /**
+     * Begins a render pass that targets a color and optional depth attachment.
+     *
+     * @param ctx         command context (from {@link #beginCommandBuffer()})
+     * @param label       debug label (may be null supplier)
+     * @param colorTarget color attachment texture view
+     * @param clearColor  if present, ARGB clear color applied before the first draw
+     * @param depthTarget depth attachment texture view (may be null — depth not used)
+     * @param clearDepth  if present, depth value to clear the depth attachment with
+     * @return an active {@link VulkanicRenderPass}
+     */
+    public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            VulkanicTextureView colorTarget, java.util.OptionalInt clearColor,
+            @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
+            java.util.OptionalDouble clearDepth) {
+        return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor,
+            depthTarget, clearDepth);
     }
 }

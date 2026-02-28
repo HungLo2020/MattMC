@@ -5,6 +5,7 @@ import net.sodium.client.gl.shader.uniform.GlUniform;
 import net.sodium.client.gl.shader.uniform.GlUniformBlock;
 import net.sodium.client.render.chunk.shader.ShaderBindingContext;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -35,22 +36,24 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
     }
 
     public void bind() {
-        VulkanicAPI.useProgram(this.handle());
+        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        VulkanicAPI.bindShaderProgram(ctx, this.handle());
     }
 
     public void unbind() {
-        VulkanicAPI.useProgram(0);
+        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        VulkanicAPI.bindShaderProgram(ctx, 0);
     }
 
     public void delete() {
-        VulkanicAPI.disposeProgramObject(this.handle());
+        VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), this.handle());
 
         this.invalidateHandle();
     }
 
     @Override
     public <U extends GlUniform<?>> @NotNull U bindUniform(String name, IntFunction<U> factory) {
-        int index = VulkanicAPI.locateUniformVariable(this.handle(), name);
+        int index = VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.handle(), name);
 
         if (index < 0) {
             throw new NullPointerException("No uniform exists with name: " + name);
@@ -61,7 +64,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public <U extends GlUniform<?>> U bindUniformOptional(String name, IntFunction<U> factory) {
-        int index = VulkanicAPI.locateUniformVariable(this.handle(), name);
+        int index = VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.handle(), name);
 
         if (index < 0) {
             return null;
@@ -72,26 +75,26 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public @NotNull GlUniformBlock bindUniformBlock(String name, int bindingPoint) {
-        int index = VulkanicAPI.locateUniformBlock(this.handle(), name);
+        int index = VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), this.handle(), name);
 
         if (index < 0) {
             throw new NullPointerException("No uniform block exists with name: " + name);
         }
 
-        VulkanicAPI.bindUniformBlock(this.handle(), index, bindingPoint);
+        VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), this.handle(), index, bindingPoint);
 
         return new GlUniformBlock(bindingPoint);
     }
 
     @Override
     public GlUniformBlock bindUniformBlockOptional(String name, int bindingPoint) {
-        int index = VulkanicAPI.locateUniformBlock(this.handle(), name);
+        int index = VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), this.handle(), name);
 
         if (index < 0) {
             return null;
         }
 
-        VulkanicAPI.bindUniformBlock(this.handle(), index, bindingPoint);
+        VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), this.handle(), index, bindingPoint);
 
         return new GlUniformBlock(bindingPoint);
     }
@@ -102,11 +105,11 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
         public Builder(ResourceLocation name) {
             this.name = name;
-            this.program = VulkanicAPI.constructProgramObject();
+            this.program = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
         }
 
         public Builder attachShader(GlShader shader) {
-            VulkanicAPI.attachShaderToProgram(this.program, shader.handle());
+            VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), this.program, shader.handle());
 
             return this;
         }
@@ -121,15 +124,15 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
          * @return An instantiated shader container as provided by the factory
          */
         public <U> GlProgram<U> link(Function<ShaderBindingContext, U> factory) {
-            VulkanicAPI.linkProgramBinary(this.program);
+            VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), this.program);
 
-            String log = VulkanicAPI.retrieveProgramInfoLog(this.program);
+            String log = VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), this.program);
 
             if (!log.isEmpty()) {
                 LOGGER.warn("Program link log for " + this.name + ": " + log);
             }
 
-            int result = VulkanicAPI.queryProgramParameter(this.program, VulkanicAPI.GL_LINK_STATUS);
+            int result = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), this.program, VulkanicAPI.GL_LINK_STATUS);
 
             if (result != 1) { // GL_TRUE
                 throw new RuntimeException("Shader program linking failed, see log for details");
@@ -139,13 +142,13 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         }
 
         public Builder bindAttribute(String name, int index) {
-            VulkanicAPI.bindAttributeLocation(this.program, index, name);
+            VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.program, index, name);
 
             return this;
         }
 
         public Builder bindFragmentData(String name, int index) {
-            VulkanicAPI.bindFragmentDataLocation(this.program, index, name);
+            VulkanicAPI.bindFragDataLocation(VulkanicAPI.getImmediateContext(), this.program, index, name);
 
             return this;
         }

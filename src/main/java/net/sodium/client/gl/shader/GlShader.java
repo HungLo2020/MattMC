@@ -19,18 +19,18 @@ public class GlShader extends GlObject {
     public GlShader(ShaderType type, ResourceLocation name, ShaderParser.ParsedShader parsedShader) {
         this.name = name;
 
-        int handle = VulkanicAPI.constructShaderObject(type.id);
+        int handle = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type.id);
         ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
-        VulkanicAPI.compileShaderSource(handle);
+        VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), handle);
 
-        String log = VulkanicAPI.retrieveShaderInfoLog(handle);
+        String log = VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), handle);
 
         if (!log.isEmpty()) {
             LOGGER.warn("Shader compilation log for {}: {}", this.name, log);
             LOGGER.warn("Include table: {}", Arrays.toString(parsedShader.includeIds()));
         }
 
-        int result = VulkanicAPI.queryShaderParameter(handle, VulkanicAPI.GL_COMPILE_STATUS);
+        int result = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), handle, VulkanicAPI.GL_COMPILE_STATUS);
 
         if (result != 1) {  // GL_TRUE
             throw new RuntimeException("Shader compilation failed, see log for details");
@@ -44,7 +44,7 @@ public class GlShader extends GlObject {
     }
 
     public void delete() {
-        VulkanicAPI.disposeShaderObject(this.handle());
+        VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.handle());
 
         this.invalidateHandle();
     }

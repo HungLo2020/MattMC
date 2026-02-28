@@ -69,31 +69,31 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	{
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.glUniform1i(this.gDepthMapUniform, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(this.ssaoTexture);
-		VulkanicAPI.glUniform1i(this.gSSAOMapUniform, 1);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gSSAOMapUniform, 1);
 		
-		VulkanicAPI.glUniform1i(this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
 		
 		if (this.gViewSizeUniform >= 0)
 		{
-			VulkanicAPI.glUniform2f(this.gViewSizeUniform,
+			VulkanicAPI.setUniform2f(VulkanicAPI.getImmediateContext(), this.gViewSizeUniform,
 					MC_RENDER.getTargetFramebufferViewportWidth(),
 					MC_RENDER.getTargetFramebufferViewportHeight());
 		}
 		
 		if (this.gNearUniform >= 0)
 		{
-			VulkanicAPI.glUniform1f(this.gNearUniform,
+			VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), this.gNearUniform,
 					RenderUtil.getNearClipPlaneDistanceInBlocks(partialTicks));
 		}
 		
 		if (this.gFarUniform >= 0)
 		{
 			float farClipPlane = RenderUtil.getFarClipPlaneDistanceInBlocks();
-			VulkanicAPI.glUniform1f(this.gFarUniform, farClipPlane);
+			VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), this.gFarUniform, farClipPlane);
 		}
 	}
 	
@@ -107,7 +107,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	protected void onRender()
 	{
 		GLMC.enableBlend();
-		VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
 		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_ZERO, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_ONE);
 
 		// Depth testing must be disabled otherwise this application shader won't apply anything.

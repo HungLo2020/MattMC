@@ -51,7 +51,7 @@ public class Shader
 	{
 		LOGGER.info("Loading shader at [" + path + "]");
 		// Create an empty shader object
-		this.id = VulkanicAPI.constructShaderObject(type);
+		this.id = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"].");
@@ -60,12 +60,12 @@ public class Shader
 		StringBuilder source = loadFile(path, absoluteFilePath, new StringBuilder());
 		safeShaderSource(this.id, source);
 		
-		VulkanicAPI.compileShaderSource(this.id);
+		VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), this.id);
 		// check if the shader compiled
-		int status = VulkanicAPI.queryShaderParameter(this.id, VulkanicAPI.GL_COMPILE_STATUS);
+		int status = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_COMPILE_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
 		{
-			String message = "Shader compiler error. Details: ["+VulkanicAPI.retrieveShaderInfoLog(this.id)+"].";
+			String message = "Shader compiler error. Details: ["+VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), this.id)+"].";
 			this.free(); // important!
 			throw new RuntimeException(message);
 		}
@@ -82,20 +82,20 @@ public class Shader
 		}
 		
 		// Create an empty shader object
-		this.id = VulkanicAPI.constructShaderObject(type);
+		this.id = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"] and Source: \n["+sourceString+"].");
 		}
 		
 		safeShaderSource(this.id, sourceString);
-		VulkanicAPI.compileShaderSource(this.id);
+		VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), this.id);
 		// check if the shader compiled
-		int status = VulkanicAPI.queryShaderParameter(this.id, VulkanicAPI.GL_COMPILE_STATUS);
+		int status = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_COMPILE_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
 		{
 			
-			String message = "Shader compiler error. Details: [" + VulkanicAPI.retrieveShaderInfoLog(this.id) + "]\n";
+			String message = "Shader compiler error. Details: [" + VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), this.id) + "]\n";
 			message += "Source: \n[" + sourceString + "]";
 			this.free(); // important!
 			throw new RuntimeException(message);
@@ -131,7 +131,7 @@ public class Shader
 			final PointerBuffer pointers = stack.mallocPointer(1);
 			pointers.put(sourceBuffer);
 
-			VulkanicAPI.uploadShaderSourceNative(glId, 1, pointers.address0(), 0);
+			VulkanicAPI.uploadShaderSource(VulkanicAPI.getImmediateContext(), glId, pointers.address0(), 1, 0);
 			org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
 		}
 		finally
@@ -140,7 +140,7 @@ public class Shader
 		}
 	}
 	
-	public void free() { VulkanicAPI.disposeShaderObject(this.id); }
+	public void free() { VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.id); }
 	
 	public static StringBuilder loadFile(String path, boolean absoluteFilePath, StringBuilder stringBuilder)
 	{

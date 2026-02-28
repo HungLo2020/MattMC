@@ -23,8 +23,8 @@ public abstract class AbstractVertexAttribute
 	// This will bind AbstractVertexAttribute
 	protected AbstractVertexAttribute()
 	{
-		this.id = VulkanicAPI.glGenVertexArrays();
-		VulkanicAPI.glBindVertexArray(this.id);
+		this.id = VulkanicAPI.createVertexArray(VulkanicAPI.getImmediateContext());
+		VulkanicAPI.bindVertexArray(VulkanicAPI.getImmediateContext(), this.id);
 	}
 	
 	public static AbstractVertexAttribute create()
@@ -45,11 +45,11 @@ public abstract class AbstractVertexAttribute
 	// binding //
 	//=========//
 	
-	public void bind() { VulkanicAPI.glBindVertexArray(this.id); }
-	public void unbind() { VulkanicAPI.glBindVertexArray(0); }
+	public void bind() { VulkanicAPI.bindVertexArray(VulkanicAPI.getImmediateContext(), this.id); }
+	public void unbind() { VulkanicAPI.bindVertexArray(VulkanicAPI.getImmediateContext(), 0); }
 	
 	/** Always remember to always free your resources! */
-	public void free() { VulkanicAPI.glDeleteVertexArrays(this.id); }
+	public void free() { VulkanicAPI.deleteVertexArrays(VulkanicAPI.getImmediateContext(), this.id); }
 	
 	
 	

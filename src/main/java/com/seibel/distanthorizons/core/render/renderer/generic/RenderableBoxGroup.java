@@ -309,20 +309,20 @@ public class RenderableBoxGroup
 			
 			
 			// Upload transformation matrices
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceChunkPosVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceSubChunkPosVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceScaleVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceChunkPosVbo);
+			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceSubChunkPosVbo);
+			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceScaleVbo);
+			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload colors
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceColorVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceColorVbo);
+			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload materials
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceMaterialVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceMaterialVbo);
+			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
 		}
 		
 		

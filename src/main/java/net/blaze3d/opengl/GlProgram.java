@@ -94,13 +94,13 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 					if (this instanceof net.irisshaders.iris.pipeline.programs.IrisProgram is) {
 						k = is.iris$getBlockIndex(this.programId, string);
 					} else {
-						k = VulkanicAPI.locateUniformBlock(this.programId, string);
+						k = VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), this.programId, string);
 					}
 					if (k == -1) {
 						yield null;
 					} else {
 						int l = i++;
-						VulkanicAPI.bindUniformBlock(this.programId, k, l);
+						VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), this.programId, k, l);
 						yield new Uniform.Ubo(l);
 					}
 				}
@@ -140,11 +140,11 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 		int o = GlStateManager.glGetProgrami(this.programId, 35382);
 
 		for (int p = 0; p < o; p++) {
-			String string = VulkanicAPI.retrieveActiveUniformBlockName(this.programId, p);
+			String string = VulkanicAPI.retrieveActiveUniformBlockName(VulkanicAPI.getImmediateContext(), this.programId, p);
 			if (!this.uniformsByName.containsKey(string)) {
 				if (!list2.contains(string) && BUILT_IN_UNIFORMS.contains(string)) {
 					int n = i++;
-					VulkanicAPI.bindUniformBlock(this.programId, p, n);
+					VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), this.programId, p, n);
 					this.uniformsByName.put(string, new Uniform.Ubo(n));
 				} else if (string.startsWith("iris_")) {
 					// Silently skip Iris-injected uniforms

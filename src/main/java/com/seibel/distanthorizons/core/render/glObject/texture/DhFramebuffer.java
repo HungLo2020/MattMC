@@ -5,6 +5,7 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public class DhFramebuffer implements IDhApiFramebuffer
@@ -25,11 +26,12 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	
 	public DhFramebuffer() 
 	{
-		this.id = VulkanicAPI.glGenFramebuffers();
+		this.id = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
 
 		this.attachments = new Int2IntArrayMap();
-		this.maxDrawBuffers = VulkanicAPI.glGetInteger(VulkanicAPI.GL_MAX_DRAW_BUFFERS);
-		this.maxColorAttachments = VulkanicAPI.glGetInteger(VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		this.maxDrawBuffers = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_DRAW_BUFFERS);
+		this.maxColorAttachments = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
 		this.hasDepthAttachment = false;
 	}
 
@@ -39,8 +41,9 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.id = id;
 		
 		this.attachments = new Int2IntArrayMap();
-		this.maxDrawBuffers = VulkanicAPI.glGetInteger(VulkanicAPI.GL_MAX_DRAW_BUFFERS);
-		this.maxColorAttachments = VulkanicAPI.glGetInteger(VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		this.maxDrawBuffers = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_DRAW_BUFFERS);
+		this.maxColorAttachments = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
 		this.hasDepthAttachment = false;
 	}
 	
@@ -56,7 +59,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.bind();
 		
 		int depthAttachment = isCombinedStencil ? VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT : VulkanicAPI.GL_DEPTH_ATTACHMENT;
-		VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, depthAttachment, VulkanicAPI.GL_TEXTURE_2D, textureId, 0);
+		VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, depthAttachment, VulkanicAPI.GL_TEXTURE_2D, textureId, 0);
 		
 		this.hasDepthAttachment = true;
 	}
@@ -66,14 +69,14 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	{
 		this.bind();
 		
-		VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + textureIndex, VulkanicAPI.GL_TEXTURE_2D, textureId, 0);
+		VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + textureIndex, VulkanicAPI.GL_TEXTURE_2D, textureId, 0);
 		this.attachments.put(textureIndex, textureId);
 	}
 
 	public void noDrawBuffers()
 	{
 		this.bind(); 
-		VulkanicAPI.glDrawBuffers(new int[]{VulkanicAPI.GL_NONE});
+		VulkanicAPI.drawBuffers(VulkanicAPI.getImmediateContext(), new int[]{VulkanicAPI.GL_NONE});
 	}
 	
 	public void drawBuffers(int[] buffers)
@@ -97,13 +100,13 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		}
 		
 		this.bind(); 
-		VulkanicAPI.glDrawBuffers(new int[]{VulkanicAPI.GL_NONE});
+		VulkanicAPI.drawBuffers(VulkanicAPI.getImmediateContext(), new int[]{VulkanicAPI.GL_NONE});
 	}
 	
 	public void readBuffer(int buffer)
 	{
 		this.bind();
-		VulkanicAPI.glReadBuffer(VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
+		VulkanicAPI.setReadBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
 	}
 	
 	public int getColorAttachment(int index) { return this.attachments.get(index); }
@@ -127,7 +130,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	@Override
 	public void destroy()
 	{
-		VulkanicAPI.glDeleteFramebuffers(this.id); 
+		VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.id); 
 		this.id = -1;
 	}
 	
@@ -135,7 +138,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	public int getStatus()
 	{
 		this.bind(); 
-		int status = VulkanicAPI.glCheckFramebufferStatus(VulkanicAPI.GL_FRAMEBUFFER);
+		int status = VulkanicAPI.checkFramebufferStatus(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER);
 		return status;
 	}
 	
