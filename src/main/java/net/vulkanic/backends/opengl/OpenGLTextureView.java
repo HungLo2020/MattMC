@@ -1,5 +1,6 @@
 package net.vulkanic.backends.opengl;
 
+import net.blaze3d.opengl.GlTexture;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureView;
 
@@ -48,12 +49,39 @@ public class OpenGLTextureView extends VulkanicTextureView {
     }
 
     /**
-     * Returns the backing texture cast to {@link OpenGLTexture}, or {@code null} if the
-     * backing texture is not an {@code OpenGLTexture} (e.g. it is a Blaze3D {@code GlTexture}
-     * held via the {@code VulkanicTexture} interface).
+     * Returns the native OpenGL texture object name (the integer handle) for this view.
      *
-     * <p>Callers that need the native GL handle of any backing texture should call
-     * {@code texture()} and use the {@code VulkanicTexture} interface methods instead.
+     * <p>Works for both {@link OpenGLTexture}-backed views (the normal Vulkanic-managed path)
+     * and {@link GlTexture}-backed views (Blaze3D textures that implement
+     * {@link VulkanicTexture} via {@code GpuTexture}).
+     *
+     * <p>This is the method callers should use when they need the raw GL handle — do NOT
+     * call {@code openGLTexture().getGlHandle()} because {@link #openGLTexture()} returns
+     * {@code null} when the backing texture is a {@code GlTexture}.
+     *
+     * @return the GL texture object name
+     * @throws IllegalStateException if the backing texture type is not supported by
+     *                               this OpenGL backend implementation
+     */
+    public int glHandle() {
+        if (texture instanceof OpenGLTexture o) {
+            return o.getGlHandle();
+        }
+        if (texture instanceof GlTexture t) {
+            return t.glId();
+        }
+        throw new IllegalStateException(
+            "OpenGLTextureView backed by unsupported texture type: " + texture.getClass().getName() +
+            " — cannot extract a GL texture handle");
+    }
+
+    /**
+     * Returns the backing texture cast to {@link OpenGLTexture}, or {@code null} if the
+     * backing texture is a Blaze3D {@code GlTexture} rather than a Vulkanic-managed
+     * {@code OpenGLTexture}.
+     *
+     * <p><strong>Do not call {@code openGLTexture().getGlHandle()} — use {@link #glHandle()}
+     * instead,</strong> which handles both texture types correctly without a null-check.
      */
     @org.jetbrains.annotations.Nullable
     public OpenGLTexture openGLTexture() {

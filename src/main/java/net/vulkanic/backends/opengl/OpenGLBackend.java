@@ -2432,7 +2432,7 @@ public class OpenGLBackend implements GraphicsBackend {
         net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER, fbo);
 
         // 3. Attach the color texture at mip level 0 of the view's base mip
-        int colorHandle = colorView.openGLTexture().getGlHandle();
+        int colorHandle = colorView.glHandle();
         int colorMip = colorView.getBaseMipLevel();
         net.vulkanic.VulkanicAPI.framebufferTexture(ctx,
             net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER,
@@ -2443,7 +2443,7 @@ public class OpenGLBackend implements GraphicsBackend {
         // 4. Attach the depth texture if provided
         if (depthTarget != null) {
             OpenGLTextureView depthView = (OpenGLTextureView) depthTarget;
-            int depthHandle = depthView.openGLTexture().getGlHandle();
+            int depthHandle = depthView.glHandle();
             int depthMip = depthView.getBaseMipLevel();
             net.vulkanic.VulkanicAPI.framebufferTexture(ctx,
                 net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER,

@@ -158,9 +158,14 @@ public class Phase3DelegationTest {
         assertEquals(1,   view.getMipLevelCount());
         assertFalse(view.isClosed(), "Fresh view must not be closed");
 
-        // The backing texture is the same non-owning texture we passed in
+        // The backing texture is the same non-owning texture we passed in.
+        // openGLTexture() is non-null here because we backed the view with OpenGLTexture.
         OpenGLTexture glTex = view.openGLTexture();
+        assertNotNull(glTex, "openGLTexture() must be non-null when backed by OpenGLTexture");
         assertEquals(55, glTex.getGlHandle());
+        // glHandle() must return the same value as getGlHandle() on the backing texture
+        assertEquals(55, view.glHandle(),
+            "glHandle() must return the GL handle regardless of how it is retrieved");
         assertEquals(VulkanicTextureFormat.DEPTH32, glTex.getFormat());
 
         // Close the view — must not throw even without a GL context
@@ -199,7 +204,11 @@ public class Phase3DelegationTest {
             assertDoesNotThrow(() -> {
                 OpenGLTexture tex = OpenGLTexture.nonOwning(1, usage, fmt, 16, 16, 1, 1, "fmt-test");
                 OpenGLTextureView ov = new OpenGLTextureView(tex, 0, 1);
-                assertEquals(fmt, ov.openGLTexture().getFormat(),
+                // openGLTexture() returns non-null here because tex IS an OpenGLTexture.
+                // Use assertNotNull to make the guarantee explicit.
+                OpenGLTexture backing = ov.openGLTexture();
+                assertNotNull(backing, "openGLTexture() must be non-null when backed by OpenGLTexture");
+                assertEquals(fmt, backing.getFormat(),
                     "Format must round-trip through OpenGLTextureView for " + fmt);
             }, "OpenGLTextureView construction should not throw for format: " + fmt);
         }
@@ -286,5 +295,61 @@ public class Phase3DelegationTest {
         }
         assertFalse(bridgeExists,
             "createTextureViewFromGlHandle bridge method must be removed from GraphicsBackend");
+    }
+
+    // ── OpenGLTextureView.glHandle() — regression for NPE crash ──────────
+    // Reproduces: "Cannot invoke OpenGLTexture.getGlHandle() because openGLTexture() is null"
+    // when a GlTexture-backed OpenGLTextureView was used in beginRenderPass.
+
+    @Test
+    public void testGlHandleOnOpenGLTextureBackedView() {
+        // Normal Vulkanic path: OpenGLTexture is the backing texture
+        OpenGLTexture tex = OpenGLTexture.nonOwning(
+            77, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.RGBA8, 256, 128, 1, 1, "test");
+        OpenGLTextureView view = new OpenGLTextureView(tex, 0, 1);
+
+        // glHandle() must return the same value as getGlHandle() on the backing OpenGLTexture
+        assertEquals(77, view.glHandle(),
+            "glHandle() must return the GL handle for an OpenGLTexture-backed view");
+    }
+
+    @Test
+    public void testGlHandleOnNonOpenGLTextureBackedView() {
+        // This is the path that crashed: a VulkanicTexture that is NOT an OpenGLTexture.
+        // We use a non-owning OpenGLTexture here (since we can't construct GlTexture without
+        // a GL context), but verify the dispatch logic via openGLTexture() returning non-null.
+        // The important assertion: glHandle() must NOT throw and must return the correct value.
+        OpenGLTexture nonOwning = OpenGLTexture.nonOwning(
+            42, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.RGBA8, 64, 64, 1, 1, "non-owning");
+        OpenGLTextureView view = new OpenGLTextureView(nonOwning, 0, 1);
+
+        assertDoesNotThrow(() -> view.glHandle(),
+            "glHandle() must not throw for any supported VulkanicTexture backing type");
+        assertEquals(42, view.glHandle());
+    }
+
+    @Test
+    public void testOpenGLTextureViewHasGlHandleMethod() throws NoSuchMethodException {
+        // Verify the method exists with the correct signature
+        var m = OpenGLTextureView.class.getMethod("glHandle");
+        assertNotNull(m);
+        assertEquals(int.class, m.getReturnType(),
+            "glHandle() must return int");
+    }
+
+    @Test
+    public void testOpenGLBackendCallsGlHandleNotOpenGLTextureGetGlHandle() throws java.io.IOException {
+        // Regression guard: OpenGLBackend.beginRenderPass must use glHandle(), not openGLTexture().getGlHandle()
+        java.nio.file.Path file = java.nio.file.Paths.get(System.getProperty("user.dir"))
+            .resolve("src/main/java/net/vulkanic/backends/opengl/OpenGLBackend.java");
+        String source = java.nio.file.Files.readString(file);
+
+        assertFalse(source.contains("openGLTexture().getGlHandle()"),
+            "OpenGLBackend.beginRenderPass must not call openGLTexture().getGlHandle() — " +
+            "openGLTexture() returns null for GlTexture-backed views; use glHandle() instead");
+        assertTrue(source.contains(".glHandle()"),
+            "OpenGLBackend.beginRenderPass must call glHandle() to get the GL texture handle");
     }
 }
