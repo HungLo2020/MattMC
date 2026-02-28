@@ -9,7 +9,7 @@ import net.blaze3d.framegraph.FrameGraphBuilder;
 import net.blaze3d.framegraph.FramePass;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.resource.ResourceHandle;
+import net.vulkanic.ResourceHandle;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;

@@ -9,7 +9,7 @@ import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.resource.GraphicsResourceAllocator;
 import net.blaze3d.resource.RenderTargetDescriptor;
-import net.blaze3d.resource.ResourceHandle;
+import net.vulkanic.ResourceHandle;
 import net.blaze3d.shaders.UniformType;
 import java.util.ArrayList;
 import java.util.HashMap;

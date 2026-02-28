@@ -2481,4 +2481,24 @@ public class OpenGLBackend implements GraphicsBackend {
 
         return new OpenGLRenderPass(fbo, ctx);
     }
+
+    // =========================================================================
+    // Phase 3e: Frame Graph
+    // =========================================================================
+
+    /**
+     * Creates a new per-frame render graph backed by {@code FrameGraphBuilder}.
+     *
+     * <p>The OpenGL implementation delegates scheduling and resource lifetime
+     * management to the existing {@code FrameGraphBuilder} implementation.
+     * No OpenGL calls are made at this point — the graph runs when
+     * {@link net.vulkanic.VulkanicFrameGraph#execute(net.vulkanic.GraphicsResourceAllocator)}
+     * is called.
+     *
+     * @return a new, empty {@link net.vulkanic.VulkanicFrameGraph}
+     */
+    @Override
+    public net.vulkanic.VulkanicFrameGraph createFrameGraph() {
+        return new net.blaze3d.framegraph.FrameGraphBuilder();
+    }
 }

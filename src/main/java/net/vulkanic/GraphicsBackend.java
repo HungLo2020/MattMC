@@ -2898,4 +2898,23 @@ public interface GraphicsBackend {
                                         VulkanicTextureView colorTarget, OptionalInt clearColor,
                                         @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
                                         OptionalDouble clearDepth);
+
+    // =========================================================================
+    // Phase 3e: Frame Graph
+    // =========================================================================
+
+    /**
+     * Creates a new per-frame render graph.
+     *
+     * <p>In OpenGL: returns a {@code VulkanicFrameGraph} backed by the existing
+     * {@code FrameGraphBuilder} scheduler.
+     * In Vulkan: returns a native implementation that manages command-buffer
+     * submission, pipeline barriers, and semaphore synchronisation.
+     *
+     * <p>The returned graph must be executed exactly once per frame via
+     * {@link VulkanicFrameGraph#execute(GraphicsResourceAllocator)}.
+     *
+     * @return a new empty frame graph
+     */
+    VulkanicFrameGraph createFrameGraph();
 }

@@ -1,6 +1,7 @@
 package net.blaze3d.resource;
 
 import com.google.common.annotations.VisibleForTesting;
+import net.vulkanic.ResourceDescriptor;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;

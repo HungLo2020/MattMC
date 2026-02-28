@@ -5,6 +5,7 @@ import net.blaze3d.pipeline.TextureTarget;
 import net.blaze3d.systems.RenderSystem;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.ResourceDescriptor;
 
 @Environment(EnvType.CLIENT)
 public record RenderTargetDescriptor(int width, int height, boolean useDepth, int clearColor) implements ResourceDescriptor<RenderTarget> {

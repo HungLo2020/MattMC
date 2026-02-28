@@ -10,7 +10,7 @@ import net.blaze3d.pipeline.TextureTarget;
 import net.blaze3d.platform.Lighting;
 import net.blaze3d.resource.GraphicsResourceAllocator;
 import net.blaze3d.resource.RenderTargetDescriptor;
-import net.blaze3d.resource.ResourceHandle;
+import net.vulkanic.ResourceHandle;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.PoseStack;

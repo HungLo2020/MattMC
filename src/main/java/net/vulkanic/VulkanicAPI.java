@@ -2413,4 +2413,43 @@ public class VulkanicAPI {
         return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor,
             depthTarget, clearDepth);
     }
+
+    // =========================================================================
+    // Phase 3e: Frame Graph
+    // =========================================================================
+
+    /**
+     * Creates a new per-frame render graph.
+     *
+     * <p>In OpenGL the returned graph is backed by the existing
+     * {@code FrameGraphBuilder} scheduler.  In Vulkan it will be a native
+     * implementation that manages command-buffer submission and synchronisation.
+     *
+     * <p>Typical usage:
+     * <pre>
+     * VulkanicFrameGraph fg = VulkanicAPI.beginFrame();
+     * VulkanicFramePass skyPass = fg.addPass("sky");
+     * ResourceHandle&lt;RenderTarget&gt; sky = skyPass.createsInternal("sky-color", skyDesc);
+     * skyPass.executes(() -&gt; renderSky(sky.get()));
+     * VulkanicAPI.executeFrame(fg, allocator);
+     * </pre>
+     *
+     * @return a new empty {@link VulkanicFrameGraph}
+     */
+    public static VulkanicFrameGraph beginFrame() {
+        return getBackend().createFrameGraph();
+    }
+
+    /**
+     * Executes all passes in the frame graph in dependency order and then
+     * discards the graph.
+     *
+     * @param frameGraph the frame graph to execute (must not be re-used after this call)
+     * @param allocator  the resource pool used to acquire and release physical
+     *                   GPU resources during execution
+     */
+    public static void executeFrame(VulkanicFrameGraph frameGraph,
+            GraphicsResourceAllocator allocator) {
+        frameGraph.execute(allocator);
+    }
 }

@@ -1,8 +1,10 @@
 package net.blaze3d.framegraph;
 
-import net.blaze3d.resource.GraphicsResourceAllocator;
-import net.blaze3d.resource.ResourceDescriptor;
-import net.blaze3d.resource.ResourceHandle;
+import net.vulkanic.GraphicsResourceAllocator;
+import net.vulkanic.ResourceDescriptor;
+import net.vulkanic.ResourceHandle;
+import net.vulkanic.VulkanicFrameGraph;
+import net.vulkanic.VulkanicFramePass;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -16,23 +18,26 @@ import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class FrameGraphBuilder {
+public class FrameGraphBuilder implements VulkanicFrameGraph {
 	private final List<FrameGraphBuilder.InternalVirtualResource<?>> internalResources = new ArrayList();
 	private final List<FrameGraphBuilder.ExternalResource<?>> externalResources = new ArrayList();
 	private final List<FrameGraphBuilder.Pass> passes = new ArrayList();
 
+	@Override
 	public FramePass addPass(String string) {
 		FrameGraphBuilder.Pass pass = new FrameGraphBuilder.Pass(this.passes.size(), string);
 		this.passes.add(pass);
 		return pass;
 	}
 
+	@Override
 	public <T> ResourceHandle<T> importExternal(String string, T object) {
 		FrameGraphBuilder.ExternalResource<T> externalResource = new FrameGraphBuilder.ExternalResource<>(string, null, object);
 		this.externalResources.add(externalResource);
 		return externalResource.handle;
 	}
 
+	@Override
 	public <T> ResourceHandle<T> createInternal(String string, ResourceDescriptor<T> resourceDescriptor) {
 		return this.createInternalResource(string, resourceDescriptor, null).handle;
 	}
@@ -46,6 +51,7 @@ public class FrameGraphBuilder {
 		return internalVirtualResource;
 	}
 
+	@Override
 	public void execute(GraphicsResourceAllocator graphicsResourceAllocator) {
 		this.execute(graphicsResourceAllocator, FrameGraphBuilder.Inspector.NONE);
 	}
