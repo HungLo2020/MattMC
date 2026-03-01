@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-DEST_DIR="/home/matt/OneDrive/Apps/Games/Storage/MattMC"
+DEST_DIR="/mnt/storage/OneDrive/Apps/Games/Storage/MattMC"
 
 # ---- Locate app root (detects based on current and parent directory) ----
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
