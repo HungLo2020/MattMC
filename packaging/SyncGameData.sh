@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_DIR="$SCRIPT_DIR"
 LOCAL_NAME="$(basename "$LOCAL_DIR")"
 
-REMOTE_SYNC_ROOT="/mnt/storage/OneDrive/Apps/Games/Storage/MattMC/Sync"
+REMOTE_SYNC_ROOT="/mnt/storage/Storage/Sync"
 REMOTE_DIR="$REMOTE_SYNC_ROOT/$LOCAL_NAME"
 
 require_command() {
