@@ -1,0 +1,19 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Run Dev Script",
+			"type": "node-terminal",
+			"request": "launch",
+			"command": "bash DevUtils/RunDev.sh",
+			"cwd": "${workspaceFolder}"
+		},
+        {
+            "name": "Run Exported Build Script",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "bash DevUtils/RunExport.sh",
+            "cwd": "${workspaceFolder}"
+        }
+	]
+}
