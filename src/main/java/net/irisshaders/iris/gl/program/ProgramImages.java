@@ -1,7 +1,6 @@
 package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableList;
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.image.ImageBinding;
 import net.irisshaders.iris.gl.image.ImageHolder;
 import net.irisshaders.iris.gl.image.ImageLimits;
@@ -60,12 +59,12 @@ public class ProgramImages {
 
 		@Override
 		public boolean hasImage(String name) {
-			return GlStateManager._glGetUniformLocation(program, name) != -1;
+			return VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name) != -1;
 		}
 
 		@Override
 		public void addTextureImage(IntSupplier textureID, InternalTextureFormat internalFormat, String name) {
-			int location = GlStateManager._glGetUniformLocation(program, name);
+			int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name);
 
 			if (location == -1) {
 				return;

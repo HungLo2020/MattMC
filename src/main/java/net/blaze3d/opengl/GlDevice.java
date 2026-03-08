@@ -337,11 +337,11 @@ public class GlDevice implements GpuDevice {
 	}
 
 	private static void sacrificeShaderToOpenGlAndAmd() {
-		int i = GlStateManager.glCreateShader(35633);
-		int j = GlStateManager.glCreateProgram();
-		GlStateManager.glAttachShader(j, i);
-		GlStateManager.glDeleteShader(i);
-		GlStateManager.glDeleteProgram(j);
+		int i = net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext(), 35633);
+		int j = net.vulkanic.VulkanicAPI.createShaderProgram(net.vulkanic.VulkanicAPI.getImmediateContext());
+		net.vulkanic.VulkanicAPI.attachShader(net.vulkanic.VulkanicAPI.getImmediateContext(), j, i);
+		net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
+		net.vulkanic.VulkanicAPI.deleteProgram(net.vulkanic.VulkanicAPI.getImmediateContext(), j);
 	}
 
 	@Override
@@ -411,11 +411,11 @@ public class GlDevice implements GpuDevice {
 			return GlShaderModule.INVALID_SHADER;
 		} else {
 			String string2 = GlslPreprocessor.injectDefines(string, shaderCompilationKey.defines);
-			int i = GlStateManager.glCreateShader(GlConst.toGl(shaderCompilationKey.type));
-			GlStateManager.glShaderSource(i, string2);
-			GlStateManager.glCompileShader(i);
-			if (GlStateManager.glGetShaderi(i, 35713) == 0) {
-				String string3 = StringUtils.trim(GlStateManager.glGetShaderInfoLog(i, 32768));
+			int i = net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext(), GlConst.toGl(shaderCompilationKey.type));
+			net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(i, string2);
+			net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
+			if (net.vulkanic.VulkanicAPI.getShaderParameter(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 35713) == 0) {
+				String string3 = StringUtils.trim(net.vulkanic.VulkanicAPI.getShaderInfoLog(net.vulkanic.VulkanicAPI.getImmediateContext(), i));
 				LOGGER.error("Couldn't compile {} shader ({}): {}", shaderCompilationKey.type.getName(), shaderCompilationKey.id, string3);
 				return GlShaderModule.INVALID_SHADER;
 			} else {

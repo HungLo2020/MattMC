@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -43,7 +44,8 @@ public class GlBuffer extends GpuBuffer {
 				this.persistentBuffer = null;
 			}
 
-			GlStateManager._glDeleteBuffers(this.handle);
+			GlStateManager.decrementTrackedBuffers();
+			VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), this.handle);
 			MEMORY_POOl.free(this.handle);
 		}
 	}

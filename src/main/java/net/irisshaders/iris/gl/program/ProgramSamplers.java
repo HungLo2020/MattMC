@@ -130,7 +130,7 @@ public class ProgramSamplers {
 			}
 
 			for (String name : names) {
-				int location = GlStateManager._glGetUniformLocation(program, name);
+				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name);
 
 				if (location == -1) {
 					// There's no active sampler with this particular name in the program.
@@ -145,7 +145,7 @@ public class ProgramSamplers {
 
 		@Override
 		public boolean hasSampler(String name) {
-			return GlStateManager._glGetUniformLocation(program, name) != -1;
+			return VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name) != -1;
 		}
 
 		@Override
@@ -184,7 +184,7 @@ public class ProgramSamplers {
 			}
 
 			for (String name : names) {
-				int location = GlStateManager._glGetUniformLocation(program, name);
+				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name);
 
 				if (location == -1) {
 					// There's no active sampler with this particular name in the program.

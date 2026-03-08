@@ -1440,6 +1440,30 @@ public class VulkanicAPI {
     public static int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
         return getBackend().getUniformLocation(ctx, program, name);
     }
+
+    public static int getUniformLocationWithLegacySamplerFallback(CommandContext ctx, int program, CharSequence name) {
+        int location = getUniformLocation(ctx, program, name);
+        if (location != -1) {
+            return location;
+        }
+
+        String uniformName = name.toString();
+        if (uniformName.equals("Sampler0")) {
+            location = getUniformLocation(ctx, program, "tex");
+            if (location == -1) {
+                location = getUniformLocation(ctx, program, "gtexture");
+                if (location == -1) {
+                    location = getUniformLocation(ctx, program, "texture");
+                }
+            }
+        } else if (uniformName.equals("Sampler1")) {
+            location = getUniformLocation(ctx, program, "iris_overlay");
+        } else if (uniformName.equals("Sampler2")) {
+            location = getUniformLocation(ctx, program, "lightmap");
+        }
+
+        return location;
+    }
     
     public static int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
         return getBackend().getAttributeLocation(ctx, program, name);

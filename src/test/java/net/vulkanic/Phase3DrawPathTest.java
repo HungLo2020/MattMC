@@ -184,6 +184,8 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should not attach depth with hardcoded GL_DEPTH_ATTACHMENT literal 36096");
         assertFalse(source.contains("VulkanicAPI.copyBufferSubData(VulkanicAPI.getImmediateContext(), 36662, 36663"),
             "DirectStateAccess should not copy buffers with hardcoded copy-target literals 36662/36663");
+        assertFalse(source.contains("GlStateManager._glBlitFrameBuffer("),
+            "DirectStateAccess should not blit through removed GlStateManager._glBlitFrameBuffer wrapper");
 
         assertTrue(source.contains("VulkanicAPI.namedFramebufferColorAttachment0DSA("),
             "DirectStateAccess should use namedFramebufferColorAttachment0DSA helper");
@@ -195,6 +197,8 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should bind copy-write via VulkanicAPI.bindCopyWriteBuffer");
         assertTrue(source.contains("VulkanicAPI.copyBufferSubDataBetweenCopyTargets("),
             "DirectStateAccess should copy via VulkanicAPI.copyBufferSubDataBetweenCopyTargets");
+        assertTrue(source.contains("VulkanicAPI.blitFramebuffer(VulkanicAPI.getImmediateContext()"),
+            "DirectStateAccess should blit framebuffers directly via VulkanicAPI.blitFramebuffer");
     }
 
     @Test
@@ -211,6 +215,51 @@ public class Phase3DrawPathTest {
             "GlStateManager should bind read FBO via VulkanicAPI.bindReadFramebuffer");
         assertTrue(source.contains("VulkanicAPI.bindDrawFramebuffer(ctx, j)"),
             "GlStateManager should bind draw FBO via VulkanicAPI.bindDrawFramebuffer");
+    }
+
+    @Test
+    public void testFramebufferDeletePathsUseDirectVulkanicCalls() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+        assertFalse(stateManagerSource.contains("public static void _glDeleteFramebuffers("),
+            "GlStateManager should no longer expose _glDeleteFramebuffers wrapper");
+        assertFalse(stateManagerSource.contains("public static int glGenFramebuffers("),
+            "GlStateManager should no longer expose glGenFramebuffers wrapper");
+
+        Path directStateAccessFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
+        String directStateAccessSource = Files.readString(directStateAccessFile);
+        assertFalse(directStateAccessSource.contains("GlStateManager.glGenFramebuffers("),
+            "DirectStateAccess should not create FBOs through removed GlStateManager.glGenFramebuffers wrapper");
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext())"),
+            "DirectStateAccess should create FBOs directly through VulkanicAPI.createFramebuffer");
+
+        Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
+        String glTextureSource = Files.readString(glTextureFile);
+        assertFalse(glTextureSource.contains("GlStateManager._glDeleteFramebuffers("),
+            "GlTexture should not delete cached FBOs through removed GlStateManager._glDeleteFramebuffers wrapper");
+        assertTrue(glTextureSource.contains("VulkanicAPI.deleteFramebuffer(ctx, i)"),
+            "GlTexture should delete cached FBOs directly through VulkanicAPI.deleteFramebuffer");
+
+        Path irisFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
+        String irisFramebufferSource = Files.readString(irisFramebufferFile);
+        assertFalse(irisFramebufferSource.contains("GlStateManager._glDeleteFramebuffers("),
+            "GlFramebuffer should not destroy FBOs through removed GlStateManager._glDeleteFramebuffers wrapper");
+        assertTrue(irisFramebufferSource.contains("VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer)"),
+            "GlFramebuffer should destroy FBOs directly through VulkanicAPI.deleteFramebuffer");
+
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertFalse(irisRenderSystemSource.contains("GlStateManager.glGenFramebuffers("),
+            "IrisRenderSystem should not create FBOs through removed GlStateManager.glGenFramebuffers wrapper");
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext())"),
+            "IrisRenderSystem should create FBOs directly through VulkanicAPI.createFramebuffer");
+
+        Path textureManipulationUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
+        String textureManipulationUtilSource = Files.readString(textureManipulationUtilFile);
+        assertFalse(textureManipulationUtilSource.contains("GlStateManager.glGenFramebuffers("),
+            "TextureManipulationUtil should not create helper FBO through removed GlStateManager.glGenFramebuffers wrapper");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext())"),
+            "TextureManipulationUtil should create helper FBO directly through VulkanicAPI.createFramebuffer");
     }
 
     @Test
@@ -340,8 +389,10 @@ public class Phase3DrawPathTest {
 
         assertFalse(source.contains("_glBindBuffer(34962"),
             "VertexArrayCache should not bind GL_ARRAY_BUFFER via hardcoded target literal 34962");
-        assertTrue(source.contains("_glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle)"),
-            "VertexArrayCache should bind array buffers via VulkanicAPI.GL_ARRAY_BUFFER constant");
+        assertFalse(source.contains("GlStateManager._glBindBuffer("),
+            "VertexArrayCache should not bind buffers through GlStateManager wrapper");
+        assertTrue(source.contains("VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle)"),
+            "VertexArrayCache should bind array buffers directly via VulkanicAPI.bindBuffer using VulkanicAPI.GL_ARRAY_BUFFER");
         assertFalse(source.contains("GlStateManager._enableVertexAttribArray("),
             "VertexArrayCache should not enable attributes through GlStateManager wrapper");
         assertFalse(source.contains("GlStateManager._vertexAttribPointer("),
@@ -569,12 +620,16 @@ public class Phase3DrawPathTest {
             "TextureManipulationUtil should not query framebuffer/texture bindings through GlStateManager._getInteger wrapper");
         assertFalse(textureManipulationUtilSource.contains("GlStateManager._getTexLevelParameter("),
             "TextureManipulationUtil should not query tex level dimensions through GlStateManager._getTexLevelParameter wrapper");
+        assertFalse(textureManipulationUtilSource.contains("GlStateManager._glFramebufferTexture2D("),
+            "TextureManipulationUtil should not attach/detach framebuffer textures through removed GlStateManager._glFramebufferTexture2D wrapper");
         assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER_BINDING)"),
             "TextureManipulationUtil should query previous framebuffer directly through VulkanicAPI.getInteger");
         assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
             "TextureManipulationUtil should query previous texture directly through VulkanicAPI.getInteger");
         assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_WIDTH)"),
             "TextureManipulationUtil should query mip width directly through VulkanicAPI.getTextureLevelParameter");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER"),
+            "TextureManipulationUtil should attach/detach color attachments directly through VulkanicAPI.framebufferColorAttachment0Texture2D");
 
         Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
         String sodiumShaderSource = Files.readString(sodiumShaderFile);
@@ -664,13 +719,19 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _glUniform1i wrapper");
         assertFalse(stateManagerSource.contains("public static void _glBindAttribLocation("),
             "GlStateManager should no longer expose _glBindAttribLocation wrapper");
+        assertFalse(stateManagerSource.contains("public static int _glGetUniformLocation("),
+            "GlStateManager should no longer expose _glGetUniformLocation wrapper");
 
         Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
         String glProgramSource = Files.readString(glProgramFile);
         assertFalse(glProgramSource.contains("GlStateManager._glBindAttribLocation("),
             "GlProgram should not bind attributes through removed GlStateManager wrapper");
+        assertFalse(glProgramSource.contains("GlStateManager._glGetUniformLocation("),
+            "GlProgram should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
         assertTrue(glProgramSource.contains("VulkanicAPI.setAttributeLocation(ctx"),
             "GlProgram should bind attributes directly via VulkanicAPI.setAttributeLocation");
+        assertTrue(glProgramSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), this.programId"),
+            "GlProgram should query uniforms via VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
 
         Path vertexFormatFile = SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java");
         String vertexFormatSource = Files.readString(vertexFormatFile);
@@ -678,6 +739,281 @@ public class Phase3DrawPathTest {
             "VertexFormat Iris binding path should not use removed GlStateManager wrapper");
         assertTrue(vertexFormatSource.contains("VulkanicAPI.setAttributeLocation(ctx"),
             "VertexFormat Iris binding path should use VulkanicAPI.setAttributeLocation directly");
+
+        Path samplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
+        String samplersSource = Files.readString(samplersFile);
+        assertFalse(samplersSource.contains("GlStateManager._glGetUniformLocation("),
+            "ProgramSamplers should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
+        assertTrue(samplersSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
+            "ProgramSamplers should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
+
+        Path imagesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramImages.java");
+        String imagesSource = Files.readString(imagesFile);
+        assertFalse(imagesSource.contains("GlStateManager._glGetUniformLocation("),
+            "ProgramImages should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
+        assertTrue(imagesSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
+            "ProgramImages should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
+
+        Path uniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramUniforms.java");
+        String uniformsSource = Files.readString(uniformsFile);
+        assertFalse(uniformsSource.contains("GlStateManager._glGetUniformLocation("),
+            "ProgramUniforms should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
+        assertTrue(uniformsSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
+            "ProgramUniforms should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
+
+        Path fallbackShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/FallbackShader.java");
+        String fallbackShaderSource = Files.readString(fallbackShaderFile);
+        assertFalse(fallbackShaderSource.contains("GlStateManager._glGetUniformLocation("),
+            "FallbackShader should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
+        assertTrue(fallbackShaderSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
+            "FallbackShader should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
+
+        Path extendedShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ExtendedShader.java");
+        String extendedShaderSource = Files.readString(extendedShaderFile);
+        assertFalse(extendedShaderSource.contains("GlStateManager._glGetUniformLocation("),
+            "ExtendedShader should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
+        assertTrue(extendedShaderSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
+            "ExtendedShader should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        assertTrue(vulkanicApiSource.contains("getUniformLocationWithLegacySamplerFallback"),
+            "VulkanicAPI should expose getUniformLocationWithLegacySamplerFallback for legacy Sampler0/1/2 compatibility");
+    }
+
+    @Test
+    public void testBlaze3dProgramLifecycleWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static int glCreateProgram("),
+            "GlStateManager should no longer expose glCreateProgram wrapper");
+        assertFalse(stateManagerSource.contains("public static void glDeleteProgram("),
+            "GlStateManager should no longer expose glDeleteProgram wrapper");
+        assertFalse(stateManagerSource.contains("public static void glLinkProgram("),
+            "GlStateManager should no longer expose glLinkProgram wrapper");
+        assertFalse(stateManagerSource.contains("public static int glGetProgrami("),
+            "GlStateManager should no longer expose glGetProgrami wrapper");
+        assertFalse(stateManagerSource.contains("public static String glGetProgramInfoLog("),
+            "GlStateManager should no longer expose glGetProgramInfoLog wrapper");
+
+        Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
+        String glProgramSource = Files.readString(glProgramFile);
+        assertFalse(glProgramSource.contains("GlStateManager.glCreateProgram("),
+            "GlProgram should not create programs through removed GlStateManager.glCreateProgram wrapper");
+        assertFalse(glProgramSource.contains("GlStateManager.glLinkProgram("),
+            "GlProgram should not link programs through removed GlStateManager.glLinkProgram wrapper");
+        assertFalse(glProgramSource.contains("GlStateManager.glGetProgrami("),
+            "GlProgram should not query program params through removed GlStateManager.glGetProgrami wrapper");
+        assertFalse(glProgramSource.contains("GlStateManager.glGetProgramInfoLog("),
+            "GlProgram should not query info logs through removed GlStateManager.glGetProgramInfoLog wrapper");
+        assertFalse(glProgramSource.contains("GlStateManager.glDeleteProgram("),
+            "GlProgram should not delete programs through removed GlStateManager.glDeleteProgram wrapper");
+        assertTrue(glProgramSource.contains("VulkanicAPI.createShaderProgram(ctx)"),
+            "GlProgram should create programs directly through VulkanicAPI.createShaderProgram");
+        assertTrue(glProgramSource.contains("VulkanicAPI.linkProgram(ctx, i)"),
+            "GlProgram should link programs directly through VulkanicAPI.linkProgram");
+        assertTrue(glProgramSource.contains("VulkanicAPI.getProgramParameter(ctx, i, 35714)"),
+            "GlProgram should query link status directly through VulkanicAPI.getProgramParameter");
+        assertTrue(glProgramSource.contains("VulkanicAPI.getProgramInfoLog(ctx, i)"),
+            "GlProgram should query program info log directly through VulkanicAPI.getProgramInfoLog");
+        assertTrue(glProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), this.programId)"),
+            "GlProgram should delete programs directly through VulkanicAPI.deleteProgram");
+
+        Path shaderCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ShaderCreator.java");
+        String shaderCreatorSource = Files.readString(shaderCreatorFile);
+        assertFalse(shaderCreatorSource.contains("GlStateManager.glCreateProgram("),
+            "ShaderCreator should not create programs through removed GlStateManager.glCreateProgram wrapper");
+        assertFalse(shaderCreatorSource.contains("GlStateManager.glLinkProgram("),
+            "ShaderCreator should not link programs through removed GlStateManager.glLinkProgram wrapper");
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext())"),
+            "ShaderCreator should create programs directly through VulkanicAPI.createShaderProgram");
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), i)"),
+            "ShaderCreator should link programs directly through VulkanicAPI.linkProgram");
+
+        Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
+        String programCreatorSource = Files.readString(programCreatorFile);
+        assertFalse(programCreatorSource.contains("GlStateManager.glCreateProgram("),
+            "ProgramCreator should not create programs through removed GlStateManager.glCreateProgram wrapper");
+        assertFalse(programCreatorSource.contains("GlStateManager.glLinkProgram("),
+            "ProgramCreator should not link programs through removed GlStateManager.glLinkProgram wrapper");
+        assertFalse(programCreatorSource.contains("GlStateManager.glGetProgrami("),
+            "ProgramCreator should not query link status through removed GlStateManager.glGetProgrami wrapper");
+        assertTrue(programCreatorSource.contains("VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext())"),
+            "ProgramCreator should create programs directly through VulkanicAPI.createShaderProgram");
+        assertTrue(programCreatorSource.contains("VulkanicAPI.linkProgram(ctx, program)"),
+            "ProgramCreator should link programs directly through VulkanicAPI.linkProgram");
+        assertTrue(programCreatorSource.contains("VulkanicAPI.getProgramParameter(ctx, program, VulkanicAPI.GL_LINK_STATUS)"),
+            "ProgramCreator should query link status directly through VulkanicAPI.getProgramParameter");
+
+        Path shaderMapFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ShaderMap.java");
+        String shaderMapSource = Files.readString(shaderMapFile);
+        assertFalse(shaderMapSource.contains("GlStateManager.glDeleteProgram("),
+            "ShaderMap should not delete programs through removed GlStateManager.glDeleteProgram wrapper");
+        assertFalse(shaderMapSource.contains("GlStateManager.glGetProgrami("),
+            "ShaderMap should not query link status through removed GlStateManager.glGetProgrami wrapper");
+        assertFalse(shaderMapSource.contains("GlStateManager.glGetProgramInfoLog("),
+            "ShaderMap should not query program logs through removed GlStateManager.glGetProgramInfoLog wrapper");
+        assertTrue(shaderMapSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), shader.id().program())"),
+            "ShaderMap should delete programs directly through VulkanicAPI.deleteProgram");
+        assertTrue(shaderMapSource.contains("VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), i, 35714)"),
+            "ShaderMap should query link status directly through VulkanicAPI.getProgramParameter");
+        assertTrue(shaderMapSource.contains("VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), i)"),
+            "ShaderMap should query program info logs directly through VulkanicAPI.getProgramInfoLog");
+
+        Path uniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramUniforms.java");
+        String uniformsSource = Files.readString(uniformsFile);
+        assertFalse(uniformsSource.contains("GlStateManager.glGetProgrami("),
+            "ProgramUniforms should not query active uniforms through removed GlStateManager.glGetProgrami wrapper");
+        assertTrue(uniformsSource.contains("VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), program, VulkanicAPI.GL_ACTIVE_UNIFORMS)"),
+            "ProgramUniforms should query active uniforms directly through VulkanicAPI.getProgramParameter");
+
+        Path programFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/Program.java");
+        String programSource = Files.readString(programFile);
+        assertFalse(programSource.contains("GlStateManager.glDeleteProgram("),
+            "Program should not destroy programs through removed GlStateManager.glDeleteProgram wrapper");
+        assertTrue(programSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), getGlId())"),
+            "Program should destroy programs directly through VulkanicAPI.deleteProgram");
+
+        Path computeProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ComputeProgram.java");
+        String computeProgramSource = Files.readString(computeProgramFile);
+        assertFalse(computeProgramSource.contains("GlStateManager.glDeleteProgram("),
+            "ComputeProgram should not destroy programs through removed GlStateManager.glDeleteProgram wrapper");
+        assertTrue(computeProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), getGlId())"),
+            "ComputeProgram should destroy programs directly through VulkanicAPI.deleteProgram");
+
+        Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String glDeviceSource = Files.readString(glDeviceFile);
+        assertFalse(glDeviceSource.contains("GlStateManager.glCreateProgram("),
+            "GlDevice AMD workaround should not create programs through removed GlStateManager.glCreateProgram wrapper");
+        assertFalse(glDeviceSource.contains("GlStateManager.glDeleteProgram("),
+            "GlDevice AMD workaround should not delete programs through removed GlStateManager.glDeleteProgram wrapper");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShaderProgram(net.vulkanic.VulkanicAPI.getImmediateContext())"),
+            "GlDevice AMD workaround should create programs directly through VulkanicAPI.createShaderProgram");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.deleteProgram(net.vulkanic.VulkanicAPI.getImmediateContext(), j)"),
+            "GlDevice AMD workaround should delete programs directly through VulkanicAPI.deleteProgram");
+    }
+
+    @Test
+    public void testBlaze3dShaderLifecycleWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void glAttachShader("),
+            "GlStateManager should no longer expose glAttachShader wrapper");
+        assertFalse(stateManagerSource.contains("public static void glDeleteShader("),
+            "GlStateManager should no longer expose glDeleteShader wrapper");
+        assertFalse(stateManagerSource.contains("public static int glCreateShader("),
+            "GlStateManager should no longer expose glCreateShader wrapper");
+        assertFalse(stateManagerSource.contains("public static void glShaderSource("),
+            "GlStateManager should no longer expose glShaderSource wrapper");
+        assertFalse(stateManagerSource.contains("public static void glCompileShader("),
+            "GlStateManager should no longer expose glCompileShader wrapper");
+        assertFalse(stateManagerSource.contains("public static int glGetShaderi("),
+            "GlStateManager should no longer expose glGetShaderi wrapper");
+        assertFalse(stateManagerSource.contains("public static String glGetShaderInfoLog("),
+            "GlStateManager should no longer expose glGetShaderInfoLog wrapper");
+
+        Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
+        String glProgramSource = Files.readString(glProgramFile);
+        assertFalse(glProgramSource.contains("GlStateManager.glAttachShader("),
+            "GlProgram should not attach shaders through removed GlStateManager.glAttachShader wrapper");
+        assertTrue(glProgramSource.contains("VulkanicAPI.attachShader(ctx, i"),
+            "GlProgram should attach shaders directly through VulkanicAPI.attachShader");
+
+        Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
+        String programCreatorSource = Files.readString(programCreatorFile);
+        assertFalse(programCreatorSource.contains("GlStateManager.glAttachShader("),
+            "ProgramCreator should not attach shaders through removed GlStateManager.glAttachShader wrapper");
+        assertTrue(programCreatorSource.contains("VulkanicAPI.attachShader(ctx, program"),
+            "ProgramCreator should attach shaders directly through VulkanicAPI.attachShader");
+
+        Path shaderCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ShaderCreator.java");
+        String shaderCreatorSource = Files.readString(shaderCreatorFile);
+        assertFalse(shaderCreatorSource.contains("GlStateManager.glAttachShader("),
+            "ShaderCreator should not attach shaders through removed GlStateManager.glAttachShader wrapper");
+        assertFalse(shaderCreatorSource.contains("GlStateManager.glDeleteShader("),
+            "ShaderCreator should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
+        assertFalse(shaderCreatorSource.contains("GlStateManager.glCreateShader("),
+            "ShaderCreator should not create shaders through removed GlStateManager.glCreateShader wrapper");
+        assertFalse(shaderCreatorSource.contains("GlStateManager.glShaderSource("),
+            "ShaderCreator should not upload source through removed GlStateManager.glShaderSource wrapper");
+        assertFalse(shaderCreatorSource.contains("GlStateManager.glCompileShader("),
+            "ShaderCreator should not compile shaders through removed GlStateManager.glCompileShader wrapper");
+        assertFalse(shaderCreatorSource.contains("GlStateManager.glGetShaderi("),
+            "ShaderCreator should not query shader status through removed GlStateManager.glGetShaderi wrapper");
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), i, s)"),
+            "ShaderCreator should attach shaders directly through VulkanicAPI.attachShader");
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), s)"),
+            "ShaderCreator should delete shaders directly through VulkanicAPI.deleteShader");
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), shaderType.id)"),
+            "ShaderCreator should create shaders directly through VulkanicAPI.createShader");
+        assertTrue(shaderCreatorSource.contains("ShaderWorkarounds.safeShaderSource(shader, source)"),
+            "ShaderCreator should upload shader source via ShaderWorkarounds.safeShaderSource");
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), shader)"),
+            "ShaderCreator should compile shaders directly through VulkanicAPI.compileShader");
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), shader, VulkanicAPI.GL_COMPILE_STATUS)"),
+            "ShaderCreator should query compile status directly through VulkanicAPI.getShaderParameter");
+
+        Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String glDeviceSource = Files.readString(glDeviceFile);
+        assertFalse(glDeviceSource.contains("GlStateManager.glCreateShader("),
+            "GlDevice should not create shaders through removed GlStateManager.glCreateShader wrapper");
+        assertFalse(glDeviceSource.contains("GlStateManager.glAttachShader("),
+            "GlDevice should not attach shaders through removed GlStateManager.glAttachShader wrapper");
+        assertFalse(glDeviceSource.contains("GlStateManager.glDeleteShader("),
+            "GlDevice should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
+        assertFalse(glDeviceSource.contains("GlStateManager.glShaderSource("),
+            "GlDevice should not upload shader source through removed GlStateManager.glShaderSource wrapper");
+        assertFalse(glDeviceSource.contains("GlStateManager.glCompileShader("),
+            "GlDevice should not compile shaders through removed GlStateManager.glCompileShader wrapper");
+        assertFalse(glDeviceSource.contains("GlStateManager.glGetShaderi("),
+            "GlDevice should not query shader status through removed GlStateManager.glGetShaderi wrapper");
+        assertFalse(glDeviceSource.contains("GlStateManager.glGetShaderInfoLog("),
+            "GlDevice should not query shader logs through removed GlStateManager.glGetShaderInfoLog wrapper");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext()"),
+            "GlDevice should create shaders directly through VulkanicAPI.createShader");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.attachShader(net.vulkanic.VulkanicAPI.getImmediateContext(), j, i)"),
+            "GlDevice should attach shaders directly through VulkanicAPI.attachShader");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i)"),
+            "GlDevice should delete shaders directly through VulkanicAPI.deleteShader");
+        assertTrue(glDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(i, string2)"),
+            "GlDevice should upload shader source via ShaderWorkarounds.safeShaderSource");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i)"),
+            "GlDevice should compile shaders directly through VulkanicAPI.compileShader");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderParameter(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 35713)"),
+            "GlDevice should query compile status directly through VulkanicAPI.getShaderParameter");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderInfoLog(net.vulkanic.VulkanicAPI.getImmediateContext(), i)"),
+            "GlDevice should query shader logs directly through VulkanicAPI.getShaderInfoLog");
+
+        Path glShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/GlShader.java");
+        String glShaderSource = Files.readString(glShaderFile);
+        assertFalse(glShaderSource.contains("GlStateManager.glCreateShader("),
+            "GlShader should not create shaders through removed GlStateManager.glCreateShader wrapper");
+        assertFalse(glShaderSource.contains("GlStateManager.glCompileShader("),
+            "GlShader should not compile shaders through removed GlStateManager.glCompileShader wrapper");
+        assertFalse(glShaderSource.contains("GlStateManager.glDeleteShader("),
+            "GlShader should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
+        assertTrue(glShaderSource.contains("VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type.id)"),
+            "GlShader should create shaders directly through VulkanicAPI.createShader");
+        assertTrue(glShaderSource.contains("VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), handle)"),
+            "GlShader should compile shaders directly through VulkanicAPI.compileShader");
+        assertTrue(glShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.getGlId())"),
+            "GlShader should delete shaders directly through VulkanicAPI.deleteShader");
+
+        Path partialShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/PartialShader.java");
+        String partialShaderSource = Files.readString(partialShaderFile);
+        assertFalse(partialShaderSource.contains("GlStateManager.glDeleteShader("),
+            "PartialShader should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
+        assertTrue(partialShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), s)"),
+            "PartialShader should delete shaders directly through VulkanicAPI.deleteShader");
+
+        Path shaderModuleFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlShaderModule.java");
+        String shaderModuleSource = Files.readString(shaderModuleFile);
+        assertFalse(shaderModuleSource.contains("GlStateManager.glDeleteShader("),
+            "GlShaderModule should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
+        assertTrue(shaderModuleSource.contains("net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), this.shaderId)"),
+            "GlShaderModule should delete shaders directly through VulkanicAPI.deleteShader");
     }
 
     @Test
@@ -754,6 +1090,8 @@ public class Phase3DrawPathTest {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
         String stateManagerSource = Files.readString(stateManagerFile);
 
+        assertFalse(stateManagerSource.contains("public static void _glBindBuffer("),
+            "GlStateManager should no longer expose _glBindBuffer wrapper");
         assertFalse(stateManagerSource.contains("public static void _glBindVertexArray("),
             "GlStateManager should no longer expose _glBindVertexArray wrapper");
         assertFalse(stateManagerSource.contains("public static void _enableVertexAttribArray("),
@@ -764,6 +1102,18 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _vertexAttribIPointer wrapper");
         assertFalse(stateManagerSource.contains("public static int _glGenVertexArrays("),
             "GlStateManager should no longer expose _glGenVertexArrays wrapper");
+        assertFalse(stateManagerSource.contains("public static int _glGenBuffers("),
+            "GlStateManager should no longer expose _glGenBuffers wrapper");
+        assertFalse(stateManagerSource.contains("public static void _glBufferData("),
+            "GlStateManager should no longer expose _glBufferData wrapper overloads");
+        assertFalse(stateManagerSource.contains("public static void _glBufferSubData("),
+            "GlStateManager should no longer expose _glBufferSubData wrapper");
+        assertFalse(stateManagerSource.contains("public static ByteBuffer _glMapBufferRange("),
+            "GlStateManager should no longer expose _glMapBufferRange wrapper");
+        assertFalse(stateManagerSource.contains("public static void _glUnmapBuffer("),
+            "GlStateManager should no longer expose _glUnmapBuffer wrapper");
+        assertFalse(stateManagerSource.contains("public static void _glDeleteBuffers("),
+            "GlStateManager should no longer expose _glDeleteBuffers wrapper");
 
         Path dhProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
         String dhProgramSource = Files.readString(dhProgramFile);
@@ -775,6 +1125,73 @@ public class Phase3DrawPathTest {
             "IrisGenericRenderProgram should create VAOs directly through VulkanicAPI.createVertexArray");
         assertTrue(dhProgramSource.contains("VulkanicAPI.bindVertexArray("),
             "IrisGenericRenderProgram should bind VAOs directly through VulkanicAPI.bindVertexArray");
+
+        Path directStateAccessFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
+        String directStateAccessSource = Files.readString(directStateAccessFile);
+        assertFalse(directStateAccessSource.contains("GlStateManager._glGenBuffers("),
+            "DirectStateAccess should not create buffers through removed GlStateManager._glGenBuffers wrapper");
+        assertFalse(directStateAccessSource.contains("GlStateManager._glBindBuffer("),
+            "DirectStateAccess should not bind buffers through removed GlStateManager._glBindBuffer wrapper");
+        assertFalse(directStateAccessSource.contains("GlStateManager._glMapBufferRange("),
+            "DirectStateAccess should not map buffers through removed GlStateManager._glMapBufferRange wrapper");
+        assertFalse(directStateAccessSource.contains("GlStateManager._glUnmapBuffer("),
+            "DirectStateAccess should not unmap buffers through removed GlStateManager._glUnmapBuffer wrapper");
+        assertTrue(directStateAccessSource.contains("GlStateManager.incrementTrackedBuffers();"),
+            "DirectStateAccess should keep Blaze3D buffer tracking increments explicitly");
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext())"),
+            "DirectStateAccess should create buffers directly via VulkanicAPI.createBuffer");
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(),"),
+            "DirectStateAccess should bind/unbind emulated targets directly via VulkanicAPI.bindBuffer");
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.mapBuffer(VulkanicAPI.getImmediateContext(),"),
+            "DirectStateAccess should map buffers directly via VulkanicAPI.mapBuffer");
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.unmapBuffer(VulkanicAPI.getImmediateContext(),"),
+            "DirectStateAccess should unmap buffers directly via VulkanicAPI.unmapBuffer");
+
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertFalse(irisRenderSystemSource.contains("GlStateManager._glGenBuffers("),
+            "IrisRenderSystem should not create buffers through removed GlStateManager._glGenBuffers wrapper");
+        assertFalse(irisRenderSystemSource.contains("GlStateManager._glBindBuffer("),
+            "IrisRenderSystem should not bind buffers through removed GlStateManager._glBindBuffer wrapper");
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext())"),
+            "IrisRenderSystem should create buffers directly via VulkanicAPI.createBuffer");
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer)"),
+            "IrisRenderSystem should bind new buffers directly via VulkanicAPI.bindBuffer");
+
+        Path ssboFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/buffer/ShaderStorageBuffer.java");
+        String ssboSource = Files.readString(ssboFile);
+        assertFalse(ssboSource.contains("GlStateManager._glGenBuffers("),
+            "ShaderStorageBuffer should not create buffers through removed GlStateManager._glGenBuffers wrapper");
+        assertFalse(ssboSource.contains("GlStateManager._glBindBuffer("),
+            "ShaderStorageBuffer should not bind buffers through removed GlStateManager._glBindBuffer wrapper");
+        assertFalse(ssboSource.contains("GlStateManager._glBufferSubData("),
+            "ShaderStorageBuffer should not upload content through removed GlStateManager._glBufferSubData wrapper");
+        assertTrue(ssboSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext())"),
+            "ShaderStorageBuffer should create buffers directly via VulkanicAPI.createBuffer");
+        assertTrue(ssboSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, getId())"),
+            "ShaderStorageBuffer should bind SSBOs directly via VulkanicAPI.bindBuffer");
+        assertTrue(ssboSource.contains("VulkanicAPI.bufferSubData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0L, content)"),
+            "ShaderStorageBuffer should upload content directly via VulkanicAPI.bufferSubData");
+
+        Path glBufferFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlBuffer.java");
+        String glBufferSource = Files.readString(glBufferFile);
+        assertFalse(glBufferSource.contains("GlStateManager._glDeleteBuffers("),
+            "GlBuffer should not delete buffers through removed GlStateManager._glDeleteBuffers wrapper");
+        assertTrue(glBufferSource.contains("GlStateManager.decrementTrackedBuffers();"),
+            "GlBuffer should preserve tracked-buffer decrement explicitly when closing");
+        assertTrue(glBufferSource.contains("VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), this.handle)"),
+            "GlBuffer should delete buffers directly via VulkanicAPI.deleteBuffer");
+
+        Path dsaFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
+        String dsaSource = Files.readString(dsaFile);
+        assertFalse(dsaSource.contains("GlStateManager._glBufferData("),
+            "DirectStateAccess should not call removed GlStateManager._glBufferData wrappers");
+        assertFalse(dsaSource.contains("GlStateManager._glBufferSubData("),
+            "DirectStateAccess should not call removed GlStateManager._glBufferSubData wrapper");
+        assertTrue(dsaSource.contains("VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext()"),
+            "DirectStateAccess should upload buffer data directly via VulkanicAPI.bufferData");
+        assertTrue(dsaSource.contains("VulkanicAPI.bufferSubData(VulkanicAPI.getImmediateContext()"),
+            "DirectStateAccess should update buffer ranges directly via VulkanicAPI.bufferSubData");
     }
 
     @Test
@@ -790,6 +1207,12 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _pixelStore wrapper");
         assertFalse(stateManagerSource.contains("public static void _readPixels("),
             "GlStateManager should no longer expose _readPixels wrapper");
+        assertFalse(stateManagerSource.contains("public static void _glBlitFrameBuffer("),
+            "GlStateManager should no longer expose _glBlitFrameBuffer wrapper");
+        assertFalse(stateManagerSource.contains("public static void _glFramebufferTexture2D("),
+            "GlStateManager should no longer expose _glFramebufferTexture2D wrapper");
+        assertFalse(stateManagerSource.contains("public static void _texSubImage2D("),
+            "GlStateManager should no longer expose _texSubImage2D wrapper overloads");
     }
 
     @Test

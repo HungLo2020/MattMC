@@ -10,6 +10,7 @@ import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.shader.ShaderCompileException;
 import net.irisshaders.iris.gl.shader.ShaderType;
+import net.irisshaders.iris.gl.shader.ShaderWorkarounds;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.gl.blending.AlphaTest;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
@@ -161,7 +162,7 @@ public class ShaderCreator {
 
 
 	public static PartialShader link(String name, String vertex, String geometry, String tessControl, String tessEval, String fragment, VertexFormat vertexFormat, boolean isFallback) throws ShaderCompileException {
-		int i = GlStateManager.glCreateProgram();
+		int i = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
 		if (i <= 0) {
 			throw new RuntimeException("Could not create shader program (returned program ID " + i + ")");
 		} else {
@@ -179,7 +180,7 @@ public class ShaderCreator {
 
 			((VertexFormatExtension) vertexFormat).bindAttributesIris(isFallback, i);
 
-			GlStateManager.glLinkProgram(i);
+			VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), i);
 
 			return new PartialShader(i, vertexS, fragS, geometryS, tessContS, tessEvalS);
 		}
@@ -187,30 +188,30 @@ public class ShaderCreator {
 
 	private static void attachIfValid(int i, int s) {
 		if (s >= 0) {
-			GlStateManager.glAttachShader(i, s);
+			VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), i, s);
 		}
 	}
 
 	private static void detachIfValid(int i, int s) {
 		if (s >= 0) {
 			IrisRenderSystem.detachShader(i, s);
-			GlStateManager.glDeleteShader(s);
+			VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), s);
 		}
 	}
 
 	private static int createShader(String name, ShaderType shaderType, String source) {
 		if (source == null) return -1;
 
-		int shader = GlStateManager.glCreateShader(shaderType.id);
-		GlStateManager.glShaderSource(shader, source);
-		GlStateManager.glCompileShader(shader);
+		int shader = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), shaderType.id);
+		ShaderWorkarounds.safeShaderSource(shader, source);
+		VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), shader);
 		String log = IrisRenderSystem.getShaderInfoLog(shader);
 
 		if (!log.isEmpty()) {
 			Iris.logger.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = GlStateManager.glGetShaderi(shader, VulkanicAPI.GL_COMPILE_STATUS);
+		int result = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), shader, VulkanicAPI.GL_COMPILE_STATUS);
 
 		if (result != VulkanicAPI.GL_TRUE) {
 			throw new ShaderCompileException(name, log);

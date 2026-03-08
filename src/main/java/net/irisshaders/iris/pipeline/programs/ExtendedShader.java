@@ -122,7 +122,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		ProgramUniforms.Builder uniformBuilder = ProgramUniforms.builder(string, programId);
 		ProgramSamplers.Builder samplerBuilder = ProgramSamplers.builder(programId, IrisSamplers.WORLD_RESERVED_TEXTURE_UNITS);
 		uniformCreator.accept(uniformBuilder);
-		this.normalMat = GlStateManager._glGetUniformLocation(programId, "iris_NormalMat");
+		this.normalMat = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "iris_NormalMat");
 		ProgramImages.Builder builder = ProgramImages.builder(programId);
 		samplerCreator.accept(samplerBuilder, builder);
 		customUniforms.mapholderToPass(uniformBuilder, this);
@@ -140,8 +140,8 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		this.alphaTest = alphaTest.reference();
 		this.parent = parent;
 
-		this.modelViewInverse = GlStateManager._glGetUniformLocation(programId, "iris_ModelViewMatInverse");
-		this.projectionInverse = GlStateManager._glGetUniformLocation(programId, "iris_ProjMatInverse");
+		this.modelViewInverse = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "iris_ModelViewMatInverse");
+		this.projectionInverse = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "iris_ProjMatInverse");
 
 		this.intensitySwizzle = isIntensity;
 	}
@@ -207,7 +207,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 		images.update();
 
-		//GL46C.glUniform1i(GlStateManager._glGetUniformLocation(getProgramId(), "iris_overlay"), 1);
+		//GL46C.glUniform1i(VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), getProgramId(), "iris_overlay"), 1);
 		BlendModeOverride.restore();
 
 		if (this.blendModeOverride != null) {

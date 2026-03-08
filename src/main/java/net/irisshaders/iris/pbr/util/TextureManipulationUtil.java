@@ -9,7 +9,7 @@ public class TextureManipulationUtil {
 
 	public static void fillWithColor(int textureId, int maxLevel, int rgba) {
 		if (colorFillFBO == -1) {
-			colorFillFBO = GlStateManager.glGenFramebuffers();
+			colorFillFBO = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
 		}
 
 		int previousFramebufferId = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER_BINDING);
@@ -31,9 +31,9 @@ public class TextureManipulationUtil {
 			int width = VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_WIDTH);
 			int height = VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_HEIGHT);
 			GlStateManager._viewport(0, 0, width, height);
-			GlStateManager._glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, textureId, level);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, textureId, level);
 			GlStateManager._clear(VulkanicAPI.GL_COLOR_BUFFER_BIT);
-			GlStateManager._glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, 0, level);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, 0, level);
 		}
 
 		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, previousFramebufferId);

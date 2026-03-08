@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.shader;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
@@ -25,9 +24,9 @@ public class GlShader extends GlResource {
 	}
 
 	private static int createShader(ShaderType type, String name, String src) {
-		int handle = GlStateManager.glCreateShader(type.id);
+		int handle = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type.id);
 		ShaderWorkarounds.safeShaderSource(handle, src);
-		GlStateManager.glCompileShader(handle);
+		VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), handle);
 
 		GLDebug.nameObject(VulkanicAPI.GL_SHADER, handle, name + "(" + type.name().toLowerCase(Locale.ROOT) + ")");
 
@@ -56,6 +55,6 @@ public class GlShader extends GlResource {
 
 	@Override
 	protected void destroyInternal() {
-		GlStateManager.glDeleteShader(this.getGlId());
+		VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.getGlId());
 	}
 }

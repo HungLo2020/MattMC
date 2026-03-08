@@ -774,10 +774,11 @@ public class IrisRenderSystem {
 
 		@Override
 		public int bufferStorage(int target, float[] data, int usage) {
-			int buffer = GlStateManager._glGenBuffers();
-			GlStateManager._glBindBuffer(target, buffer);
+			GlStateManager.incrementTrackedBuffers();
+			int buffer = VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer);
 			bufferData(target, data, usage);
-			GlStateManager._glBindBuffer(target, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, 0);
 
 			return buffer;
 		}
@@ -797,7 +798,7 @@ public class IrisRenderSystem {
 
 		@Override
 		public int createFramebuffer() {
-			int framebuffer = GlStateManager.glGenFramebuffers();
+			int framebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
 			return framebuffer;
 		}
@@ -812,7 +813,8 @@ public class IrisRenderSystem {
 
 		@Override
 		public int createBuffers() {
-			return GlStateManager._glGenBuffers();
+			GlStateManager.incrementTrackedBuffers();
+			return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
 		}
 	}
 

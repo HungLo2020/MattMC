@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.shader;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
@@ -11,7 +10,7 @@ public class ProgramCreator {
 	private static final Logger LOGGER = LogManager.getLogger(ProgramCreator.class);
 
 	public static int create(String name, GlShader... shaders) {
-		int program = GlStateManager.glCreateProgram();
+		int program = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 
 		VulkanicAPI.setAttributeLocation(ctx, program, 11, "iris_Entity");
@@ -26,10 +25,10 @@ public class ProgramCreator {
 		for (GlShader shader : shaders) {
 			GLDebug.nameObject(VulkanicAPI.GL_SHADER, shader.getHandle(), shader.getName());
 
-			GlStateManager.glAttachShader(program, shader.getHandle());
+			VulkanicAPI.attachShader(ctx, program, shader.getHandle());
 		}
 
-		GlStateManager.glLinkProgram(program);
+		VulkanicAPI.linkProgram(ctx, program);
 
 		GLDebug.nameObject(VulkanicAPI.GL_PROGRAM, program, name);
 
@@ -44,7 +43,7 @@ public class ProgramCreator {
 			LOGGER.warn("Program link log for " + name + ": " + log);
 		}
 
-		int result = GlStateManager.glGetProgrami(program, VulkanicAPI.GL_LINK_STATUS);
+		int result = VulkanicAPI.getProgramParameter(ctx, program, VulkanicAPI.GL_LINK_STATUS);
 
 		if (result != VulkanicAPI.GL_TRUE) {
 			throw new ShaderCompileException(name, log);

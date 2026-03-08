@@ -42,10 +42,19 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	private void destroyImmediately() {
 		GlStateManager._deleteTexture(this.id);
 		IntIterator var1 = this.fboCache.values().iterator();
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 
 		while (var1.hasNext()) {
 			int i = (Integer)var1.next();
-			GlStateManager._glDeleteFramebuffers(i);
+			if (GlStateManager.getFrameBuffer(VulkanicAPI.GL_READ_FRAMEBUFFER) == i) {
+				GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+			}
+
+			if (GlStateManager.getFrameBuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER) == i) {
+				GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, 0);
+			}
+
+			VulkanicAPI.deleteFramebuffer(ctx, i);
 		}
 	}
 

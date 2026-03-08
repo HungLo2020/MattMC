@@ -135,73 +135,74 @@ public abstract class DirectStateAccess {
 
 		@Override
 		int createBuffer() {
-			return GlStateManager._glGenBuffers();
+			GlStateManager.incrementTrackedBuffers();
+			return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
 		}
 
 		@Override
 		void bufferData(int i, long l, int j) {
 			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
-			GlStateManager._glBufferData(k, l, GlConst.bufferUsageToGlEnum(j));
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, i);
+			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), k, l, GlConst.bufferUsageToGlEnum(j));
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, 0);
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
 			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
-			GlStateManager._glBufferData(k, byteBuffer, GlConst.bufferUsageToGlEnum(j));
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, i);
+			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), k, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, 0);
 		}
 
 		@Override
 		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
 			int l = this.selectBufferBindTarget(k);
-			GlStateManager._glBindBuffer(l, i);
-			GlStateManager._glBufferSubData(l, j, byteBuffer);
-			GlStateManager._glBindBuffer(l, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), l, i);
+			VulkanicAPI.bufferSubData(VulkanicAPI.getImmediateContext(), l, (long)j, byteBuffer);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), l, 0);
 		}
 
 		@Override
 		void bufferStorage(int i, long l, int j) {
 			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, i);
 			VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), k, l, GlConst.bufferUsageToGlFlag(j));
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, 0);
 		}
 
 		@Override
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
 			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, i);
 			VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, 0);
 		}
 
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
 			int n = this.selectBufferBindTarget(m);
-			GlStateManager._glBindBuffer(n, i);
-			ByteBuffer byteBuffer = GlStateManager._glMapBufferRange(n, j, k, l);
-			GlStateManager._glBindBuffer(n, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), n, i);
+			ByteBuffer byteBuffer = VulkanicAPI.mapBuffer(VulkanicAPI.getImmediateContext(), n, j, k, l);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), n, 0);
 			return byteBuffer;
 		}
 
 		@Override
 		void unmapBuffer(int i, int j) {
 			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
-			GlStateManager._glUnmapBuffer(k);
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, i);
+			VulkanicAPI.unmapBuffer(VulkanicAPI.getImmediateContext(), k);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), k, 0);
 		}
 
 		@Override
 		void flushMappedBufferRange(int i, int j, int k, int l) {
 			int m = this.selectBufferBindTarget(l);
-			GlStateManager._glBindBuffer(m, i);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), m, i);
 			VulkanicAPI.flushMappedBufferRange(VulkanicAPI.getImmediateContext(), m, j, k);
-			GlStateManager._glBindBuffer(m, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), m, 0);
 		}
 
 		@Override
@@ -216,7 +217,7 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public int createFrameBufferObject() {
-			return GlStateManager.glGenFramebuffers();
+			return VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
 		}
 
 		@Override
@@ -237,7 +238,7 @@ public abstract class DirectStateAccess {
 			int v = GlStateManager.getFrameBuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER);
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, i);
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, j);
-			GlStateManager._glBlitFrameBuffer(k, l, m, n, o, p, q, r, s, t);
+			VulkanicAPI.blitFramebuffer(VulkanicAPI.getImmediateContext(), k, l, m, n, o, p, q, r, s, t);
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, u);
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, v);
 		}

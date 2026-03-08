@@ -167,12 +167,16 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	/** Generates a buffer object */
 	@Override
 	public int glGenBuffers()
-	{ return GlStateManager._glGenBuffers(); }
+	{
+		GlStateManager.incrementTrackedBuffers();
+		return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
+	}
 	
 	/** Deletes a buffer object */
 	@Override
 	public void glDeleteBuffers(int buffer)
 	{
+		GlStateManager.decrementTrackedBuffers();
 		VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), buffer);
 		
 		// MC's implementation has a bug where it will throw:

@@ -41,7 +41,7 @@ public abstract class VertexArrayCache {
 				int i = VulkanicAPI.createVertexArray(ctx);
 				VulkanicAPI.bindVertexArray(ctx, i);
 				if (glBuffer != null) {
-					GlStateManager._glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle);
+					VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle);
 					setupCombinedAttributes(vertexFormat, true);
 				}
 
@@ -51,7 +51,7 @@ public abstract class VertexArrayCache {
 			} else {
 				VulkanicAPI.bindVertexArray(ctx, vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
-					GlStateManager._glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle);
+					VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle);
 					vertexArray.lastVertexBuffer = glBuffer;
 					setupCombinedAttributes(vertexFormat, false);
 				}

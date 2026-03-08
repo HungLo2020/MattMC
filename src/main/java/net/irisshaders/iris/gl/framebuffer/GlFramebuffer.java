@@ -100,7 +100,16 @@ public class GlFramebuffer extends GlResource {
 	}
 
 	protected void destroyInternal() {
-		GlStateManager._glDeleteFramebuffers(getGlId());
+		int framebuffer = getGlId();
+		if (GlStateManager.getFrameBuffer(VulkanicAPI.GL_READ_FRAMEBUFFER) == framebuffer) {
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		}
+
+		if (GlStateManager.getFrameBuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER) == framebuffer) {
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, 0);
+		}
+
+		VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
 	}
 
 	public int getStatus() {

@@ -34,7 +34,7 @@ public final class Program extends GlResource {
 	}
 
 	public void destroyInternal() {
-		GlStateManager.glDeleteProgram(getGlId());
+		VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), getGlId());
 	}
 
 	/**

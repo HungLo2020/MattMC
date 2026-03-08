@@ -53,17 +53,17 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 		this.writingToBeforeTranslucent = writingToBeforeTranslucent;
 		this.writingToAfterTranslucent = writingToAfterTranslucent;
 
-		this.FOG_DENSITY = GlStateManager._glGetUniformLocation(programId, "FogDensity");
-		this.FOG_IS_EXP2 = GlStateManager._glGetUniformLocation(programId, "FogIsExp2");
+		this.FOG_DENSITY = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "FogDensity");
+		this.FOG_IS_EXP2 = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "FogIsExp2");
 
-		this.gtexture = GlStateManager._glGetUniformLocation(programId, "gtexture");
-		this.overlay = GlStateManager._glGetUniformLocation(programId, "overlay");
-		this.lightmap = GlStateManager._glGetUniformLocation(programId, "lightmap");
+		this.gtexture = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "gtexture");
+		this.overlay = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "overlay");
+		this.lightmap = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "lightmap");
 
 		GlStateManager._glUseProgram(programId);
 
 
-		int ALPHA_TEST_VALUE = GlStateManager._glGetUniformLocation(programId, "AlphaTestValue");
+		int ALPHA_TEST_VALUE = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "AlphaTestValue");
 
 		if (ALPHA_TEST_VALUE > -1) {
 			VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), ALPHA_TEST_VALUE, alphaValue);
