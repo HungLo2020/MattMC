@@ -21,12 +21,12 @@ public final class Program extends GlResource {
 	public static void unbind() {
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
-		GlStateManager._glUseProgram(0);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(0);
 	}
 
 	public void use() {
 		IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
-		GlStateManager._glUseProgram(getGlId());
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getGlId());
 
 		uniforms.update();
 		samplers.update();

@@ -224,7 +224,7 @@ public class ShadowRenderer {
 		final Int2ObjectMap<PackShadowDirectives.SamplingSettings> colorSamplingSettings =
 			shadowDirectives.getColorSamplingSettings();
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE4);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE4);
 
 		configureDepthSampler(targets.getDepthTexture().iris$getGlId(), depthSamplingSettings.get(0));
 
@@ -238,7 +238,7 @@ public class ShadowRenderer {
 			}
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 	}
 
 	private void configureDepthSampler(int glTextureId, PackShadowDirectives.DepthSamplingSettings settings) {
@@ -273,13 +273,13 @@ public class ShadowRenderer {
 	}
 
 	private void generateMipmaps() {
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE4);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE4);
 
 		for (MipmapPass mipmapPass : mipmapPasses) {
 			setupMipmappingForTexture(mipmapPass.texture(), mipmapPass.targetFilteringMode());
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 	}
 
 	private void setupMipmappingForTexture(int texture, int filteringMode) {
@@ -370,7 +370,7 @@ public class ShadowRenderer {
 
 	public void setupShadowViewport() {
 		// Set up the viewport
-		GlStateManager._viewport(0, 0, resolution, resolution);
+		VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), 0, 0, resolution, resolution);
 	}
 
 	public void renderShadows(LevelRenderer levelRenderer, Camera playerCamera, CameraRenderState renderState) {
@@ -503,7 +503,7 @@ public class ShadowRenderer {
 		pipeline.setPhase(WorldRenderingPhase.ENTITIES);
 
 		// Reset our viewport in case Sodium overrode it
-		GlStateManager._viewport(0, 0, resolution, resolution);
+		VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), 0, 0, resolution, resolution);
 
 		profiler.popPush("entities");
 
@@ -596,7 +596,7 @@ public class ShadowRenderer {
 		((LevelRendererExtension) levelRenderer).sodium$setMatrices(playerMatrices);
 
 		// Restore the old viewport
-		GlStateManager._viewport(0, 0, client.getMainRenderTarget().width, client.getMainRenderTarget().height);
+		VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), 0, 0, client.getMainRenderTarget().width, client.getMainRenderTarget().height);
 
 		if (levelRenderer instanceof CullingDataCache) {
 			((CullingDataCache) levelRenderer).restoreState();

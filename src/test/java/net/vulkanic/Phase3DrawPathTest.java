@@ -202,19 +202,26 @@ public class Phase3DrawPathTest {
     }
 
     @Test
-    public void testGlStateManagerUsesFramebufferIntentWrappers() throws IOException {
-        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String source = Files.readString(file);
+    public void testIrisRenderSystemUsesFramebufferIntentHelpers() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
 
-        assertFalse(source.contains("VulkanicAPI.bindFramebuffer(ctx, 36008, j)"),
-            "GlStateManager should not bind read FBO via hardcoded target literal 36008");
-        assertFalse(source.contains("VulkanicAPI.bindFramebuffer(ctx, 36009, j)"),
-            "GlStateManager should not bind draw FBO via hardcoded target literal 36009");
+        assertFalse(stateManagerSource.contains("public static void _glBindFramebuffer("),
+            "GlStateManager should no longer expose _glBindFramebuffer wrapper");
+        assertFalse(stateManagerSource.contains("public static int getFrameBuffer("),
+            "GlStateManager should no longer expose getFrameBuffer wrapper");
 
-        assertTrue(source.contains("VulkanicAPI.bindReadFramebuffer(ctx, j)"),
-            "GlStateManager should bind read FBO via VulkanicAPI.bindReadFramebuffer");
-        assertTrue(source.contains("VulkanicAPI.bindDrawFramebuffer(ctx, j)"),
-            "GlStateManager should bind draw FBO via VulkanicAPI.bindDrawFramebuffer");
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+
+        assertTrue(irisRenderSystemSource.contains("public static void bindFramebuffer("),
+            "IrisRenderSystem should provide bindFramebuffer helper after wrapper removal");
+        assertTrue(irisRenderSystemSource.contains("public static int getFrameBuffer("),
+            "IrisRenderSystem should provide getFrameBuffer helper after wrapper removal");
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.bindReadFramebuffer(ctx, framebuffer)"),
+            "IrisRenderSystem.bindFramebuffer should bind read FBO via VulkanicAPI.bindReadFramebuffer");
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.bindDrawFramebuffer(ctx, framebuffer)"),
+            "IrisRenderSystem.bindFramebuffer should bind draw FBO via VulkanicAPI.bindDrawFramebuffer");
     }
 
     @Test
@@ -352,8 +359,8 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should detach color attachments via framebufferColorAttachment0Texture2D helper");
         assertTrue(source.contains("VulkanicAPI.framebufferDepthAttachmentTexture2D("),
             "GlCommandEncoder should detach depth attachments via framebufferDepthAttachmentTexture2D helper");
-        assertTrue(source.contains("GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER"),
-            "GlCommandEncoder should bind/unbind framebuffers via VulkanicAPI.GL_FRAMEBUFFER constant");
+        assertTrue(source.contains("IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER"),
+            "GlCommandEncoder should bind/unbind framebuffers through IrisRenderSystem.bindFramebuffer");
         assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
             "GlCommandEncoder should clear buffers via VulkanicAPI.clearBuffersWithMacosWorkaround");
         assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT)"),
@@ -1354,6 +1361,8 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _disableDepthTest wrapper");
         assertFalse(stateManagerSource.contains("public static void _depthFunc("),
             "GlStateManager should no longer expose _depthFunc wrapper");
+        assertFalse(stateManagerSource.contains("public static void _depthMask("),
+            "GlStateManager should no longer expose _depthMask wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
         String encoderSource = Files.readString(encoderFile);
@@ -1363,10 +1372,14 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should not call removed GlStateManager._disableDepthTest wrapper");
         assertFalse(encoderSource.contains("GlStateManager._depthFunc("),
             "GlCommandEncoder should not call removed GlStateManager._depthFunc wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._depthMask("),
+            "GlCommandEncoder should not call removed GlStateManager._depthMask wrapper");
         assertTrue(encoderSource.contains("VulkanicAPI.setDepthTestEnabled("),
             "GlCommandEncoder should toggle depth test through VulkanicAPI.setDepthTestEnabled");
         assertTrue(encoderSource.contains("VulkanicAPI.setDepthFunc("),
             "GlCommandEncoder should set depth function through VulkanicAPI.setDepthFunc");
+        assertTrue(encoderSource.contains("DepthColorStorage.setDepthMask("),
+            "GlCommandEncoder should route depth-write mask changes through DepthColorStorage.setDepthMask");
 
         Path oldImageButtonFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gui/OldImageButton.java");
         String oldImageButtonSource = Files.readString(oldImageButtonFile);
@@ -1401,8 +1414,235 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should not call removed GlStateManager._disableDepthTest wrapper");
         assertFalse(dhWrapperSource.contains("GlStateManager._depthFunc("),
             "MinecraftGLWrapper should not call removed GlStateManager._depthFunc wrapper");
+        assertFalse(dhWrapperSource.contains("GlStateManager._depthMask("),
+            "MinecraftGLWrapper should not call removed GlStateManager._depthMask wrapper");
         assertTrue(dhWrapperSource.contains("VulkanicAPI.setDepthTestEnabled("),
             "MinecraftGLWrapper should toggle depth testing through VulkanicAPI.setDepthTestEnabled");
+        assertTrue(dhWrapperSource.contains("DepthColorStorage.setDepthMask("),
+            "MinecraftGLWrapper should route depth-write mask changes through DepthColorStorage.setDepthMask");
+
+        Path depthColorStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/DepthColorStorage.java");
+        String depthColorStorageSource = Files.readString(depthColorStorageFile);
+        assertTrue(depthColorStorageSource.contains("public static void setDepthMask("),
+            "DepthColorStorage should expose lock-aware setDepthMask after _depthMask wrapper removal");
+    }
+
+    @Test
+    public void testBlaze3dColorMaskWrapperRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _colorMask("),
+            "GlStateManager should no longer expose _colorMask wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._colorMask("),
+            "GlCommandEncoder should not call removed GlStateManager._colorMask wrapper");
+        assertTrue(encoderSource.contains("DepthColorStorage.setColorMask("),
+            "GlCommandEncoder should route color-mask changes through DepthColorStorage.setColorMask");
+
+        Path depthColorStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/DepthColorStorage.java");
+        String depthColorStorageSource = Files.readString(depthColorStorageFile);
+        assertFalse(depthColorStorageSource.contains("GlStateManager._colorMask("),
+            "DepthColorStorage should not call removed GlStateManager._colorMask wrapper");
+        assertTrue(depthColorStorageSource.contains("public static void setColorMask("),
+            "DepthColorStorage should expose lock-aware setColorMask after _colorMask wrapper removal");
+    }
+
+    @Test
+    public void testBlaze3dBlendWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _enableBlend("),
+            "GlStateManager should no longer expose _enableBlend wrapper");
+        assertFalse(stateManagerSource.contains("public static void _disableBlend("),
+            "GlStateManager should no longer expose _disableBlend wrapper");
+        assertFalse(stateManagerSource.contains("public static void _blendFuncSeparate("),
+            "GlStateManager should no longer expose _blendFuncSeparate wrapper");
+        assertFalse(stateManagerSource.contains("public static void glBlendFuncSeparate("),
+            "GlStateManager should no longer expose glBlendFuncSeparate shim");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._enableBlend("),
+            "GlCommandEncoder should not call removed GlStateManager._enableBlend wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._disableBlend("),
+            "GlCommandEncoder should not call removed GlStateManager._disableBlend wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._blendFuncSeparate("),
+            "GlCommandEncoder should not call removed GlStateManager._blendFuncSeparate wrapper");
+        assertTrue(encoderSource.contains("BlendModeStorage.setBlendEnabled("),
+            "GlCommandEncoder should route blend toggles through BlendModeStorage.setBlendEnabled");
+        assertTrue(encoderSource.contains("BlendModeStorage.setBlendFuncSeparate("),
+            "GlCommandEncoder should route blend functions through BlendModeStorage.setBlendFuncSeparate");
+
+        Path blendStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/BlendModeStorage.java");
+        String blendStorageSource = Files.readString(blendStorageFile);
+        assertTrue(blendStorageSource.contains("public static void setBlendEnabled("),
+            "BlendModeStorage should expose setBlendEnabled helper after wrapper removal");
+        assertTrue(blendStorageSource.contains("public static void setBlendFuncSeparate("),
+            "BlendModeStorage should expose setBlendFuncSeparate helper after wrapper removal");
+        assertTrue(blendStorageSource.contains("VulkanicAPI.setBlendFunction("),
+            "BlendModeStorage should set blend function directly through VulkanicAPI.setBlendFunction");
+
+        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
+        String dhWrapperSource = Files.readString(dhWrapperFile);
+        assertFalse(dhWrapperSource.contains("GlStateManager._enableBlend("),
+            "MinecraftGLWrapper should not call removed GlStateManager._enableBlend wrapper");
+        assertFalse(dhWrapperSource.contains("GlStateManager._disableBlend("),
+            "MinecraftGLWrapper should not call removed GlStateManager._disableBlend wrapper");
+        assertFalse(dhWrapperSource.contains("GlStateManager._blendFuncSeparate("),
+            "MinecraftGLWrapper should not call removed GlStateManager._blendFuncSeparate wrapper");
+        assertTrue(dhWrapperSource.contains("BlendModeStorage.setBlendEnabled("),
+            "MinecraftGLWrapper should route blend toggles through BlendModeStorage.setBlendEnabled");
+    }
+
+    @Test
+    public void testBlaze3dUseProgramWrapperRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _glUseProgram("),
+            "GlStateManager should no longer expose _glUseProgram wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._glUseProgram("),
+            "GlCommandEncoder should not call removed GlStateManager._glUseProgram wrapper");
+        assertTrue(encoderSource.contains("IrisRenderSystem.useProgram("),
+            "GlCommandEncoder should bind programs through IrisRenderSystem.useProgram");
+
+        Path programFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/Program.java");
+        String programSource = Files.readString(programFile);
+        assertFalse(programSource.contains("GlStateManager._glUseProgram("),
+            "Program should not call removed GlStateManager._glUseProgram wrapper");
+        assertTrue(programSource.contains("IrisRenderSystem.useProgram("),
+            "Program should bind programs through IrisRenderSystem.useProgram");
+
+        Path computeProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ComputeProgram.java");
+        String computeProgramSource = Files.readString(computeProgramFile);
+        assertFalse(computeProgramSource.contains("GlStateManager._glUseProgram("),
+            "ComputeProgram should not call removed GlStateManager._glUseProgram wrapper");
+        assertTrue(computeProgramSource.contains("IrisRenderSystem.useProgram("),
+            "ComputeProgram should bind programs through IrisRenderSystem.useProgram");
+
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertTrue(irisRenderSystemSource.contains("public static void useProgram("),
+            "IrisRenderSystem should provide useProgram helper after _glUseProgram removal");
+        assertTrue(irisRenderSystemSource.contains("ImmediateState.usingTessellation = false"),
+            "IrisRenderSystem.useProgram should preserve tessellation reset behavior");
+    }
+
+    @Test
+    public void testBlaze3dActiveTextureWrapperRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _activeTexture("),
+            "GlStateManager should no longer expose _activeTexture wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._activeTexture("),
+            "GlCommandEncoder should not call removed GlStateManager._activeTexture wrapper");
+        assertTrue(encoderSource.contains("IrisRenderSystem.setActiveTexture("),
+            "GlCommandEncoder should route active texture changes through IrisRenderSystem.setActiveTexture");
+
+        Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
+        String sodiumShaderSource = Files.readString(sodiumShaderFile);
+        assertFalse(sodiumShaderSource.contains("GlStateManager._activeTexture("),
+            "SodiumShader should not call removed GlStateManager._activeTexture wrapper");
+        assertTrue(sodiumShaderSource.contains("IrisRenderSystem.setActiveTexture("),
+            "SodiumShader should route active texture changes through IrisRenderSystem.setActiveTexture");
+
+        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
+        String dhWrapperSource = Files.readString(dhWrapperFile);
+        assertFalse(dhWrapperSource.contains("GlStateManager._activeTexture("),
+            "MinecraftGLWrapper should not call removed GlStateManager._activeTexture wrapper");
+        assertTrue(dhWrapperSource.contains("IrisRenderSystem.setActiveTexture("),
+            "MinecraftGLWrapper should route active texture changes through IrisRenderSystem.setActiveTexture");
+
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertTrue(irisRenderSystemSource.contains("public static void setActiveTexture("),
+            "IrisRenderSystem should provide setActiveTexture helper after _activeTexture removal");
+    }
+
+    @Test
+    public void testIrisTextureStateAccessUsesIrisRenderSystemHelpers() throws IOException {
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+
+        assertTrue(irisRenderSystemSource.contains("public static int getActiveTextureUnitIndex("),
+            "IrisRenderSystem should expose getActiveTextureUnitIndex helper for active texture state");
+        assertTrue(irisRenderSystemSource.contains("public static int getTextureBinding("),
+            "IrisRenderSystem should expose getTextureBinding helper for per-unit binding state");
+        assertTrue(irisRenderSystemSource.contains("public static int getBoundTextureOnActiveUnit("),
+            "IrisRenderSystem should expose getBoundTextureOnActiveUnit helper for active binding reads");
+        assertTrue(irisRenderSystemSource.contains("public static void setTextureBinding("),
+            "IrisRenderSystem should expose setTextureBinding helper for binding tracking updates");
+
+        Path programSamplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
+        String programSamplersSource = Files.readString(programSamplersFile);
+        assertFalse(programSamplersSource.contains("GlStateManager.activeTexture"),
+            "ProgramSamplers should not read active texture directly from GlStateManager");
+        assertTrue(programSamplersSource.contains("IrisRenderSystem.getActiveTextureUnitIndex("),
+            "ProgramSamplers should read active texture through IrisRenderSystem helper");
+
+        Path depthCopyStrategyFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/DepthCopyStrategy.java");
+        String depthCopyStrategySource = Files.readString(depthCopyStrategyFile);
+        assertFalse(depthCopyStrategySource.contains("GlStateManager.TEXTURES[GlStateManager.activeTexture].binding"),
+            "DepthCopyStrategy should not read active-unit binding directly from GlStateManager");
+        assertTrue(depthCopyStrategySource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
+            "DepthCopyStrategy should read active-unit binding through IrisRenderSystem helper");
+
+        Path customTextureManagerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CustomTextureManager.java");
+        String customTextureManagerSource = Files.readString(customTextureManagerFile);
+        assertFalse(customTextureManagerSource.contains("GlStateManager.activeTexture"),
+            "CustomTextureManager should not read active texture directly from GlStateManager");
+        assertFalse(customTextureManagerSource.contains("GlStateManager.TEXTURES"),
+            "CustomTextureManager should not read texture bindings directly from GlStateManager");
+        assertTrue(customTextureManagerSource.contains("IrisRenderSystem.getActiveTextureUnitIndex("),
+            "CustomTextureManager should read active texture through IrisRenderSystem helper");
+        assertTrue(customTextureManagerSource.contains("IrisRenderSystem.getTextureBinding("),
+            "CustomTextureManager should read texture bindings through IrisRenderSystem helper");
+
+        Path compositeRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java");
+        String compositeRendererSource = Files.readString(compositeRendererFile);
+        assertFalse(compositeRendererSource.contains("GlStateManager.TEXTURES"),
+            "CompositeRenderer should not read texture bindings directly from GlStateManager");
+        assertTrue(compositeRendererSource.contains("IrisRenderSystem.getTextureBinding("),
+            "CompositeRenderer should check bindings through IrisRenderSystem helper");
+
+        Path finalPassRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java");
+        String finalPassRendererSource = Files.readString(finalPassRendererFile);
+        assertFalse(finalPassRendererSource.contains("GlStateManager.TEXTURES"),
+            "FinalPassRenderer should not read texture bindings directly from GlStateManager");
+        assertTrue(finalPassRendererSource.contains("IrisRenderSystem.getTextureBinding("),
+            "FinalPassRenderer should check bindings through IrisRenderSystem helper");
+
+        Path pipelineFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java");
+        String pipelineSource = Files.readString(pipelineFile);
+        assertFalse(pipelineSource.contains("GlStateManager.TEXTURES[GlStateManager.activeTexture].binding"),
+            "IrisRenderingPipeline should not read active-unit binding directly from GlStateManager");
+        assertTrue(pipelineSource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
+            "IrisRenderingPipeline should read active-unit binding through IrisRenderSystem helper");
+
+        Path textureInfoCacheFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureInfoCache.java");
+        String textureInfoCacheSource = Files.readString(textureInfoCacheFile);
+        assertFalse(textureInfoCacheSource.contains("GlStateManager.TEXTURES[GlStateManager.activeTexture].binding"),
+            "TextureInfoCache should not read active-unit binding directly from GlStateManager");
+        assertTrue(textureInfoCacheSource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
+            "TextureInfoCache should read active-unit binding through IrisRenderSystem helper");
+
+        Path pbrTextureManagerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/texture/PBRTextureManager.java");
+        String pbrTextureManagerSource = Files.readString(pbrTextureManagerFile);
+        assertFalse(pbrTextureManagerSource.contains("GlStateManager.TEXTURES[GlStateManager.activeTexture].binding"),
+            "PBRTextureManager should not read active-unit binding directly from GlStateManager");
+        assertTrue(pbrTextureManagerSource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
+            "PBRTextureManager should read active-unit binding through IrisRenderSystem helper");
     }
 
     @Test
@@ -1456,6 +1696,83 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should not call removed GlStateManager._bindTexture wrapper");
         assertTrue(dhWrapperSource.contains("VulkanicAPI.bindTexture2D("),
             "MinecraftGLWrapper should bind textures through VulkanicAPI.bindTexture2D");
+    }
+
+    @Test
+    public void testBlaze3dTextureLifecycleWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static int _genTexture("),
+            "GlStateManager should no longer expose _genTexture wrapper");
+        assertFalse(stateManagerSource.contains("public static void _deleteTexture("),
+            "GlStateManager should no longer expose _deleteTexture wrapper");
+
+        Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String glDeviceSource = Files.readString(glDeviceFile);
+        assertFalse(glDeviceSource.contains("GlStateManager._genTexture("),
+            "GlDevice should not call removed GlStateManager._genTexture wrapper");
+        assertTrue(glDeviceSource.contains("IrisRenderSystem.createTextureId("),
+            "GlDevice should create textures through IrisRenderSystem.createTextureId");
+
+        Path uniformFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/Uniform.java");
+        String uniformSource = Files.readString(uniformFile);
+        assertFalse(uniformSource.contains("GlStateManager._genTexture("),
+            "Uniform should not call removed GlStateManager._genTexture wrapper");
+        assertFalse(uniformSource.contains("GlStateManager._deleteTexture("),
+            "Uniform should not call removed GlStateManager._deleteTexture wrapper");
+        assertTrue(uniformSource.contains("IrisRenderSystem.createTextureId("),
+            "Uniform should create textures through IrisRenderSystem.createTextureId");
+        assertTrue(uniformSource.contains("IrisRenderSystem.deleteTextureId("),
+            "Uniform should delete textures through IrisRenderSystem.deleteTextureId");
+
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertTrue(irisRenderSystemSource.contains("public static int createTextureId("),
+            "IrisRenderSystem should provide createTextureId helper after _genTexture removal");
+        assertTrue(irisRenderSystemSource.contains("public static void deleteTextureId("),
+            "IrisRenderSystem should provide deleteTextureId helper after _deleteTexture removal");
+    }
+
+    @Test
+    public void testBlaze3dTexImageWrapperRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _texImage2D("),
+            "GlStateManager should no longer expose _texImage2D wrapper");
+
+        Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String glDeviceSource = Files.readString(glDeviceFile);
+        assertFalse(glDeviceSource.contains("GlStateManager._texImage2D("),
+            "GlDevice should not call removed GlStateManager._texImage2D wrapper");
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.uploadTexture2D("),
+            "GlDevice texture allocation paths should upload directly through VulkanicAPI.uploadTexture2D");
+        assertTrue(glDeviceSource.contains("net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D("),
+            "GlDevice texture allocation paths should preserve TextureInfoCache tracking after wrapper removal");
+    }
+
+    @Test
+    public void testBlaze3dViewportWrapperRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _viewport("),
+            "GlStateManager should no longer expose _viewport wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._viewport("),
+            "GlCommandEncoder should not call removed GlStateManager._viewport wrapper");
+        assertTrue(encoderSource.contains("VulkanicAPI.setDynamicViewport("),
+            "GlCommandEncoder should set viewport through VulkanicAPI.setDynamicViewport");
+
+        Path clearPassFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/ClearPass.java");
+        String clearPassSource = Files.readString(clearPassFile);
+        assertFalse(clearPassSource.contains("GlStateManager._viewport("),
+            "ClearPass should not call removed GlStateManager._viewport wrapper");
+        assertTrue(clearPassSource.contains("VulkanicAPI.setDynamicViewport("),
+            "ClearPass should set viewport through VulkanicAPI.setDynamicViewport");
     }
 
     @Test

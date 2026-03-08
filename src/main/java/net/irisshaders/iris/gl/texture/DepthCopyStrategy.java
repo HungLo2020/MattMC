@@ -1,10 +1,8 @@
 package net.irisshaders.iris.gl.texture;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.system.MemoryUtil;
 
 public interface DepthCopyStrategy {
 	// GL constants (from GL20C, GL30C, GL43C)
@@ -58,7 +56,7 @@ public interface DepthCopyStrategy {
 		public void copy(GlFramebuffer sourceFb, int sourceTexture, GlFramebuffer destFb, int destTexture, int width, int height) {
 			sourceFb.bindAsReadBuffer();
 
-			int previousTexture = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
+			int previousTexture = IrisRenderSystem.getBoundTextureOnActiveUnit();
 
 			IrisRenderSystem.copyTexSubImage2D(
 				destTexture,

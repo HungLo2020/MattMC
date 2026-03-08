@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.DepthTestFunction;
 import net.blaze3d.systems.RenderPass;
@@ -195,7 +194,7 @@ public class CompositeRenderer {
 		this.passes = passes.build();
 		this.flippedAtLeastOnceFinal = flippedAtLeastOnce.build();
 
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
 	}
 
 	private boolean hasComputes(ComputeSource[][] computes) {
@@ -306,7 +305,7 @@ public class CompositeRenderer {
 				}
 
 				if (!compositePass.mipmappedBuffers.isEmpty()) {
-					GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 
 					for (int index : compositePass.mipmappedBuffers) {
 						setupMipmapping(CompositeRenderer.this.renderTargets.get(index), compositePass.stageReadsFromAlt.contains(index));
@@ -319,7 +318,7 @@ public class CompositeRenderer {
 				float scaledHeight = compositePass.viewHeight * compositePass.viewportScale.scale();
 				int beginWidth = (int) (compositePass.viewWidth * compositePass.viewportScale.viewportX());
 				int beginHeight = (int) (compositePass.viewHeight * compositePass.viewportScale.viewportY());
-				GlStateManager._viewport(beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
+				VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
 
 				compositePass.program.use();
 
@@ -338,19 +337,19 @@ public class CompositeRenderer {
 		// Also bind the "main" framebuffer if it isn't already bound.
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
-		GlStateManager._glUseProgram(0);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(0);
 
 		// NB: Unbinding all of these textures is necessary for proper shaderpack reloading.
 		for (int i = 0; i < SamplerLimits.get().getMaxTextureUnits(); i++) {
 			// Unbind all textures that we may have used.
 			// NB: This is necessary for shader pack reloading to work propely
-			if (GlStateManager.TEXTURES[i].binding != 0) {
-				GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
+			if (net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(i) != 0) {
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + i);
 				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 			}
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 
 		GLDebug.popGroup();
 
@@ -514,7 +513,7 @@ public class CompositeRenderer {
 				blendModeOverride.apply();
 			} else {
 				BlendModeStorage.restoreBlend();
-				GlStateManager._disableBlend();
+				BlendModeStorage.setBlendEnabled(false);
 			}
 		}
 	}

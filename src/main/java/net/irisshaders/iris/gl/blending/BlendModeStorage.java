@@ -1,6 +1,7 @@
 package net.irisshaders.iris.gl.blending;
 
 import net.blaze3d.opengl.GlStateManager;
+import net.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 
 public class BlendModeStorage {
@@ -24,13 +25,46 @@ public class BlendModeStorage {
 		blendLocked = false;
 
 		if (override == null) {
-			GlStateManager._disableBlend();
+			setBlendEnabled(false);
 		} else {
-			GlStateManager._enableBlend();
-			GlStateManager._blendFuncSeparate(override.srcRgb(), override.dstRgb(), override.srcAlpha(), override.dstAlpha());
+			setBlendEnabled(true);
+			setBlendFuncSeparate(override.srcRgb(), override.dstRgb(), override.srcAlpha(), override.dstAlpha());
 		}
 
 		blendLocked = true;
+	}
+
+	public static void setBlendEnabled(boolean enabled) {
+		RenderSystem.assertOnRenderThread();
+		if (blendLocked) {
+			deferBlendModeToggle(enabled);
+			return;
+		}
+
+		if (enabled) {
+			GlStateManager.BLEND.mode.enable();
+		} else {
+			GlStateManager.BLEND.mode.disable();
+		}
+	}
+
+	public static void setBlendFuncSeparate(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+		RenderSystem.assertOnRenderThread();
+		if (blendLocked) {
+			deferBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
+			return;
+		}
+
+		GlStateManager.BlendState blendState = GlStateManager.BLEND;
+		if (srcRgb != blendState.srcRgb || dstRgb != blendState.dstRgb || srcAlpha != blendState.srcAlpha || dstAlpha != blendState.dstAlpha) {
+			blendState.srcRgb = srcRgb;
+			blendState.dstRgb = dstRgb;
+			blendState.srcAlpha = srcAlpha;
+			blendState.dstAlpha = dstAlpha;
+			net.vulkanic.VulkanicAPI.setBlendFunction(net.vulkanic.VulkanicAPI.getImmediateContext(), srcRgb, dstRgb, srcAlpha, dstAlpha);
+		}
+
+		GlStateManager.notifyBlendFuncChanged();
 	}
 
 	public static void overrideBufferBlend(int index, BlendMode override) {
@@ -68,12 +102,12 @@ public class BlendModeStorage {
 		blendLocked = false;
 
 		if (originalBlendEnable) {
-			GlStateManager._enableBlend();
+			setBlendEnabled(true);
 		} else {
-			GlStateManager._disableBlend();
+			setBlendEnabled(false);
 		}
 
-		GlStateManager._blendFuncSeparate(originalBlend.srcRgb(), originalBlend.dstRgb(),
+		setBlendFuncSeparate(originalBlend.srcRgb(), originalBlend.dstRgb(),
 			originalBlend.srcAlpha(), originalBlend.dstAlpha());
 	}
 }

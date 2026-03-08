@@ -14,7 +14,7 @@ public class GlTexture extends GlResource implements TextureAccess {
 	private final TextureType target;
 
 	public GlTexture(TextureType target, int sizeX, int sizeY, int sizeZ, int internalFormat, int format, int pixelType, byte[] pixels, TextureFilteringData filteringData) {
-		super(GlStateManager._genTexture());
+		super(net.irisshaders.iris.gl.IrisRenderSystem.createTextureId());
 		IrisRenderSystem.bindTextureForSetup(target.getGlType(), getGlId());
 
 		TextureUploadHelper.resetTextureUploadState();
@@ -69,6 +69,6 @@ public class GlTexture extends GlResource implements TextureAccess {
 
 	@Override
 	protected void destroyInternal() {
-		GlStateManager._deleteTexture(getGlId());
+		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(getGlId());
 	}
 }

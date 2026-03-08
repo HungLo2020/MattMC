@@ -34,7 +34,7 @@ public final class ComputeProgram extends GlResource {
 
 	public static void unbind() {
 		ProgramUniforms.clearActiveUniforms();
-		GlStateManager._glUseProgram(0);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(0);
 	}
 
 	public void setWorkGroupInfo(Vector2f relativeWorkGroups, Vector3i absoluteWorkGroups, FilledIndirectPointer indirectPointer) {
@@ -63,7 +63,7 @@ public final class ComputeProgram extends GlResource {
 	}
 
 	public void use() {
-		GlStateManager._glUseProgram(getGlId());
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getGlId());
 
 		uniforms.update();
 		samplers.update();

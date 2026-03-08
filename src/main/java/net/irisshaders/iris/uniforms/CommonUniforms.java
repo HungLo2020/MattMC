@@ -85,7 +85,7 @@ public final class CommonUniforms {
 		});
 
 		uniforms.uniform2i("gtextureSize", () -> {
-			int glId = GlStateManager.TEXTURES[0].binding;
+			int glId = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(0);
 
 			TextureInfo info = TextureInfoCache.INSTANCE.getInfo(glId);
 			return new Vector2i(info.getWidth(), info.getHeight());

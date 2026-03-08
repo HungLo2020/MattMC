@@ -1,6 +1,5 @@
 package net.irisshaders.iris.pbr.texture;
 
-import net.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.irisshaders.iris.Iris;
@@ -108,7 +107,7 @@ public class PBRTextureManager {
 			Class<? extends AbstractTexture> clazz = texture.getClass();
 			PBRTextureLoader loader = PBRTextureLoaderRegistry.INSTANCE.getLoader(clazz);
 			if (loader != null) {
-				int previousTextureBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
+				int previousTextureBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
 				consumer.clear();
 				try {
 					loader.load(texture, Minecraft.getInstance().getResourceManager(), consumer);

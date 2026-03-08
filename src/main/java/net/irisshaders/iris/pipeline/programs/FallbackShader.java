@@ -60,7 +60,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 		this.overlay = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "overlay");
 		this.lightmap = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "lightmap");
 
-		GlStateManager._glUseProgram(programId);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(programId);
 
 
 		int ALPHA_TEST_VALUE = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "AlphaTestValue");
@@ -94,7 +94,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 		isSetUp = true;
 		DepthColorStorage.unlockDepthColor();
 
-		GlStateManager._glUseProgram(getProgramId());
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getProgramId());
 
 		if (FOG_DENSITY > -1 && FOG_IS_EXP2 > -1) {
 			float fogDensity = CapturedRenderingState.INSTANCE.getFogDensity();

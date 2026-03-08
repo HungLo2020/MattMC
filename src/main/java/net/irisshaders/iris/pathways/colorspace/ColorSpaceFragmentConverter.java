@@ -56,7 +56,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 			program = null;
 			framebuffer.destroy();
 			framebuffer = null;
-			GlStateManager._deleteTexture(swapTexture);
+			IrisRenderSystem.deleteTextureId(swapTexture);
 			swapTexture = 0;
 		}
 
@@ -86,7 +86,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		builder.uniformMatrix(UniformUpdateFrequency.ONCE, "projection", () -> new Matrix4f(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, -1, -1, 0, 1));
 		builder.addDynamicSampler(() -> target.glId(), "readImage");
 
-		swapTexture = GlStateManager._genTexture();
+		swapTexture = IrisRenderSystem.createTextureId();
 		IrisRenderSystem.texImage2D(swapTexture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, null);
 
 		this.framebuffer = new GlFramebuffer();

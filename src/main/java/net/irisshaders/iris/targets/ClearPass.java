@@ -1,6 +1,5 @@
 package net.irisshaders.iris.targets;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.vulkanic.VulkanicAPI;
@@ -25,7 +24,7 @@ public class ClearPass {
 	}
 
 	public void execute(Vector4f defaultClearColor) {
-		GlStateManager._viewport(0, 0, viewportX.getAsInt(), viewportY.getAsInt());
+		VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), 0, 0, viewportX.getAsInt(), viewportY.getAsInt());
 		framebuffer.bind();
 
 		Vector4f color = Objects.requireNonNull(defaultClearColor);

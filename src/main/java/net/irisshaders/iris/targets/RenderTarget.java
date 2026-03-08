@@ -35,8 +35,8 @@ public class RenderTarget {
 		this.height = builder.height;
 
 
-		this.mainTexture = GlStateManager._genTexture();
-		this.altTexture = GlStateManager._genTexture();
+		this.mainTexture = net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
+		this.altTexture = net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
 
 		boolean isPixelFormatInteger = builder.internalFormat.getPixelFormat().isInteger();
 		setupTexture(mainTexture, builder.width, builder.height, !isPixelFormatInteger, false);
@@ -112,8 +112,8 @@ public class RenderTarget {
 		requireValid();
 		isValid = false;
 
-		GlStateManager._deleteTexture(mainTexture);
-		GlStateManager._deleteTexture(altTexture);
+		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(mainTexture);
+		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(altTexture);
 	}
 
 	private void requireValid() {

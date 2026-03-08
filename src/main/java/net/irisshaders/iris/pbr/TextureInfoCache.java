@@ -1,6 +1,6 @@
 package net.irisshaders.iris.pbr;
 
-import net.blaze3d.opengl.GlStateManager;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.vulkanic.VulkanicAPI;
@@ -28,7 +28,7 @@ public class TextureInfoCache {
 	public void onTexImage2D(int target, int level, int internalformat, int width, int height, int border,
 							 int format, int type, @Nullable ByteBuffer pixels) {
 		if (level == 0) {
-			int id = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
+			int id = IrisRenderSystem.getBoundTextureOnActiveUnit();
 			TextureInfo info = getInfo(id);
 			info.internalFormat = internalformat;
 			info.width = width;

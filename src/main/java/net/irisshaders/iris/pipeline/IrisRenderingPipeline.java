@@ -6,7 +6,6 @@ import net.blaze3d.opengl.GlConst;
 import net.blaze3d.opengl.GlProgram;
 import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
@@ -287,12 +286,12 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		);
 
 		// Don't clobber anything in texture unit 0. It probably won't cause issues, but we're just being cautious here.
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE2);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE2);
 
 		customTextureManager = new CustomTextureManager(programSet.getPackDirectives(), programSet.getPack().getCustomTextureDataMap(), programSet.getPack().getIrisCustomTextureDataMap(), programSet.getPack().getCustomNoiseTexture());
 		whitePixel = new NativeImageBackedSingleColorTexture(255, 255, 255, 255);
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 
 		BufferFlipper flipper = new BufferFlipper();
 
@@ -833,7 +832,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 			TextureFormat textureFormat = TextureFormatLoader.getFormat();
 			if (textureFormat != null) {
-				int previousBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
+				int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
 				textureFormat.setupTextureParameters(PBRType.NORMAL, pbrHolder.normalTexture());
 				textureFormat.setupTextureParameters(PBRType.SPECULAR, pbrHolder.specularTexture());
 				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousBinding);
@@ -856,7 +855,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		}
 
 		// Make sure we're using texture unit 0 for this.
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		Vector4f emptyClearColor = new Vector4f(1.0F);
 
 		GLDebug.pushGroup(100, "Clear textures");
@@ -876,7 +875,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 			} else {
 				// Clear depth first, regardless of any color clearing.
 				shadowRenderTargets.getDepthSourceFb().bind();
-				GlStateManager._depthMask(true);
+				net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
 				VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 
 				ImmutableList<ClearPass> passes;
@@ -1179,7 +1178,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		//
 		// Without this code, there will be weird issues when reloading certain shaderpacks.
 		for (int i = 0; i < 16; i++) {
-			GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
+			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + i);
 			IrisRenderSystem.unbindAllSamplers();
 			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 		}
@@ -1187,7 +1186,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		// Set the active texture unit to unit 0
 		//
 		// This seems to be what most code expects. It's a sane default in any case.
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 
 		for (int i = 0; i < 12; i++) {
 			// Clear all shader textures
@@ -1208,9 +1207,9 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 		horizonRenderer.destroy();
 
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, 0);
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
+		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, 0);
+		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
 
 		renderTargets.destroy();
 		dhCompat.clearPipeline();

@@ -96,17 +96,13 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableDepthMask() 
 	{
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setDepthWriteMask(ctx, true);
-		GlStateManager._depthMask(true); 
+		net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
 	}
 	/** Disables depth buffer writing */
 	@Override
 	public void disableDepthMask() 
 	{
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setDepthWriteMask(ctx, false);
-		GlStateManager._depthMask(false); 
+		net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(false);
 	}
 	
 	
@@ -116,17 +112,13 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableBlend() 
 	{
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND, true);
-		GlStateManager._enableBlend();
+		net.irisshaders.iris.gl.blending.BlendModeStorage.setBlendEnabled(true);
 	}
 	/** Disables blending */
 	@Override
 	public void disableBlend() 
 	{
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND, false);
-		GlStateManager._disableBlend(); 
+		net.irisshaders.iris.gl.blending.BlendModeStorage.setBlendEnabled(false);
 	}
 	
 	/** Sets blend function */
@@ -140,8 +132,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBlendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha) 
 	{
-		VulkanicAPI.setBlendFunction(net.vulkanic.VulkanicAPI.getImmediateContext(), sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
-		GlStateManager._blendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha); 
+		net.irisshaders.iris.gl.blending.BlendModeStorage.setBlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
 	}
 	
 	
@@ -153,7 +144,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		VulkanicAPI.bindFramebuffer(ctx, target, framebuffer);
-		GlStateManager._glBindFramebuffer(target, framebuffer);
+		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(target, framebuffer);
 	}
 	
 	
@@ -204,10 +195,10 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	
 	/** Generates a texture object */
 	@Override
-	public int glGenTextures() { return GlStateManager._genTexture(); }
+	public int glGenTextures() { return net.irisshaders.iris.gl.IrisRenderSystem.createTextureId(); }
 	/** Deletes a texture object */
 	@Override
-	public void glDeleteTextures(int texture) { GlStateManager._deleteTexture(texture); }
+	public void glDeleteTextures(int texture) { net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(texture); }
 	
 	/** Sets the active texture unit */
 	@Override
@@ -215,7 +206,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		VulkanicAPI.setActiveTextureUnit(ctx, textureId);
-		GlStateManager._activeTexture(textureId);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(textureId);
 	}
 	@Override
 	public int getActiveTexture() { 

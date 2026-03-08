@@ -2,7 +2,6 @@ package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import net.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.sampler.GlSampler;
@@ -69,13 +68,13 @@ public class ProgramSamplers {
 
 		// We need to keep the active texture intact, since if we mess it up
 		// in the middle of RenderType setup, bad things will happen.
-		int activeTexture = GlStateManager.activeTexture;
+		int activeTexture = IrisRenderSystem.getActiveTextureUnitIndex();
 
 		for (SamplerBinding samplerBinding : samplerBindings) {
 			samplerBinding.update();
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + activeTexture);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + activeTexture);
 	}
 
 	public void removeListeners() {

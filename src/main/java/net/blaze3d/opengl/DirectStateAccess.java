@@ -101,7 +101,7 @@ public abstract class DirectStateAccess {
 			net.vulkanic.VulkanicAPI.namedFramebufferColorAttachment0DSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, l);
 			net.vulkanic.VulkanicAPI.namedFramebufferDepthAttachmentDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, k, l);
 			if (m != 0) {
-				GlStateManager._glBindFramebuffer(m, i);
+				net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(m, i);
 			}
 		}
 
@@ -223,24 +223,24 @@ public abstract class DirectStateAccess {
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
 			int n = m == 0 ? VulkanicAPI.GL_FRAMEBUFFER : m;
-			int o = GlStateManager.getFrameBuffer(n);
-			GlStateManager._glBindFramebuffer(n, i);
+			int o = net.irisshaders.iris.gl.IrisRenderSystem.getFrameBuffer(n);
+			net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(n, i);
 			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), n, j, l);
 			VulkanicAPI.framebufferDepthAttachmentTexture2D(VulkanicAPI.getImmediateContext(), n, k, l);
 			if (m == 0) {
-				GlStateManager._glBindFramebuffer(n, o);
+				net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(n, o);
 			}
 		}
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			int u = GlStateManager.getFrameBuffer(VulkanicAPI.GL_READ_FRAMEBUFFER);
-			int v = GlStateManager.getFrameBuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER);
-			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, i);
-			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, j);
+			int u = net.irisshaders.iris.gl.IrisRenderSystem.getFrameBuffer(VulkanicAPI.GL_READ_FRAMEBUFFER);
+			int v = net.irisshaders.iris.gl.IrisRenderSystem.getFrameBuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER);
+			net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, i);
+			net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, j);
 			VulkanicAPI.blitFramebuffer(VulkanicAPI.getImmediateContext(), k, l, m, n, o, p, q, r, s, t);
-			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, u);
-			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, v);
+			net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, u);
+			net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, v);
 		}
 	}
 }

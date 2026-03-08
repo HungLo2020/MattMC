@@ -2,7 +2,6 @@ package net.blaze3d.pipeline;
 
 import net.blaze3d.opengl.GlConst;
 import net.blaze3d.opengl.GlDevice;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
@@ -180,7 +179,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	// Iris: RenderTargetInterface implementation
 	@Override
 	public void iris$bindFramebuffer() {
-		GlStateManager._glBindFramebuffer(GlConst.GL_FRAMEBUFFER,
+		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(GlConst.GL_FRAMEBUFFER,
 			((GlTexture) this.colorTexture).getFbo(
 				((GlDevice) RenderSystem.getDevice()).directStateAccess(),
 				this.depthTexture));

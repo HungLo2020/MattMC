@@ -36,7 +36,7 @@ public class VanillaRenderingPipeline implements WorldRenderingPipeline {
 	@Override
 	public void beginLevelRendering() {
 		// Use the default Minecraft framebuffer and ensure that no programs are in use
-		GlStateManager._glUseProgram(0);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(0);
 	}
 
 	@Override

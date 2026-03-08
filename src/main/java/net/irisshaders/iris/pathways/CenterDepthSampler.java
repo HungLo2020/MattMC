@@ -8,6 +8,7 @@ import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
+import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.gl.program.Program;
 import net.irisshaders.iris.gl.program.ProgramBuilder;
@@ -48,8 +49,8 @@ public class CenterDepthSampler {
 	private boolean destroyed;
 
 	public CenterDepthSampler(IntSupplier depthSupplier, float halfLife) {
-		this.texture = GlStateManager._genTexture();
-		this.altTexture = GlStateManager._genTexture();
+		this.texture = IrisRenderSystem.createTextureId();
+		this.altTexture = IrisRenderSystem.createTextureId();
 		this.framebuffer = new GlFramebuffer();
 
 		InternalTextureFormat format = InternalTextureFormat.R32F;
@@ -91,7 +92,7 @@ public class CenterDepthSampler {
 		VertexFormat.IndexType type = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 		BlendModeOverride.restore();
 
-		GlStateManager._disableBlend();
+		BlendModeStorage.setBlendEnabled(false);
 		try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "centerDepthSmooth sampler", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
 			renderPass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
 			renderPass.setIndexBuffer(indices, type);
@@ -102,7 +103,7 @@ public class CenterDepthSampler {
 			this.framebuffer.bind();
 			this.program.use();
 
-			GlStateManager._viewport(0, 0, 1, 1);
+			VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), 0, 0, 1, 1);
 
 			renderPass.drawIndexed(0, 0, 6, 1);
 
@@ -135,8 +136,8 @@ public class CenterDepthSampler {
 	}
 
 	public void destroy() {
-		GlStateManager._deleteTexture(texture);
-		GlStateManager._deleteTexture(altTexture);
+		IrisRenderSystem.deleteTextureId(texture);
+		IrisRenderSystem.deleteTextureId(altTexture);
 		framebuffer.destroy();
 		program.destroy();
 		destroyed = true;

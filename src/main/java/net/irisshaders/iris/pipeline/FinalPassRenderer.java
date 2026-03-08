@@ -3,7 +3,6 @@ package net.irisshaders.iris.pipeline;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.VertexFormat;
@@ -12,6 +11,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.features.FeatureFlags;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.gl.buffer.ShaderStorageBufferHolder;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
@@ -154,7 +154,7 @@ public class FinalPassRenderer {
 
 		this.swapPasses = swapPasses.build();
 
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
 	}
 
 	private static void setupMipmapping(RenderTarget target, boolean readFromAlt) {
@@ -238,7 +238,7 @@ public class FinalPassRenderer {
 			IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
 
 			if (!finalPass.mipmappedBuffers.isEmpty()) {
-				GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 
 				for (int index : finalPass.mipmappedBuffers) {
 					setupMipmapping(renderTargets.get(index), finalPass.stageReadsFromAlt.contains(index));
@@ -258,7 +258,7 @@ public class FinalPassRenderer {
 				finalPass.program.use();
 
 				BlendModeOverride.restore();
-				GlStateManager._disableBlend();
+				BlendModeStorage.setBlendEnabled(false);
 
 				// program is the identifier for final :shrug:
 				this.customUniforms.push(finalPass.program);
@@ -282,7 +282,7 @@ public class FinalPassRenderer {
 			IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, baseWidth, baseHeight);
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 
 		for (int i = 0; i < renderTargets.getRenderTargetCount(); i++) {
 			// Reset mipmapping states at the end of the frame.
@@ -308,18 +308,18 @@ public class FinalPassRenderer {
 		// Also bind the "main" framebuffer if it isn't already bound.
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
-		GlStateManager._glUseProgram(0);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(0);
 
 		for (int i = 0; i < SamplerLimits.get().getMaxTextureUnits(); i++) {
 			// Unbind all textures that we may have used.
 			// NB: This is necessary for shader pack reloading to work properly
-			if (GlStateManager.TEXTURES[i].binding != 0) {
-				GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
+			if (net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(i) != 0) {
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + i);
 				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 			}
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 	}
 
 	public void recalculateSwapPassSize() {

@@ -174,7 +174,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		}
 
 		CapturedRenderingState.INSTANCE.setCurrentAlphaTest(alphaTest);
-		GlStateManager._glUseProgram(getProgramId());
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getProgramId());
 
 		if (modelViewInverse > -1) {
 			IrisRenderSystem.uniformMatrix4fv(modelViewInverse, false, RenderSystem.getModelViewMatrix().invert(tempMatrix4f).get(tempFloats));

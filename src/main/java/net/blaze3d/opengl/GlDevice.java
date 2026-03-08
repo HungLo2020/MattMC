@@ -121,7 +121,7 @@ public class GlDevice implements GpuDevice {
 
 			while (net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext()) != 0) {
 			}
-			int n = GlStateManager._genTexture();
+			int n = net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
 			if (string == null) {
 				string = String.valueOf(n);
 			}
@@ -147,14 +147,14 @@ public class GlDevice implements GpuDevice {
 			if (bl) {
 				for (int p : GlConst.CUBEMAP_TARGETS) {
 					for (int q = 0; q < m; q++) {
-						GlStateManager._texImage2D(
+						uploadTexture2DAndTrack(
 							p, q, GlConst.toGlInternalId(textureFormat), j >> q, k >> q, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
 						);
 					}
 				}
 			} else {
 				for (int r = 0; r < m; r++) {
-					GlStateManager._texImage2D(
+					uploadTexture2DAndTrack(
 						o, r, GlConst.toGlInternalId(textureFormat), j >> r, k >> r, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
 					);
 				}
@@ -277,7 +277,7 @@ public class GlDevice implements GpuDevice {
 		int i = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_MAX_TEXTURE_SIZE);
 
 		for (int j = Math.max(32768, i); j >= 1024; j >>= 1) {
-			GlStateManager._texImage2D(
+			uploadTexture2DAndTrack(
 				net.vulkanic.VulkanicAPI.GL_PROXY_TEXTURE_2D,
 				0,
 				net.vulkanic.VulkanicAPI.GL_RGBA,
@@ -302,6 +302,11 @@ public class GlDevice implements GpuDevice {
 		int jx = Math.max(i, 1024);
 		LOGGER.info("Failed to determine maximum texture size by probing, trying GL_MAX_TEXTURE_SIZE = {}", jx);
 		return jx;
+	}
+
+	private static void uploadTexture2DAndTrack(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
+		net.vulkanic.VulkanicAPI.uploadTexture2D(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, byteBuffer);
+		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
 	}
 
 	@Override
