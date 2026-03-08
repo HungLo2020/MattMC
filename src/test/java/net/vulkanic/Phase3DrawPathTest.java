@@ -68,8 +68,8 @@ public class Phase3DrawPathTest {
             "drawFromBuffers must call VulkanicAPI.drawElements(ctx, ...) for non-instanced indexed draws");
         assertTrue(source.contains("VulkanicAPI.drawArrays(ctx,"),
             "drawFromBuffers must call VulkanicAPI.drawArrays(ctx, ...) for non-instanced non-indexed draws");
-        assertTrue(source.contains("VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER,"),
-            "drawFromBuffers must bind the index buffer via VulkanicAPI.bindBuffer");
+        assertTrue(source.contains("VulkanicAPI.bindIndexBuffer(ctx,"),
+            "drawFromBuffers must bind the index buffer via the backend-agnostic VulkanicAPI.bindIndexBuffer helper");
     }
 
     @Test
@@ -97,6 +97,19 @@ public class Phase3DrawPathTest {
         // rather than calling getImmediateContext() repeatedly.
         assertTrue(source.contains("CommandContext ctx = VulkanicAPI.getImmediateContext();"),
             "drawFromBuffers should obtain a single CommandContext and reuse it");
+    }
+
+    @Test
+    public void testDrawFromBuffersUsesBackendAgnosticIndexTypeRouting() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve(
+            "net/blaze3d/opengl/GlCommandEncoder.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("GlConst.toGl(indexType)"),
+            "drawFromBuffers should not convert index types through OpenGL-specific GlConst.toGl(indexType); " +
+            "it should route through VulkanicIndexType-aware VulkanicAPI overloads");
+        assertTrue(source.contains("toVulkanicIndexType(indexType)"),
+            "drawFromBuffers should map VertexFormat.IndexType to VulkanicIndexType for backend-agnostic indexed draws");
     }
 
     // ── Task 1b: getActiveVulkanicRenderPass() accessor ───────────────────────

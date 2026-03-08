@@ -28,6 +28,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIndexType;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -794,17 +795,17 @@ public class GlCommandEncoder implements CommandEncoder {
 		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		if (indexType != null) {
 			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.
-			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, ((GlBuffer)glRenderPass.indexBuffer).handle);
-			int glIndexType = GlConst.toGl(indexType);
+			VulkanicAPI.bindIndexBuffer(ctx, ((GlBuffer)glRenderPass.indexBuffer).handle);
+			VulkanicIndexType vkIndexType = toVulkanicIndexType(indexType);
 			long indexOffset = (long)j * indexType.bytes;
 			if (l > 1) {
 				if (i > 0) {
-					VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, glPrimitiveMode, k, glIndexType, indexOffset, l, i);
+					VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, l, i);
 				} else {
-					VulkanicAPI.drawIndexedInstanced(ctx, glPrimitiveMode, k, glIndexType, indexOffset, l);
+					VulkanicAPI.drawIndexedInstanced(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, l);
 				}
 			} else if (i > 0) {
-				VulkanicAPI.drawIndexedBaseVertex(ctx, glPrimitiveMode, k, glIndexType, indexOffset, i);
+				VulkanicAPI.drawIndexedBaseVertex(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, i);
 			} else {
 				// Route non-instanced indexed draw through VulkanicAPI.
 				// Iris: apply tessellation mode override for the non-instanced path, matching the
@@ -812,7 +813,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				int drawMode = (glPrimitiveMode == VulkanicAPI.GL_TRIANGLES
 						&& net.irisshaders.iris.vertices.ImmediateState.usingTessellation)
 					? VulkanicAPI.GL_PATCHES : glPrimitiveMode;
-				VulkanicAPI.drawElements(ctx, drawMode, k, glIndexType, indexOffset);
+				VulkanicAPI.drawElements(ctx, drawMode, k, vkIndexType, indexOffset);
 			}
 		} else if (l > 1) {
 			VulkanicAPI.drawArraysInstanced(ctx, glPrimitiveMode, i, k, l);
@@ -820,6 +821,13 @@ public class GlCommandEncoder implements CommandEncoder {
 			// Route non-instanced non-indexed draw through VulkanicAPI rather than the GlStateManager wrapper.
 			VulkanicAPI.drawArrays(ctx, glPrimitiveMode, i, k);
 		}
+	}
+
+	private static VulkanicIndexType toVulkanicIndexType(VertexFormat.IndexType indexType) {
+		return switch (indexType) {
+			case SHORT -> VulkanicIndexType.SHORT;
+			case INT -> VulkanicIndexType.INT;
+		};
 	}
 
 	private boolean trySetup(GlRenderPass glRenderPass, Collection<String> collection) {

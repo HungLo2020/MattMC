@@ -5,14 +5,14 @@
 			"name": "Run Dev Script",
 			"type": "node-terminal",
 			"request": "launch",
-			"command": "bash DevUtils/RunDev.sh",
+			"command": "bash DevUtils/RunDev.sh; exit",
 			"cwd": "${workspaceFolder}"
 		},
         {
             "name": "Run Exported Build Script",
             "type": "node-terminal",
             "request": "launch",
-            "command": "bash DevUtils/RunExport.sh",
+            "command": "bash DevUtils/RunExport.; exit",
             "cwd": "${workspaceFolder}"
         }
 	]

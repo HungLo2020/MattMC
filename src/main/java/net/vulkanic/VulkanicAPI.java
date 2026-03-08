@@ -737,6 +737,16 @@ public class VulkanicAPI {
     public static void bindBuffer(CommandContext ctx, int target, int buffer) {
         getBackend().bindBuffer(ctx, target, buffer);
     }
+
+    /**
+     * Binds an index buffer using backend-agnostic intent.
+     *
+     * <p>In OpenGL this binds {@code GL_ELEMENT_ARRAY_BUFFER}. In Vulkan this maps to
+     * index-buffer binding semantics for the active command context.
+     */
+    public static void bindIndexBuffer(CommandContext ctx, int buffer) {
+        getBackend().bindBuffer(ctx, GL_ELEMENT_ARRAY_BUFFER, buffer);
+    }
     
     /**
      * Binds a buffer to an indexed buffer target.
@@ -1058,6 +1068,13 @@ public class VulkanicAPI {
     
     public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
         getBackend().drawElements(ctx, mode, count, type, indices);
+    }
+
+    /**
+     * Draws indexed primitives using a backend-agnostic index type.
+     */
+    public static void drawElements(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices) {
+        getBackend().drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices);
     }
     
     public static void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
@@ -1475,6 +1492,13 @@ public class VulkanicAPI {
     public static void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
         getBackend().drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, instanceCount, baseVertex);
     }
+
+    /**
+     * Renders indexed primitives with instancing and a base vertex using a backend-agnostic index type.
+     */
+    public static void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices, int instanceCount, int baseVertex) {
+        getBackend().drawIndexedInstancedBaseVertex(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount, baseVertex);
+    }
     
     /**
      * Renders indexed primitives with a base vertex offset.
@@ -1483,6 +1507,13 @@ public class VulkanicAPI {
     public static void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
         getBackend().drawIndexedBaseVertex(ctx, mode, count, type, indices, baseVertex);
     }
+
+    /**
+     * Renders indexed primitives with a base vertex offset using a backend-agnostic index type.
+     */
+    public static void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices, int baseVertex) {
+        getBackend().drawIndexedBaseVertex(ctx, mode, count, indexType.toGlTypeConstant(), indices, baseVertex);
+    }
     
     /**
      * Renders indexed primitives with instancing.
@@ -1490,6 +1521,13 @@ public class VulkanicAPI {
      */
     public static void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
         getBackend().drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount);
+    }
+
+    /**
+     * Renders indexed primitives with instancing using a backend-agnostic index type.
+     */
+    public static void drawIndexedInstanced(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices, int instanceCount) {
+        getBackend().drawIndexedInstanced(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount);
     }
     
     /**

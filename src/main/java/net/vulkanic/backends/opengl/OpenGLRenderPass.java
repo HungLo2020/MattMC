@@ -88,21 +88,20 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
                 "OpenGL render pass requires an OpenGLBuffer for index buffer, got: " +
                 (buffer == null ? "null" : buffer.getClass().getName()));
         }
-        VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, glBuffer.getGlHandle());
+        VulkanicAPI.bindIndexBuffer(ctx, glBuffer.getGlHandle());
         this.currentIndexType = indexType;
     }
 
     @Override
     public void drawIndexed(int firstIndex, int indexCount, int baseVertex, int instanceCount) {
         checkNotClosed();
-        int glType = currentIndexType.toGlTypeConstant();
         // Offset in bytes = firstIndex * bytesPerIndex
         long offset = (long) firstIndex * currentIndexType.bytesPerIndex();
         if (instanceCount == 1 && baseVertex == 0) {
-            VulkanicAPI.drawElements(ctx, VulkanicAPI.GL_TRIANGLES, indexCount, glType, offset);
+            VulkanicAPI.drawElements(ctx, VulkanicAPI.GL_TRIANGLES, indexCount, currentIndexType, offset);
         } else {
             VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, VulkanicAPI.GL_TRIANGLES,
-                indexCount, glType, offset, instanceCount, baseVertex);
+                indexCount, currentIndexType, offset, instanceCount, baseVertex);
         }
     }
 
