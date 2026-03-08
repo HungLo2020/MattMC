@@ -3,6 +3,7 @@ package net.irisshaders.iris.targets;
 import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector4f;
 
 import java.util.Objects;
@@ -34,7 +35,7 @@ public class ClearPass {
 		}
 
 		IrisRenderSystem.clearColor(color.x, color.y, color.z, color.w);
-		GlStateManager._clear(clearFlags);
+		VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), clearFlags);
 	}
 
 	public GlFramebuffer getFramebuffer() {

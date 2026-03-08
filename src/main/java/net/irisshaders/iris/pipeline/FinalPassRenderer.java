@@ -195,7 +195,7 @@ public class FinalPassRenderer {
 		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
 		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
 
-		GlStateManager._bindTexture(0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 	}
 
 	public void renderFinalPass() {
@@ -300,7 +300,7 @@ public class FinalPassRenderer {
 			// Also note that RenderTargets already calls readBuffer(0) for us.
 			swapPass.from.bind();
 
-			GlStateManager._bindTexture(swapPass.targetTexture);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), swapPass.targetTexture);
 			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
 		}
 
@@ -315,7 +315,7 @@ public class FinalPassRenderer {
 			// NB: This is necessary for shader pack reloading to work properly
 			if (GlStateManager.TEXTURES[i].binding != 0) {
 				GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
-				GlStateManager._bindTexture(0);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 			}
 		}
 

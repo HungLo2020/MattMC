@@ -48,16 +48,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	public void enableScissorTest() 
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, true);
-		GlStateManager._enableScissorTest(); 
+		VulkanicAPI.setScissorTestEnabled(ctx, true);
 	}
 	/** Disables scissor testing */
 	@Override
 	public void disableScissorTest() 
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, false);
-		GlStateManager._disableScissorTest(); 
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
 	}
 	
 	
@@ -66,7 +64,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 //	/** Enables stencil testing */
 //	public void enableScissorTest() { GlStateManager._stencilFunc(); }
 //	/** Disables stencil testing */
-//	public void disableScissorTest() { GlStateManager._disableScissorTest(); }
+//	public void disableScissorTest() { /* stencil disable */ }
 	
 	
 	// depth //
@@ -76,16 +74,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	public void enableDepthTest() 
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_DEPTH_TEST, true);
-		GlStateManager._enableDepthTest(); 
+		VulkanicAPI.setDepthTestEnabled(ctx, true);
 	}
 	/** Disables depth testing */
 	@Override
 	public void disableDepthTest() 
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_DEPTH_TEST, false);
-		GlStateManager._disableDepthTest(); 
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
 	}
 	
 	/** Sets depth comparison function */
@@ -94,7 +90,6 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	{ 
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		VulkanicAPI.setDepthFunc(ctx, func);
-		GlStateManager._depthFunc(func); 
 	}
 	
 	/** Enables depth buffer writing */
@@ -194,16 +189,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	public void enableFaceCulling() 
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_CULL_FACE, true);
-		GlStateManager._enableCull(); 
+		VulkanicAPI.setCullFaceEnabled(ctx, true);
 	}
 	/** Disables face culling */
 	@Override
 	public void disableFaceCulling() 
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_CULL_FACE, false);
-		GlStateManager._disableCull(); 
+		VulkanicAPI.setCullFaceEnabled(ctx, false);
 	}
 	
 	
@@ -238,7 +231,6 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	{
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		VulkanicAPI.bindTexture2D(ctx, texture);
-		GlStateManager._bindTexture(texture);
 	}
 	
 	

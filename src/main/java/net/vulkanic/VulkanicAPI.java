@@ -9,6 +9,7 @@ import net.vulkanic.backends.opengl.OpenGLCommandContext;
  */
 public class VulkanicAPI {
     private static GraphicsBackend backend;
+    private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
     
     // Functional interfaces for debug callbacks
     @FunctionalInterface
@@ -206,6 +207,10 @@ public class VulkanicAPI {
     // OpenGL Constants - Blend State
     public static final int GL_BLEND = 0x0BE2;
     public static final int GL_FUNC_ADD = 0x8006;
+
+    // OpenGL Constants - Color Logic
+    public static final int GL_COLOR_LOGIC_OP = 0x0BF2;
+    public static final int GL_OR_REVERSE = 0x150B;
     
     // OpenGL Constants - Culling
     public static final int GL_CULL_FACE = 0x0B44;
@@ -214,6 +219,7 @@ public class VulkanicAPI {
     // OpenGL Constants - Tests
     public static final int GL_DEPTH_TEST = 0x0B71;
     public static final int GL_SCISSOR_TEST = 0x0C11;
+    public static final int GL_POLYGON_OFFSET_FILL = 0x8037;
     
     // OpenGL Constants - Texture Parameters
     public static final int GL_TEXTURE_MIN_FILTER = 0x2801;
@@ -619,6 +625,16 @@ public class VulkanicAPI {
      */
     public static void clearBuffers(CommandContext ctx, int mask) {
         getBackend().clearBuffers(ctx, mask);
+    }
+
+    /**
+     * Clears buffers and drains the error queue on macOS for compatibility with legacy GL behavior.
+     */
+    public static void clearBuffersWithMacosWorkaround(CommandContext ctx, int mask) {
+        getBackend().clearBuffers(ctx, mask);
+        if (IS_MACOS) {
+            getBackend().getError(ctx);
+        }
     }
     
     /**
@@ -1029,6 +1045,41 @@ public class VulkanicAPI {
      */
     public static void setProgramPointSizeEnabled(CommandContext ctx, boolean enabled) {
         getBackend().setCapabilityEnabled(ctx, GL_PROGRAM_POINT_SIZE, enabled);
+    }
+
+    /**
+     * Enables or disables face culling.
+     */
+    public static void setCullFaceEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, GL_CULL_FACE, enabled);
+    }
+
+    /**
+     * Enables or disables depth testing.
+     */
+    public static void setDepthTestEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, GL_DEPTH_TEST, enabled);
+    }
+
+    /**
+     * Enables or disables scissor testing.
+     */
+    public static void setScissorTestEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, GL_SCISSOR_TEST, enabled);
+    }
+
+    /**
+     * Enables or disables polygon offset for filled primitives.
+     */
+    public static void setPolygonOffsetFillEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, GL_POLYGON_OFFSET_FILL, enabled);
+    }
+
+    /**
+     * Enables or disables color-logic operations.
+     */
+    public static void setColorLogicOpEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, GL_COLOR_LOGIC_OP, enabled);
     }
     
     /**

@@ -17,50 +17,311 @@
 > Task :compileTestJava FROM-CACHE
 > Task :processTestResources NO-SOURCE
 > Task :testClasses UP-TO-DATE
-> Task :test FROM-CACHE
+
+> Task :test
+
+Mth Utility Tests > should clamp values within range PASSED
+
+Mth Utility Tests > should calculate floor correctly PASSED
+
+Mth Utility Tests > should calculate square root correctly PASSED
+
+ProfilerCollectorWrapperTest > testBasicHierarchy() PASSED
+
+ProfilerCollectorWrapperTest > testClear() PASSED
+
+ProfilerCollectorWrapperTest > testPopPush() PASSED
+
+ProfilerCollectorWrapperTest > testMultipleOperations() PASSED
+
+ArchitecturalBoundaryTest > testVulkanImportsOnlyInBackend() PASSED
+
+ArchitecturalBoundaryTest > testOpenGLImportsOnlyInBackend() PASSED
+
+ArchitecturalBoundaryTest > testBackendDirectoriesExist() PASSED
+
+ArchitecturalBoundaryTest > testBackendImportsOnlyFromVulkanicPackage() PASSED
+
+CommandContextTest > testContextToString() PASSED
+
+CommandContextTest > testOpenGLCommandContextIsImmediate() PASSED
+
+CommandContextTest > testGetImmediateContext() PASSED
+
+CommandContextTest > testOpenGLCommandContextIsSingleton() PASSED
+
+CommandContextTest > testSetDynamicViewportWithContext() PASSED
+
+CommandContextTest > testSetDynamicScissorWithContext() PASSED
+
+CommandContextTest > testLegacyMethodsDelegateToContextVariant() PASSED
+
+Phase3DelegationTest > testNonOwningTextureProperties() PASSED
+
+Phase3DelegationTest > testBridgeMethodRemovedFromVulkanicAPI() PASSED
+
+Phase3DelegationTest > testToVulkanicFormatHelperRemovedNoBridgeNeeded() PASSED
+
+Phase3DelegationTest > testNonOwningTextureCloseIsNoop() PASSED
+
+Phase3DelegationTest > testOpenGLTextureViewHasGlHandleMethod() PASSED
+
+Phase3DelegationTest > testGpuTextureGetVulkanicFormatConversion() PASSED
+
+Phase3DelegationTest > testGlCommandEncoderHasActiveVulkanicRenderPassField() PASSED
+
+Phase3DelegationTest > testBridgeMethodRemovedFromGraphicsBackend() PASSED
+
+Phase3DelegationTest > testAllFormatsRoundTrip() PASSED
+
+Phase3DelegationTest > testGlHandleOnOpenGLTextureBackedView() PASSED
+
+Phase3DelegationTest > testOpenGLBackendCallsGlHandleNotOpenGLTextureGetGlHandle() PASSED
+
+Phase3DelegationTest > testOwningTextureFlagDistinct() PASSED
+
+Phase3DelegationTest > testCreateTextureViewFromGlHandleReturnType() PASSED
+
+Phase3DelegationTest > testGpuTextureImplementsVulkanicTexture() PASSED
+
+Phase3DelegationTest > testVulkanicTextureIsInterface() PASSED
+
+Phase3DelegationTest > testGlHandleOnNonOpenGLTextureBackedView() PASSED
+
+Phase3DelegationTest > testNonOwningTextureIsInstanceOfVulkanicTexture() PASSED
+
+Phase3DelegationTest > testGlCommandEncoderHasToVulkanicTextureViewHelper() PASSED
+
+Phase3DelegationTest > testCreateTextureViewFromGlHandleMipRange() PASSED
+
+Phase3DelegationTest > testOpenGLTextureImplementsVulkanicTexture() PASSED
+
+Phase3DelegationTest > testCreateTextureViewFromGlHandleProperties() PASSED
+
+Phase3DrawPathTest > testDrawFromBuffersNoGlStateManagerDrawCall() PASSED
+
+Phase3DrawPathTest > testGlCommandEncoderUsesAgnosticUnpackUploadHelpers() PASSED
+
+Phase3DrawPathTest > testGlDebugLabelUsesAgnosticLabelHelpers() PASSED
+
+Phase3DrawPathTest > testBlaze3dDrawAndPixelWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testGlDeviceUsesAgnosticCapabilityAndAlignmentHelpers() PASSED
+
+Phase3DrawPathTest > testNvidiaWorkaroundUsesDebugOutputSyncHelper() PASSED
+
+Phase3DrawPathTest > testFramebufferDeletePathsUseDirectVulkanicCalls() PASSED
+
+Phase3DrawPathTest > testGlCommandEncoderClearPathsUseAgnosticFramebufferHelpers() PASSED
+
+Phase3DrawPathTest > testBlaze3dDepthWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testGlDeviceTextureSetupUsesAgnosticTextureParameterHelpers() PASSED
+
+Phase3DrawPathTest > testBlaze3dBindTextureWrapperRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testGpuTextureImplementsVulkanicTextureInSource() PASSED
+
+Phase3DrawPathTest > testBlaze3dSyncPathsUseAgnosticFenceHelpers() PASSED
+
+Phase3DrawPathTest > testBufferStorageUsesDirectVulkanicErrorQueries() PASSED
+
+Phase3DrawPathTest > testBlaze3dScissorAndPolygonWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testDrawFromBuffersRetainsInstancedDrawCalls() PASSED
+
+Phase3DrawPathTest > testBlaze3dProgramLifecycleWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testCompressibleGLBufferedImageStillCallsVulkanicAPI() PASSED
+
+Phase3DrawPathTest > testBlaze3dVertexArrayWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testCreateTextureViewFromGlHandleRemovedFromGraphicsBackend() PASSED
+
+Phase3DrawPathTest > testIrisGlDebugUsesAgnosticDebugControlHelpers() PASSED
+
+Phase3DrawPathTest > testGlCommandEncoderUsesAgnosticTextureAndUniformBindings() PASSED
+
+Phase3DrawPathTest > testSodiumSyncPathsUseAgnosticFenceHelpers() PASSED
+
+Phase3DrawPathTest > testDrawFromBuffersUsesBackendAgnosticIndexTypeRouting() PASSED
+
+Phase3DrawPathTest > testGlDeviceUsesDirectVulkanicQueryAndErrorCalls() PASSED
+
+Phase3DrawPathTest > testDrawFromBuffersPreservesIrisTessellationOverride() PASSED
+
+Phase3DrawPathTest > testDirectStateAccessUsesAgnosticFramebufferAndCopyHelpers() PASSED
+
+Phase3DrawPathTest > testGlCommandEncoderUsesAgnosticReadbackBindings() PASSED
+
+Phase3DrawPathTest > testGlCommandEncoderHasGetActiveVulkanicRenderPassAccessor() PASSED
+
+Phase3DrawPathTest > testDrawFromBuffersSharesContextAcrossCalls() PASSED
+
+Phase3DrawPathTest > testGlDeviceUsesAgnosticCubemapBindHelper() PASSED
+
+Phase3DrawPathTest > testBlaze3dUniformAndAttribWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testCompressibleGLBufferedImageDropsCommandContextImport() PASSED
+
+Phase3DrawPathTest > testBlaze3dCullWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testTimerQueryUsesAgnosticQueryHelpers() PASSED
+
+Phase3DrawPathTest > testIrisUtilityPathsUseDirectVulkanicCalls() PASSED
+
+Phase3DrawPathTest > testBlaze3dShaderLifecycleWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testGlStateManagerUsesFramebufferIntentWrappers() PASSED
+
+Phase3DrawPathTest > testSodiumGLRenderDeviceUsesAgnosticCopyFenceAndCapabilityHelpers() PASSED
+
+Phase3DrawPathTest > testBlaze3dColorLogicWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testBlaze3dPolygonOffsetWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testBlaze3dClearWrapperRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testOpenGLBackendManagedAllocationsAvoidBlaze3dErrorWrappers() PASSED
+
+Phase3DrawPathTest > testBlaze3dErrorWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testVertexArrayCacheUsesAgnosticArrayBufferConstant() PASSED
+
+Phase3DrawPathTest > testBlaze3dQueryAndTexParameterWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testDrawFromBuffersCallsVulkanicAPIDrawElements() PASSED
+
+Phase3DrawPathTest > testVertexArrayCacheUsesDirectVulkanicStringQueries() PASSED
+
+Phase3DrawPathTest > testCompressibleGLBufferedImageUsesGenerateMipmapDSA() PASSED
+
+Phase3DrawPathTest > testBlaze3dScissorToggleWrappersRemovedFromGlStateManager() PASSED
+
+Phase3DrawPathTest > testGetActiveVulkanicRenderPassIsNullableAnnotated() PASSED
+
+Phase3RenderPassTest > testOpenGLRenderPassMethodsThrowWhenClosed() PASSED
+
+Phase3RenderPassTest > testGraphicsBackendHasBeginRenderPassNoDepth() PASSED
+
+Phase3RenderPassTest > testOpenGLRenderPassSetPipelineThrowsOnNullPipeline() PASSED
+
+Phase3RenderPassTest > testVulkanicIndexTypeGlConstants() PASSED
+
+Phase3RenderPassTest > testRenderPassUsesIndexTypeForByteOffset() PASSED
+
+Phase3RenderPassTest > testOpenGLRenderPassImplementsVulkanicRenderPass() PASSED
+
+Phase3RenderPassTest > testOpenGLRenderPassGetFbo() PASSED
+
+Phase3RenderPassTest > testVulkanicAPIHasBeginRenderPassWithDepth() PASSED
+
+Phase3RenderPassTest > testVulkanicIndexTypeBytesPerIndex() PASSED
+
+Phase3RenderPassTest > testGraphicsBackendHasBeginRenderPassWithDepth() PASSED
+
+Phase3RenderPassTest > testVulkanicRenderPassIsInterface() PASSED
+
+Phase3RenderPassTest > testVulkanicRenderPassHasExpectedMethods() PASSED
+
+Phase3RenderPassTest > testOpenGLRenderPassCloseIsIdempotent() PASSED
+
+Phase3RenderPassTest > testVulkanicRenderPassImplementsAutoCloseable() PASSED
+
+Phase3RenderPassTest > testVulkanicIndexTypeValues() PASSED
+
+Phase3RenderPassTest > testVulkanicAPIHasBeginRenderPassNoDepth() PASSED
+
+Phase3RenderPassTest > testOpenGLRenderPassSetVertexBufferThrowsOnWrongType() PASSED
+
+Phase3ResourceTypesTest > testOpenGLTextureViewIsInstanceOfVulkanicTextureView() PASSED
+
+Phase3ResourceTypesTest > testVulkanicTextureFormatHasColorAspect() PASSED
+
+Phase3ResourceTypesTest > testOpenGLPipelineHandleClose() PASSED
+
+Phase3ResourceTypesTest > testPipelineDescriptorFromNull() PASSED
+
+Phase3ResourceTypesTest > testOpenGLBufferSliceOutOfRange() PASSED
+
+Phase3ResourceTypesTest > testOpenGLBufferSliceFullRange() PASSED
+
+Phase3ResourceTypesTest > testOpenGLTextureViewClose() PASSED
+
+Phase3ResourceTypesTest > testVulkanicTextureFormatPixelSizes() PASSED
+
+Phase3ResourceTypesTest > testOpenGLTextureViewCreation() PASSED
+
+Phase3ResourceTypesTest > testSubmitCommandBufferImmediateMode() PASSED
+
+Phase3ResourceTypesTest > testOpenGLBufferCreation() PASSED
+
+Phase3ResourceTypesTest > testVulkanicTextureFormatHasDepthAspect() PASSED
+
+Phase3ResourceTypesTest > testOpenGLTextureViewDimensions() PASSED
+
+Phase3ResourceTypesTest > testOpenGLTextureMipDimensions() PASSED
+
+Phase3ResourceTypesTest > testBeginCommandBufferReturnsSomething() PASSED
+
+Phase3ResourceTypesTest > testOpenGLBufferSlice() PASSED
+
+Phase3ResourceTypesTest > testOpenGLTextureIsInstanceOfVulkanicTexture() PASSED
+
+Phase3ResourceTypesTest > testOpenGLTextureViewInvalidMipRange() PASSED
+
+Phase3ResourceTypesTest > testOpenGLBufferIsInstanceOfVulkanicBuffer() PASSED
+
+Phase3ResourceTypesTest > testVulkanicBufferUsageConstants() PASSED
+
+Phase3ResourceTypesTest > testOpenGLTextureCreation() PASSED
+
+Test Results: SUCCESS
+Tests run: 128, Passed: 128, Failed: 0, Skipped: 0
+
 > Task :shaderPackZip
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-25
-[13:34:46] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[13:34:46] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[13:34:46] [main/INFO]: Mappings not present!
-[13:34:46] [main/INFO]: Loading 3 mods:
+[14:06:36] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[14:06:36] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[14:06:36] [main/INFO]: Mappings not present!
+[14:06:36] [main/INFO]: Loading 3 mods:
 	- java 25
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[13:34:46] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[13:34:46] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[13:34:46] [main/INFO]: Searching for graphics cards...
-[13:34:46] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[13:34:46] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[13:34:46] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[14:06:36] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[14:06:36] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[14:06:36] [main/INFO]: Searching for graphics cards...
+[14:06:36] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[14:06:36] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[14:06:36] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
 WARNING: A restricted method in java.lang.System has been called
 WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/home/matt/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.14.0/67bf3eaea4f0718cb376a181a629e5f88fa1c9dd/jna-5.14.0.jar)
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[13:34:47] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 199 milliseconds
+[14:06:36] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 179 milliseconds
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/home/matt/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar)
 WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
 WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
-[13:34:49] [Render thread/INFO]: Setting user: HungLo
-[13:34:49] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[13:34:49] [Render thread/INFO]: Running library validation...
-[13:34:49] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
-[13:34:49] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[13:34:49] [Render thread/INFO]: Registering Fabric Client Events
-[13:34:49] [Render thread/INFO]: Registering Distant Horizons hooks
-[13:34:49] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[13:34:49] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[13:34:49] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[13:34:49] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[13:34:49] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[13:34:49] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[13:34:49] [Render thread/INFO]: [DistantHorizons] Config initialised
-[13:34:49] [Render thread/INFO]: Applying config to loggers
-[13:34:49] [Render thread/INFO]: Distant Horizons client Initialized.
+[14:06:38] [Render thread/INFO]: Setting user: HungLo
+[14:06:38] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[14:06:38] [Render thread/INFO]: Running library validation...
+[14:06:38] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
+[14:06:38] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[14:06:38] [Render thread/INFO]: Registering Fabric Client Events
+[14:06:38] [Render thread/INFO]: Registering Distant Horizons hooks
+[14:06:38] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[14:06:38] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[14:06:38] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[14:06:38] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[14:06:38] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[14:06:38] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[14:06:38] [Render thread/INFO]: [DistantHorizons] Config initialised
+[14:06:38] [Render thread/INFO]: Applying config to loggers
+[14:06:38] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.17.0-14-generic
 	JRE: Linux amd64 25.0.1
@@ -71,17 +332,17 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[13:34:49] [Render thread/INFO]: Queuing DH event binding...
-[13:34:49] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[14:06:38] [Render thread/INFO]: Queuing DH event binding...
+[14:06:38] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[13:34:49] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
-[13:34:49] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[13:34:49] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
+[14:06:38] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[14:06:38] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[14:06:38] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -93,138 +354,138 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
-[13:34:49] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+[14:06:39] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
 [LWJGL] Java 10 multiplyHigh enabled
-[13:34:49] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[13:34:49] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[13:34:49] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.126.09
-[13:34:49] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[13:34:49] [Render thread/INFO]: Debug functionality is disabled.
-[13:34:49] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[13:34:49] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[13:34:49] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
-[13:34:49] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
-[13:34:49] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
-[13:34:49] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
-[13:34:49] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[14:06:39] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[14:06:39] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[14:06:39] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.126.09
+[14:06:39] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[14:06:39] [Render thread/INFO]: Debug functionality is disabled.
+[14:06:39] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[14:06:39] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[14:06:39] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
+[14:06:39] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
+[14:06:39] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
+[14:06:39] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
+[14:06:39] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[W][13:34:49.859704] pw.conf      | [          conf.c: 1204 pw_conf_load_conf_for_context()] setting config.name to client-rt.conf is deprecated, using client.conf
-[13:34:49] [Render thread/INFO]: Hardware information:
-[13:34:49] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[13:34:49] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.126.09)
-[13:34:49] [Render thread/INFO]: OS: Linux (6.17.0-14-generic)
+[W][14:06:39.360279] pw.conf      | [          conf.c: 1204 pw_conf_load_conf_for_context()] setting config.name to client-rt.conf is deprecated, using client.conf
+[14:06:39] [Render thread/INFO]: Hardware information:
+[14:06:39] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[14:06:39] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.126.09)
+[14:06:39] [Render thread/INFO]: OS: Linux (6.17.0-14-generic)
 [LWJGL] Java 16 memcpy enabled
-[13:34:49] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[13:34:50] [Worker-Main-12/INFO]: Found unifont_pua-16.0.03.hex, loading
-[13:34:50] [Worker-Main-18/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[13:34:50] [Render thread/INFO]: Initializing VoxelMap...
-[13:34:50] [Render thread/INFO]: VoxelMap initialization complete
-[13:34:50] [Worker-Main-13/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[13:34:50] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
-[13:34:50] [Worker-Main-11/WARN]: Missing textures in model minecraft:block/tree_star:
+[14:06:39] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[14:06:39] [Worker-Main-17/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[14:06:39] [Worker-Main-18/INFO]: Found unifont_pua-16.0.03.hex, loading
+[14:06:39] [Render thread/INFO]: Initializing VoxelMap...
+[14:06:39] [Render thread/INFO]: VoxelMap initialization complete
+[14:06:39] [Worker-Main-11/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[14:06:39] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
+[14:06:40] [Worker-Main-15/WARN]: Missing textures in model minecraft:block/tree_star:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[13:34:50] [Worker-Main-11/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
+[14:06:40] [Worker-Main-15/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[13:34:50] [Worker-Main-11/WARN]: Missing texture references in model minecraft:block/fern_thatch:
+[14:06:40] [Worker-Main-15/WARN]: Missing texture references in model minecraft:block/fern_thatch:
     #missing
-[13:34:50] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[13:34:50] [Render thread/INFO]: Created: 256x256 waypoints-atlas
-[13:34:50] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
-[13:34:50] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
-[13:34:50] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
-[13:34:50] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
-[13:34:50] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
-[13:34:50] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
-[13:34:50] [Render thread/INFO]: OpenAL initialized on device CORSAIR Slipstream Multi-Device Receiver Analog Stereo
-[13:34:50] [Render thread/INFO]: Sound engine started
-[13:34:50] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[13:34:50] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[13:34:51] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[13:34:51] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[13:34:51] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[13:34:51] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
-[13:34:51] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[13:34:51] [Render thread/WARN]: Type is VERTEX
-[13:34:51] [Render thread/WARN]: Type is FRAGMENT
-[13:34:51] [Render thread/WARN]: Type is VERTEX
-[13:34:51] [Render thread/WARN]: Type is FRAGMENT
-[13:34:51] [Render thread/WARN]: Type is VERTEX
-[13:34:51] [Render thread/WARN]: Type is FRAGMENT
-[13:34:58] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_breedables as it is missing following references: minecraft:seeds (from vanilla)
-[13:34:58] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_breedables as it is missing following references: minecraft:cosmic_cod (from vanilla)
-[13:34:58] [Render thread/ERROR]: Couldn't load tag minecraft:insect_items as it is missing following references: minecraft:maggot (from vanilla), minecraft:mosquito_larva (from vanilla)
-[13:34:58] [Render thread/ERROR]: Couldn't load tag minecraft:anteater_foodstuffs as it is missing following references: #minecraft:insect_items (from vanilla)
-[13:34:58] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_tameables as it is missing following references: minecraft:cosmic_cod (from vanilla)
-[13:34:58] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_foodstuffs as it is missing following references: #minecraft:cosmaw_breedables (from vanilla), #minecraft:cosmaw_tameables (from vanilla)
-[13:34:58] [Render thread/ERROR]: Couldn't load tag minecraft:resists_totem_of_possession as it is missing following references: #c:bosses (from vanilla)
-[13:34:59] [Worker-Main-11/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[13:34:59] [Worker-Main-11/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[13:34:59] [Worker-Main-11/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
-[13:34:59] [Worker-Main-11/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[13:34:59] [Render thread/INFO]: Loaded 1483 recipes
-[13:34:59] [Render thread/INFO]: Loaded 1574 advancements
-[13:34:59] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
-[13:34:59] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[13:34:59] [Server thread/INFO]: Generating keypair
-[13:34:59] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[13:34:59] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
-[13:35:00] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[13:35:00] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
-[13:35:00] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[13:35:00] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
-[13:35:00] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[13:35:00] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
-[13:35:00] [Server thread/INFO]: Loading 0 persistent chunks...
-[13:35:00] [Server thread/INFO]: WorldEdit initialized
-[13:35:00] [Server thread/INFO]: WorldEdit commands registered
-[13:35:00] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[13:35:00] [Server thread/INFO]: Preparing spawn area: 16%
-[13:35:00] [Server thread/INFO]: Preparing spawn area: 100%
-[13:35:00] [Server thread/INFO]: Time elapsed: 514 ms
-[13:35:00] [Server thread/INFO]: HungLo[local:E:332ebbd6] logged in with entity id 87 at (352.8701495241877, 98.6026419549169, -90.80528188961509)
-[13:35:00] [Server thread/INFO]: Player [HungLo] joined.
-[13:35:00] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[13:35:00] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[13:35:00] [Server thread/INFO]: HungLo joined the game
-[13:35:00] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[13:35:00] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[13:35:00] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[13:35:01] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[13:35:01] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[13:35:01] [Render thread/INFO]: Started 10 worker threads
-[13:35:01] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
-[13:35:01] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
-[13:35:01] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
-[13:35:01] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
-[13:35:01] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
-[13:35:01] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
-[13:35:01] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
-[13:35:01] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[13:35:01] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
-[13:35:01] [Render thread/INFO]: Loaded 133 advancements
-[13:35:01] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[13:35:01] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[13:35:01] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[13:35:01] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[13:35:01] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[13:35:01] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[13:35:01] [Render thread/INFO]: Stopping worker threads
-[13:35:01] [Render thread/INFO]: Started 10 worker threads
-[13:35:01] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[13:35:01] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[13:35:01] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.126.09].
-[13:35:01] [Render thread/INFO]: minecraftGlCapabilities:
+[14:06:40] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[14:06:40] [Render thread/INFO]: Created: 256x256 waypoints-atlas
+[14:06:40] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
+[14:06:40] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
+[14:06:40] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
+[14:06:40] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
+[14:06:40] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
+[14:06:40] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
+[14:06:40] [Render thread/INFO]: OpenAL initialized on device CORSAIR Slipstream Multi-Device Receiver Analog Stereo
+[14:06:40] [Render thread/INFO]: Sound engine started
+[14:06:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[14:06:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[14:06:40] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
+[14:06:40] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[14:06:40] [Render thread/WARN]: Type is VERTEX
+[14:06:40] [Render thread/WARN]: Type is FRAGMENT
+[14:06:40] [Render thread/WARN]: Type is VERTEX
+[14:06:40] [Render thread/WARN]: Type is FRAGMENT
+[14:06:40] [Render thread/WARN]: Type is VERTEX
+[14:06:40] [Render thread/WARN]: Type is FRAGMENT
+[14:07:12] [Render thread/ERROR]: Couldn't load tag minecraft:resists_totem_of_possession as it is missing following references: #c:bosses (from vanilla)
+[14:07:12] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_breedables as it is missing following references: minecraft:seeds (from vanilla)
+[14:07:12] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_breedables as it is missing following references: minecraft:cosmic_cod (from vanilla)
+[14:07:12] [Render thread/ERROR]: Couldn't load tag minecraft:insect_items as it is missing following references: minecraft:maggot (from vanilla), minecraft:mosquito_larva (from vanilla)
+[14:07:12] [Render thread/ERROR]: Couldn't load tag minecraft:anteater_foodstuffs as it is missing following references: #minecraft:insect_items (from vanilla)
+[14:07:12] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_tameables as it is missing following references: minecraft:cosmic_cod (from vanilla)
+[14:07:12] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_foodstuffs as it is missing following references: #minecraft:cosmaw_breedables (from vanilla), #minecraft:cosmaw_tameables (from vanilla)
+[14:07:12] [Worker-Main-15/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[14:07:12] [Worker-Main-15/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[14:07:12] [Worker-Main-15/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[14:07:12] [Worker-Main-15/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[14:07:12] [Render thread/INFO]: Loaded 1483 recipes
+[14:07:12] [Render thread/INFO]: Loaded 1574 advancements
+[14:07:12] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
+[14:07:12] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[14:07:12] [Server thread/INFO]: Generating keypair
+[14:07:13] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
+[14:07:13] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[14:07:13] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[14:07:13] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
+[14:07:13] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[14:07:13] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
+[14:07:13] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[14:07:13] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data)]].
+[14:07:13] [Server thread/INFO]: Loading 0 persistent chunks...
+[14:07:13] [Server thread/INFO]: WorldEdit initialized
+[14:07:13] [Server thread/INFO]: WorldEdit commands registered
+[14:07:13] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[14:07:13] [Server thread/INFO]: Preparing spawn area: 16%
+[14:07:14] [Server thread/INFO]: Preparing spawn area: 100%
+[14:07:14] [Server thread/INFO]: Time elapsed: 531 ms
+[14:07:14] [Server thread/INFO]: HungLo[local:E:3d3b113d] logged in with entity id 87 at (352.8701495241877, 98.6026419549169, -90.80528188961509)
+[14:07:14] [Server thread/INFO]: Player [HungLo] joined.
+[14:07:14] [Server thread/INFO]: HungLo joined the game
+[14:07:14] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[14:07:14] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[14:07:14] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
+[14:07:14] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
+[14:07:14] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[14:07:14] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[14:07:14] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[14:07:14] [Render thread/INFO]: Started 10 worker threads
+[14:07:14] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
+[14:07:14] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
+[14:07:14] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
+[14:07:14] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
+[14:07:14] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
+[14:07:14] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
+[14:07:14] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
+[14:07:14] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[14:07:14] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
+[14:07:14] [Render thread/INFO]: Loaded 133 advancements
+[14:07:14] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
+[14:07:14] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
+[14:07:14] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
+[14:07:14] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[14:07:14] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
+[14:07:14] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[14:07:14] [Render thread/INFO]: Stopping worker threads
+[14:07:14] [Render thread/INFO]: Started 10 worker threads
+[14:07:14] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[14:07:14] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[14:07:14] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.126.09].
+[14:07:14] [Render thread/INFO]: minecraftGlCapabilities:
 Your OpenGL support:
 openGL version 3.2+: [true] <- REQUIRED
 Vertex Attribute Buffer Binding: [true] <- optional improvement
@@ -232,91 +493,91 @@ Buffer Storage: [true] <- optional improvement
 
 [LWJGL] [GL] Using KHR_debug for error logging.
 [LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
-[13:35:01] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
-[13:35:01] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
-[13:35:01] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[13:35:01] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
-[13:35:01] [Render thread/INFO]: Setting up renderer
-[13:35:01] [Render thread/INFO]: Loading shader with type: [35633]
-[13:35:01] [Render thread/INFO]: Shader loaded sucessfully.
-[13:35:01] [Render thread/INFO]: Loading shader with type: [35632]
-[13:35:01] [Render thread/INFO]: Shader loaded sucessfully.
-[13:35:01] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
-[13:35:01] [Render thread/INFO]: Renderer setup complete
-[13:35:01] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[13:35:01] [Render thread/INFO]: Loading shader with type: [35633]
-[13:35:01] [Render thread/INFO]: Shader loaded sucessfully.
-[13:35:01] [Render thread/INFO]: Loading shader with type: [35632]
-[13:35:01] [Render thread/INFO]: Shader loaded sucessfully.
-[13:35:01] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[13:35:01] [Render thread/INFO]: Loading shader with type: [35633]
-[13:35:01] [Render thread/INFO]: Shader loaded sucessfully.
-[13:35:01] [Render thread/INFO]: Loading shader with type: [35632]
-[13:35:01] [Render thread/INFO]: Shader loaded sucessfully.
-[13:35:01] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[13:35:01] [Render thread/INFO]: Loaded 133 advancements
-[13:35:10] [DH-Update Propagator Thread[2]/WARN]: [EMPTY] biome string deserialized. This may mean the level was null when a save was attempted, a file saving error, or a biome saving error. Future errors will not be logged.
-[13:35:14] [Server thread/INFO]: Saving and pausing game...
-[13:35:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:overworld
-[13:35:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:primordial_caves
-[13:35:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_nether
-[13:35:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_end
-[13:35:15] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
-[13:35:15] [level shutdown/INFO]: Shutting down ClientRenderState
-[13:35:15] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}].
-[13:35:15] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}].
-[13:35:15] [level shutdown/INFO]: Shutting down LodQuadTree...
-[13:35:15] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}].
-[13:35:15] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}
-[13:35:15] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}
-[13:35:15] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}
-[13:35:15] [level shutdown/INFO]: Finished shutting down LodQuadTree
-[13:35:15] [level shutdown/INFO]: Closing world gen queue
-[13:35:15] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[13:35:15] [level shutdown/INFO]: Shutting down world generator thread pool...
-[13:35:15] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
-[13:35:15] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[13:35:15] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[13:35:15] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[13:35:15] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}].
-[13:35:15] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}
-[13:35:15] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[13:35:15] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}].
-[13:35:15] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}].
-[13:35:15] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}
-[13:35:15] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}].
-[13:35:15] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}].
-[13:35:15] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}
-[13:35:15] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}
-[13:35:15] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}
-[13:35:15] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[13:35:15] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[13:35:15] [Server thread/INFO]: HungLo lost connection: Disconnected
-[13:35:15] [Server thread/INFO]: HungLo left the game
-[13:35:15] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[13:35:15] [Server thread/INFO]: WorldEdit shutdown
-[13:35:15] [Server thread/INFO]: Stopping server
-[13:35:15] [Server thread/INFO]: Saving players
-[13:35:15] [Server thread/INFO]: Saving worlds
-[13:35:15] [Render thread/INFO]: Closing all [4] database connections...
-[13:35:15] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data/DistantHorizons.sqlite]
-[13:35:15] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[13:35:15] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data/DistantHorizons.sqlite]
-[13:35:15] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data/DistantHorizons.sqlite]
-[13:35:15] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:overworld
-[13:35:15] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:primordial_caves
-[13:35:15] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_nether
-[13:35:15] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_end
-[13:35:15] [Server thread/INFO]: ThreadedAnvilChunkStorage (Origin Prime City 3): All chunks are saved
-[13:35:15] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[13:35:15] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[13:35:15] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[13:35:15] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[13:35:16] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[3ls0d68vul1ou@minecraft:overworld].
-[13:35:16] [Render thread/INFO]: Stopping worker threads
-[13:35:17] [Render thread/INFO]: Stopping!
-[13:35:17] [Render thread/INFO]: Saving all world maps
-[13:35:17] [Render thread/INFO]: Save queue flushed!
+[14:07:14] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[14:07:14] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[14:07:14] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
+[14:07:14] [Render thread/INFO]: Setting up renderer
+[14:07:14] [Render thread/INFO]: Loading shader with type: [35633]
+[14:07:14] [Render thread/INFO]: Shader loaded sucessfully.
+[14:07:14] [Render thread/INFO]: Loading shader with type: [35632]
+[14:07:14] [Render thread/INFO]: Shader loaded sucessfully.
+[14:07:14] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[14:07:14] [Render thread/INFO]: Renderer setup complete
+[14:07:15] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[14:07:15] [Render thread/INFO]: Loading shader with type: [35633]
+[14:07:15] [Render thread/INFO]: Shader loaded sucessfully.
+[14:07:15] [Render thread/INFO]: Loading shader with type: [35632]
+[14:07:15] [Render thread/INFO]: Shader loaded sucessfully.
+[14:07:15] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[14:07:15] [Render thread/INFO]: Loading shader with type: [35633]
+[14:07:15] [Render thread/INFO]: Shader loaded sucessfully.
+[14:07:15] [Render thread/INFO]: Loading shader with type: [35632]
+[14:07:15] [Render thread/INFO]: Shader loaded sucessfully.
+[14:07:15] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[14:07:15] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[14:07:15] [Render thread/INFO]: Loaded 133 advancements
+[14:07:18] [DH-Render Loader Thread[0]/WARN]: [EMPTY] biome string deserialized. This may mean the level was null when a save was attempted, a file saving error, or a biome saving error. Future errors will not be logged.
+[14:07:21] [Server thread/INFO]: Saving and pausing game...
+[14:07:21] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:overworld
+[14:07:21] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_end
+[14:07:21] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_nether
+[14:07:21] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:primordial_caves
+[14:07:24] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
+[14:07:24] [level shutdown/INFO]: Shutting down ClientRenderState
+[14:07:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}].
+[14:07:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}].
+[14:07:24] [level shutdown/INFO]: Shutting down LodQuadTree...
+[14:07:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}].
+[14:07:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}
+[14:07:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}
+[14:07:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}
+[14:07:24] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[14:07:24] [level shutdown/INFO]: Closing world gen queue
+[14:07:24] [level shutdown/INFO]: Closing WorldGenerationQueue...
+[14:07:24] [level shutdown/INFO]: Shutting down world generator thread pool...
+[14:07:24] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
+[14:07:24] [Server thread/INFO]: HungLo lost connection: Disconnected
+[14:07:24] [Server thread/INFO]: HungLo left the game
+[14:07:24] [level shutdown/INFO]: [BatchGenerator] shutting down...
+[14:07:24] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
+[14:07:24] [level shutdown/INFO]: Finished closing WorldGenerationQueue
+[14:07:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}].
+[14:07:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}
+[14:07:24] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[14:07:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}].
+[14:07:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}
+[14:07:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}].
+[14:07:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}].
+[14:07:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}].
+[14:07:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}
+[14:07:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}
+[14:07:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}
+[14:07:24] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[14:07:24] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[14:07:24] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[14:07:24] [Render thread/INFO]: Closing all [4] database connections...
+[14:07:24] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data/DistantHorizons.sqlite]
+[14:07:24] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
+[14:07:24] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data/DistantHorizons.sqlite]
+[14:07:24] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data/DistantHorizons.sqlite]
+[14:07:24] [Server thread/INFO]: WorldEdit shutdown
+[14:07:24] [Server thread/INFO]: Stopping server
+[14:07:24] [Server thread/INFO]: Saving players
+[14:07:24] [Server thread/INFO]: Saving worlds
+[14:07:24] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:overworld
+[14:07:24] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_end
+[14:07:24] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_nether
+[14:07:24] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:primordial_caves
+[14:07:24] [Server thread/INFO]: ThreadedAnvilChunkStorage (Origin Prime City 3): All chunks are saved
+[14:07:24] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[14:07:24] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[14:07:24] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
+[14:07:24] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[14:07:24] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[3ls0d68vul1ou@minecraft:overworld].
+[14:07:24] [Render thread/INFO]: Stopping worker threads
+[14:07:25] [Render thread/INFO]: Stopping!
+[14:07:25] [Render thread/INFO]: Saving all world maps
+[14:07:25] [Render thread/INFO]: Save queue flushed!
 
 [Incubating] Problems report is available at: file:///home/matt/Documents/Repos/MattMC/build/reports/problems/problems-report.html
 
@@ -326,6 +587,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 46s
-9 actionable tasks: 6 executed, 3 from cache
+BUILD SUCCESSFUL in 1m 7s
+9 actionable tasks: 7 executed, 2 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html

@@ -28,6 +28,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -132,7 +133,7 @@ public class GlDevice implements GpuDevice {
 				net.vulkanic.VulkanicAPI.bindCubemapTexture(ctx, n);
 				o = net.vulkanic.VulkanicAPI.GL_TEXTURE_CUBE_MAP;
 			} else {
-				GlStateManager._bindTexture(n);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), n);
 				o = net.vulkanic.VulkanicAPI.GL_TEXTURE_2D;
 			}
 

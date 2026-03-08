@@ -691,9 +691,9 @@ public class IrisRenderSystem {
 		@Override
 		public void generateMipmaps(int texture, int target) {
 			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
-			GlStateManager._bindTexture(texture);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), texture);
 			VulkanicAPI.generateMipmap(VulkanicAPI.getImmediateContext(), target);
-			GlStateManager._bindTexture(previous);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previous);
 		}
 
 		@Override
@@ -756,9 +756,9 @@ public class IrisRenderSystem {
 		@Override
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
 			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
-			GlStateManager._bindTexture(destTexture);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), destTexture);
 			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getImmediateContext(), target, i, i1, i2, i3, i4, width, height);
-			GlStateManager._bindTexture(previous);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previous);
 		}
 
 		@Override
@@ -830,7 +830,7 @@ public class IrisRenderSystem {
 		} else {
 			for (int binding : bindings) {
 				GlStateManager._activeTexture(startingTexture);
-				GlStateManager._bindTexture(binding);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), binding);
 				startingTexture++;
 			}
 		}

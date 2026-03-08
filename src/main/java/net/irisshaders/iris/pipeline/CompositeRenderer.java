@@ -346,7 +346,7 @@ public class CompositeRenderer {
 			// NB: This is necessary for shader pack reloading to work propely
 			if (GlStateManager.TEXTURES[i].binding != 0) {
 				GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
-				GlStateManager._bindTexture(0);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 			}
 		}
 

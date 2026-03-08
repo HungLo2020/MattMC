@@ -488,7 +488,7 @@ public class ShadowRenderer {
 		// However, it only partially resolves issues of light leaking into caves.
 		//
 		// TODO: Better way of preventing light from leaking into places where it shouldn't
-		GlStateManager._disableCull();
+		VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
 
 		ChunkSectionsToRender sections = new ChunkSectionsToRender(null, 0, null);
 		((SodiumChunkSection) (Object) sections).sodium$setRendering(((LevelRendererExtension) levelRenderer).sodium$getWorldRenderer(),
@@ -592,7 +592,7 @@ public class ShadowRenderer {
 		profiler.popPush("restore gl state");
 
 		// Restore backface culling
-		GlStateManager._enableCull();
+		VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
 		((LevelRendererExtension) levelRenderer).sodium$setMatrices(playerMatrices);
 
 		// Restore the old viewport

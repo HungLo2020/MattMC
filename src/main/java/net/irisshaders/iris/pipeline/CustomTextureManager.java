@@ -151,7 +151,7 @@ public class CustomTextureManager {
 						int binding = GlStateManager.TEXTURES[tex].binding;
 						texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
 						GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + tex);
-						GlStateManager._bindTexture(binding);
+						VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), binding);
 					}
 					return texture != null ? texture.getTexture().iris$getGlId() : textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture().iris$getGlId();
 				}, TextureType.TEXTURE_2D);
@@ -168,7 +168,7 @@ public class CustomTextureManager {
 							int binding = GlStateManager.TEXTURES[tex].binding;
 							texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
 							GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + tex);
-							GlStateManager._bindTexture(binding);
+							VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), binding);
 						}
 						int id = texture.getTexture().iris$getGlId();
 						PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(id);
@@ -180,9 +180,9 @@ public class CustomTextureManager {
 						TextureFormat textureFormat = TextureFormatLoader.getFormat();
 						if (textureFormat != null) {
 							int previousBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
-							GlStateManager._bindTexture(pbrTexture.getTexture().iris$getGlId());
+							VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), pbrTexture.getTexture().iris$getGlId());
 							textureFormat.setupTextureParameters(pbrType, pbrTexture);
-							GlStateManager._bindTexture(previousBinding);
+							VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousBinding);
 						}
 
 						return pbrTexture.getTexture().iris$getGlId();

@@ -1,6 +1,5 @@
 package net.blaze3d.opengl;
 
-import net.blaze3d.platform.MacosUtil;
 import net.blaze3d.systems.RenderSystem;
 import com.mojang.jtracy.Plot;
 import com.mojang.jtracy.TracyClient;
@@ -27,10 +26,6 @@ public class GlStateManager {
 	private static int numBuffers = 0;
 	public static final GlStateManager.BlendState BLEND = new GlStateManager.BlendState(); // Made public for Iris shader mod integration
 	public static final GlStateManager.DepthState DEPTH = new GlStateManager.DepthState(); // Made public for Iris shader mod integration
-	private static final GlStateManager.CullState CULL = new GlStateManager.CullState();
-	private static final GlStateManager.PolygonOffsetState POLY_OFFSET = new GlStateManager.PolygonOffsetState();
-	private static final GlStateManager.ColorLogicState COLOR_LOGIC = new GlStateManager.ColorLogicState();
-	private static final GlStateManager.ScissorState SCISSOR = new GlStateManager.ScissorState();
 	public static int activeTexture; // Made public for Iris shader mod integration
 	// Iris: Increased from 12 to 128 to support more texture units for shaders
 	public static final GlStateManager.TextureState[] TEXTURES = (GlStateManager.TextureState[])IntStream.range(0, 128)
@@ -46,41 +41,6 @@ public class GlStateManager {
 	private static int iris$viewportY;
 	private static int iris$viewportWidth;
 	private static int iris$viewportHeight;
-
-	public static void _disableScissorTest() {
-		RenderSystem.assertOnRenderThread();
-		SCISSOR.mode.disable();
-	}
-
-	public static void _enableScissorTest() {
-		RenderSystem.assertOnRenderThread();
-		SCISSOR.mode.enable();
-	}
-
-	public static void _scissorBox(int i, int j, int k, int l) {
-		RenderSystem.assertOnRenderThread();
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		net.vulkanic.VulkanicAPI.setDynamicScissor(ctx, i, j, k, l);
-	}
-
-	public static void _disableDepthTest() {
-		RenderSystem.assertOnRenderThread();
-		DEPTH.mode.disable();
-	}
-
-	public static void _enableDepthTest() {
-		RenderSystem.assertOnRenderThread();
-		DEPTH.mode.enable();
-	}
-
-	public static void _depthFunc(int i) {
-		RenderSystem.assertOnRenderThread();
-		if (i != DEPTH.func) {
-			DEPTH.func = i;
-			CommandContext ctx = VulkanicAPI.getImmediateContext();
-			net.vulkanic.VulkanicAPI.setDepthTest(ctx, i);
-		}
-	}
 
 	public static void _depthMask(boolean bl) {
 		RenderSystem.assertOnRenderThread();
@@ -191,58 +151,6 @@ public class GlStateManager {
 		net.vulkanic.VulkanicAPI.setBlendFunction(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l);
 	}
 
-	public static void _enableCull() {
-		RenderSystem.assertOnRenderThread();
-		CULL.enable.enable();
-	}
-
-	public static void _disableCull() {
-		RenderSystem.assertOnRenderThread();
-		CULL.enable.disable();
-	}
-
-	public static void _polygonMode(int i, int j) {
-		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setPolygonMode(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j);
-	}
-
-	public static void _enablePolygonOffset() {
-		RenderSystem.assertOnRenderThread();
-		POLY_OFFSET.fill.enable();
-	}
-
-	public static void _disablePolygonOffset() {
-		RenderSystem.assertOnRenderThread();
-		POLY_OFFSET.fill.disable();
-	}
-
-	public static void _polygonOffset(float f, float g) {
-		RenderSystem.assertOnRenderThread();
-		if (f != POLY_OFFSET.factor || g != POLY_OFFSET.units) {
-			POLY_OFFSET.factor = f;
-			POLY_OFFSET.units = g;
-			net.vulkanic.VulkanicAPI.setPolygonOffset(net.vulkanic.VulkanicAPI.getImmediateContext(), f, g);
-		}
-	}
-
-	public static void _enableColorLogicOp() {
-		RenderSystem.assertOnRenderThread();
-		COLOR_LOGIC.enable.enable();
-	}
-
-	public static void _disableColorLogicOp() {
-		RenderSystem.assertOnRenderThread();
-		COLOR_LOGIC.enable.disable();
-	}
-
-	public static void _logicOp(int i) {
-		RenderSystem.assertOnRenderThread();
-		if (i != COLOR_LOGIC.op) {
-			COLOR_LOGIC.op = i;
-			net.vulkanic.VulkanicAPI.setLogicOp(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
-		}
-	}
-
 	public static void _activeTexture(int i) {
 		RenderSystem.assertOnRenderThread();
 		// Iris: From MixinGlStateManager_FramebufferBinding - validate texture unit range
@@ -284,12 +192,6 @@ public class GlStateManager {
 		net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.onDeleteTexture(i);
 	}
 
-	public static void _bindTexture(int i) {
-		RenderSystem.assertOnRenderThread();
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		net.vulkanic.VulkanicAPI.bindTexture2D(ctx, i);
-	}
-
 	public static void _texImage2D(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
 		net.vulkanic.VulkanicAPI.uploadTexture2D(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o, p, byteBuffer);
@@ -328,15 +230,6 @@ public class GlStateManager {
 			COLOR_MASK.alpha = bl4;
 			CommandContext ctx = VulkanicAPI.getImmediateContext();
 			net.vulkanic.VulkanicAPI.setColorMask(ctx, bl, bl2, bl3, bl4);
-		}
-	}
-
-	public static void _clear(int i) {
-		RenderSystem.assertOnRenderThread();
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		net.vulkanic.VulkanicAPI.clearBuffers(ctx, i);
-		if (MacosUtil.IS_MACOS) {
-			VulkanicAPI.getError(ctx);
 		}
 	}
 
@@ -400,12 +293,6 @@ public class GlStateManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class ColorLogicState {
-		public final GlStateManager.BooleanState enable = new GlStateManager.BooleanState(3058);
-		public int op = 5379;
-	}
-
-	@Environment(EnvType.CLIENT)
 	public static class ColorMask {
 		public boolean red = true;
 		public boolean green = true;
@@ -414,27 +301,10 @@ public class GlStateManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class CullState {
-		public final GlStateManager.BooleanState enable = new GlStateManager.BooleanState(2884);
-	}
-
-	@Environment(EnvType.CLIENT)
 	public static class DepthState {
 		public final GlStateManager.BooleanState mode = new GlStateManager.BooleanState(2929);
 		public boolean mask = true;
 		public int func = 513;
-	}
-
-	@Environment(EnvType.CLIENT)
-	static class PolygonOffsetState {
-		public final GlStateManager.BooleanState fill = new GlStateManager.BooleanState(32823);
-		public float factor;
-		public float units;
-	}
-
-	@Environment(EnvType.CLIENT)
-	static class ScissorState {
-		public final GlStateManager.BooleanState mode = new GlStateManager.BooleanState(3089);
 	}
 
 	@Environment(EnvType.CLIENT)

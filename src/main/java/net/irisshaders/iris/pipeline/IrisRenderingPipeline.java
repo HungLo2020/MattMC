@@ -836,7 +836,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 				int previousBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 				textureFormat.setupTextureParameters(PBRType.NORMAL, pbrHolder.normalTexture());
 				textureFormat.setupTextureParameters(PBRType.SPECULAR, pbrHolder.specularTexture());
-				GlStateManager._bindTexture(previousBinding);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousBinding);
 			}
 
 			PBRTextureManager.notifyPBRTexturesChanged();
@@ -877,7 +877,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 				// Clear depth first, regardless of any color clearing.
 				shadowRenderTargets.getDepthSourceFb().bind();
 				GlStateManager._depthMask(true);
-				GlStateManager._clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 
 				ImmutableList<ClearPass> passes;
 
@@ -1181,7 +1181,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		for (int i = 0; i < 16; i++) {
 			GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
 			IrisRenderSystem.unbindAllSamplers();
-			GlStateManager._bindTexture(0);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 		}
 
 		// Set the active texture unit to unit 0

@@ -35,7 +35,7 @@ public class NoiseTexture extends GlResource {
 
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, "noise texture");
 
-		GlStateManager._bindTexture(0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 	}
 
 	void resize(int texture, int width, int height) {
@@ -50,7 +50,7 @@ public class NoiseTexture extends GlResource {
 		VulkanicAPI.setPixelStore(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_UNPACK_ALIGNMENT, 1);
 		IrisRenderSystem.texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGB, width, height, 0, VulkanicAPI.GL_RGB, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
 
-		GlStateManager._bindTexture(0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 	}
 
 	private ByteBuffer generateNoise() {

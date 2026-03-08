@@ -161,7 +161,7 @@ public class SodiumShader implements ChunkShaderInterface {
 
 
 		if (isShadowPass) {
-			GlStateManager._disableCull();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
 		}
 
 		var textureAtlas = Minecraft.getInstance()

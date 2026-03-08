@@ -297,8 +297,8 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	public void fillIndirectUniformData(DhApiRenderParam dhApiRenderParam, DhApiRenderableBoxGroupShading dhApiRenderableBoxGroupShading, IDhApiRenderableBoxGroup boxGroup, DhApiVec3d camPos) {
 		bind(dhApiRenderParam);
-		GlStateManager._enableDepthTest();
-		GlStateManager._depthFunc(VulkanicAPI.GL_LEQUAL);
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), true);
+		VulkanicAPI.setDepthFunc(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_LEQUAL);
 		this.setUniform(this.instancedShaderOffsetChunkUniform,
 			new DhApiVec3i(
 				getChunkPosFromDouble(boxGroup.getOriginBlockPos().x),

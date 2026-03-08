@@ -354,12 +354,14 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should detach depth attachments via framebufferDepthAttachmentTexture2D helper");
         assertTrue(source.contains("GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER"),
             "GlCommandEncoder should bind/unbind framebuffers via VulkanicAPI.GL_FRAMEBUFFER constant");
-        assertTrue(source.contains("_clear(VulkanicAPI.GL_COLOR_BUFFER_BIT)"),
-            "GlCommandEncoder should clear color via VulkanicAPI.GL_COLOR_BUFFER_BIT");
-        assertTrue(source.contains("_clear(VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
-            "GlCommandEncoder should clear color+depth via explicit VulkanicAPI clear-bit composition");
-        assertTrue(source.contains("_clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
-            "GlCommandEncoder should clear depth via VulkanicAPI.GL_DEPTH_BUFFER_BIT");
+        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
+            "GlCommandEncoder should clear buffers via VulkanicAPI.clearBuffersWithMacosWorkaround");
+        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT)"),
+            "GlCommandEncoder should clear color via VulkanicAPI.clearBuffersWithMacosWorkaround + VulkanicAPI.GL_COLOR_BUFFER_BIT");
+        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
+            "GlCommandEncoder should clear color+depth via VulkanicAPI.clearBuffersWithMacosWorkaround");
+        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
+            "GlCommandEncoder should clear depth via VulkanicAPI.clearBuffersWithMacosWorkaround + VulkanicAPI.GL_DEPTH_BUFFER_BIT");
     }
 
     @Test
@@ -1213,6 +1215,276 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _glFramebufferTexture2D wrapper");
         assertFalse(stateManagerSource.contains("public static void _texSubImage2D("),
             "GlStateManager should no longer expose _texSubImage2D wrapper overloads");
+    }
+
+    @Test
+    public void testBlaze3dScissorAndPolygonWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _scissorBox("),
+            "GlStateManager should no longer expose _scissorBox wrapper");
+        assertFalse(stateManagerSource.contains("public static void _polygonMode("),
+            "GlStateManager should no longer expose _polygonMode wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+
+        assertFalse(encoderSource.contains("GlStateManager._scissorBox("),
+            "GlCommandEncoder should not call removed GlStateManager._scissorBox wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._polygonMode("),
+            "GlCommandEncoder should not call removed GlStateManager._polygonMode wrapper");
+        assertTrue(encoderSource.contains("VulkanicAPI.setDynamicScissor(VulkanicAPI.getImmediateContext()"),
+            "GlCommandEncoder should set scissor directly through VulkanicAPI.setDynamicScissor");
+        assertTrue(encoderSource.contains("VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext()"),
+            "GlCommandEncoder should set polygon mode directly through VulkanicAPI.setPolygonMode");
+    }
+
+    @Test
+    public void testBlaze3dColorLogicWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _enableColorLogicOp("),
+            "GlStateManager should no longer expose _enableColorLogicOp wrapper");
+        assertFalse(stateManagerSource.contains("public static void _disableColorLogicOp("),
+            "GlStateManager should no longer expose _disableColorLogicOp wrapper");
+        assertFalse(stateManagerSource.contains("public static void _logicOp("),
+            "GlStateManager should no longer expose _logicOp wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+
+        assertFalse(encoderSource.contains("GlStateManager._enableColorLogicOp("),
+            "GlCommandEncoder should not call removed GlStateManager._enableColorLogicOp wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._disableColorLogicOp("),
+            "GlCommandEncoder should not call removed GlStateManager._disableColorLogicOp wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._logicOp("),
+            "GlCommandEncoder should not call removed GlStateManager._logicOp wrapper");
+        assertFalse(encoderSource.contains("VulkanicAPI.setLogicOp(VulkanicAPI.getImmediateContext(), 5387)"),
+            "GlCommandEncoder should not hardcode OR_REVERSE literal 5387 when setting logic op");
+
+        assertTrue(encoderSource.contains("VulkanicAPI.setColorLogicOpEnabled("),
+            "GlCommandEncoder should enable/disable color logic directly through VulkanicAPI.setColorLogicOpEnabled");
+        assertTrue(encoderSource.contains("VulkanicAPI.setLogicOp(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_OR_REVERSE)"),
+            "GlCommandEncoder should set OR_REVERSE logic op through VulkanicAPI.GL_OR_REVERSE");
+    }
+
+    @Test
+    public void testBlaze3dPolygonOffsetWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _enablePolygonOffset("),
+            "GlStateManager should no longer expose _enablePolygonOffset wrapper");
+        assertFalse(stateManagerSource.contains("public static void _disablePolygonOffset("),
+            "GlStateManager should no longer expose _disablePolygonOffset wrapper");
+        assertFalse(stateManagerSource.contains("public static void _polygonOffset("),
+            "GlStateManager should no longer expose _polygonOffset wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+
+        assertFalse(encoderSource.contains("GlStateManager._enablePolygonOffset("),
+            "GlCommandEncoder should not call removed GlStateManager._enablePolygonOffset wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._disablePolygonOffset("),
+            "GlCommandEncoder should not call removed GlStateManager._disablePolygonOffset wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._polygonOffset("),
+            "GlCommandEncoder should not call removed GlStateManager._polygonOffset wrapper");
+
+        assertTrue(encoderSource.contains("VulkanicAPI.setPolygonOffset("),
+            "GlCommandEncoder should set polygon offset directly through VulkanicAPI.setPolygonOffset");
+        assertTrue(encoderSource.contains("VulkanicAPI.setPolygonOffsetFillEnabled("),
+            "GlCommandEncoder should toggle polygon-offset fill state directly through VulkanicAPI.setPolygonOffsetFillEnabled");
+    }
+
+    @Test
+    public void testBlaze3dCullWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _enableCull("),
+            "GlStateManager should no longer expose _enableCull wrapper");
+        assertFalse(stateManagerSource.contains("public static void _disableCull("),
+            "GlStateManager should no longer expose _disableCull wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._enableCull("),
+            "GlCommandEncoder should not call removed GlStateManager._enableCull wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._disableCull("),
+            "GlCommandEncoder should not call removed GlStateManager._disableCull wrapper");
+        assertTrue(encoderSource.contains("VulkanicAPI.setCullFaceEnabled("),
+            "GlCommandEncoder should toggle cull state directly through VulkanicAPI.setCullFaceEnabled");
+
+        Path shadowRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderer.java");
+        String shadowRendererSource = Files.readString(shadowRendererFile);
+        assertFalse(shadowRendererSource.contains("GlStateManager._disableCull("),
+            "ShadowRenderer should not call removed GlStateManager._disableCull wrapper");
+        assertFalse(shadowRendererSource.contains("GlStateManager._enableCull("),
+            "ShadowRenderer should not call removed GlStateManager._enableCull wrapper");
+        assertTrue(shadowRendererSource.contains("VulkanicAPI.setCullFaceEnabled("),
+            "ShadowRenderer should toggle cull state via VulkanicAPI.setCullFaceEnabled");
+
+        Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
+        String sodiumShaderSource = Files.readString(sodiumShaderFile);
+        assertFalse(sodiumShaderSource.contains("GlStateManager._disableCull("),
+            "SodiumShader should not call removed GlStateManager._disableCull wrapper");
+        assertTrue(sodiumShaderSource.contains("VulkanicAPI.setCullFaceEnabled("),
+            "SodiumShader should disable culling through VulkanicAPI.setCullFaceEnabled");
+
+        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
+        String dhWrapperSource = Files.readString(dhWrapperFile);
+        assertFalse(dhWrapperSource.contains("GlStateManager._enableCull("),
+            "MinecraftGLWrapper should not call removed GlStateManager._enableCull wrapper");
+        assertFalse(dhWrapperSource.contains("GlStateManager._disableCull("),
+            "MinecraftGLWrapper should not call removed GlStateManager._disableCull wrapper");
+        assertTrue(dhWrapperSource.contains("VulkanicAPI.setCullFaceEnabled("),
+            "MinecraftGLWrapper should toggle culling through VulkanicAPI.setCullFaceEnabled");
+    }
+
+    @Test
+    public void testBlaze3dDepthWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _enableDepthTest("),
+            "GlStateManager should no longer expose _enableDepthTest wrapper");
+        assertFalse(stateManagerSource.contains("public static void _disableDepthTest("),
+            "GlStateManager should no longer expose _disableDepthTest wrapper");
+        assertFalse(stateManagerSource.contains("public static void _depthFunc("),
+            "GlStateManager should no longer expose _depthFunc wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._enableDepthTest("),
+            "GlCommandEncoder should not call removed GlStateManager._enableDepthTest wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._disableDepthTest("),
+            "GlCommandEncoder should not call removed GlStateManager._disableDepthTest wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._depthFunc("),
+            "GlCommandEncoder should not call removed GlStateManager._depthFunc wrapper");
+        assertTrue(encoderSource.contains("VulkanicAPI.setDepthTestEnabled("),
+            "GlCommandEncoder should toggle depth test through VulkanicAPI.setDepthTestEnabled");
+        assertTrue(encoderSource.contains("VulkanicAPI.setDepthFunc("),
+            "GlCommandEncoder should set depth function through VulkanicAPI.setDepthFunc");
+
+        Path oldImageButtonFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gui/OldImageButton.java");
+        String oldImageButtonSource = Files.readString(oldImageButtonFile);
+        assertFalse(oldImageButtonSource.contains("GlStateManager._enableDepthTest("),
+            "OldImageButton should not call removed GlStateManager._enableDepthTest wrapper");
+        assertTrue(oldImageButtonSource.contains("VulkanicAPI.setDepthTestEnabled("),
+            "OldImageButton should enable depth test through VulkanicAPI.setDepthTestEnabled");
+
+        Path irisButtonFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gui/element/screen/IrisButton.java");
+        String irisButtonSource = Files.readString(irisButtonFile);
+        assertFalse(irisButtonSource.contains("GlStateManager._enableDepthTest("),
+            "IrisButton should not call removed GlStateManager._enableDepthTest wrapper");
+        assertTrue(irisButtonSource.contains("VulkanicAPI.setDepthTestEnabled("),
+            "IrisButton should enable depth test through VulkanicAPI.setDepthTestEnabled");
+
+        Path dhProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
+        String dhProgramSource = Files.readString(dhProgramFile);
+        assertFalse(dhProgramSource.contains("GlStateManager._enableDepthTest("),
+            "IrisGenericRenderProgram should not call removed GlStateManager._enableDepthTest wrapper");
+        assertFalse(dhProgramSource.contains("GlStateManager._depthFunc("),
+            "IrisGenericRenderProgram should not call removed GlStateManager._depthFunc wrapper");
+        assertTrue(dhProgramSource.contains("VulkanicAPI.setDepthTestEnabled("),
+            "IrisGenericRenderProgram should enable depth test through VulkanicAPI.setDepthTestEnabled");
+        assertTrue(dhProgramSource.contains("VulkanicAPI.setDepthFunc("),
+            "IrisGenericRenderProgram should set depth func through VulkanicAPI.setDepthFunc");
+
+        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
+        String dhWrapperSource = Files.readString(dhWrapperFile);
+        assertFalse(dhWrapperSource.contains("GlStateManager._enableDepthTest("),
+            "MinecraftGLWrapper should not call removed GlStateManager._enableDepthTest wrapper");
+        assertFalse(dhWrapperSource.contains("GlStateManager._disableDepthTest("),
+            "MinecraftGLWrapper should not call removed GlStateManager._disableDepthTest wrapper");
+        assertFalse(dhWrapperSource.contains("GlStateManager._depthFunc("),
+            "MinecraftGLWrapper should not call removed GlStateManager._depthFunc wrapper");
+        assertTrue(dhWrapperSource.contains("VulkanicAPI.setDepthTestEnabled("),
+            "MinecraftGLWrapper should toggle depth testing through VulkanicAPI.setDepthTestEnabled");
+    }
+
+    @Test
+    public void testBlaze3dClearWrapperRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _clear("),
+            "GlStateManager should no longer expose _clear wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._clear("),
+            "GlCommandEncoder should not call removed GlStateManager._clear wrapper");
+        assertTrue(encoderSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
+            "GlCommandEncoder should clear via VulkanicAPI.clearBuffersWithMacosWorkaround");
+
+        Path clearPassFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/ClearPass.java");
+        String clearPassSource = Files.readString(clearPassFile);
+        assertFalse(clearPassSource.contains("GlStateManager._clear("),
+            "ClearPass should not call removed GlStateManager._clear wrapper");
+        assertTrue(clearPassSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
+            "ClearPass should clear via VulkanicAPI.clearBuffersWithMacosWorkaround");
+    }
+
+    @Test
+    public void testBlaze3dBindTextureWrapperRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _bindTexture("),
+            "GlStateManager should no longer expose _bindTexture wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._bindTexture("),
+            "GlCommandEncoder should not call removed GlStateManager._bindTexture wrapper");
+        assertTrue(encoderSource.contains("VulkanicAPI.bindTexture2D("),
+            "GlCommandEncoder should bind 2D textures directly through VulkanicAPI.bindTexture2D");
+
+        Path renderTargetsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTargets.java");
+        String renderTargetsSource = Files.readString(renderTargetsFile);
+        assertFalse(renderTargetsSource.contains("GlStateManager._bindTexture("),
+            "RenderTargets should not call removed GlStateManager._bindTexture wrapper");
+        assertTrue(renderTargetsSource.contains("VulkanicAPI.bindTexture2D("),
+            "RenderTargets should bind textures through VulkanicAPI.bindTexture2D");
+
+        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
+        String dhWrapperSource = Files.readString(dhWrapperFile);
+        assertFalse(dhWrapperSource.contains("GlStateManager._bindTexture("),
+            "MinecraftGLWrapper should not call removed GlStateManager._bindTexture wrapper");
+        assertTrue(dhWrapperSource.contains("VulkanicAPI.bindTexture2D("),
+            "MinecraftGLWrapper should bind textures through VulkanicAPI.bindTexture2D");
+    }
+
+    @Test
+    public void testBlaze3dScissorToggleWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _enableScissorTest("),
+            "GlStateManager should no longer expose _enableScissorTest wrapper");
+        assertFalse(stateManagerSource.contains("public static void _disableScissorTest("),
+            "GlStateManager should no longer expose _disableScissorTest wrapper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("GlStateManager._enableScissorTest("),
+            "GlCommandEncoder should not call removed GlStateManager._enableScissorTest wrapper");
+        assertFalse(encoderSource.contains("GlStateManager._disableScissorTest("),
+            "GlCommandEncoder should not call removed GlStateManager._disableScissorTest wrapper");
+        assertTrue(encoderSource.contains("VulkanicAPI.setScissorTestEnabled("),
+            "GlCommandEncoder should toggle scissor test through VulkanicAPI.setScissorTestEnabled");
+
+        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
+        String dhWrapperSource = Files.readString(dhWrapperFile);
+        assertFalse(dhWrapperSource.contains("GlStateManager._enableScissorTest("),
+            "MinecraftGLWrapper should not call removed GlStateManager._enableScissorTest wrapper");
+        assertFalse(dhWrapperSource.contains("GlStateManager._disableScissorTest("),
+            "MinecraftGLWrapper should not call removed GlStateManager._disableScissorTest wrapper");
+        assertTrue(dhWrapperSource.contains("VulkanicAPI.setScissorTestEnabled("),
+            "MinecraftGLWrapper should toggle scissor test through VulkanicAPI.setScissorTestEnabled");
     }
 
     @Test

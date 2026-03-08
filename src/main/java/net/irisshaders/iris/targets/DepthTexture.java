@@ -20,7 +20,7 @@ public class DepthTexture extends GlResource {
 		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
 		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
 
-		GlStateManager._bindTexture(0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 	}
 
 	void resize(int width, int height, DepthBufferFormat format) {

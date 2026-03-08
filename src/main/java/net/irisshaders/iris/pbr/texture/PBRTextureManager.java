@@ -14,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.Dumpable;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -115,7 +116,7 @@ public class PBRTextureManager {
 				} catch (Exception e) {
 					Iris.logger.warn("Failed to load PBR textures for texture " + id, e);
 				} finally {
-					GlStateManager._bindTexture(previousTextureBinding);
+					VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousTextureBinding);
 				}
 			}
 		}

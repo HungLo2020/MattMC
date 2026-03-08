@@ -55,7 +55,7 @@ public class CenterDepthSampler {
 		InternalTextureFormat format = InternalTextureFormat.R32F;
 		setupColorTexture(texture, format);
 		setupColorTexture(altTexture, format);
-		GlStateManager._bindTexture(0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 
 		this.framebuffer.addColorAttachment(0, texture);
 		ProgramBuilder builder;
