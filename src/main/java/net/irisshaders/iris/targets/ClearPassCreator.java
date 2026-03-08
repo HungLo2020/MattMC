@@ -1,7 +1,6 @@
 package net.irisshaders.iris.targets;
 
 import com.google.common.collect.ImmutableList;
-import net.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.irisshaders.iris.shaderpack.properties.PackRenderTargetDirectives;
@@ -19,7 +18,7 @@ import java.util.Map;
 public class ClearPassCreator {
 	public static ImmutableList<ClearPass> createClearPasses(RenderTargets renderTargets, boolean fullClear,
 															 PackRenderTargetDirectives renderTargetDirectives) {
-		final int maxDrawBuffers = GlStateManager._getInteger(VulkanicAPI.GL_MAX_DRAW_BUFFERS);
+		final int maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS);
 
 		// Sort buffers by their clear color so we can group up glClear calls.
 		Map<Vector2i, Map<ClearPassInformation, IntList>> clearByColor = new HashMap<>();
@@ -83,7 +82,7 @@ public class ClearPassCreator {
 			return ImmutableList.of();
 		}
 
-		final int maxDrawBuffers = GlStateManager._getInteger(VulkanicAPI.GL_MAX_DRAW_BUFFERS);
+		final int maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS);
 
 		// Sort buffers by their clear color so we can group up glClear calls.
 		Map<Vector4f, IntList> clearByColor = new HashMap<>();

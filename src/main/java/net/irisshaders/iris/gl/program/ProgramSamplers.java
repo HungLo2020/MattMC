@@ -61,7 +61,7 @@ public class ProgramSamplers {
 
 		if (initializer != null) {
 			for (GlUniform1iCall call : initializer) {
-				GlStateManager._glUniform1i(call.location(), call.value());
+				VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), call.location(), call.value());
 			}
 
 			initializer = null;

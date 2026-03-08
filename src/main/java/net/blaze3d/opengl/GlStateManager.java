@@ -249,16 +249,6 @@ public class GlStateManager {
 		return location;
 	}
 
-	public static void _glUniform1i(int i, int j) {
-		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setUniform1i(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j);
-	}
-
-	public static void _glBindAttribLocation(int i, int j, CharSequence charSequence) {
-		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setAttributeLocation(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, charSequence);
-	}
-
 	public static void incrementTrackedBuffers() {
 		numBuffers++;
 		PLOT_BUFFERS.setValue(numBuffers);
@@ -271,22 +261,10 @@ public class GlStateManager {
 		return net.vulkanic.VulkanicAPI.createBuffer(ctx);
 	}
 
-	public static int _glGenVertexArrays() {
-		RenderSystem.assertOnRenderThread();
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		return net.vulkanic.VulkanicAPI.createVertexArray(ctx);
-	}
-
 	public static void _glBindBuffer(int i, int j) {
 		RenderSystem.assertOnRenderThread();
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		net.vulkanic.VulkanicAPI.bindBuffer(ctx, i, j);
-	}
-
-	public static void _glBindVertexArray(int i) {
-		RenderSystem.assertOnRenderThread();
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		net.vulkanic.VulkanicAPI.bindVertexArray(ctx, i);
 	}
 
 	public static void _glBufferData(int i, ByteBuffer byteBuffer, int j) {
@@ -454,16 +432,6 @@ public class GlStateManager {
 		}
 	}
 
-	public static void _texParameter(int i, int j, int k) {
-		RenderSystem.assertOnRenderThread();
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		net.vulkanic.VulkanicAPI.setTextureParameter(ctx, i, j, k);
-	}
-
-	public static int _getTexLevelParameter(int i, int j, int k) {
-		return VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), i, j, k);
-	}
-
 	public static int _genTexture() {
 		RenderSystem.assertOnRenderThread();
 		numTextures++;
@@ -552,87 +520,8 @@ public class GlStateManager {
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		net.vulkanic.VulkanicAPI.clearBuffers(ctx, i);
 		if (MacosUtil.IS_MACOS) {
-			_getError();
+			VulkanicAPI.getError(ctx);
 		}
-	}
-
-	public static void _vertexAttribPointer(int i, int j, int k, boolean bl, int l, long m) {
-		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setVertexAttribPointer(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, bl, l, m);
-	}
-
-	public static void _vertexAttribIPointer(int i, int j, int k, int l, long m) {
-		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setVertexAttribIPointer(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k, l, m);
-	}
-
-	public static void _enableVertexAttribArray(int i) {
-		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.enableVertexAttribArray(net.vulkanic.VulkanicAPI.getImmediateContext(), i);
-	}
-
-	public static void _drawElements(int i, int j, int k, long l) {
-		RenderSystem.assertOnRenderThread();
-		// Iris: From MixinGlStateManager_DepthColorOverride - tessellation support
-		int mode = i;
-		if (mode == VulkanicAPI.GL_TRIANGLES && net.irisshaders.iris.vertices.ImmediateState.usingTessellation) {
-			mode = VulkanicAPI.GL_PATCHES;
-		}
-		
-		net.vulkanic.VulkanicAPI.drawElements(net.vulkanic.VulkanicAPI.getImmediateContext(), mode, j, k, l);
-	}
-
-	public static void _drawArrays(int i, int j, int k) {
-		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.drawArrays(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, k);
-	}
-
-	public static void _pixelStore(int i, int j) {
-		RenderSystem.assertOnRenderThread();
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		net.vulkanic.VulkanicAPI.setPixelStore(ctx, i, j);
-	}
-
-	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {
-		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.readPixels(VulkanicAPI.getImmediateContext(), i, j, k, l, m, n, o);
-	}
-
-	public static int _getError() {
-		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext());
-	}
-
-	public static void clearGlErrors() {
-		RenderSystem.assertOnRenderThread();
-
-		while (VulkanicAPI.getError(VulkanicAPI.getImmediateContext()) != 0) {
-		}
-	}
-
-	public static String _getString(int i) {
-		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), i);
-	}
-
-	public static int _getInteger(int i) {
-		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), i);
-	}
-
-	public static long _glFenceSync(int i, int j) {
-		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.createFenceSync(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j);
-	}
-
-	public static int _glClientWaitSync(long l, int i, long m) {
-		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.waitForSync(net.vulkanic.VulkanicAPI.getImmediateContext(), l, i, m);
-	}
-
-	public static void _glDeleteSync(long l) {
-		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.destroySync(net.vulkanic.VulkanicAPI.getImmediateContext(), l);
 	}
 
 	@Environment(EnvType.CLIENT)

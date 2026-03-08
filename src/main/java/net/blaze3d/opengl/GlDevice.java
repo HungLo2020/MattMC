@@ -118,26 +118,29 @@ public class GlDevice implements GpuDevice {
 				throw new UnsupportedOperationException("Array or 3D textures are not yet supported");
 			}
 
-			GlStateManager.clearGlErrors();
+			while (net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext()) != 0) {
+			}
 			int n = GlStateManager._genTexture();
 			if (string == null) {
 				string = String.valueOf(n);
 			}
 
+			net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+
 			int o;
 			if (bl) {
-				net.vulkanic.VulkanicAPI.bindCubemapTexture(net.vulkanic.VulkanicAPI.getImmediateContext(), n);
-				o = 34067;
+				net.vulkanic.VulkanicAPI.bindCubemapTexture(ctx, n);
+				o = net.vulkanic.VulkanicAPI.GL_TEXTURE_CUBE_MAP;
 			} else {
 				GlStateManager._bindTexture(n);
-				o = 3553;
+				o = net.vulkanic.VulkanicAPI.GL_TEXTURE_2D;
 			}
 
-			GlStateManager._texParameter(o, 33085, m - 1);
-			GlStateManager._texParameter(o, 33082, 0);
-			GlStateManager._texParameter(o, 33083, m - 1);
+			net.vulkanic.VulkanicAPI.setTextureMaxLevel(ctx, o, m - 1);
+			net.vulkanic.VulkanicAPI.setTextureMinLod(ctx, o, 0);
+			net.vulkanic.VulkanicAPI.setTextureMaxLod(ctx, o, m - 1);
 			if (textureFormat.hasDepthAspect()) {
-				GlStateManager._texParameter(o, 34892, 0);
+				net.vulkanic.VulkanicAPI.disableTextureCompareMode(ctx, o);
 			}
 
 			if (bl) {
@@ -156,7 +159,7 @@ public class GlDevice implements GpuDevice {
 				}
 			}
 
-			int r = GlStateManager._getError();
+			int r = net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext());
 			if (r == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate texture of " + j + "x" + k + " for " + string);
 			} else if (r != 0) {
@@ -192,9 +195,10 @@ public class GlDevice implements GpuDevice {
 		if (j <= 0) {
 			throw new IllegalArgumentException("Buffer size must be greater than zero");
 		} else {
-			GlStateManager.clearGlErrors();
+			while (net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext()) != 0) {
+			}
 			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, j);
-			int k = GlStateManager._getError();
+			int k = net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext());
 			if (k == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + j + " for " + supplier);
 			} else if (k != 0) {
@@ -211,10 +215,11 @@ public class GlDevice implements GpuDevice {
 		if (!byteBuffer.hasRemaining()) {
 			throw new IllegalArgumentException("Buffer source must not be empty");
 		} else {
-			GlStateManager.clearGlErrors();
+			while (net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext()) != 0) {
+			}
 			long l = byteBuffer.remaining();
 			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, byteBuffer);
-			int j = GlStateManager._getError();
+			int j = net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getImmediateContext());
 			if (j == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + l + " for " + supplier);
 			} else if (j != 0) {
@@ -230,7 +235,11 @@ public class GlDevice implements GpuDevice {
 	public String getImplementationInformation() {
 		return GLFW.glfwGetCurrentContext() == 0L
 			? "NO CONTEXT"
-			: GlStateManager._getString(7937) + " GL version " + GlStateManager._getString(7938) + ", " + GlStateManager._getString(7936);
+			: net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_RENDERER)
+				+ " GL version "
+				+ net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_VERSION)
+				+ ", "
+				+ net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_VENDOR);
 	}
 
 	@Override
@@ -245,12 +254,12 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getRenderer() {
-		return GlStateManager._getString(7937);
+		return net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_RENDERER);
 	}
 
 	@Override
 	public String getVendor() {
-		return GlStateManager._getString(7936);
+		return net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_VENDOR);
 	}
 
 	@Override
@@ -260,15 +269,30 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getVersion() {
-		return GlStateManager._getString(7938);
+		return net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_VERSION);
 	}
 
 	private static int getMaxSupportedTextureSize() {
-		int i = GlStateManager._getInteger(3379);
+		int i = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_MAX_TEXTURE_SIZE);
 
 		for (int j = Math.max(32768, i); j >= 1024; j >>= 1) {
-			GlStateManager._texImage2D(32868, 0, 6408, j, j, 0, 6408, 5121, null);
-			int k = GlStateManager._getTexLevelParameter(32868, 0, 4096);
+			GlStateManager._texImage2D(
+				net.vulkanic.VulkanicAPI.GL_PROXY_TEXTURE_2D,
+				0,
+				net.vulkanic.VulkanicAPI.GL_RGBA,
+				j,
+				j,
+				0,
+				net.vulkanic.VulkanicAPI.GL_RGBA,
+				net.vulkanic.VulkanicAPI.GL_UNSIGNED_BYTE,
+				null
+			);
+			int k = net.vulkanic.VulkanicAPI.getTextureLevelParameter(
+				net.vulkanic.VulkanicAPI.getImmediateContext(),
+				net.vulkanic.VulkanicAPI.GL_PROXY_TEXTURE_2D,
+				0,
+				net.vulkanic.VulkanicAPI.GL_TEXTURE_WIDTH
+			);
 			if (k != 0) {
 				return j;
 			}
@@ -306,7 +330,7 @@ public class GlDevice implements GpuDevice {
 		}
 
 		this.shaderCache.clear();
-		String string = GlStateManager._getString(7937);
+		String string = net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getImmediateContext(), net.vulkanic.VulkanicAPI.GL_RENDERER);
 		if (string.contains("AMD")) {
 			sacrificeShaderToOpenGlAndAmd();
 		}

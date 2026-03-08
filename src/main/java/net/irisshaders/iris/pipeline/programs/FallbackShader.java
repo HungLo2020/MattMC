@@ -108,9 +108,9 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 			}
 		}
 
-		GlStateManager._glUniform1i(gtexture, 0);
-		GlStateManager._glUniform1i(overlay, 1);
-		GlStateManager._glUniform1i(lightmap, 2);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), gtexture, 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), overlay, 1);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), lightmap, 2);
 
 		if (this.blendModeOverride != null) {
 			this.blendModeOverride.apply();

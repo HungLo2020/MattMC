@@ -6,6 +6,7 @@ import net.irisshaders.iris.gl.image.ImageBinding;
 import net.irisshaders.iris.gl.image.ImageHolder;
 import net.irisshaders.iris.gl.image.ImageLimits;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,7 @@ public class ProgramImages {
 	public void update() {
 		if (initializer != null) {
 			for (GlUniform1iCall call : initializer) {
-				GlStateManager._glUniform1i(call.location(), call.value());
+				VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), call.location(), call.value());
 			}
 
 			initializer = null;

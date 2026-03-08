@@ -53,6 +53,8 @@ public class VulkanicAPI {
     public static final int GL_SYNC_STATUS = 0x9114;
     public static final int GL_SIGNALED = 0x9119;
     public static final int GL_SYNC_FLUSH_COMMANDS_BIT = 0x00000001;
+    public static final int GL_TIMEOUT_EXPIRED = 0x911B;
+    public static final int GL_WAIT_FAILED = 0x911D;
     
     // OpenGL Constants - Primitive Types
     public static final int GL_LINES = 0x0001;
@@ -116,6 +118,7 @@ public class VulkanicAPI {
     public static final int GL_READ_WRITE = 0x88BA;
     
     // OpenGL Constants - Query Limits
+    public static final int GL_MAX_TEXTURE_SIZE = 0x0D33;
     public static final int GL_MAX_TEXTURE_IMAGE_UNITS = 0x8872;
     public static final int GL_MAX_DRAW_BUFFERS = 0x8824;
     public static final int GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS = 0x90DD;
@@ -167,6 +170,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Texture Types
     public static final int GL_TEXTURE_1D = 0x0DE0;
+    public static final int GL_PROXY_TEXTURE_2D = 0x8064;
     public static final int GL_TEXTURE_3D = 0x806F;
     public static final int GL_TEXTURE_BUFFER = 0x8C2A;
     public static final int GL_TEXTURE_CUBE_MAP = 0x8513;
@@ -881,6 +885,34 @@ public class VulkanicAPI {
     public static void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
         getBackend().setTextureParameter(ctx, target, pname, param);
     }
+
+    /**
+     * Sets the maximum mip level that can be sampled from a texture target.
+     */
+    public static void setTextureMaxLevel(CommandContext ctx, int target, int maxLevel) {
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAX_LEVEL, maxLevel);
+    }
+
+    /**
+     * Sets the minimum level-of-detail clamp for a texture target.
+     */
+    public static void setTextureMinLod(CommandContext ctx, int target, int minLod) {
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MIN_LOD, minLod);
+    }
+
+    /**
+     * Sets the maximum level-of-detail clamp for a texture target.
+     */
+    public static void setTextureMaxLod(CommandContext ctx, int target, int maxLod) {
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAX_LOD, maxLod);
+    }
+
+    /**
+     * Disables depth-compare mode for a depth texture target.
+     */
+    public static void disableTextureCompareMode(CommandContext ctx, int target) {
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    }
     
     /**
      * Copies a region from the framebuffer to a texture subregion.
@@ -1509,6 +1541,20 @@ public class VulkanicAPI {
      */
     public static int waitForSyncWithFlush(CommandContext ctx, long sync, long timeout) {
         return getBackend().waitForSync(ctx, sync, GL_SYNC_FLUSH_COMMANDS_BIT, timeout);
+    }
+
+    /**
+     * Returns true if a sync wait result indicates timeout expiration.
+     */
+    public static boolean isSyncWaitTimeout(int waitResult) {
+        return waitResult == GL_TIMEOUT_EXPIRED;
+    }
+
+    /**
+     * Returns true if a sync wait result indicates failure.
+     */
+    public static boolean isSyncWaitFailed(int waitResult) {
+        return waitResult == GL_WAIT_FAILED;
     }
     
     public static void destroySync(CommandContext ctx, long sync) {

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -145,10 +146,11 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 	@Override
 	public void bindAttributesIris(boolean isFallback, int programId) {
 		com.google.common.collect.ImmutableSet<String> ATTRIBUTE_LIST = com.google.common.collect.ImmutableSet.of("Position", "Color", "Normal", "UV0", "UV1", "UV2");
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 		int j = 0;
 
 		for (String string : this.getElementAttributeNames()) {
-			GlStateManager._glBindAttribLocation(programId, j, ATTRIBUTE_LIST.contains(string) && !isFallback ? "iris_" + string : string);
+			VulkanicAPI.setAttributeLocation(ctx, programId, j, ATTRIBUTE_LIST.contains(string) && !isFallback ? "iris_" + string : string);
 			j++;
 		}
 	}

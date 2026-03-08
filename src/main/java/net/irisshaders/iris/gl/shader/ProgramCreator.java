@@ -12,15 +12,16 @@ public class ProgramCreator {
 
 	public static int create(String name, GlShader... shaders) {
 		int program = GlStateManager.glCreateProgram();
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 
-		GlStateManager._glBindAttribLocation(program, 11, "iris_Entity");
-		GlStateManager._glBindAttribLocation(program, 11, "mc_Entity");
-		GlStateManager._glBindAttribLocation(program, 12, "mc_midTexCoord");
-		GlStateManager._glBindAttribLocation(program, 13, "at_tangent");
-		GlStateManager._glBindAttribLocation(program, 14, "at_midBlock");
+		VulkanicAPI.setAttributeLocation(ctx, program, 11, "iris_Entity");
+		VulkanicAPI.setAttributeLocation(ctx, program, 11, "mc_Entity");
+		VulkanicAPI.setAttributeLocation(ctx, program, 12, "mc_midTexCoord");
+		VulkanicAPI.setAttributeLocation(ctx, program, 13, "at_tangent");
+		VulkanicAPI.setAttributeLocation(ctx, program, 14, "at_midBlock");
 
-		GlStateManager._glBindAttribLocation(program, 0, "Position");
-		GlStateManager._glBindAttribLocation(program, 1, "UV0");
+		VulkanicAPI.setAttributeLocation(ctx, program, 0, "Position");
+		VulkanicAPI.setAttributeLocation(ctx, program, 1, "UV0");
 
 		for (GlShader shader : shaders) {
 			GLDebug.nameObject(VulkanicAPI.GL_SHADER, shader.getHandle(), shader.getName());

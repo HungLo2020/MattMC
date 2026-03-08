@@ -189,11 +189,12 @@ public class SodiumShader implements ChunkShaderInterface {
 	}
 
 	private void bindTextures(GpuTextureView atlas) {
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0, atlas.texture().iris$getGlId());
 		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
-		GlStateManager._texParameter(3553, 33084, atlas.baseMipLevel());
-		GlStateManager._texParameter(3553, 33085, atlas.baseMipLevel() + atlas.mipLevels() - 1);
+		VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, atlas.baseMipLevel());
+		VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, atlas.baseMipLevel() + atlas.mipLevels() - 1);
 		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 
 		GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();

@@ -58,10 +58,11 @@ public abstract class BufferStorage {
 
 			ByteBuffer byteBuffer;
 			if (l != 0) {
-				GlStateManager.clearGlErrors();
+				while (VulkanicAPI.getError(VulkanicAPI.getImmediateContext()) != 0) {
+				}
 				byteBuffer = directStateAccess.mapBufferRange(j, 0, k, l | 64, i);
 				if (byteBuffer == null) {
-					throw new IllegalStateException("Can't persistently map buffer, opengl error " + GlStateManager._getError());
+					throw new IllegalStateException("Can't persistently map buffer, opengl error " + VulkanicAPI.getError(VulkanicAPI.getImmediateContext()));
 				}
 			} else {
 				byteBuffer = null;
@@ -103,10 +104,11 @@ public abstract class BufferStorage {
 
 		@Override
 		public GlBuffer.GlMappedView mapBuffer(DirectStateAccess directStateAccess, GlBuffer glBuffer, int i, int j, int k) {
-			GlStateManager.clearGlErrors();
+			while (VulkanicAPI.getError(VulkanicAPI.getImmediateContext()) != 0) {
+			}
 			ByteBuffer byteBuffer = directStateAccess.mapBufferRange(glBuffer.handle, i, j, k, glBuffer.usage());
 			if (byteBuffer == null) {
-				throw new IllegalStateException("Can't map buffer, opengl error " + GlStateManager._getError());
+				throw new IllegalStateException("Can't map buffer, opengl error " + VulkanicAPI.getError(VulkanicAPI.getImmediateContext()));
 			} else {
 				return new GlBuffer.GlMappedView(() -> directStateAccess.unmapBuffer(glBuffer.handle, glBuffer.usage()), glBuffer, byteBuffer);
 			}

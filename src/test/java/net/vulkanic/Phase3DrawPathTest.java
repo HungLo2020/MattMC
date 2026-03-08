@@ -134,7 +134,7 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should bind texture buffers via VulkanicAPI.bindTextureBuffer");
         assertTrue(source.contains("VulkanicAPI.bindTextureBufferData("),
             "GlCommandEncoder should attach texel buffer data via VulkanicAPI.bindTextureBufferData");
-        assertTrue(source.contains("VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), var39"),
+        assertTrue(source.contains("VulkanicAPI.bindUniformBufferRange(ctx, var39"),
             "GlCommandEncoder should use target-agnostic bindUniformBufferRange overload in uniform upload path");
     }
 
@@ -224,6 +224,10 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder readback path should not set pack row length via hardcoded pname literal 3330");
         assertFalse(source.contains("GlStateManager._glFramebufferTexture2D(36008, 36064, 3553"),
             "GlCommandEncoder readback path should not detach read framebuffer attachment via hardcoded literals");
+        assertFalse(source.contains("GlStateManager._readPixels("),
+            "GlCommandEncoder readback path should not route readPixels through GlStateManager wrapper");
+        assertFalse(source.contains("GlStateManager._getError()"),
+            "GlCommandEncoder readback path should not route getError through GlStateManager wrapper");
 
         assertTrue(source.contains("VulkanicAPI.bindPixelPackBuffer("),
             "GlCommandEncoder readback path should bind PBO through VulkanicAPI.bindPixelPackBuffer");
@@ -231,6 +235,46 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder readback path should set row length via VulkanicAPI GL_PACK_ROW_LENGTH helper");
         assertTrue(source.contains("VulkanicAPI.framebufferColorAttachment0Texture2D("),
             "GlCommandEncoder readback path should detach color attachment via framebufferColorAttachment0Texture2D helper");
+        assertTrue(source.contains("VulkanicAPI.readPixels(ctx"),
+            "GlCommandEncoder readback path should call VulkanicAPI.readPixels directly");
+        assertTrue(source.contains("VulkanicAPI.getError(ctx)"),
+            "GlCommandEncoder readback path should query error via VulkanicAPI.getError(ctx)");
+    }
+
+    @Test
+    public void testGlCommandEncoderUsesAgnosticUnpackUploadHelpers() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("GlStateManager._pixelStore(3314"),
+            "GlCommandEncoder texture upload paths should not set unpack row length via hardcoded literal 3314");
+        assertFalse(source.contains("GlStateManager._pixelStore(3316"),
+            "GlCommandEncoder texture upload paths should not set unpack skip-pixels via hardcoded literal 3316");
+        assertFalse(source.contains("GlStateManager._pixelStore(3315"),
+            "GlCommandEncoder texture upload paths should not set unpack skip-rows via hardcoded literal 3315");
+        assertFalse(source.contains("GlStateManager._pixelStore(3317"),
+            "GlCommandEncoder texture upload paths should not set unpack alignment via hardcoded literal 3317");
+        assertFalse(source.contains("GlStateManager._texSubImage2D("),
+            "GlCommandEncoder texture upload paths should not route texSubImage2D through GlStateManager wrapper");
+
+        assertTrue(source.contains("VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ROW_LENGTH"),
+            "GlCommandEncoder texture upload paths should set unpack row length via VulkanicAPI helper");
+        assertTrue(source.contains("VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_PIXELS"),
+            "GlCommandEncoder texture upload paths should set unpack skip-pixels via VulkanicAPI helper");
+        assertTrue(source.contains("VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_ROWS"),
+            "GlCommandEncoder texture upload paths should set unpack skip-rows via VulkanicAPI helper");
+        assertTrue(source.contains("VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ALIGNMENT"),
+            "GlCommandEncoder texture upload paths should set unpack alignment via VulkanicAPI helper");
+        assertTrue(source.contains("VulkanicAPI.uploadTexture2DSubImage(ctx"),
+            "GlCommandEncoder texture upload paths should call VulkanicAPI.uploadTexture2DSubImage directly");
+        assertFalse(source.contains("GlStateManager._glUniform1i("),
+            "GlCommandEncoder should not upload UTB/sampler uniforms through GlStateManager._glUniform1i wrapper");
+        assertFalse(source.contains("GlStateManager._texParameter("),
+            "GlCommandEncoder sampler setup should not set texture parameters through GlStateManager._texParameter wrapper");
+        assertTrue(source.contains("VulkanicAPI.setUniform1i(ctx"),
+            "GlCommandEncoder should upload UTB/sampler uniforms directly via VulkanicAPI.setUniform1i");
+        assertTrue(source.contains("VulkanicAPI.setTextureParameter(ctx"),
+            "GlCommandEncoder sampler setup should set base/max level directly via VulkanicAPI.setTextureParameter");
     }
 
     @Test
@@ -298,6 +342,22 @@ public class Phase3DrawPathTest {
             "VertexArrayCache should not bind GL_ARRAY_BUFFER via hardcoded target literal 34962");
         assertTrue(source.contains("_glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle)"),
             "VertexArrayCache should bind array buffers via VulkanicAPI.GL_ARRAY_BUFFER constant");
+        assertFalse(source.contains("GlStateManager._enableVertexAttribArray("),
+            "VertexArrayCache should not enable attributes through GlStateManager wrapper");
+        assertFalse(source.contains("GlStateManager._vertexAttribPointer("),
+            "VertexArrayCache should not set attrib pointers through GlStateManager wrapper");
+        assertFalse(source.contains("GlStateManager._vertexAttribIPointer("),
+            "VertexArrayCache should not set integer attrib pointers through GlStateManager wrapper");
+        assertFalse(source.contains("GlStateManager._glBindVertexArray("),
+            "VertexArrayCache should not bind vertex arrays through GlStateManager wrapper");
+        assertTrue(source.contains("VulkanicAPI.enableVertexAttribArray("),
+            "VertexArrayCache should enable attributes directly via VulkanicAPI.enableVertexAttribArray");
+        assertTrue(source.contains("VulkanicAPI.setVertexAttribPointer("),
+            "VertexArrayCache should set attrib pointers directly via VulkanicAPI.setVertexAttribPointer");
+        assertTrue(source.contains("VulkanicAPI.setVertexAttribIPointer("),
+            "VertexArrayCache should set integer attrib pointers directly via VulkanicAPI.setVertexAttribIPointer");
+        assertTrue(source.contains("VulkanicAPI.bindVertexArray("),
+            "VertexArrayCache should bind vertex arrays directly via VulkanicAPI.bindVertexArray");
     }
 
     @Test
@@ -314,6 +374,64 @@ public class Phase3DrawPathTest {
             "GlDevice should query UBO alignment via VulkanicAPI.getUniformBufferOffsetAlignment");
         assertTrue(source.contains("VulkanicAPI.setProgramPointSizeEnabled("),
             "GlDevice should enable program point size via VulkanicAPI.setProgramPointSizeEnabled");
+    }
+
+    @Test
+    public void testGlDeviceTextureSetupUsesAgnosticTextureParameterHelpers() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("_texParameter(o, 33085"),
+            "GlDevice texture setup should not set GL_TEXTURE_MAX_LEVEL via hardcoded literal 33085");
+        assertFalse(source.contains("_texParameter(o, 33082"),
+            "GlDevice texture setup should not set GL_TEXTURE_MIN_LOD via hardcoded literal 33082");
+        assertFalse(source.contains("_texParameter(o, 33083"),
+            "GlDevice texture setup should not set GL_TEXTURE_MAX_LOD via hardcoded literal 33083");
+        assertFalse(source.contains("_texParameter(o, 34892"),
+            "GlDevice texture setup should not toggle GL_TEXTURE_COMPARE_MODE via hardcoded literal 34892");
+        assertFalse(source.contains("_getInteger(3379)"),
+            "GlDevice max texture-size probe should not query GL_MAX_TEXTURE_SIZE via hardcoded literal 3379");
+        assertFalse(source.contains("_texImage2D(32868"),
+            "GlDevice max texture-size probe should not use hardcoded GL_PROXY_TEXTURE_2D literal 32868");
+
+        assertTrue(source.contains("VulkanicAPI.setTextureMaxLevel("),
+            "GlDevice texture setup should use VulkanicAPI.setTextureMaxLevel helper");
+        assertTrue(source.contains("VulkanicAPI.setTextureMinLod("),
+            "GlDevice texture setup should use VulkanicAPI.setTextureMinLod helper");
+        assertTrue(source.contains("VulkanicAPI.setTextureMaxLod("),
+            "GlDevice texture setup should use VulkanicAPI.setTextureMaxLod helper");
+        assertTrue(source.contains("VulkanicAPI.disableTextureCompareMode("),
+            "GlDevice depth texture setup should use VulkanicAPI.disableTextureCompareMode helper");
+        assertTrue(source.contains("VulkanicAPI.GL_MAX_TEXTURE_SIZE"),
+            "GlDevice max texture-size probe should use VulkanicAPI.GL_MAX_TEXTURE_SIZE constant");
+        assertTrue(source.contains("VulkanicAPI.GL_PROXY_TEXTURE_2D"),
+            "GlDevice max texture-size probe should use VulkanicAPI.GL_PROXY_TEXTURE_2D constant");
+    }
+
+    @Test
+    public void testGlDeviceUsesDirectVulkanicQueryAndErrorCalls() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("GlStateManager._getString("),
+            "GlDevice should not query strings via GlStateManager._getString wrapper in migrated paths");
+        assertFalse(source.contains("GlStateManager._getInteger("),
+            "GlDevice should not query integers via GlStateManager._getInteger wrapper in migrated paths");
+        assertFalse(source.contains("GlStateManager._getTexLevelParameter("),
+            "GlDevice should not query texture level params via GlStateManager wrapper in migrated paths");
+        assertFalse(source.contains("GlStateManager._getError()"),
+            "GlDevice should not query errors via GlStateManager._getError wrapper in migrated paths");
+        assertFalse(source.contains("GlStateManager.clearGlErrors()"),
+            "GlDevice should not clear errors via GlStateManager.clearGlErrors wrapper in migrated paths");
+
+        assertTrue(source.contains("VulkanicAPI.getString("),
+            "GlDevice should query strings via direct VulkanicAPI.getString calls");
+        assertTrue(source.contains("VulkanicAPI.getInteger("),
+            "GlDevice should query integer limits via direct VulkanicAPI.getInteger calls");
+        assertTrue(source.contains("VulkanicAPI.getTextureLevelParameter("),
+            "GlDevice should query proxy texture width via VulkanicAPI.getTextureLevelParameter");
+        assertTrue(source.contains("VulkanicAPI.getError("),
+            "GlDevice should query errors via direct VulkanicAPI.getError calls");
     }
 
     @Test
@@ -340,6 +458,134 @@ public class Phase3DrawPathTest {
             "GLDebug should control ARB debug filtering via setDebugMessageControlAllARB helper");
         assertTrue(source.contains("VulkanicAPI.isDebugContext("),
             "GLDebug should check context debug status via VulkanicAPI.isDebugContext");
+    }
+
+    @Test
+    public void testIrisUtilityPathsUseDirectVulkanicCalls() throws IOException {
+        Path clearPassFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/ClearPassCreator.java");
+        String clearPassSource = Files.readString(clearPassFile);
+        assertFalse(clearPassSource.contains("GlStateManager._getInteger("),
+            "ClearPassCreator should not query max draw buffers through GlStateManager wrapper");
+        assertTrue(clearPassSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS)"),
+            "ClearPassCreator should query max draw buffers directly through VulkanicAPI");
+
+        Path samplerLimitsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/sampler/SamplerLimits.java");
+        String samplerLimitsSource = Files.readString(samplerLimitsFile);
+        assertFalse(samplerLimitsSource.contains("GlStateManager._getInteger("),
+            "SamplerLimits should not query limits through GlStateManager wrapper");
+        assertTrue(samplerLimitsSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext()"),
+            "SamplerLimits should query limits directly through VulkanicAPI");
+
+        Path standardMacrosFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/StandardMacros.java");
+        String standardMacrosSource = Files.readString(standardMacrosFile);
+        assertFalse(standardMacrosSource.contains("GlStateManager._getString("),
+            "StandardMacros should not query GL strings through GlStateManager wrapper");
+        assertFalse(standardMacrosSource.contains("GlStateManager._getInteger("),
+            "StandardMacros should not query extension count through GlStateManager wrapper");
+        assertTrue(standardMacrosSource.contains("VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), name)"),
+            "StandardMacros should query GL version strings directly through VulkanicAPI");
+        assertTrue(standardMacrosSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_NUM_EXTENSIONS)"),
+            "StandardMacros should query extension count directly through VulkanicAPI");
+
+        Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
+        String programCreatorSource = Files.readString(programCreatorFile);
+        assertFalse(programCreatorSource.contains("GlStateManager._glBindAttribLocation("),
+            "ProgramCreator should not bind attributes through GlStateManager wrapper");
+        assertTrue(programCreatorSource.contains("VulkanicAPI.setAttributeLocation(ctx, program"),
+            "ProgramCreator should bind attributes through VulkanicAPI.setAttributeLocation");
+
+        Path intCachedUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/custom/cached/IntCachedUniform.java");
+        String intCachedUniformSource = Files.readString(intCachedUniformFile);
+        assertFalse(intCachedUniformSource.contains("GlStateManager._glUniform1i("),
+            "IntCachedUniform should not upload via GlStateManager._glUniform1i wrapper");
+        assertTrue(intCachedUniformSource.contains("VulkanicAPI.setUniform1i("),
+            "IntCachedUniform should upload directly via VulkanicAPI.setUniform1i");
+
+        Path boolCachedUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/custom/cached/BooleanCachedUniform.java");
+        String boolCachedUniformSource = Files.readString(boolCachedUniformFile);
+        assertFalse(boolCachedUniformSource.contains("GlStateManager._glUniform1i("),
+            "BooleanCachedUniform should not upload via GlStateManager._glUniform1i wrapper");
+        assertTrue(boolCachedUniformSource.contains("VulkanicAPI.setUniform1i("),
+            "BooleanCachedUniform should upload directly via VulkanicAPI.setUniform1i");
+
+        Path programSamplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
+        String programSamplersSource = Files.readString(programSamplersFile);
+        assertFalse(programSamplersSource.contains("GlStateManager._glUniform1i("),
+            "ProgramSamplers initializer should not upload via GlStateManager._glUniform1i wrapper");
+        assertTrue(programSamplersSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext()"),
+            "ProgramSamplers initializer should upload directly through VulkanicAPI.setUniform1i");
+
+        Path programImagesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramImages.java");
+        String programImagesSource = Files.readString(programImagesFile);
+        assertFalse(programImagesSource.contains("GlStateManager._glUniform1i("),
+            "ProgramImages initializer should not upload via GlStateManager._glUniform1i wrapper");
+        assertTrue(programImagesSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext()"),
+            "ProgramImages initializer should upload directly through VulkanicAPI.setUniform1i");
+
+        Path textureUploadHelperFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/TextureUploadHelper.java");
+        String textureUploadHelperSource = Files.readString(textureUploadHelperFile);
+        assertFalse(textureUploadHelperSource.contains("GlStateManager._pixelStore("),
+            "TextureUploadHelper should not reset unpack state through GlStateManager._pixelStore wrapper");
+        assertTrue(textureUploadHelperSource.contains("VulkanicAPI.setPixelStore(ctx"),
+            "TextureUploadHelper should reset unpack state directly through VulkanicAPI.setPixelStore");
+
+        Path fallbackShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/FallbackShader.java");
+        String fallbackShaderSource = Files.readString(fallbackShaderFile);
+        assertFalse(fallbackShaderSource.contains("GlStateManager._glUniform1i("),
+            "FallbackShader should not upload sampler uniforms through GlStateManager._glUniform1i wrapper");
+        assertTrue(fallbackShaderSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), gtexture, 0)"),
+            "FallbackShader should upload sampler uniforms directly through VulkanicAPI.setUniform1i");
+
+        Path intUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/uniform/IntUniform.java");
+        String intUniformSource = Files.readString(intUniformFile);
+        assertFalse(intUniformSource.contains("GlStateManager._glUniform1i("),
+            "IntUniform should not upload through GlStateManager._glUniform1i wrapper");
+        assertTrue(intUniformSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), location, newValue)"),
+            "IntUniform should upload directly through VulkanicAPI.setUniform1i");
+
+        Path glFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
+        String glFramebufferSource = Files.readString(glFramebufferFile);
+        assertFalse(glFramebufferSource.contains("GlStateManager._getInteger("),
+            "GlFramebuffer should not query caps through GlStateManager._getInteger wrapper");
+        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS)"),
+            "GlFramebuffer should query draw-buffer cap directly through VulkanicAPI.getInteger");
+        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS)"),
+            "GlFramebuffer should query color-attachment cap directly through VulkanicAPI.getInteger");
+
+        Path textureInfoCacheFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureInfoCache.java");
+        String textureInfoCacheSource = Files.readString(textureInfoCacheFile);
+        assertFalse(textureInfoCacheSource.contains("GlStateManager._getInteger("),
+            "TextureInfoCache should not query current texture binding through GlStateManager._getInteger wrapper");
+        assertFalse(textureInfoCacheSource.contains("GlStateManager._getTexLevelParameter("),
+            "TextureInfoCache should not query texture level params through GlStateManager._getTexLevelParameter wrapper");
+        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
+            "TextureInfoCache should query current texture binding directly through VulkanicAPI.getInteger");
+        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, pname)"),
+            "TextureInfoCache should query texture level params directly through VulkanicAPI.getTextureLevelParameter");
+
+        Path textureManipulationUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
+        String textureManipulationUtilSource = Files.readString(textureManipulationUtilFile);
+        assertFalse(textureManipulationUtilSource.contains("GlStateManager._getInteger("),
+            "TextureManipulationUtil should not query framebuffer/texture bindings through GlStateManager._getInteger wrapper");
+        assertFalse(textureManipulationUtilSource.contains("GlStateManager._getTexLevelParameter("),
+            "TextureManipulationUtil should not query tex level dimensions through GlStateManager._getTexLevelParameter wrapper");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER_BINDING)"),
+            "TextureManipulationUtil should query previous framebuffer directly through VulkanicAPI.getInteger");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
+            "TextureManipulationUtil should query previous texture directly through VulkanicAPI.getInteger");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_WIDTH)"),
+            "TextureManipulationUtil should query mip width directly through VulkanicAPI.getTextureLevelParameter");
+
+        Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
+        String sodiumShaderSource = Files.readString(sodiumShaderFile);
+        assertFalse(sodiumShaderSource.contains("GlStateManager._texParameter(3553, 33084"),
+            "SodiumShader should not set base mip level with hardcoded target/pname literals via GlStateManager wrapper");
+        assertFalse(sodiumShaderSource.contains("GlStateManager._texParameter(3553, 33085"),
+            "SodiumShader should not set max mip level with hardcoded target/pname literals via GlStateManager wrapper");
+        assertTrue(sodiumShaderSource.contains("VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL"),
+            "SodiumShader should set base mip level directly through VulkanicAPI.setTextureParameter");
+        assertTrue(sodiumShaderSource.contains("VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL"),
+            "SodiumShader should set max mip level directly through VulkanicAPI.setTextureParameter");
     }
 
     @Test
@@ -373,6 +619,177 @@ public class Phase3DrawPathTest {
             "GlFence should compare completion state against VulkanicAPI.GL_SIGNALED");
         assertTrue(fenceSource.contains("VulkanicAPI.waitForSyncWithFlush("),
             "GlFence should wait via VulkanicAPI.waitForSyncWithFlush");
+    }
+
+    @Test
+    public void testBlaze3dSyncPathsUseAgnosticFenceHelpers() throws IOException {
+        Path fenceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlFence.java");
+        String fenceSource = Files.readString(fenceFile);
+
+        assertFalse(fenceSource.contains("_glFenceSync(37143, 0)"),
+            "blaze3d GlFence should not create sync with hardcoded GL_SYNC_GPU_COMMANDS_COMPLETE literal 37143");
+        assertFalse(fenceSource.contains("i == 37147"),
+            "blaze3d GlFence should not compare timeout with hardcoded GL_TIMEOUT_EXPIRED literal 37147");
+        assertFalse(fenceSource.contains("i == 37149"),
+            "blaze3d GlFence should not compare failure with hardcoded GL_WAIT_FAILED literal 37149");
+
+        assertTrue(fenceSource.contains("VulkanicAPI.isSyncWaitTimeout("),
+            "blaze3d GlFence should detect timeout via VulkanicAPI.isSyncWaitTimeout helper");
+        assertTrue(fenceSource.contains("VulkanicAPI.isSyncWaitFailed("),
+            "blaze3d GlFence should detect wait failure via VulkanicAPI.isSyncWaitFailed helper");
+        assertTrue(fenceSource.contains("VulkanicAPI.createGpuCompletionFence("),
+            "blaze3d GlFence should create fences directly via VulkanicAPI.createGpuCompletionFence");
+        assertTrue(fenceSource.contains("VulkanicAPI.destroySync("),
+            "blaze3d GlFence should destroy fences directly via VulkanicAPI.destroySync");
+        assertTrue(fenceSource.contains("VulkanicAPI.waitForSync("),
+            "blaze3d GlFence should wait directly via VulkanicAPI.waitForSync");
+
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static long _glFenceSync("),
+            "GlStateManager should no longer expose _glFenceSync wrapper");
+        assertFalse(stateManagerSource.contains("public static int _glClientWaitSync("),
+            "GlStateManager should no longer expose _glClientWaitSync wrapper");
+        assertFalse(stateManagerSource.contains("public static void _glDeleteSync("),
+            "GlStateManager should no longer expose _glDeleteSync wrapper");
+    }
+
+    @Test
+    public void testBlaze3dUniformAndAttribWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _glUniform1i("),
+            "GlStateManager should no longer expose _glUniform1i wrapper");
+        assertFalse(stateManagerSource.contains("public static void _glBindAttribLocation("),
+            "GlStateManager should no longer expose _glBindAttribLocation wrapper");
+
+        Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
+        String glProgramSource = Files.readString(glProgramFile);
+        assertFalse(glProgramSource.contains("GlStateManager._glBindAttribLocation("),
+            "GlProgram should not bind attributes through removed GlStateManager wrapper");
+        assertTrue(glProgramSource.contains("VulkanicAPI.setAttributeLocation(ctx"),
+            "GlProgram should bind attributes directly via VulkanicAPI.setAttributeLocation");
+
+        Path vertexFormatFile = SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java");
+        String vertexFormatSource = Files.readString(vertexFormatFile);
+        assertFalse(vertexFormatSource.contains("GlStateManager._glBindAttribLocation("),
+            "VertexFormat Iris binding path should not use removed GlStateManager wrapper");
+        assertTrue(vertexFormatSource.contains("VulkanicAPI.setAttributeLocation(ctx"),
+            "VertexFormat Iris binding path should use VulkanicAPI.setAttributeLocation directly");
+    }
+
+    @Test
+    public void testBlaze3dQueryAndTexParameterWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static String _getString("),
+            "GlStateManager should no longer expose _getString wrapper");
+        assertFalse(stateManagerSource.contains("public static int _getInteger("),
+            "GlStateManager should no longer expose _getInteger wrapper");
+        assertFalse(stateManagerSource.contains("public static int _getTexLevelParameter("),
+            "GlStateManager should no longer expose _getTexLevelParameter wrapper");
+        assertFalse(stateManagerSource.contains("public static void _texParameter("),
+            "GlStateManager should no longer expose _texParameter wrapper");
+    }
+
+    @Test
+    public void testOpenGLBackendManagedAllocationsAvoidBlaze3dErrorWrappers() throws IOException {
+        Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
+        String backendSource = Files.readString(backendFile);
+
+        assertFalse(backendSource.contains("net.blaze3d.opengl.GlStateManager.clearGlErrors()"),
+            "OpenGLBackend managed allocation paths should not clear errors through Blaze3D GlStateManager wrapper");
+        assertFalse(backendSource.contains("net.blaze3d.opengl.GlStateManager._getError()"),
+            "OpenGLBackend managed allocation paths should not query errors through Blaze3D GlStateManager wrapper");
+        assertTrue(backendSource.contains("while (GL11.glGetError() != GL11.GL_NO_ERROR)"),
+            "OpenGLBackend managed allocation paths should clear errors directly via GL11.glGetError loop");
+        assertTrue(backendSource.contains("int error = GL11.glGetError()"),
+            "OpenGLBackend managed allocation paths should query errors directly via GL11.glGetError");
+    }
+
+    @Test
+    public void testVertexArrayCacheUsesDirectVulkanicStringQueries() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/VertexArrayCache.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("GlStateManager._getString(7936)"),
+            "VertexArrayCache should not query GL_VENDOR via hardcoded literal through GlStateManager._getString wrapper");
+        assertFalse(source.contains("GlStateManager._getString(7938)"),
+            "VertexArrayCache should not query GL_VERSION via hardcoded literal through GlStateManager._getString wrapper");
+        assertTrue(source.contains("VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_VENDOR)"),
+            "VertexArrayCache should query vendor directly through VulkanicAPI.getString + VulkanicAPI.GL_VENDOR");
+        assertTrue(source.contains("VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_VERSION)"),
+            "VertexArrayCache should query version directly through VulkanicAPI.getString + VulkanicAPI.GL_VERSION");
+    }
+
+    @Test
+    public void testBufferStorageUsesDirectVulkanicErrorQueries() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/BufferStorage.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("GlStateManager._getError()"),
+            "BufferStorage map failure paths should not query errors through GlStateManager._getError wrapper");
+        assertFalse(source.contains("GlStateManager.clearGlErrors()"),
+            "BufferStorage map failure paths should not clear errors through GlStateManager.clearGlErrors wrapper");
+        assertTrue(source.contains("VulkanicAPI.getError(VulkanicAPI.getImmediateContext())"),
+            "BufferStorage map failure paths should query errors directly through VulkanicAPI.getError");
+    }
+
+    @Test
+    public void testBlaze3dErrorWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static int _getError("),
+            "GlStateManager should no longer expose _getError wrapper");
+        assertFalse(stateManagerSource.contains("public static void clearGlErrors("),
+            "GlStateManager should no longer expose clearGlErrors wrapper");
+    }
+
+    @Test
+    public void testBlaze3dVertexArrayWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _glBindVertexArray("),
+            "GlStateManager should no longer expose _glBindVertexArray wrapper");
+        assertFalse(stateManagerSource.contains("public static void _enableVertexAttribArray("),
+            "GlStateManager should no longer expose _enableVertexAttribArray wrapper");
+        assertFalse(stateManagerSource.contains("public static void _vertexAttribPointer("),
+            "GlStateManager should no longer expose _vertexAttribPointer wrapper");
+        assertFalse(stateManagerSource.contains("public static void _vertexAttribIPointer("),
+            "GlStateManager should no longer expose _vertexAttribIPointer wrapper");
+        assertFalse(stateManagerSource.contains("public static int _glGenVertexArrays("),
+            "GlStateManager should no longer expose _glGenVertexArrays wrapper");
+
+        Path dhProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
+        String dhProgramSource = Files.readString(dhProgramFile);
+        assertFalse(dhProgramSource.contains("GlStateManager._glBindVertexArray("),
+            "IrisGenericRenderProgram should not bind VAOs through removed GlStateManager wrapper");
+        assertFalse(dhProgramSource.contains("GlStateManager._glGenVertexArrays("),
+            "IrisGenericRenderProgram should not create VAOs through removed GlStateManager wrapper");
+        assertTrue(dhProgramSource.contains("VulkanicAPI.createVertexArray("),
+            "IrisGenericRenderProgram should create VAOs directly through VulkanicAPI.createVertexArray");
+        assertTrue(dhProgramSource.contains("VulkanicAPI.bindVertexArray("),
+            "IrisGenericRenderProgram should bind VAOs directly through VulkanicAPI.bindVertexArray");
+    }
+
+    @Test
+    public void testBlaze3dDrawAndPixelWrappersRemovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void _drawElements("),
+            "GlStateManager should no longer expose _drawElements wrapper");
+        assertFalse(stateManagerSource.contains("public static void _drawArrays("),
+            "GlStateManager should no longer expose _drawArrays wrapper");
+        assertFalse(stateManagerSource.contains("public static void _pixelStore("),
+            "GlStateManager should no longer expose _pixelStore wrapper");
+        assertFalse(stateManagerSource.contains("public static void _readPixels("),
+            "GlStateManager should no longer expose _readPixels wrapper");
     }
 
     @Test

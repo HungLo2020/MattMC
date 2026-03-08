@@ -54,10 +54,11 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 		if (i <= 0) {
 			throw new ShaderManager.CompilationException("Could not create shader program (returned program ID " + i + ")");
 		} else {
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 			int j = 0;
 
 			for (String string2 : vertexFormat.getElementAttributeNames()) {
-				GlStateManager._glBindAttribLocation(i, j, string2);
+				VulkanicAPI.setAttributeLocation(ctx, i, j, string2);
 				j++;
 			}
 

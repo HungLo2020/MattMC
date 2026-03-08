@@ -205,7 +205,7 @@ public class StandardMacros {
 	 * @see <a href="https://github.com/sp614x/optifine/blob/9c6a5b5326558ccc57c6490b66b3be3b2dc8cbef/OptiFineDoc/doc/shaders.txt#L705-L707">Optifine Doc for GLSL Version</a>
 	 */
 	public static String getGlVersion(int name) {
-		String info = GlStateManager._getString(name);
+		String info = VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), name);
 
 		Matcher matcher = SEMVER_PATTERN.matcher(Objects.requireNonNull(info));
 
@@ -326,7 +326,7 @@ public class StandardMacros {
 	 */
 	public static Set<String> getGlExtensions() {
 		// In OpenGL Core, we must use a new way of retrieving extensions.
-		int numExtensions = GlStateManager._getInteger(VulkanicAPI.GL_NUM_EXTENSIONS);
+		int numExtensions = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_NUM_EXTENSIONS);
 
 		String[] extensions = new String[numExtensions];
 

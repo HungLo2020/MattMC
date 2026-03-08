@@ -2192,7 +2192,8 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("Buffer size must be greater than zero, got: " + size);
         }
         CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
-        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
         int handle = GL15.glGenBuffers();
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, handle);
         if (hasBufferStorageExtension()) {
@@ -2204,7 +2205,7 @@ public class OpenGLBackend implements GraphicsBackend {
             bufferData(ctx, GL15.GL_ARRAY_BUFFER, (long) size, GL15.GL_DYNAMIC_DRAW);
         }
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-        int error = net.blaze3d.opengl.GlStateManager._getError();
+        int error = GL11.glGetError();
         if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
             throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate buffer of size " + size);
         } else if (error != 0) {
@@ -2220,7 +2221,8 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         int size = initialData.remaining();
         CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
-        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
         int handle = GL15.glGenBuffers();
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, handle);
         if (hasBufferStorageExtension()) {
@@ -2232,7 +2234,7 @@ public class OpenGLBackend implements GraphicsBackend {
             bufferData(ctx, GL15.GL_ARRAY_BUFFER, initialData, GL15.GL_DYNAMIC_DRAW);
         }
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-        int error = net.blaze3d.opengl.GlStateManager._getError();
+        int error = GL11.glGetError();
         if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
             throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate buffer of size " + size);
         } else if (error != 0) {
@@ -2255,14 +2257,14 @@ public class OpenGLBackend implements GraphicsBackend {
         if (accessFlags == 0) {
             throw new IllegalArgumentException("At least one of read or write must be true");
         }
-        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, openGLBuffer.getGlHandle());
         java.nio.ByteBuffer mapped = org.lwjgl.opengl.GL30.glMapBufferRange(
             GL15.GL_ARRAY_BUFFER, 0, openGLBuffer.size(), accessFlags);
         if (mapped == null) {
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-            throw new IllegalStateException("glMapBufferRange returned null, GL error: " +
-                net.blaze3d.opengl.GlStateManager._getError());
+            throw new IllegalStateException("glMapBufferRange returned null, GL error: " + GL11.glGetError());
         }
         int glHandle = openGLBuffer.getGlHandle();
         return new OpenGLBuffer.OpenGLMappedView(
@@ -2285,7 +2287,8 @@ public class OpenGLBackend implements GraphicsBackend {
         if (mipLevels < 1) throw new IllegalArgumentException("mipLevels must be at least 1");
         if (depthOrLayers < 1) throw new IllegalArgumentException("depthOrLayers must be at least 1");
         if (depthOrLayers > 1) throw new UnsupportedOperationException("Array/3D textures not yet supported in managed API");
-        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
         int handle = GL11.glGenTextures();
         if (label == null) label = String.valueOf(handle);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, handle);
@@ -2299,7 +2302,7 @@ public class OpenGLBackend implements GraphicsBackend {
                 Math.max(1, height >> mip), 0, externalFmt, glType, (java.nio.ByteBuffer) null);
         }
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-        int error = net.blaze3d.opengl.GlStateManager._getError();
+        int error = GL11.glGetError();
         if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
             throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate texture " + width + "x" + height);
         } else if (error != 0) {

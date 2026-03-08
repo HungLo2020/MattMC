@@ -77,11 +77,11 @@ public class TextureInfoCache {
 
 		private int fetchLevelParameter(int pname) {
 			// Keep track of what texture was bound before
-			int previousTextureBinding = GlStateManager._getInteger(VulkanicAPI.GL_TEXTURE_BINDING_2D);
+			int previousTextureBinding = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_BINDING_2D);
 
 			// Bind this texture and grab the parameter from it.
 			GlStateManager._bindTexture(id);
-			int parameter = GlStateManager._getTexLevelParameter(VulkanicAPI.GL_TEXTURE_2D, 0, pname);
+			int parameter = VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, pname);
 
 			// Make sure to re-bind the previous texture to avoid issues.
 			GlStateManager._bindTexture(previousTextureBinding);

@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.sampler;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
 
@@ -11,9 +10,11 @@ public class SamplerLimits {
 	private final int maxShaderStorageUnits;
 
 	private SamplerLimits() {
-		this.maxTextureUnits = GlStateManager._getInteger(VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS);
-		this.maxDrawBuffers = GlStateManager._getInteger(VulkanicAPI.GL_MAX_DRAW_BUFFERS);
-		this.maxShaderStorageUnits = IrisRenderSystem.supportsSSBO() ? GlStateManager._getInteger(VulkanicAPI.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS) : 0;
+		this.maxTextureUnits = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS);
+		this.maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS);
+		this.maxShaderStorageUnits = IrisRenderSystem.supportsSSBO()
+			? VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS)
+			: 0;
 	}
 
 	public static SamplerLimits get() {
