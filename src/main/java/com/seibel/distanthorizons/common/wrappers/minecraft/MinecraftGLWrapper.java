@@ -1,6 +1,5 @@
 package com.seibel.distanthorizons.common.wrappers.minecraft;
 
-import net.blaze3d.opengl.GlStateManager;
 
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
@@ -154,7 +153,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public int glGenBuffers()
 	{
-		GlStateManager.incrementTrackedBuffers();
+		net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
 		return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
 	}
 	
@@ -162,7 +161,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glDeleteBuffers(int buffer)
 	{
-		GlStateManager.decrementTrackedBuffers();
+		net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
 		VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), buffer);
 		
 		// MC's implementation has a bug where it will throw:

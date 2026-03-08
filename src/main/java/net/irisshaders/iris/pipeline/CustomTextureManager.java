@@ -149,7 +149,7 @@ public class CustomTextureManager {
 						int tex = net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex();
 						int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
 						texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
-						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + tex);
+						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(tex);
 						VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), binding);
 					}
 					return texture != null ? texture.getTexture().iris$getGlId() : textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture().iris$getGlId();
@@ -166,7 +166,7 @@ public class CustomTextureManager {
 							int tex = net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex();
 							int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
 							texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
-							net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + tex);
+							net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(tex);
 							VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), binding);
 						}
 						int id = texture.getTexture().iris$getGlId();

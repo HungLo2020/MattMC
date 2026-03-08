@@ -1178,7 +1178,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		//
 		// Without this code, there will be weird issues when reloading certain shaderpacks.
 		for (int i = 0; i < 16; i++) {
-			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + i);
+			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
 			IrisRenderSystem.unbindAllSamplers();
 			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 		}

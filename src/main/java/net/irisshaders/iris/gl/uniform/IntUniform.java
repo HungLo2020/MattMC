@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.uniform;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import net.vulkanic.VulkanicAPI;
 

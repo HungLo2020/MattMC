@@ -1,8 +1,8 @@
 package net.irisshaders.iris.uniforms;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.compat.dh.DHCompat;
+import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
 import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
@@ -93,10 +93,13 @@ public final class CommonUniforms {
 		}, StateUpdateNotifiers.bindTextureNotifier);
 
 		uniforms.uniform4i("blendFunc", () -> {
-			GlStateManager.BlendState blend = GlStateManager.BLEND; // Direct static field access
-
-			if (blend.mode.enabled) { // Direct field access - enabled is public
-				return new Vector4i(blend.srcRgb, blend.dstRgb, blend.srcAlpha, blend.dstAlpha);
+			if (BlendModeStorage.isBlendEnabled()) {
+				return new Vector4i(
+					BlendModeStorage.getBlendSrcRgb(),
+					BlendModeStorage.getBlendDstRgb(),
+					BlendModeStorage.getBlendSrcAlpha(),
+					BlendModeStorage.getBlendDstAlpha()
+				);
 			} else {
 				return ZERO_VECTOR_4i;
 			}

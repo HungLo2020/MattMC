@@ -2,7 +2,6 @@ package net.irisshaders.iris.pipeline.programs;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.Iris;

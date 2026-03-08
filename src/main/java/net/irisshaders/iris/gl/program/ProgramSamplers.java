@@ -74,7 +74,7 @@ public class ProgramSamplers {
 			samplerBinding.update();
 		}
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + activeTexture);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(activeTexture);
 	}
 
 	public void removeListeners() {

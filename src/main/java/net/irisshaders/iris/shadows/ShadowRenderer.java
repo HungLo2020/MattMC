@@ -1,7 +1,6 @@
 package net.irisshaders.iris.shadows;
 
 import com.google.common.collect.ImmutableList;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;

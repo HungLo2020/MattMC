@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.framebuffer;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.textures.GpuTexture;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;

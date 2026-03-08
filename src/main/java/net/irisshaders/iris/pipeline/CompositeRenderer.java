@@ -344,7 +344,7 @@ public class CompositeRenderer {
 			// Unbind all textures that we may have used.
 			// NB: This is necessary for shader pack reloading to work propely
 			if (net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(i) != 0) {
-				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + i);
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
 				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
 			}
 		}

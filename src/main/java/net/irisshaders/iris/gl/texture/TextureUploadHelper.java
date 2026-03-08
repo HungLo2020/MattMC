@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.texture;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.VulkanicAPI;
 
 public class TextureUploadHelper {

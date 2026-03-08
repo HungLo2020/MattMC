@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.buffer;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
@@ -52,7 +51,7 @@ public class ShaderStorageBuffer {
 		if (!info.relative()) return;
 
 		IrisRenderSystem.deleteBuffers(id);
-		GlStateManager.incrementTrackedBuffers();
+		IrisRenderSystem.incrementTrackedBuffers();
 		int newId = VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
 		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, newId);
 

@@ -1,12 +1,16 @@
 package net.irisshaders.iris.gl.blending;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.VulkanicAPI;
 
 public class DepthColorStorage {
 	private static boolean originalDepthEnable;
 	private static ColorMask originalColor;
 	private static boolean depthColorLocked;
+	private static boolean currentDepthEnable = true;
+	private static boolean currentRedMask = true;
+	private static boolean currentGreenMask = true;
+	private static boolean currentBlueMask = true;
+	private static boolean currentAlphaMask = true;
 
 	public static boolean isDepthColorLocked() {
 		return depthColorLocked;
@@ -15,11 +19,8 @@ public class DepthColorStorage {
 	public static void disableDepthColor() {
 		if (!depthColorLocked) {
 			// Only save the previous state if the depth and color mask wasn't already locked
-			GlStateManager.ColorMask colorMask = GlStateManager.COLOR_MASK;
-			GlStateManager.DepthState depthState = GlStateManager.DEPTH;
-
-			originalDepthEnable = depthState.mask;
-			originalColor = new ColorMask(colorMask.red, colorMask.green, colorMask.blue, colorMask.alpha);
+			originalDepthEnable = currentDepthEnable;
+			originalColor = new ColorMask(currentRedMask, currentGreenMask, currentBlueMask, currentAlphaMask);
 		}
 
 		depthColorLocked = false;
@@ -36,8 +37,8 @@ public class DepthColorStorage {
 			return;
 		}
 
-		if (enabled != GlStateManager.DEPTH.mask) {
-			GlStateManager.DEPTH.mask = enabled;
+		if (enabled != currentDepthEnable) {
+			currentDepthEnable = enabled;
 			VulkanicAPI.setDepthWriteMask(VulkanicAPI.getImmediateContext(), enabled);
 		}
 	}
@@ -48,12 +49,11 @@ public class DepthColorStorage {
 			return;
 		}
 
-		GlStateManager.ColorMask colorMask = GlStateManager.COLOR_MASK;
-		if (red != colorMask.red || green != colorMask.green || blue != colorMask.blue || alpha != colorMask.alpha) {
-			colorMask.red = red;
-			colorMask.green = green;
-			colorMask.blue = blue;
-			colorMask.alpha = alpha;
+		if (red != currentRedMask || green != currentGreenMask || blue != currentBlueMask || alpha != currentAlphaMask) {
+			currentRedMask = red;
+			currentGreenMask = green;
+			currentBlueMask = blue;
+			currentAlphaMask = alpha;
 			VulkanicAPI.setColorMask(VulkanicAPI.getImmediateContext(), red, green, blue, alpha);
 		}
 	}

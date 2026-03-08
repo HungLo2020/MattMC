@@ -1,7 +1,6 @@
 package net.irisshaders.iris.targets;
 
 import com.google.common.collect.ImmutableSet;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.AddressMode;
 import net.blaze3d.textures.FilterMode;

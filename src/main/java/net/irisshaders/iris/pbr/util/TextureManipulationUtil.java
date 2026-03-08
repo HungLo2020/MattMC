@@ -1,6 +1,5 @@
 package net.irisshaders.iris.pbr.util;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
 

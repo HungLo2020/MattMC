@@ -1,13 +1,16 @@
 package net.irisshaders.iris.gl;
 
+import com.mojang.jtracy.Plot;
+import com.mojang.jtracy.TracyClient;
 import net.blaze3d.ProjectionType;
 import net.blaze3d.buffers.GpuBufferSlice;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.gl.sampler.SamplerLimits;
+import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
@@ -38,8 +41,20 @@ public class IrisRenderSystem {
 	private static int[] samplers;
 	private static final IntList textureToUnswizzle = new IntArrayList();
 	private static int currentProgram;
+	private static Runnable blendFuncListener;
 	private static int readFramebuffer;
 	private static int writeFramebuffer;
+	private static final int TEXTURE_UNIT_COUNT = 128;
+	private static int activeTextureUnitIndex;
+	private static final int[] textureBindings = new int[TEXTURE_UNIT_COUNT];
+	private static final Plot PLOT_BUFFERS = TracyClient.createPlot("GPU Buffers");
+	private static int numBuffers = 0;
+	private static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
+	private static int numTextures = 0;
+
+	static {
+		StateUpdateNotifiers.blendFuncNotifier = listener -> blendFuncListener = listener;
+	}
 
 	public static void initRenderer() {
 		if (VulkanicAPI.getGraphicsCapabilities().OpenGL45) {
@@ -314,13 +329,13 @@ public class IrisRenderSystem {
 	public static void disableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
 		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_BLEND, buffer, false);
-		((BooleanStateExtended) GlStateManager.BLEND.mode).setUnknownState();
+		BlendModeStorage.markBlendStateUnknown();
 	}
 
 	public static void enableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
 		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_BLEND, buffer, true);
-		((BooleanStateExtended) GlStateManager.BLEND.mode).setUnknownState();
+		BlendModeStorage.markBlendStateUnknown();
 	}
 
 	public static void blendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
@@ -534,19 +549,23 @@ public class IrisRenderSystem {
 		int textureUnitIndex = textureUnit - VulkanicAPI.GL_TEXTURE0;
 		validateTextureUnitIndex(textureUnitIndex);
 
-		if (GlStateManager.activeTexture != textureUnitIndex) {
-			GlStateManager.activeTexture = textureUnitIndex;
+		if (activeTextureUnitIndex != textureUnitIndex) {
+			activeTextureUnitIndex = textureUnitIndex;
 			VulkanicAPI.setActiveTextureUnit(VulkanicAPI.getImmediateContext(), textureUnit);
 		}
 	}
 
+	public static void setActiveTextureUnitIndex(int textureUnitIndex) {
+		setActiveTexture(VulkanicAPI.GL_TEXTURE0 + textureUnitIndex);
+	}
+
 	public static int getActiveTextureUnitIndex() {
-		return GlStateManager.activeTexture;
+		return activeTextureUnitIndex;
 	}
 
 	public static int getTextureBinding(int textureUnitIndex) {
 		validateTextureUnitIndex(textureUnitIndex);
-		return GlStateManager.TEXTURES[textureUnitIndex].binding;
+		return textureBindings[textureUnitIndex];
 	}
 
 	public static int getBoundTextureOnActiveUnit() {
@@ -555,11 +574,11 @@ public class IrisRenderSystem {
 
 	public static void setTextureBinding(int textureUnitIndex, int textureId) {
 		validateTextureUnitIndex(textureUnitIndex);
-		GlStateManager.TEXTURES[textureUnitIndex].binding = textureId;
+		textureBindings[textureUnitIndex] = textureId;
 	}
 
 	private static void validateTextureUnitIndex(int textureUnitIndex) {
-		if (textureUnitIndex < 0 || textureUnitIndex >= GlStateManager.TEXTURES.length) {
+		if (textureUnitIndex < 0 || textureUnitIndex >= textureBindings.length) {
 			throw new IllegalArgumentException("Texture " + textureUnitIndex + " out of range");
 		}
 	}
@@ -587,21 +606,47 @@ public class IrisRenderSystem {
 
 	public static int createTextureId() {
 		RenderSystem.assertOnRenderThread();
-		GlStateManager.incrementTrackedTextures();
+		incrementTrackedTextures();
 		return VulkanicAPI.createTexture2D(VulkanicAPI.getImmediateContext());
+	}
+
+	public static void incrementTrackedTextures() {
+		numTextures++;
+		PLOT_TEXTURES.setValue(numTextures);
+	}
+
+	public static void decrementTrackedTextures() {
+		numTextures--;
+		PLOT_TEXTURES.setValue(numTextures);
+	}
+
+	public static void incrementTrackedBuffers() {
+		numBuffers++;
+		PLOT_BUFFERS.setValue(numBuffers);
+	}
+
+	public static void decrementTrackedBuffers() {
+		numBuffers--;
+		PLOT_BUFFERS.setValue(numBuffers);
+	}
+
+	public static void notifyBlendFuncChanged() {
+		if (blendFuncListener != null) {
+			blendFuncListener.run();
+		}
 	}
 
 	public static void deleteTextureId(int textureId) {
 		RenderSystem.assertOnRenderThread();
 		VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), textureId);
 
-		for (GlStateManager.TextureState textureState : GlStateManager.TEXTURES) {
-			if (textureState.binding == textureId) {
-				textureState.binding = -1;
+		for (int textureUnitIndex = 0; textureUnitIndex < textureBindings.length; textureUnitIndex++) {
+			if (textureBindings[textureUnitIndex] == textureId) {
+				textureBindings[textureUnitIndex] = -1;
 			}
 		}
 
-		GlStateManager.decrementTrackedTextures();
+		decrementTrackedTextures();
 
 		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.onDeleteTexture(textureId);
 		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onDeleteTexture(textureId);
@@ -857,17 +902,17 @@ public class IrisRenderSystem {
 		@Override
 		public void bindTextureToUnit(int target, int unit, int texture) {
 			int activeTexture = getActiveTextureUnitIndex();
-			setActiveTexture(VulkanicAPI.GL_TEXTURE0 + unit);
+			setActiveTextureUnitIndex(unit);
 			VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), target, texture);
 			if (target == VulkanicAPI.GL_TEXTURE_2D) {
 				setTextureBinding(unit, texture);
 			}
-			setActiveTexture(VulkanicAPI.GL_TEXTURE0 + activeTexture);
+			setActiveTextureUnitIndex(activeTexture);
 		}
 
 		@Override
 		public int bufferStorage(int target, float[] data, int usage) {
-			GlStateManager.incrementTrackedBuffers();
+			incrementTrackedBuffers();
 			int buffer = VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
 			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer);
 			bufferData(target, data, usage);
@@ -906,7 +951,7 @@ public class IrisRenderSystem {
 
 		@Override
 		public int createBuffers() {
-			GlStateManager.incrementTrackedBuffers();
+			incrementTrackedBuffers();
 			return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
 		}
 	}

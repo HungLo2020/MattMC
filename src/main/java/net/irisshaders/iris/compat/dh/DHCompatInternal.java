@@ -1,6 +1,5 @@
 package net.irisshaders.iris.compat.dh;
 
-import net.blaze3d.opengl.GlStateManager;
 import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiFramebuffer;
 import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiGenericObjectShaderProgram;

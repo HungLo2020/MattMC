@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.VertexFormat;

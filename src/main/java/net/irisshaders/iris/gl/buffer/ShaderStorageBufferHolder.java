@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.buffer;
 
-import net.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.IrisRenderSystem;

@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.texture;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.shaderpack.texture.TextureFilteringData;

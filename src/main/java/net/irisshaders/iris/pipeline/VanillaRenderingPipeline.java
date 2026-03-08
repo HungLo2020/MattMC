@@ -1,6 +1,5 @@
 package net.irisshaders.iris.pipeline;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.textures.GpuTextureView;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMaps;

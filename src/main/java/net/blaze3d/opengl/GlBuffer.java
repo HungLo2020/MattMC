@@ -44,7 +44,7 @@ public class GlBuffer extends GpuBuffer {
 				this.persistentBuffer = null;
 			}
 
-			GlStateManager.decrementTrackedBuffers();
+			net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
 			VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), this.handle);
 			MEMORY_POOl.free(this.handle);
 		}

@@ -1,7 +1,6 @@
 package net.irisshaders.iris.pipeline.programs;
 
 import net.blaze3d.opengl.GlProgram;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.Uniform;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.UniformType;

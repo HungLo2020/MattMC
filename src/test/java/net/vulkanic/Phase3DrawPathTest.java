@@ -58,6 +58,18 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testGlStateManagerTypeDeleted() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        assertTrue(Files.exists(stateManagerFile), "GlStateManager.java path should remain for migration tracking");
+
+        String source = Files.readString(stateManagerFile);
+        assertFalse(source.contains("class GlStateManager"),
+            "GlStateManager type should be fully deleted from source");
+        assertFalse(source.contains("public class GlStateManager"),
+            "GlStateManager should no longer exist as a concrete class");
+    }
+
+    @Test
     public void testDrawFromBuffersCallsVulkanicAPIDrawElements() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/blaze3d/opengl/GlCommandEncoder.java");
@@ -1056,6 +1068,26 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testOpenGLBackendTracksTextureBindingsWithoutGlStateManager() throws IOException {
+        Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
+        String backendSource = Files.readString(backendFile);
+
+        assertFalse(backendSource.contains("import net.blaze3d.opengl.GlStateManager;"),
+            "OpenGLBackend should not import GlStateManager for texture-state tracking");
+        assertFalse(backendSource.contains("GlStateManager.activeTexture"),
+            "OpenGLBackend should not read active texture from GlStateManager");
+        assertFalse(backendSource.contains("GlStateManager.TEXTURES"),
+            "OpenGLBackend should not read or write texture bindings through GlStateManager.TEXTURES");
+
+        assertTrue(backendSource.contains("private final int[] texture2DBindings"),
+            "OpenGLBackend should maintain backend-local 2D texture binding cache");
+        assertTrue(backendSource.contains("private int activeTextureUnitIndex"),
+            "OpenGLBackend should maintain backend-local active texture unit index");
+        assertTrue(backendSource.contains("activeTextureUnitIndex = textureUnitIndex"),
+            "OpenGLBackend should update backend-local active texture unit state in setActiveTextureUnit");
+    }
+
+    @Test
     public void testVertexArrayCacheUsesDirectVulkanicStringQueries() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/VertexArrayCache.java");
         String source = Files.readString(file);
@@ -1145,8 +1177,10 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should not map buffers through removed GlStateManager._glMapBufferRange wrapper");
         assertFalse(directStateAccessSource.contains("GlStateManager._glUnmapBuffer("),
             "DirectStateAccess should not unmap buffers through removed GlStateManager._glUnmapBuffer wrapper");
-        assertTrue(directStateAccessSource.contains("GlStateManager.incrementTrackedBuffers();"),
-            "DirectStateAccess should keep Blaze3D buffer tracking increments explicitly");
+        assertFalse(directStateAccessSource.contains("GlStateManager.incrementTrackedBuffers();"),
+            "DirectStateAccess should no longer increment tracked buffers through GlStateManager");
+        assertTrue(directStateAccessSource.contains("IrisRenderSystem.incrementTrackedBuffers();"),
+            "DirectStateAccess should increment tracked buffers through IrisRenderSystem helper");
         assertTrue(directStateAccessSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext())"),
             "DirectStateAccess should create buffers directly via VulkanicAPI.createBuffer");
         assertTrue(directStateAccessSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(),"),
@@ -1186,8 +1220,8 @@ public class Phase3DrawPathTest {
         String glBufferSource = Files.readString(glBufferFile);
         assertFalse(glBufferSource.contains("GlStateManager._glDeleteBuffers("),
             "GlBuffer should not delete buffers through removed GlStateManager._glDeleteBuffers wrapper");
-        assertTrue(glBufferSource.contains("GlStateManager.decrementTrackedBuffers();"),
-            "GlBuffer should preserve tracked-buffer decrement explicitly when closing");
+        assertTrue(glBufferSource.contains("IrisRenderSystem.decrementTrackedBuffers();"),
+            "GlBuffer should preserve tracked-buffer decrement through IrisRenderSystem helper when closing");
         assertTrue(glBufferSource.contains("VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), this.handle)"),
             "GlBuffer should delete buffers directly via VulkanicAPI.deleteBuffer");
 
@@ -1363,6 +1397,10 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _depthFunc wrapper");
         assertFalse(stateManagerSource.contains("public static void _depthMask("),
             "GlStateManager should no longer expose _depthMask wrapper");
+        assertFalse(stateManagerSource.contains("public static final GlStateManager.DepthState DEPTH"),
+            "GlStateManager should no longer own depth-mask state container");
+        assertFalse(stateManagerSource.contains("class DepthState"),
+            "GlStateManager should no longer define DepthState helper class");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
         String encoderSource = Files.readString(encoderFile);
@@ -1425,6 +1463,10 @@ public class Phase3DrawPathTest {
         String depthColorStorageSource = Files.readString(depthColorStorageFile);
         assertTrue(depthColorStorageSource.contains("public static void setDepthMask("),
             "DepthColorStorage should expose lock-aware setDepthMask after _depthMask wrapper removal");
+        assertFalse(depthColorStorageSource.contains("GlStateManager.DEPTH"),
+            "DepthColorStorage should not read depth-mask state from GlStateManager");
+        assertTrue(depthColorStorageSource.contains("private static boolean currentDepthEnable"),
+            "DepthColorStorage should own depth-mask state locally");
     }
 
     @Test
@@ -1434,6 +1476,10 @@ public class Phase3DrawPathTest {
 
         assertFalse(stateManagerSource.contains("public static void _colorMask("),
             "GlStateManager should no longer expose _colorMask wrapper");
+        assertFalse(stateManagerSource.contains("public static final GlStateManager.ColorMask COLOR_MASK"),
+            "GlStateManager should no longer own color-mask state container");
+        assertFalse(stateManagerSource.contains("class ColorMask"),
+            "GlStateManager should no longer define color-mask state helper class");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
         String encoderSource = Files.readString(encoderFile);
@@ -1448,6 +1494,10 @@ public class Phase3DrawPathTest {
             "DepthColorStorage should not call removed GlStateManager._colorMask wrapper");
         assertTrue(depthColorStorageSource.contains("public static void setColorMask("),
             "DepthColorStorage should expose lock-aware setColorMask after _colorMask wrapper removal");
+        assertFalse(depthColorStorageSource.contains("GlStateManager.COLOR_MASK"),
+            "DepthColorStorage should not read color-mask state from GlStateManager");
+        assertTrue(depthColorStorageSource.contains("private static boolean currentRedMask"),
+            "DepthColorStorage should own color-mask state locally");
     }
 
     @Test
@@ -1463,6 +1513,16 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _blendFuncSeparate wrapper");
         assertFalse(stateManagerSource.contains("public static void glBlendFuncSeparate("),
             "GlStateManager should no longer expose glBlendFuncSeparate shim");
+        assertFalse(stateManagerSource.contains("public static void notifyBlendFuncChanged("),
+            "GlStateManager should no longer expose blend-function notifier trigger");
+        assertFalse(stateManagerSource.contains("StateUpdateNotifiers.blendFuncNotifier"),
+            "GlStateManager should no longer own blend-function notifier wiring");
+        assertFalse(stateManagerSource.contains("public static final GlStateManager.BlendState BLEND"),
+            "GlStateManager should no longer own blend-state container");
+        assertFalse(stateManagerSource.contains("class BlendState"),
+            "GlStateManager should no longer define BlendState helper class");
+        assertFalse(stateManagerSource.contains("class BooleanState"),
+            "GlStateManager should no longer define BooleanState helper class");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
         String encoderSource = Files.readString(encoderFile);
@@ -1483,8 +1543,42 @@ public class Phase3DrawPathTest {
             "BlendModeStorage should expose setBlendEnabled helper after wrapper removal");
         assertTrue(blendStorageSource.contains("public static void setBlendFuncSeparate("),
             "BlendModeStorage should expose setBlendFuncSeparate helper after wrapper removal");
+        assertTrue(blendStorageSource.contains("public static boolean isBlendEnabled("),
+            "BlendModeStorage should expose blend-enabled getter for non-Blaze blend-state reads");
+        assertTrue(blendStorageSource.contains("public static int getBlendSrcRgb("),
+            "BlendModeStorage should expose blend factor getters for non-Blaze blend-state reads");
         assertTrue(blendStorageSource.contains("VulkanicAPI.setBlendFunction("),
             "BlendModeStorage should set blend function directly through VulkanicAPI.setBlendFunction");
+        assertTrue(blendStorageSource.contains("VulkanicAPI.setCapabilityEnabled("),
+            "BlendModeStorage should toggle GL_BLEND capability directly through VulkanicAPI");
+        assertTrue(blendStorageSource.contains("public static void markBlendStateUnknown("),
+            "BlendModeStorage should expose unknown-state marker for indexed blend overrides");
+        assertFalse(blendStorageSource.contains("GlStateManager.notifyBlendFuncChanged("),
+            "BlendModeStorage should not trigger blend-function notifier through GlStateManager");
+        assertTrue(blendStorageSource.contains("IrisRenderSystem.notifyBlendFuncChanged("),
+            "BlendModeStorage should trigger blend-function notifier through IrisRenderSystem");
+        assertFalse(blendStorageSource.contains("GlStateManager.BLEND"),
+            "BlendModeStorage should no longer read or write blend state through GlStateManager.BLEND");
+
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertTrue(irisRenderSystemSource.contains("public static void notifyBlendFuncChanged("),
+            "IrisRenderSystem should expose blend-function notifier trigger after migration");
+        assertTrue(irisRenderSystemSource.contains("StateUpdateNotifiers.blendFuncNotifier"),
+            "IrisRenderSystem should own blend-function notifier wiring after migration");
+        assertFalse(irisRenderSystemSource.contains("GlStateManager.BLEND"),
+            "IrisRenderSystem should not invalidate blend state through GlStateManager.BLEND");
+        assertTrue(irisRenderSystemSource.contains("BlendModeStorage.markBlendStateUnknown("),
+            "IrisRenderSystem should invalidate blend state through BlendModeStorage helper");
+
+        Path commonUniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/CommonUniforms.java");
+        String commonUniformsSource = Files.readString(commonUniformsFile);
+        assertFalse(commonUniformsSource.contains("GlStateManager.BLEND"),
+            "CommonUniforms should not read blend state directly from GlStateManager");
+        assertTrue(commonUniformsSource.contains("BlendModeStorage.isBlendEnabled("),
+            "CommonUniforms should read blend enabled state through BlendModeStorage helper");
+        assertTrue(commonUniformsSource.contains("BlendModeStorage.getBlendSrcRgb("),
+            "CommonUniforms should read blend factors through BlendModeStorage helpers");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = Files.readString(dhWrapperFile);
@@ -1496,6 +1590,35 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should not call removed GlStateManager._blendFuncSeparate wrapper");
         assertTrue(dhWrapperSource.contains("BlendModeStorage.setBlendEnabled("),
             "MinecraftGLWrapper should route blend toggles through BlendModeStorage.setBlendEnabled");
+    }
+
+    @Test
+    public void testCoreIrisPathsDoNotImportGlStateManager() throws IOException {
+        String legacyImport = "import net.blaze3d.opengl.GlStateManager;";
+        String[] migratedFiles = new String[] {
+            "net/irisshaders/iris/gl/blending/BlendModeStorage.java",
+            "net/irisshaders/iris/gl/IrisRenderSystem.java",
+            "net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java",
+            "net/irisshaders/iris/gl/program/Program.java",
+            "net/irisshaders/iris/gl/program/ComputeProgram.java",
+            "net/irisshaders/iris/gl/texture/GlTexture.java",
+            "net/irisshaders/iris/gl/texture/TextureUploadHelper.java",
+            "net/irisshaders/iris/gl/image/GlImage.java",
+            "net/irisshaders/iris/pipeline/programs/SodiumShader.java",
+            "net/irisshaders/iris/pipeline/programs/ExtendedShader.java",
+            "net/irisshaders/iris/pipeline/programs/FallbackShader.java",
+            "net/irisshaders/iris/pipeline/programs/ShaderCreator.java",
+            "net/irisshaders/iris/shadows/ShadowRenderer.java",
+            "net/irisshaders/iris/shadows/ShadowCompositeRenderer.java",
+            "com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java"
+        };
+
+        for (String relativePath : migratedFiles) {
+            Path file = SRC_MAIN_JAVA.resolve(relativePath);
+            String source = Files.readString(file);
+            assertFalse(source.contains(legacyImport),
+                relativePath + " should not import GlStateManager after Vulkanic migration");
+        }
     }
 
     @Test
@@ -1568,10 +1691,21 @@ public class Phase3DrawPathTest {
         String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
         assertTrue(irisRenderSystemSource.contains("public static void setActiveTexture("),
             "IrisRenderSystem should provide setActiveTexture helper after _activeTexture removal");
+        assertTrue(irisRenderSystemSource.contains("public static void setActiveTextureUnitIndex("),
+            "IrisRenderSystem should expose index-based active texture helper to avoid GL_TEXTURE0 arithmetic at call sites");
     }
 
     @Test
     public void testIrisTextureStateAccessUsesIrisRenderSystemHelpers() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+        assertFalse(stateManagerSource.contains("public static int activeTexture"),
+            "GlStateManager should no longer own activeTexture state field");
+        assertFalse(stateManagerSource.contains("public static final GlStateManager.TextureState[] TEXTURES"),
+            "GlStateManager should no longer own per-unit texture binding state array");
+        assertFalse(stateManagerSource.contains("class TextureState"),
+            "GlStateManager should no longer define TextureState helper class");
+
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
         String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
 
@@ -1583,6 +1717,14 @@ public class Phase3DrawPathTest {
             "IrisRenderSystem should expose getBoundTextureOnActiveUnit helper for active binding reads");
         assertTrue(irisRenderSystemSource.contains("public static void setTextureBinding("),
             "IrisRenderSystem should expose setTextureBinding helper for binding tracking updates");
+        assertTrue(irisRenderSystemSource.contains("private static int activeTextureUnitIndex"),
+            "IrisRenderSystem should own active texture unit index state locally");
+        assertTrue(irisRenderSystemSource.contains("private static final int[] textureBindings"),
+            "IrisRenderSystem should own per-unit texture binding state array locally");
+        assertFalse(irisRenderSystemSource.contains("GlStateManager.activeTexture"),
+            "IrisRenderSystem should not read active texture from GlStateManager");
+        assertFalse(irisRenderSystemSource.contains("GlStateManager.TEXTURES"),
+            "IrisRenderSystem should not read texture bindings from GlStateManager");
 
         Path programSamplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
         String programSamplersSource = Files.readString(programSamplersFile);
@@ -1643,6 +1785,20 @@ public class Phase3DrawPathTest {
             "PBRTextureManager should not read active-unit binding directly from GlStateManager");
         assertTrue(pbrTextureManagerSource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
             "PBRTextureManager should read active-unit binding through IrisRenderSystem helper");
+
+        Path programSamplersFile2 = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
+        String programSamplersSource2 = Files.readString(programSamplersFile2);
+        assertFalse(programSamplersSource2.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 +"),
+            "ProgramSamplers should not compute GL_TEXTURE0 offsets directly when restoring active texture");
+        assertTrue(programSamplersSource2.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
+            "ProgramSamplers should restore active texture through IrisRenderSystem index helper");
+
+        Path pipelineManagerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/PipelineManager.java");
+        String pipelineManagerSource = Files.readString(pipelineManagerFile);
+        assertFalse(pipelineManagerSource.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 +"),
+            "PipelineManager should not compute GL_TEXTURE0 offsets directly in texture unit loops");
+        assertTrue(pipelineManagerSource.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
+            "PipelineManager should switch texture units through IrisRenderSystem index helper");
     }
 
     @Test
@@ -1707,6 +1863,10 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _genTexture wrapper");
         assertFalse(stateManagerSource.contains("public static void _deleteTexture("),
             "GlStateManager should no longer expose _deleteTexture wrapper");
+        assertFalse(stateManagerSource.contains("public static void incrementTrackedTextures("),
+            "GlStateManager should no longer expose incrementTrackedTextures helper");
+        assertFalse(stateManagerSource.contains("public static void decrementTrackedTextures("),
+            "GlStateManager should no longer expose decrementTrackedTextures helper");
 
         Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
         String glDeviceSource = Files.readString(glDeviceFile);
@@ -1732,6 +1892,53 @@ public class Phase3DrawPathTest {
             "IrisRenderSystem should provide createTextureId helper after _genTexture removal");
         assertTrue(irisRenderSystemSource.contains("public static void deleteTextureId("),
             "IrisRenderSystem should provide deleteTextureId helper after _deleteTexture removal");
+        assertTrue(irisRenderSystemSource.contains("public static void incrementTrackedTextures("),
+            "IrisRenderSystem should expose incrementTrackedTextures helper after migration");
+        assertTrue(irisRenderSystemSource.contains("public static void decrementTrackedTextures("),
+            "IrisRenderSystem should expose decrementTrackedTextures helper after migration");
+    }
+
+    @Test
+    public void testBlaze3dBufferTrackingMovedFromGlStateManager() throws IOException {
+        Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
+        String stateManagerSource = Files.readString(stateManagerFile);
+
+        assertFalse(stateManagerSource.contains("public static void incrementTrackedBuffers("),
+            "GlStateManager should no longer expose incrementTrackedBuffers helper");
+        assertFalse(stateManagerSource.contains("public static void decrementTrackedBuffers("),
+            "GlStateManager should no longer expose decrementTrackedBuffers helper");
+
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertTrue(irisRenderSystemSource.contains("public static void incrementTrackedBuffers("),
+            "IrisRenderSystem should expose incrementTrackedBuffers helper after migration");
+        assertTrue(irisRenderSystemSource.contains("public static void decrementTrackedBuffers("),
+            "IrisRenderSystem should expose decrementTrackedBuffers helper after migration");
+
+        Path dsaFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
+        String dsaSource = Files.readString(dsaFile);
+        assertFalse(dsaSource.contains("GlStateManager.incrementTrackedBuffers("),
+            "DirectStateAccess should not increment tracked buffers through GlStateManager");
+        assertTrue(dsaSource.contains("IrisRenderSystem.incrementTrackedBuffers("),
+            "DirectStateAccess should increment tracked buffers through IrisRenderSystem helper");
+
+        Path glBufferFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlBuffer.java");
+        String glBufferSource = Files.readString(glBufferFile);
+        assertFalse(glBufferSource.contains("GlStateManager.decrementTrackedBuffers("),
+            "GlBuffer should not decrement tracked buffers through GlStateManager");
+        assertTrue(glBufferSource.contains("IrisRenderSystem.decrementTrackedBuffers("),
+            "GlBuffer should decrement tracked buffers through IrisRenderSystem helper");
+
+        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
+        String dhWrapperSource = Files.readString(dhWrapperFile);
+        assertFalse(dhWrapperSource.contains("GlStateManager.incrementTrackedBuffers("),
+            "MinecraftGLWrapper should not increment tracked buffers through GlStateManager");
+        assertFalse(dhWrapperSource.contains("GlStateManager.decrementTrackedBuffers("),
+            "MinecraftGLWrapper should not decrement tracked buffers through GlStateManager");
+        assertTrue(dhWrapperSource.contains("IrisRenderSystem.incrementTrackedBuffers("),
+            "MinecraftGLWrapper should increment tracked buffers through IrisRenderSystem helper");
+        assertTrue(dhWrapperSource.contains("IrisRenderSystem.decrementTrackedBuffers("),
+            "MinecraftGLWrapper should decrement tracked buffers through IrisRenderSystem helper");
     }
 
     @Test

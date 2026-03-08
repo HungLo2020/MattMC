@@ -1,19 +1,20 @@
 package net.vulkanic.backends.opengl;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.opengl.*;
-import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
  * This is the ONLY place where direct OpenGL calls should be made.
  */
 public class OpenGLBackend implements GraphicsBackend {
+
+    private static final int TEXTURE_UNIT_COUNT = 128;
+    private final int[] texture2DBindings = new int[TEXTURE_UNIT_COUNT];
+    private int activeTextureUnitIndex = 0;
 
     /**
      * Reference to the GlDevice, set after device initialization.
@@ -136,10 +137,14 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        
-        int activeTexUnit = GlStateManager.activeTexture;
-        if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
-            GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
+
+        if (activeTextureUnitIndex < 0 || activeTextureUnitIndex >= texture2DBindings.length) {
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+            return;
+        }
+
+        if (textureId != texture2DBindings[activeTextureUnitIndex]) {
+            texture2DBindings[activeTextureUnitIndex] = textureId;
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
         }
     }
@@ -228,6 +233,11 @@ public class OpenGLBackend implements GraphicsBackend {
     public void setActiveTextureUnit(CommandContext ctx, int unit) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        int textureUnitIndex = unit - GL13.GL_TEXTURE0;
+        if (textureUnitIndex >= 0 && textureUnitIndex < texture2DBindings.length) {
+            activeTextureUnitIndex = textureUnitIndex;
         }
         GL13.glActiveTexture(unit);
     }

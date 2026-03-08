@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import net.blaze3d.GraphicsWorkarounds;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;

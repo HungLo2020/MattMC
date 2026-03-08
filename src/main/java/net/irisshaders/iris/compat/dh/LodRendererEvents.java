@@ -1,6 +1,5 @@
 package net.irisshaders.iris.compat.dh;
 
-import net.blaze3d.opengl.GlStateManager;
 import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiFogDrawMode;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiRenderPass;

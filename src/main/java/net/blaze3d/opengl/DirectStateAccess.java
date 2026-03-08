@@ -51,7 +51,7 @@ public abstract class DirectStateAccess {
 	static class Core extends DirectStateAccess {
 		@Override
 		int createBuffer() {
-			GlStateManager.incrementTrackedBuffers();
+			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
 			return net.vulkanic.VulkanicAPI.createBufferDSA(net.vulkanic.VulkanicAPI.getImmediateContext());
 		}
 
@@ -135,7 +135,7 @@ public abstract class DirectStateAccess {
 
 		@Override
 		int createBuffer() {
-			GlStateManager.incrementTrackedBuffers();
+			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
 			return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
 		}
 

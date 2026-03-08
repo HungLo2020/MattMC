@@ -1,7 +1,6 @@
 package net.irisshaders.iris.gl.shader;
 
 import com.google.common.collect.ImmutableList;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.compat.dh.DHCompat;
