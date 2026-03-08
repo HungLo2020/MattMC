@@ -76,7 +76,7 @@ public class GLRenderDevice implements RenderDevice {
 
     @Override
     public int getMaxTextureLodBias() {
-        return VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), 33085); // GL_MAX_TEXTURE_LOD_BIAS
+        return VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_MAX_LEVEL);
     }
 
     private void checkDeviceActive() {
@@ -114,7 +114,7 @@ public class GLRenderDevice implements RenderDevice {
             this.bindBuffer(GlBufferTarget.COPY_READ_BUFFER, src);
             this.bindBuffer(GlBufferTarget.COPY_WRITE_BUFFER, dst);
 
-            VulkanicAPI.copyBufferSubData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COPY_READ_BUFFER, VulkanicAPI.GL_COPY_WRITE_BUFFER, readOffset, writeOffset, bytes);
+            VulkanicAPI.copyBufferSubDataBetweenCopyTargets(VulkanicAPI.getImmediateContext(), readOffset, writeOffset, bytes);
         }
 
         @Override
@@ -251,7 +251,7 @@ public class GLRenderDevice implements RenderDevice {
 
         @Override
         public GlFence createFence() {
-            return new GlFence(VulkanicAPI.createFenceSync(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
+            return new GlFence(VulkanicAPI.createGpuCompletionFence(VulkanicAPI.getImmediateContext()));
         }
 
         private void checkMapDisposed(GlBufferMapping map) {

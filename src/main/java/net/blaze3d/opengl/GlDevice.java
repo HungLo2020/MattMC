@@ -72,9 +72,9 @@ public class GlDevice implements GpuDevice {
 		this.maxSupportedTextureSize = j;
 		this.defaultShaderSource = biFunction;
 		this.encoder = new GlCommandEncoder(this);
-		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getImmediateContext(), 35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
+		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getUniformBufferOffsetAlignment(net.vulkanic.VulkanicAPI.getImmediateContext());
 		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
-		net.vulkanic.VulkanicAPI.setCapabilityEnabled(ctx, 34895, true); // GL_PROGRAM_POINT_SIZE
+		net.vulkanic.VulkanicAPI.setProgramPointSizeEnabled(ctx, true);
 		// Register this device with the Vulkanic backend so it can delegate
 		// device-level operations (pipeline compilation, etc.) back to this GlDevice.
 		net.vulkanic.VulkanicAPI.registerDevice(this);

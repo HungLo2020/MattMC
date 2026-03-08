@@ -172,13 +172,13 @@ public class GlCommandEncoder implements CommandEncoder {
 			throw new IllegalStateException("Close the existing render pass before creating a new one!");
 		} else {
 			this.verifyColorTexture(gpuTexture);
-			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTexture).id, 0, 0, 36160);
+			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTexture).id, 0, 0, VulkanicAPI.GL_FRAMEBUFFER);
 			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			GlStateManager._disableScissorTest();
 			GlStateManager._colorMask(true, true, true, true);
-			GlStateManager._clear(16384);
-			GlStateManager._glFramebufferTexture2D(36160, 36064, 3553, 0, 0);
-			GlStateManager._glBindFramebuffer(36160, 0);
+			GlStateManager._clear(VulkanicAPI.GL_COLOR_BUFFER_BIT);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, 0, 0);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
 		}
 	}
 
@@ -190,14 +190,14 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.verifyColorTexture(gpuTexture);
 			this.verifyDepthTexture(gpuTexture2);
 			int j = ((GlTexture)gpuTexture).getFbo(this.device.directStateAccess(), gpuTexture2);
-			GlStateManager._glBindFramebuffer(36160, j);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, j);
 			GlStateManager._disableScissorTest();
 			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
 			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			GlStateManager._depthMask(true);
 			GlStateManager._colorMask(true, true, true, true);
-			GlStateManager._clear(16640);
-			GlStateManager._glBindFramebuffer(36160, 0);
+			GlStateManager._clear(VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
 		}
 	}
 
@@ -210,15 +210,15 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.verifyDepthTexture(gpuTexture2);
 			this.verifyRegion(gpuTexture, j, k, l, m);
 			int n = ((GlTexture)gpuTexture).getFbo(this.device.directStateAccess(), gpuTexture2);
-			GlStateManager._glBindFramebuffer(36160, n);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, n);
 			GlStateManager._scissorBox(j, k, l, m);
 			GlStateManager._enableScissorTest();
 			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
 			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			GlStateManager._depthMask(true);
 			GlStateManager._colorMask(true, true, true, true);
-			GlStateManager._clear(16640);
-			GlStateManager._glBindFramebuffer(36160, 0);
+			GlStateManager._clear(VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
 		}
 	}
 
@@ -244,15 +244,15 @@ public class GlCommandEncoder implements CommandEncoder {
 			throw new IllegalStateException("Close the existing render pass before creating a new one!");
 		} else {
 			this.verifyDepthTexture(gpuTexture);
-			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, 0, ((GlTexture)gpuTexture).id, 0, 36160);
+			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, 0, ((GlTexture)gpuTexture).id, 0, VulkanicAPI.GL_FRAMEBUFFER);
 			VulkanicAPI.setDrawBufferNone(VulkanicAPI.getImmediateContext());
 			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
 			GlStateManager._depthMask(true);
 			GlStateManager._disableScissorTest();
-			GlStateManager._clear(256);
+			GlStateManager._clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			VulkanicAPI.setDrawBufferColorAttachment0(VulkanicAPI.getImmediateContext());
-			GlStateManager._glFramebufferTexture2D(36160, 36096, 3553, 0, 0);
-			GlStateManager._glBindFramebuffer(36160, 0);
+			VulkanicAPI.framebufferDepthAttachmentTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, 0, 0);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
 		}
 	}
 
@@ -582,14 +582,15 @@ public class GlCommandEncoder implements CommandEncoder {
 				throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for copying");
 			} else {
 				GlStateManager.clearGlErrors();
-				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, ((GlTexture)gpuTexture).glId(), 0, j, 36008);
-				GlStateManager._glBindBuffer(35051, ((GlBuffer)gpuBuffer).handle);
-				GlStateManager._pixelStore(3330, m);
+				net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, ((GlTexture)gpuTexture).glId(), 0, j, VulkanicAPI.GL_READ_FRAMEBUFFER);
+				VulkanicAPI.bindPixelPackBuffer(ctx, ((GlBuffer)gpuBuffer).handle);
+				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_PACK_ROW_LENGTH, m);
 				GlStateManager._readPixels(k, l, m, n, GlConst.toGlExternalId(gpuTexture.getFormat()), GlConst.toGlType(gpuTexture.getFormat()), i);
 				RenderSystem.queueFencedTask(runnable);
-				GlStateManager._glFramebufferTexture2D(36008, 36064, 3553, 0, j);
-				GlStateManager._glBindFramebuffer(36008, 0);
-				GlStateManager._glBindBuffer(35051, 0);
+				VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_READ_FRAMEBUFFER, 0, j);
+				GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+				VulkanicAPI.bindPixelPackBuffer(ctx, 0);
 				int o = GlStateManager._getError();
 				if (o != 0) {
 					throw new IllegalStateException("Couldn't perform copyTobuffer for texture " + gpuTexture.getLabel() + ": GL error " + o);
@@ -1107,7 +1108,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else if (!net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
 			// Iris shadow/safeMultiply path: manually unbind the GlTexture cached FBO.
 			// Don't unbind when in safe-multiply state (Iris manages that separately).
-			GlStateManager._glBindFramebuffer(36160, 0);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
 		}
 
 		this.device.debugLabels().popDebugGroup();

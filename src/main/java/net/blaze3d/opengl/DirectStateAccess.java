@@ -98,8 +98,8 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 36064, j, l); // GL_COLOR_ATTACHMENT0
-			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 36096, k, l); // GL_DEPTH_ATTACHMENT
+			net.vulkanic.VulkanicAPI.namedFramebufferColorAttachment0DSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, j, l);
+			net.vulkanic.VulkanicAPI.namedFramebufferDepthAttachmentDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, k, l);
 			if (m != 0) {
 				GlStateManager._glBindFramebuffer(m, i);
 			}
@@ -125,11 +125,11 @@ public abstract class DirectStateAccess {
 	static class Emulated extends DirectStateAccess {
 		private int selectBufferBindTarget(int i) {
 			if ((i & 32) != 0) {
-				return 34962;
+				return VulkanicAPI.GL_ARRAY_BUFFER;
 			} else if ((i & 64) != 0) {
-				return 34963;
+				return VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER;
 			} else {
-				return (i & 128) != 0 ? 35345 : 36663;
+				return (i & 128) != 0 ? VulkanicAPI.GL_UNIFORM_BUFFER : VulkanicAPI.GL_COPY_WRITE_BUFFER;
 			}
 		}
 
@@ -206,11 +206,12 @@ public abstract class DirectStateAccess {
 
 		@Override
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
-			GlStateManager._glBindBuffer(36662, i);
-			GlStateManager._glBindBuffer(36663, j);
-			VulkanicAPI.copyBufferSubData(VulkanicAPI.getImmediateContext(), 36662, 36663, k, l, m);
-			GlStateManager._glBindBuffer(36662, 0);
-			GlStateManager._glBindBuffer(36663, 0);
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			VulkanicAPI.bindCopyReadBuffer(ctx, i);
+			VulkanicAPI.bindCopyWriteBuffer(ctx, j);
+			VulkanicAPI.copyBufferSubDataBetweenCopyTargets(ctx, k, l, m);
+			VulkanicAPI.bindCopyReadBuffer(ctx, 0);
+			VulkanicAPI.bindCopyWriteBuffer(ctx, 0);
 		}
 
 		@Override
@@ -220,11 +221,11 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			int n = m == 0 ? '販' : m;
+			int n = m == 0 ? VulkanicAPI.GL_FRAMEBUFFER : m;
 			int o = GlStateManager.getFrameBuffer(n);
 			GlStateManager._glBindFramebuffer(n, i);
-			GlStateManager._glFramebufferTexture2D(n, 36064, 3553, j, l);
-			GlStateManager._glFramebufferTexture2D(n, 36096, 3553, k, l);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), n, j, l);
+			VulkanicAPI.framebufferDepthAttachmentTexture2D(VulkanicAPI.getImmediateContext(), n, k, l);
 			if (m == 0) {
 				GlStateManager._glBindFramebuffer(n, o);
 			}
@@ -232,13 +233,13 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			int u = GlStateManager.getFrameBuffer(36008);
-			int v = GlStateManager.getFrameBuffer(36009);
-			GlStateManager._glBindFramebuffer(36008, i);
-			GlStateManager._glBindFramebuffer(36009, j);
+			int u = GlStateManager.getFrameBuffer(VulkanicAPI.GL_READ_FRAMEBUFFER);
+			int v = GlStateManager.getFrameBuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, i);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, j);
 			GlStateManager._glBlitFrameBuffer(k, l, m, n, o, p, q, r, s, t);
-			GlStateManager._glBindFramebuffer(36008, u);
-			GlStateManager._glBindFramebuffer(36009, v);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, u);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, v);
 		}
 	}
 }

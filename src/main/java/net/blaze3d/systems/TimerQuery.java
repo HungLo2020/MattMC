@@ -21,8 +21,9 @@ public class TimerQuery {
 		if (this.nextQueryName != 0) {
 			throw new IllegalStateException("Current profile not ended");
 		} else {
-			this.nextQueryName = VulkanicAPI.generateQueryObject(VulkanicAPI.getImmediateContext());
-			VulkanicAPI.initiateQuery(VulkanicAPI.getImmediateContext(), 35007, this.nextQueryName);
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			this.nextQueryName = VulkanicAPI.generateQueryObject(ctx);
+			VulkanicAPI.beginTimeElapsedQuery(ctx, this.nextQueryName);
 		}
 	}
 
@@ -31,7 +32,8 @@ public class TimerQuery {
 		if (this.nextQueryName == 0) {
 			throw new IllegalStateException("endProfile called before beginProfile");
 		} else {
-			VulkanicAPI.concludeQuery(VulkanicAPI.getImmediateContext(), 35007);
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			VulkanicAPI.endTimeElapsedQuery(ctx);
 			TimerQuery.FrameProfile frameProfile = new TimerQuery.FrameProfile(this.nextQueryName);
 			this.nextQueryName = 0;
 			return frameProfile;
@@ -53,17 +55,19 @@ public class TimerQuery {
 			RenderSystem.assertOnRenderThread();
 			if (this.result == 0L) {
 				this.result = -1L;
-				VulkanicAPI.disposeQueryObject(VulkanicAPI.getImmediateContext(), this.queryName);
+				net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+				VulkanicAPI.disposeQueryObject(ctx, this.queryName);
 			}
 		}
 
 		public boolean isDone() {
 			RenderSystem.assertOnRenderThread();
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 			if (this.result != 0L) {
 				return true;
-			} else if (1 == VulkanicAPI.retrieveQueryObjectInt(VulkanicAPI.getImmediateContext(), this.queryName, 34919)) {
-				this.result = VulkanicAPI.retrieveQueryObjectInt64(VulkanicAPI.getImmediateContext(), this.queryName, 34918);
-				VulkanicAPI.disposeQueryObject(VulkanicAPI.getImmediateContext(), this.queryName);
+			} else if (VulkanicAPI.isQueryResultAvailable(ctx, this.queryName)) {
+				this.result = VulkanicAPI.getQueryResultInt64(ctx, this.queryName);
+				VulkanicAPI.disposeQueryObject(ctx, this.queryName);
 				return true;
 			} else {
 				return false;
@@ -73,8 +77,9 @@ public class TimerQuery {
 		public long get() {
 			RenderSystem.assertOnRenderThread();
 			if (this.result == 0L) {
-				this.result = VulkanicAPI.retrieveQueryObjectInt64(VulkanicAPI.getImmediateContext(), this.queryName, 34918);
-				VulkanicAPI.disposeQueryObject(VulkanicAPI.getImmediateContext(), this.queryName);
+				net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+				this.result = VulkanicAPI.getQueryResultInt64(ctx, this.queryName);
+				VulkanicAPI.disposeQueryObject(ctx, this.queryName);
 			}
 
 			return this.result;

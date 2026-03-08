@@ -31,6 +31,7 @@ public class VulkanicAPI {
     public static final int GL_ELEMENT_ARRAY_BUFFER = 0x8893;
     public static final int GL_COPY_READ_BUFFER = 0x8F36;
     public static final int GL_COPY_WRITE_BUFFER = 0x8F37;
+    public static final int GL_PIXEL_PACK_BUFFER = 0x88EB;
     public static final int GL_SHADER_STORAGE_BUFFER = 0x90D2;
     
     // OpenGL Constants - Buffer Usage
@@ -49,6 +50,9 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Sync
     public static final int GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
+    public static final int GL_SYNC_STATUS = 0x9114;
+    public static final int GL_SIGNALED = 0x9119;
+    public static final int GL_SYNC_FLUSH_COMMANDS_BIT = 0x00000001;
     
     // OpenGL Constants - Primitive Types
     public static final int GL_LINES = 0x0001;
@@ -64,6 +68,7 @@ public class VulkanicAPI {
     // OpenGL Constants - Debug Objects
     public static final int GL_SHADER = 0x82E1;
     public static final int GL_PROGRAM = 0x82E2;
+    public static final int GL_VERTEX_ARRAY = 0x8074;
     
     // OpenGL Constants - Texture Targets and Units
     public static final int GL_TEXTURE_2D = 0x0DE1;      // 3553
@@ -114,6 +119,7 @@ public class VulkanicAPI {
     public static final int GL_MAX_TEXTURE_IMAGE_UNITS = 0x8872;
     public static final int GL_MAX_DRAW_BUFFERS = 0x8824;
     public static final int GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS = 0x90DD;
+    public static final int GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT = 0x8A34;
     
     // OpenGL Constants - Shader Types
     public static final int GL_VERTEX_SHADER = 0x8B31;
@@ -177,7 +183,10 @@ public class VulkanicAPI {
     // OpenGL Constants - Debug Capabilities
     public static final int GL_DEBUG_OUTPUT_SYNCHRONOUS = 0x8242;
     public static final int GL_CONTEXT_FLAGS = 0x821E;
+    public static final int GL_CONTEXT_FLAG_DEBUG_BIT = 0x00000002;
     public static final int GL_DEBUG_OUTPUT = 0x92E0;
+    public static final int GL_DONT_CARE = 0x1100;
+    public static final int GL_MAX_LABEL_LENGTH = 0x82E8;
     
     // OpenGL Constants - Framebuffer Targets and Attachments
     public static final int GL_READ_FRAMEBUFFER = 0x8CA8;
@@ -196,6 +205,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Culling
     public static final int GL_CULL_FACE = 0x0B44;
+    public static final int GL_PROGRAM_POINT_SIZE = 0x8642;
     
     // OpenGL Constants - Tests
     public static final int GL_DEPTH_TEST = 0x0B71;
@@ -262,10 +272,16 @@ public class VulkanicAPI {
     public static final int GL_DEBUG_SOURCE_APPLICATION = 0x824A;
     
     // OpenGL Constants - Pixel Store Parameters
+    public static final int GL_PACK_ROW_LENGTH = 0x0D02;
     public static final int GL_UNPACK_ROW_LENGTH = 0x0CF2;
     public static final int GL_UNPACK_SKIP_ROWS = 0x0CF3;
     public static final int GL_UNPACK_SKIP_PIXELS = 0x0CF4;
     public static final int GL_UNPACK_ALIGNMENT = 0x0CF5;
+
+    // OpenGL Constants - Query Targets/Results
+    public static final int GL_TIME_ELAPSED = 0x88BF;
+    public static final int GL_QUERY_RESULT = 0x8866;
+    public static final int GL_QUERY_RESULT_AVAILABLE = 0x8867;
     
     // OpenGL Constants - Clear Bits
     public static final int GL_COLOR_BUFFER_BIT = 0x00004000;
@@ -354,6 +370,11 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Program Query
     public static final int GL_ACTIVE_UNIFORMS = 0x8B86;
+
+    // OpenGL Constants - EXT_debug_label types
+    public static final int GL_BUFFER_OBJECT_EXT = 0x9151;
+    public static final int GL_SHADER_OBJECT_EXT = 0x8B48;
+    public static final int GL_PROGRAM_OBJECT_EXT = 0x8B40;
     
     // OpenGL Constants - GL State Query
     public static final int GL_CURRENT_PROGRAM = 0x8B8D;
@@ -648,6 +669,27 @@ public class VulkanicAPI {
     public static void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
         getBackend().setCapabilityEnabled(ctx, cap, enabled);
     }
+
+    /**
+     * Enables or disables synchronous debug output.
+     */
+    public static void setDebugOutputSynchronousEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, GL_DEBUG_OUTPUT_SYNCHRONOUS, enabled);
+    }
+
+    /**
+     * Enables or disables debug output generation.
+     */
+    public static void setDebugOutputEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, GL_DEBUG_OUTPUT, enabled);
+    }
+
+    /**
+     * Returns true when the current context has the debug flag set.
+     */
+    public static boolean isDebugContext(CommandContext ctx) {
+        return (getBackend().getInteger(ctx, GL_CONTEXT_FLAGS) & GL_CONTEXT_FLAG_DEBUG_BIT) != 0;
+    }
     
     /**
      * Binds a 2D texture to the current texture unit.
@@ -749,6 +791,20 @@ public class VulkanicAPI {
     public static void bindFramebuffer(CommandContext ctx, int target, int fbo) {
         getBackend().bindFramebuffer(ctx, target, fbo);
     }
+
+    /**
+     * Binds the read framebuffer target.
+     */
+    public static void bindReadFramebuffer(CommandContext ctx, int fbo) {
+        getBackend().bindFramebuffer(ctx, GL_READ_FRAMEBUFFER, fbo);
+    }
+
+    /**
+     * Binds the draw framebuffer target.
+     */
+    public static void bindDrawFramebuffer(CommandContext ctx, int fbo) {
+        getBackend().bindFramebuffer(ctx, GL_DRAW_FRAMEBUFFER, fbo);
+    }
     
     /**
      * Binds a buffer object to a target.
@@ -759,6 +815,27 @@ public class VulkanicAPI {
      */
     public static void bindBuffer(CommandContext ctx, int target, int buffer) {
         getBackend().bindBuffer(ctx, target, buffer);
+    }
+
+    /**
+     * Binds the pixel-pack buffer used for texture readbacks.
+     */
+    public static void bindPixelPackBuffer(CommandContext ctx, int buffer) {
+        getBackend().bindBuffer(ctx, GL_PIXEL_PACK_BUFFER, buffer);
+    }
+
+    /**
+     * Binds the copy-read buffer target.
+     */
+    public static void bindCopyReadBuffer(CommandContext ctx, int buffer) {
+        getBackend().bindBuffer(ctx, GL_COPY_READ_BUFFER, buffer);
+    }
+
+    /**
+     * Binds the copy-write buffer target.
+     */
+    public static void bindCopyWriteBuffer(CommandContext ctx, int buffer) {
+        getBackend().bindBuffer(ctx, GL_COPY_WRITE_BUFFER, buffer);
     }
 
     /**
@@ -861,6 +938,20 @@ public class VulkanicAPI {
     public static void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
         getBackend().framebufferTexture2D(ctx, target, attachment, textarget, texture, level);
     }
+
+    /**
+     * Attaches a 2D texture to color attachment 0 of a framebuffer target.
+     */
+    public static void framebufferColorAttachment0Texture2D(CommandContext ctx, int target, int texture, int level) {
+        getBackend().framebufferTexture2D(ctx, target, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, level);
+    }
+
+    /**
+     * Attaches a 2D texture to the depth attachment of a framebuffer target.
+     */
+    public static void framebufferDepthAttachmentTexture2D(CommandContext ctx, int target, int texture, int level) {
+        getBackend().framebufferTexture2D(ctx, target, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture, level);
+    }
     
     /**
      * Specifies a list of color buffers to be drawn into.
@@ -892,6 +983,20 @@ public class VulkanicAPI {
      */
     public static int getInteger(CommandContext ctx, int pname) {
         return getBackend().getInteger(ctx, pname);
+    }
+
+    /**
+     * Queries the required alignment for uniform-buffer range offsets.
+     */
+    public static int getUniformBufferOffsetAlignment(CommandContext ctx) {
+        return getBackend().getInteger(ctx, GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT);
+    }
+
+    /**
+     * Enables or disables program point-size behavior.
+     */
+    public static void setProgramPointSizeEnabled(CommandContext ctx, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, GL_PROGRAM_POINT_SIZE, enabled);
     }
     
     /**
@@ -1050,6 +1155,20 @@ public class VulkanicAPI {
     public static void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
         getBackend().namedFramebufferTextureDSA(ctx, framebuffer, attachment, texture, level);
     }
+
+    /**
+     * Attaches a texture to COLOR_ATTACHMENT0 using DSA.
+     */
+    public static void namedFramebufferColorAttachment0DSA(CommandContext ctx, int framebuffer, int texture, int level) {
+        getBackend().namedFramebufferTextureDSA(ctx, framebuffer, GL_COLOR_ATTACHMENT0, texture, level);
+    }
+
+    /**
+     * Attaches a texture to DEPTH_ATTACHMENT using DSA.
+     */
+    public static void namedFramebufferDepthAttachmentDSA(CommandContext ctx, int framebuffer, int texture, int level) {
+        getBackend().namedFramebufferTextureDSA(ctx, framebuffer, GL_DEPTH_ATTACHMENT, texture, level);
+    }
     
     /**
      * Blits (copies) pixels between framebuffers using Direct State Access (DSA).
@@ -1182,6 +1301,13 @@ public class VulkanicAPI {
     
     public static void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         getBackend().copyBufferSubData(ctx, readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+
+    /**
+     * Copies data between buffers using copy-read/copy-write intent targets.
+     */
+    public static void copyBufferSubDataBetweenCopyTargets(CommandContext ctx, long readOffset, long writeOffset, long size) {
+        getBackend().copyBufferSubData(ctx, GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, readOffset, writeOffset, size);
     }
     
     public static void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
@@ -1366,9 +1492,23 @@ public class VulkanicAPI {
     public static long createFenceSync(CommandContext ctx, int condition, int flags) {
         return getBackend().createFenceSync(ctx, condition, flags);
     }
+
+    /**
+     * Creates a fence that is signaled when prior GPU commands complete.
+     */
+    public static long createGpuCompletionFence(CommandContext ctx) {
+        return getBackend().createFenceSync(ctx, GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    }
     
     public static int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
         return getBackend().waitForSync(ctx, sync, flags, timeout);
+    }
+
+    /**
+     * Waits for a sync object while requesting command-stream flush semantics.
+     */
+    public static int waitForSyncWithFlush(CommandContext ctx, long sync, long timeout) {
+        return getBackend().waitForSync(ctx, sync, GL_SYNC_FLUSH_COMMANDS_BIT, timeout);
     }
     
     public static void destroySync(CommandContext ctx, long sync) {
@@ -1410,9 +1550,23 @@ public class VulkanicAPI {
     public static void initiateQuery(CommandContext ctx, int target, int id) {
         getBackend().initiateQuery(ctx, target, id);
     }
+
+    /**
+     * Begins a time-elapsed query.
+     */
+    public static void beginTimeElapsedQuery(CommandContext ctx, int id) {
+        getBackend().initiateQuery(ctx, GL_TIME_ELAPSED, id);
+    }
     
     public static void concludeQuery(CommandContext ctx, int target) {
         getBackend().concludeQuery(ctx, target);
+    }
+
+    /**
+     * Ends a time-elapsed query.
+     */
+    public static void endTimeElapsedQuery(CommandContext ctx) {
+        getBackend().concludeQuery(ctx, GL_TIME_ELAPSED);
     }
     
     public static void disposeQueryObject(CommandContext ctx, int id) {
@@ -1422,17 +1576,62 @@ public class VulkanicAPI {
     public static int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
         return getBackend().retrieveQueryObjectInt(ctx, id, pname);
     }
+
+    /**
+     * Returns whether query results are available.
+     */
+    public static boolean isQueryResultAvailable(CommandContext ctx, int id) {
+        return getBackend().retrieveQueryObjectInt(ctx, id, GL_QUERY_RESULT_AVAILABLE) == GL_TRUE;
+    }
     
     public static long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
         return getBackend().retrieveQueryObjectInt64(ctx, id, pname);
+    }
+
+    /**
+     * Retrieves a 64-bit query result value.
+     */
+    public static long getQueryResultInt64(CommandContext ctx, int id) {
+        return getBackend().retrieveQueryObjectInt64(ctx, id, GL_QUERY_RESULT);
     }
     
     public static void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
         getBackend().labelDebugObject(ctx, identifier, name, label);
     }
+
+    /**
+     * Queries the implementation's maximum debug label length.
+     */
+    public static int getMaxDebugLabelLength(CommandContext ctx) {
+        return getBackend().getInteger(ctx, GL_MAX_LABEL_LENGTH);
+    }
+
+    public static void labelBufferDebugObject(CommandContext ctx, int name, String label) {
+        getBackend().labelDebugObject(ctx, GL_BUFFER, name, label);
+    }
+
+    public static void labelTextureDebugObject(CommandContext ctx, int name, String label) {
+        getBackend().labelDebugObject(ctx, GL_TEXTURE, name, label);
+    }
+
+    public static void labelShaderDebugObject(CommandContext ctx, int name, String label) {
+        getBackend().labelDebugObject(ctx, GL_SHADER, name, label);
+    }
+
+    public static void labelProgramDebugObject(CommandContext ctx, int name, String label) {
+        getBackend().labelDebugObject(ctx, GL_PROGRAM, name, label);
+    }
+
+    public static void labelVertexArrayDebugObject(CommandContext ctx, int name, String label) {
+        getBackend().labelDebugObject(ctx, GL_VERTEX_ARRAY, name, label);
+    }
     
     public static void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
         getBackend().enterDebugGroup(ctx, source, id, message);
+    }
+
+    public static void enterApplicationDebugGroup(CommandContext ctx, int id, CharSequence message) {
+        getBackend().enterDebugGroup(ctx, GL_DEBUG_SOURCE_APPLICATION, id, message);
     }
     
     public static void exitDebugGroup(CommandContext ctx) {
@@ -1442,13 +1641,34 @@ public class VulkanicAPI {
     public static void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().debugMessageControl(ctx, source, type, severity, ids, enabled);
     }
+
+    /**
+     * Controls debug-message filtering across all sources and types.
+     */
+    public static void setDebugMessageControlAll(CommandContext ctx, int severity, boolean enabled) {
+        getBackend().debugMessageControl(ctx, GL_DONT_CARE, GL_DONT_CARE, severity, null, enabled);
+    }
     
     public static void debugMessageControlKHR(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().debugMessageControlKHR(ctx, source, type, severity, ids, enabled);
     }
+
+    /**
+     * Controls KHR_debug message filtering across all sources and types.
+     */
+    public static void setDebugMessageControlAllKHR(CommandContext ctx, int severity, boolean enabled) {
+        getBackend().debugMessageControlKHR(ctx, GL_DONT_CARE, GL_DONT_CARE, severity, null, enabled);
+    }
     
     public static void debugMessageControlARB(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().debugMessageControlARB(ctx, source, type, severity, ids, enabled);
+    }
+
+    /**
+     * Controls ARB_debug_output filtering across all sources and types.
+     */
+    public static void setDebugMessageControlAllARB(CommandContext ctx, int severity, boolean enabled) {
+        getBackend().debugMessageControlARB(ctx, GL_DONT_CARE, GL_DONT_CARE, severity, null, enabled);
     }
     
     public static void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled) {
@@ -1464,6 +1684,26 @@ public class VulkanicAPI {
      */
     public static void labelObjectExt(CommandContext ctx, int type, int object, String label) {
         getBackend().labelObjectExt(ctx, type, object, label);
+    }
+
+    public static void labelBufferExtObject(CommandContext ctx, int object, String label) {
+        getBackend().labelObjectExt(ctx, GL_BUFFER_OBJECT_EXT, object, label);
+    }
+
+    public static void labelTextureExtObject(CommandContext ctx, int object, String label) {
+        getBackend().labelObjectExt(ctx, GL_TEXTURE, object, label);
+    }
+
+    public static void labelShaderExtObject(CommandContext ctx, int object, String label) {
+        getBackend().labelObjectExt(ctx, GL_SHADER_OBJECT_EXT, object, label);
+    }
+
+    public static void labelProgramExtObject(CommandContext ctx, int object, String label) {
+        getBackend().labelObjectExt(ctx, GL_PROGRAM_OBJECT_EXT, object, label);
+    }
+
+    public static void labelVertexArrayExtObject(CommandContext ctx, int object, String label) {
+        getBackend().labelObjectExt(ctx, GL_VERTEX_ARRAY, object, label);
     }
     
     public static boolean supportsKhrDebug() {
@@ -1628,6 +1868,13 @@ public class VulkanicAPI {
     
     public static int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
         return getBackend().getSynci(ctx, sync, pname, length);
+    }
+
+    /**
+     * Queries the signal status of a sync object.
+     */
+    public static int getSyncStatus(CommandContext ctx, long sync, java.nio.IntBuffer length) {
+        return getBackend().getSynci(ctx, sync, GL_SYNC_STATUS, length);
     }
     
     public static GraphicsCapabilities obtainGraphicsCapabilities() {

@@ -326,22 +326,22 @@ public class GlStateManager {
 
 	public static void _glBindFramebuffer(int i, int j) {
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		if ((i == 36008 || i == 36160) && readFbo != j) {
-			net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, 36008, j);
+		if ((i == VulkanicAPI.GL_READ_FRAMEBUFFER || i == VulkanicAPI.GL_FRAMEBUFFER) && readFbo != j) {
+			net.vulkanic.VulkanicAPI.bindReadFramebuffer(ctx, j);
 			readFbo = j;
 		}
 
-		if ((i == 36009 || i == 36160) && writeFbo != j) {
-			net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, 36009, j);
+		if ((i == VulkanicAPI.GL_DRAW_FRAMEBUFFER || i == VulkanicAPI.GL_FRAMEBUFFER) && writeFbo != j) {
+			net.vulkanic.VulkanicAPI.bindDrawFramebuffer(ctx, j);
 			writeFbo = j;
 		}
 	}
 
 	public static int getFrameBuffer(int i) {
-		if (i == 36008) {
+		if (i == VulkanicAPI.GL_READ_FRAMEBUFFER) {
 			return readFbo;
 		} else {
-			return i == 36009 ? writeFbo : 0;
+			return i == VulkanicAPI.GL_DRAW_FRAMEBUFFER ? writeFbo : 0;
 		}
 	}
 

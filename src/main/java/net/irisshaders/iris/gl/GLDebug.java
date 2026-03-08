@@ -1,7 +1,6 @@
 package net.irisshaders.iris.gl;
 
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
@@ -67,7 +66,7 @@ public final class GLDebug {
 	public static int setupDebugMessageCallback(PrintStream stream) {
 		GraphicsCapabilities caps = VulkanicAPI.getGraphicsCapabilities();
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_DEBUG_OUTPUT_SYNCHRONOUS, true);
+		VulkanicAPI.setDebugOutputSynchronousEnabled(ctx, true);
 		if (caps.OpenGL43) {
 			Iris.logger.info("[GL] Using OpenGL 4.3 for error logging.");
 			VulkanicAPI.setupDebugMessageCallback((source, type, id, severity, messageStr) -> {
@@ -79,14 +78,14 @@ public final class GLDebug {
 				printDetail(stream, "Message", messageStr);
 				printTrace(stream);
 			});
-			VulkanicAPI.debugMessageControl(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_HIGH, (int[]) null, true);
-			VulkanicAPI.debugMessageControl(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, (int[]) null, false);
-			VulkanicAPI.debugMessageControl(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, (int[]) null, false);
-			VulkanicAPI.debugMessageControl(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, (int[]) null, false);
+			VulkanicAPI.setDebugMessageControlAll(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_HIGH, true);
+			VulkanicAPI.setDebugMessageControlAll(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, false);
+			VulkanicAPI.setDebugMessageControlAll(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, false);
+			VulkanicAPI.setDebugMessageControlAll(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, false);
 			CommandContext ctx2 = VulkanicAPI.getImmediateContext();
-			if ((VulkanicAPI.getInteger(ctx2, VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
+			if (!VulkanicAPI.isDebugContext(ctx2)) {
 				Iris.logger.warn("[GL] Warning: A non-debug context may not produce any debug output.");
-				VulkanicAPI.setCapabilityEnabled(ctx2, VulkanicAPI.GL_DEBUG_OUTPUT, true);
+				VulkanicAPI.setDebugOutputEnabled(ctx2, true);
 				return 2;
 			}
 			return 1;
@@ -101,14 +100,14 @@ public final class GLDebug {
 				printDetail(stream, "Message", messageStr);
 				printTrace(stream);
 			});
-			VulkanicAPI.debugMessageControlKHR(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_HIGH, (int[]) null, true);
-			VulkanicAPI.debugMessageControlKHR(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, (int[]) null, false);
-			VulkanicAPI.debugMessageControlKHR(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, (int[]) null, false);
-			VulkanicAPI.debugMessageControlKHR(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, (int[]) null, false);
+			VulkanicAPI.setDebugMessageControlAllKHR(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_HIGH, true);
+			VulkanicAPI.setDebugMessageControlAllKHR(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, false);
+			VulkanicAPI.setDebugMessageControlAllKHR(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, false);
+			VulkanicAPI.setDebugMessageControlAllKHR(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, false);
 			CommandContext ctx3 = VulkanicAPI.getImmediateContext();
-			if (caps.OpenGL30 && (VulkanicAPI.getInteger(ctx3, VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
+			if (caps.OpenGL30 && !VulkanicAPI.isDebugContext(ctx3)) {
 				Iris.logger.warn("[GL] Warning: A non-debug context may not produce any debug output.");
-				VulkanicAPI.setCapabilityEnabled(ctx3, VulkanicAPI.GL_DEBUG_OUTPUT, true);
+				VulkanicAPI.setDebugOutputEnabled(ctx3, true);
 				return 2;
 			}
 			return 1;
@@ -123,10 +122,10 @@ public final class GLDebug {
 				printDetail(stream, "Message", messageStr);
 				printTrace(stream);
 			});
-			VulkanicAPI.debugMessageControlARB(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_HIGH, (int[]) null, true);
-			VulkanicAPI.debugMessageControlARB(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, (int[]) null, false);
-			VulkanicAPI.debugMessageControlARB(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, (int[]) null, false);
-			VulkanicAPI.debugMessageControlARB(ctx, 4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, (int[]) null, false);
+			VulkanicAPI.setDebugMessageControlAllARB(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_HIGH, true);
+			VulkanicAPI.setDebugMessageControlAllARB(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, false);
+			VulkanicAPI.setDebugMessageControlAllARB(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, false);
+			VulkanicAPI.setDebugMessageControlAllARB(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, false);
 			return 1;
 		} else if (caps.GL_AMD_debug_output) {
 			Iris.logger.info("[GL] Using AMD_debug_output for error logging.");
@@ -157,8 +156,8 @@ public final class GLDebug {
 		} else if (caps.GL_KHR_debug) {
 			VulkanicAPI.clearDebugMessageCallbackKHR();
 			CommandContext ctx4 = VulkanicAPI.getImmediateContext();
-			if (caps.OpenGL30 && (VulkanicAPI.getInteger(ctx4, VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
-				VulkanicAPI.setCapabilityEnabled(ctx4, VulkanicAPI.GL_DEBUG_OUTPUT, false);
+			if (caps.OpenGL30 && !VulkanicAPI.isDebugContext(ctx4)) {
+				VulkanicAPI.setDebugOutputEnabled(ctx4, false);
 			}
 			return 1;
 		} else if (caps.GL_ARB_debug_output) {
