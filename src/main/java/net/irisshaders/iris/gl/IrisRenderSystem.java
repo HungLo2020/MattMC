@@ -42,8 +42,6 @@ public class IrisRenderSystem {
 	private static final IntList textureToUnswizzle = new IntArrayList();
 	private static int currentProgram;
 	private static Runnable blendFuncListener;
-	private static int readFramebuffer;
-	private static int writeFramebuffer;
 	private static final int TEXTURE_UNIT_COUNT = 128;
 	private static int activeTextureUnitIndex;
 	private static final int[] textureBindings = new int[TEXTURE_UNIT_COUNT];
@@ -583,27 +581,6 @@ public class IrisRenderSystem {
 		}
 	}
 
-	public static void bindFramebuffer(int target, int framebuffer) {
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		if ((target == VulkanicAPI.GL_READ_FRAMEBUFFER || target == VulkanicAPI.GL_FRAMEBUFFER) && readFramebuffer != framebuffer) {
-			VulkanicAPI.bindReadFramebuffer(ctx, framebuffer);
-			readFramebuffer = framebuffer;
-		}
-
-		if ((target == VulkanicAPI.GL_DRAW_FRAMEBUFFER || target == VulkanicAPI.GL_FRAMEBUFFER) && writeFramebuffer != framebuffer) {
-			VulkanicAPI.bindDrawFramebuffer(ctx, framebuffer);
-			writeFramebuffer = framebuffer;
-		}
-	}
-
-	public static int getFrameBuffer(int target) {
-		if (target == VulkanicAPI.GL_READ_FRAMEBUFFER) {
-			return readFramebuffer;
-		}
-
-		return target == VulkanicAPI.GL_DRAW_FRAMEBUFFER ? writeFramebuffer : 0;
-	}
-
 	public static int createTextureId() {
 		RenderSystem.assertOnRenderThread();
 		incrementTrackedTextures();
@@ -857,31 +834,31 @@ public class IrisRenderSystem {
 
 		@Override
 		public void readBuffer(int framebuffer, int buffer) {
-			bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
 			VulkanicAPI.setReadBuffer(VulkanicAPI.getImmediateContext(), buffer);
 		}
 
 		@Override
 		public void drawBuffers(int framebuffer, int[] buffers) {
-			bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
 			VulkanicAPI.drawBuffers(VulkanicAPI.getImmediateContext(), buffers);
 		}
 
 		@Override
 		public void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
-			bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
 			VulkanicAPI.clearBufferfv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
 			VulkanicAPI.clearBufferiv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
 			VulkanicAPI.clearBufferuiv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
 		}
 
@@ -923,21 +900,21 @@ public class IrisRenderSystem {
 
 		@Override
 		public void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
-			bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, source);
-			bindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, dest);
+			VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), source);
+			VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), dest);
 			VulkanicAPI.blitFramebuffer(VulkanicAPI.getImmediateContext(), offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 		}
 
 		@Override
 		public void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
-			bindFramebuffer(fbtarget, fb);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), fbtarget, fb);
 			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), fbtarget, attachment, target, texture, levels);
 		}
 
 		@Override
 		public int createFramebuffer() {
 			int framebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-			bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
 			return framebuffer;
 		}
 

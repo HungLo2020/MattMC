@@ -66,7 +66,7 @@ public class DhFadeRenderer
 		}
 		
 		this.fadeFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fadeFramebuffer);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.fadeFramebuffer);
 		
 		
 		if (this.fadeTexture != -1)

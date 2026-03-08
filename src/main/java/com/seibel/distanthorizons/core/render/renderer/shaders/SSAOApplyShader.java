@@ -116,8 +116,8 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		GLMC.disableDepthTest();
 		
 		// apply the rendered SSAO to the LODs 
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, SSAOShader.INSTANCE.frameBuffer);
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, LodRenderer.INSTANCE.getActiveFramebufferId());
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), SSAOShader.INSTANCE.frameBuffer);
+		VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), LodRenderer.INSTANCE.getActiveFramebufferId());
 		
 		
 		ScreenQuad.INSTANCE.render();

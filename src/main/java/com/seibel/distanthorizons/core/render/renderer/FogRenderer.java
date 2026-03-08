@@ -65,7 +65,7 @@ public class FogRenderer
 		}
 		
 		this.fogFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fogFramebuffer);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.fogFramebuffer);
 		
 		this.fogTexture = GLMC.glGenTextures();
 		{

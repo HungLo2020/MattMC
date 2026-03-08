@@ -87,25 +87,25 @@ public class GlFramebuffer extends GlResource {
 	}
 
 	public void bind() {
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, getGlId());
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), getGlId());
 	}
 
 	public void bindAsReadBuffer() {
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, getGlId());
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), getGlId());
 	}
 
 	public void bindAsDrawBuffer() {
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, getGlId());
+		VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), getGlId());
 	}
 
 	protected void destroyInternal() {
 		int framebuffer = getGlId();
-		if (net.irisshaders.iris.gl.IrisRenderSystem.getFrameBuffer(VulkanicAPI.GL_READ_FRAMEBUFFER) == framebuffer) {
-			net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		if (VulkanicAPI.getReadFramebufferBinding() == framebuffer) {
+			VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
 		}
 
-		if (net.irisshaders.iris.gl.IrisRenderSystem.getFrameBuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER) == framebuffer) {
-			net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, 0);
+		if (VulkanicAPI.getDrawFramebufferBinding() == framebuffer) {
+			VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), 0);
 		}
 
 		VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);

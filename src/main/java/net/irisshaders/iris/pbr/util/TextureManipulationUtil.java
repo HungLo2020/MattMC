@@ -18,7 +18,7 @@ public class TextureManipulationUtil {
 		int[] previousViewport = new int[4];
 		IrisRenderSystem.getIntegerv(VulkanicAPI.GL_VIEWPORT, previousViewport);
 
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, colorFillFBO);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), colorFillFBO);
 		IrisRenderSystem.clearColor(
 			(rgba >> 24 & 0xFF) / 255.0f,
 			(rgba >> 16 & 0xFF) / 255.0f,
@@ -35,7 +35,7 @@ public class TextureManipulationUtil {
 			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, 0, level);
 		}
 
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, previousFramebufferId);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), previousFramebufferId);
 		IrisRenderSystem.clearColor(previousClearColor[0], previousClearColor[1], previousClearColor[2], previousClearColor[3]);
 		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousTextureId);
 		VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);

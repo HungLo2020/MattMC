@@ -1207,9 +1207,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 		horizonRenderer.destroy();
 
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, 0);
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
+		VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getImmediateContext());
 
 		renderTargets.destroy();
 		dhCompat.clearPipeline();

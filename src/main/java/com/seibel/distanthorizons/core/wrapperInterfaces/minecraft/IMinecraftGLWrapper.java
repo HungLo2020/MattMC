@@ -1,10 +1,6 @@
 package com.seibel.distanthorizons.core.wrapperInterfaces.minecraft;
 
 import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
-import net.vulkanic.VulkanicAPI;
-
-import java.util.ArrayList;
-import java.util.UUID;
 
 /**
  * Used to sync GL state changes between DH and MC.
@@ -57,12 +53,6 @@ public interface IMinecraftGLWrapper extends IBindable
 	void glBlendFunc(int sfactor, int dfactor);
 	/** Sets separate blend functions for RGB and alpha */
 	void glBlendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha);
-	
-	
-	// frame buffers //
-	
-	/** Binds a framebuffer */
-	void glBindFramebuffer(int target, int framebuffer);
 	
 	
 	// buffers //

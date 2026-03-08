@@ -65,7 +65,7 @@ public class SSAORenderer
 		}
 		
 		this.ssaoFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.ssaoFramebuffer);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.ssaoFramebuffer);
 		
 		this.ssaoTexture = GLMC.glGenTextures();
 		{

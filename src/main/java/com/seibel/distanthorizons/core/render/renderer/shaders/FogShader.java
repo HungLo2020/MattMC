@@ -236,7 +236,7 @@ public class FogShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender()
 	{
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.frameBuffer);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.frameBuffer);
 		GLMC.disableScissorTest();
 		GLMC.disableDepthTest();
 		GLMC.disableBlend();

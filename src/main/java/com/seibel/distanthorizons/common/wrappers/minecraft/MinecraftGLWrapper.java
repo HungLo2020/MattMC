@@ -135,18 +135,6 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	}
 	
 	
-	// frame buffers //
-	
-	/** Binds a framebuffer */
-	@Override
-	public void glBindFramebuffer(int target, int framebuffer) 
-	{
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.bindFramebuffer(ctx, target, framebuffer);
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(target, framebuffer);
-	}
-	
-	
 	// buffers //
 	
 	/** Generates a buffer object */

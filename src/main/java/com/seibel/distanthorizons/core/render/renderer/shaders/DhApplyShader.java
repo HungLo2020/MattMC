@@ -97,14 +97,14 @@ public class DhApplyShader extends AbstractShaderRenderer
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 1);
 		
 		// Copy to MC's framebuffer
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, targetFrameBuffer);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), targetFrameBuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore();
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, targetFrameBuffer);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), targetFrameBuffer);
 		
 	}
 	private void renderToMcTexture()
@@ -156,14 +156,14 @@ public class DhApplyShader extends AbstractShaderRenderer
 		VulkanicAPI.framebufferTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, targetColorTextureId, 0);
 		
 		// Copy to MC's texture via MC's framebuffer
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, dhFrameBufferId);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), dhFrameBufferId);
 		
 		ScreenQuad.INSTANCE.render();
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore();
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, mcFrameBufferId);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), mcFrameBufferId);
 		
 	}
 	

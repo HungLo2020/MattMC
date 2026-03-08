@@ -137,12 +137,12 @@ public class GLState
 	public void restore()
 	{
 		// explicitly unbinding the frame buffer is necessary to prevent GL_CLEAR calls from hitting the wrong buffer
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
+		VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getImmediateContext());
 		boolean frameBufferSet = false;
 		
 		if (this.fbo != 0 && VulkanicAPI.isFramebuffer(VulkanicAPI.getImmediateContext(), this.fbo))
 		{
-			GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fbo);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.fbo);
 			frameBufferSet = true;
 		}
 		

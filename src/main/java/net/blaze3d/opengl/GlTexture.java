@@ -46,12 +46,12 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 
 		while (var1.hasNext()) {
 			int i = (Integer)var1.next();
-			if (net.irisshaders.iris.gl.IrisRenderSystem.getFrameBuffer(VulkanicAPI.GL_READ_FRAMEBUFFER) == i) {
-				net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+			if (VulkanicAPI.getReadFramebufferBinding() == i) {
+				VulkanicAPI.bindReadFramebuffer(ctx, 0);
 			}
 
-			if (net.irisshaders.iris.gl.IrisRenderSystem.getFrameBuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER) == i) {
-				net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, 0);
+			if (VulkanicAPI.getDrawFramebufferBinding() == i) {
+				VulkanicAPI.bindDrawFramebuffer(ctx, 0);
 			}
 
 			VulkanicAPI.deleteFramebuffer(ctx, i);

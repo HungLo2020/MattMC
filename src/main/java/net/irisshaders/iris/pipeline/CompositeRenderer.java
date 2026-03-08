@@ -194,7 +194,7 @@ public class CompositeRenderer {
 		this.passes = passes.build();
 		this.flippedAtLeastOnceFinal = flippedAtLeastOnce.build();
 
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
 	}
 
 	private boolean hasComputes(ComputeSource[][] computes) {

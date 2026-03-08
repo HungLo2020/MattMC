@@ -86,7 +86,7 @@ public class TestRenderer
 		// TODO fix for MC 1.21.5+
 		this.init();
 		
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, MC_RENDER.getTargetFramebuffer());
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), MC_RENDER.getTargetFramebuffer());
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		VulkanicAPI.setDynamicViewport(ctx, 0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
 		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);

@@ -85,8 +85,8 @@ public class FadeApplyShader extends AbstractShaderRenderer
 		
 		
 		// apply the rendered Fade to Minecraft's framebuffer
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, this.readFramebuffer);
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.drawFramebuffer);
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), this.readFramebuffer);
+		VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), this.drawFramebuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		

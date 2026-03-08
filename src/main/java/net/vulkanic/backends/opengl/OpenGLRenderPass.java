@@ -116,7 +116,7 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
         if (!closed) {
             closed = true;
             // Unbind the FBO → restore default framebuffer
-            VulkanicAPI.bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, 0);
+            VulkanicAPI.bindDefaultFramebuffer(ctx);
             // Delete the temporary FBO we created for this render pass
             VulkanicAPI.deleteFramebuffer(ctx, fbo);
         }

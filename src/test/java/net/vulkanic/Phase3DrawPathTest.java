@@ -226,14 +226,90 @@ public class Phase3DrawPathTest {
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
         String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
 
-        assertTrue(irisRenderSystemSource.contains("public static void bindFramebuffer("),
-            "IrisRenderSystem should provide bindFramebuffer helper after wrapper removal");
-        assertTrue(irisRenderSystemSource.contains("public static int getFrameBuffer("),
-            "IrisRenderSystem should provide getFrameBuffer helper after wrapper removal");
-        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.bindReadFramebuffer(ctx, framebuffer)"),
-            "IrisRenderSystem.bindFramebuffer should bind read FBO via VulkanicAPI.bindReadFramebuffer");
-        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.bindDrawFramebuffer(ctx, framebuffer)"),
-            "IrisRenderSystem.bindFramebuffer should bind draw FBO via VulkanicAPI.bindDrawFramebuffer");
+        assertFalse(irisRenderSystemSource.contains("public static void bindFramebuffer("),
+            "IrisRenderSystem framebuffer bind wrapper should be removed after VulkanicAPI helper migration");
+        assertFalse(irisRenderSystemSource.contains("public static int getFrameBuffer("),
+            "IrisRenderSystem framebuffer binding getter wrapper should be removed after VulkanicAPI helper migration");
+        assertFalse(irisRenderSystemSource.contains("private static int readFramebuffer"),
+            "IrisRenderSystem should not own read framebuffer binding state");
+        assertFalse(irisRenderSystemSource.contains("private static int writeFramebuffer"),
+            "IrisRenderSystem should not own draw framebuffer binding state");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+
+        assertTrue(vulkanicApiSource.contains("private static int readFramebufferBinding"),
+            "VulkanicAPI should own cached read framebuffer binding state");
+        assertTrue(vulkanicApiSource.contains("private static int drawFramebufferBinding"),
+            "VulkanicAPI should own cached draw framebuffer binding state");
+        assertTrue(vulkanicApiSource.contains("public static void bindDefaultFramebuffer(CommandContext ctx)"),
+            "VulkanicAPI should expose bindDefaultFramebuffer helper for intent-level default FBO binds");
+        assertTrue(vulkanicApiSource.contains("public static int getReadFramebufferBinding()"),
+            "VulkanicAPI should expose cached read framebuffer getter");
+        assertTrue(vulkanicApiSource.contains("public static int getDrawFramebufferBinding()"),
+            "VulkanicAPI should expose cached draw framebuffer getter");
+    }
+
+    @Test
+    public void testFramebufferIntentCallsitesUseVulkanicAPIHelpers() throws IOException {
+        Path commandEncoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String commandEncoderSource = Files.readString(commandEncoderFile);
+        assertFalse(commandEncoderSource.contains("IrisRenderSystem.bindFramebuffer("),
+            "GlCommandEncoder framebuffer paths should not bind through IrisRenderSystem framebuffer helper wrappers");
+        assertTrue(commandEncoderSource.contains("VulkanicAPI.bindDefaultFramebuffer("),
+            "GlCommandEncoder framebuffer paths should bind default FBO through VulkanicAPI helper");
+
+        Path directStateAccessFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
+        String directStateAccessSource = Files.readString(directStateAccessFile);
+        assertFalse(directStateAccessSource.contains("IrisRenderSystem.getFrameBuffer("),
+            "DirectStateAccess should not read framebuffer bindings through IrisRenderSystem helper wrappers");
+        assertFalse(directStateAccessSource.contains("IrisRenderSystem.bindFramebuffer("),
+            "DirectStateAccess should not bind framebuffer targets through IrisRenderSystem helper wrappers");
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.getFramebufferBinding("),
+            "DirectStateAccess should read framebuffer bindings through VulkanicAPI cached binding helpers");
+
+        Path renderTargetFile = SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/RenderTarget.java");
+        String renderTargetSource = Files.readString(renderTargetFile);
+        assertFalse(renderTargetSource.contains("IrisRenderSystem.bindFramebuffer("),
+            "RenderTarget iris$bindFramebuffer path should not bind through IrisRenderSystem helper wrappers");
+        assertTrue(renderTargetSource.contains("VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext()"),
+            "RenderTarget iris$bindFramebuffer path should bind through VulkanicAPI helper");
+
+        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
+        String dhWrapperSource = Files.readString(dhWrapperFile);
+        assertFalse(dhWrapperSource.contains("IrisRenderSystem.bindFramebuffer("),
+            "MinecraftGLWrapper should not perform duplicate framebuffer binds through IrisRenderSystem helper wrappers");
+        assertFalse(dhWrapperSource.contains("glBindFramebuffer("),
+            "MinecraftGLWrapper should no longer expose framebuffer bind wrapper after VulkanicAPI callsite migration");
+
+        Path dhInterfaceFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/wrapperInterfaces/minecraft/IMinecraftGLWrapper.java");
+        String dhInterfaceSource = Files.readString(dhInterfaceFile);
+        assertFalse(dhInterfaceSource.contains("void glBindFramebuffer("),
+            "IMinecraftGLWrapper should no longer declare framebuffer bind wrapper after VulkanicAPI callsite migration");
+
+        Path dhFramebufferFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/texture/DhFramebuffer.java");
+        String dhFramebufferSource = Files.readString(dhFramebufferFile);
+        assertFalse(dhFramebufferSource.contains("GLMC.glBindFramebuffer("),
+            "DhFramebuffer should not bind framebuffers through GLMC wrapper");
+        assertTrue(dhFramebufferSource.contains("VulkanicAPI.bindReadFramebuffer("),
+            "DhFramebuffer should bind read framebuffer through VulkanicAPI helper");
+        assertTrue(dhFramebufferSource.contains("VulkanicAPI.bindDrawFramebuffer("),
+            "DhFramebuffer should bind draw framebuffer through VulkanicAPI helper");
+
+        Path fogApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogApplyShader.java");
+        String fogApplySource = Files.readString(fogApplyFile);
+        assertFalse(fogApplySource.contains("GLMC.glBindFramebuffer("),
+            "FogApplyShader should not bind read/draw framebuffers through GLMC wrapper");
+
+        Path ssaoApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOApplyShader.java");
+        String ssaoApplySource = Files.readString(ssaoApplyFile);
+        assertFalse(ssaoApplySource.contains("GLMC.glBindFramebuffer("),
+            "SSAOApplyShader should not bind read/draw framebuffers through GLMC wrapper");
+
+        Path fadeApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FadeApplyShader.java");
+        String fadeApplySource = Files.readString(fadeApplyFile);
+        assertFalse(fadeApplySource.contains("GLMC.glBindFramebuffer("),
+            "FadeApplyShader should not bind read/draw framebuffers through GLMC wrapper");
     }
 
     @Test
@@ -371,8 +447,8 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should detach color attachments via framebufferColorAttachment0Texture2D helper");
         assertTrue(source.contains("VulkanicAPI.framebufferDepthAttachmentTexture2D("),
             "GlCommandEncoder should detach depth attachments via framebufferDepthAttachmentTexture2D helper");
-        assertTrue(source.contains("IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER"),
-            "GlCommandEncoder should bind/unbind framebuffers through IrisRenderSystem.bindFramebuffer");
+        assertTrue(source.contains("VulkanicAPI.bindDefaultFramebuffer("),
+            "GlCommandEncoder should bind/unbind default framebuffer through VulkanicAPI.bindDefaultFramebuffer");
         assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
             "GlCommandEncoder should clear buffers via VulkanicAPI.clearBuffersWithMacosWorkaround");
         assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT)"),

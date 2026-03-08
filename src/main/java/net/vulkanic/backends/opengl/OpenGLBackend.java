@@ -2442,7 +2442,7 @@ public class OpenGLBackend implements GraphicsBackend {
         int fbo = net.vulkanic.VulkanicAPI.createFramebuffer(ctx);
 
         // 2. Bind the FBO
-        net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER, fbo);
+        net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, fbo);
 
         // 3. Attach the color texture at mip level 0 of the view's base mip
         int colorHandle = colorView.glHandle();

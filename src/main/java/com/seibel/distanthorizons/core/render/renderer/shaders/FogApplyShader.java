@@ -88,12 +88,12 @@ public class FogApplyShader extends AbstractShaderRenderer
 		
 		
 		// apply the rendered Fog to DH's framebuffer
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, FogShader.INSTANCE.frameBuffer);
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, LodRenderer.INSTANCE.getActiveFramebufferId());
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), FogShader.INSTANCE.frameBuffer);
+		VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), LodRenderer.INSTANCE.getActiveFramebufferId());
 		
 		ScreenQuad.INSTANCE.render();
 		
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
 	}
 	
 }

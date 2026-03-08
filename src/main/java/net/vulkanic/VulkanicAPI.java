@@ -10,6 +10,8 @@ import net.vulkanic.backends.opengl.OpenGLCommandContext;
 public class VulkanicAPI {
     private static GraphicsBackend backend;
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
+    private static int readFramebufferBinding;
+    private static int drawFramebufferBinding;
     
     // Functional interfaces for debug callbacks
     @FunctionalInterface
@@ -515,6 +517,9 @@ public class VulkanicAPI {
                 case VULKAN:
                     throw new UnsupportedOperationException("Vulkan backend not yet implemented");
             }
+
+			readFramebufferBinding = 0;
+			drawFramebufferBinding = 0;
         }
     }
     
@@ -809,21 +814,85 @@ public class VulkanicAPI {
      * @param fbo The framebuffer object ID
      */
     public static void bindFramebuffer(CommandContext ctx, int target, int fbo) {
+        if (target == GL_READ_FRAMEBUFFER) {
+            if (readFramebufferBinding != fbo) {
+                getBackend().bindFramebuffer(ctx, target, fbo);
+                readFramebufferBinding = fbo;
+            }
+            return;
+        }
+
+        if (target == GL_DRAW_FRAMEBUFFER) {
+            if (drawFramebufferBinding != fbo) {
+                getBackend().bindFramebuffer(ctx, target, fbo);
+                drawFramebufferBinding = fbo;
+            }
+            return;
+        }
+
+        if (target == GL_FRAMEBUFFER) {
+            if (readFramebufferBinding != fbo || drawFramebufferBinding != fbo) {
+                getBackend().bindFramebuffer(ctx, target, fbo);
+                readFramebufferBinding = fbo;
+                drawFramebufferBinding = fbo;
+            }
+            return;
+        }
+
         getBackend().bindFramebuffer(ctx, target, fbo);
+    }
+
+    /**
+     * Binds both read and draw framebuffers to the same FBO.
+     */
+    public static void bindFramebuffer(CommandContext ctx, int fbo) {
+        bindFramebuffer(ctx, GL_FRAMEBUFFER, fbo);
+    }
+
+    /**
+     * Binds framebuffer 0 for both read and draw targets.
+     */
+    public static void bindDefaultFramebuffer(CommandContext ctx) {
+        bindFramebuffer(ctx, 0);
     }
 
     /**
      * Binds the read framebuffer target.
      */
     public static void bindReadFramebuffer(CommandContext ctx, int fbo) {
-        getBackend().bindFramebuffer(ctx, GL_READ_FRAMEBUFFER, fbo);
+        bindFramebuffer(ctx, GL_READ_FRAMEBUFFER, fbo);
     }
 
     /**
      * Binds the draw framebuffer target.
      */
     public static void bindDrawFramebuffer(CommandContext ctx, int fbo) {
-        getBackend().bindFramebuffer(ctx, GL_DRAW_FRAMEBUFFER, fbo);
+		bindFramebuffer(ctx, GL_DRAW_FRAMEBUFFER, fbo);
+        }
+
+        /**
+         * Gets cached bound read framebuffer ID.
+         */
+        public static int getReadFramebufferBinding() {
+		return readFramebufferBinding;
+        }
+
+        /**
+         * Gets cached bound draw framebuffer ID.
+         */
+        public static int getDrawFramebufferBinding() {
+		return drawFramebufferBinding;
+        }
+
+        /**
+         * Gets cached framebuffer binding for a target.
+         */
+        public static int getFramebufferBinding(int target) {
+		if (target == GL_READ_FRAMEBUFFER) {
+			return readFramebufferBinding;
+		}
+
+		return target == GL_DRAW_FRAMEBUFFER ? drawFramebufferBinding : 0;
     }
     
     /**

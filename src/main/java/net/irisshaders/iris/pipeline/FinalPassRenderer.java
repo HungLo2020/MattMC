@@ -154,7 +154,7 @@ public class FinalPassRenderer {
 
 		this.swapPasses = swapPasses.build();
 
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
 	}
 
 	private static void setupMipmapping(RenderTarget target, boolean readFromAlt) {

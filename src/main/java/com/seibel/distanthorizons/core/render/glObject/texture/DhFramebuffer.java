@@ -1,8 +1,6 @@
 package com.seibel.distanthorizons.core.render.glObject.texture;
 
 import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiFramebuffer;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import net.vulkanic.CommandContext;
@@ -10,8 +8,6 @@ import net.vulkanic.VulkanicAPI;
 
 public class DhFramebuffer implements IDhApiFramebuffer
 {
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
-	
 	private final Int2IntMap attachments;
 	private final int maxDrawBuffers;
 	private final int maxColorAttachments;
@@ -120,12 +116,12 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		{
 			throw new IllegalStateException("Framebuffer does not exist!");
 		} 
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.id);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.id);
 	}
 	
-	public void bindAsReadBuffer() { GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, this.id); }
+	public void bindAsReadBuffer() { VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), this.id); }
 	
-	public void bindAsDrawBuffer() { GLMC.glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.id); }
+	public void bindAsDrawBuffer() { VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), this.id); }
 	
 	@Override
 	public void destroy()

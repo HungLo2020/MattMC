@@ -121,7 +121,7 @@ public class DhFadeShader extends AbstractShaderRenderer
 		
 		
 		
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.frameBuffer);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.frameBuffer);
 		GLMC.disableScissorTest();
 		GLMC.disableDepthTest();
 		GLMC.disableBlend();

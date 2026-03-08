@@ -150,7 +150,7 @@ public class ShadowCompositeRenderer {
 		this.passes = passes.build();
 		this.flippedAtLeastOnceFinal = flippedAtLeastOnce.build();
 
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
 	}
 
 	private static void setupMipmapping(net.irisshaders.iris.targets.RenderTarget target, boolean readFromAlt) {

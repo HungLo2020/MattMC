@@ -68,7 +68,7 @@ public class VanillaFadeRenderer
 		}
 		
 		this.fadeFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fadeFramebuffer);
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.fadeFramebuffer);
 		
 		
 		// Applying the fade texture is only needed if MC is drawing to their own frame buffer,

@@ -1,6 +1,5 @@
 package net.blaze3d.pipeline;
 
-import net.blaze3d.opengl.GlConst;
 import net.blaze3d.opengl.GlDevice;
 import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.systems.GpuDevice;
@@ -15,6 +14,7 @@ import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -179,7 +179,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	// Iris: RenderTargetInterface implementation
 	@Override
 	public void iris$bindFramebuffer() {
-		net.irisshaders.iris.gl.IrisRenderSystem.bindFramebuffer(GlConst.GL_FRAMEBUFFER,
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(),
 			((GlTexture) this.colorTexture).getFbo(
 				((GlDevice) RenderSystem.getDevice()).directStateAccess(),
 				this.depthTexture));
