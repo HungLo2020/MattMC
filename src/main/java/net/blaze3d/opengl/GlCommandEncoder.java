@@ -245,12 +245,12 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyDepthTexture(gpuTexture);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, 0, ((GlTexture)gpuTexture).id, 0, 36160);
-			VulkanicAPI.setDrawBuffer(VulkanicAPI.getImmediateContext(), 0);
+			VulkanicAPI.setDrawBufferNone(VulkanicAPI.getImmediateContext());
 			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
 			GlStateManager._depthMask(true);
 			GlStateManager._disableScissorTest();
 			GlStateManager._clear(256);
-			VulkanicAPI.setDrawBuffer(VulkanicAPI.getImmediateContext(), 36064);
+			VulkanicAPI.setDrawBufferColorAttachment0(VulkanicAPI.getImmediateContext());
 			GlStateManager._glFramebufferTexture2D(36160, 36096, 3553, 0, 0);
 			GlStateManager._glBindFramebuffer(36160, 0);
 		}
@@ -459,7 +459,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				int q;
 				if ((gpuTexture.usage() & 16) != 0) {
 					q = GlConst.CUBEMAP_TARGETS[j % 6];
-					VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindCubemapTexture(VulkanicAPI.getImmediateContext(), ((GlTexture)gpuTexture).id);
 				} else {
 					q = 3553;
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
@@ -511,7 +511,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				int o;
 				if ((gpuTexture.usage() & 16) != 0) {
 					o = GlConst.CUBEMAP_TARGETS[j % 6];
-					VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindCubemapTexture(VulkanicAPI.getImmediateContext(), ((GlTexture)gpuTexture).id);
 				} else {
 					o = 3553;
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
@@ -740,7 +740,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (biConsumer != null) {
 					biConsumer.accept(object, (RenderPass.UniformUploader)(string, gpuBufferSlice) -> {
 						if (glRenderPass.pipeline.program().getUniform(string) instanceof Uniform.Ubo(int i)) {
-							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), 35345, i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
+							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
 						}
 					});
 				}
@@ -975,7 +975,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					int var39 = var61;
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice2 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-						VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), 35345, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
+							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
 					}
 					break;
 				case Uniform.Utb(int var41, int var42, TextureFormat var43, int var59):
@@ -985,10 +985,10 @@ public class GlCommandEncoder implements CommandEncoder {
 					}
 
 					GlStateManager._activeTexture(33984 + var42);
-					VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 35882, var44);
+					VulkanicAPI.bindTextureBuffer(VulkanicAPI.getImmediateContext(), var44);
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice3 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-						VulkanicAPI.texBuffer(VulkanicAPI.getImmediateContext(), 35882, GlConst.toGlInternalId(var43), ((GlBuffer)gpuBufferSlice3.buffer()).handle);
+						VulkanicAPI.bindTextureBufferData(VulkanicAPI.getImmediateContext(), GlConst.toGlInternalId(var43), ((GlBuffer)gpuBufferSlice3.buffer()).handle);
 					}
 					break;
 				case Uniform.Sampler(int glTextureView2, int var51):
@@ -1007,7 +1007,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					int o;
 					if ((glTexture.usage() & 16) != 0) {
 						o = 34067;
-						VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067, glTexture.id);
+						VulkanicAPI.bindCubemapTexture(VulkanicAPI.getImmediateContext(), glTexture.id);
 					} else {
 						o = 3553;
 						GlStateManager._bindTexture(glTexture.id);

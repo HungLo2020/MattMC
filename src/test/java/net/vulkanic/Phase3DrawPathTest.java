@@ -112,6 +112,44 @@ public class Phase3DrawPathTest {
             "drawFromBuffers should map VertexFormat.IndexType to VulkanicIndexType for backend-agnostic indexed draws");
     }
 
+    @Test
+    public void testGlCommandEncoderUsesAgnosticTextureAndUniformBindings() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve(
+            "net/blaze3d/opengl/GlCommandEncoder.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067"),
+            "GlCommandEncoder should not bind cubemaps via hardcoded GL target 34067; use bindCubemapTexture");
+        assertFalse(source.contains("VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 35882"),
+            "GlCommandEncoder should not bind texture buffers via hardcoded GL target 35882; use bindTextureBuffer");
+        assertFalse(source.contains("VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), 35345"),
+            "GlCommandEncoder should not bind UBO ranges with hardcoded GL target 35345; use target-agnostic overload");
+        assertFalse(source.contains("VulkanicAPI.setDrawBuffer(VulkanicAPI.getImmediateContext(), 0)"),
+            "GlCommandEncoder should use setDrawBufferNone helper instead of raw draw-buffer literal 0");
+        assertFalse(source.contains("VulkanicAPI.setDrawBuffer(VulkanicAPI.getImmediateContext(), 36064)"),
+            "GlCommandEncoder should use setDrawBufferColorAttachment0 helper instead of raw draw-buffer literal 36064");
+
+        assertTrue(source.contains("VulkanicAPI.bindCubemapTexture("),
+            "GlCommandEncoder should bind cubemaps via VulkanicAPI.bindCubemapTexture");
+        assertTrue(source.contains("VulkanicAPI.bindTextureBuffer("),
+            "GlCommandEncoder should bind texture buffers via VulkanicAPI.bindTextureBuffer");
+        assertTrue(source.contains("VulkanicAPI.bindTextureBufferData("),
+            "GlCommandEncoder should attach texel buffer data via VulkanicAPI.bindTextureBufferData");
+        assertTrue(source.contains("VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), var39"),
+            "GlCommandEncoder should use target-agnostic bindUniformBufferRange overload in uniform upload path");
+    }
+
+    @Test
+    public void testGlDeviceUsesAgnosticCubemapBindHelper() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067"),
+            "GlDevice should not bind cubemaps via hardcoded GL target 34067");
+        assertTrue(source.contains("VulkanicAPI.bindCubemapTexture("),
+            "GlDevice should bind cubemaps via VulkanicAPI.bindCubemapTexture");
+    }
+
     // ── Task 1b: getActiveVulkanicRenderPass() accessor ───────────────────────
 
     @Test

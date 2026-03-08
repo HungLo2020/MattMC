@@ -162,7 +162,12 @@ public class VulkanicAPI {
     // OpenGL Constants - Texture Types
     public static final int GL_TEXTURE_1D = 0x0DE0;
     public static final int GL_TEXTURE_3D = 0x806F;
+    public static final int GL_TEXTURE_BUFFER = 0x8C2A;
+    public static final int GL_TEXTURE_CUBE_MAP = 0x8513;
     public static final int GL_TEXTURE_RECTANGLE = 0x84F5;
+
+    // OpenGL Constants - Buffer Targets (extended)
+    public static final int GL_UNIFORM_BUFFER = 0x8A11;
     
     // OpenGL Constants - Query Names
     public static final int GL_SHADING_LANGUAGE_VERSION = 0x8B8C;
@@ -656,6 +661,24 @@ public class VulkanicAPI {
     
     public static void bindTexture(CommandContext ctx, int target, int textureId) {
         getBackend().bindTexture(ctx, target, textureId);
+    }
+
+    /**
+     * Binds a cubemap texture to the current texture unit.
+     *
+     * <p>Transitional convenience wrapper to reduce target-specific integer usage in callsites.
+     */
+    public static void bindCubemapTexture(CommandContext ctx, int textureId) {
+        getBackend().bindTexture(ctx, GL_TEXTURE_CUBE_MAP, textureId);
+    }
+
+    /**
+     * Binds a texture buffer object to the current texture unit.
+     *
+     * <p>Transitional convenience wrapper to reduce target-specific integer usage in callsites.
+     */
+    public static void bindTextureBuffer(CommandContext ctx, int textureId) {
+        getBackend().bindTexture(ctx, GL_TEXTURE_BUFFER, textureId);
     }
     
     public static void bindSampler(CommandContext ctx, int unit, int sampler) {
@@ -1484,6 +1507,20 @@ public class VulkanicAPI {
     public static void setDrawBuffer(CommandContext ctx, int mode) {
         getBackend().setDrawBuffer(ctx, mode);
     }
+
+    /**
+     * Sets the draw buffer to none.
+     */
+    public static void setDrawBufferNone(CommandContext ctx) {
+        getBackend().setDrawBuffer(ctx, GL_NONE);
+    }
+
+    /**
+     * Sets the draw buffer to the first color attachment.
+     */
+    public static void setDrawBufferColorAttachment0(CommandContext ctx) {
+        getBackend().setDrawBuffer(ctx, GL_COLOR_ATTACHMENT0);
+    }
     
     /**
      * Renders indexed primitives with instancing and a base vertex.
@@ -1545,6 +1582,13 @@ public class VulkanicAPI {
     public static void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
         getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size);
     }
+
+    /**
+     * Binds a range of a buffer to a uniform buffer binding point.
+     */
+    public static void bindUniformBufferRange(CommandContext ctx, int index, int buffer, long offset, long size) {
+        getBackend().bindUniformBufferRange(ctx, GL_UNIFORM_BUFFER, index, buffer, offset, size);
+    }
     
     /**
      * Attaches a buffer object to a texture buffer.
@@ -1552,6 +1596,13 @@ public class VulkanicAPI {
      */
     public static void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer) {
         getBackend().texBuffer(ctx, target, internalFormat, buffer);
+    }
+
+    /**
+     * Attaches a buffer object to a texture buffer target.
+     */
+    public static void bindTextureBufferData(CommandContext ctx, int internalFormat, int buffer) {
+        getBackend().texBuffer(ctx, GL_TEXTURE_BUFFER, internalFormat, buffer);
     }
     
     
