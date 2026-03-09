@@ -8,7 +8,7 @@ import java.util.TreeSet;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 
@@ -39,7 +39,12 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	/** This will bind the {@link AbstractVertexAttribute} */
 	public VertexAttributePreGL43()
 	{
-		super(); // also bind AbstractVertexAttribute
+		this(VulkanicAPI.getCommandContext());
+	}
+
+	public VertexAttributePreGL43(CommandContext ctx)
+	{
+		super(ctx); // also bind AbstractVertexAttribute
 		this.bindingPointsToIndexBuilder = new TreeMap<>();
 		this.pointersBuilder = new ArrayList<>();
 	}
@@ -54,9 +59,10 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	@Override
 	public void bindBufferToAllBindingPoints(int buffer)
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		for (int i = 0; i < this.pointers.length; i++)
 		{
-			VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), i);
+			VulkanicAPI.enableVertexAttribArray(ctx, i);
 		}
 		
 		for (int i = 0; i < this.pointers.length; i++)
@@ -69,12 +75,12 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 			
 			if (pointer.useInteger)
 			{
-				VulkanicAPI.setVertexAttribIPointer(VulkanicAPI.getImmediateContext(), i, pointer.elementCount, pointer.glType,
+				VulkanicAPI.setVertexAttribIPointer(ctx, i, pointer.elementCount, pointer.glType,
 						this.strideSize, this.pointersOffset[i]);
 			}
 			else
 			{
-				VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), i, pointer.elementCount, pointer.glType,
+				VulkanicAPI.setVertexAttribPointer(ctx, i, pointer.elementCount, pointer.glType,
 					pointer.normalized, this.strideSize, this.pointersOffset[i]);
 			}
 		}
@@ -84,11 +90,12 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	@Override
 	public void bindBufferToBindingPoint(int buffer, int bindingPoint)
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		int[] bindingPointIndexes = this.bindingPointsToIndex[bindingPoint];
 		
 		for (int bindingPointIndex : bindingPointIndexes)
 		{
-			VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), bindingPointIndex);
+			VulkanicAPI.enableVertexAttribArray(ctx, bindingPointIndex);
 		}
 		
 		for (int bindingPointIndex : bindingPointIndexes)
@@ -101,12 +108,12 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 			
 			if (pointer.useInteger)
 			{
-				VulkanicAPI.setVertexAttribIPointer(VulkanicAPI.getImmediateContext(), bindingPointIndex, pointer.elementCount, pointer.glType,
+				VulkanicAPI.setVertexAttribIPointer(ctx, bindingPointIndex, pointer.elementCount, pointer.glType,
 						this.strideSize, this.pointersOffset[bindingPointIndex]);
 			}
 			else
 			{
-				VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), bindingPointIndex, pointer.elementCount, pointer.glType,
+				VulkanicAPI.setVertexAttribPointer(ctx, bindingPointIndex, pointer.elementCount, pointer.glType,
 						pointer.normalized, this.strideSize, this.pointersOffset[bindingPointIndex]);
 			}
 		}
@@ -123,9 +130,10 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	@Override
 	public void unbindBuffersFromAllBindingPoint()
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		for (int i = 0; i < this.pointers.length; i++)
 		{
-			VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), i);
+			VulkanicAPI.disableVertexAttribArray(ctx, i);
 		}
 	}
 	
@@ -133,10 +141,11 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	@Override
 	public void unbindBuffersFromBindingPoint(int bindingPoint)
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		int[] bindingPointIndexes = this.bindingPointsToIndex[bindingPoint];
 		for (int bindingPointIndex : bindingPointIndexes)
 		{
-			VulkanicAPI.disableVertexAttribArray(VulkanicAPI.getImmediateContext(), bindingPointIndex);
+			VulkanicAPI.disableVertexAttribArray(ctx, bindingPointIndex);
 		}
 	}
 	

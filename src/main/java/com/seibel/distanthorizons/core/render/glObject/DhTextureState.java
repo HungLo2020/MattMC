@@ -9,13 +9,22 @@ public final class DhTextureState
 
 	public static void setActiveTextureUnit(int textureId)
 	{
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		setActiveTextureUnit(VulkanicAPI.getCommandContext(), textureId);
+	}
+
+	public static void setActiveTextureUnit(CommandContext ctx, int textureId)
+	{
 		VulkanicAPI.setActiveTextureUnit(ctx, textureId);
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(textureId);
 	}
 
 	public static void bindTexture2D(int textureId)
 	{
-		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), textureId);
+		bindTexture2D(VulkanicAPI.getCommandContext(), textureId);
+	}
+
+	public static void bindTexture2D(CommandContext ctx, int textureId)
+	{
+		VulkanicAPI.bindTexture2D(ctx, textureId);
 	}
 }

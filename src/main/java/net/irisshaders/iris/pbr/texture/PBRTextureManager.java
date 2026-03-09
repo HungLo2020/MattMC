@@ -115,7 +115,7 @@ public class PBRTextureManager {
 				} catch (Exception e) {
 					Iris.logger.warn("Failed to load PBR textures for texture " + id, e);
 				} finally {
-					VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousTextureBinding);
+					VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousTextureBinding);
 				}
 			}
 		}

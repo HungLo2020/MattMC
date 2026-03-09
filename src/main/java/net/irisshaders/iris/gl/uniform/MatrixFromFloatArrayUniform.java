@@ -29,7 +29,7 @@ public class MatrixFromFloatArrayUniform extends Uniform {
 			buffer.put(cachedValue);
 			buffer.rewind();
 
-			VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, false, buffer);
+			VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getCommandContext(), location, false, buffer);
 		}
 	}
 }

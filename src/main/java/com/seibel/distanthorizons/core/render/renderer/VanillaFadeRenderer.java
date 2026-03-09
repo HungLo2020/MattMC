@@ -13,6 +13,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
@@ -58,16 +59,16 @@ public class VanillaFadeRenderer
 		FadeApplyShader.INSTANCE.init();
 	}
 	
-	private void createFramebuffer(int width, int height)
+	private void createFramebuffer(CommandContext ctx, int width, int height)
 	{
 		if (this.fadeFramebuffer != -1)
 		{
-			VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.fadeFramebuffer);
+			VulkanicAPI.deleteFramebuffer(ctx, this.fadeFramebuffer);
 			this.fadeFramebuffer = -1;
 		}
 		
-		this.fadeFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.fadeFramebuffer);
+		this.fadeFramebuffer = VulkanicAPI.createFramebuffer(ctx);
+		VulkanicAPI.bindFramebuffer(ctx, this.fadeFramebuffer);
 		
 		
 		// Applying the fade texture is only needed if MC is drawing to their own frame buffer,
@@ -76,20 +77,20 @@ public class VanillaFadeRenderer
 		{
 			if (this.fadeTexture != -1)
 			{
-				VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), this.fadeTexture);
+				VulkanicAPI.deleteTexture(ctx, this.fadeTexture);
 				this.fadeTexture = -1;
 			}
 			
-			this.fadeTexture = VulkanicAPI.createTexture2D(net.vulkanic.VulkanicAPI.getImmediateContext());
+			this.fadeTexture = VulkanicAPI.createTexture2D(ctx);
 			DhTextureState.bindTexture2D(this.fadeTexture);
-			VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fadeTexture, 0);
+			VulkanicAPI.uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
+			VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
+			VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fadeTexture, 0);
 		}
 		else
 		{
-			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, MC_RENDER.getColorTextureId(), 0);
+			VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, MC_RENDER.getColorTextureId(), 0);
 		}
 	}
 	
@@ -116,7 +117,8 @@ public class VanillaFadeRenderer
 		profiler.push("DH-Vanilla Fade");
 		
 		
-		GLState mcState = new GLState();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		GLState mcState = new GLState(ctx);
 		
 		try
 		{
@@ -131,7 +133,7 @@ public class VanillaFadeRenderer
 			{
 				this.width = width;
 				this.height = height;
-				this.createFramebuffer(width, height);
+				this.createFramebuffer(ctx, width, height);
 			}
 			
 			
@@ -162,7 +164,7 @@ public class VanillaFadeRenderer
 		{
 			// make sure we always revert to MC's state to prevent GL state corruption
 			// this is especially important on MC 1.16.5 or when other rendering mods are present
-			mcState.restore();
+			mcState.restore(ctx);
 		}
 	}
 	

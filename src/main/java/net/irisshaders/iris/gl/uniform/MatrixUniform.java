@@ -46,7 +46,7 @@ public class MatrixUniform extends Uniform {
 			cachedValue.get(buffer);
 			buffer.rewind();
 
-			VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, false, buffer);
+			VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getCommandContext(), location, false, buffer);
 		}
 	}
 }

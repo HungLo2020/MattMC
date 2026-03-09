@@ -60,7 +60,7 @@ public class ProgramSamplers {
 
 		if (initializer != null) {
 			for (GlUniform1iCall call : initializer) {
-				VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), call.location(), call.value());
+				VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), call.location(), call.value());
 			}
 
 			initializer = null;
@@ -129,7 +129,7 @@ public class ProgramSamplers {
 			}
 
 			for (String name : names) {
-				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name);
+				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
 
 				if (location == -1) {
 					// There's no active sampler with this particular name in the program.
@@ -144,7 +144,7 @@ public class ProgramSamplers {
 
 		@Override
 		public boolean hasSampler(String name) {
-			return VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name) != -1;
+			return VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name) != -1;
 		}
 
 		@Override
@@ -183,7 +183,7 @@ public class ProgramSamplers {
 			}
 
 			for (String name : names) {
-				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name);
+				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
 
 				if (location == -1) {
 					// There's no active sampler with this particular name in the program.

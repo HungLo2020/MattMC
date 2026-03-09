@@ -35,6 +35,7 @@ import net.irisshaders.iris.vertices.ImmediateState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 
@@ -118,10 +119,11 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 		super.setupUniforms(uniformList, samplerList);
 
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		ProgramUniforms.Builder uniformBuilder = ProgramUniforms.builder(string, programId);
 		ProgramSamplers.Builder samplerBuilder = ProgramSamplers.builder(programId, IrisSamplers.WORLD_RESERVED_TEXTURE_UNITS);
 		uniformCreator.accept(uniformBuilder);
-		this.normalMat = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "iris_NormalMat");
+		this.normalMat = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "iris_NormalMat");
 		ProgramImages.Builder builder = ProgramImages.builder(programId);
 		samplerCreator.accept(samplerBuilder, builder);
 		customUniforms.mapholderToPass(uniformBuilder, this);
@@ -139,8 +141,8 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		this.alphaTest = alphaTest.reference();
 		this.parent = parent;
 
-		this.modelViewInverse = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "iris_ModelViewMatInverse");
-		this.projectionInverse = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), programId, "iris_ProjMatInverse");
+		this.modelViewInverse = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "iris_ModelViewMatInverse");
+		this.projectionInverse = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "iris_ProjMatInverse");
 
 		this.intensitySwizzle = isIntensity;
 	}
@@ -209,7 +211,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 		images.update();
 
-		//GL46C.glUniform1i(VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), getProgramId(), "iris_overlay"), 1);
+		//GL46C.glUniform1i(VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), getProgramId(), "iris_overlay"), 1);
 		BlendModeOverride.restore();
 
 		if (this.blendModeOverride != null) {
@@ -238,7 +240,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 	@Override
 	public int iris$getBlockIndex(int program, CharSequence uniformBlockName) {
-		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), program, "iris_" + uniformBlockName);
+		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getCommandContext(), program, "iris_" + uniformBlockName);
 	}
 
 	@Override

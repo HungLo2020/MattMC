@@ -94,7 +94,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
         // Iris: From MixinShaderChunkRenderer - viewport redirect (skip if in shadow pass)
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            CommandContext ctx = VulkanicAPI.getCommandContext();
             VulkanicAPI.setDynamicViewport(ctx, 0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
         }
         
@@ -117,7 +117,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         }
 
         if (program == null) {
-            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            CommandContext ctx = VulkanicAPI.getCommandContext();
             VulkanicAPI.bindFramebuffer(ctx, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
             program = this.compileProgram(options);
         }

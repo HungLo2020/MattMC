@@ -140,16 +140,16 @@ public class FogShader extends AbstractShaderRenderer
 		
 		if (this.inverseMvmProjMatrix != null)
 		{
-			this.shader.setUniform(this.uInvMvmProj, this.inverseMvmProjMatrix);
+			this.shader.setUniform(ctx, this.uInvMvmProj, this.inverseMvmProjMatrix);
 		}
 		
 		
 		// Fog uniforms
-		this.shader.setUniform(this.uFogColor, this.getFogColor(partialTicks));
-		this.shader.setUniform(this.uFogScale, 1.f / lodDrawDistance);
-		this.shader.setUniform(this.uFogVerticalScale, 1.f / MC.getWrappedClientLevel().getMaxHeight());
+		this.shader.setUniform(ctx, this.uFogColor, this.getFogColor(partialTicks));
+		this.shader.setUniform(ctx, this.uFogScale, 1.f / lodDrawDistance);
+		this.shader.setUniform(ctx, this.uFogVerticalScale, 1.f / MC.getWrappedClientLevel().getMaxHeight());
 		// only used for debugging
-		this.shader.setUniform(this.uFullFogMode, 0); // 1 = render everything with fog color // 7 = use debug rendering
+		this.shader.setUniform(ctx, this.uFullFogMode, 0); // 1 = render everything with fog color // 7 = use debug rendering
 		
 		
 		// fog config
@@ -167,11 +167,11 @@ public class FogShader extends AbstractShaderRenderer
 			farFogEnd = 0.0f;
 		}
 		
-		this.shader.setUniform(this.uFarFogStart, farFogStart);
-		this.shader.setUniform(this.uFarFogLength, farFogEnd - farFogStart);
-		this.shader.setUniform(this.uFarFogMin, farFogMin);
-		this.shader.setUniform(this.uFarFogRange, farFogMax - farFogMin);
-		this.shader.setUniform(this.uFarFogDensity, farFogDensity);
+		this.shader.setUniform(ctx, this.uFarFogStart, farFogStart);
+		this.shader.setUniform(ctx, this.uFarFogLength, farFogEnd - farFogStart);
+		this.shader.setUniform(ctx, this.uFarFogMin, farFogMin);
+		this.shader.setUniform(ctx, this.uFarFogRange, farFogMax - farFogMin);
+		this.shader.setUniform(ctx, this.uFarFogDensity, farFogDensity);
 		
 		
 		// height config
@@ -186,22 +186,22 @@ public class FogShader extends AbstractShaderRenderer
 		float heightFogMax = Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogMax.get().floatValue();
 		float heightFogDensity = Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogDensity.get().floatValue();
 		
-		this.shader.setUniform(this.uHeightFogStart, heightFogStart);
-		this.shader.setUniform(this.uHeightFogLength, heightFogEnd - heightFogStart);
-		this.shader.setUniform(this.uHeightFogMin, heightFogMin);
-		this.shader.setUniform(this.uHeightFogRange, heightFogMax - heightFogMin);
-		this.shader.setUniform(this.uHeightFogDensity, heightFogDensity);
+		this.shader.setUniform(ctx, this.uHeightFogStart, heightFogStart);
+		this.shader.setUniform(ctx, this.uHeightFogLength, heightFogEnd - heightFogStart);
+		this.shader.setUniform(ctx, this.uHeightFogMin, heightFogMin);
+		this.shader.setUniform(ctx, this.uHeightFogRange, heightFogMax - heightFogMin);
+		this.shader.setUniform(ctx, this.uHeightFogDensity, heightFogDensity);
 		
 		
-		this.shader.setUniform(this.uHeightFogEnabled, heightFogEnabled);
-		this.shader.setUniform(this.uHeightFogFalloffType, Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogFalloff.get().value);
-		this.shader.setUniform(this.uHeightFogBaseHeight, Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogBaseHeight.get().floatValue());
-		this.shader.setUniform(this.uHeightBasedOnCamera, heightFogCameraDirection.basedOnCamera);
-		this.shader.setUniform(this.uHeightFogAppliesUp, heightFogCameraDirection.fogAppliesUp);
-		this.shader.setUniform(this.uHeightFogAppliesDown, heightFogCameraDirection.fogAppliesDown);
-		this.shader.setUniform(this.uUseSphericalFog, useSphericalFog);
-		this.shader.setUniform(this.uHeightFogMixingMode, heightFogMixingMode.value);
-		this.shader.setUniform(this.uCameraBlockYPos, (float)MC_RENDER.getCameraExactPosition().y);
+		this.shader.setUniform(ctx, this.uHeightFogEnabled, heightFogEnabled);
+		this.shader.setUniform(ctx, this.uHeightFogFalloffType, Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogFalloff.get().value);
+		this.shader.setUniform(ctx, this.uHeightFogBaseHeight, Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogBaseHeight.get().floatValue());
+		this.shader.setUniform(ctx, this.uHeightBasedOnCamera, heightFogCameraDirection.basedOnCamera);
+		this.shader.setUniform(ctx, this.uHeightFogAppliesUp, heightFogCameraDirection.fogAppliesUp);
+		this.shader.setUniform(ctx, this.uHeightFogAppliesDown, heightFogCameraDirection.fogAppliesDown);
+		this.shader.setUniform(ctx, this.uUseSphericalFog, useSphericalFog);
+		this.shader.setUniform(ctx, this.uHeightFogMixingMode, heightFogMixingMode.value);
+		this.shader.setUniform(ctx, this.uCameraBlockYPos, (float)MC_RENDER.getCameraExactPosition().y);
 		
 	}
 	private Color getFogColor(float partialTicks)

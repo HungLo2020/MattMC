@@ -60,7 +60,7 @@ public class GlImage extends GlResource {
 		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAX_LOD, 0);
 		IrisRenderSystem.texParameterf(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_LOD_BIAS, 0.0F);
 
-		VulkanicAPI.clearTexImage(VulkanicAPI.getImmediateContext(), texture, 0, format.getGlFormat(), pixelType.getGlFormat(), (int[]) null);
+		VulkanicAPI.clearTexImage(VulkanicAPI.getCommandContext(), texture, 0, format.getGlFormat(), pixelType.getGlFormat(), (int[]) null);
 	}
 
 	public String getName() {

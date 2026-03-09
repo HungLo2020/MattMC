@@ -42,7 +42,7 @@ public class ShaderStorageBufferHolder {
 				buffers[index].createStatic();
 			}
 		});
-		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0);
 	}
 
 	private static long toMib(long x) {

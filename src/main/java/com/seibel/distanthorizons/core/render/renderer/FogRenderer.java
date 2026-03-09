@@ -7,6 +7,7 @@ import com.seibel.distanthorizons.core.render.renderer.shaders.FogApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FogShader;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
@@ -49,34 +50,34 @@ public class FogRenderer
 		FogApplyShader.INSTANCE.init();
 	}
 	
-	private void createFramebuffer(int width, int height)
+	private void createFramebuffer(CommandContext ctx, int width, int height)
 	{
 		if (this.fogFramebuffer != -1)
 		{
-			VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.fogFramebuffer);
+			VulkanicAPI.deleteFramebuffer(ctx, this.fogFramebuffer);
 			this.fogFramebuffer = -1;
 		}
 		
 		if (this.fogTexture != -1)
 		{
-			VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), this.fogTexture);
+			VulkanicAPI.deleteTexture(ctx, this.fogTexture);
 			this.fogTexture = -1;
 		}
 		
-		this.fogFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.fogFramebuffer);
+		this.fogFramebuffer = VulkanicAPI.createFramebuffer(ctx);
+		VulkanicAPI.bindFramebuffer(ctx, this.fogFramebuffer);
 		
-		this.fogTexture = VulkanicAPI.createTexture2D(VulkanicAPI.getImmediateContext());
+		this.fogTexture = VulkanicAPI.createTexture2D(ctx);
 		{
 			DhTextureState.bindTexture2D(this.fogTexture);
-			VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fogTexture, 0);
+			VulkanicAPI.uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
+			VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
+			VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fogTexture, 0);
 			
 			// disable mip-mapping since DH is just going to draw straight to the screen
-			VulkanicAPI.texParameteri(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
-			VulkanicAPI.texParameteri(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
+			VulkanicAPI.texParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
+			VulkanicAPI.texParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 		}
 	}
 	
@@ -89,7 +90,8 @@ public class FogRenderer
 	public void render(Mat4f modelViewProjectionMatrix, float partialTicks)
 	{
 		// needed to preserve GL state - MC may not manually set each GL state before the next rendering step
-		GLState state = new GLState();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		GLState state = new GLState(ctx);
 		
 		this.init();
 		
@@ -100,7 +102,7 @@ public class FogRenderer
 		{
 			this.width = width;
 			this.height = height;
-			this.createFramebuffer(width, height);
+			this.createFramebuffer(ctx, width, height);
 		}
 		
 		FogShader.INSTANCE.frameBuffer = this.fogFramebuffer;
@@ -110,7 +112,7 @@ public class FogRenderer
 		FogApplyShader.INSTANCE.fogTexture = this.fogTexture;
 		FogApplyShader.INSTANCE.render(partialTicks);
 		
-		state.restore();
+		state.restore(ctx);
 	}
 	
 	public void free()

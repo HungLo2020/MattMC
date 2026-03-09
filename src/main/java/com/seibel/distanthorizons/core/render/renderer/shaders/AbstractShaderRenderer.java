@@ -31,7 +31,7 @@ public abstract class AbstractShaderRenderer
 		this.init();
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		
-		this.shader.bind();
+		this.shader.bind(ctx);
 		
 		this.onApplyUniforms(ctx, partialTicks);
 		
@@ -41,7 +41,7 @@ public abstract class AbstractShaderRenderer
 		
 		this.onRender(ctx);
 		
-		this.shader.unbind();
+		this.shader.unbind(ctx);
 	}
 	
 	public void free()

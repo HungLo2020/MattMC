@@ -69,14 +69,14 @@ public class BlendModeStorage {
 		if (blendStateUnknown) {
 			blendEnabled = enabled;
 			blendStateUnknown = false;
-			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			CommandContext ctx = VulkanicAPI.getCommandContext();
 			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND, enabled);
 			return;
 		}
 
 		if (enabled != blendEnabled) {
 			blendEnabled = enabled;
-			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			CommandContext ctx = VulkanicAPI.getCommandContext();
 			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND, enabled);
 		}
 	}
@@ -93,7 +93,7 @@ public class BlendModeStorage {
 			blendDstRgb = dstRgb;
 			blendSrcAlpha = srcAlpha;
 			blendDstAlpha = dstAlpha;
-			VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), srcRgb, dstRgb, srcAlpha, dstAlpha);
+			VulkanicAPI.setBlendFunction(VulkanicAPI.getCommandContext(), srcRgb, dstRgb, srcAlpha, dstAlpha);
 		}
 
 		IrisRenderSystem.notifyBlendFuncChanged();

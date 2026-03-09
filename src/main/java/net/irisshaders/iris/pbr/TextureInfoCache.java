@@ -76,15 +76,16 @@ public class TextureInfoCache {
 		}
 
 		private int fetchLevelParameter(int pname) {
+			var ctx = VulkanicAPI.getCommandContext();
 			// Keep track of what texture was bound before
-			int previousTextureBinding = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_BINDING_2D);
+			int previousTextureBinding = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
 
 			// Bind this texture and grab the parameter from it.
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), id);
-			int parameter = VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, pname);
+			VulkanicAPI.bindTexture2D(ctx, id);
+			int parameter = VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, pname);
 
 			// Make sure to re-bind the previous texture to avoid issues.
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousTextureBinding);
+			VulkanicAPI.bindTexture2D(ctx, previousTextureBinding);
 
 			return parameter;
 		}

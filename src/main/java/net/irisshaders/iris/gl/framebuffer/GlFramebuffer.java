@@ -18,8 +18,8 @@ public class GlFramebuffer extends GlResource {
 		super(IrisRenderSystem.createFramebuffer());
 
 		this.attachments = new Int2IntArrayMap();
-		this.maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS);
-		this.maxColorAttachments = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
+		this.maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS);
+		this.maxColorAttachments = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
 		this.hasDepthAttachment = false;
 	}
 
@@ -87,28 +87,28 @@ public class GlFramebuffer extends GlResource {
 	}
 
 	public void bind() {
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), getGlId());
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), getGlId());
 	}
 
 	public void bindAsReadBuffer() {
-		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), getGlId());
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getCommandContext(), getGlId());
 	}
 
 	public void bindAsDrawBuffer() {
-		VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), getGlId());
+		VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getCommandContext(), getGlId());
 	}
 
 	protected void destroyInternal() {
 		int framebuffer = getGlId();
 		if (VulkanicAPI.getReadFramebufferBinding() == framebuffer) {
-			VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
+			VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getCommandContext(), 0);
 		}
 
 		if (VulkanicAPI.getDrawFramebufferBinding() == framebuffer) {
-			VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), 0);
+			VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getCommandContext(), 0);
 		}
 
-		VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
+		VulkanicAPI.deleteFramebuffer(VulkanicAPI.getCommandContext(), framebuffer);
 	}
 
 	public int getStatus() {

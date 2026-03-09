@@ -6,7 +6,6 @@ import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.SSAORenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
-import com.seibel.distanthorizons.core.util.NumberUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
 import net.vulkanic.CommandContext;
@@ -83,30 +82,30 @@ public class SSAOShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
-		this.shader.setUniform(this.uProj, this.projection);
+		this.shader.setUniform(ctx, this.uProj, this.projection);
 		
-		this.shader.setUniform(this.uInvProj, this.invertedProjection);
+		this.shader.setUniform(ctx, this.uInvProj, this.invertedProjection);
 		
-		this.shader.setUniform(this.uSampleCount, Config.Client.Advanced.Graphics.Ssao.sampleCount.get());
+		this.shader.setUniform(ctx, this.uSampleCount, Config.Client.Advanced.Graphics.Ssao.sampleCount.get());
 		
 		// Explicit Number casts need to be done to prevent issues with the default value being an int
 		Number radius = Config.Client.Advanced.Graphics.Ssao.radius.get(); 
-		this.shader.setUniform(this.uRadius, radius.floatValue());
+		this.shader.setUniform(ctx, this.uRadius, radius.floatValue());
 		
 		Number strength = Config.Client.Advanced.Graphics.Ssao.strength.get();
-		this.shader.setUniform(this.uStrength, strength.floatValue());
+		this.shader.setUniform(ctx, this.uStrength, strength.floatValue());
 		
 		Number minLight = Config.Client.Advanced.Graphics.Ssao.minLight.get();
-		this.shader.setUniform(this.uMinLight, minLight.floatValue());
+		this.shader.setUniform(ctx, this.uMinLight, minLight.floatValue());
 		
 		Number bias = Config.Client.Advanced.Graphics.Ssao.bias.get();
-		this.shader.setUniform(this.uBias, bias.floatValue());
+		this.shader.setUniform(ctx, this.uBias, bias.floatValue());
 		
 		VulkanicAPI.setUniform1i(ctx, this.uDepthMap, 0);
 		
 		float fadeDistanceInBlocks = Config.Client.Advanced.Graphics.Ssao.fadeDistanceInBlocks.get().floatValue();
 		fadeDistanceInBlocks = MathUtil.clamp(0.0f, fadeDistanceInBlocks, Float.MAX_VALUE); // clamp to prevent accidentally setting a negative number
-		this.shader.setUniform(this.uFadeDistanceInBlocks, fadeDistanceInBlocks);
+		this.shader.setUniform(ctx, this.uFadeDistanceInBlocks, fadeDistanceInBlocks);
 	}
 	
 	

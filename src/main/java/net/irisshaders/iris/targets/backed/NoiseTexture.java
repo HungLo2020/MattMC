@@ -19,6 +19,7 @@ public class NoiseTexture extends GlResource {
 
 	public NoiseTexture(int width, int height) {
 		super(IrisRenderSystem.createTexture(VulkanicAPI.GL_TEXTURE_2D));
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		int texture = getGlId();
 		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
@@ -34,22 +35,23 @@ public class NoiseTexture extends GlResource {
 
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, "noise texture");
 
-		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+		VulkanicAPI.bindTexture2D(ctx, 0);
 	}
 
 	void resize(int texture, int width, int height) {
 		this.width = width;
 		this.height = height;
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		ByteBuffer pixels = generateNoise();
 
 		TextureUploadHelper.resetTextureUploadState();
 
 		// Since we're using tightly-packed RGB data, we must use an alignment of 1 byte instead of the usual 4 bytes.
-		VulkanicAPI.setPixelStore(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_UNPACK_ALIGNMENT, 1);
+		VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ALIGNMENT, 1);
 		IrisRenderSystem.texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGB, width, height, 0, VulkanicAPI.GL_RGB, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
 
-		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+		VulkanicAPI.bindTexture2D(ctx, 0);
 	}
 
 	private ByteBuffer generateNoise() {

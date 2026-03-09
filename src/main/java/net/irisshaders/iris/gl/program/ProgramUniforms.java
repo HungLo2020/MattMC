@@ -288,7 +288,7 @@ public class ProgramUniforms {
 
 		@Override
 		public OptionalInt location(String name, UniformType type) {
-			int id = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name);
+			int id = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
 
 			if (id == -1) {
 				return OptionalInt.empty();
@@ -309,7 +309,7 @@ public class ProgramUniforms {
 		public ProgramUniforms buildUniforms() {
 			// Check for any unsupported uniforms and warn about them so that we can easily figure out what uniforms we
 			// need to add.
-			int activeUniforms = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), program, VulkanicAPI.GL_ACTIVE_UNIFORMS);
+			int activeUniforms = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), program, VulkanicAPI.GL_ACTIVE_UNIFORMS);
 			IntBuffer sizeBuf = BufferUtils.createIntBuffer(1);
 			IntBuffer typeBuf = BufferUtils.createIntBuffer(1);
 

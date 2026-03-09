@@ -89,8 +89,8 @@ public class VanillaFadeShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
-		this.shader.setUniform(this.uMcInvMvmProj, this.inverseMcMvmProjMatrix);
-		this.shader.setUniform(this.uDhInvMvmProj, this.inverseDhMvmProjMatrix);
+		this.shader.setUniform(ctx, this.uMcInvMvmProj, this.inverseMcMvmProjMatrix);
+		this.shader.setUniform(ctx, this.uDhInvMvmProj, this.inverseDhMvmProjMatrix);
 		
 		
 		float dhNearClipDistance = RenderUtil.getNearClipPlaneInBlocksForFading(partialTicks);
@@ -103,12 +103,12 @@ public class VanillaFadeShader extends AbstractShaderRenderer
 		float fadeStartDistance = dhNearClipDistance * 1.5f;
 		float fadeEndDistance = dhNearClipDistance * 1.9f;
 		
-		this.shader.setUniform(this.uStartFadeBlockDistance, fadeStartDistance);
-		this.shader.setUniform(this.uEndFadeBlockDistance, fadeEndDistance);
+		this.shader.setUniform(ctx, this.uStartFadeBlockDistance, fadeStartDistance);
+		this.shader.setUniform(ctx, this.uEndFadeBlockDistance, fadeEndDistance);
 		
-		this.shader.setUniform(this.uMaxLevelHeight, this.levelMaxHeight);
+		this.shader.setUniform(ctx, this.uMaxLevelHeight, this.levelMaxHeight);
 		
-		this.shader.setUniform(this.uOnlyRenderLods, Config.Client.Advanced.Debugging.lodOnlyMode.get());
+		this.shader.setUniform(ctx, this.uOnlyRenderLods, Config.Client.Advanced.Debugging.lodOnlyMode.get());
 	}
 	
 	public void setProjectionMatrix(Mat4f mcModelViewMatrix, Mat4f mcProjectionMatrix, float partialTicks)

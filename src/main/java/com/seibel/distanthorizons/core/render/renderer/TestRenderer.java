@@ -84,18 +84,18 @@ public class TestRenderer
 		// TODO fix for MC 1.21.5+
 		this.init();
 		
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), MC_RENDER.getTargetFramebuffer());
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindFramebuffer(ctx, MC_RENDER.getTargetFramebuffer());
 		VulkanicAPI.setDynamicViewport(ctx, 0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
-		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 		
 		VulkanicAPI.setCullFaceEnabled(ctx, false);
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		
-		this.basicShader.bind();
-		this.va.bind();
+		this.basicShader.bind(ctx);
+		this.va.bind(ctx);
 		
 		this.vbo.bind();
 		this.va.bindBufferToAllBindingPoints(this.vbo.getId());

@@ -20,7 +20,7 @@ public class SodiumGpuSyncHelper {
     public static void beforeFrameTick() {
         ProfilerFiller profiler = Profiler.get();
         profiler.push("wait_for_gpu");
-        var ctx = VulkanicAPI.getImmediateContext();
+        var ctx = VulkanicAPI.getCommandContext();
 
         while (fences.size() > SodiumClientMod.options().advanced.cpuRenderAheadLimit) {
             long fence = fences.dequeueLong();
@@ -52,7 +52,7 @@ public class SodiumGpuSyncHelper {
      * Called at the end of each frame to create a new fence for GPU synchronization.
      */
     public static void afterFrameTick() {
-        long fence = VulkanicAPI.createGpuCompletionFence(VulkanicAPI.getImmediateContext());
+        long fence = VulkanicAPI.createGpuCompletionFence(VulkanicAPI.getCommandContext());
 
         if (fence == 0) {
             throw new RuntimeException("Failed to create fence object");

@@ -43,7 +43,7 @@ public class RenderTarget {
 
 		// Clean up after ourselves
 		// This is strictly defensive to ensure that other buggy code doesn't tamper with our textures
-		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 	}
 
 	public static Builder builder() {

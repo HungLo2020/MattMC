@@ -77,15 +77,15 @@ public class DhFadeShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
-		this.shader.setUniform(this.uDhInvMvmProj, this.inverseDhMvmProjMatrix);
+		this.shader.setUniform(ctx, this.uDhInvMvmProj, this.inverseDhMvmProjMatrix);
 		
 		
 		float dhFarClipDistance = RenderUtil.getFarClipPlaneDistanceInBlocks();
 		float fadeStartDistance = dhFarClipDistance * 0.5f;
 		float fadeEndDistance = dhFarClipDistance * 0.9f;
 		
-		this.shader.setUniform(this.uStartFadeBlockDistance, fadeStartDistance);
-		this.shader.setUniform(this.uEndFadeBlockDistance, fadeEndDistance);
+		this.shader.setUniform(ctx, this.uStartFadeBlockDistance, fadeStartDistance);
+		this.shader.setUniform(ctx, this.uEndFadeBlockDistance, fadeEndDistance);
 		
 	}
 	

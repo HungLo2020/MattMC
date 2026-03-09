@@ -7,6 +7,7 @@ import com.seibel.distanthorizons.core.render.renderer.shaders.SSAOApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.SSAOShader;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
@@ -49,36 +50,36 @@ public class SSAORenderer
 		SSAOApplyShader.INSTANCE.init();
 	}
 	
-	private void createFramebuffer(int width, int height)
+	private void createFramebuffer(CommandContext ctx, int width, int height)
 	{
 		if (this.ssaoFramebuffer != -1)
 		{
-			VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.ssaoFramebuffer);
+			VulkanicAPI.deleteFramebuffer(ctx, this.ssaoFramebuffer);
 			this.ssaoFramebuffer = -1;
 		}
 		
 		if (this.ssaoTexture != -1)
 		{
-			VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), this.ssaoTexture);
+			VulkanicAPI.deleteTexture(ctx, this.ssaoTexture);
 			this.ssaoTexture = -1;
 		}
 		
-		this.ssaoFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.ssaoFramebuffer);
+		this.ssaoFramebuffer = VulkanicAPI.createFramebuffer(ctx);
+		VulkanicAPI.bindFramebuffer(ctx, this.ssaoFramebuffer);
 		
-		this.ssaoTexture = VulkanicAPI.createTexture2D(VulkanicAPI.getImmediateContext());
+		this.ssaoTexture = VulkanicAPI.createTexture2D(ctx);
 		{
 			DhTextureState.bindTexture2D(this.ssaoTexture);
-			VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_R16F, width, height, 0, VulkanicAPI.GL_RED, VulkanicAPI.GL_HALF_FLOAT, (ByteBuffer) null);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			VulkanicAPI.uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_R16F, width, height, 0, VulkanicAPI.GL_RED, VulkanicAPI.GL_HALF_FLOAT, (ByteBuffer) null);
+			VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
+			VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
 			
 			// disable mip-mapping since DH is just going to draw straight to the screen
-			VulkanicAPI.texParameteri(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
-			VulkanicAPI.texParameteri(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
+			VulkanicAPI.texParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
+			VulkanicAPI.texParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 		}
 		
-		VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.ssaoTexture, 0);
+		VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.ssaoTexture, 0);
 	}
 	
 	
@@ -89,7 +90,8 @@ public class SSAORenderer
 	
 	public void render(Mat4f projectionMatrix, float partialTicks)
 	{
-		GLState state = new GLState();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		GLState state = new GLState(ctx);
 		
 		this.init();
 		
@@ -100,7 +102,7 @@ public class SSAORenderer
 		{
 			this.width = width;
 			this.height = height;
-			this.createFramebuffer(width, height);
+			this.createFramebuffer(ctx, width, height);
 		}
 		
 		SSAOShader.INSTANCE.frameBuffer = this.ssaoFramebuffer;
@@ -110,7 +112,7 @@ public class SSAORenderer
 		SSAOApplyShader.INSTANCE.ssaoTexture = this.ssaoTexture;
 		SSAOApplyShader.INSTANCE.render(partialTicks);
 		
-		state.restore();
+		state.restore(ctx);
 	}
 	
 	public void free()

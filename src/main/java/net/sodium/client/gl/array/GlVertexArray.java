@@ -11,7 +11,7 @@ public class GlVertexArray extends GlObject {
     public static final int NULL_ARRAY_ID = 0;
 
     public GlVertexArray() {
-        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        CommandContext ctx = VulkanicAPI.getCommandContext();
         this.setHandle(VulkanicAPI.createVertexArray(ctx));
     }
 }

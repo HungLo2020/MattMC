@@ -10,10 +10,11 @@ public class SamplerLimits {
 	private final int maxShaderStorageUnits;
 
 	private SamplerLimits() {
-		this.maxTextureUnits = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS);
-		this.maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS);
+		var ctx = VulkanicAPI.getCommandContext();
+		this.maxTextureUnits = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS);
+		this.maxDrawBuffers = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_DRAW_BUFFERS);
 		this.maxShaderStorageUnits = IrisRenderSystem.supportsSSBO()
-			? VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS)
+			? VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS)
 			: 0;
 	}
 

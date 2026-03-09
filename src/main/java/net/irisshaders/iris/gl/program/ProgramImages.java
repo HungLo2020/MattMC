@@ -27,7 +27,7 @@ public class ProgramImages {
 	public void update() {
 		if (initializer != null) {
 			for (GlUniform1iCall call : initializer) {
-				VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), call.location(), call.value());
+				VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), call.location(), call.value());
 			}
 
 			initializer = null;
@@ -59,12 +59,12 @@ public class ProgramImages {
 
 		@Override
 		public boolean hasImage(String name) {
-			return VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name) != -1;
+			return VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name) != -1;
 		}
 
 		@Override
 		public void addTextureImage(IntSupplier textureID, InternalTextureFormat internalFormat, String name) {
-			int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), program, name);
+			int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
 
 			if (location == -1) {
 				return;

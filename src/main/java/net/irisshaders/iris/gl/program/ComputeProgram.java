@@ -83,7 +83,7 @@ public final class ComputeProgram extends GlResource {
 	}
 
 	public void destroyInternal() {
-		VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), getGlId());
+		VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), getGlId());
 	}
 
 	/**

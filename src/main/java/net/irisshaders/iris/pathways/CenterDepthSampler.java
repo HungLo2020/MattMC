@@ -55,7 +55,7 @@ public class CenterDepthSampler {
 		InternalTextureFormat format = InternalTextureFormat.R32F;
 		setupColorTexture(texture, format);
 		setupColorTexture(altTexture, format);
-		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 
 		this.framebuffer.addColorAttachment(0, texture);
 		ProgramBuilder builder;
@@ -102,7 +102,7 @@ public class CenterDepthSampler {
 			this.framebuffer.bind();
 			this.program.use();
 
-			VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), 0, 0, 1, 1);
+			VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, 1, 1);
 
 			renderPass.drawIndexed(0, 0, 6, 1);
 

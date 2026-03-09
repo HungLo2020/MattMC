@@ -41,7 +41,7 @@ public final class PartialShader {
 	private static void detachIfValid(int i, int s) {
 		if (s >= 0) {
 			IrisRenderSystem.detachShader(i, s);
-			VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), s);
+			VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), s);
 		}
 	}
 

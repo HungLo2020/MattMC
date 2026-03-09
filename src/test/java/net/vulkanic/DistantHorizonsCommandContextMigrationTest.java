@@ -92,4 +92,130 @@ public class DistantHorizonsCommandContextMigrationTest {
         assertBackendNeutralSingleContext(SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/generic/RenderableBoxGroup.java"));
     }
+
+    @Test
+    public void testDhGlObjectLayerExposesContextAwareSeams() throws IOException {
+        Path shaderProgram = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/shader/ShaderProgram.java");
+        Path glState = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/GLState.java");
+        Path framebuffer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/texture/DhFramebuffer.java");
+        Path glBuffer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/buffer/GLBuffer.java");
+        Path colorTexture = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/texture/DhColorTexture.java");
+        Path depthTexture = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/texture/DHDepthTexture.java");
+        Path textureState = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/DhTextureState.java");
+        Path glProxy = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/GLProxy.java");
+        Path abstractVertexAttribute = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/vertexAttribute/AbstractVertexAttribute.java");
+        Path vertexAttributePreGL43 = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/vertexAttribute/VertexAttributePreGL43.java");
+        Path vertexAttributePostGL43 = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/vertexAttribute/VertexAttributePostGL43.java");
+
+        String shaderProgramSource = readSourceWithoutComments(shaderProgram);
+        String glStateSource = readSourceWithoutComments(glState);
+        String framebufferSource = readSourceWithoutComments(framebuffer);
+        String glBufferSource = readSourceWithoutComments(glBuffer);
+        String colorTextureSource = readSourceWithoutComments(colorTexture);
+        String depthTextureSource = readSourceWithoutComments(depthTexture);
+        String textureStateSource = readSourceWithoutComments(textureState);
+        String glProxySource = readSourceWithoutComments(glProxy);
+        String abstractVertexAttributeSource = readSourceWithoutComments(abstractVertexAttribute);
+        String vertexAttributePreGL43Source = readSourceWithoutComments(vertexAttributePreGL43);
+        String vertexAttributePostGL43Source = readSourceWithoutComments(vertexAttributePostGL43);
+
+        assertNoImmediateContext(shaderProgram);
+        assertNoImmediateContext(glState);
+        assertNoImmediateContext(framebuffer);
+        assertNoImmediateContext(glBuffer);
+        assertNoImmediateContext(colorTexture);
+        assertNoImmediateContext(depthTexture);
+        assertNoImmediateContext(textureState);
+        assertNoImmediateContext(glProxy);
+        assertNoImmediateContext(abstractVertexAttribute);
+        assertNoImmediateContext(vertexAttributePreGL43);
+        assertNoImmediateContext(vertexAttributePostGL43);
+
+        assertTrue(shaderProgramSource.contains("bind(CommandContext ctx)"),
+            "ShaderProgram should expose explicit context-aware bind");
+        assertTrue(shaderProgramSource.contains("setUniform(CommandContext ctx"),
+            "ShaderProgram should expose explicit context-aware uniform updates");
+
+        assertTrue(glStateSource.contains("saveState(CommandContext ctx)"),
+            "GLState should support context-aware state capture");
+        assertTrue(glStateSource.contains("restore(CommandContext ctx)"),
+            "GLState should support context-aware state restore");
+
+        assertTrue(framebufferSource.contains("bind(CommandContext ctx)"),
+            "DhFramebuffer should expose context-aware bind operations");
+        assertTrue(framebufferSource.contains("addDepthAttachment(CommandContext ctx"),
+            "DhFramebuffer should expose context-aware attachment operations");
+
+        assertTrue(glBufferSource.contains("bind(CommandContext ctx)"),
+            "GLBuffer should expose context-aware bind/unbind operations");
+
+        assertTrue(colorTextureSource.contains("resizeTexture(CommandContext ctx"),
+            "DhColorTexture should route texture upload through explicit context seam");
+        assertTrue(depthTextureSource.contains("resize(CommandContext ctx"),
+            "DHDepthTexture should expose context-aware resize operation");
+        assertTrue(depthTextureSource.contains("destroy(CommandContext ctx)"),
+            "DHDepthTexture should expose context-aware destroy operation");
+        assertTrue(textureStateSource.contains("bindTexture2D(CommandContext ctx"),
+            "DhTextureState should expose context-aware texture binding helper");
+        assertTrue(glProxySource.contains("VulkanicAPI.getCommandContext()"),
+            "GLProxy should query renderer metadata through backend-neutral context");
+
+        assertTrue(abstractVertexAttributeSource.contains("create(CommandContext ctx)"),
+            "AbstractVertexAttribute should expose context-aware factory method");
+        assertTrue(abstractVertexAttributeSource.contains("bind(CommandContext ctx)"),
+            "AbstractVertexAttribute should expose context-aware bind operation");
+        assertTrue(vertexAttributePreGL43Source.contains("VertexAttributePreGL43(CommandContext ctx)"),
+            "VertexAttributePreGL43 should support context-aware construction");
+        assertTrue(vertexAttributePostGL43Source.contains("VertexAttributePostGL43(CommandContext ctx)"),
+            "VertexAttributePostGL43 should support context-aware construction");
+    }
+
+    @Test
+    public void testDhPostProcessRenderersAvoidImmediateContext() throws IOException {
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/SSAORenderer.java"));
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/FogRenderer.java"));
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/DhFadeRenderer.java"));
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java"));
+    }
+
+    @Test
+    public void testDhSharedAndDebugRenderPathsAvoidImmediateContext() throws IOException {
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/ScreenQuad.java"));
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/DebugRenderer.java"));
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/TestRenderer.java"));
+    }
+
+    @Test
+    public void testIrisDhCompatProgramsAvoidImmediateContext() throws IOException {
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java"));
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/compat/dh/IrisLodRenderProgram.java"));
+    }
+
+    @Test
+    public void testIrisDhCompatEventsAndInternalsAvoidImmediateContext() throws IOException {
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/compat/dh/LodRendererEvents.java"));
+        assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/compat/dh/DHCompatInternal.java"));
+    }
 }

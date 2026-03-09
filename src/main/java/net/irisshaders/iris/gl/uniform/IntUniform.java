@@ -34,7 +34,7 @@ public class IntUniform extends Uniform {
 
 		if (cachedValue != newValue) {
 			cachedValue = newValue;
-			VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), location, newValue);
+			VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), location, newValue);
 		}
 	}
 }

@@ -160,7 +160,7 @@ public class SodiumShader implements ChunkShaderInterface {
 
 
 		if (isShadowPass) {
-			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getCommandContext(), false);
 		}
 
 		var textureAtlas = Minecraft.getInstance()
@@ -188,7 +188,7 @@ public class SodiumShader implements ChunkShaderInterface {
 	}
 
 	private void bindTextures(GpuTextureView atlas) {
-		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0, atlas.texture().iris$getGlId());
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);

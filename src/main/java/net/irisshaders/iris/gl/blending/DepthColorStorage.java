@@ -39,7 +39,7 @@ public class DepthColorStorage {
 
 		if (enabled != currentDepthEnable) {
 			currentDepthEnable = enabled;
-			VulkanicAPI.setDepthWriteMask(VulkanicAPI.getImmediateContext(), enabled);
+			VulkanicAPI.setDepthWriteMask(VulkanicAPI.getCommandContext(), enabled);
 		}
 	}
 
@@ -54,7 +54,7 @@ public class DepthColorStorage {
 			currentGreenMask = green;
 			currentBlueMask = blue;
 			currentAlphaMask = alpha;
-			VulkanicAPI.setColorMask(VulkanicAPI.getImmediateContext(), red, green, blue, alpha);
+			VulkanicAPI.setColorMask(VulkanicAPI.getCommandContext(), red, green, blue, alpha);
 		}
 	}
 

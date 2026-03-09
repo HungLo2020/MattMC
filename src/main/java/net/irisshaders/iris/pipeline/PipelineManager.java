@@ -101,7 +101,7 @@ public class PipelineManager {
 		// Without this code, there will be weird issues when reloading certain shaderpacks.
 		for (int i = 0; i < 16; i++) {
 			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 		}
 
 		// Set the active texture unit to unit 0

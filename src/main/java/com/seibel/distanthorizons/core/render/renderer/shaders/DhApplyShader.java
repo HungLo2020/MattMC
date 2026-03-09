@@ -73,7 +73,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		}
 		
 		
-		GLState state = new GLState();
+		GLState state = new GLState(ctx);
 		
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		
@@ -102,7 +102,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
-		state.restore();
+		state.restore(ctx);
 		VulkanicAPI.bindFramebuffer(ctx, targetFrameBuffer);
 		
 	}
@@ -128,7 +128,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		
 		
-		GLState state = new GLState();
+		GLState state = new GLState(ctx);
 		
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		
@@ -161,7 +161,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
-		state.restore();
+		state.restore(ctx);
 		VulkanicAPI.bindFramebuffer(ctx, mcFrameBufferId);
 		
 	}

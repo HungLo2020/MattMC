@@ -30,7 +30,7 @@ public class ShaderWorkarounds {
 			final PointerBuffer pointers = stack.mallocPointer(1);
 			pointers.put(sourceBuffer);
 
-			VulkanicAPI.uploadShaderSource(VulkanicAPI.getImmediateContext(), glId, pointers.address0(), 1, 0);
+			VulkanicAPI.uploadShaderSource(VulkanicAPI.getCommandContext(), glId, pointers.address0(), 1, 0);
 			org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
 		} finally {
 			stack.setPointer(stackPointer);

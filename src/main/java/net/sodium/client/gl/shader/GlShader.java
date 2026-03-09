@@ -2,6 +2,7 @@ package net.sodium.client.gl.shader;
 
 import net.sodium.client.gl.GlObject;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -18,19 +19,20 @@ public class GlShader extends GlObject {
 
     public GlShader(ShaderType type, ResourceLocation name, ShaderParser.ParsedShader parsedShader) {
         this.name = name;
+        CommandContext ctx = VulkanicAPI.getCommandContext();
 
-        int handle = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type.id);
+        int handle = VulkanicAPI.createShader(ctx, type.id);
         ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
-        VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), handle);
+        VulkanicAPI.compileShader(ctx, handle);
 
-        String log = VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), handle);
+        String log = VulkanicAPI.getShaderInfoLog(ctx, handle);
 
         if (!log.isEmpty()) {
             LOGGER.warn("Shader compilation log for {}: {}", this.name, log);
             LOGGER.warn("Include table: {}", Arrays.toString(parsedShader.includeIds()));
         }
 
-        int result = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), handle, VulkanicAPI.GL_COMPILE_STATUS);
+        int result = VulkanicAPI.getShaderParameter(ctx, handle, VulkanicAPI.GL_COMPILE_STATUS);
 
         if (result != 1) {  // GL_TRUE
             throw new RuntimeException("Shader compilation failed, see log for details");
@@ -44,7 +46,7 @@ public class GlShader extends GlObject {
     }
 
     public void delete() {
-        VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.handle());
+        VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), this.handle());
 
         this.invalidateHandle();
     }

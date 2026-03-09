@@ -49,11 +49,12 @@ public class ShaderStorageBuffer {
 
 	public void resizeIfRelative(int width, int height) {
 		if (!info.relative()) return;
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		IrisRenderSystem.deleteBuffers(id);
 		IrisRenderSystem.incrementTrackedBuffers();
-		int newId = VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
-		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, newId);
+		int newId = VulkanicAPI.createBuffer(ctx);
+		VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, newId);
 
 		// Calculation time
 		long newWidth = (long) (width * info.scaleX());
@@ -70,10 +71,11 @@ public class ShaderStorageBuffer {
 	}
 
 	public void createStatic() {
-		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, getId());
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, getId());
 		IrisRenderSystem.bufferStorage(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, info.size(), content == null ? 0 : VulkanicAPI.GL_DYNAMIC_STORAGE_BIT);
 		if (content != null) {
-			VulkanicAPI.bufferSubData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0L, content);
+			VulkanicAPI.bufferSubData(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0L, content);
 		} else {
 			IrisRenderSystem.clearBufferSubData(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, VulkanicAPI.GL_R8, 0, info.size(), VulkanicAPI.GL_RED, VulkanicAPI.GL_BYTE, new int[]{0});
 		}

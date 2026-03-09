@@ -73,7 +73,7 @@ public interface DepthCopyStrategy {
 				// height
 				height);
 
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousTexture);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousTexture);
 		}
 	}
 

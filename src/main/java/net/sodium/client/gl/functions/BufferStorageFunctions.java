@@ -17,13 +17,13 @@ public enum BufferStorageFunctions {
     CORE {
         @Override
         public void createBufferStorage(GlBufferTarget target, long length, EnumBitField<GlBufferStorageFlags> flags) {
-            VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), target.getTargetParameter(), length, flags.getBitField());
+            VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), target.getTargetParameter(), length, flags.getBitField());
         }
     },
     ARB {
         @Override
         public void createBufferStorage(GlBufferTarget target, long length, EnumBitField<GlBufferStorageFlags> flags) {
-            VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), target.getTargetParameter(), length, flags.getBitField());
+            VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), target.getTargetParameter(), length, flags.getBitField());
         }
     };
 

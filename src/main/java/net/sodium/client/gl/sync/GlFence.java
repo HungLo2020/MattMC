@@ -17,7 +17,7 @@ public class GlFence {
         this.checkDisposed();
 
         int result;
-        var ctx = VulkanicAPI.getImmediateContext();
+        var ctx = VulkanicAPI.getCommandContext();
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer length = stack.callocInt(1);
@@ -38,11 +38,11 @@ public class GlFence {
 
     public void sync(long timeout) {
         this.checkDisposed();
-        VulkanicAPI.waitForSyncWithFlush(VulkanicAPI.getImmediateContext(), this.id, timeout);
+        VulkanicAPI.waitForSyncWithFlush(VulkanicAPI.getCommandContext(), this.id, timeout);
     }
 
     public void delete() {
-        VulkanicAPI.destroySync(VulkanicAPI.getImmediateContext(), this.id);
+        VulkanicAPI.destroySync(VulkanicAPI.getCommandContext(), this.id);
         this.disposed = true;
     }
 

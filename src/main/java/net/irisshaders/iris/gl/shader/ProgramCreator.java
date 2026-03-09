@@ -2,6 +2,7 @@ package net.irisshaders.iris.gl.shader;
 
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -10,8 +11,8 @@ public class ProgramCreator {
 	private static final Logger LOGGER = LogManager.getLogger(ProgramCreator.class);
 
 	public static int create(String name, GlShader... shaders) {
-		int program = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
-		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		int program = VulkanicAPI.createShaderProgram(ctx);
 
 		VulkanicAPI.setAttributeLocation(ctx, program, 11, "iris_Entity");
 		VulkanicAPI.setAttributeLocation(ctx, program, 11, "mc_Entity");

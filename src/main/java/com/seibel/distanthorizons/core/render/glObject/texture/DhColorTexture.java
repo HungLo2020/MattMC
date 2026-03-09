@@ -1,5 +1,6 @@
 package com.seibel.distanthorizons.core.render.glObject.texture;
 
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Vector2i;
 
@@ -29,6 +30,7 @@ public class DhColorTexture
 	public DhColorTexture(Builder builder)
 	{
 		this.isValid = true;
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		
 		this.internalFormat = builder.internalFormat;
 		this.format = builder.format;
@@ -37,14 +39,14 @@ public class DhColorTexture
 		this.width = builder.width;
 		this.height = builder.height;
 		
-		this.id = VulkanicAPI.createTexture2D(VulkanicAPI.getImmediateContext());
+		this.id = VulkanicAPI.createTexture2D(ctx);
 		
 		boolean isPixelFormatInteger = builder.internalFormat.getPixelFormat().isInteger();
-		this.setupTexture(this.id, builder.width, builder.height, !isPixelFormatInteger); // this binds the texture
+		this.setupTexture(ctx, this.id, builder.width, builder.height, !isPixelFormatInteger); // this binds the texture
 		
 		// Clean up after ourselves
 		// This is strictly defensive to ensure that other buggy code doesn't tamper with our textures
-		VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0);
+		VulkanicAPI.bindTexture(ctx, VulkanicAPI.GL_TEXTURE_2D, 0);
 	}
 	
 	
@@ -53,24 +55,24 @@ public class DhColorTexture
 	// methods //
 	//=========//
 	
-	private void setupTexture(int id, int width, int height, boolean allowsLinear)
+	private void setupTexture(CommandContext ctx, int id, int width, int height, boolean allowsLinear)
 	{
-		this.resizeTexture(id, width, height);
+		this.resizeTexture(ctx, id, width, height);
 		
-		VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
-		VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
-		VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
-		VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
+		VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
+		VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
 		
 		// disable mip-mapping since DH is just going to draw straight to the screen
-		VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
-		VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
+		VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
+		VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 	}
 	
-	private void resizeTexture(int texture, int width, int height)
+	private void resizeTexture(CommandContext ctx, int texture, int width, int height)
 	{
-		VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, texture);
-		VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
+		VulkanicAPI.bindTexture(ctx, VulkanicAPI.GL_TEXTURE_2D, texture);
+		VulkanicAPI.uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
 	}
 	
 	void resize(Vector2i textureScaleOverride) { this.resize(textureScaleOverride.x, textureScaleOverride.y); }
@@ -79,11 +81,12 @@ public class DhColorTexture
 	public void resize(int width, int height)
 	{
 		this.throwIfInvalid();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		
 		this.width = width;
 		this.height = height;
 		
-		this.resizeTexture(this.id, width, height);
+		this.resizeTexture(ctx, this.id, width, height);
 	}
 	
 	public EDhInternalTextureFormat getInternalFormat() { return this.internalFormat; }
@@ -103,7 +106,7 @@ public class DhColorTexture
 		this.throwIfInvalid();
 		this.isValid = false;
 		
-		VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), this.id);
+		VulkanicAPI.deleteTexture(VulkanicAPI.getCommandContext(), this.id);
 	}
 	
 	/** @throws IllegalStateException if the texture isn't valid */

@@ -13,6 +13,6 @@ public class GlUniformInt extends GlUniform<Integer> {
     }
 
     public void setInt(int value) {
-        VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.index, value);
+        VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), this.index, value);
     }
 }

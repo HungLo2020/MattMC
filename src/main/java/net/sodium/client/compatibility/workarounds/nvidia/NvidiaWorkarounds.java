@@ -129,7 +129,7 @@ public class NvidiaWorkarounds {
         if (capabilities.GL_KHR_debug) {
             LOGGER.info("Enabling GL_DEBUG_OUTPUT_SYNCHRONOUS to force the NVIDIA driver to disable threaded " +
                     "command submission");
-            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            CommandContext ctx = VulkanicAPI.getCommandContext();
             VulkanicAPI.setDebugOutputSynchronousEnabled(ctx, true);
         } else {
             LOGGER.error("GL_KHR_debug does not appear to be supported, unable to disable threaded " +

@@ -26,7 +26,7 @@ public class IntCachedUniform extends CachedUniform {
 
 	@Override
 	public void push(int location) {
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), location, this.cached);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), location, this.cached);
 	}
 
 	@Override

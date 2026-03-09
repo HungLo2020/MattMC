@@ -509,7 +509,7 @@ public class Phase3DrawPathTest {
         String irisFramebufferSource = Files.readString(irisFramebufferFile);
         assertFalse(irisFramebufferSource.contains("GlStateManager._glDeleteFramebuffers("),
             "GlFramebuffer should not destroy FBOs through removed GlStateManager._glDeleteFramebuffers wrapper");
-        assertTrue(irisFramebufferSource.contains("VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer)"),
+        assertTrue(irisFramebufferSource.contains("VulkanicAPI.deleteFramebuffer(VulkanicAPI.getCommandContext(), framebuffer)"),
             "GlFramebuffer should destroy FBOs directly through VulkanicAPI.deleteFramebuffer");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
@@ -523,7 +523,9 @@ public class Phase3DrawPathTest {
         String textureManipulationUtilSource = Files.readString(textureManipulationUtilFile);
         assertFalse(textureManipulationUtilSource.contains("GlStateManager.glGenFramebuffers("),
             "TextureManipulationUtil should not create helper FBO through removed GlStateManager.glGenFramebuffers wrapper");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext())"),
+        assertTrue(textureManipulationUtilSource.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
+            "TextureManipulationUtil should acquire backend-neutral command context once per operation");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.createFramebuffer(ctx)"),
             "TextureManipulationUtil should create helper FBO directly through VulkanicAPI.createFramebuffer");
     }
 
@@ -641,12 +643,96 @@ public class Phase3DrawPathTest {
         assertFalse(source.contains("createFenceSync(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0)"),
             "GLRenderDevice should not create completion fences via raw createFenceSync parameters");
 
-        assertTrue(source.contains("getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_MAX_LEVEL)"),
+        assertTrue(source.contains("getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TEXTURE_MAX_LEVEL)"),
             "GLRenderDevice should use VulkanicAPI constant instead of hardcoded texture query literal");
         assertTrue(source.contains("VulkanicAPI.copyBufferSubDataBetweenCopyTargets("),
             "GLRenderDevice should copy buffer ranges via copyBufferSubDataBetweenCopyTargets helper");
         assertTrue(source.contains("VulkanicAPI.createGpuCompletionFence("),
             "GLRenderDevice should create sync fences via createGpuCompletionFence helper");
+        assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
+            "GLRenderDevice should not hard-wire immediate-context retrieval");
+        assertTrue(source.contains("VulkanicAPI.getCommandContext()"),
+            "GLRenderDevice should fetch backend-neutral command context");
+    }
+
+    @Test
+    public void testSodiumGlProgramUsesBackendNeutralContext() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/shader/GlProgram.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
+            "Sodium GlProgram should not hard-wire immediate-context retrieval");
+        assertTrue(source.contains("VulkanicAPI.getCommandContext()"),
+            "Sodium GlProgram should fetch backend-neutral command context");
+    }
+
+    @Test
+    public void testSodiumGlShaderAndSyncWrappersUseBackendNeutralContext() throws IOException {
+        Path shaderFile = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/shader/GlShader.java");
+        String shaderSource = Files.readString(shaderFile);
+
+        assertFalse(shaderSource.contains("VulkanicAPI.getImmediateContext()"),
+            "Sodium GlShader should not hard-wire immediate-context retrieval");
+        assertTrue(shaderSource.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
+            "Sodium GlShader should fetch backend-neutral command context once and reuse it");
+
+        Path fenceFile = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/sync/GlFence.java");
+        String fenceSource = Files.readString(fenceFile);
+
+        assertFalse(fenceSource.contains("VulkanicAPI.getImmediateContext()"),
+            "Sodium GlFence should not hard-wire immediate-context retrieval");
+        assertTrue(fenceSource.contains("VulkanicAPI.getCommandContext()"),
+            "Sodium GlFence should fetch backend-neutral command context");
+
+        Path storageFile = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/functions/BufferStorageFunctions.java");
+        String storageSource = Files.readString(storageFile);
+
+        assertFalse(storageSource.contains("VulkanicAPI.getImmediateContext()"),
+            "Sodium BufferStorageFunctions should not hard-wire immediate-context retrieval");
+        assertTrue(storageSource.contains("VulkanicAPI.getCommandContext()"),
+            "Sodium BufferStorageFunctions should fetch backend-neutral command context");
+    }
+
+    @Test
+    public void testSodiumShaderChunkRendererUsesBackendNeutralContext() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java");
+        String source = Files.readString(file);
+
+        assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
+            "ShaderChunkRenderer should not hard-wire immediate-context retrieval in viewport/framebuffer setup");
+        assertTrue(source.contains("VulkanicAPI.getCommandContext()"),
+            "ShaderChunkRenderer should fetch backend-neutral command context");
+    }
+
+    @Test
+    public void testSodiumLeafWrappersUseBackendNeutralContext() throws IOException {
+        String[] migratedFiles = new String[] {
+            "net/sodium/client/gl/tessellation/GlAbstractTessellation.java",
+            "net/sodium/client/compatibility/environment/GlContextInfo.java",
+            "net/sodium/fabric/SodiumGpuSyncHelper.java",
+            "net/sodium/client/render/chunk/shader/DefaultShaderInterface.java",
+            "net/sodium/client/gl/shader/uniform/GlUniformFloat4v.java",
+            "net/sodium/client/gl/shader/uniform/GlUniformFloat3v.java",
+            "net/sodium/client/gl/shader/uniform/GlUniformFloat2v.java",
+            "net/sodium/client/gl/shader/uniform/GlUniformMatrix4f.java",
+            "net/sodium/client/gl/shader/uniform/GlUniformInt.java",
+            "net/sodium/client/gl/shader/uniform/GlUniformFloat.java",
+            "net/sodium/client/gl/shader/uniform/GlUniformBlock.java",
+            "net/sodium/client/gl/shader/ShaderWorkarounds.java",
+            "net/sodium/client/gl/buffer/GlBuffer.java",
+            "net/sodium/client/gl/array/GlVertexArray.java",
+            "net/sodium/client/compatibility/workarounds/nvidia/NvidiaWorkarounds.java"
+        };
+
+        for (String relativePath : migratedFiles) {
+            Path file = SRC_MAIN_JAVA.resolve(relativePath);
+            String source = Files.readString(file);
+
+            assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
+                relativePath + " should not hard-wire immediate-context retrieval");
+            assertTrue(source.contains("VulkanicAPI.getCommandContext()"),
+                relativePath + " should fetch backend-neutral command context");
+        }
     }
 
     @Test
@@ -784,15 +870,19 @@ public class Phase3DrawPathTest {
         String clearPassSource = Files.readString(clearPassFile);
         assertFalse(clearPassSource.contains("GlStateManager._getInteger("),
             "ClearPassCreator should not query max draw buffers through GlStateManager wrapper");
-        assertTrue(clearPassSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS)"),
+        assertTrue(clearPassSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS)"),
             "ClearPassCreator should query max draw buffers directly through VulkanicAPI");
 
         Path samplerLimitsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/sampler/SamplerLimits.java");
         String samplerLimitsSource = Files.readString(samplerLimitsFile);
         assertFalse(samplerLimitsSource.contains("GlStateManager._getInteger("),
             "SamplerLimits should not query limits through GlStateManager wrapper");
-        assertTrue(samplerLimitsSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext()"),
-            "SamplerLimits should query limits directly through VulkanicAPI");
+        assertFalse(samplerLimitsSource.contains("VulkanicAPI.getImmediateContext()"),
+            "SamplerLimits should not hard-wire immediate-context retrieval");
+        assertTrue(samplerLimitsSource.contains("var ctx = VulkanicAPI.getCommandContext();"),
+            "SamplerLimits should fetch backend-neutral command context");
+        assertTrue(samplerLimitsSource.contains("VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS)"),
+            "SamplerLimits should query limits directly through VulkanicAPI with shared context");
 
         Path standardMacrosFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/StandardMacros.java");
         String standardMacrosSource = Files.readString(standardMacrosFile);
@@ -800,9 +890,11 @@ public class Phase3DrawPathTest {
             "StandardMacros should not query GL strings through GlStateManager wrapper");
         assertFalse(standardMacrosSource.contains("GlStateManager._getInteger("),
             "StandardMacros should not query extension count through GlStateManager wrapper");
-        assertTrue(standardMacrosSource.contains("VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), name)"),
+        assertFalse(standardMacrosSource.contains("VulkanicAPI.getImmediateContext()"),
+            "StandardMacros should not hard-wire immediate-context retrieval");
+        assertTrue(standardMacrosSource.contains("VulkanicAPI.getString(VulkanicAPI.getCommandContext(), name)"),
             "StandardMacros should query GL version strings directly through VulkanicAPI");
-        assertTrue(standardMacrosSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_NUM_EXTENSIONS)"),
+        assertTrue(standardMacrosSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_NUM_EXTENSIONS)"),
             "StandardMacros should query extension count directly through VulkanicAPI");
 
         Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
@@ -830,14 +922,18 @@ public class Phase3DrawPathTest {
         String programSamplersSource = Files.readString(programSamplersFile);
         assertFalse(programSamplersSource.contains("GlStateManager._glUniform1i("),
             "ProgramSamplers initializer should not upload via GlStateManager._glUniform1i wrapper");
-        assertTrue(programSamplersSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext()"),
+        assertFalse(programSamplersSource.contains("VulkanicAPI.getImmediateContext()"),
+            "ProgramSamplers should not hard-wire immediate-context retrieval");
+        assertTrue(programSamplersSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext()"),
             "ProgramSamplers initializer should upload directly through VulkanicAPI.setUniform1i");
 
         Path programImagesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramImages.java");
         String programImagesSource = Files.readString(programImagesFile);
         assertFalse(programImagesSource.contains("GlStateManager._glUniform1i("),
             "ProgramImages initializer should not upload via GlStateManager._glUniform1i wrapper");
-        assertTrue(programImagesSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext()"),
+        assertFalse(programImagesSource.contains("VulkanicAPI.getImmediateContext()"),
+            "ProgramImages should not hard-wire immediate-context retrieval");
+        assertTrue(programImagesSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext()"),
             "ProgramImages initializer should upload directly through VulkanicAPI.setUniform1i");
 
         Path textureUploadHelperFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/TextureUploadHelper.java");
@@ -851,23 +947,25 @@ public class Phase3DrawPathTest {
         String fallbackShaderSource = Files.readString(fallbackShaderFile);
         assertFalse(fallbackShaderSource.contains("GlStateManager._glUniform1i("),
             "FallbackShader should not upload sampler uniforms through GlStateManager._glUniform1i wrapper");
-        assertTrue(fallbackShaderSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), gtexture, 0)"),
+        assertTrue(fallbackShaderSource.contains("VulkanicAPI.setUniform1i(ctx, gtexture, 0)"),
             "FallbackShader should upload sampler uniforms directly through VulkanicAPI.setUniform1i");
 
         Path intUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/uniform/IntUniform.java");
         String intUniformSource = Files.readString(intUniformFile);
         assertFalse(intUniformSource.contains("GlStateManager._glUniform1i("),
             "IntUniform should not upload through GlStateManager._glUniform1i wrapper");
-        assertTrue(intUniformSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), location, newValue)"),
+        assertTrue(intUniformSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), location, newValue)"),
             "IntUniform should upload directly through VulkanicAPI.setUniform1i");
 
         Path glFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
         String glFramebufferSource = Files.readString(glFramebufferFile);
         assertFalse(glFramebufferSource.contains("GlStateManager._getInteger("),
             "GlFramebuffer should not query caps through GlStateManager._getInteger wrapper");
-        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS)"),
+        assertFalse(glFramebufferSource.contains("VulkanicAPI.getImmediateContext()"),
+            "GlFramebuffer should not hard-wire immediate-context retrieval");
+        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS)"),
             "GlFramebuffer should query draw-buffer cap directly through VulkanicAPI.getInteger");
-        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS)"),
+        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS)"),
             "GlFramebuffer should query color-attachment cap directly through VulkanicAPI.getInteger");
 
         Path textureInfoCacheFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureInfoCache.java");
@@ -876,9 +974,13 @@ public class Phase3DrawPathTest {
             "TextureInfoCache should not query current texture binding through GlStateManager._getInteger wrapper");
         assertFalse(textureInfoCacheSource.contains("GlStateManager._getTexLevelParameter("),
             "TextureInfoCache should not query texture level params through GlStateManager._getTexLevelParameter wrapper");
-        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
+        assertFalse(textureInfoCacheSource.contains("VulkanicAPI.getImmediateContext()"),
+            "TextureInfoCache should not hard-wire immediate-context retrieval");
+        assertTrue(textureInfoCacheSource.contains("var ctx = VulkanicAPI.getCommandContext();"),
+            "TextureInfoCache should fetch backend-neutral command context in level-parameter helper");
+        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
             "TextureInfoCache should query current texture binding directly through VulkanicAPI.getInteger");
-        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, pname)"),
+        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, pname)"),
             "TextureInfoCache should query texture level params directly through VulkanicAPI.getTextureLevelParameter");
 
         Path textureManipulationUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
@@ -889,13 +991,13 @@ public class Phase3DrawPathTest {
             "TextureManipulationUtil should not query tex level dimensions through GlStateManager._getTexLevelParameter wrapper");
         assertFalse(textureManipulationUtilSource.contains("GlStateManager._glFramebufferTexture2D("),
             "TextureManipulationUtil should not attach/detach framebuffer textures through removed GlStateManager._glFramebufferTexture2D wrapper");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER_BINDING)"),
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_FRAMEBUFFER_BINDING)"),
             "TextureManipulationUtil should query previous framebuffer directly through VulkanicAPI.getInteger");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
             "TextureManipulationUtil should query previous texture directly through VulkanicAPI.getInteger");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getTextureLevelParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_WIDTH)"),
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_WIDTH)"),
             "TextureManipulationUtil should query mip width directly through VulkanicAPI.getTextureLevelParameter");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER"),
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER"),
             "TextureManipulationUtil should attach/detach color attachments directly through VulkanicAPI.framebufferColorAttachment0Texture2D");
 
         Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
@@ -1093,9 +1195,9 @@ public class Phase3DrawPathTest {
             "ShaderCreator should not create programs through removed GlStateManager.glCreateProgram wrapper");
         assertFalse(shaderCreatorSource.contains("GlStateManager.glLinkProgram("),
             "ShaderCreator should not link programs through removed GlStateManager.glLinkProgram wrapper");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext())"),
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShaderProgram(ctx)"),
             "ShaderCreator should create programs directly through VulkanicAPI.createShaderProgram");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), i)"),
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.linkProgram(ctx, i)"),
             "ShaderCreator should link programs directly through VulkanicAPI.linkProgram");
 
         Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
@@ -1106,7 +1208,7 @@ public class Phase3DrawPathTest {
             "ProgramCreator should not link programs through removed GlStateManager.glLinkProgram wrapper");
         assertFalse(programCreatorSource.contains("GlStateManager.glGetProgrami("),
             "ProgramCreator should not query link status through removed GlStateManager.glGetProgrami wrapper");
-        assertTrue(programCreatorSource.contains("VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext())"),
+        assertTrue(programCreatorSource.contains("VulkanicAPI.createShaderProgram(ctx)"),
             "ProgramCreator should create programs directly through VulkanicAPI.createShaderProgram");
         assertTrue(programCreatorSource.contains("VulkanicAPI.linkProgram(ctx, program)"),
             "ProgramCreator should link programs directly through VulkanicAPI.linkProgram");
@@ -1121,32 +1223,32 @@ public class Phase3DrawPathTest {
             "ShaderMap should not query link status through removed GlStateManager.glGetProgrami wrapper");
         assertFalse(shaderMapSource.contains("GlStateManager.glGetProgramInfoLog("),
             "ShaderMap should not query program logs through removed GlStateManager.glGetProgramInfoLog wrapper");
-        assertTrue(shaderMapSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), shader.id().program())"),
+        assertTrue(shaderMapSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), shader.id().program())"),
             "ShaderMap should delete programs directly through VulkanicAPI.deleteProgram");
-        assertTrue(shaderMapSource.contains("VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), i, 35714)"),
+        assertTrue(shaderMapSource.contains("VulkanicAPI.getProgramParameter(ctx, i, 35714)"),
             "ShaderMap should query link status directly through VulkanicAPI.getProgramParameter");
-        assertTrue(shaderMapSource.contains("VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), i)"),
+        assertTrue(shaderMapSource.contains("VulkanicAPI.getProgramInfoLog(ctx, i)"),
             "ShaderMap should query program info logs directly through VulkanicAPI.getProgramInfoLog");
 
         Path uniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramUniforms.java");
         String uniformsSource = Files.readString(uniformsFile);
         assertFalse(uniformsSource.contains("GlStateManager.glGetProgrami("),
             "ProgramUniforms should not query active uniforms through removed GlStateManager.glGetProgrami wrapper");
-        assertTrue(uniformsSource.contains("VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), program, VulkanicAPI.GL_ACTIVE_UNIFORMS)"),
+        assertTrue(uniformsSource.contains("VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), program, VulkanicAPI.GL_ACTIVE_UNIFORMS)"),
             "ProgramUniforms should query active uniforms directly through VulkanicAPI.getProgramParameter");
 
         Path programFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/Program.java");
         String programSource = Files.readString(programFile);
         assertFalse(programSource.contains("GlStateManager.glDeleteProgram("),
             "Program should not destroy programs through removed GlStateManager.glDeleteProgram wrapper");
-        assertTrue(programSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), getGlId())"),
+        assertTrue(programSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), getGlId())"),
             "Program should destroy programs directly through VulkanicAPI.deleteProgram");
 
         Path computeProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ComputeProgram.java");
         String computeProgramSource = Files.readString(computeProgramFile);
         assertFalse(computeProgramSource.contains("GlStateManager.glDeleteProgram("),
             "ComputeProgram should not destroy programs through removed GlStateManager.glDeleteProgram wrapper");
-        assertTrue(computeProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), getGlId())"),
+        assertTrue(computeProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), getGlId())"),
             "ComputeProgram should destroy programs directly through VulkanicAPI.deleteProgram");
 
         Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
@@ -1209,17 +1311,17 @@ public class Phase3DrawPathTest {
             "ShaderCreator should not compile shaders through removed GlStateManager.glCompileShader wrapper");
         assertFalse(shaderCreatorSource.contains("GlStateManager.glGetShaderi("),
             "ShaderCreator should not query shader status through removed GlStateManager.glGetShaderi wrapper");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), i, s)"),
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.attachShader(ctx, i, s)"),
             "ShaderCreator should attach shaders directly through VulkanicAPI.attachShader");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), s)"),
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), s)"),
             "ShaderCreator should delete shaders directly through VulkanicAPI.deleteShader");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), shaderType.id)"),
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShader(ctx, shaderType.id)"),
             "ShaderCreator should create shaders directly through VulkanicAPI.createShader");
         assertTrue(shaderCreatorSource.contains("ShaderWorkarounds.safeShaderSource(shader, source)"),
             "ShaderCreator should upload shader source via ShaderWorkarounds.safeShaderSource");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), shader)"),
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.compileShader(ctx, shader)"),
             "ShaderCreator should compile shaders directly through VulkanicAPI.compileShader");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), shader, VulkanicAPI.GL_COMPILE_STATUS)"),
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.getShaderParameter(ctx, shader, VulkanicAPI.GL_COMPILE_STATUS)"),
             "ShaderCreator should query compile status directly through VulkanicAPI.getShaderParameter");
 
         Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
@@ -1261,18 +1363,22 @@ public class Phase3DrawPathTest {
             "GlShader should not compile shaders through removed GlStateManager.glCompileShader wrapper");
         assertFalse(glShaderSource.contains("GlStateManager.glDeleteShader("),
             "GlShader should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
-        assertTrue(glShaderSource.contains("VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type.id)"),
+        assertFalse(glShaderSource.contains("VulkanicAPI.getImmediateContext()"),
+            "GlShader should not hard-wire immediate-context retrieval");
+        assertTrue(glShaderSource.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
+            "GlShader should fetch backend-neutral command context once in shader creation path");
+        assertTrue(glShaderSource.contains("VulkanicAPI.createShader(ctx, type.id)"),
             "GlShader should create shaders directly through VulkanicAPI.createShader");
-        assertTrue(glShaderSource.contains("VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), handle)"),
+        assertTrue(glShaderSource.contains("VulkanicAPI.compileShader(ctx, handle)"),
             "GlShader should compile shaders directly through VulkanicAPI.compileShader");
-        assertTrue(glShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.getGlId())"),
+        assertTrue(glShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), this.getGlId())"),
             "GlShader should delete shaders directly through VulkanicAPI.deleteShader");
 
         Path partialShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/PartialShader.java");
         String partialShaderSource = Files.readString(partialShaderFile);
         assertFalse(partialShaderSource.contains("GlStateManager.glDeleteShader("),
             "PartialShader should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
-        assertTrue(partialShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), s)"),
+        assertTrue(partialShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), s)"),
             "PartialShader should delete shaders directly through VulkanicAPI.deleteShader");
 
         Path shaderModuleFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlShaderModule.java");
@@ -1455,11 +1561,11 @@ public class Phase3DrawPathTest {
             "ShaderStorageBuffer should not bind buffers through removed GlStateManager._glBindBuffer wrapper");
         assertFalse(ssboSource.contains("GlStateManager._glBufferSubData("),
             "ShaderStorageBuffer should not upload content through removed GlStateManager._glBufferSubData wrapper");
-        assertTrue(ssboSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext())"),
+        assertTrue(ssboSource.contains("VulkanicAPI.createBuffer(ctx)"),
             "ShaderStorageBuffer should create buffers directly via VulkanicAPI.createBuffer");
-        assertTrue(ssboSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, getId())"),
+        assertTrue(ssboSource.contains("VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, getId())"),
             "ShaderStorageBuffer should bind SSBOs directly via VulkanicAPI.bindBuffer");
-        assertTrue(ssboSource.contains("VulkanicAPI.bufferSubData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0L, content)"),
+        assertTrue(ssboSource.contains("VulkanicAPI.bufferSubData(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0L, content)"),
             "ShaderStorageBuffer should upload content directly via VulkanicAPI.bufferSubData");
 
         Path glBufferFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlBuffer.java");
