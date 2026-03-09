@@ -17,7 +17,7 @@ public class MappableRingBuffer implements AutoCloseable {
 	private int current = 0;
 
 	public MappableRingBuffer(Supplier<String> supplier, int i, int j) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		if ((i & 1) == 0 && (i & 2) == 0) {
 			throw new IllegalArgumentException("MappableRingBuffer requires at least one of USAGE_MAP_READ or USAGE_MAP_WRITE");
 		} else {
@@ -51,7 +51,7 @@ public class MappableRingBuffer implements AutoCloseable {
 			this.fences[this.current].close();
 		}
 
-		this.fences[this.current] = RenderSystem.getDevice().createCommandEncoder().createFence();
+		this.fences[this.current] = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().createFence();
 		this.current = (this.current + 1) % 3;
 	}
 

@@ -15,8 +15,8 @@ public class GLUtils {
         int width = gpuTexture.getWidth(0);
         int height = gpuTexture.getHeight(0);
         int bufferSize = bytePerPixel * width * height;
-        GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(() -> "Texture read buffer", GpuBuffer.USAGE_MAP_READ | GpuBuffer.USAGE_COPY_DST, bufferSize);
-        CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+        GpuBuffer gpuBuffer = net.vulkanic.VulkanicAPI.getDevice().createBuffer(() -> "Texture read buffer", GpuBuffer.USAGE_MAP_READ | GpuBuffer.USAGE_COPY_DST, bufferSize);
+        CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder();
         commandEncoder.copyTextureToBuffer(gpuTexture, gpuBuffer, 0, () -> {
             BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
             try (GpuBuffer.MappedView readView = commandEncoder.mapBuffer(gpuBuffer, true, false)) {

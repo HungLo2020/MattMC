@@ -198,7 +198,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		// Iris: From MixinGameRenderer - log hardware information
 		net.irisshaders.iris.Iris.logger.info("Hardware information:");
 		net.irisshaders.iris.Iris.logger.info("CPU: " + GLX._getCpuInfo());
-		net.irisshaders.iris.Iris.logger.info("GPU: " + RenderSystem.getDevice().getRenderer() + " (Supports OpenGL " + RenderSystem.getDevice().getVersion() + ")");
+		net.irisshaders.iris.Iris.logger.info("GPU: " + VulkanicAPI.getDevice().getRenderer() + " (Supports OpenGL " + VulkanicAPI.getDevice().getVersion() + ")");
 		net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
@@ -315,7 +315,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void preloadUiShader(ResourceProvider resourceProvider) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = VulkanicAPI.getDevice();
 		BiFunction<ResourceLocation, ShaderType, String> biFunction = (resourceLocation, shaderType) -> {
 			ResourceLocation resourceLocation2 = shaderType.idConverter().idToFile(resourceLocation);
 
@@ -685,7 +685,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 			this.fogRenderer.endFrame();
 			RenderTarget renderTarget = this.minecraft.getMainRenderTarget();
-			RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
+			VulkanicAPI.getDevice().createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 			this.guiRenderState.reset();
 			profilerFiller.push("guiExtraction");
@@ -966,7 +966,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				.getBuffer(this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(), this.getFov(this.mainCamera, f, false)),
 			ProjectionType.PERSPECTIVE
 		);
-		RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(this.minecraft.getMainRenderTarget().getDepthTexture(), 1.0);
+		VulkanicAPI.getDevice().createCommandEncoder().clearDepthTexture(this.minecraft.getMainRenderTarget().getDepthTexture(), 1.0);
 		this.renderItemInHand(f, bl3, matrix4f2);
 		profilerFiller.popPush("screenEffects");
 		MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();

@@ -2,8 +2,8 @@ package net.minecraft.client.multiplayer;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
-import net.blaze3d.systems.RenderSystem;
 import net.logging.LogUtils;
+import net.vulkanic.VulkanicAPI;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -146,7 +146,7 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 	}
 
 	public void handleKeepAlive(ClientboundKeepAlivePacket clientboundKeepAlivePacket) {
-		this.sendWhen(new ServerboundKeepAlivePacket(clientboundKeepAlivePacket.getId()), () -> !RenderSystem.isFrozenAtPollEvents(), Duration.ofMinutes(1L));
+		this.sendWhen(new ServerboundKeepAlivePacket(clientboundKeepAlivePacket.getId()), () -> !VulkanicAPI.isFrozenAtPollEvents(), Duration.ofMinutes(1L));
 	}
 
 	public void handlePing(ClientboundPingPacket clientboundPingPacket) {

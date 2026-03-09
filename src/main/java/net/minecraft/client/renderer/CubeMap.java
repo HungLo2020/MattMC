@@ -48,18 +48,18 @@ public class CubeMap implements AutoCloseable {
 		RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
 		GpuTextureView gpuTextureView = renderTarget.getColorTextureView();
 		GpuTextureView gpuTextureView2 = renderTarget.getDepthTextureView();
-		RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer gpuBuffer = autoStorageIndexBuffer.getBuffer(36);
 		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.rotationX((float) Math.PI);
 		matrix4fStack.rotateX(f * (float) (Math.PI / 180.0));
 		matrix4fStack.rotateY(g * (float) (Math.PI / 180.0));
-		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 			.writeTransform(new Matrix4f(matrix4fStack), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		matrix4fStack.popMatrix();
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
+		try (RenderPass renderPass = VulkanicAPI.getDevice()
 				.createCommandEncoder()
 				.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
@@ -102,7 +102,7 @@ public class CubeMap implements AutoCloseable {
 			bufferBuilder.addVertex(1.0F, 1.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var3 = RenderSystem.getDevice().createBuffer(() -> "Cube map vertex buffer", 32, meshData.vertexBuffer());
+				var3 = VulkanicAPI.getDevice().createBuffer(() -> "Cube map vertex buffer", 32, meshData.vertexBuffer());
 			}
 		}
 

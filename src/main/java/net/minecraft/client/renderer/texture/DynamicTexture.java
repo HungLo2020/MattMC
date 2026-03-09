@@ -38,14 +38,14 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 	}
 
 	private void createTexture(Supplier<String> supplier) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.texture = gpuDevice.createTexture(supplier, 5, TextureFormat.RGBA8, this.pixels.getWidth(), this.pixels.getHeight(), 1, 1);
 		this.texture.setTextureFilter(FilterMode.NEAREST, false);
 		this.textureView = gpuDevice.createTextureView(this.texture);
 	}
 
 	private void createTexture(String string) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.texture = gpuDevice.createTexture(string, 5, TextureFormat.RGBA8, this.pixels.getWidth(), this.pixels.getHeight(), 1, 1);
 		this.texture.setTextureFilter(FilterMode.NEAREST, false);
 		this.textureView = gpuDevice.createTextureView(this.texture);
@@ -53,7 +53,7 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 
 	public void upload() {
 		if (this.pixels != null && this.texture != null) {
-			RenderSystem.getDevice().createCommandEncoder().writeToTexture(this.texture, this.pixels);
+			net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().writeToTexture(this.texture, this.pixels);
 		} else {
 			LOGGER.warn("Trying to upload disposed texture {}", this.getTexture().getLabel());
 		}

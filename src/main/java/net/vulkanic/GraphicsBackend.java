@@ -19,6 +19,16 @@ public interface GraphicsBackend {
      * Returns 0 or NULL if no context is current.
      */
     long getGraphicsContext();
+
+    /**
+     * Gets the current command context for recording/submitting rendering commands.
+     *
+     * In OpenGL: Returns the singleton immediate command context.
+     * In Vulkan: Returns the backend-managed command-buffer context for the current scope.
+     *
+     * @return Current command context
+     */
+    CommandContext getCurrentCommandContext();
     
     /**
      * Sets the dynamic viewport state for rendering.

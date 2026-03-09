@@ -27,7 +27,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 	private final String label;
 
 	public DynamicUniformStorage(String string, int i, int j) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.blockSize = Mth.roundToward(i, gpuDevice.getUniformOffsetAlignment());
 		this.capacity = Mth.smallestEncompassingPowerOfTwo(j);
 		this.nextBlock = 0;
@@ -68,7 +68,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 
 			int i = this.nextBlock * this.blockSize;
 
-			try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice()
+			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.mapBuffer(this.ringBuffer.currentBuffer().slice(i, this.blockSize), false, true)) {
 				dynamicUniform.write(mappedView.data());
@@ -93,7 +93,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 			int i = this.nextBlock * this.blockSize;
 			GpuBufferSlice[] gpuBufferSlices = new GpuBufferSlice[dynamicUniforms.length];
 
-			try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice()
+			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.mapBuffer(this.ringBuffer.currentBuffer().slice(i, dynamicUniforms.length * this.blockSize), false, true)) {
 				ByteBuffer byteBuffer = mappedView.data();

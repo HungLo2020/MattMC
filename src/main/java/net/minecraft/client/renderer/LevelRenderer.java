@@ -557,7 +557,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		framePass.executes(
 			() -> {
 				RenderTarget renderTarget = this.minecraft.getMainRenderTarget();
-				RenderSystem.getDevice()
+				VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.clearColorAndDepthTextures(
 						renderTarget.getColorTexture(), ARGB.colorFromFloat(0.0F, vector4f.x, vector4f.y, vector4f.z), renderTarget.getDepthTexture(), 1.0
@@ -724,7 +724,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 			if (this.shouldShowEntityOutlines() && resourceHandle4 != null) {
 				RenderTarget renderTarget = resourceHandle4.get();
-				RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
+				VulkanicAPI.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 			}
 
 			PoseStack poseStack = new PoseStack();
@@ -885,12 +885,12 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			VulkanicAPI.setShaderFog(gpuBufferSlice);
 			PoseStack poseStack = new PoseStack();
 			MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
-			RenderSystem.outputColorTextureOverride = resourceHandle.get().getColorTextureView();
-			RenderSystem.outputDepthTextureOverride = resourceHandle.get().getDepthTextureView();
+			VulkanicAPI.setOutputColorTextureOverride(resourceHandle.get().getColorTextureView());
+			VulkanicAPI.setOutputDepthTextureOverride(resourceHandle.get().getDepthTextureView());
 			this.debugRenderer.render(poseStack, frustum, bufferSource, vec3.x, vec3.y, vec3.z, true);
 			bufferSource.endLastBatch();
-			RenderSystem.outputColorTextureOverride = null;
-			RenderSystem.outputDepthTextureOverride = null;
+			VulkanicAPI.setOutputColorTextureOverride(null);
+			VulkanicAPI.setOutputDepthTextureOverride(null);
 			this.checkPoseStack(poseStack);
 		});
 	}

@@ -17,7 +17,7 @@ public class PerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	private final GpuBufferSlice bufferSlice;
 
 	public PerspectiveProjectionMatrixBuffer(String string) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.buffer = gpuDevice.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 		this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 	}
@@ -25,7 +25,7 @@ public class PerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	public GpuBufferSlice getBuffer(Matrix4f matrix4f) {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE).putMat4f(matrix4f).get();
-			RenderSystem.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
+			net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
 		}
 
 		return this.bufferSlice;

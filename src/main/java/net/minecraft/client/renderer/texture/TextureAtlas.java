@@ -51,12 +51,12 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 	public TextureAtlas(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
-		this.maxSupportedTextureSize = RenderSystem.getDevice().getMaxTextureSize();
+		this.maxSupportedTextureSize = net.vulkanic.VulkanicAPI.getDevice().getMaxTextureSize();
 	}
 
 	private void createTexture(int i, int j, int k) {
 		LOGGER.info("Created: {}x{}x{} {}-atlas", i, j, k, this.location);
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.close();
 		this.texture = gpuDevice.createTexture(this.location::toString, 7, TextureFormat.RGBA8, i, j, 1, k + 1);
 		this.textureView = gpuDevice.createTextureView(this.texture);

@@ -376,7 +376,7 @@ public class UnihexProvider implements GlyphProvider {
 						IntBuffer intBuffer = MemoryUtil.memAllocInt(Glyph.this.width() * 16);
 						UnihexProvider.unpackBitsToBytes(intBuffer, Glyph.this.contents, Glyph.this.left, Glyph.this.right);
 						intBuffer.rewind();
-						RenderSystem.getDevice()
+						net.vulkanic.VulkanicAPI.getDevice()
 							.createCommandEncoder()
 							.writeToTexture(gpuTexture, MemoryUtil.memByteBuffer(intBuffer), NativeImage.Format.RGBA, 0, 0, i, j, Glyph.this.width(), 16);
 						MemoryUtil.memFree(intBuffer);

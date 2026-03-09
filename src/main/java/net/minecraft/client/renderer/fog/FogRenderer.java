@@ -56,7 +56,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	private FogParameters parameters = FogParameters.NONE;
 
 	public FogRenderer() {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.regularBuffer = new MappableRingBuffer(() -> "Fog UBO", 130, FOG_UBO_SIZE);
 
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
@@ -221,7 +221,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			hook.onFogParametersCalculated(camera, i, bl, deltaTracker, f, clientLevel, fogData, vector4f);
 		}
 
-		try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
+		try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
 			this.updateBuffer(
 				mappedView.data(),
 				0,

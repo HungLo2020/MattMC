@@ -227,7 +227,7 @@ public class BitmapProvider implements GlyphProvider {
 
 					@Override
 					public void upload(int i, int j, GpuTexture gpuTexture) {
-						RenderSystem.getDevice()
+						net.vulkanic.VulkanicAPI.getDevice()
 							.createCommandEncoder()
 							.writeToTexture(gpuTexture, Glyph.this.image, 0, 0, i, j, Glyph.this.width, Glyph.this.height, Glyph.this.offsetX, Glyph.this.offsetY);
 					}

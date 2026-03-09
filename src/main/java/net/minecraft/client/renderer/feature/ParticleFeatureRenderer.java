@@ -45,7 +45,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 		});
 		
 		if (!submitNodeCollection.getParticleGroupRenderers().isEmpty()) {
-			GpuDevice gpuDevice = RenderSystem.getDevice();
+			GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 			Minecraft minecraft = Minecraft.getInstance();
 			TextureManager textureManager = minecraft.getTextureManager();
 			RenderTarget renderTarget = minecraft.getMainRenderTarget();
@@ -119,7 +119,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 				this.ringBuffer = new MappableRingBuffer(() -> "Particle Vertices", 34, byteBuffer.remaining());
 			}
 
-			try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.ringBuffer.currentBuffer().slice(), false, true)) {
+			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().mapBuffer(this.ringBuffer.currentBuffer().slice(), false, true)) {
 				mappedView.data().put(byteBuffer);
 			}
 		}

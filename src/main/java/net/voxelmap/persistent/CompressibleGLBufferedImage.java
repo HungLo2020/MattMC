@@ -5,7 +5,6 @@ import net.voxelmap.util.CompressionUtils;
 import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.platform.NativeImage;
 import net.blaze3d.platform.NativeImage.Format;
-import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -60,7 +59,7 @@ public class CompressibleGLBufferedImage {
     }
 
     public void deleteTexture() {
-        if (!RenderSystem.isOnRenderThread()) {
+        if (!VulkanicAPI.isOnRenderThread()) {
             VoxelConstants.getLogger().log(Level.WARN, "Texture unload call from wrong thread", new Exception());
             return;
         }
@@ -71,7 +70,7 @@ public class CompressibleGLBufferedImage {
     }
 
     public void uploadToTexture() {
-        if (!RenderSystem.isOnRenderThread()) {
+        if (!VulkanicAPI.isOnRenderThread()) {
             VoxelConstants.getLogger().log(Level.WARN, "Texture upload call from wrong thread", new Exception());
             return;
         }

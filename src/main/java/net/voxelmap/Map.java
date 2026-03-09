@@ -241,8 +241,8 @@ public class Map implements Runnable, IChangeObserver {
         this.setZoomScale();
 
         final int fboTextureSize = 512;
-        this.fboTexture = RenderSystem.getDevice().createTexture("voxelmap-fbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
-        this.fboTextureView = RenderSystem.getDevice().createTextureView(this.fboTexture);
+        this.fboTexture = net.vulkanic.VulkanicAPI.getDevice().createTexture("voxelmap-fbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
+        this.fboTextureView = net.vulkanic.VulkanicAPI.getDevice().createTextureView(this.fboTexture);
         // DynamicTexture fboTexture = new DynamicTexture("voxelmap-fbotexture", fboTextureSize, fboTextureSize, true);
         // minecraft.getTextureManager().register(resourceFboTexture, fboTexture);
         // this.fboTexture = fboTexture.getTexture();
@@ -1610,7 +1610,7 @@ public class Map implements Runnable, IChangeObserver {
         VulkanicAPI.getModelViewStack().pushMatrix();
         VulkanicAPI.getModelViewStack().identity();
 
-        GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+        GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
                 .writeTransform(
                         VulkanicAPI.getModelViewMatrix(),
                         new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
@@ -1624,7 +1624,7 @@ public class Map implements Runnable, IChangeObserver {
             GpuBuffer indexBuffer;
             VertexFormat.IndexType indexType;
             if (meshData.indexBuffer() == null) {
-                RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(meshData.drawState().mode());
+                VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(meshData.drawState().mode());
                 indexBuffer = autoStorageIndexBuffer.getBuffer(meshData.drawState().indexCount());
                 indexType = autoStorageIndexBuffer.type();
             } else {
@@ -1639,7 +1639,7 @@ public class Map implements Runnable, IChangeObserver {
                 stencilTexture = Minecraft.getInstance().getTextureManager().getTexture(circleStencil).getTextureView();
             }
 
-            try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Voxelmap: Map to screen", fboTextureView, OptionalInt.of(0x00000000))) {
+            try (RenderPass renderPass = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().createRenderPass(() -> "Voxelmap: Map to screen", fboTextureView, OptionalInt.of(0x00000000))) {
                 renderPass.setPipeline(renderPipeline);
                 net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
                 renderPass.setUniform("DynamicTransforms", gpuBufferSlice);

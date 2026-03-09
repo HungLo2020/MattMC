@@ -3,13 +3,28 @@ package net.vulkanic;
 import net.blaze3d.ProjectionType;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.platform.GLX;
+import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.systems.ScissorState;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.vertex.VertexFormat;
+import net.minecraft.Util;
+import net.minecraft.client.renderer.DynamicUniforms;
+import net.minecraft.util.Mth;
+import net.minecraft.util.TimeSource.NanoTimeSource;
 import net.vulkanic.backends.opengl.OpenGLBackend;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.glfw.GLFWErrorCallbackI;
+
+import java.nio.ByteBuffer;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
@@ -18,6 +33,10 @@ import org.joml.Matrix4fStack;
 public class VulkanicAPI {
     private static GraphicsBackend backend;
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
+    @Nullable
+    private static Thread renderThread;
+    @Nullable
+    private static GpuDevice device;
     private static ProjectionType projectionType = ProjectionType.PERSPECTIVE;
     private static ProjectionType savedProjectionType = ProjectionType.PERSPECTIVE;
     @Nullable
@@ -27,6 +46,27 @@ public class VulkanicAPI {
     private static final Matrix4fStack modelViewStack = new Matrix4fStack(16);
     private static Matrix4f textureMatrix = new Matrix4f();
     private static float shaderLineWidth = 1.0F;
+    private static double lastDrawTime = Double.MIN_VALUE;
+    private static final AtomicLong pollEventsWaitStart = new AtomicLong();
+    private static final AtomicBoolean pollingEvents = new AtomicBoolean(false);
+    private static final ScissorState scissorStateForRenderTypeDraws = new ScissorState();
+    private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequential = new VulkanicAPI.AutoStorageIndexBuffer(1, 1, it.unimi.dsi.fastutil.ints.IntConsumer::accept);
+    private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequentialQuad = new VulkanicAPI.AutoStorageIndexBuffer(4, 6, (intConsumer, i) -> {
+        intConsumer.accept(i);
+        intConsumer.accept(i + 1);
+        intConsumer.accept(i + 2);
+        intConsumer.accept(i + 2);
+        intConsumer.accept(i + 3);
+        intConsumer.accept(i);
+    });
+    private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequentialLines = new VulkanicAPI.AutoStorageIndexBuffer(4, 6, (intConsumer, i) -> {
+        intConsumer.accept(i);
+        intConsumer.accept(i + 1);
+        intConsumer.accept(i + 2);
+        intConsumer.accept(i + 3);
+        intConsumer.accept(i + 2);
+        intConsumer.accept(i + 1);
+    });
     private static int readFramebufferBinding;
     private static int drawFramebufferBinding;
     private static final java.util.ArrayDeque<GpuAsyncTask> PENDING_FENCED_TASKS = new java.util.ArrayDeque<>();
@@ -36,6 +76,12 @@ public class VulkanicAPI {
     private static GpuBufferSlice shaderLightDirections;
     @Nullable
     private static GpuBuffer globalSettingsUniform;
+    @Nullable
+    private static GpuTextureView outputColorTextureOverride;
+    @Nullable
+    private static GpuTextureView outputDepthTextureOverride;
+    @Nullable
+    private static DynamicUniforms dynamicUniforms;
     @Nullable
     private static Runnable fogStartListener;
     @Nullable
@@ -601,10 +647,15 @@ public class VulkanicAPI {
      * 
      * @return Immediate-mode command context (OpenGL singleton)
      */
+    public static CommandContext getCommandContext() {
+        return getBackend().getCurrentCommandContext();
+    }
+
+    /**
+     * @deprecated Use {@link #getCommandContext()} for backend-neutral command-context retrieval.
+     */
     public static CommandContext getImmediateContext() {
-        // For now, we only have OpenGL backend, so return OpenGL immediate context
-        // When Vulkan backend is added, this would check backend type
-        return OpenGLCommandContext.IMMEDIATE;
+        return getCommandContext();
     }
     
     // Context operations
@@ -1774,68 +1825,299 @@ public class VulkanicAPI {
         }
     }
 
+    public static String getBackendDescription() {
+        return String.format(Locale.ROOT, "LWJGL version %s", GLX._getLWJGLVersion());
+    }
+
+    public static void initRenderThread() {
+        if (renderThread != null) {
+            throw new IllegalStateException("Could not initialize render thread");
+        }
+
+        renderThread = Thread.currentThread();
+    }
+
+    public static boolean isOnRenderThread() {
+        return Thread.currentThread() == renderThread;
+    }
+
+    public static boolean isInInit() {
+        return renderThread == null || Thread.currentThread() == renderThread;
+    }
+
+    public static void assertOnRenderThread() {
+        if (!isOnRenderThread()) {
+            throw constructThreadException();
+        }
+    }
+
+    public static void assertOnRenderThreadOrInit() {
+        if (!isOnRenderThread() && !isInInit()) {
+            throw constructThreadException();
+        }
+    }
+
+    private static IllegalStateException constructThreadException() {
+        return new IllegalStateException("Rendersystem called from wrong thread");
+    }
+
+    public static void setDevice(GpuDevice gpuDevice) {
+        assertOnRenderThread();
+        device = gpuDevice;
+    }
+
+    public static GpuDevice getDevice() {
+        if (device == null) {
+            throw new IllegalStateException("Can't getDevice() before it was initialized");
+        }
+
+        return device;
+    }
+
+    @Nullable
+    public static GpuDevice tryGetDevice() {
+        return device;
+    }
+
+    public static String getApiDescription() {
+        GpuDevice gpuDevice = tryGetDevice();
+        return gpuDevice == null ? "Unknown" : gpuDevice.getImplementationInformation();
+    }
+
+    public static NanoTimeSource initBackendSystem() {
+        return GLX._initGlfw()::getAsLong;
+    }
+
+    public static void setupDefaultState() {
+        assertOnRenderThread();
+        getModelViewStack().clear();
+        resetTextureMatrix();
+    }
+
+    public static void setErrorCallback(GLFWErrorCallbackI glfwErrorCallback) {
+        GLX._setGlfwErrorCallback(glfwErrorCallback);
+    }
+
+    public static void pollEvents() {
+        pollEventsWaitStart.set(Util.getMillis());
+        pollingEvents.set(true);
+        GLFW.glfwPollEvents();
+        pollingEvents.set(false);
+    }
+
+    public static boolean isFrozenAtPollEvents() {
+        return pollingEvents.get() && Util.getMillis() - pollEventsWaitStart.get() > 200L;
+    }
+
+    public static void limitDisplayFPS(int fpsLimit) {
+        double targetTime = lastDrawTime + 1.0 / fpsLimit;
+
+        double currentTime;
+        for (currentTime = GLFW.glfwGetTime(); currentTime < targetTime; currentTime = GLFW.glfwGetTime()) {
+            GLFW.glfwWaitEventsTimeout(targetTime - currentTime);
+        }
+
+        lastDrawTime = currentTime;
+    }
+
+    public static void initializeDynamicUniforms() {
+        assertOnRenderThread();
+        dynamicUniforms = new DynamicUniforms();
+    }
+
+    public static DynamicUniforms getDynamicUniforms() {
+        assertOnRenderThread();
+        if (dynamicUniforms == null) {
+            throw new IllegalStateException("Can't getDynamicUniforms() before device was initialized");
+        }
+
+        return dynamicUniforms;
+    }
+
+    public static void resetDynamicUniforms() {
+        getDynamicUniforms().reset();
+    }
+
+    public static VulkanicAPI.AutoStorageIndexBuffer getSequentialBuffer(VertexFormat.Mode mode) {
+        assertOnRenderThread();
+
+        return switch (mode) {
+            case QUADS -> sharedSequentialQuad;
+            case LINES -> sharedSequentialLines;
+            default -> sharedSequential;
+        };
+    }
+
+    public static final class AutoStorageIndexBuffer {
+        private final int vertexStride;
+        private final int indexStride;
+        private final VulkanicAPI.AutoStorageIndexBuffer.IndexGenerator generator;
+        @Nullable
+        private GpuBuffer buffer;
+        private VertexFormat.IndexType type = VertexFormat.IndexType.SHORT;
+        private int indexCount;
+
+        public AutoStorageIndexBuffer(int i, int j, VulkanicAPI.AutoStorageIndexBuffer.IndexGenerator indexGenerator) {
+            this.vertexStride = i;
+            this.indexStride = j;
+            this.generator = indexGenerator;
+        }
+
+        public boolean hasStorage(int i) {
+            return i <= this.indexCount;
+        }
+
+        public GpuBuffer getBuffer(int i) {
+            this.ensureStorage(i);
+            return this.buffer;
+        }
+
+        private void ensureStorage(int i) {
+            if (!this.hasStorage(i)) {
+                i = Mth.roundToward(i * 2, this.indexStride);
+                int j = i / this.indexStride;
+                int k = j * this.vertexStride;
+                VertexFormat.IndexType indexType = VertexFormat.IndexType.least(k);
+                int l = Mth.roundToward(i * indexType.bytes, 4);
+                ByteBuffer byteBuffer = MemoryUtil.memAlloc(l);
+
+                try {
+                    this.type = indexType;
+                    it.unimi.dsi.fastutil.ints.IntConsumer intConsumer = this.intConsumer(byteBuffer);
+
+                    for (int m = 0; m < i; m += this.indexStride) {
+                        this.generator.accept(intConsumer, m * this.vertexStride / this.indexStride);
+                    }
+
+                    byteBuffer.flip();
+                    if (this.buffer != null) {
+                        this.buffer.close();
+                    }
+
+                    this.buffer = getDevice().createBuffer(() -> "Auto Storage index buffer", 64, byteBuffer);
+                } finally {
+                    MemoryUtil.memFree(byteBuffer);
+                }
+
+                this.indexCount = i;
+            }
+        }
+
+        private it.unimi.dsi.fastutil.ints.IntConsumer intConsumer(ByteBuffer byteBuffer) {
+            return switch (this.type) {
+                case SHORT -> i -> byteBuffer.putShort((short)i);
+                case INT -> byteBuffer::putInt;
+            };
+        }
+
+        public VertexFormat.IndexType type() {
+            return this.type;
+        }
+
+        public interface IndexGenerator {
+            void accept(it.unimi.dsi.fastutil.ints.IntConsumer intConsumer, int i);
+        }
+    }
+
     public static void setProjectionMatrix(@Nullable GpuBufferSlice gpuBufferSlice, ProjectionType projectionType) {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         projectionMatrixBuffer = gpuBufferSlice;
         VulkanicAPI.projectionType = projectionType;
     }
 
     public static void backupProjectionMatrix() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         savedProjectionMatrixBuffer = projectionMatrixBuffer;
         savedProjectionType = projectionType;
     }
 
     public static void restoreProjectionMatrix() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         projectionMatrixBuffer = savedProjectionMatrixBuffer;
         projectionType = savedProjectionType;
     }
 
     @Nullable
     public static GpuBufferSlice getProjectionMatrixBuffer() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         return projectionMatrixBuffer;
     }
 
     public static ProjectionType getProjectionType() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         return projectionType;
     }
 
     public static Matrix4f getModelViewMatrix() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         return modelViewStack;
     }
 
     public static Matrix4fStack getModelViewStack() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         return modelViewStack;
     }
 
     public static void setTextureMatrix(Matrix4f matrix4f) {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         textureMatrix = new Matrix4f(matrix4f);
     }
 
     public static void resetTextureMatrix() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         textureMatrix.identity();
     }
 
     public static Matrix4f getTextureMatrix() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         return textureMatrix;
     }
 
     public static void lineWidth(float f) {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         shaderLineWidth = f;
     }
 
     public static float getShaderLineWidth() {
-        RenderSystem.assertOnRenderThread();
+        assertOnRenderThread();
         return shaderLineWidth;
+    }
+
+    public static void enableScissorForRenderTypeDraws(int i, int j, int k, int l) {
+        assertOnRenderThread();
+        scissorStateForRenderTypeDraws.enable(i, j, k, l);
+    }
+
+    public static void disableScissorForRenderTypeDraws() {
+        assertOnRenderThread();
+        scissorStateForRenderTypeDraws.disable();
+    }
+
+    public static ScissorState getScissorStateForRenderTypeDraws() {
+        assertOnRenderThread();
+        return scissorStateForRenderTypeDraws;
+    }
+
+    public static void setOutputColorTextureOverride(@Nullable GpuTextureView gpuTextureView) {
+        assertOnRenderThread();
+        outputColorTextureOverride = gpuTextureView;
+    }
+
+    @Nullable
+    public static GpuTextureView getOutputColorTextureOverride() {
+        assertOnRenderThread();
+        return outputColorTextureOverride;
+    }
+
+    public static void setOutputDepthTextureOverride(@Nullable GpuTextureView gpuTextureView) {
+        assertOnRenderThread();
+        outputDepthTextureOverride = gpuTextureView;
+    }
+
+    @Nullable
+    public static GpuTextureView getOutputDepthTextureOverride() {
+        assertOnRenderThread();
+        return outputDepthTextureOverride;
     }
 
     public static void setShaderFog(@Nullable GpuBufferSlice gpuBufferSlice) {

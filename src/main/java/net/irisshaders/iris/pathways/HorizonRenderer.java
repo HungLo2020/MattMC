@@ -172,9 +172,9 @@ public class HorizonRenderer {
 			rebuildBuffer();
 		}
 
-		RenderSystem.AutoStorageIndexBuffer indices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer indexBuffer = indices.getBuffer(indexCount);
-		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms().writeTransform(modelView, fogColor, new Vector3f(), VulkanicAPI.getTextureMatrix(), VulkanicAPI.getShaderLineWidth());
+		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms().writeTransform(modelView, fogColor, new Vector3f(), VulkanicAPI.getTextureMatrix(), VulkanicAPI.getShaderLineWidth());
 		try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Sky", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty(),
 			Minecraft.getInstance().getMainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
 			VulkanicAPI.bindDefaultUniforms(pass);

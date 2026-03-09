@@ -32,7 +32,7 @@ public abstract class ReloadableTexture extends AbstractTexture {
 	}
 
 	protected void doLoad(NativeImage nativeImage, boolean bl, boolean bl2) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.close();
 		this.texture = gpuDevice.createTexture(this.resourceId::toString, 5, TextureFormat.RGBA8, nativeImage.getWidth(), nativeImage.getHeight(), 1, 1);
 		this.textureView = gpuDevice.createTextureView(this.texture);

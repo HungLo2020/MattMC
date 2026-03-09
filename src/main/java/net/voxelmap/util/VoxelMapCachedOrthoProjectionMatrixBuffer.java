@@ -17,7 +17,7 @@ public class VoxelMapCachedOrthoProjectionMatrixBuffer implements AutoCloseable 
     private final GpuBufferSlice bufferSlice;
 
     public VoxelMapCachedOrthoProjectionMatrixBuffer(String string, float left, float right, float bottom, float top, float zNear, float zFar) {
-        GpuDevice gpuDevice = RenderSystem.getDevice();
+        GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
         this.buffer = gpuDevice.createBuffer(() -> "Projection matrix UBO " + string, GpuBuffer.USAGE_UNIFORM + GpuBuffer.USAGE_COPY_DST, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
         this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 
@@ -26,7 +26,7 @@ public class VoxelMapCachedOrthoProjectionMatrixBuffer implements AutoCloseable 
         try (MemoryStack memoryStack = MemoryStack.stackPush()) {
             ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE)
                     .putMat4f(matrix4f).get();
-            RenderSystem.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
+            net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
         }
     }
 

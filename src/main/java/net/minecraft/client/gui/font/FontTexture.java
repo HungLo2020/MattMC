@@ -27,7 +27,7 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 	public FontTexture(Supplier<String> supplier, GlyphRenderTypes glyphRenderTypes, boolean bl) {
 		this.colored = bl;
 		this.root = new FontTexture.Node(0, 0, 256, 256);
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.texture = gpuDevice.createTexture(supplier, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
 		this.texture.setTextureFilter(FilterMode.NEAREST, false);
 		this.textureView = gpuDevice.createTextureView(this.texture);

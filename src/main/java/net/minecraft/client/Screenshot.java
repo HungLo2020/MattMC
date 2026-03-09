@@ -16,6 +16,7 @@ import net.minecraft.Util;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent.OpenFile;
 import net.minecraft.util.ARGB;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -90,9 +91,9 @@ public class Screenshot {
 		if (gpuTexture == null) {
 			throw new IllegalStateException("Tried to capture screenshot of an incomplete framebuffer");
 		} else if (j % i == 0 && k % i == 0) {
-			GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(() -> "Screenshot buffer", 9, j * k * gpuTexture.getFormat().pixelSize());
-			CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
-			RenderSystem.getDevice().createCommandEncoder().copyTextureToBuffer(gpuTexture, gpuBuffer, 0, () -> {
+			GpuBuffer gpuBuffer = VulkanicAPI.getDevice().createBuffer(() -> "Screenshot buffer", 9, j * k * gpuTexture.getFormat().pixelSize());
+			CommandEncoder commandEncoder = VulkanicAPI.getDevice().createCommandEncoder();
+			VulkanicAPI.getDevice().createCommandEncoder().copyTextureToBuffer(gpuTexture, gpuBuffer, 0, () -> {
 				try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(gpuBuffer, true, false)) {
 					int l = k / i;
 					int m = j / i;

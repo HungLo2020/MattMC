@@ -2,7 +2,7 @@ package net.minecraft.client.main;
 
 import net.blaze3d.TracyBootstrap;
 import net.blaze3d.platform.DisplayData;
-import net.blaze3d.systems.RenderSystem;
+import net.vulkanic.VulkanicAPI;
 import com.mojang.jtracy.TracyClient;
 import net.logging.LogUtils;
 import net.minecraft.util.UndashedUuid;
@@ -239,7 +239,7 @@ public class Main {
 
 		try {
 			Thread.currentThread().setName("Render thread");
-			RenderSystem.initRenderThread();
+			VulkanicAPI.initRenderThread();
 			minecraft = new Minecraft(gameConfig);
 		} catch (SilentInitException var72) {
 			Util.shutdownExecutors();

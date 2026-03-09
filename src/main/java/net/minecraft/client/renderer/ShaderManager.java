@@ -207,7 +207,7 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 		ShaderManager.CompilationCache compilationCache = new ShaderManager.CompilationCache(configs);
 		Set<RenderPipeline> set = new HashSet(RenderPipelines.getStaticPipelines());
 		List<ResourceLocation> list = new ArrayList();
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		gpuDevice.clearPipelineCache();
 
 		for (RenderPipeline renderPipeline : set) {

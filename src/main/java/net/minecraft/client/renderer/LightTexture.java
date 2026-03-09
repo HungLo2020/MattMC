@@ -55,7 +55,7 @@ public class LightTexture implements AutoCloseable {
 	public LightTexture(GameRenderer gameRenderer, Minecraft minecraft) {
 		this.renderer = gameRenderer;
 		this.minecraft = minecraft;
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = VulkanicAPI.getDevice();
 		this.texture = gpuDevice.createTexture("Light Texture", 12, TextureFormat.RGBA8, 16, 16, 1, 1);
 		this.texture.setTextureFilter(FilterMode.LINEAR, false);
 		this.textureView = gpuDevice.createTextureView(this.texture);
@@ -155,7 +155,7 @@ public class LightTexture implements AutoCloseable {
 				float n = this.blockLightRedFlicker + 1.5F;
 				float o = clientLevel.dimensionType().ambientLight();
 				float p = this.minecraft.options.gamma().get().floatValue();
-				CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+				CommandEncoder commandEncoder = VulkanicAPI.getDevice().createCommandEncoder();
 
 				try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(this.ubo.currentBuffer(), false, true)) {
 					Std140Builder.intoBuffer(mappedView.data())

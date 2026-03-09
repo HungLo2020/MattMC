@@ -54,7 +54,7 @@ public class SkyRenderer implements AutoCloseable {
 	private static final float END_FLASH_HEIGHT = 100.0F;
 	private static final float END_FLASH_SCALE = 60.0F;
 	private final GpuBuffer starBuffer;
-	private final RenderSystem.AutoStorageIndexBuffer starIndices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+	private final VulkanicAPI.AutoStorageIndexBuffer starIndices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 	private final GpuBuffer topSkyBuffer;
 	private final GpuBuffer bottomSkyBuffer;
 	private final GpuBuffer endSkyBuffer;
@@ -62,7 +62,7 @@ public class SkyRenderer implements AutoCloseable {
 	private final GpuBuffer moonBuffer;
 	private final GpuBuffer sunriseBuffer;
 	private final GpuBuffer endFlashBuffer;
-	private final RenderSystem.AutoStorageIndexBuffer quadIndices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+	private final VulkanicAPI.AutoStorageIndexBuffer quadIndices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 	@Nullable
 	private AbstractTexture sunTexture;
 	@Nullable
@@ -86,14 +86,14 @@ public class SkyRenderer implements AutoCloseable {
 			this.buildSkyDisc(bufferBuilder, 16.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				this.topSkyBuffer = RenderSystem.getDevice().createBuffer(() -> "Top sky vertex buffer", 32, meshData.vertexBuffer());
+				this.topSkyBuffer = VulkanicAPI.getDevice().createBuffer(() -> "Top sky vertex buffer", 32, meshData.vertexBuffer());
 			}
 
 			bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.TRIANGLE_FAN, DefaultVertexFormat.POSITION);
 			this.buildSkyDisc(bufferBuilder, -16.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				this.bottomSkyBuffer = RenderSystem.getDevice().createBuffer(() -> "Bottom sky vertex buffer", 32, meshData.vertexBuffer());
+				this.bottomSkyBuffer = VulkanicAPI.getDevice().createBuffer(() -> "Bottom sky vertex buffer", 32, meshData.vertexBuffer());
 			}
 		}
 	}
@@ -131,7 +131,7 @@ public class SkyRenderer implements AutoCloseable {
 			}
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var16 = RenderSystem.getDevice().createBuffer(() -> "Sunrise/Sunset fan", 32, meshData.vertexBuffer());
+				var16 = VulkanicAPI.getDevice().createBuffer(() -> "Sunrise/Sunset fan", 32, meshData.vertexBuffer());
 			}
 		}
 
@@ -149,7 +149,7 @@ public class SkyRenderer implements AutoCloseable {
 			bufferBuilder.addVertex(matrix4f, -1.0F, 0.0F, 1.0F).setUv(0.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var5 = RenderSystem.getDevice().createBuffer(() -> "Sun quad", 40, meshData.vertexBuffer());
+				var5 = VulkanicAPI.getDevice().createBuffer(() -> "Sun quad", 40, meshData.vertexBuffer());
 			}
 		}
 
@@ -179,7 +179,7 @@ public class SkyRenderer implements AutoCloseable {
 			}
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var18 = RenderSystem.getDevice().createBuffer(() -> "Moon phases", 32, meshData.vertexBuffer());
+				var18 = VulkanicAPI.getDevice().createBuffer(() -> "Moon phases", 32, meshData.vertexBuffer());
 			}
 		}
 
@@ -213,7 +213,7 @@ public class SkyRenderer implements AutoCloseable {
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
 				this.starIndexCount = meshData.drawState().indexCount();
-				var19 = RenderSystem.getDevice().createBuffer(() -> "Stars vertex buffer", 40, meshData.vertexBuffer());
+				var19 = VulkanicAPI.getDevice().createBuffer(() -> "Stars vertex buffer", 40, meshData.vertexBuffer());
 			}
 		}
 
@@ -260,7 +260,7 @@ public class SkyRenderer implements AutoCloseable {
 			}
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var10 = RenderSystem.getDevice().createBuffer(() -> "End sky vertex buffer", 40, meshData.vertexBuffer());
+				var10 = VulkanicAPI.getDevice().createBuffer(() -> "End sky vertex buffer", 40, meshData.vertexBuffer());
 			}
 		}
 
@@ -278,7 +278,7 @@ public class SkyRenderer implements AutoCloseable {
 			bufferBuilder.addVertex(matrix4f, -1.0F, 0.0F, 1.0F).setUv(0.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var5 = RenderSystem.getDevice().createBuffer(() -> "End flash quad", 32, meshData.vertexBuffer());
+				var5 = VulkanicAPI.getDevice().createBuffer(() -> "End flash quad", 32, meshData.vertexBuffer());
 			}
 		}
 
@@ -289,12 +289,12 @@ public class SkyRenderer implements AutoCloseable {
 		// Iris: Set rendering phase to SKY (from MixinSkyRenderer)
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SKY);
 		
-		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 			.writeTransform(VulkanicAPI.getModelViewMatrix(), new Vector4f(f, g, h, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 		GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
+		try (RenderPass renderPass = VulkanicAPI.getDevice()
 				.createCommandEncoder()
 				.createRenderPass(() -> "Sky disc", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(RenderPipelines.SKY);
@@ -341,12 +341,12 @@ public class SkyRenderer implements AutoCloseable {
 		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.translate(0.0F, 12.0F, 0.0F);
-		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 			.writeTransform(matrix4fStack, new Vector4f(0.0F, 0.0F, 0.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 		GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
+		try (RenderPass renderPass = VulkanicAPI.getDevice()
 				.createCommandEncoder()
 				.createRenderPass(() -> "Sky dark", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(RenderPipelines.SKY);
@@ -388,13 +388,13 @@ public class SkyRenderer implements AutoCloseable {
 			matrix4fStack.mul(poseStack.last().pose());
 			matrix4fStack.translate(0.0F, 100.0F, 0.0F);
 			matrix4fStack.scale(30.0F, 1.0F, 30.0F);
-			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(matrix4fStack, new Vector4f(1.0F, 1.0F, 1.0F, f), new Vector3f(), new Matrix4f(), 0.0F);
 			GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 			GpuBuffer gpuBuffer = this.quadIndices.getBuffer(6);
 
-			try (RenderPass renderPass = RenderSystem.getDevice()
+			try (RenderPass renderPass = VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.createRenderPass(() -> "Sky sun", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
@@ -426,13 +426,13 @@ public class SkyRenderer implements AutoCloseable {
 			matrix4fStack.mul(poseStack.last().pose());
 			matrix4fStack.translate(0.0F, -100.0F, 0.0F);
 			matrix4fStack.scale(20.0F, 1.0F, 20.0F);
-			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(matrix4fStack, new Vector4f(1.0F, 1.0F, 1.0F, f), new Vector3f(), new Matrix4f(), 0.0F);
 			GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 			GpuBuffer gpuBuffer = this.quadIndices.getBuffer(6);
 
-			try (RenderPass renderPass = RenderSystem.getDevice()
+			try (RenderPass renderPass = VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.createRenderPass(() -> "Sky moon", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
@@ -459,10 +459,10 @@ public class SkyRenderer implements AutoCloseable {
 		GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 		GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 		GpuBuffer gpuBuffer = this.starIndices.getBuffer(this.starIndexCount);
-		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 			.writeTransform(matrix4fStack, new Vector4f(f, f, f, f), new Vector3f(), new Matrix4f(), 0.0F);
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
+		try (RenderPass renderPass = VulkanicAPI.getDevice()
 				.createCommandEncoder()
 				.createRenderPass(() -> "Stars", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
@@ -493,12 +493,12 @@ public class SkyRenderer implements AutoCloseable {
 			matrix4fStack.pushMatrix();
 			matrix4fStack.mul(poseStack.last().pose());
 			matrix4fStack.scale(1.0F, 1.0F, g);
-			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(matrix4fStack, new Vector4f(h, j, k, g), new Vector3f(), new Matrix4f(), 0.0F);
 			GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 
-			try (RenderPass renderPass = RenderSystem.getDevice()
+			try (RenderPass renderPass = VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.createRenderPass(() -> "Sunrise sunset", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.SUNRISE_SUNSET);
@@ -515,14 +515,14 @@ public class SkyRenderer implements AutoCloseable {
 
 	public void renderEndSky() {
 		if (this.endSkyTexture != null) {
-			RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+			VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 			GpuBuffer gpuBuffer = autoStorageIndexBuffer.getBuffer(36);
 			GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
-			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(VulkanicAPI.getModelViewMatrix(), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 
-			try (RenderPass renderPass = RenderSystem.getDevice()
+			try (RenderPass renderPass = VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.createRenderPass(() -> "End sky", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.END_SKY);
@@ -545,13 +545,13 @@ public class SkyRenderer implements AutoCloseable {
 			matrix4fStack.mul(poseStack.last().pose());
 			matrix4fStack.translate(0.0F, 100.0F, 0.0F);
 			matrix4fStack.scale(60.0F, 1.0F, 60.0F);
-			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(matrix4fStack, new Vector4f(f, f, f, f), new Vector3f(), new Matrix4f(), 0.0F);
 			GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 			GpuBuffer gpuBuffer = this.quadIndices.getBuffer(6);
 
-			try (RenderPass renderPass = RenderSystem.getDevice()
+			try (RenderPass renderPass = VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.createRenderPass(() -> "End flash", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);

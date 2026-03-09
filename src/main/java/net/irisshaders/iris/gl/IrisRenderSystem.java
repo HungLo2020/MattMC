@@ -211,17 +211,17 @@ public class IrisRenderSystem {
 	}
 
 	public static void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
-		RenderSystem.assertOnRenderThreadOrInit();
+		VulkanicAPI.assertOnRenderThreadOrInit();
 		dsaState.clearBufferfv(framebuffer, buffer, drawbuffer, values);
 	}
 
 	public static void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-		RenderSystem.assertOnRenderThreadOrInit();
+		VulkanicAPI.assertOnRenderThreadOrInit();
 		dsaState.clearBufferiv(framebuffer, buffer, drawbuffer, values);
 	}
 
 	public static void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-		RenderSystem.assertOnRenderThreadOrInit();
+		VulkanicAPI.assertOnRenderThreadOrInit();
 		dsaState.clearBufferuiv(framebuffer, buffer, drawbuffer, values);
 	}
 

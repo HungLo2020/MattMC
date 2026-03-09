@@ -208,7 +208,7 @@ public class GpuWarnlistManager extends SimplePreparableReloadListener<GpuWarnli
 
 		ImmutableMap<String, String> apply() {
 			Builder<String, String> builder = new Builder<>();
-			GpuDevice gpuDevice = RenderSystem.getDevice();
+			GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 			if (gpuDevice.getBackendName().equals("OpenGL")) {
 				String string = matchAny(this.rendererPatterns, gpuDevice.getRenderer());
 				if (!string.isEmpty()) {

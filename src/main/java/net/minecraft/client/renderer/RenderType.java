@@ -938,7 +938,7 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 		@Override
 		public void draw(MeshData meshData) {
 			this.setupRenderState();
-			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(
 					VulkanicAPI.getModelViewMatrix(),
 					new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
@@ -953,7 +953,7 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 				GpuBuffer gpuBuffer2;
 				VertexFormat.IndexType indexType;
 				if (meshData.indexBuffer() == null) {
-					RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(meshData.drawState().mode());
+					VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(meshData.drawState().mode());
 					gpuBuffer2 = autoStorageIndexBuffer.getBuffer(meshData.drawState().indexCount());
 					indexType = autoStorageIndexBuffer.type();
 				} else {
@@ -962,18 +962,18 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 				}
 
 				RenderTarget renderTarget = this.state.outputState.getRenderTarget();
-				GpuTextureView gpuTextureView = RenderSystem.outputColorTextureOverride != null
-					? RenderSystem.outputColorTextureOverride
+				GpuTextureView gpuTextureView = VulkanicAPI.getOutputColorTextureOverride() != null
+					? VulkanicAPI.getOutputColorTextureOverride()
 					: renderTarget.getColorTextureView();
 				GpuTextureView gpuTextureView2 = renderTarget.useDepth
-					? (RenderSystem.outputDepthTextureOverride != null ? RenderSystem.outputDepthTextureOverride : renderTarget.getDepthTextureView())
+					? (VulkanicAPI.getOutputDepthTextureOverride() != null ? VulkanicAPI.getOutputDepthTextureOverride() : renderTarget.getDepthTextureView())
 					: null;
 
-				try (RenderPass renderPass = RenderSystem.getDevice()
+				try (RenderPass renderPass = VulkanicAPI.getDevice()
 						.createCommandEncoder()
 						.createRenderPass(() -> "Immediate draw for " + this.getName(), gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 					renderPass.setPipeline(this.renderPipeline);
-					ScissorState scissorState = RenderSystem.getScissorStateForRenderTypeDraws();
+					ScissorState scissorState = VulkanicAPI.getScissorStateForRenderTypeDraws();
 					if (scissorState.enabled()) {
 						renderPass.enableScissor(scissorState.x(), scissorState.y(), scissorState.width(), scissorState.height());
 					}

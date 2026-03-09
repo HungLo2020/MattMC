@@ -43,9 +43,9 @@ public class WorldBorderRenderer {
 	private double lastBorderMaxX;
 	private double lastBorderMinZ;
 	private double lastBorderMaxZ;
-	private final GpuBuffer worldBorderBuffer = RenderSystem.getDevice()
+	private final GpuBuffer worldBorderBuffer = VulkanicAPI.getDevice()
 		.createBuffer(() -> "World border vertex buffer", 40, 16 * DefaultVertexFormat.POSITION_TEX.getVertexSize());
-	private final RenderSystem.AutoStorageIndexBuffer indices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+	private final VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 
 	private void rebuildWorldBorderBuffer(WorldBorderRenderState worldBorderRenderState, double d, double e, double f, float g, float h, float i) {
 		try (ByteBufferBuilder byteBufferBuilder = ByteBufferBuilder.exactlySized(DefaultVertexFormat.POSITION_TEX.getVertexSize() * 4 * 4)) {
@@ -80,7 +80,7 @@ public class WorldBorderRenderer {
 			bufferBuilder.addVertex((float)(k - r), g, (float)(o - n)).setUv(p, i);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				RenderSystem.getDevice().createCommandEncoder().writeToBuffer(this.worldBorderBuffer.slice(), meshData.vertexBuffer());
+				VulkanicAPI.getDevice().createCommandEncoder().writeToBuffer(this.worldBorderBuffer.slice(), meshData.vertexBuffer());
 			}
 
 			this.lastBorderMinX = j;
@@ -149,7 +149,7 @@ public class WorldBorderRenderer {
 			}
 
 			GpuBuffer gpuBuffer = this.indices.getBuffer(6);
-			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(
 					VulkanicAPI.getModelViewMatrix(),
 					new Vector4f(i, j, k, (float)worldBorderRenderState.alpha),
@@ -158,7 +158,7 @@ public class WorldBorderRenderer {
 					0.0F
 				);
 
-			try (RenderPass renderPass = RenderSystem.getDevice()
+			try (RenderPass renderPass = VulkanicAPI.getDevice()
 					.createCommandEncoder()
 					.createRenderPass(() -> "World border", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(renderPipeline);

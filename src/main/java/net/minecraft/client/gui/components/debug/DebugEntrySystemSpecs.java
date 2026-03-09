@@ -19,7 +19,7 @@ public class DebugEntrySystemSpecs implements DebugScreenEntry {
 
 	@Override
 	public void display(DebugScreenDisplayer debugScreenDisplayer, @Nullable Level level, @Nullable LevelChunk levelChunk, @Nullable LevelChunk levelChunk2) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		debugScreenDisplayer.addToGroup(
 			GROUP,
 			List.of(

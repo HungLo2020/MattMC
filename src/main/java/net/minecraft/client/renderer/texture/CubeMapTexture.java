@@ -92,7 +92,7 @@ public class CubeMapTexture extends ReloadableTexture {
 
 	@Override
 	protected void doLoad(NativeImage nativeImage, boolean bl, boolean bl2) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		int i = nativeImage.getWidth();
 		int j = nativeImage.getHeight() / 6;
 		this.close();

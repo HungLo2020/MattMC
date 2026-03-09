@@ -118,6 +118,20 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testSsaoApplyShaderUsesBackendNeutralSingleContext() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/shaders/SSAOApplyShader.java");
+        assertTrue(Files.exists(file), "SSAOApplyShader.java must exist");
+
+        String source = Files.readString(file);
+
+        assertTrue(source.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
+            "SSAOApplyShader should fetch a backend-neutral CommandContext once per render phase");
+        assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
+            "SSAOApplyShader should not hard-wire immediate OpenGL context retrieval");
+    }
+
+    @Test
     public void testDrawFromBuffersUsesBackendAgnosticIndexTypeRouting() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/blaze3d/opengl/GlCommandEncoder.java");
@@ -2766,8 +2780,6 @@ public class Phase3DrawPathTest {
             "RenderSystem should not expose getModelViewMatrix after model-view migration to VulkanicAPI");
         assertFalse(renderSystemSource.contains("public static Matrix4fStack getModelViewStack("),
             "RenderSystem should not expose getModelViewStack after model-view migration to VulkanicAPI");
-        assertTrue(renderSystemSource.contains("VulkanicAPI.getModelViewStack().clear()"),
-            "RenderSystem.setupDefaultState should clear the VulkanicAPI model-view stack");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         String vulkanicApiSource = Files.readString(vulkanicApiFile);
@@ -2778,6 +2790,450 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose getModelViewMatrix after migration");
         assertTrue(vulkanicApiSource.contains("public static Matrix4fStack getModelViewStack("),
             "VulkanicAPI should expose getModelViewStack after migration");
+        assertTrue(vulkanicApiSource.contains("public static void setupDefaultState("),
+            "VulkanicAPI should own setupDefaultState after migration");
+        assertTrue(vulkanicApiSource.contains("getModelViewStack().clear();"),
+            "VulkanicAPI.setupDefaultState should clear the model-view stack");
+        assertTrue(vulkanicApiSource.contains("resetTextureMatrix();"),
+            "VulkanicAPI.setupDefaultState should reset the texture matrix");
+    }
+
+    @Test
+    public void testBootstrapHelpersOwnershipMovedToVulkanicAPI() throws IOException {
+        Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
+        String renderSystemSource = Files.readString(renderSystemFile);
+
+        assertFalse(renderSystemSource.contains("public static String getBackendDescription("),
+            "RenderSystem should not expose getBackendDescription after bootstrap migration");
+        assertFalse(renderSystemSource.contains("public static String getApiDescription("),
+            "RenderSystem should not expose getApiDescription after bootstrap migration");
+        assertFalse(renderSystemSource.contains("public static NanoTimeSource initBackendSystem("),
+            "RenderSystem should not expose initBackendSystem after bootstrap migration");
+        assertFalse(renderSystemSource.contains("public static void setupDefaultState("),
+            "RenderSystem should not expose setupDefaultState after bootstrap migration");
+        assertFalse(renderSystemSource.contains("public static void setErrorCallback("),
+            "RenderSystem should not expose setErrorCallback after bootstrap migration");
+        assertFalse(renderSystemSource.contains("public static boolean isFrozenAtPollEvents("),
+            "RenderSystem should not expose isFrozenAtPollEvents after poll-state migration");
+        assertFalse(renderSystemSource.contains("public static void limitDisplayFPS("),
+            "RenderSystem should not expose limitDisplayFPS after frame pacing migration");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+
+        assertTrue(vulkanicApiSource.contains("public static String getBackendDescription("),
+            "VulkanicAPI should expose getBackendDescription after bootstrap migration");
+        assertTrue(vulkanicApiSource.contains("public static String getApiDescription("),
+            "VulkanicAPI should expose getApiDescription after bootstrap migration");
+        assertTrue(vulkanicApiSource.contains("public static NanoTimeSource initBackendSystem("),
+            "VulkanicAPI should expose initBackendSystem after bootstrap migration");
+        assertTrue(vulkanicApiSource.contains("public static void setupDefaultState("),
+            "VulkanicAPI should expose setupDefaultState after bootstrap migration");
+        assertTrue(vulkanicApiSource.contains("public static void setErrorCallback("),
+            "VulkanicAPI should expose setErrorCallback after bootstrap migration");
+        assertTrue(vulkanicApiSource.contains("public static void pollEvents("),
+            "VulkanicAPI should expose pollEvents after poll-state migration");
+        assertTrue(vulkanicApiSource.contains("public static boolean isFrozenAtPollEvents("),
+            "VulkanicAPI should expose isFrozenAtPollEvents after poll-state migration");
+        assertTrue(vulkanicApiSource.contains("public static void limitDisplayFPS("),
+            "VulkanicAPI should expose limitDisplayFPS after frame pacing migration");
+
+        Path minecraftFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java");
+        String minecraftSource = Files.readString(minecraftFile);
+
+        assertFalse(minecraftSource.contains("RenderSystem.getBackendDescription("),
+            "Minecraft should not call RenderSystem.getBackendDescription after bootstrap migration");
+        assertFalse(minecraftSource.contains("RenderSystem.getApiDescription("),
+            "Minecraft should not call RenderSystem.getApiDescription after bootstrap migration");
+        assertFalse(minecraftSource.contains("RenderSystem.initBackendSystem("),
+            "Minecraft should not call RenderSystem.initBackendSystem after bootstrap migration");
+        assertFalse(minecraftSource.contains("RenderSystem.setupDefaultState("),
+            "Minecraft should not call RenderSystem.setupDefaultState after bootstrap migration");
+        assertFalse(minecraftSource.contains("RenderSystem.setErrorCallback("),
+            "Minecraft should not call RenderSystem.setErrorCallback after bootstrap migration");
+        assertFalse(minecraftSource.contains("RenderSystem.limitDisplayFPS("),
+            "Minecraft should not call RenderSystem.limitDisplayFPS after frame pacing migration");
+        assertTrue(minecraftSource.contains("VulkanicAPI.getBackendDescription("),
+            "Minecraft should call VulkanicAPI.getBackendDescription after bootstrap migration");
+        assertTrue(
+            minecraftSource.contains("VulkanicAPI.getApiDescription(")
+                || minecraftSource.contains("VulkanicAPI::getApiDescription"),
+            "Minecraft should call VulkanicAPI.getApiDescription after bootstrap migration"
+        );
+        assertTrue(minecraftSource.contains("VulkanicAPI.initBackendSystem("),
+            "Minecraft should call VulkanicAPI.initBackendSystem after bootstrap migration");
+        assertTrue(minecraftSource.contains("VulkanicAPI.setupDefaultState("),
+            "Minecraft should call VulkanicAPI.setupDefaultState after bootstrap migration");
+        assertTrue(minecraftSource.contains("VulkanicAPI.setErrorCallback("),
+            "Minecraft should call VulkanicAPI.setErrorCallback after bootstrap migration");
+        assertTrue(minecraftSource.contains("VulkanicAPI.limitDisplayFPS("),
+            "Minecraft should call VulkanicAPI.limitDisplayFPS after frame pacing migration");
+
+        Path glxFile = SRC_MAIN_JAVA.resolve("net/blaze3d/platform/GLX.java");
+        String glxSource = Files.readString(glxFile);
+        assertFalse(glxSource.contains("RenderSystem.setErrorCallback("),
+            "GLX should not route GLFW error callback setup through RenderSystem after bootstrap migration");
+        assertTrue(glxSource.contains("VulkanicAPI.setErrorCallback("),
+            "GLX should route GLFW error callback setup through VulkanicAPI after bootstrap migration");
+
+        Path packetListenerFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/multiplayer/ClientCommonPacketListenerImpl.java");
+        String packetListenerSource = Files.readString(packetListenerFile);
+        assertFalse(packetListenerSource.contains("RenderSystem.isFrozenAtPollEvents("),
+            "ClientCommonPacketListenerImpl should not query poll freeze state through RenderSystem after migration");
+        assertTrue(packetListenerSource.contains("VulkanicAPI.isFrozenAtPollEvents("),
+            "ClientCommonPacketListenerImpl should query poll freeze state through VulkanicAPI after migration");
+
+        assertTrue(renderSystemSource.contains("VulkanicAPI.pollEvents();"),
+            "RenderSystem.flipFrame should route poll event calls through VulkanicAPI after migration");
+    }
+
+    @Test
+    public void testThreadAndDeviceOwnershipMovedToVulkanicAPI() throws IOException {
+        Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
+        String renderSystemSource = Files.readString(renderSystemFile);
+
+        assertFalse(renderSystemSource.contains("private static Thread renderThread;"),
+            "RenderSystem should not own renderThread after thread ownership migration");
+        assertFalse(renderSystemSource.contains("private static GpuDevice DEVICE;"),
+            "RenderSystem should not own DEVICE after device ownership migration");
+        assertFalse(renderSystemSource.contains("public static void initRenderThread("),
+            "RenderSystem should not expose initRenderThread after thread ownership migration");
+        assertFalse(renderSystemSource.contains("public static boolean isOnRenderThread("),
+            "RenderSystem should not expose isOnRenderThread after thread ownership migration");
+        assertFalse(renderSystemSource.contains("public static boolean isInInit("),
+            "RenderSystem should not expose isInInit after thread ownership migration");
+        assertFalse(renderSystemSource.contains("public static void assertOnRenderThreadOrInit("),
+            "RenderSystem should not expose assertOnRenderThreadOrInit after thread ownership migration");
+        assertFalse(renderSystemSource.contains("public static GpuDevice tryGetDevice("),
+            "RenderSystem should not expose tryGetDevice after device ownership migration");
+        assertTrue(renderSystemSource.contains("VulkanicAPI.setDevice(new GlDevice("),
+            "RenderSystem.initRenderer should set the device through VulkanicAPI after migration");
+        assertTrue(renderSystemSource.contains("return net.vulkanic.VulkanicAPI.getDevice();"),
+            "RenderSystem.getDevice should delegate to VulkanicAPI after migration");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+
+        assertTrue(vulkanicApiSource.contains("private static Thread renderThread;"),
+            "VulkanicAPI should own renderThread after migration");
+        assertTrue(vulkanicApiSource.contains("private static GpuDevice device;"),
+            "VulkanicAPI should own device after migration");
+        assertTrue(vulkanicApiSource.contains("public static void initRenderThread("),
+            "VulkanicAPI should expose initRenderThread after migration");
+        assertTrue(vulkanicApiSource.contains("public static boolean isOnRenderThread("),
+            "VulkanicAPI should expose isOnRenderThread after migration");
+        assertTrue(vulkanicApiSource.contains("public static boolean isInInit("),
+            "VulkanicAPI should expose isInInit after migration");
+        assertTrue(vulkanicApiSource.contains("public static void assertOnRenderThreadOrInit("),
+            "VulkanicAPI should expose assertOnRenderThreadOrInit after migration");
+        assertTrue(vulkanicApiSource.contains("public static void setDevice("),
+            "VulkanicAPI should expose setDevice after migration");
+        assertTrue(vulkanicApiSource.contains("public static GpuDevice getDevice("),
+            "VulkanicAPI should expose getDevice after migration");
+        assertTrue(vulkanicApiSource.contains("public static GpuDevice tryGetDevice("),
+            "VulkanicAPI should expose tryGetDevice after migration");
+
+        Path mainFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/main/Main.java");
+        String mainSource = Files.readString(mainFile);
+        assertFalse(mainSource.contains("RenderSystem.initRenderThread("),
+            "Main should not initialize render thread through RenderSystem after migration");
+        assertTrue(mainSource.contains("VulkanicAPI.initRenderThread("),
+            "Main should initialize render thread through VulkanicAPI after migration");
+
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertFalse(irisRenderSystemSource.contains("RenderSystem.assertOnRenderThreadOrInit("),
+            "IrisRenderSystem should not call RenderSystem.assertOnRenderThreadOrInit after migration");
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.assertOnRenderThreadOrInit("),
+            "IrisRenderSystem should call VulkanicAPI.assertOnRenderThreadOrInit after migration");
+
+        Path renderAssertsFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/util/RenderAsserts.java");
+        String renderAssertsSource = Files.readString(renderAssertsFile);
+        assertFalse(renderAssertsSource.contains("RenderSystem.isOnRenderThread("),
+            "RenderAsserts should not call RenderSystem.isOnRenderThread after migration");
+        assertTrue(renderAssertsSource.contains("VulkanicAPI.isOnRenderThread("),
+            "RenderAsserts should call VulkanicAPI.isOnRenderThread after migration");
+
+        Path voxelImageFile = SRC_MAIN_JAVA.resolve("net/voxelmap/persistent/CompressibleGLBufferedImage.java");
+        String voxelImageSource = Files.readString(voxelImageFile);
+        assertFalse(voxelImageSource.contains("RenderSystem.isOnRenderThread("),
+            "CompressibleGLBufferedImage should not call RenderSystem.isOnRenderThread after migration");
+        assertTrue(voxelImageSource.contains("VulkanicAPI.isOnRenderThread("),
+            "CompressibleGLBufferedImage should call VulkanicAPI.isOnRenderThread after migration");
+
+        Path minecraftFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java");
+        String minecraftSource = Files.readString(minecraftFile);
+        assertFalse(minecraftSource.contains("RenderSystem.tryGetDevice("),
+            "Minecraft should not call RenderSystem.tryGetDevice after migration");
+        assertTrue(minecraftSource.contains("VulkanicAPI.tryGetDevice("),
+            "Minecraft should call VulkanicAPI.tryGetDevice after migration");
+    }
+
+    @Test
+    public void testBlaze3dPackageUsesVulkanicAPIGetDevice() throws IOException {
+        Path[] migratedFiles = new Path[] {
+            SRC_MAIN_JAVA.resolve("net/blaze3d/platform/Lighting.java"),
+            SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java"),
+            SRC_MAIN_JAVA.resolve("net/blaze3d/platform/TextureUtil.java"),
+            SRC_MAIN_JAVA.resolve("net/blaze3d/TracyFrameCapture.java"),
+            SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/RenderTarget.java"),
+            SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"),
+            SRC_MAIN_JAVA.resolve("net/blaze3d/resource/RenderTargetDescriptor.java"),
+            SRC_MAIN_JAVA.resolve("net/blaze3d/font/TrueTypeGlyphProvider.java")
+        };
+
+        for (Path file : migratedFiles) {
+            String source = Files.readString(file);
+            assertFalse(source.contains("RenderSystem.getDevice("),
+                file + " should not call RenderSystem.getDevice after device-access migration");
+            assertTrue(source.contains("VulkanicAPI.getDevice("),
+                file + " should call VulkanicAPI.getDevice after device-access migration");
+        }
+    }
+
+    @Test
+    public void testVoxelMapPackageUsesVulkanicAPIGetDevice() throws IOException {
+        Path[] migratedFiles = new Path[] {
+            SRC_MAIN_JAVA.resolve("net/voxelmap/util/VoxelMapCachedOrthoProjectionMatrixBuffer.java"),
+            SRC_MAIN_JAVA.resolve("net/voxelmap/util/AllocatedTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/voxelmap/util/GLUtils.java"),
+            SRC_MAIN_JAVA.resolve("net/voxelmap/entityrender/EntityMapImageManager.java"),
+            SRC_MAIN_JAVA.resolve("net/voxelmap/textures/TextureAtlas.java"),
+            SRC_MAIN_JAVA.resolve("net/voxelmap/Map.java")
+        };
+
+        for (Path file : migratedFiles) {
+            String source = Files.readString(file);
+            assertFalse(source.contains("RenderSystem.getDevice("),
+                file + " should not call RenderSystem.getDevice after device-access migration");
+            assertTrue(source.contains("VulkanicAPI.getDevice("),
+                file + " should call VulkanicAPI.getDevice after device-access migration");
+        }
+    }
+
+    @Test
+    public void testMinecraftAndGuiUseVulkanicAPIGetDevice() throws IOException {
+        Path[] migratedFiles = new Path[] {
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/FontTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/glyphs/SpecialGlyphs.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/BitmapProvider.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/UnihexProvider.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/DebugScreenOverlay.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/screens/LoadingOverlay.java")
+        };
+
+        for (Path file : migratedFiles) {
+            String source = Files.readString(file);
+            assertFalse(source.contains("RenderSystem.getDevice("),
+                file + " should not call RenderSystem.getDevice after device-access migration");
+            assertTrue(source.contains("VulkanicAPI.getDevice("),
+                file + " should call VulkanicAPI.getDevice after device-access migration");
+        }
+    }
+
+    @Test
+    public void testRendererClusterUsesVulkanicAPIGetDevice() throws IOException {
+        Path[] migratedFiles = new Path[] {
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/Screenshot.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CloudRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/WorldBorderRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/SkyRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/ChunkSectionsToRender.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/CompiledSectionMesh.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/SpriteContents.java")
+        };
+
+        for (Path file : migratedFiles) {
+            String source = Files.readString(file);
+            assertFalse(source.contains("RenderSystem.getDevice("),
+                file + " should not call RenderSystem.getDevice after renderer-cluster migration");
+            assertTrue(source.contains("VulkanicAPI.getDevice("),
+                file + " should call VulkanicAPI.getDevice after renderer-cluster migration");
+        }
+    }
+
+    @Test
+    public void testScissorStateOwnershipMovedToVulkanicAPI() throws IOException {
+        Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
+        String renderSystemSource = Files.readString(renderSystemFile);
+
+        assertFalse(renderSystemSource.contains("scissorStateForRenderTypeDraws"),
+            "RenderSystem should not own scissorStateForRenderTypeDraws after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void enableScissorForRenderTypeDraws("),
+            "RenderSystem should not expose enableScissorForRenderTypeDraws after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void disableScissorForRenderTypeDraws("),
+            "RenderSystem should not expose disableScissorForRenderTypeDraws after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static ScissorState getScissorStateForRenderTypeDraws("),
+            "RenderSystem should not expose getScissorStateForRenderTypeDraws after migration to VulkanicAPI");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+
+        assertTrue(vulkanicApiSource.contains("private static final ScissorState scissorStateForRenderTypeDraws = new ScissorState();"),
+            "VulkanicAPI should own scissorStateForRenderTypeDraws after migration");
+        assertTrue(vulkanicApiSource.contains("public static void enableScissorForRenderTypeDraws("),
+            "VulkanicAPI should expose enableScissorForRenderTypeDraws after migration");
+        assertTrue(vulkanicApiSource.contains("public static void disableScissorForRenderTypeDraws("),
+            "VulkanicAPI should expose disableScissorForRenderTypeDraws after migration");
+        assertTrue(vulkanicApiSource.contains("public static ScissorState getScissorStateForRenderTypeDraws("),
+            "VulkanicAPI should expose getScissorStateForRenderTypeDraws after migration");
+
+        Path guiRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java");
+        String guiRendererSource = Files.readString(guiRendererFile);
+        assertFalse(guiRendererSource.contains("RenderSystem.enableScissorForRenderTypeDraws("),
+            "GuiRenderer should not enable draw scissor through RenderSystem after migration");
+        assertFalse(guiRendererSource.contains("RenderSystem.disableScissorForRenderTypeDraws("),
+            "GuiRenderer should not disable draw scissor through RenderSystem after migration");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.enableScissorForRenderTypeDraws("),
+            "GuiRenderer should enable draw scissor through VulkanicAPI after migration");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.disableScissorForRenderTypeDraws("),
+            "GuiRenderer should disable draw scissor through VulkanicAPI after migration");
+
+        Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
+        String renderTypeSource = Files.readString(renderTypeFile);
+        assertFalse(renderTypeSource.contains("RenderSystem.getScissorStateForRenderTypeDraws("),
+            "RenderType should not read draw scissor state through RenderSystem after migration");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.getScissorStateForRenderTypeDraws("),
+            "RenderType should read draw scissor state through VulkanicAPI after migration");
+    }
+
+    @Test
+    public void testOutputOverrideOwnershipMovedToVulkanicAPI() throws IOException {
+        Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
+        String renderSystemSource = Files.readString(renderSystemFile);
+
+        assertFalse(renderSystemSource.contains("public static GpuTextureView outputColorTextureOverride"),
+            "RenderSystem should not own outputColorTextureOverride after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static GpuTextureView outputDepthTextureOverride"),
+            "RenderSystem should not own outputDepthTextureOverride after migration to VulkanicAPI");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+
+        assertTrue(vulkanicApiSource.contains("private static GpuTextureView outputColorTextureOverride"),
+            "VulkanicAPI should own outputColorTextureOverride after migration");
+        assertTrue(vulkanicApiSource.contains("private static GpuTextureView outputDepthTextureOverride"),
+            "VulkanicAPI should own outputDepthTextureOverride after migration");
+        assertTrue(vulkanicApiSource.contains("public static void setOutputColorTextureOverride("),
+            "VulkanicAPI should expose output color override setter after migration");
+        assertTrue(vulkanicApiSource.contains("public static GpuTextureView getOutputColorTextureOverride("),
+            "VulkanicAPI should expose output color override getter after migration");
+        assertTrue(vulkanicApiSource.contains("public static void setOutputDepthTextureOverride("),
+            "VulkanicAPI should expose output depth override setter after migration");
+        assertTrue(vulkanicApiSource.contains("public static GpuTextureView getOutputDepthTextureOverride("),
+            "VulkanicAPI should expose output depth override getter after migration");
+
+        Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
+        String renderTypeSource = Files.readString(renderTypeFile);
+        assertFalse(renderTypeSource.contains("RenderSystem.outputColorTextureOverride"),
+            "RenderType should not read outputColorTextureOverride through RenderSystem after migration");
+        assertFalse(renderTypeSource.contains("RenderSystem.outputDepthTextureOverride"),
+            "RenderType should not read outputDepthTextureOverride through RenderSystem after migration");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.getOutputColorTextureOverride()"),
+            "RenderType should read outputColorTextureOverride through VulkanicAPI after migration");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.getOutputDepthTextureOverride()"),
+            "RenderType should read outputDepthTextureOverride through VulkanicAPI after migration");
+
+        Path guiRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java");
+        String guiRendererSource = Files.readString(guiRendererFile);
+        assertFalse(guiRendererSource.contains("RenderSystem.outputColorTextureOverride"),
+            "GuiRenderer should not write outputColorTextureOverride through RenderSystem after migration");
+        assertFalse(guiRendererSource.contains("RenderSystem.outputDepthTextureOverride"),
+            "GuiRenderer should not write outputDepthTextureOverride through RenderSystem after migration");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.setOutputColorTextureOverride("),
+            "GuiRenderer should write outputColorTextureOverride through VulkanicAPI after migration");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.setOutputDepthTextureOverride("),
+            "GuiRenderer should write outputDepthTextureOverride through VulkanicAPI after migration");
+
+        Path levelRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java");
+        String levelRendererSource = Files.readString(levelRendererFile);
+        assertFalse(levelRendererSource.contains("RenderSystem.outputColorTextureOverride"),
+            "LevelRenderer should not write outputColorTextureOverride through RenderSystem after migration");
+        assertFalse(levelRendererSource.contains("RenderSystem.outputDepthTextureOverride"),
+            "LevelRenderer should not write outputDepthTextureOverride through RenderSystem after migration");
+        assertTrue(levelRendererSource.contains("VulkanicAPI.setOutputColorTextureOverride("),
+            "LevelRenderer should write outputColorTextureOverride through VulkanicAPI after migration");
+        assertTrue(levelRendererSource.contains("VulkanicAPI.setOutputDepthTextureOverride("),
+            "LevelRenderer should write outputDepthTextureOverride through VulkanicAPI after migration");
+
+        Path pictureInPictureRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java");
+        String pictureInPictureRendererSource = Files.readString(pictureInPictureRendererFile);
+        assertFalse(pictureInPictureRendererSource.contains("RenderSystem.outputColorTextureOverride"),
+            "PictureInPictureRenderer should not write outputColorTextureOverride through RenderSystem after migration");
+        assertFalse(pictureInPictureRendererSource.contains("RenderSystem.outputDepthTextureOverride"),
+            "PictureInPictureRenderer should not write outputDepthTextureOverride through RenderSystem after migration");
+        assertTrue(pictureInPictureRendererSource.contains("VulkanicAPI.setOutputColorTextureOverride("),
+            "PictureInPictureRenderer should write outputColorTextureOverride through VulkanicAPI after migration");
+        assertTrue(pictureInPictureRendererSource.contains("VulkanicAPI.setOutputDepthTextureOverride("),
+            "PictureInPictureRenderer should write outputDepthTextureOverride through VulkanicAPI after migration");
+    }
+
+    @Test
+    public void testSequentialAndDynamicUniformOwnershipMovedToVulkanicAPI() throws IOException {
+        Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
+        String renderSystemSource = Files.readString(renderSystemFile);
+
+        assertFalse(renderSystemSource.contains("class AutoStorageIndexBuffer"),
+            "RenderSystem should not define AutoStorageIndexBuffer after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("private static DynamicUniforms dynamicUniforms"),
+            "RenderSystem should not own dynamicUniforms after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static VulkanicAPI.AutoStorageIndexBuffer getSequentialBuffer("),
+            "RenderSystem should not expose getSequentialBuffer after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static DynamicUniforms getDynamicUniforms("),
+            "RenderSystem should not expose getDynamicUniforms after migration to VulkanicAPI");
+        assertTrue(renderSystemSource.contains("VulkanicAPI.initializeDynamicUniforms();"),
+            "RenderSystem.initRenderer should initialize dynamic uniforms via VulkanicAPI");
+        assertTrue(renderSystemSource.contains("VulkanicAPI.resetDynamicUniforms();"),
+            "RenderSystem.flipFrame should reset dynamic uniforms via VulkanicAPI");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+
+        assertTrue(vulkanicApiSource.contains("private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequential ="),
+            "VulkanicAPI should own sharedSequential index buffer after migration");
+        assertTrue(vulkanicApiSource.contains("private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequentialQuad ="),
+            "VulkanicAPI should own sharedSequentialQuad index buffer after migration");
+        assertTrue(vulkanicApiSource.contains("private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequentialLines ="),
+            "VulkanicAPI should own sharedSequentialLines index buffer after migration");
+        assertTrue(vulkanicApiSource.contains("public static final class AutoStorageIndexBuffer"),
+            "VulkanicAPI should define AutoStorageIndexBuffer after migration");
+        assertTrue(vulkanicApiSource.contains("private static DynamicUniforms dynamicUniforms;"),
+            "VulkanicAPI should own dynamicUniforms after migration");
+        assertTrue(vulkanicApiSource.contains("public static VulkanicAPI.AutoStorageIndexBuffer getSequentialBuffer("),
+            "VulkanicAPI should expose getSequentialBuffer after migration");
+        assertTrue(vulkanicApiSource.contains("public static DynamicUniforms getDynamicUniforms("),
+            "VulkanicAPI should expose getDynamicUniforms after migration");
+
+        Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
+        String renderTypeSource = Files.readString(renderTypeFile);
+        assertFalse(renderTypeSource.contains("RenderSystem.getSequentialBuffer("),
+            "RenderType should not use RenderSystem.getSequentialBuffer after migration");
+        assertFalse(renderTypeSource.contains("RenderSystem.getDynamicUniforms("),
+            "RenderType should not use RenderSystem.getDynamicUniforms after migration");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.getSequentialBuffer("),
+            "RenderType should use VulkanicAPI.getSequentialBuffer after migration");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.getDynamicUniforms("),
+            "RenderType should use VulkanicAPI.getDynamicUniforms after migration");
+
+        Path skyRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/SkyRenderer.java");
+        String skyRendererSource = Files.readString(skyRendererFile);
+        assertFalse(skyRendererSource.contains("RenderSystem.getSequentialBuffer("),
+            "SkyRenderer should not use RenderSystem.getSequentialBuffer after migration");
+        assertFalse(skyRendererSource.contains("RenderSystem.getDynamicUniforms("),
+            "SkyRenderer should not use RenderSystem.getDynamicUniforms after migration");
+        assertTrue(skyRendererSource.contains("VulkanicAPI.getSequentialBuffer("),
+            "SkyRenderer should use VulkanicAPI.getSequentialBuffer after migration");
+        assertTrue(skyRendererSource.contains("VulkanicAPI.getDynamicUniforms("),
+            "SkyRenderer should use VulkanicAPI.getDynamicUniforms after migration");
     }
 
     // ── Consistency: drawFromBuffers still has all instanced paths ────────────

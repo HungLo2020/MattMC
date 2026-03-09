@@ -52,6 +52,11 @@ public class OpenGLBackend implements GraphicsBackend {
             return 0L;
         }
     }
+
+    @Override
+    public CommandContext getCurrentCommandContext() {
+        return OpenGLCommandContext.IMMEDIATE;
+    }
     
     /**
      * Sets the dynamic viewport state with explicit command context.

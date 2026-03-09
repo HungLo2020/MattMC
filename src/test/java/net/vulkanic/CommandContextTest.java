@@ -52,6 +52,18 @@ public class CommandContextTest {
         assertSame(OpenGLCommandContext.IMMEDIATE, ctx, 
             "getImmediateContext() should return OpenGL immediate context");
     }
+
+    @Test
+    public void testGetCommandContext() {
+        VulkanicAPI.initialize();
+
+        CommandContext ctx = VulkanicAPI.getCommandContext();
+
+        assertNotNull(ctx, "getCommandContext() should return a context");
+        assertTrue(ctx.isImmediate(), "OpenGL backend should provide immediate command context");
+        assertSame(OpenGLCommandContext.IMMEDIATE, ctx,
+            "getCommandContext() should return OpenGL immediate context on OpenGL backend");
+    }
     
     @Test
     public void testSetDynamicViewportWithContext() {

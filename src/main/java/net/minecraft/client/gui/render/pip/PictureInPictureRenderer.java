@@ -46,16 +46,16 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 			this.blitTexture(pictureInPictureRenderState, guiRenderState);
 		} else {
 			this.prepareTexturesAndProjection(bl, j, k);
-			RenderSystem.outputColorTextureOverride = this.textureView;
-			RenderSystem.outputDepthTextureOverride = this.depthTextureView;
+			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(this.textureView);
+			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(this.depthTextureView);
 			PoseStack poseStack = new PoseStack();
 			poseStack.translate(j / 2.0F, this.getTranslateY(k, i), 0.0F);
 			float f = i * pictureInPictureRenderState.scale();
 			poseStack.scale(f, f, -f);
 			this.renderToTexture(pictureInPictureRenderState, poseStack);
 			this.bufferSource.endBatch();
-			RenderSystem.outputColorTextureOverride = null;
-			RenderSystem.outputDepthTextureOverride = null;
+			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(null);
+			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(null);
 			this.blitTexture(pictureInPictureRenderState, guiRenderState);
 		}
 	}
@@ -93,7 +93,7 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 			this.depthTextureView = null;
 		}
 
-		GpuDevice gpuDevice = RenderSystem.getDevice();
+		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		if (this.texture == null) {
 			this.texture = gpuDevice.createTexture(() -> "UI " + this.getTextureLabel() + " texture", 12, TextureFormat.RGBA8, i, j, 1, 1);
 			this.texture.setTextureFilter(FilterMode.NEAREST, false);

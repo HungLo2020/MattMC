@@ -77,7 +77,7 @@ public class DebugScreenOverlay {
 	private final Minecraft minecraft;
 	private final Font font;
 	private final GpuBuffer crosshairBuffer;
-	private final RenderSystem.AutoStorageIndexBuffer crosshairIndicies = RenderSystem.getSequentialBuffer(VertexFormat.Mode.LINES);
+	private final VulkanicAPI.AutoStorageIndexBuffer crosshairIndicies = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.LINES);
 	@Nullable
 	private ChunkPos lastPos;
 	@Nullable
@@ -119,7 +119,7 @@ public class DebugScreenOverlay {
 			bufferBuilder.addVertex(0.0F, 0.0F, 1.0F).setColor(-8421377).setNormal(0.0F, 0.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				this.crosshairBuffer = RenderSystem.getDevice().createBuffer(() -> "Crosshair vertex buffer", 32, meshData.vertexBuffer());
+				this.crosshairBuffer = VulkanicAPI.getDevice().createBuffer(() -> "Crosshair vertex buffer", 32, meshData.vertexBuffer());
 			}
 		}
 	}
@@ -471,13 +471,13 @@ public class DebugScreenOverlay {
 		GpuTextureView gpuTextureView = renderTarget.getColorTextureView();
 		GpuTextureView gpuTextureView2 = renderTarget.getDepthTextureView();
 		GpuBuffer gpuBuffer = this.crosshairIndicies.getBuffer(18);
-		GpuBufferSlice[] gpuBufferSlices = RenderSystem.getDynamicUniforms()
+		GpuBufferSlice[] gpuBufferSlices = VulkanicAPI.getDynamicUniforms()
 			.writeTransforms(
 				new DynamicUniforms.Transform(new Matrix4f(matrix4fStack), new Vector4f(0.0F, 0.0F, 0.0F, 1.0F), new Vector3f(), new Matrix4f(), 4.0F),
 				new DynamicUniforms.Transform(new Matrix4f(matrix4fStack), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 2.0F)
 			);
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
+		try (RenderPass renderPass = VulkanicAPI.getDevice()
 				.createCommandEncoder()
 				.createRenderPass(() -> "3d crosshair", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);

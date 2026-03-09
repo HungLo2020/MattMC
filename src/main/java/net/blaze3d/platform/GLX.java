@@ -61,7 +61,7 @@ public class GLX {
 				LOGGER.error("GLFW error collected during initialization: {}", string);
 			}
 
-			RenderSystem.setErrorCallback(gLFWErrorCallback);
+			net.vulkanic.VulkanicAPI.setErrorCallback(gLFWErrorCallback);
 			return longSupplier;
 		}
 	}
