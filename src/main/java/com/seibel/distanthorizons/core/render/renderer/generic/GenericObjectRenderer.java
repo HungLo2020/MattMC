@@ -21,7 +21,6 @@ import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.render.glObject.buffer.GLElementBuffer;
 import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
@@ -51,7 +50,6 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	private static final ISodiumAccessor SODIUM = ModAccessorInjector.INSTANCE.get(ISodiumAccessor.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	private static final DhApiRenderableBoxGroupShading DEFAULT_SHADING = DhApiRenderableBoxGroupShading.getUnshaded();
 	
@@ -380,17 +378,17 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		if (renderWireframe)
 		{
 			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
-			GLMC.disableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
 		}
 		else
 		{
 			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		
-		GLMC.enableBlend();
+		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
 		VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		IDhApiGenericObjectShaderProgram shaderProgram = useInstancedRendering ? this.instancedShaderProgram : this.directShaderProgram;
 		IDhApiGenericObjectShaderProgram shaderProgramOverride = OverrideInjector.INSTANCE.get(IDhApiGenericObjectShaderProgram.class);
@@ -477,7 +475,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		{
 			// default back to GL_FILL since all other rendering uses it 
 			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		
 		shaderProgram.unbind();

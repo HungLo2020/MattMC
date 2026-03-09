@@ -2,7 +2,6 @@ package net.irisshaders.iris.pipeline.programs;
 
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.opengl.GlTexture;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTextureView;
 import net.sodium.client.gl.device.GLRenderDevice;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat2v;
@@ -22,6 +21,7 @@ import net.irisshaders.iris.gl.program.ProgramSamplers;
 import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.irisshaders.iris.samplers.IrisSamplers;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.irisshaders.iris.uniforms.CommonUniforms;
@@ -154,7 +154,7 @@ public class SodiumShader implements ChunkShaderInterface {
 		DepthColorStorage.unlockDepthColor();
 
 		applyBlendModes();
-		RenderSystem.setShaderTexture(0, pass.getAtlas());
+		TextureTracker.INSTANCE.onSetShaderTexture(0, pass.getAtlas());
 		updateUniforms();
 		images.update();
 

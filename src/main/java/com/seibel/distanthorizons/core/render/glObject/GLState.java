@@ -1,16 +1,13 @@
 package com.seibel.distanthorizons.core.render.glObject;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 // TODO make this Closable or AutoClosable so it can be used with try-resource blocks
 public class GLState
 {
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
-	
-	
+
 	private static final int FBO_MAX = 4;
 	
 	public int program;
@@ -65,19 +62,19 @@ public class GLState
 		this.texture2D = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
 		this.activeTextureNumber = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_ACTIVE_TEXTURE);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
 		this.texture0 = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
 		this.texture1 = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2); // problem with Iris
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2); // problem with Iris
 		this.texture2 = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE3);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE3);
 		this.texture3 = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
 		
-		GLMC.glActiveTexture(this.activeTextureNumber);
+		DhTextureState.setActiveTextureUnit(this.activeTextureNumber);
 		
 		if (this.fbo != 0)
 		{
@@ -149,36 +146,36 @@ public class GLState
 		
 		if (this.blend)
 		{
-			GLMC.enableBlend();
+			VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		else
 		{
-			GLMC.disableBlend();
+			VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
 		}
 		
 		if (this.scissor)
 		{
-			GLMC.enableScissorTest();
+			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		else
 		{
-			GLMC.disableScissorTest();
+			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
 		}
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture0) ? this.texture0 : 0);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture0) ? this.texture0 : 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture1) ? this.texture1 : 0);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture1) ? this.texture1 : 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2);
-		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture2) ? this.texture2 : 0);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2);
+		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture2) ? this.texture2 : 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE3);
-		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture3) ? this.texture3 : 0);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE3);
+		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture3) ? this.texture3 : 0);
 		
-		GLMC.glActiveTexture(this.activeTextureNumber);
-		GLMC.glBindTexture(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture2D) ? this.texture2D : 0);
+		DhTextureState.setActiveTextureUnit(this.activeTextureNumber);
+		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(VulkanicAPI.getImmediateContext(), this.texture2D) ? this.texture2D : 0);
 		
 		// attempting to set textures on the default frame buffer (ID 0) will throw errors
 		if (frameBufferSet)
@@ -195,26 +192,26 @@ public class GLState
 		
 		if (this.writeToDepthBuffer)
 		{
-			GLMC.enableDepthMask();
+			VulkanicAPI.setDepthWriteMask(VulkanicAPI.getImmediateContext(), true);
 		}
 		else
 		{
-			GLMC.disableDepthMask();
+			VulkanicAPI.setDepthWriteMask(VulkanicAPI.getImmediateContext(), false);
 		}
 		
-		GLMC.glBlendFunc(this.blendSrcColor, this.blendDstColor);
+		VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), this.blendSrcColor, this.blendDstColor);
 		VulkanicAPI.setBlendEquationSeparate(VulkanicAPI.getImmediateContext(), this.blendEqRGB, this.blendEqAlpha);
-		GLMC.glBlendFuncSeparate(this.blendSrcColor, this.blendDstColor, this.blendSrcAlpha, this.blendDstAlpha);
+		VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), this.blendSrcColor, this.blendDstColor, this.blendSrcAlpha, this.blendDstAlpha);
 		
 		if (this.depth)
 		{
-			GLMC.enableDepthTest();
+			VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		else
 		{
-			GLMC.disableDepthTest();
+			VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
 		}
-		GLMC.glDepthFunc(this.depthFunc);
+		VulkanicAPI.setDepthFunc(VulkanicAPI.getImmediateContext(), this.depthFunc);
 		
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		if (this.stencil)
@@ -230,11 +227,11 @@ public class GLState
 		VulkanicAPI.setViewport(VulkanicAPI.getImmediateContext(), this.view[0], this.view[1], this.view[2], this.view[3]);
 		if (this.cull)
 		{
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		else
 		{
-			GLMC.disableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
 		}
 		VulkanicAPI.setCullFaceMode(VulkanicAPI.getImmediateContext(), this.cullMode);
 		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, this.polyMode);

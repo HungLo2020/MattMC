@@ -8,7 +8,6 @@ import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 
 import net.vulkanic.CommandContext;
@@ -23,7 +22,6 @@ public class TestRenderer
 	public static final DhLogger LOGGER = new DhLoggerBuilder().build(); 
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	
@@ -91,10 +89,10 @@ public class TestRenderer
 		VulkanicAPI.setDynamicViewport(ctx, 0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
 		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 		
-		GLMC.disableFaceCulling();
-		GLMC.disableDepthTest();
-		GLMC.disableBlend();
-		GLMC.disableScissorTest();
+		VulkanicAPI.setCullFaceEnabled(ctx, false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		
 		this.basicShader.bind();
 		this.va.bind();

@@ -5,13 +5,13 @@ import com.seibel.distanthorizons.api.enums.rendering.EDhApiHeightFogDirection;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiHeightFogMixMode;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
@@ -23,7 +23,6 @@ public class FogShader extends AbstractShaderRenderer
 	public static final FogShader INSTANCE = new FogShader();
 	
 	private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
 	
@@ -237,12 +236,12 @@ public class FogShader extends AbstractShaderRenderer
 	protected void onRender()
 	{
 		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.frameBuffer);
-		GLMC.disableScissorTest();
-		GLMC.disableDepthTest();
-		GLMC.disableBlend();
+		VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDepthMap, 0);
 		
 		// this is necessary for Legacy OpenGL support

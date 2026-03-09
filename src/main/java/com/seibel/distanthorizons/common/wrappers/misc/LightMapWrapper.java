@@ -1,16 +1,14 @@
 package com.seibel.distanthorizons.common.wrappers.misc;
 
 import net.blaze3d.platform.NativeImage;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.VulkanicAPI;
 
 public class LightMapWrapper implements ILightMapWrapper
 {
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
 	private int textureId = 0;
@@ -53,12 +51,12 @@ public class LightMapWrapper implements ILightMapWrapper
 	@Override
 	public void bind()
 	{
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(this.textureId);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(this.textureId);
 	}
 	
 	@Override
-	public void unbind() { GLMC.glBindTexture(0); }
+	public void unbind() { DhTextureState.bindTexture2D(0); }
 	
 }
 

@@ -1,7 +1,5 @@
 package com.seibel.distanthorizons.core.render.glObject.texture;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Vector2i;
 
@@ -9,9 +7,7 @@ import java.nio.ByteBuffer;
 
 public class DhColorTexture
 {
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
-	
-	
+
 	private final EDhInternalTextureFormat internalFormat;
 	private final EDhPixelFormat format;
 	private final EDhPixelType type;
@@ -107,7 +103,7 @@ public class DhColorTexture
 		this.throwIfInvalid();
 		this.isValid = false;
 		
-		GLMC.glDeleteTextures(this.id);
+		VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), this.id);
 	}
 	
 	/** @throws IllegalStateException if the texture isn't valid */

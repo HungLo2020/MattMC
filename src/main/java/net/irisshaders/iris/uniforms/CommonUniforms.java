@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms;
 
-import net.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.compat.dh.DHCompat;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
@@ -72,8 +72,8 @@ public final class CommonUniforms {
 		// the shader will always be setup (and therefore uniforms will be re-uploaded)
 		// after the texture is changed and before rendering starts.
 		uniforms.uniform2i("atlasSize", () -> {
-			if (RenderSystem.getShaderTexture(0) == null) return ZERO_VECTOR_2i;
-			int glId = RenderSystem.getShaderTexture(0).texture().iris$getGlId();
+			int glId = IrisRenderSystem.getTextureBinding(0);
+			if (glId <= 0) return ZERO_VECTOR_2i;
 
 			AbstractTexture texture = TextureTracker.INSTANCE.getTexture(glId);
 			if (texture instanceof TextureAtlas atlas) {
@@ -85,7 +85,7 @@ public final class CommonUniforms {
 		});
 
 		uniforms.uniform2i("gtextureSize", () -> {
-			int glId = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(0);
+			int glId = IrisRenderSystem.getTextureBinding(0);
 
 			TextureInfo info = TextureInfoCache.INSTANCE.getInfo(glId);
 			return new Vector2i(info.getWidth(), info.getHeight());

@@ -1,10 +1,10 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.VanillaFadeRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.vulkanic.VulkanicAPI;
 
@@ -20,7 +20,6 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	public static FadeApplyShader INSTANCE = new FadeApplyShader();
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	
@@ -61,8 +60,8 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(float partialTicks)
 	{
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(this.fadeTexture);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(this.fadeTexture);
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uFadeColorTextureUniform, 0);
 		
 	}
@@ -76,12 +75,12 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender()
 	{
-		GLMC.disableBlend();
+		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
 		// it should be automatically restored after rendering is complete.
-		GLMC.disableDepthTest();
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		
 		// apply the rendered Fade to Minecraft's framebuffer
@@ -90,7 +89,7 @@ public class FadeApplyShader extends AbstractShaderRenderer
 		
 		ScreenQuad.INSTANCE.render();
 		
-		GLMC.enableDepthTest();
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), true);
 		
 	}
 	

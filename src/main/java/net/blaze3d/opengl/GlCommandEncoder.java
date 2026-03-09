@@ -1040,7 +1040,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		if (glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.IrisProgram is && !is.iris$isSetUp()) {
 			GpuTextureView sam = glRenderPass.samplers.get("Sampler0");
 			if (sam != null) {
-				RenderSystem.setShaderTexture(0, sam);
+				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.onSetShaderTexture(0, sam);
 			}
 			is.iris$setupState();
 			iris$programsToClear.add(is);

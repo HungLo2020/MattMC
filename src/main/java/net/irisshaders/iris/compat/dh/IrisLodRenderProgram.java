@@ -1,7 +1,6 @@
 package net.irisshaders.iris.compat.dh;
 
 import com.google.common.primitives.Ints;
-import net.blaze3d.systems.RenderSystem;
 import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
 import net.irisshaders.iris.gl.IrisRenderSystem;
@@ -238,7 +237,8 @@ public class IrisLodRenderProgram {
 		VulkanicAPI.bindShaderProgram(ctx, id);
 
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
-		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, RenderSystem.getShaderTexture(2).texture().iris$getGlId());
+		int lightmapTextureId = IrisRenderSystem.getTextureBinding(2);
+		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, lightmapTextureId);
 		setUniform(modelViewUniform, modelView);
 		setUniform(modelViewInverseUniform, modelView.invert(new Matrix4f()));
 		setUniform(projectionUniform, projection);

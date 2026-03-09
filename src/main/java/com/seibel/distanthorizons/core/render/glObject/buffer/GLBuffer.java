@@ -2,13 +2,11 @@ package com.seibel.distanthorizons.core.render.glObject.buffer;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import net.vulkanic.VulkanicAPI;
 
 import java.lang.ref.PhantomReference;
@@ -25,8 +23,6 @@ public class GLBuffer implements AutoCloseable
 			.fileLevelConfig(Config.Common.Logging.logRendererGLEventToFile)
 			.chatLevelConfig(Config.Common.Logging.logRendererGLEventToChat)
 			.build();
-	
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	public static final double BUFFER_EXPANSION_MULTIPLIER = 1.3;
@@ -59,6 +55,18 @@ public class GLBuffer implements AutoCloseable
 	static { CLEANUP_THREAD.execute(() -> runPhantomReferenceCleanupLoop()); }
 	
 	public GLBuffer(boolean isBufferStorage) { this.create(isBufferStorage); }
+
+	private static int createTrackedBufferId()
+	{
+		net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+		return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
+	}
+
+	private static void deleteTrackedBufferId(int id)
+	{
+		net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
+		VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), id);
+	}
 	
 	
 	
@@ -92,7 +100,7 @@ public class GLBuffer implements AutoCloseable
 			destroyBufferIdAsync(this.id);
 		}
 		
-		this.id = GLMC.glGenBuffers();
+		this.id = createTrackedBufferId();
 		this.bufferStorage = asBufferStorage;
 		bufferCount.getAndIncrement();
 		
@@ -137,7 +145,7 @@ public class GLBuffer implements AutoCloseable
 			// the buffer may not exist if the destroy method is called twice
 			if (VulkanicAPI.isBuffer(VulkanicAPI.getImmediateContext(), id))
 			{
-				GLMC.glDeleteBuffers(id);
+				deleteTrackedBufferId(id);
 				bufferCount.decrementAndGet();
 				
 				if (Config.Client.Advanced.Debugging.logBufferGarbageCollection.get())
@@ -256,8 +264,8 @@ public class GLBuffer implements AutoCloseable
 			this.size = newSize;
 			if (this.bufferStorage)
 			{
-				GLMC.glDeleteBuffers(this.id);
-				this.id = GLMC.glGenBuffers();
+				deleteTrackedBufferId(this.id);
+				this.id = createTrackedBufferId();
 				VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id);
 				VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id);
 				VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), newSize, bufferHint);

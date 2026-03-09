@@ -1,7 +1,6 @@
 package net.irisshaders.iris.compat.dh;
 
 import com.google.common.primitives.Ints;
-import net.blaze3d.systems.RenderSystem;
 import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiGenericObjectShaderProgram;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
 import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
@@ -255,7 +254,8 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		setUniform(dhProjectionInverseUniform, toJOML(renderParam.dhProjectionMatrix).invert());
 		
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
-		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, RenderSystem.getShaderTexture(2).texture().iris$getGlId());
+		int lightmapTextureId = IrisRenderSystem.getTextureBinding(2);
+		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, lightmapTextureId);
 		this.setUniform(this.instancedShaderProjectionModelViewMatrixUniform, toJOML(renderParam.dhProjectionMatrix).mul(toJOML(renderParam.dhModelViewMatrix)));
 
 		samplers.update();

@@ -1,11 +1,10 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.FogRenderer;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -18,8 +17,6 @@ import net.vulkanic.VulkanicAPI;
 public class FogApplyShader extends AbstractShaderRenderer
 {
 	public static FogApplyShader INSTANCE = new FogApplyShader();
-	
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	public int fogTexture;
@@ -58,12 +55,12 @@ public class FogApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(float partialTicks)
 	{
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(this.fogTexture);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(this.fogTexture);
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.colorTextureUniform, 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.depthTextureUniform, 1);
 		
 	}
@@ -77,14 +74,14 @@ public class FogApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender()
 	{
-		GLMC.enableBlend();
+		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
 		VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
 		// it should be automatically restored after rendering is complete.
-		GLMC.disableDepthTest();
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		
 		// apply the rendered Fog to DH's framebuffer

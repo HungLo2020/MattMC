@@ -1,12 +1,12 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.vulkanic.VulkanicAPI;
 
@@ -15,7 +15,6 @@ public class DhFadeShader extends AbstractShaderRenderer
 	public static DhFadeShader INSTANCE = new DhFadeShader();
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	public int frameBuffer = -1;
@@ -122,21 +121,21 @@ public class DhFadeShader extends AbstractShaderRenderer
 		
 		
 		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.frameBuffer);
-		GLMC.disableScissorTest();
-		GLMC.disableDepthTest();
-		GLMC.disableBlend();
+		VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(depthTextureId);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(depthTextureId);
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhDepthTexture, 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(MC_RENDER.getColorTextureId());
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.bindTexture2D(MC_RENDER.getColorTextureId());
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uMcColorTexture, 1);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2);
-		GLMC.glBindTexture(colorTextureId);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2);
+		DhTextureState.bindTexture2D(colorTextureId);
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhColorTexture, 2);
 		
 		

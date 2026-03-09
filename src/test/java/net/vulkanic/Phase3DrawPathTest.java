@@ -32,6 +32,13 @@ public class Phase3DrawPathTest {
     private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
 
+    private static String readSourceIfExists(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return "";
+        }
+        return Files.readString(path);
+    }
+
     // ── Task 1: drawFromBuffers routes directly through VulkanicAPI ───────────
 
     @Test
@@ -276,16 +283,85 @@ public class Phase3DrawPathTest {
             "RenderTarget iris$bindFramebuffer path should bind through VulkanicAPI helper");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = Files.readString(dhWrapperFile);
+        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
         assertFalse(dhWrapperSource.contains("IrisRenderSystem.bindFramebuffer("),
             "MinecraftGLWrapper should not perform duplicate framebuffer binds through IrisRenderSystem helper wrappers");
         assertFalse(dhWrapperSource.contains("glBindFramebuffer("),
             "MinecraftGLWrapper should no longer expose framebuffer bind wrapper after VulkanicAPI callsite migration");
 
         Path dhInterfaceFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/wrapperInterfaces/minecraft/IMinecraftGLWrapper.java");
-        String dhInterfaceSource = Files.readString(dhInterfaceFile);
+        String dhInterfaceSource = readSourceIfExists(dhInterfaceFile);
         assertFalse(dhInterfaceSource.contains("void glBindFramebuffer("),
             "IMinecraftGLWrapper should no longer declare framebuffer bind wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void enableBlend("),
+            "IMinecraftGLWrapper should no longer declare blend enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void disableBlend("),
+            "IMinecraftGLWrapper should no longer declare blend disable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void glBlendFunc("),
+            "IMinecraftGLWrapper should no longer declare blend function wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void glBlendFuncSeparate("),
+            "IMinecraftGLWrapper should no longer declare blend separate wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void enableDepthMask("),
+            "IMinecraftGLWrapper should no longer declare depth-mask enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void disableDepthMask("),
+            "IMinecraftGLWrapper should no longer declare depth-mask disable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("int glGenTextures("),
+            "IMinecraftGLWrapper should no longer declare texture generation wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void glDeleteTextures("),
+            "IMinecraftGLWrapper should no longer declare texture deletion wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("int glGenBuffers("),
+            "IMinecraftGLWrapper should no longer declare buffer generation wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void glDeleteBuffers("),
+            "IMinecraftGLWrapper should no longer declare buffer deletion wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void enableScissorTest("),
+            "IMinecraftGLWrapper should no longer declare scissor enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void disableScissorTest("),
+            "IMinecraftGLWrapper should no longer declare scissor disable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void enableDepthTest("),
+            "IMinecraftGLWrapper should no longer declare depth-test enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void disableDepthTest("),
+            "IMinecraftGLWrapper should no longer declare depth-test disable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void glDepthFunc("),
+            "IMinecraftGLWrapper should no longer declare depth-function wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void enableFaceCulling("),
+            "IMinecraftGLWrapper should no longer declare cull enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhInterfaceSource.contains("void disableFaceCulling("),
+            "IMinecraftGLWrapper should no longer declare cull disable wrapper after VulkanicAPI callsite migration");
+
+        assertFalse(dhWrapperSource.contains("public void enableBlend("),
+            "MinecraftGLWrapper should not implement blend enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void disableBlend("),
+            "MinecraftGLWrapper should not implement blend disable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void glBlendFunc("),
+            "MinecraftGLWrapper should not implement blend function wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void glBlendFuncSeparate("),
+            "MinecraftGLWrapper should not implement blend separate wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void enableDepthMask("),
+            "MinecraftGLWrapper should not implement depth-mask enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void disableDepthMask("),
+            "MinecraftGLWrapper should not implement depth-mask disable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public int glGenTextures("),
+            "MinecraftGLWrapper should not implement texture generation wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void glDeleteTextures("),
+            "MinecraftGLWrapper should not implement texture deletion wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public int glGenBuffers("),
+            "MinecraftGLWrapper should not implement buffer generation wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void glDeleteBuffers("),
+            "MinecraftGLWrapper should not implement buffer deletion wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void enableScissorTest("),
+            "MinecraftGLWrapper should not implement scissor enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void disableScissorTest("),
+            "MinecraftGLWrapper should not implement scissor disable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void enableDepthTest("),
+            "MinecraftGLWrapper should not implement depth-test enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void disableDepthTest("),
+            "MinecraftGLWrapper should not implement depth-test disable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void glDepthFunc("),
+            "MinecraftGLWrapper should not implement depth-function wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void enableFaceCulling("),
+            "MinecraftGLWrapper should not implement cull enable wrapper after VulkanicAPI callsite migration");
+        assertFalse(dhWrapperSource.contains("public void disableFaceCulling("),
+            "MinecraftGLWrapper should not implement cull disable wrapper after VulkanicAPI callsite migration");
 
         Path dhFramebufferFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/texture/DhFramebuffer.java");
         String dhFramebufferSource = Files.readString(dhFramebufferFile);
@@ -310,6 +386,79 @@ public class Phase3DrawPathTest {
         String fadeApplySource = Files.readString(fadeApplyFile);
         assertFalse(fadeApplySource.contains("GLMC.glBindFramebuffer("),
             "FadeApplyShader should not bind read/draw framebuffers through GLMC wrapper");
+
+        Path glStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/GLState.java");
+        String glStateSource = Files.readString(glStateFile);
+        assertFalse(glStateSource.contains("GLMC.enableBlend("),
+            "GLState should not restore blending through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.disableBlend("),
+            "GLState should not restore blending through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.glBlendFunc("),
+            "GLState should not restore blend function through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.glBlendFuncSeparate("),
+            "GLState should not restore blend function separate through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.enableDepthMask("),
+            "GLState should not restore depth mask through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.disableDepthMask("),
+            "GLState should not restore depth mask through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.enableScissorTest("),
+            "GLState should not restore scissor state through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.disableScissorTest("),
+            "GLState should not restore scissor state through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.enableDepthTest("),
+            "GLState should not restore depth test through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.disableDepthTest("),
+            "GLState should not restore depth test through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.glDepthFunc("),
+            "GLState should not restore depth function through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.enableFaceCulling("),
+            "GLState should not restore culling through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("GLMC.disableFaceCulling("),
+            "GLState should not restore culling through GLMC wrapper methods");
+
+        Path fogRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/FogRenderer.java");
+        String fogRendererSource = Files.readString(fogRendererFile);
+        assertFalse(fogRendererSource.contains("GLMC.glGenTextures("),
+            "FogRenderer should not generate textures through GLMC wrapper methods");
+        assertFalse(fogRendererSource.contains("GLMC.glDeleteTextures("),
+            "FogRenderer should not delete textures through GLMC wrapper methods");
+        assertTrue(fogRendererSource.contains("VulkanicAPI.createTexture2D("),
+            "FogRenderer should generate textures through VulkanicAPI helper");
+        assertTrue(fogRendererSource.contains("VulkanicAPI.deleteTexture("),
+            "FogRenderer should delete textures through VulkanicAPI helper");
+
+        Path ssaoRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/SSAORenderer.java");
+        String ssaoRendererSource = Files.readString(ssaoRendererFile);
+        assertFalse(ssaoRendererSource.contains("GLMC.glGenTextures("),
+            "SSAORenderer should not generate textures through GLMC wrapper methods");
+        assertFalse(ssaoRendererSource.contains("GLMC.glDeleteTextures("),
+            "SSAORenderer should not delete textures through GLMC wrapper methods");
+        assertTrue(ssaoRendererSource.contains("VulkanicAPI.createTexture2D("),
+            "SSAORenderer should generate textures through VulkanicAPI helper");
+        assertTrue(ssaoRendererSource.contains("VulkanicAPI.deleteTexture("),
+            "SSAORenderer should delete textures through VulkanicAPI helper");
+
+        Path dhGlBufferFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/buffer/GLBuffer.java");
+        String dhGlBufferSource = Files.readString(dhGlBufferFile);
+        assertFalse(dhGlBufferSource.contains("GLMC.glGenBuffers("),
+            "DH GLBuffer should not generate buffers through GLMC wrapper methods");
+        assertFalse(dhGlBufferSource.contains("GLMC.glDeleteBuffers("),
+            "DH GLBuffer should not delete buffers through GLMC wrapper methods");
+        assertTrue(dhGlBufferSource.contains("VulkanicAPI.createBuffer("),
+            "DH GLBuffer should create buffers through VulkanicAPI helper");
+        assertTrue(dhGlBufferSource.contains("VulkanicAPI.deleteBuffer("),
+            "DH GLBuffer should delete buffers through VulkanicAPI helper");
+
+        Path renderableBoxGroupFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/generic/RenderableBoxGroup.java");
+        String renderableBoxGroupSource = Files.readString(renderableBoxGroupFile);
+        assertFalse(renderableBoxGroupSource.contains("GLMC.glGenBuffers("),
+            "RenderableBoxGroup should not generate instance buffers through GLMC wrapper methods");
+        assertFalse(renderableBoxGroupSource.contains("GLMC.glDeleteBuffers("),
+            "RenderableBoxGroup should not delete instance buffers through GLMC wrapper methods");
+        assertTrue(renderableBoxGroupSource.contains("VulkanicAPI.createBuffer("),
+            "RenderableBoxGroup should create instance buffers through VulkanicAPI helper");
+        assertTrue(renderableBoxGroupSource.contains("VulkanicAPI.deleteBuffer("),
+            "RenderableBoxGroup should delete instance buffers through VulkanicAPI helper");
     }
 
     @Test
@@ -1451,13 +1600,15 @@ public class Phase3DrawPathTest {
             "SodiumShader should disable culling through VulkanicAPI.setCullFaceEnabled");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = Files.readString(dhWrapperFile);
+        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
         assertFalse(dhWrapperSource.contains("GlStateManager._enableCull("),
             "MinecraftGLWrapper should not call removed GlStateManager._enableCull wrapper");
         assertFalse(dhWrapperSource.contains("GlStateManager._disableCull("),
             "MinecraftGLWrapper should not call removed GlStateManager._disableCull wrapper");
-        assertTrue(dhWrapperSource.contains("VulkanicAPI.setCullFaceEnabled("),
-            "MinecraftGLWrapper should toggle culling through VulkanicAPI.setCullFaceEnabled");
+        assertFalse(dhWrapperSource.contains("public void enableFaceCulling("),
+            "MinecraftGLWrapper should no longer expose cull wrapper methods");
+        assertFalse(dhWrapperSource.contains("public void disableFaceCulling("),
+            "MinecraftGLWrapper should no longer expose cull wrapper methods");
     }
 
     @Test
@@ -1521,7 +1672,7 @@ public class Phase3DrawPathTest {
             "IrisGenericRenderProgram should set depth func through VulkanicAPI.setDepthFunc");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = Files.readString(dhWrapperFile);
+        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
         assertFalse(dhWrapperSource.contains("GlStateManager._enableDepthTest("),
             "MinecraftGLWrapper should not call removed GlStateManager._enableDepthTest wrapper");
         assertFalse(dhWrapperSource.contains("GlStateManager._disableDepthTest("),
@@ -1530,10 +1681,16 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should not call removed GlStateManager._depthFunc wrapper");
         assertFalse(dhWrapperSource.contains("GlStateManager._depthMask("),
             "MinecraftGLWrapper should not call removed GlStateManager._depthMask wrapper");
-        assertTrue(dhWrapperSource.contains("VulkanicAPI.setDepthTestEnabled("),
-            "MinecraftGLWrapper should toggle depth testing through VulkanicAPI.setDepthTestEnabled");
-        assertTrue(dhWrapperSource.contains("DepthColorStorage.setDepthMask("),
-            "MinecraftGLWrapper should route depth-write mask changes through DepthColorStorage.setDepthMask");
+        assertFalse(dhWrapperSource.contains("public void enableDepthTest("),
+            "MinecraftGLWrapper should no longer expose depth-test wrapper methods");
+        assertFalse(dhWrapperSource.contains("public void disableDepthTest("),
+            "MinecraftGLWrapper should no longer expose depth-test wrapper methods");
+        assertFalse(dhWrapperSource.contains("public void glDepthFunc("),
+            "MinecraftGLWrapper should no longer expose depth-function wrapper methods");
+        assertFalse(dhWrapperSource.contains("public void enableDepthMask("),
+            "MinecraftGLWrapper should no longer expose depth-write mask wrapper methods");
+        assertFalse(dhWrapperSource.contains("public void disableDepthMask("),
+            "MinecraftGLWrapper should no longer expose depth-write mask wrapper methods");
 
         Path depthColorStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/DepthColorStorage.java");
         String depthColorStorageSource = Files.readString(depthColorStorageFile);
@@ -1657,15 +1814,17 @@ public class Phase3DrawPathTest {
             "CommonUniforms should read blend factors through BlendModeStorage helpers");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = Files.readString(dhWrapperFile);
+        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
         assertFalse(dhWrapperSource.contains("GlStateManager._enableBlend("),
             "MinecraftGLWrapper should not call removed GlStateManager._enableBlend wrapper");
         assertFalse(dhWrapperSource.contains("GlStateManager._disableBlend("),
             "MinecraftGLWrapper should not call removed GlStateManager._disableBlend wrapper");
         assertFalse(dhWrapperSource.contains("GlStateManager._blendFuncSeparate("),
             "MinecraftGLWrapper should not call removed GlStateManager._blendFuncSeparate wrapper");
-        assertTrue(dhWrapperSource.contains("BlendModeStorage.setBlendEnabled("),
-            "MinecraftGLWrapper should route blend toggles through BlendModeStorage.setBlendEnabled");
+        assertFalse(dhWrapperSource.contains("public void enableBlend("),
+            "MinecraftGLWrapper should no longer expose blend wrapper methods");
+        assertFalse(dhWrapperSource.contains("public void disableBlend("),
+            "MinecraftGLWrapper should no longer expose blend wrapper methods");
     }
 
     @Test
@@ -1691,7 +1850,7 @@ public class Phase3DrawPathTest {
 
         for (String relativePath : migratedFiles) {
             Path file = SRC_MAIN_JAVA.resolve(relativePath);
-            String source = Files.readString(file);
+            String source = readSourceIfExists(file);
             assertFalse(source.contains(legacyImport),
                 relativePath + " should not import GlStateManager after Vulkanic migration");
         }
@@ -1757,11 +1916,14 @@ public class Phase3DrawPathTest {
             "SodiumShader should route active texture changes through IrisRenderSystem.setActiveTexture");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = Files.readString(dhWrapperFile);
+        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
         assertFalse(dhWrapperSource.contains("GlStateManager._activeTexture("),
             "MinecraftGLWrapper should not call removed GlStateManager._activeTexture wrapper");
-        assertTrue(dhWrapperSource.contains("IrisRenderSystem.setActiveTexture("),
-            "MinecraftGLWrapper should route active texture changes through IrisRenderSystem.setActiveTexture");
+
+        Path dhTextureStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/DhTextureState.java");
+        String dhTextureStateSource = Files.readString(dhTextureStateFile);
+        assertTrue(dhTextureStateSource.contains("IrisRenderSystem.setActiveTexture("),
+            "DhTextureState should route active texture changes through IrisRenderSystem.setActiveTexture");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
         String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
@@ -1875,6 +2037,48 @@ public class Phase3DrawPathTest {
             "PipelineManager should not compute GL_TEXTURE0 offsets directly in texture unit loops");
         assertTrue(pipelineManagerSource.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
             "PipelineManager should switch texture units through IrisRenderSystem index helper");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+        assertFalse(encoderSource.contains("RenderSystem.setShaderTexture(0, sam)"),
+            "GlCommandEncoder should not bridge Sampler0 through RenderSystem.setShaderTexture in Iris setup path");
+        assertTrue(encoderSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, sam)"),
+            "GlCommandEncoder should notify Iris texture tracking directly for Sampler0 setup");
+
+        Path commonUniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/CommonUniforms.java");
+        String commonUniformsSource = Files.readString(commonUniformsFile);
+        assertFalse(commonUniformsSource.contains("RenderSystem.getShaderTexture(0)"),
+            "CommonUniforms should not read atlasSize texture through RenderSystem.getShaderTexture after Iris texture-state migration");
+        assertTrue(commonUniformsSource.contains("IrisRenderSystem.getTextureBinding(0)"),
+            "CommonUniforms should read atlasSize texture through IrisRenderSystem.getTextureBinding");
+
+        Path extendedShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ExtendedShader.java");
+        String extendedShaderSource = Files.readString(extendedShaderFile);
+        assertFalse(extendedShaderSource.contains("RenderSystem.getShaderTexture(0)"),
+            "ExtendedShader should not read intensity swizzle texture through RenderSystem.getShaderTexture after Iris texture-state migration");
+        assertTrue(extendedShaderSource.contains("IrisRenderSystem.getTextureBinding(0)"),
+            "ExtendedShader should read intensity swizzle texture through IrisRenderSystem.getTextureBinding");
+
+        Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
+        String sodiumShaderSource = Files.readString(sodiumShaderFile);
+        assertFalse(sodiumShaderSource.contains("RenderSystem.setShaderTexture(0, pass.getAtlas())"),
+            "SodiumShader should not bridge atlas binding through RenderSystem.setShaderTexture after Iris texture-state migration");
+        assertTrue(sodiumShaderSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, pass.getAtlas())"),
+            "SodiumShader should notify Iris texture tracking directly for atlas binding");
+
+        Path dhLodProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisLodRenderProgram.java");
+        String dhLodProgramSource = Files.readString(dhLodProgramFile);
+        assertFalse(dhLodProgramSource.contains("RenderSystem.getShaderTexture(2)"),
+            "IrisLodRenderProgram should not read lightmap texture through RenderSystem.getShaderTexture after Iris texture-state migration");
+        assertTrue(dhLodProgramSource.contains("IrisRenderSystem.getTextureBinding(2)"),
+            "IrisLodRenderProgram should read lightmap texture through IrisRenderSystem.getTextureBinding");
+
+        Path dhGenericProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
+        String dhGenericProgramSource = Files.readString(dhGenericProgramFile);
+        assertFalse(dhGenericProgramSource.contains("RenderSystem.getShaderTexture(2)"),
+            "IrisGenericRenderProgram should not read lightmap texture through RenderSystem.getShaderTexture after Iris texture-state migration");
+        assertTrue(dhGenericProgramSource.contains("IrisRenderSystem.getTextureBinding(2)"),
+            "IrisGenericRenderProgram should read lightmap texture through IrisRenderSystem.getTextureBinding");
     }
 
     @Test
@@ -1923,11 +2127,14 @@ public class Phase3DrawPathTest {
             "RenderTargets should bind textures through VulkanicAPI.bindTexture2D");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = Files.readString(dhWrapperFile);
+        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
         assertFalse(dhWrapperSource.contains("GlStateManager._bindTexture("),
             "MinecraftGLWrapper should not call removed GlStateManager._bindTexture wrapper");
-        assertTrue(dhWrapperSource.contains("VulkanicAPI.bindTexture2D("),
-            "MinecraftGLWrapper should bind textures through VulkanicAPI.bindTexture2D");
+
+        Path dhTextureStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/DhTextureState.java");
+        String dhTextureStateSource = Files.readString(dhTextureStateFile);
+        assertTrue(dhTextureStateSource.contains("VulkanicAPI.bindTexture2D("),
+            "DhTextureState should bind textures through VulkanicAPI.bindTexture2D");
     }
 
     @Test
@@ -2006,15 +2213,29 @@ public class Phase3DrawPathTest {
             "GlBuffer should decrement tracked buffers through IrisRenderSystem helper");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = Files.readString(dhWrapperFile);
+        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
         assertFalse(dhWrapperSource.contains("GlStateManager.incrementTrackedBuffers("),
             "MinecraftGLWrapper should not increment tracked buffers through GlStateManager");
         assertFalse(dhWrapperSource.contains("GlStateManager.decrementTrackedBuffers("),
             "MinecraftGLWrapper should not decrement tracked buffers through GlStateManager");
-        assertTrue(dhWrapperSource.contains("IrisRenderSystem.incrementTrackedBuffers("),
-            "MinecraftGLWrapper should increment tracked buffers through IrisRenderSystem helper");
-        assertTrue(dhWrapperSource.contains("IrisRenderSystem.decrementTrackedBuffers("),
-            "MinecraftGLWrapper should decrement tracked buffers through IrisRenderSystem helper");
+        assertFalse(dhWrapperSource.contains("public int glGenBuffers("),
+            "MinecraftGLWrapper should no longer expose buffer generation wrapper methods");
+        assertFalse(dhWrapperSource.contains("public void glDeleteBuffers("),
+            "MinecraftGLWrapper should no longer expose buffer deletion wrapper methods");
+
+        Path dhGlBufferFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/buffer/GLBuffer.java");
+        String dhGlBufferSource = Files.readString(dhGlBufferFile);
+        assertTrue(dhGlBufferSource.contains("IrisRenderSystem.incrementTrackedBuffers("),
+            "DH GLBuffer should increment tracked buffers through IrisRenderSystem helper");
+        assertTrue(dhGlBufferSource.contains("IrisRenderSystem.decrementTrackedBuffers("),
+            "DH GLBuffer should decrement tracked buffers through IrisRenderSystem helper");
+
+        Path renderableBoxGroupFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/generic/RenderableBoxGroup.java");
+        String renderableBoxGroupSource = Files.readString(renderableBoxGroupFile);
+        assertTrue(renderableBoxGroupSource.contains("IrisRenderSystem.incrementTrackedBuffers("),
+            "RenderableBoxGroup should increment tracked buffers through IrisRenderSystem helper");
+        assertTrue(renderableBoxGroupSource.contains("IrisRenderSystem.decrementTrackedBuffers("),
+            "RenderableBoxGroup should decrement tracked buffers through IrisRenderSystem helper");
     }
 
     @Test
@@ -2078,13 +2299,15 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should toggle scissor test through VulkanicAPI.setScissorTestEnabled");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = Files.readString(dhWrapperFile);
+        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
         assertFalse(dhWrapperSource.contains("GlStateManager._enableScissorTest("),
             "MinecraftGLWrapper should not call removed GlStateManager._enableScissorTest wrapper");
         assertFalse(dhWrapperSource.contains("GlStateManager._disableScissorTest("),
             "MinecraftGLWrapper should not call removed GlStateManager._disableScissorTest wrapper");
-        assertTrue(dhWrapperSource.contains("VulkanicAPI.setScissorTestEnabled("),
-            "MinecraftGLWrapper should toggle scissor test through VulkanicAPI.setScissorTestEnabled");
+        assertFalse(dhWrapperSource.contains("public void enableScissorTest("),
+            "MinecraftGLWrapper should no longer expose scissor wrapper methods");
+        assertFalse(dhWrapperSource.contains("public void disableScissorTest("),
+            "MinecraftGLWrapper should no longer expose scissor wrapper methods");
     }
 
     @Test

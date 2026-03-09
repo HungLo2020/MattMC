@@ -1,16 +1,12 @@
 package com.seibel.distanthorizons.core.render.glObject.texture;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
 
 public class DHDepthTexture
 {
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
-	
-	
+
 	private int id;
 	public DHDepthTexture(int width, int height, EDhDepthBufferFormat format)
 	{
@@ -52,7 +48,7 @@ public class DHDepthTexture
 	
 	public void destroy()
 	{
-		GLMC.glDeleteTextures(this.getTextureId());
+		VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), this.getTextureId());
 		this.id = -1;
 	}
 	

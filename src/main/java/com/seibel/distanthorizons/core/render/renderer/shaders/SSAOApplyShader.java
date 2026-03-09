@@ -1,13 +1,12 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.SSAORenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.RenderUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -20,8 +19,6 @@ import net.vulkanic.VulkanicAPI;
 public class SSAOApplyShader extends AbstractShaderRenderer
 {
 	public static SSAOApplyShader INSTANCE = new SSAOApplyShader();
-	
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	public int ssaoTexture;
@@ -67,12 +64,12 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(float partialTicks)
 	{
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(this.ssaoTexture);
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.bindTexture2D(this.ssaoTexture);
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gSSAOMapUniform, 1);
 		
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
@@ -106,14 +103,14 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender()
 	{
-		GLMC.enableBlend();
+		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
 		VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_ZERO, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_ONE);
+		VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ZERO, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_ONE);
 
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
 		// it should be automatically restored after rendering is complete.
-		GLMC.disableDepthTest();
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		// apply the rendered SSAO to the LODs 
 		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), SSAOShader.INSTANCE.frameBuffer);

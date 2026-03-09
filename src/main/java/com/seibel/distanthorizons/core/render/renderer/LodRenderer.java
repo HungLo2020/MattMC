@@ -24,7 +24,6 @@ import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.util.objects.SortedArraySet;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
@@ -54,7 +53,6 @@ public class LodRenderer
 	
 	private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	private static final IIrisAccessor IRIS_ACCESSOR = ModAccessorInjector.INSTANCE.get(IIrisAccessor.class);
 	
 	public static final LodRenderer INSTANCE = new LodRenderer();
@@ -376,18 +374,18 @@ public class LodRenderer
 		
 		// by default draw everything as triangles
 		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-		GLMC.enableFaceCulling();
+		VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
 		
-		GLMC.glBlendFunc(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
-		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
+		VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
 		
 		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, false);
 		
 		// Enable depth test and depth mask
-		GLMC.enableDepthTest();
-		GLMC.glDepthFunc(VulkanicAPI.GL_LESS);
-		GLMC.enableDepthMask();
+		VulkanicAPI.setDepthTestEnabled(ctx, true);
+		VulkanicAPI.setDepthFunc(ctx, VulkanicAPI.GL_LESS);
+		VulkanicAPI.setDepthWriteMask(VulkanicAPI.getImmediateContext(), true);
 		
 		// This is required for MC versions 1.21.5+
 		// due to MC updating the lightmap by changing the viewport size
@@ -580,24 +578,24 @@ public class LodRenderer
 		if (renderWireframe)
 		{
 			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
-			GLMC.disableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
 		}
 		else
 		{
 			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		
 		if (!opaquePass)
 		{
-			GLMC.enableBlend();
-			GLMC.enableDepthTest();
+			VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
+			VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), true);
 			VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-			GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+			VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		}
 		else
 		{
-			GLMC.disableBlend();
+			VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
 		}
 		
 		
@@ -615,7 +613,7 @@ public class LodRenderer
 			// which causes Sodium to render some water chunks with their normal inverted
 			// https://github.com/IrisShaders/Iris/issues/2582
 			// https://github.com/IrisShaders/Iris/blob/1.21.9/common/src/main/java/net/irisshaders/iris/compat/dh/LodRendererEvents.java#L346
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		
 		
@@ -663,7 +661,7 @@ public class LodRenderer
 		{
 			// default back to GL_FILL since all other rendering uses it 
 			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
 		}
 		
 	}

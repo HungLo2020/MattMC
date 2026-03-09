@@ -1,12 +1,11 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.GLState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.VulkanicAPI;
 
@@ -18,7 +17,6 @@ public class DhApplyShader extends AbstractShaderRenderer
 	public static DhApplyShader INSTANCE = new DhApplyShader();
 	
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	// uniforms
@@ -76,24 +74,24 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		GLState state = new GLState();
 		
-		GLMC.disableDepthTest();
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		// blending isn't needed, we're manually merging the MC and DH textures
 		// Note: this prevents the sun/moon and stars from rendering through transparent LODs,
 		// however this also fixes transparent LODs from glowing when rendered against the sky during the day
-		GLMC.disableBlend();
+		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		// old blending logic in case it's ever needed:
-		//GLMC.enableBlend();
-		//GL32.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
-		//GLMC.glBlendFunc(VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		//VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
+		//VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
+		//VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveColorTextureId());
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDhColorTextureUniform, 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 1);
 		
 		// Copy to MC's framebuffer
@@ -131,24 +129,24 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		GLState state = new GLState();
 		
-		GLMC.disableDepthTest();
+		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		// blending isn't needed, we're just directly merging the MC and DH textures
 		// Note: this prevents the sun/moon and stars from rendering through transparent LODs,
 		// however this also fixes
-		GLMC.disableBlend();
+		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
 		
 		// old blending logic in case it's ever needed:
-		//GLMC.enableBlend();
-		//GL32.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
-		//GLMC.glBlendFunc(VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		//VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
+		//VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
+		//VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveColorTextureId());
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDhColorTextureUniform, 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 1);
 		
 		

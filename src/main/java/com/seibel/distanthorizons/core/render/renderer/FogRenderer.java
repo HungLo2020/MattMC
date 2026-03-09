@@ -1,11 +1,11 @@
 package com.seibel.distanthorizons.core.render.renderer;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.GLState;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FogApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FogShader;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.vulkanic.VulkanicAPI;
 
@@ -22,7 +22,6 @@ public class FogRenderer
 	public static FogRenderer INSTANCE = new FogRenderer();
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	private boolean init = false;
@@ -60,16 +59,16 @@ public class FogRenderer
 		
 		if (this.fogTexture != -1)
 		{
-			GLMC.glDeleteTextures(this.fogTexture);
+			VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), this.fogTexture);
 			this.fogTexture = -1;
 		}
 		
 		this.fogFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
 		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.fogFramebuffer);
 		
-		this.fogTexture = GLMC.glGenTextures();
+		this.fogTexture = VulkanicAPI.createTexture2D(VulkanicAPI.getImmediateContext());
 		{
-			GLMC.glBindTexture(this.fogTexture);
+			DhTextureState.bindTexture2D(this.fogTexture);
 			VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
 			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
 			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);

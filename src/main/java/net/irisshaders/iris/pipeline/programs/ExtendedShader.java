@@ -192,9 +192,12 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		}
 
 		if (intensitySwizzle) {
-			IrisRenderSystem.addUnswizzle(RenderSystem.getShaderTexture(0).texture().iris$getGlId());
-			IrisRenderSystem.texParameteriv(RenderSystem.getShaderTexture(0).texture().iris$getGlId(), TextureType.TEXTURE_2D.getGlType(), VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
-				new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED});
+			int shaderTextureId = IrisRenderSystem.getTextureBinding(0);
+			if (shaderTextureId > 0) {
+				IrisRenderSystem.addUnswizzle(shaderTextureId);
+				IrisRenderSystem.texParameteriv(shaderTextureId, TextureType.TEXTURE_2D.getGlType(), VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
+					new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED});
+			}
 		}
 
 		ImmediateState.usingTessellation = usesTessellation;
