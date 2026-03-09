@@ -1,7 +1,15 @@
 package net.vulkanic;
 
+import net.blaze3d.ProjectionType;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
 import net.vulkanic.backends.opengl.OpenGLBackend;
 import net.vulkanic.backends.opengl.OpenGLCommandContext;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fStack;
 
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
@@ -10,8 +18,36 @@ import net.vulkanic.backends.opengl.OpenGLCommandContext;
 public class VulkanicAPI {
     private static GraphicsBackend backend;
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
+    private static ProjectionType projectionType = ProjectionType.PERSPECTIVE;
+    private static ProjectionType savedProjectionType = ProjectionType.PERSPECTIVE;
+    @Nullable
+    private static GpuBufferSlice projectionMatrixBuffer;
+    @Nullable
+    private static GpuBufferSlice savedProjectionMatrixBuffer;
+    private static final Matrix4fStack modelViewStack = new Matrix4fStack(16);
+    private static Matrix4f textureMatrix = new Matrix4f();
+    private static float shaderLineWidth = 1.0F;
     private static int readFramebufferBinding;
     private static int drawFramebufferBinding;
+    private static final java.util.ArrayDeque<GpuAsyncTask> PENDING_FENCED_TASKS = new java.util.ArrayDeque<>();
+    @Nullable
+    private static GpuBufferSlice shaderFog;
+    @Nullable
+    private static GpuBufferSlice shaderLightDirections;
+    @Nullable
+    private static GpuBuffer globalSettingsUniform;
+    @Nullable
+    private static Runnable fogStartListener;
+    @Nullable
+    private static Runnable fogEndListener;
+
+    static {
+        net.irisshaders.iris.gl.state.StateUpdateNotifiers.fogStartNotifier = listener -> fogStartListener = listener;
+        net.irisshaders.iris.gl.state.StateUpdateNotifiers.fogEndNotifier = listener -> fogEndListener = listener;
+    }
+
+    private record GpuAsyncTask(Runnable callback, long syncObject) {
+    }
     
     // Functional interfaces for debug callbacks
     @FunctionalInterface
@@ -1703,6 +1739,161 @@ public class VulkanicAPI {
     
     public static void destroySync(CommandContext ctx, long sync) {
         getBackend().destroySync(ctx, sync);
+    }
+
+    /**
+     * Enqueues a callback to run after all currently submitted GPU work completes.
+     */
+    public static void queueFencedTask(Runnable runnable) {
+        long syncObject = createGpuCompletionFence(getImmediateContext());
+        PENDING_FENCED_TASKS.addLast(new GpuAsyncTask(runnable, syncObject));
+    }
+
+    /**
+     * Executes queued fenced callbacks whose GPU fences have signaled.
+     */
+    public static void executePendingFenceTasks() {
+        CommandContext ctx = getImmediateContext();
+
+        for (GpuAsyncTask task = PENDING_FENCED_TASKS.peekFirst();
+             task != null;
+             task = PENDING_FENCED_TASKS.peekFirst()) {
+            int waitResult = waitForSyncWithFlush(ctx, task.syncObject(), 0L);
+            if (isSyncWaitTimeout(waitResult)) {
+                return;
+            }
+
+            try {
+                if (!isSyncWaitFailed(waitResult)) {
+                    task.callback().run();
+                }
+            } finally {
+                destroySync(ctx, task.syncObject());
+                PENDING_FENCED_TASKS.removeFirst();
+            }
+        }
+    }
+
+    public static void setProjectionMatrix(@Nullable GpuBufferSlice gpuBufferSlice, ProjectionType projectionType) {
+        RenderSystem.assertOnRenderThread();
+        projectionMatrixBuffer = gpuBufferSlice;
+        VulkanicAPI.projectionType = projectionType;
+    }
+
+    public static void backupProjectionMatrix() {
+        RenderSystem.assertOnRenderThread();
+        savedProjectionMatrixBuffer = projectionMatrixBuffer;
+        savedProjectionType = projectionType;
+    }
+
+    public static void restoreProjectionMatrix() {
+        RenderSystem.assertOnRenderThread();
+        projectionMatrixBuffer = savedProjectionMatrixBuffer;
+        projectionType = savedProjectionType;
+    }
+
+    @Nullable
+    public static GpuBufferSlice getProjectionMatrixBuffer() {
+        RenderSystem.assertOnRenderThread();
+        return projectionMatrixBuffer;
+    }
+
+    public static ProjectionType getProjectionType() {
+        RenderSystem.assertOnRenderThread();
+        return projectionType;
+    }
+
+    public static Matrix4f getModelViewMatrix() {
+        RenderSystem.assertOnRenderThread();
+        return modelViewStack;
+    }
+
+    public static Matrix4fStack getModelViewStack() {
+        RenderSystem.assertOnRenderThread();
+        return modelViewStack;
+    }
+
+    public static void setTextureMatrix(Matrix4f matrix4f) {
+        RenderSystem.assertOnRenderThread();
+        textureMatrix = new Matrix4f(matrix4f);
+    }
+
+    public static void resetTextureMatrix() {
+        RenderSystem.assertOnRenderThread();
+        textureMatrix.identity();
+    }
+
+    public static Matrix4f getTextureMatrix() {
+        RenderSystem.assertOnRenderThread();
+        return textureMatrix;
+    }
+
+    public static void lineWidth(float f) {
+        RenderSystem.assertOnRenderThread();
+        shaderLineWidth = f;
+    }
+
+    public static float getShaderLineWidth() {
+        RenderSystem.assertOnRenderThread();
+        return shaderLineWidth;
+    }
+
+    public static void setShaderFog(@Nullable GpuBufferSlice gpuBufferSlice) {
+        if (fogStartListener != null) {
+            fogStartListener.run();
+        }
+        if (fogEndListener != null) {
+            fogEndListener.run();
+        }
+        shaderFog = gpuBufferSlice;
+    }
+
+    @Nullable
+    public static GpuBufferSlice getShaderFog() {
+        return shaderFog;
+    }
+
+    public static void setShaderLights(@Nullable GpuBufferSlice gpuBufferSlice) {
+        shaderLightDirections = gpuBufferSlice;
+    }
+
+    @Nullable
+    public static GpuBufferSlice getShaderLights() {
+        return shaderLightDirections;
+    }
+
+    public static void setGlobalSettingsUniform(@Nullable GpuBuffer gpuBuffer) {
+        globalSettingsUniform = gpuBuffer;
+    }
+
+    @Nullable
+    public static GpuBuffer getGlobalSettingsUniform() {
+        return globalSettingsUniform;
+    }
+
+    /**
+     * Binds shared/default per-frame uniforms expected by standard pipelines.
+     */
+    public static void bindDefaultUniforms(RenderPass renderPass) {
+        GpuBufferSlice projection = getProjectionMatrixBuffer();
+        if (projection != null) {
+            renderPass.setUniform("Projection", projection);
+        }
+
+        GpuBufferSlice fog = getShaderFog();
+        if (fog != null) {
+            renderPass.setUniform("Fog", fog);
+        }
+
+        GpuBuffer globals = getGlobalSettingsUniform();
+        if (globals != null) {
+            renderPass.setUniform("Globals", globals);
+        }
+
+        GpuBufferSlice lighting = getShaderLights();
+        if (lighting != null) {
+            renderPass.setUniform("Lighting", lighting);
+        }
     }
     
     public static void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {

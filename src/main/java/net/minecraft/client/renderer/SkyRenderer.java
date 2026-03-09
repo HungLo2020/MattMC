@@ -28,6 +28,7 @@ import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -289,7 +290,7 @@ public class SkyRenderer implements AutoCloseable {
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SKY);
 		
 		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
-			.writeTransform(RenderSystem.getModelViewMatrix(), new Vector4f(f, g, h, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
+			.writeTransform(VulkanicAPI.getModelViewMatrix(), new Vector4f(f, g, h, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 		GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 
@@ -297,7 +298,7 @@ public class SkyRenderer implements AutoCloseable {
 				.createCommandEncoder()
 				.createRenderPass(() -> "Sky disc", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(RenderPipelines.SKY);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 			renderPass.setVertexBuffer(0, this.topSkyBuffer);
 			renderPass.draw(0, 10);
@@ -337,7 +338,7 @@ public class SkyRenderer implements AutoCloseable {
 		// Iris: Set rendering phase to VOID (from MixinSkyRenderer)
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.VOID);
 		
-		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.translate(0.0F, 12.0F, 0.0F);
 		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
@@ -349,7 +350,7 @@ public class SkyRenderer implements AutoCloseable {
 				.createCommandEncoder()
 				.createRenderPass(() -> "Sky dark", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(RenderPipelines.SKY);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 			renderPass.setVertexBuffer(0, this.bottomSkyBuffer);
 			renderPass.draw(0, 10);
@@ -382,7 +383,7 @@ public class SkyRenderer implements AutoCloseable {
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SUN);
 		
 		if (this.sunTexture != null) {
-			Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 			matrix4fStack.pushMatrix();
 			matrix4fStack.mul(poseStack.last().pose());
 			matrix4fStack.translate(0.0F, 100.0F, 0.0F);
@@ -397,7 +398,7 @@ public class SkyRenderer implements AutoCloseable {
 					.createCommandEncoder()
 					.createRenderPass(() -> "Sky sun", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
-				RenderSystem.bindDefaultUniforms(renderPass);
+				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 				renderPass.bindSampler("Sampler0", this.sunTexture.getTextureView());
 				renderPass.setVertexBuffer(0, this.sunBuffer);
@@ -420,7 +421,7 @@ public class SkyRenderer implements AutoCloseable {
 		if (this.moonTexture != null) {
 			int j = i & 7;
 			int k = j * 4;
-			Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 			matrix4fStack.pushMatrix();
 			matrix4fStack.mul(poseStack.last().pose());
 			matrix4fStack.translate(0.0F, -100.0F, 0.0F);
@@ -435,7 +436,7 @@ public class SkyRenderer implements AutoCloseable {
 					.createCommandEncoder()
 					.createRenderPass(() -> "Sky moon", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
-				RenderSystem.bindDefaultUniforms(renderPass);
+				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 				renderPass.bindSampler("Sampler0", this.moonTexture.getTextureView());
 				renderPass.setVertexBuffer(0, this.moonBuffer);
@@ -451,7 +452,7 @@ public class SkyRenderer implements AutoCloseable {
 		// Iris: Set rendering phase to STARS (from MixinSkyRenderer)
 		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.STARS);
 		
-		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.mul(poseStack.last().pose());
 		RenderPipeline renderPipeline = RenderPipelines.STARS;
@@ -465,7 +466,7 @@ public class SkyRenderer implements AutoCloseable {
 				.createCommandEncoder()
 				.createRenderPass(() -> "Stars", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 			renderPass.setVertexBuffer(0, this.starBuffer);
 			renderPass.setIndexBuffer(gpuBuffer, this.starIndices.type());
@@ -488,7 +489,7 @@ public class SkyRenderer implements AutoCloseable {
 			poseStack.mulPose(Axis.XP.rotationDegrees(90.0F));
 			float l = Mth.sin(f) < 0.0F ? 180.0F : 0.0F;
 			poseStack.mulPose(Axis.ZP.rotationDegrees(l + 90.0F));
-			Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 			matrix4fStack.pushMatrix();
 			matrix4fStack.mul(poseStack.last().pose());
 			matrix4fStack.scale(1.0F, 1.0F, g);
@@ -501,7 +502,7 @@ public class SkyRenderer implements AutoCloseable {
 					.createCommandEncoder()
 					.createRenderPass(() -> "Sunrise sunset", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.SUNRISE_SUNSET);
-				RenderSystem.bindDefaultUniforms(renderPass);
+				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 				renderPass.setVertexBuffer(0, this.sunriseBuffer);
 				renderPass.draw(0, 18);
@@ -519,13 +520,13 @@ public class SkyRenderer implements AutoCloseable {
 			GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
-				.writeTransform(RenderSystem.getModelViewMatrix(), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
+				.writeTransform(VulkanicAPI.getModelViewMatrix(), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 
 			try (RenderPass renderPass = RenderSystem.getDevice()
 					.createCommandEncoder()
 					.createRenderPass(() -> "End sky", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.END_SKY);
-				RenderSystem.bindDefaultUniforms(renderPass);
+				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 				renderPass.bindSampler("Sampler0", this.endSkyTexture.getTextureView());
 				renderPass.setVertexBuffer(0, this.endSkyBuffer);
@@ -539,7 +540,7 @@ public class SkyRenderer implements AutoCloseable {
 		if (this.endFlashTexture != null) {
 			poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - h));
 			poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F - g));
-			Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 			matrix4fStack.pushMatrix();
 			matrix4fStack.mul(poseStack.last().pose());
 			matrix4fStack.translate(0.0F, 100.0F, 0.0F);
@@ -554,7 +555,7 @@ public class SkyRenderer implements AutoCloseable {
 					.createCommandEncoder()
 					.createRenderPass(() -> "End flash", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
-				RenderSystem.bindDefaultUniforms(renderPass);
+				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 				renderPass.bindSampler("Sampler0", this.endFlashTexture.getTextureView());
 				renderPass.setVertexBuffer(0, this.endFlashBuffer);

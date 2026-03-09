@@ -410,8 +410,8 @@ public class ShadowRenderer {
 		PoseStack modelView = createShadowModelView(this.sunPathRotation, this.intervalSize, nearPlane, farPlane);
 		MODELVIEW = new Matrix4f(modelView.last().pose());
 
-		RenderSystem.getModelViewStack().pushMatrix();
-		RenderSystem.getModelViewStack().set(MODELVIEW);
+		VulkanicAPI.getModelViewStack().pushMatrix();
+		VulkanicAPI.getModelViewStack().set(MODELVIEW);
 
 		// Set up our orthographic projection matrix and load it into RenderSystem
 		Matrix4f shadowProjection;
@@ -546,7 +546,7 @@ public class ShadowRenderer {
 
 		MultiBufferSource.BufferSource bufferSource = buffers.bufferSource();
 		EntityRenderDispatcher dispatcher = levelRenderer.entityRenderDispatcher;
-		RenderSystem.getModelViewStack().identity();
+		VulkanicAPI.getModelViewStack().identity();
 
 		renderedShadowEntities = renderEntities(levelRenderer, dispatcher, bufferSource, modelView, tickDelta, entityShadowFrustum, cameraX, cameraY, cameraZ);
 
@@ -566,7 +566,7 @@ public class ShadowRenderer {
 
 		copyPreTranslucentDepth(levelRenderer);
 
-		RenderSystem.getModelViewStack().set(MODELVIEW);
+		VulkanicAPI.getModelViewStack().set(MODELVIEW);
 
 		profiler.popPush("translucent terrain");
 		pipeline.setPhase(WorldRenderingPhase.NONE);
@@ -612,7 +612,7 @@ public class ShadowRenderer {
 		visibleBlockEntities = null;
 		ACTIVE = false;
 
-		RenderSystem.getModelViewStack().popMatrix();
+		VulkanicAPI.getModelViewStack().popMatrix();
 
 		profiler.pop();
 		profiler.popPush("updatechunks");

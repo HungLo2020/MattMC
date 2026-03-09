@@ -21,6 +21,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.CubeMapTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
@@ -40,7 +41,7 @@ public class CubeMap implements AutoCloseable {
 	}
 
 	public void render(Minecraft minecraft, float f, float g) {
-		RenderSystem.setProjectionMatrix(
+		net.vulkanic.VulkanicAPI.setProjectionMatrix(
 			this.projectionMatrixUbo.getBuffer(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), 85.0F), ProjectionType.PERSPECTIVE
 		);
 		RenderPipeline renderPipeline = RenderPipelines.PANORAMA;
@@ -49,7 +50,7 @@ public class CubeMap implements AutoCloseable {
 		GpuTextureView gpuTextureView2 = renderTarget.getDepthTextureView();
 		RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer gpuBuffer = autoStorageIndexBuffer.getBuffer(36);
-		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.rotationX((float) Math.PI);
 		matrix4fStack.rotateX(f * (float) (Math.PI / 180.0));
@@ -62,7 +63,7 @@ public class CubeMap implements AutoCloseable {
 				.createCommandEncoder()
 				.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setVertexBuffer(0, this.vertexBuffer);
 			renderPass.setIndexBuffer(gpuBuffer, autoStorageIndexBuffer.type());
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);

@@ -28,6 +28,7 @@ import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.systems.TimerQuery;
 import net.blaze3d.vertex.Tesselator;
+import net.vulkanic.VulkanicAPI;
 import com.mojang.datafixers.DataFixer;
 import com.mojang.jtracy.DiscontinuousFrame;
 import com.mojang.jtracy.TracyClient;
@@ -1352,7 +1353,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		this.window.setErrorSection("Render");
 		profilerFiller.push("gpuAsync");
-		RenderSystem.executePendingTasks();
+		VulkanicAPI.executePendingFenceTasks();
 		profilerFiller.popPush("sound");
 		this.soundManager.updateSource(this.gameRenderer.getMainCamera());
 		profilerFiller.popPush("toasts");

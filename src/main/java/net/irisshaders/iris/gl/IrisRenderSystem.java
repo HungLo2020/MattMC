@@ -358,13 +358,13 @@ public class IrisRenderSystem {
 	}
 
 	public static void setShadowProjection(Matrix4f shadowProjection) {
-		backupProjection = RenderSystem.getProjectionMatrixBuffer();
-		backupProjectionType = RenderSystem.getProjectionType();
-		RenderSystem.setProjectionMatrix(perspectiveProjectionMatrixBuffer.getBuffer(shadowProjection), ProjectionType.ORTHOGRAPHIC);
+		backupProjection = VulkanicAPI.getProjectionMatrixBuffer();
+		backupProjectionType = VulkanicAPI.getProjectionType();
+		VulkanicAPI.setProjectionMatrix(perspectiveProjectionMatrixBuffer.getBuffer(shadowProjection), ProjectionType.ORTHOGRAPHIC);
 	}
 
 	public static void restorePlayerProjection() {
-		RenderSystem.setProjectionMatrix(backupProjection, backupProjectionType);
+		VulkanicAPI.setProjectionMatrix(backupProjection, backupProjectionType);
 		backupProjection = null;
 		backupProjectionType = null;
 	}

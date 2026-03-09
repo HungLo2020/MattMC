@@ -1,10 +1,8 @@
 package net.blaze3d.systems;
 
-import net.blaze3d.ProjectionType;
 import net.blaze3d.TracyFrameCapture;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
-import net.blaze3d.buffers.GpuFence;
 import net.blaze3d.buffers.Std140SizeCalculator;
 import net.blaze3d.opengl.GlDevice;
 import net.blaze3d.platform.GLX;
@@ -28,12 +26,9 @@ import net.minecraft.client.renderer.DynamicUniforms;
 import net.minecraft.hooks.HookRegistry;
 import net.minecraft.hooks.RenderHooks;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.ArrayListDeque;
 import net.minecraft.util.Mth;
 import net.minecraft.util.TimeSource.NanoTimeSource;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
-import org.joml.Matrix4fStack;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallbackI;
 import org.lwjgl.system.MemoryUtil;
@@ -68,42 +63,16 @@ public class RenderSystem {
 		intConsumer.accept(i + 2);
 		intConsumer.accept(i + 1);
 	});
-	private static ProjectionType projectionType = ProjectionType.PERSPECTIVE;
-	private static ProjectionType savedProjectionType = ProjectionType.PERSPECTIVE;
-	private static final Matrix4fStack modelViewStack = new Matrix4fStack(16);
-	private static Matrix4f textureMatrix = new Matrix4f();
-	public static final int TEXTURE_COUNT = 12;
-	private static final GpuTextureView[] shaderTextures = new GpuTextureView[12];
-	@Nullable
-	private static GpuBufferSlice shaderFog = null;
-	@Nullable
-	private static GpuBufferSlice shaderLightDirections;
-	@Nullable
-	private static GpuBufferSlice projectionMatrixBuffer;
-	@Nullable
-	private static GpuBufferSlice savedProjectionMatrixBuffer;
-	private static float shaderLineWidth = 1.0F;
 	private static String apiDescription = "Unknown";
 	private static final AtomicLong pollEventsWaitStart = new AtomicLong();
 	private static final AtomicBoolean pollingEvents = new AtomicBoolean(false);
-	private static final ArrayListDeque<RenderSystem.GpuAsyncTask> PENDING_FENCES = new ArrayListDeque();
 	@Nullable
 	public static GpuTextureView outputColorTextureOverride;
 	@Nullable
 	public static GpuTextureView outputDepthTextureOverride;
 	@Nullable
-	private static GpuBuffer globalSettingsUniform;
-	@Nullable
 	private static DynamicUniforms dynamicUniforms;
 	private static ScissorState scissorStateForRenderTypeDraws = new ScissorState();
-	// Iris: Fog state listeners
-	private static Runnable fogStartListener;
-	private static Runnable fogEndListener;
-	
-	static {
-		net.irisshaders.iris.gl.state.StateUpdateNotifiers.fogStartNotifier = listener -> fogStartListener = listener;
-		net.irisshaders.iris.gl.state.StateUpdateNotifiers.fogEndNotifier = listener -> fogEndListener = listener;
-	}
 
 	public static void initRenderThread() {
 		if (renderThread != null) {
@@ -203,41 +172,6 @@ public class RenderSystem {
 		lastDrawTime = e;
 	}
 
-	public static void setShaderFog(GpuBufferSlice gpuBufferSlice) {
-		// Iris: Notify fog listeners
-		if (fogStartListener != null) {
-			fogStartListener.run();
-		}
-		if (fogEndListener != null) {
-			fogEndListener.run();
-		}
-		shaderFog = gpuBufferSlice;
-	}
-
-	@Nullable
-	public static GpuBufferSlice getShaderFog() {
-		return shaderFog;
-	}
-
-	public static void setShaderLights(GpuBufferSlice gpuBufferSlice) {
-		shaderLightDirections = gpuBufferSlice;
-	}
-
-	@Nullable
-	public static GpuBufferSlice getShaderLights() {
-		return shaderLightDirections;
-	}
-
-	public static void lineWidth(float f) {
-		assertOnRenderThread();
-		shaderLineWidth = f;
-	}
-
-	public static float getShaderLineWidth() {
-		assertOnRenderThread();
-		return shaderLineWidth;
-	}
-
 	public static void enableScissorForRenderTypeDraws(int i, int j, int k, int l) {
 		scissorStateForRenderTypeDraws.enable(i, j, k, l);
 	}
@@ -298,83 +232,8 @@ public class RenderSystem {
 	}
 
 	public static void setupDefaultState() {
-		modelViewStack.clear();
-		textureMatrix.identity();
-	}
-
-	public static void setupOverlayColor(@Nullable GpuTextureView gpuTextureView) {
-		assertOnRenderThread();
-		setShaderTexture(1, gpuTextureView);
-	}
-
-	public static void teardownOverlayColor() {
-		assertOnRenderThread();
-		setShaderTexture(1, null);
-	}
-
-	public static void setShaderTexture(int i, @Nullable GpuTextureView gpuTextureView) {
-		assertOnRenderThread();
-		if (i >= 0 && i < shaderTextures.length) {
-			shaderTextures[i] = gpuTextureView;
-		}
-		
-		// Iris: Track shader texture changes (from MixinRenderSystem)
-		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.onSetShaderTexture(i, gpuTextureView);
-	}
-
-	@Nullable
-	public static GpuTextureView getShaderTexture(int i) {
-		assertOnRenderThread();
-		return i >= 0 && i < shaderTextures.length ? shaderTextures[i] : null;
-	}
-
-	public static void setProjectionMatrix(GpuBufferSlice gpuBufferSlice, ProjectionType projectionType) {
-		assertOnRenderThread();
-		projectionMatrixBuffer = gpuBufferSlice;
-		RenderSystem.projectionType = projectionType;
-	}
-
-	public static void setTextureMatrix(Matrix4f matrix4f) {
-		assertOnRenderThread();
-		textureMatrix = new Matrix4f(matrix4f);
-	}
-
-	public static void resetTextureMatrix() {
-		assertOnRenderThread();
-		textureMatrix.identity();
-	}
-
-	public static void backupProjectionMatrix() {
-		assertOnRenderThread();
-		savedProjectionMatrixBuffer = projectionMatrixBuffer;
-		savedProjectionType = projectionType;
-	}
-
-	public static void restoreProjectionMatrix() {
-		assertOnRenderThread();
-		projectionMatrixBuffer = savedProjectionMatrixBuffer;
-		projectionType = savedProjectionType;
-	}
-
-	@Nullable
-	public static GpuBufferSlice getProjectionMatrixBuffer() {
-		assertOnRenderThread();
-		return projectionMatrixBuffer;
-	}
-
-	public static Matrix4f getModelViewMatrix() {
-		assertOnRenderThread();
-		return modelViewStack;
-	}
-
-	public static Matrix4fStack getModelViewStack() {
-		assertOnRenderThread();
-		return modelViewStack;
-	}
-
-	public static Matrix4f getTextureMatrix() {
-		assertOnRenderThread();
-		return textureMatrix;
+		net.vulkanic.VulkanicAPI.getModelViewStack().clear();
+		net.vulkanic.VulkanicAPI.resetTextureMatrix();
 	}
 
 	public static RenderSystem.AutoStorageIndexBuffer getSequentialBuffer(VertexFormat.Mode mode) {
@@ -385,43 +244,6 @@ public class RenderSystem {
 			case LINES -> sharedSequentialLines;
 			default -> sharedSequential;
 		};
-	}
-
-	public static void setGlobalSettingsUniform(GpuBuffer gpuBuffer) {
-		globalSettingsUniform = gpuBuffer;
-	}
-
-	@Nullable
-	public static GpuBuffer getGlobalSettingsUniform() {
-		return globalSettingsUniform;
-	}
-
-	public static ProjectionType getProjectionType() {
-		assertOnRenderThread();
-		return projectionType;
-	}
-
-	public static void queueFencedTask(Runnable runnable) {
-		PENDING_FENCES.addLast(new RenderSystem.GpuAsyncTask(runnable, getDevice().createCommandEncoder().createFence()));
-	}
-
-	public static void executePendingTasks() {
-		for (RenderSystem.GpuAsyncTask gpuAsyncTask = (RenderSystem.GpuAsyncTask)PENDING_FENCES.peekFirst();
-			gpuAsyncTask != null;
-			gpuAsyncTask = (RenderSystem.GpuAsyncTask)PENDING_FENCES.peekFirst()
-		) {
-			if (!gpuAsyncTask.fence.awaitCompletion(0L)) {
-				return;
-			}
-
-			try {
-				gpuAsyncTask.callback.run();
-			} finally {
-				gpuAsyncTask.fence.close();
-			}
-
-			PENDING_FENCES.removeFirst();
-		}
 	}
 
 	public static GpuDevice getDevice() {
@@ -442,28 +264,6 @@ public class RenderSystem {
 			throw new IllegalStateException("Can't getDynamicUniforms() before device was initialized");
 		} else {
 			return dynamicUniforms;
-		}
-	}
-
-	public static void bindDefaultUniforms(RenderPass renderPass) {
-		GpuBufferSlice gpuBufferSlice = getProjectionMatrixBuffer();
-		if (gpuBufferSlice != null) {
-			renderPass.setUniform("Projection", gpuBufferSlice);
-		}
-
-		GpuBufferSlice gpuBufferSlice2 = getShaderFog();
-		if (gpuBufferSlice2 != null) {
-			renderPass.setUniform("Fog", gpuBufferSlice2);
-		}
-
-		GpuBuffer gpuBuffer = getGlobalSettingsUniform();
-		if (gpuBuffer != null) {
-			renderPass.setUniform("Globals", gpuBuffer);
-		}
-
-		GpuBufferSlice gpuBufferSlice3 = getShaderLights();
-		if (gpuBufferSlice3 != null) {
-			renderPass.setUniform("Lighting", gpuBufferSlice3);
 		}
 	}
 
@@ -544,7 +344,4 @@ public class RenderSystem {
 		}
 	}
 
-	@Environment(EnvType.CLIENT)
-	record GpuAsyncTask(Runnable callback, GpuFence fence) {
-	}
 }

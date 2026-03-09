@@ -1905,15 +1905,19 @@ public class Phase3DrawPathTest {
         String encoderSource = Files.readString(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._activeTexture("),
             "GlCommandEncoder should not call removed GlStateManager._activeTexture wrapper");
-        assertTrue(encoderSource.contains("IrisRenderSystem.setActiveTexture("),
-            "GlCommandEncoder should route active texture changes through IrisRenderSystem.setActiveTexture");
+        assertFalse(encoderSource.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 +"),
+            "GlCommandEncoder should not compute GL_TEXTURE0 offsets directly when selecting active texture units");
+        assertTrue(encoderSource.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
+            "GlCommandEncoder should route active texture changes through IrisRenderSystem.setActiveTextureUnitIndex");
 
         Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
         String sodiumShaderSource = Files.readString(sodiumShaderFile);
         assertFalse(sodiumShaderSource.contains("GlStateManager._activeTexture("),
             "SodiumShader should not call removed GlStateManager._activeTexture wrapper");
-        assertTrue(sodiumShaderSource.contains("IrisRenderSystem.setActiveTexture("),
-            "SodiumShader should route active texture changes through IrisRenderSystem.setActiveTexture");
+        assertFalse(sodiumShaderSource.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 +"),
+            "SodiumShader should not compute GL_TEXTURE0 offsets directly when selecting active texture units");
+        assertTrue(sodiumShaderSource.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
+            "SodiumShader should route active texture changes through IrisRenderSystem.setActiveTextureUnitIndex");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = readSourceIfExists(dhWrapperFile);
@@ -2079,6 +2083,321 @@ public class Phase3DrawPathTest {
             "IrisGenericRenderProgram should not read lightmap texture through RenderSystem.getShaderTexture after Iris texture-state migration");
         assertTrue(dhGenericProgramSource.contains("IrisRenderSystem.getTextureBinding(2)"),
             "IrisGenericRenderProgram should read lightmap texture through IrisRenderSystem.getTextureBinding");
+
+        Path guiUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gui/GuiUtil.java");
+        String guiUtilSource = Files.readString(guiUtilFile);
+        assertFalse(guiUtilSource.contains("RenderSystem.setShaderTexture(0"),
+            "GuiUtil should not bind widget texture through RenderSystem.setShaderTexture after Iris texture-state migration");
+        assertTrue(guiUtilSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, textureView)"),
+            "GuiUtil should notify Iris texture tracking directly when binding widget texture");
+
+        Path horizonRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java");
+        String horizonRendererSource = Files.readString(horizonRendererFile);
+        assertFalse(horizonRendererSource.contains("RenderSystem.getShaderTexture(i)"),
+            "HorizonRenderer should not read shader samplers through RenderSystem.getShaderTexture after Iris texture-state migration");
+        assertTrue(horizonRendererSource.contains("IrisRenderSystem.getTextureBinding(i)"),
+            "HorizonRenderer should read sampler texture bindings through IrisRenderSystem.getTextureBinding");
+        assertTrue(horizonRendererSource.contains("TextureTracker.INSTANCE.getTexture(textureId)"),
+            "HorizonRenderer should resolve bound textures through TextureTracker before binding samplers");
+
+        Path irisPipelineFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java");
+        String irisPipelineSource = Files.readString(irisPipelineFile);
+        assertFalse(irisPipelineSource.contains("RenderSystem.setShaderTexture(i, null)"),
+            "IrisRenderingPipeline destroy path should not clear shader textures through RenderSystem.setShaderTexture");
+        assertTrue(irisPipelineSource.contains("IrisRenderSystem.setTextureBinding(i, 0)"),
+            "IrisRenderingPipeline destroy path should clear cached texture bindings through IrisRenderSystem.setTextureBinding");
+
+        Path renderStateShardFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderStateShard.java");
+        String renderStateShardSource = Files.readString(renderStateShardFile);
+        assertFalse(renderStateShardSource.contains("RenderSystem.setShaderTexture(i, abstractTexture.getTextureView())"),
+            "RenderStateShard multi-texture setup should not bind shader textures through RenderSystem.setShaderTexture");
+        assertFalse(renderStateShardSource.contains("RenderSystem.setShaderTexture(0, abstractTexture.getTextureView())"),
+            "RenderStateShard single-texture setup should not bind shader texture 0 through RenderSystem.setShaderTexture");
+        assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, i"),
+            "RenderStateShard multi-texture setup should bind texture units through IrisRenderSystem.bindTextureToUnit");
+        assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0"),
+            "RenderStateShard single-texture setup should bind texture unit 0 through IrisRenderSystem.bindTextureToUnit");
+        assertTrue(renderStateShardSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, textureView)"),
+            "RenderStateShard texture unit 0 setup should notify TextureTracker for Iris PBR state updates");
+
+        Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
+        String renderTypeSource = Files.readString(renderTypeFile);
+        assertFalse(renderTypeSource.contains("RenderSystem.getShaderTexture(i)"),
+            "RenderType draw path should not fetch samplers through RenderSystem.getShaderTexture");
+        assertTrue(renderTypeSource.contains("IrisRenderSystem.getTextureBinding(i)"),
+            "RenderType draw path should fetch sampler bindings through IrisRenderSystem.getTextureBinding");
+        assertTrue(renderTypeSource.contains("TextureTracker.INSTANCE.getTexture(textureId)"),
+            "RenderType draw path should resolve texture views through TextureTracker before binding samplers");
+
+        Path lightTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java");
+        String lightTextureSource = Files.readString(lightTextureFile);
+        assertFalse(lightTextureSource.contains("RenderSystem.setShaderTexture(2, null)"),
+            "LightTexture should not disable light layer via RenderSystem.setShaderTexture bridge");
+        assertFalse(lightTextureSource.contains("RenderSystem.setShaderTexture(2, this.textureView)"),
+            "LightTexture should not enable light layer via RenderSystem.setShaderTexture bridge");
+        assertTrue(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, 0)"),
+            "LightTexture should disable light layer via IrisRenderSystem.bindTextureToUnit");
+        assertTrue(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, this.texture.iris$getGlId())"),
+            "LightTexture should enable light layer via IrisRenderSystem.bindTextureToUnit");
+
+        Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
+        String renderSystemSource = Files.readString(renderSystemFile);
+        assertFalse(renderSystemSource.contains("GpuTextureView[] shaderTextures"),
+            "RenderSystem should not maintain a local shaderTextures array after Iris/Vulkanic texture-state migration");
+        assertFalse(renderSystemSource.contains("shaderTextures[i] ="),
+            "RenderSystem.setShaderTexture should not write to a local shader texture cache");
+        assertFalse(renderSystemSource.contains("public static final int TEXTURE_COUNT"),
+            "RenderSystem should not expose TEXTURE_COUNT after shader-texture bridge API removal");
+        assertFalse(renderSystemSource.contains("public static void setShaderTexture("),
+            "RenderSystem should not expose setShaderTexture after migration to Iris/Vulkanic texture binding paths");
+        assertFalse(renderSystemSource.contains("public static GpuTextureView getShaderTexture("),
+            "RenderSystem should not expose getShaderTexture after migration to Iris/Vulkanic texture binding paths");
+        assertFalse(renderSystemSource.contains("public static void setupOverlayColor("),
+            "RenderSystem should not expose setupOverlayColor wrapper after overlay texture binding migration");
+        assertFalse(renderSystemSource.contains("public static void teardownOverlayColor("),
+            "RenderSystem should not expose teardownOverlayColor wrapper after overlay texture binding migration");
+        assertFalse(renderSystemSource.contains("public static void queueFencedTask("),
+            "RenderSystem should not own fenced GPU callback queueing after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void executePendingTasks("),
+            "RenderSystem should not own pending GPU task execution after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void bindDefaultUniforms("),
+            "RenderSystem should not own default uniform binding after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void setShaderFog("),
+            "RenderSystem should not own fog uniform state setter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static GpuBufferSlice getShaderFog("),
+            "RenderSystem should not own fog uniform state getter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void setShaderLights("),
+            "RenderSystem should not own lighting uniform state setter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static GpuBufferSlice getShaderLights("),
+            "RenderSystem should not own lighting uniform state getter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void setGlobalSettingsUniform("),
+            "RenderSystem should not own global uniform state setter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static GpuBuffer getGlobalSettingsUniform("),
+            "RenderSystem should not own global uniform state getter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void setProjectionMatrix("),
+            "RenderSystem should not own projection matrix setter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void backupProjectionMatrix("),
+            "RenderSystem should not own projection matrix backup helper after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void restoreProjectionMatrix("),
+            "RenderSystem should not own projection matrix restore helper after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static GpuBufferSlice getProjectionMatrixBuffer("),
+            "RenderSystem should not own projection matrix getter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static ProjectionType getProjectionType("),
+            "RenderSystem should not own projection type getter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void setTextureMatrix("),
+            "RenderSystem should not own texture matrix setter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void resetTextureMatrix("),
+            "RenderSystem should not own texture matrix reset helper after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static Matrix4f getTextureMatrix("),
+            "RenderSystem should not own texture matrix getter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static void lineWidth("),
+            "RenderSystem should not own line width setter after migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static float getShaderLineWidth("),
+            "RenderSystem should not own shader line width getter after migration to VulkanicAPI");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        assertTrue(vulkanicApiSource.contains("public static void queueFencedTask("),
+            "VulkanicAPI should expose queueFencedTask for backend-owned GPU callback scheduling");
+        assertTrue(vulkanicApiSource.contains("public static void executePendingFenceTasks("),
+            "VulkanicAPI should expose executePendingFenceTasks for backend-owned GPU callback execution");
+        assertTrue(vulkanicApiSource.contains("public static void bindDefaultUniforms("),
+            "VulkanicAPI should expose bindDefaultUniforms after RenderSystem uniform binding migration");
+        assertTrue(vulkanicApiSource.contains("public static void setShaderFog("),
+            "VulkanicAPI should expose setShaderFog after RenderSystem fog uniform migration");
+        assertTrue(vulkanicApiSource.contains("public static GpuBufferSlice getShaderFog("),
+            "VulkanicAPI should expose getShaderFog after RenderSystem fog uniform migration");
+        assertTrue(vulkanicApiSource.contains("public static void setShaderLights("),
+            "VulkanicAPI should expose setShaderLights after RenderSystem lighting uniform migration");
+        assertTrue(vulkanicApiSource.contains("public static GpuBufferSlice getShaderLights("),
+            "VulkanicAPI should expose getShaderLights after RenderSystem lighting uniform migration");
+        assertTrue(vulkanicApiSource.contains("public static void setGlobalSettingsUniform("),
+            "VulkanicAPI should expose setGlobalSettingsUniform after RenderSystem global uniform migration");
+        assertTrue(vulkanicApiSource.contains("public static GpuBuffer getGlobalSettingsUniform("),
+            "VulkanicAPI should expose getGlobalSettingsUniform after RenderSystem global uniform migration");
+        assertTrue(vulkanicApiSource.contains("public static void setProjectionMatrix("),
+            "VulkanicAPI should expose setProjectionMatrix after RenderSystem projection migration");
+        assertTrue(vulkanicApiSource.contains("public static void backupProjectionMatrix("),
+            "VulkanicAPI should expose backupProjectionMatrix after RenderSystem projection migration");
+        assertTrue(vulkanicApiSource.contains("public static void restoreProjectionMatrix("),
+            "VulkanicAPI should expose restoreProjectionMatrix after RenderSystem projection migration");
+        assertTrue(vulkanicApiSource.contains("public static GpuBufferSlice getProjectionMatrixBuffer("),
+            "VulkanicAPI should expose getProjectionMatrixBuffer after RenderSystem projection migration");
+        assertTrue(vulkanicApiSource.contains("public static ProjectionType getProjectionType("),
+            "VulkanicAPI should expose getProjectionType after RenderSystem projection migration");
+        assertTrue(vulkanicApiSource.contains("public static void setTextureMatrix("),
+            "VulkanicAPI should expose setTextureMatrix after RenderSystem texture matrix migration");
+        assertTrue(vulkanicApiSource.contains("public static void resetTextureMatrix("),
+            "VulkanicAPI should expose resetTextureMatrix after RenderSystem texture matrix migration");
+        assertTrue(vulkanicApiSource.contains("public static Matrix4f getTextureMatrix("),
+            "VulkanicAPI should expose getTextureMatrix after RenderSystem texture matrix migration");
+        assertTrue(vulkanicApiSource.contains("public static void lineWidth("),
+            "VulkanicAPI should expose lineWidth after RenderSystem line width migration");
+        assertTrue(vulkanicApiSource.contains("public static float getShaderLineWidth("),
+            "VulkanicAPI should expose getShaderLineWidth after RenderSystem line width migration");
+        assertFalse(vulkanicApiSource.contains("RenderSystem.getProjectionMatrixBuffer()"),
+            "VulkanicAPI default uniform binding should not read projection matrix state through RenderSystem after migration");
+        assertFalse(vulkanicApiSource.contains("RenderSystem.getShaderFog()"),
+            "VulkanicAPI default uniform binding should not read fog state through RenderSystem after migration");
+        assertFalse(vulkanicApiSource.contains("RenderSystem.getShaderLights()"),
+            "VulkanicAPI default uniform binding should not read lighting state through RenderSystem after migration");
+        assertFalse(vulkanicApiSource.contains("RenderSystem.getGlobalSettingsUniform()"),
+            "VulkanicAPI default uniform binding should not read global uniform state through RenderSystem after migration");
+
+        assertFalse(encoderSource.contains("RenderSystem.queueFencedTask("),
+            "GlCommandEncoder should not schedule fenced callbacks through RenderSystem.queueFencedTask");
+        assertTrue(encoderSource.contains("VulkanicAPI.queueFencedTask("),
+            "GlCommandEncoder should schedule fenced callbacks through VulkanicAPI.queueFencedTask");
+
+        Path minecraftFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java");
+        String minecraftSource = Files.readString(minecraftFile);
+        assertFalse(minecraftSource.contains("RenderSystem.executePendingTasks()"),
+            "Minecraft render loop should not execute GPU pending tasks through RenderSystem.executePendingTasks");
+        assertTrue(minecraftSource.contains("VulkanicAPI.executePendingFenceTasks()"),
+            "Minecraft render loop should execute GPU pending tasks through VulkanicAPI.executePendingFenceTasks");
+
+        Path gameRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java");
+        String gameRendererSource = Files.readString(gameRendererFile);
+        assertFalse(gameRendererSource.contains("RenderSystem.setShaderFog("),
+            "GameRenderer should not set fog uniforms through RenderSystem after VulkanicAPI migration");
+        assertTrue(gameRendererSource.contains("VulkanicAPI.setShaderFog("),
+            "GameRenderer should set fog uniforms through VulkanicAPI after migration");
+        assertFalse(gameRendererSource.contains("RenderSystem.setProjectionMatrix("),
+            "GameRenderer should not set projection matrix through RenderSystem after VulkanicAPI migration");
+        assertTrue(gameRendererSource.contains("VulkanicAPI.setProjectionMatrix("),
+            "GameRenderer should set projection matrix through VulkanicAPI after migration");
+        assertFalse(gameRendererSource.contains("RenderSystem.resetTextureMatrix("),
+            "GameRenderer should not reset texture matrix through RenderSystem after VulkanicAPI migration");
+        assertTrue(gameRendererSource.contains("VulkanicAPI.resetTextureMatrix("),
+            "GameRenderer should reset texture matrix through VulkanicAPI after migration");
+
+        Path fogRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/fog/FogRenderer.java");
+        String fogRendererSource = Files.readString(fogRendererFile);
+        assertFalse(fogRendererSource.contains("RenderSystem.setShaderFog("),
+            "FogRenderer should not initialize fog uniforms through RenderSystem after VulkanicAPI migration");
+        assertTrue(fogRendererSource.contains("VulkanicAPI.setShaderFog("),
+            "FogRenderer should initialize fog uniforms through VulkanicAPI after migration");
+
+        Path levelRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java");
+        String levelRendererSource = Files.readString(levelRendererFile);
+        assertFalse(levelRendererSource.contains("RenderSystem.getShaderFog("),
+            "LevelRenderer should not read fog uniforms through RenderSystem after VulkanicAPI migration");
+        assertFalse(levelRendererSource.contains("RenderSystem.setShaderFog("),
+            "LevelRenderer should not set fog uniforms through RenderSystem after VulkanicAPI migration");
+        assertTrue(levelRendererSource.contains("VulkanicAPI.getShaderFog("),
+            "LevelRenderer should read fog uniforms through VulkanicAPI after migration");
+        assertTrue(levelRendererSource.contains("VulkanicAPI.setShaderFog("),
+            "LevelRenderer should set fog uniforms through VulkanicAPI after migration");
+
+        Path particleFeatureRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java");
+        String particleFeatureRendererSource = Files.readString(particleFeatureRendererFile);
+        assertFalse(particleFeatureRendererSource.contains("RenderSystem.getShaderFog()"),
+            "ParticleFeatureRenderer should not read fog uniforms through RenderSystem after VulkanicAPI migration");
+        assertTrue(particleFeatureRendererSource.contains("VulkanicAPI.getShaderFog()"),
+            "ParticleFeatureRenderer should read fog uniforms through VulkanicAPI after migration");
+        assertFalse(particleFeatureRendererSource.contains("RenderSystem.getProjectionMatrixBuffer()"),
+            "ParticleFeatureRenderer should not read projection matrix through RenderSystem after VulkanicAPI migration");
+        assertTrue(particleFeatureRendererSource.contains("VulkanicAPI.getProjectionMatrixBuffer()"),
+            "ParticleFeatureRenderer should read projection matrix through VulkanicAPI after migration");
+
+        Path lightingFile = SRC_MAIN_JAVA.resolve("net/blaze3d/platform/Lighting.java");
+        String lightingSource = Files.readString(lightingFile);
+        assertFalse(lightingSource.contains("RenderSystem.setShaderLights("),
+            "Lighting should not publish lighting uniforms through RenderSystem after VulkanicAPI migration");
+        assertTrue(lightingSource.contains("VulkanicAPI.setShaderLights("),
+            "Lighting should publish lighting uniforms through VulkanicAPI after migration");
+
+        Path globalSettingsUniformFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GlobalSettingsUniform.java");
+        String globalSettingsUniformSource = Files.readString(globalSettingsUniformFile);
+        assertFalse(globalSettingsUniformSource.contains("RenderSystem.setGlobalSettingsUniform("),
+            "GlobalSettingsUniform should not publish globals UBO through RenderSystem after VulkanicAPI migration");
+        assertTrue(globalSettingsUniformSource.contains("VulkanicAPI.setGlobalSettingsUniform("),
+            "GlobalSettingsUniform should publish globals UBO through VulkanicAPI after migration");
+
+        Path postPassFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/PostPass.java");
+        String postPassSource = Files.readString(postPassFile);
+        assertFalse(postPassSource.contains("RenderSystem.backupProjectionMatrix("),
+            "PostPass should not backup projection through RenderSystem after VulkanicAPI migration");
+        assertFalse(postPassSource.contains("RenderSystem.setProjectionMatrix("),
+            "PostPass should not set projection through RenderSystem after VulkanicAPI migration");
+        assertFalse(postPassSource.contains("RenderSystem.restoreProjectionMatrix("),
+            "PostPass should not restore projection through RenderSystem after VulkanicAPI migration");
+        assertTrue(postPassSource.contains("VulkanicAPI.backupProjectionMatrix("),
+            "PostPass should backup projection through VulkanicAPI after migration");
+        assertTrue(postPassSource.contains("VulkanicAPI.setProjectionMatrix("),
+            "PostPass should set projection through VulkanicAPI after migration");
+        assertTrue(postPassSource.contains("VulkanicAPI.restoreProjectionMatrix("),
+            "PostPass should restore projection through VulkanicAPI after migration");
+
+        Path renderStateShardProjectionFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderStateShard.java");
+        String renderStateShardProjectionSource = Files.readString(renderStateShardProjectionFile);
+        assertFalse(renderStateShardProjectionSource.contains("RenderSystem.getProjectionType()"),
+            "RenderStateShard should not read projection type through RenderSystem after VulkanicAPI migration");
+        assertTrue(renderStateShardProjectionSource.contains("VulkanicAPI.getProjectionType()"),
+            "RenderStateShard should read projection type through VulkanicAPI after migration");
+        assertFalse(renderStateShardProjectionSource.contains("RenderSystem.setTextureMatrix("),
+            "RenderStateShard should not set texture matrix through RenderSystem after VulkanicAPI migration");
+        assertFalse(renderStateShardProjectionSource.contains("RenderSystem.resetTextureMatrix("),
+            "RenderStateShard should not reset texture matrix through RenderSystem after VulkanicAPI migration");
+        assertFalse(renderStateShardProjectionSource.contains("RenderSystem.lineWidth("),
+            "RenderStateShard should not set line width through RenderSystem after VulkanicAPI migration");
+        assertTrue(renderStateShardProjectionSource.contains("VulkanicAPI.setTextureMatrix("),
+            "RenderStateShard should set texture matrix through VulkanicAPI after migration");
+        assertTrue(renderStateShardProjectionSource.contains("VulkanicAPI.resetTextureMatrix("),
+            "RenderStateShard should reset texture matrix through VulkanicAPI after migration");
+        assertTrue(renderStateShardProjectionSource.contains("VulkanicAPI.lineWidth("),
+            "RenderStateShard should set line width through VulkanicAPI after migration");
+
+        Path multiBufferSourceFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/MultiBufferSource.java");
+        String multiBufferSourceSource = Files.readString(multiBufferSourceFile);
+        assertFalse(multiBufferSourceSource.contains("RenderSystem.getProjectionType()"),
+            "MultiBufferSource should not read projection type through RenderSystem after VulkanicAPI migration");
+        assertTrue(multiBufferSourceSource.contains("VulkanicAPI.getProjectionType()"),
+            "MultiBufferSource should read projection type through VulkanicAPI after migration");
+
+        assertFalse(renderTypeSource.contains("RenderSystem.bindDefaultUniforms(renderPass)"),
+            "RenderType should not bind default uniforms through RenderSystem after migration");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.bindDefaultUniforms(renderPass)"),
+            "RenderType should bind default uniforms through VulkanicAPI after migration");
+        assertFalse(renderTypeSource.contains("RenderSystem.getTextureMatrix()"),
+            "RenderType should not read texture matrix through RenderSystem after VulkanicAPI migration");
+        assertFalse(renderTypeSource.contains("RenderSystem.getShaderLineWidth()"),
+            "RenderType should not read line width through RenderSystem after VulkanicAPI migration");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.getTextureMatrix()"),
+            "RenderType should read texture matrix through VulkanicAPI after migration");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.getShaderLineWidth()"),
+            "RenderType should read line width through VulkanicAPI after migration");
+
+        Path quadParticleFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java");
+        String quadParticleSource = Files.readString(quadParticleFile);
+        assertFalse(quadParticleSource.contains("RenderSystem.getTextureMatrix()"),
+            "QuadParticleRenderState should not read texture matrix through RenderSystem after VulkanicAPI migration");
+        assertFalse(quadParticleSource.contains("RenderSystem.getShaderLineWidth()"),
+            "QuadParticleRenderState should not read line width through RenderSystem after VulkanicAPI migration");
+        assertTrue(quadParticleSource.contains("VulkanicAPI.getTextureMatrix()"),
+            "QuadParticleRenderState should read texture matrix through VulkanicAPI after migration");
+        assertTrue(quadParticleSource.contains("VulkanicAPI.getShaderLineWidth()"),
+            "QuadParticleRenderState should read line width through VulkanicAPI after migration");
+
+        assertFalse(horizonRendererSource.contains("RenderSystem.getTextureMatrix()"),
+            "HorizonRenderer should not read texture matrix through RenderSystem after VulkanicAPI migration");
+        assertFalse(horizonRendererSource.contains("RenderSystem.getShaderLineWidth()"),
+            "HorizonRenderer should not read line width through RenderSystem after VulkanicAPI migration");
+        assertTrue(horizonRendererSource.contains("VulkanicAPI.getTextureMatrix()"),
+            "HorizonRenderer should read texture matrix through VulkanicAPI after migration");
+        assertTrue(horizonRendererSource.contains("VulkanicAPI.getShaderLineWidth()"),
+            "HorizonRenderer should read line width through VulkanicAPI after migration");
+
+        Path overlayTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/OverlayTexture.java");
+        String overlayTextureSource = Files.readString(overlayTextureFile);
+        assertFalse(overlayTextureSource.contains("RenderSystem.setupOverlayColor("),
+            "OverlayTexture should not route overlay setup through RenderSystem.setupOverlayColor");
+        assertFalse(overlayTextureSource.contains("RenderSystem.teardownOverlayColor("),
+            "OverlayTexture should not route overlay teardown through RenderSystem.teardownOverlayColor");
+        assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, this.texture.getTexture().iris$getGlId())"),
+            "OverlayTexture should bind overlay texture directly through IrisRenderSystem.bindTextureToUnit");
+        assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, 0)"),
+            "OverlayTexture should clear overlay texture binding directly through IrisRenderSystem.bindTextureToUnit");
     }
 
     @Test
@@ -2434,6 +2753,31 @@ public class Phase3DrawPathTest {
 
         assertTrue(source.contains("VulkanicAPI."),
             "CompressibleGLBufferedImage must still call VulkanicAPI (generateTextureMipmapDSA)");
+    }
+
+    @Test
+    public void testModelViewOwnershipMovedToVulkanicAPI() throws IOException {
+        Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
+        String renderSystemSource = Files.readString(renderSystemFile);
+
+        assertFalse(renderSystemSource.contains("private static final Matrix4fStack modelViewStack"),
+            "RenderSystem should not own modelViewStack after model-view migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static Matrix4f getModelViewMatrix("),
+            "RenderSystem should not expose getModelViewMatrix after model-view migration to VulkanicAPI");
+        assertFalse(renderSystemSource.contains("public static Matrix4fStack getModelViewStack("),
+            "RenderSystem should not expose getModelViewStack after model-view migration to VulkanicAPI");
+        assertTrue(renderSystemSource.contains("VulkanicAPI.getModelViewStack().clear()"),
+            "RenderSystem.setupDefaultState should clear the VulkanicAPI model-view stack");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+
+        assertTrue(vulkanicApiSource.contains("private static final Matrix4fStack modelViewStack = new Matrix4fStack(16);"),
+            "VulkanicAPI should own the model-view stack after migration");
+        assertTrue(vulkanicApiSource.contains("public static Matrix4f getModelViewMatrix("),
+            "VulkanicAPI should expose getModelViewMatrix after migration");
+        assertTrue(vulkanicApiSource.contains("public static Matrix4fStack getModelViewStack("),
+            "VulkanicAPI should expose getModelViewStack after migration");
     }
 
     // ── Consistency: drawFromBuffers still has all instanced paths ────────────

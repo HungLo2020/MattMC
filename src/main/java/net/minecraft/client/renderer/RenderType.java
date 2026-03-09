@@ -16,12 +16,16 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.renderer.blockentity.AbstractEndPortalRenderer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
+import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
@@ -936,11 +940,11 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 			this.setupRenderState();
 			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
 				.writeTransform(
-					RenderSystem.getModelViewMatrix(),
+					VulkanicAPI.getModelViewMatrix(),
 					new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
 					new Vector3f(),
-					RenderSystem.getTextureMatrix(),
-					RenderSystem.getShaderLineWidth()
+					VulkanicAPI.getTextureMatrix(),
+					VulkanicAPI.getShaderLineWidth()
 				);
 			MeshData var3 = meshData;
 
@@ -974,14 +978,17 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 						renderPass.enableScissor(scissorState.x(), scissorState.y(), scissorState.width(), scissorState.height());
 					}
 
-					RenderSystem.bindDefaultUniforms(renderPass);
+					VulkanicAPI.bindDefaultUniforms(renderPass);
 					renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 					renderPass.setVertexBuffer(0, gpuBuffer);
 
 					for (int i = 0; i < 12; i++) {
-						GpuTextureView gpuTextureView3 = RenderSystem.getShaderTexture(i);
-						if (gpuTextureView3 != null) {
-							renderPass.bindSampler("Sampler" + i, gpuTextureView3);
+						int textureId = IrisRenderSystem.getTextureBinding(i);
+						if (textureId > 0) {
+							AbstractTexture texture = TextureTracker.INSTANCE.getTexture(textureId);
+							if (texture != null) {
+								renderPass.bindSampler("Sampler" + i, texture.getTextureView());
+							}
 						}
 					}
 

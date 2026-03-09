@@ -70,7 +70,7 @@ public record ChunkSectionsToRender(
 					renderTarget.getDepthTextureView(),
 					OptionalDouble.empty()
 				)) {
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.bindSampler("Sampler2", minecraft.gameRenderer.lightTexture().getTextureView());
 
 			for (ChunkSectionLayer chunkSectionLayer : chunkSectionLayers) {

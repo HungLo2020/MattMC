@@ -59,6 +59,7 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
@@ -287,15 +288,15 @@ public class EntityMapImageManager {
         AbstractTexture texture = minecraft.getTextureManager().getTexture(resourceLocation);
         AbstractTexture texture2 = resourceLocation2 == null ? null : minecraft.getTextureManager().getTexture(resourceLocation2);
 
-        RenderSystem.getModelViewStack().pushMatrix();
-        RenderSystem.getModelViewStack().identity();
+        VulkanicAPI.getModelViewStack().pushMatrix();
+        VulkanicAPI.getModelViewStack().identity();
         GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
                 .writeTransform(
-                        RenderSystem.getModelViewMatrix(),
+                        VulkanicAPI.getModelViewMatrix(),
                         new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
                         new Vector3f(),
-                        RenderSystem.getTextureMatrix(),
-                        RenderSystem.getShaderLineWidth());
+                net.vulkanic.VulkanicAPI.getTextureMatrix(),
+                net.vulkanic.VulkanicAPI.getShaderLineWidth());
 
         try (MeshData meshData = bufferBuilder.build()) {
             // no mesh? might happen with some mods
@@ -317,13 +318,13 @@ public class EntityMapImageManager {
             // float size = 64.0F * scale;
             // int width = fboTexture.getWidth(0);
             // int height = fboTexture.getHeight(0);
-            ProjectionType originalProjectionType = RenderSystem.getProjectionType();
-            GpuBufferSlice originalProjectionMatrix = RenderSystem.getProjectionMatrixBuffer();
-            RenderSystem.setProjectionMatrix(projection.getBuffer(), ProjectionType.ORTHOGRAPHIC);
+            ProjectionType originalProjectionType = net.vulkanic.VulkanicAPI.getProjectionType();
+            GpuBufferSlice originalProjectionMatrix = net.vulkanic.VulkanicAPI.getProjectionMatrixBuffer();
+            net.vulkanic.VulkanicAPI.setProjectionMatrix(projection.getBuffer(), ProjectionType.ORTHOGRAPHIC);
 
             try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "VoxelMap entity image renderer", fboTextureView, OptionalInt.of(0x00000000), fboDepthTextureView, OptionalDouble.of(1.0))) {
                 renderPass.setPipeline(renderPipeline);
-                RenderSystem.bindDefaultUniforms(renderPass);
+                net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
                 renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
                 renderPass.bindSampler("Sampler0", texture.getTextureView());
                 // renderPass.bindSampler("Sampler1", texture.getTexture()); // overlay
@@ -339,8 +340,8 @@ public class EntityMapImageManager {
                     renderPass.drawIndexed(0, 0, meshData.drawState().indexCount(), 1);
                 }
             }
-            RenderSystem.getModelViewStack().popMatrix();
-            RenderSystem.setProjectionMatrix(originalProjectionMatrix, originalProjectionType);
+            VulkanicAPI.getModelViewStack().popMatrix();
+            net.vulkanic.VulkanicAPI.setProjectionMatrix(originalProjectionMatrix, originalProjectionType);
 
         }
         // if (VoxelConstants.DEBUG) {

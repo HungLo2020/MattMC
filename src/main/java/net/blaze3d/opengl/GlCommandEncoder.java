@@ -10,7 +10,6 @@ import net.blaze3d.platform.NativeImage;
 import net.blaze3d.shaders.UniformType;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
@@ -352,7 +351,6 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (bl2) {
 					i |= 34;
 				}
-
 				return this.device.getBufferStorage().mapBuffer(this.device.directStateAccess(), glBuffer, gpuBufferSlice.offset(), gpuBufferSlice.length(), i);
 			}
 		}
@@ -590,7 +588,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				VulkanicAPI.bindPixelPackBuffer(ctx, ((GlBuffer)gpuBuffer).handle);
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_PACK_ROW_LENGTH, m);
 				VulkanicAPI.readPixels(ctx, k, l, m, n, GlConst.toGlExternalId(gpuTexture.getFormat()), GlConst.toGlType(gpuTexture.getFormat()), i);
-				RenderSystem.queueFencedTask(runnable);
+				VulkanicAPI.queueFencedTask(runnable);
 				VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_READ_FRAMEBUFFER, 0, j);
 				VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
 				VulkanicAPI.bindPixelPackBuffer(ctx, 0);
@@ -990,7 +988,7 @@ public class GlCommandEncoder implements CommandEncoder {
 							VulkanicAPI.setUniform1i(ctx, var41, var42);
 					}
 
-						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + var42);
+						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var42);
 						VulkanicAPI.bindTextureBuffer(ctx, var44);
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice3 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
@@ -1008,7 +1006,7 @@ public class GlCommandEncoder implements CommandEncoder {
 							VulkanicAPI.setUniform1i(ctx, glTextureView2, var46);
 					}
 
-						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 + var46);
+						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var46);
 					GlTexture glTexture = glTextureView2x.texture();
 					int o;
 					if ((glTexture.usage() & 16) != 0) {

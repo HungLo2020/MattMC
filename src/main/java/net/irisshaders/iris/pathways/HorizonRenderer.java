@@ -4,15 +4,18 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
-import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.vertex.BufferBuilder;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.MeshData;
 import net.blaze3d.vertex.Tesselator;
 import net.blaze3d.vertex.VertexConsumer;
 import net.blaze3d.vertex.VertexFormat;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -171,16 +174,19 @@ public class HorizonRenderer {
 
 		RenderSystem.AutoStorageIndexBuffer indices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer indexBuffer = indices.getBuffer(indexCount);
-		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms().writeTransform(modelView, fogColor, new Vector3f(), RenderSystem.getTextureMatrix(), RenderSystem.getShaderLineWidth());
+		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms().writeTransform(modelView, fogColor, new Vector3f(), VulkanicAPI.getTextureMatrix(), VulkanicAPI.getShaderLineWidth());
 		try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Sky", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty(),
 			Minecraft.getInstance().getMainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
-			RenderSystem.bindDefaultUniforms(pass);
+			VulkanicAPI.bindDefaultUniforms(pass);
 			pass.setUniform("DynamicTransforms", gpuBufferSlice);
 
 			for(int i = 0; i < 12; ++i) {
-				GpuTextureView gpuTextureView3 = RenderSystem.getShaderTexture(i);
-				if (gpuTextureView3 != null) {
-					pass.bindSampler("Sampler" + i, gpuTextureView3);
+				int textureId = IrisRenderSystem.getTextureBinding(i);
+				if (textureId > 0) {
+					AbstractTexture texture = TextureTracker.INSTANCE.getTexture(textureId);
+					if (texture != null) {
+						pass.bindSampler("Sampler" + i, texture.getTextureView());
+					}
 				}
 			}
 

@@ -87,8 +87,8 @@ public class PostPass implements AutoCloseable {
 			framePass.executes(
 				() -> {
 					RenderTarget renderTarget = resourceHandle.get();
-					RenderSystem.backupProjectionMatrix();
-					RenderSystem.setProjectionMatrix(gpuBufferSlice, ProjectionType.ORTHOGRAPHIC);
+					net.vulkanic.VulkanicAPI.backupProjectionMatrix();
+					net.vulkanic.VulkanicAPI.setProjectionMatrix(gpuBufferSlice, ProjectionType.ORTHOGRAPHIC);
 					CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
 					List<Pair<String, GpuTextureView>> list = this.inputs.stream().map(inputxx -> Pair.of(inputxx.samplerName(), inputxx.texture(map))).toList();
 
@@ -109,7 +109,7 @@ public class PostPass implements AutoCloseable {
 							OptionalDouble.empty()
 						)) {
 						renderPass.setPipeline(this.pipeline);
-						RenderSystem.bindDefaultUniforms(renderPass);
+						net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 						renderPass.setUniform("SamplerInfo", this.infoUbo.currentBuffer());
 
 						for (Entry<String, GpuBuffer> entry : this.customUniforms.entrySet()) {
@@ -124,7 +124,7 @@ public class PostPass implements AutoCloseable {
 					}
 
 					this.infoUbo.rotate();
-					RenderSystem.restoreProjectionMatrix();
+					net.vulkanic.VulkanicAPI.restoreProjectionMatrix();
 
 					for (PostPass.Input inputx : this.inputs) {
 						inputx.cleanup(map);

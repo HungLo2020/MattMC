@@ -103,7 +103,7 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 		}
 
 		gpuDevice.createCommandEncoder().clearColorAndDepthTextures(this.texture, 0, this.depthTexture, 1.0);
-		RenderSystem.setProjectionMatrix(this.projectionMatrixBuffer.getBuffer(i, j), ProjectionType.ORTHOGRAPHIC);
+		net.vulkanic.VulkanicAPI.setProjectionMatrix(this.projectionMatrixBuffer.getBuffer(i, j), ProjectionType.ORTHOGRAPHIC);
 	}
 
 	protected boolean textureIsReadyToBlit(T pictureInPictureRenderState) {

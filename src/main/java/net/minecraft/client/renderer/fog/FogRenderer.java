@@ -33,6 +33,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.material.FogType;
 import net.sodium.client.util.FogParameters;
 import net.sodium.client.util.FogStorage;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
 
@@ -64,7 +65,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			this.emptyBuffer = gpuDevice.createBuffer(() -> "Empty fog", 128, byteBuffer.flip());
 		}
 
-		RenderSystem.setShaderFog(this.getBuffer(FogRenderer.FogMode.NONE));
+		VulkanicAPI.setShaderFog(this.getBuffer(FogRenderer.FogMode.NONE));
 	}
 
 	public void close() {

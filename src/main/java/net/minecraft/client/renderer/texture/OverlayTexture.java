@@ -1,10 +1,11 @@
 package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.RenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
+import net.vulkanic.VulkanicAPI;
 
 @Environment(EnvType.CLIENT)
 public class OverlayTexture implements AutoCloseable {
@@ -38,7 +39,7 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void setupOverlayColor() {
-		RenderSystem.setupOverlayColor(this.texture.getTextureView());
+		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, this.texture.getTexture().iris$getGlId());
 	}
 
 	public static int u(float f) {
@@ -58,6 +59,6 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void teardownOverlayColor() {
-		RenderSystem.teardownOverlayColor();
+		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, 0);
 	}
 }

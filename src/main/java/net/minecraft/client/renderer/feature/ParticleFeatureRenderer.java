@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import net.minecraft.client.renderer.texture.TextureManager;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -95,8 +96,8 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 	}
 
 	private void prepareRenderPass(RenderPass renderPass) {
-		renderPass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
-		renderPass.setUniform("Fog", RenderSystem.getShaderFog());
+		renderPass.setUniform("Projection", VulkanicAPI.getProjectionMatrixBuffer());
+		renderPass.setUniform("Fog", VulkanicAPI.getShaderFog());
 		renderPass.bindSampler("Sampler2", Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 	}
 

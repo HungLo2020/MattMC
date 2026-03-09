@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.DeltaTracker;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
@@ -26,7 +27,7 @@ public class GlobalSettingsUniform implements AutoCloseable {
 			RenderSystem.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
 		}
 
-		RenderSystem.setGlobalSettingsUniform(this.buffer);
+		VulkanicAPI.setGlobalSettingsUniform(this.buffer);
 	}
 
 	public void close() {

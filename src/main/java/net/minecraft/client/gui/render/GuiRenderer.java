@@ -210,7 +210,7 @@ public class GuiRenderer implements AutoCloseable {
 		if (!this.draws.isEmpty()) {
 			Minecraft minecraft = Minecraft.getInstance();
 			Window window = minecraft.getWindow();
-			RenderSystem.setProjectionMatrix(
+			net.vulkanic.VulkanicAPI.setProjectionMatrix(
 				this.guiProjectionMatrixBuffer.getBuffer((float)window.getWidth() / window.getGuiScale(), (float)window.getHeight() / window.getGuiScale()),
 				ProjectionType.ORTHOGRAPHIC
 			);
@@ -263,7 +263,7 @@ public class GuiRenderer implements AutoCloseable {
 					renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
 					OptionalDouble.empty()
 				)) {
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("Fog", gpuBufferSlice);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice2);
 
@@ -327,7 +327,7 @@ public class GuiRenderer implements AutoCloseable {
 
 			RenderSystem.outputColorTextureOverride = this.itemsAtlasView;
 			RenderSystem.outputDepthTextureOverride = this.itemsAtlasDepthView;
-			RenderSystem.setProjectionMatrix(this.itemsProjectionMatrixBuffer.getBuffer(k, k), ProjectionType.ORTHOGRAPHIC);
+			net.vulkanic.VulkanicAPI.setProjectionMatrix(this.itemsProjectionMatrixBuffer.getBuffer(k, k), ProjectionType.ORTHOGRAPHIC);
 			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 			PoseStack poseStack = new PoseStack();
 			MutableBoolean mutableBoolean = new MutableBoolean(false);

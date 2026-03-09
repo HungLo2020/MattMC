@@ -30,6 +30,7 @@ import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.phys.Vec3;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -210,7 +211,7 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 				}
 
 				GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
-					.writeTransform(RenderSystem.getModelViewMatrix(), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
+					.writeTransform(VulkanicAPI.getModelViewMatrix(), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 				RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
 				RenderTarget renderTarget2 = Minecraft.getInstance().levelRenderer.getCloudsTarget();
 				RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
@@ -229,7 +230,7 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 						.createCommandEncoder()
 						.createRenderPass(() -> "Clouds", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 					renderPass.setPipeline(renderPipeline);
-					RenderSystem.bindDefaultUniforms(renderPass);
+					net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 					renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 					renderPass.setIndexBuffer(gpuBuffer, autoStorageIndexBuffer.type());
 					renderPass.setUniform("CloudInfo", this.ubo.currentBuffer());

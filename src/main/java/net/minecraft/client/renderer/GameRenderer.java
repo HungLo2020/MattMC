@@ -58,6 +58,7 @@ import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.state.LevelRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.AtlasManager;
+import net.vulkanic.VulkanicAPI;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -578,7 +579,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			PoseStack poseStack = new PoseStack();
 			poseStack.pushPose();
 			poseStack.mulPose(matrix4f.invert(new Matrix4f()));
-			Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 			matrix4fStack.pushMatrix().mul(matrix4f);
 			this.bobHurt(poseStack, f);
 			if (this.minecraft.options.bobView().get()) {
@@ -672,7 +673,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				this.tryTakeScreenshotIfNeeded();
 				this.minecraft.levelRenderer.doEntityOutline();
 				if (this.postEffectId != null && this.effectActive) {
-					RenderSystem.resetTextureMatrix();
+					VulkanicAPI.resetTextureMatrix();
 					PostChain postChain = this.minecraft.getShaderManager().getPostChain(this.postEffectId, LevelTargetBundle.MAIN_TARGETS);
 					if (postChain != null) {
 						postChain.process(this.minecraft.getMainRenderTarget(), this.resourcePool);
@@ -908,7 +909,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			matrix4f.rotate(-n, vector3f);
 		}
 
-		RenderSystem.setProjectionMatrix(this.levelProjectionMatrixBuffer.getBuffer(matrix4f), ProjectionType.PERSPECTIVE);
+		VulkanicAPI.setProjectionMatrix(this.levelProjectionMatrixBuffer.getBuffer(matrix4f), ProjectionType.PERSPECTIVE);
 		Quaternionf quaternionf = this.mainCamera.rotation().conjugate(new Quaternionf());
 		Matrix4f matrix4f2 = new Matrix4f();
 		
@@ -960,7 +961,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 			);
 		profilerFiller.popPush("hand");
 		boolean bl3 = this.minecraft.getCameraEntity() instanceof LivingEntity && ((LivingEntity)this.minecraft.getCameraEntity()).isSleeping();
-		RenderSystem.setProjectionMatrix(
+		VulkanicAPI.setProjectionMatrix(
 			this.hud3dProjectionMatrixBuffer
 				.getBuffer(this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(), this.getFov(this.mainCamera, f, false)),
 			ProjectionType.PERSPECTIVE
@@ -973,7 +974,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		this.featureRenderDispatcher.renderAllFeatures();
 		bufferSource.endBatch();
 		profilerFiller.pop();
-		RenderSystem.setShaderFog(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
+		VulkanicAPI.setShaderFog(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
 		if (this.minecraft.debugEntries.isCurrentlyEnabled(DebugScreenEntries.THREE_DIMENSIONAL_CROSSHAIR)
 			&& this.minecraft.options.getCameraType().isFirstPerson()
 			&& !this.minecraft.options.hideGui) {

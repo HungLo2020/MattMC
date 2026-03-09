@@ -139,7 +139,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 				.createCommandEncoder()
 				.createRenderPass(() -> "Blit render target", gpuTextureView, OptionalInt.empty())) {
 			renderPass.setPipeline(RenderPipelines.ENTITY_OUTLINE_BLIT);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.bindSampler("InSampler", this.colorTextureView);
 			renderPass.draw(0, 3);
 		}

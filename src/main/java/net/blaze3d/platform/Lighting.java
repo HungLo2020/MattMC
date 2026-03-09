@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.Mth;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryStack;
@@ -65,7 +66,7 @@ public class Lighting implements AutoCloseable {
 	}
 
 	public void setupFor(Lighting.Entry entry) {
-		RenderSystem.setShaderLights(this.buffer.slice(entry.ordinal() * this.paddedSize, UBO_SIZE));
+		VulkanicAPI.setShaderLights(this.buffer.slice(entry.ordinal() * this.paddedSize, UBO_SIZE));
 	}
 
 	public void close() {

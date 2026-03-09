@@ -176,12 +176,12 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getProgramId());
 
 		if (modelViewInverse > -1) {
-			IrisRenderSystem.uniformMatrix4fv(modelViewInverse, false, RenderSystem.getModelViewMatrix().invert(tempMatrix4f).get(tempFloats));
+			IrisRenderSystem.uniformMatrix4fv(modelViewInverse, false, VulkanicAPI.getModelViewMatrix().invert(tempMatrix4f).get(tempFloats));
 		}
 
 
 		if (normalMat > -1) {
-			tempF = RenderSystem.getModelViewMatrix().invert(tempMatrix4f).transpose3x3(normalMatrix).get(tempF);
+			tempF = VulkanicAPI.getModelViewMatrix().invert(tempMatrix4f).transpose3x3(normalMatrix).get(tempF);
 
 			IrisRenderSystem.uniformMatrix3fv(normalMat, false, tempF);
 		}

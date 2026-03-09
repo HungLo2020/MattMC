@@ -59,6 +59,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
@@ -458,7 +459,7 @@ public class DebugScreenOverlay {
 	}
 
 	public void render3dCrosshair(Camera camera) {
-		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.translate(0.0F, 0.0F, -1.0F);
 		matrix4fStack.rotateX(camera.getXRot() * (float) (Math.PI / 180.0));
@@ -480,7 +481,7 @@ public class DebugScreenOverlay {
 				.createCommandEncoder()
 				.createRenderPass(() -> "3d crosshair", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setVertexBuffer(0, this.crosshairBuffer);
 			renderPass.setIndexBuffer(gpuBuffer, this.crosshairIndicies.type());
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlices[0]);

@@ -12,6 +12,7 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import java.util.OptionalInt;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -19,6 +20,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
+import net.vulkanic.VulkanicAPI;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.dimension.DimensionType;
@@ -78,11 +80,11 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOffLightLayer() {
-		RenderSystem.setShaderTexture(2, null);
+		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, 0);
 	}
 
 	public void turnOnLightLayer() {
-		RenderSystem.setShaderTexture(2, this.textureView);
+		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, this.texture.iris$getGlId());
 	}
 
 	private float calculateDarknessScale(LivingEntity livingEntity, float f, float g) {
@@ -170,7 +172,7 @@ public class LightTexture implements AutoCloseable {
 
 				try (RenderPass renderPass = commandEncoder.createRenderPass(() -> "Update light", this.textureView, OptionalInt.empty())) {
 					renderPass.setPipeline(RenderPipelines.LIGHTMAP);
-					RenderSystem.bindDefaultUniforms(renderPass);
+					net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 					renderPass.setUniform("LightmapInfo", this.ubo.currentBuffer());
 					renderPass.draw(0, 3);
 				}

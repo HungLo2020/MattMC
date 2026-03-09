@@ -1189,8 +1189,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
 
 		for (int i = 0; i < 12; i++) {
-			// Clear all shader textures
-			RenderSystem.setShaderTexture(i, null);
+			IrisRenderSystem.setTextureBinding(i, 0);
 		}
 
 		if (shadowCompositeRenderer != null) {

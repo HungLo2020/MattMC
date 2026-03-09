@@ -28,6 +28,7 @@ import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.phys.Vec3;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -150,7 +151,7 @@ public class WorldBorderRenderer {
 			GpuBuffer gpuBuffer = this.indices.getBuffer(6);
 			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
 				.writeTransform(
-					RenderSystem.getModelViewMatrix(),
+					VulkanicAPI.getModelViewMatrix(),
 					new Vector4f(i, j, k, (float)worldBorderRenderState.alpha),
 					new Vector3f((float)(this.lastMinX - f), (float)(-vec3.y), (float)(this.lastMinZ - g)),
 					new Matrix4f().translation(l, l, 0.0F),
@@ -161,7 +162,7 @@ public class WorldBorderRenderer {
 					.createCommandEncoder()
 					.createRenderPass(() -> "World border", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(renderPipeline);
-				RenderSystem.bindDefaultUniforms(renderPass);
+				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 				renderPass.setIndexBuffer(gpuBuffer, this.indices.type());
 				renderPass.bindSampler("Sampler0", abstractTexture.getTextureView());

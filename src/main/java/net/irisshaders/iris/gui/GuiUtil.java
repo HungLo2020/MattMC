@@ -1,7 +1,8 @@
 package net.irisshaders.iris.gui;
 
-import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.GpuTextureView;
 import net.irisshaders.iris.gl.blending.BlendModeStorage;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -38,7 +39,8 @@ public final class GuiUtil {
 	 * used for succeeding draw calls.
 	 */
 	public static void bindIrisWidgetsTexture() {
-		RenderSystem.setShaderTexture(0, Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView());
+		GpuTextureView textureView = Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView();
+		TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 	}
 
 	/**
