@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public class DhFadeShader extends AbstractShaderRenderer
@@ -74,7 +75,7 @@ public class DhFadeShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		this.shader.setUniform(this.uDhInvMvmProj, this.inverseDhMvmProjMatrix);
 		
@@ -105,7 +106,7 @@ public class DhFadeShader extends AbstractShaderRenderer
 	//========//
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
 		int colorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
@@ -120,23 +121,23 @@ public class DhFadeShader extends AbstractShaderRenderer
 		
 		
 		
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.frameBuffer);
-		VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
-		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.bindFramebuffer(ctx, this.frameBuffer);
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
 		DhTextureState.bindTexture2D(depthTextureId);
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhDepthTexture, 0);
+		VulkanicAPI.setUniform1i(ctx, this.uDhDepthTexture, 0);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
 		DhTextureState.bindTexture2D(MC_RENDER.getColorTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uMcColorTexture, 1);
+		VulkanicAPI.setUniform1i(ctx, this.uMcColorTexture, 1);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2);
 		DhTextureState.bindTexture2D(colorTextureId);
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhColorTexture, 2);
+		VulkanicAPI.setUniform1i(ctx, this.uDhColorTexture, 2);
 		
 		
 		ScreenQuad.INSTANCE.render();

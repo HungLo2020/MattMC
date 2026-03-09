@@ -63,10 +63,8 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
-		CommandContext ctx = VulkanicAPI.getCommandContext();
-
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 0);
@@ -104,10 +102,8 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	//========//
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
-		CommandContext ctx = VulkanicAPI.getCommandContext();
-
 		VulkanicAPI.setBlendEnabled(ctx, true);
 		VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
 		VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_ONE);

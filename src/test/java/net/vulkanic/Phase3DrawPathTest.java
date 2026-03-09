@@ -124,9 +124,16 @@ public class Phase3DrawPathTest {
         assertTrue(Files.exists(file), "SSAOApplyShader.java must exist");
 
         String source = Files.readString(file);
+        Path abstractShaderFile = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/shaders/AbstractShaderRenderer.java");
+        String abstractShaderSource = Files.readString(abstractShaderFile);
 
-        assertTrue(source.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
-            "SSAOApplyShader should fetch a backend-neutral CommandContext once per render phase");
+        assertFalse(source.contains("VulkanicAPI.getCommandContext()"),
+            "SSAOApplyShader should inherit the shared CommandContext from AbstractShaderRenderer");
+        assertTrue(source.contains("onApplyUniforms(CommandContext ctx, float partialTicks)"),
+            "SSAOApplyShader should receive command context via shader hook parameter");
+        assertTrue(abstractShaderSource.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
+            "AbstractShaderRenderer should fetch a backend-neutral CommandContext once per render phase");
         assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
             "SSAOApplyShader should not hard-wire immediate OpenGL context retrieval");
     }

@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShad
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import org.jetbrains.annotations.Nullable;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.awt.*;
@@ -30,13 +31,13 @@ public class RenderableBoxGroup
 		private static int createTrackedBufferId()
 		{
 			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
-			return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
+			return VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext());
 		}
 
 		private static void deleteTrackedBufferId(int bufferId)
 		{
 			net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
-			VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), bufferId);
+			VulkanicAPI.deleteBuffer(VulkanicAPI.getCommandContext(), bufferId);
 		}
 		
 		
@@ -317,20 +318,21 @@ public class RenderableBoxGroup
 			
 			
 			// Upload transformation matrices
-			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceChunkPosVbo);
-			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceSubChunkPosVbo);
-			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceScaleVbo);
-			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceChunkPosVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceSubChunkPosVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceScaleVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload colors
-			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceColorVbo);
-			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceColorVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload materials
-			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, this.instanceMaterialVbo);
-			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceMaterialVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
 		}
 		
 		

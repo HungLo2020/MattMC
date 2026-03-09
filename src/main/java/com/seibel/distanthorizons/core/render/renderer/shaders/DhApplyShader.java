@@ -7,6 +7,7 @@ import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -43,7 +44,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 	}
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks) { }
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks) { }
 	
 	
 	//========//
@@ -51,19 +52,19 @@ public class DhApplyShader extends AbstractShaderRenderer
 	//========//
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
 		if (MC_RENDER.mcRendersToFrameBuffer())
 		{
-			this.renderToFrameBuffer();
+			this.renderToFrameBuffer(ctx);
 		}
 		else
 		{
-			this.renderToMcTexture();
+			this.renderToMcTexture(ctx);
 		}
 	}
 	// TODO merge duplicate code between these to render methods
-	private void renderToFrameBuffer()
+	private void renderToFrameBuffer(CommandContext ctx)
 	{
 		int targetFrameBuffer = MC_RENDER.getTargetFramebuffer();
 		if (targetFrameBuffer == -1)
@@ -74,38 +75,38 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		GLState state = new GLState();
 		
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		
 		// blending isn't needed, we're manually merging the MC and DH textures
 		// Note: this prevents the sun/moon and stars from rendering through transparent LODs,
 		// however this also fixes transparent LODs from glowing when rendered against the sky during the day
-		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		// old blending logic in case it's ever needed:
-		//VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
-		//VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-		//VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		//VulkanicAPI.setBlendEnabled(ctx, true);
+		//VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
+		//VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDhColorTextureUniform, 0);
+		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 1);
+		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 1);
 		
 		// Copy to MC's framebuffer
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), targetFrameBuffer);
+		VulkanicAPI.bindFramebuffer(ctx, targetFrameBuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore();
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), targetFrameBuffer);
+		VulkanicAPI.bindFramebuffer(ctx, targetFrameBuffer);
 		
 	}
-	private void renderToMcTexture()
+	private void renderToMcTexture(CommandContext ctx)
 	{
 		int targetColorTextureId = MC_RENDER.getColorTextureId();
 		if (targetColorTextureId == -1)
@@ -129,39 +130,39 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		GLState state = new GLState();
 		
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		
 		// blending isn't needed, we're just directly merging the MC and DH textures
 		// Note: this prevents the sun/moon and stars from rendering through transparent LODs,
 		// however this also fixes
-		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		// old blending logic in case it's ever needed:
-		//VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
-		//VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-		//VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		//VulkanicAPI.setBlendEnabled(ctx, true);
+		//VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
+		//VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDhColorTextureUniform, 0);
+		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 1);
+		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 1);
 		
 		
 		
-		VulkanicAPI.framebufferTexture(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, targetColorTextureId, 0);
+		VulkanicAPI.framebufferTexture(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, targetColorTextureId, 0);
 		
 		// Copy to MC's texture via MC's framebuffer
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), dhFrameBufferId);
+		VulkanicAPI.bindFramebuffer(ctx, dhFrameBufferId);
 		
 		ScreenQuad.INSTANCE.render();
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore();
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), mcFrameBufferId);
+		VulkanicAPI.bindFramebuffer(ctx, mcFrameBufferId);
 		
 	}
 	

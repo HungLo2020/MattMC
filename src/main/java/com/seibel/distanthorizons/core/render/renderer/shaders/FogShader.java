@@ -132,7 +132,7 @@ public class FogShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		int lodDrawDistance = Config.Client.Advanced.Graphics.Quality.lodChunkRenderDistanceRadius.get() * LodUtil.CHUNK_WIDTH;
 		
@@ -233,16 +233,16 @@ public class FogShader extends AbstractShaderRenderer
 	//========//
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.frameBuffer);
-		VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
-		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.bindFramebuffer(ctx, this.frameBuffer);
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDepthMap, 0);
+		VulkanicAPI.setUniform1i(ctx, this.uDepthMap, 0);
 		
 		// this is necessary for Legacy OpenGL support
 		// otherwise the framebuffer isn't cleared correctly and the fog smears across the screen
@@ -250,10 +250,9 @@ public class FogShader extends AbstractShaderRenderer
 		{
 			// in another part of the DH code we set the fog color to opaque, here it needs to be transparent
 			float[] clearColorValues = new float[4];
-			VulkanicAPI.getFloatv(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
-			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), clearColorValues[0], clearColorValues[1], clearColorValues[2], 0.0f);
-			
-			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			VulkanicAPI.getFloatv(ctx, VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
+			VulkanicAPI.setClearColor(ctx, clearColorValues[0], clearColorValues[1], clearColorValues[2], 0.0f);
+
 			VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 		}
 		

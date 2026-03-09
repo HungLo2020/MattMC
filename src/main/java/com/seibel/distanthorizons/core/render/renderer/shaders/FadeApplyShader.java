@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.VanillaFadeRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -58,11 +59,11 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
 		DhTextureState.bindTexture2D(this.fadeTexture);
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uFadeColorTextureUniform, 0);
+		VulkanicAPI.setUniform1i(ctx, this.uFadeColorTextureUniform, 0);
 		
 	}
 	
@@ -73,23 +74,23 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	//========//
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
-		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
 		// it should be automatically restored after rendering is complete.
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		
 		
 		// apply the rendered Fade to Minecraft's framebuffer
-		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), this.readFramebuffer);
-		VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), this.drawFramebuffer);
+		VulkanicAPI.bindReadFramebuffer(ctx, this.readFramebuffer);
+		VulkanicAPI.bindDrawFramebuffer(ctx, this.drawFramebuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), true);
+		VulkanicAPI.setDepthTestEnabled(ctx, true);
 		
 	}
 	

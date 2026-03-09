@@ -9,6 +9,7 @@ import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.NumberUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -80,7 +81,7 @@ public class SSAOShader extends AbstractShaderRenderer
 	}
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		this.shader.setUniform(this.uProj, this.projection);
 		
@@ -101,7 +102,7 @@ public class SSAOShader extends AbstractShaderRenderer
 		Number bias = Config.Client.Advanced.Graphics.Ssao.bias.get();
 		this.shader.setUniform(this.uBias, bias.floatValue());
 		
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDepthMap, 0);
+		VulkanicAPI.setUniform1i(ctx, this.uDepthMap, 0);
 		
 		float fadeDistanceInBlocks = Config.Client.Advanced.Graphics.Ssao.fadeDistanceInBlocks.get().floatValue();
 		fadeDistanceInBlocks = MathUtil.clamp(0.0f, fadeDistanceInBlocks, Float.MAX_VALUE); // clamp to prevent accidentally setting a negative number
@@ -115,12 +116,12 @@ public class SSAOShader extends AbstractShaderRenderer
 	//========//
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), this.frameBuffer);
-		VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
-		VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
-		VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
+		VulkanicAPI.bindFramebuffer(ctx, this.frameBuffer);
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());

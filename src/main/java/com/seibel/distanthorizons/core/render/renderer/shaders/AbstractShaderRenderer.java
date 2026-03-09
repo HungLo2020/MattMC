@@ -3,6 +3,7 @@ package com.seibel.distanthorizons.core.render.renderer.shaders;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public abstract class AbstractShaderRenderer
@@ -28,16 +29,17 @@ public abstract class AbstractShaderRenderer
 	public void render(float partialTicks)
 	{
 		this.init();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		
 		this.shader.bind();
 		
-		this.onApplyUniforms(partialTicks);
+		this.onApplyUniforms(ctx, partialTicks);
 		
 		int width = MC_RENDER.getTargetFramebufferViewportWidth();
 		int height = MC_RENDER.getTargetFramebufferViewportHeight();
-		VulkanicAPI.setViewport(VulkanicAPI.getImmediateContext(), 0, 0, width, height);
+		VulkanicAPI.setViewport(ctx, 0, 0, width, height);
 		
-		this.onRender();
+		this.onRender(ctx);
 		
 		this.shader.unbind();
 	}
@@ -52,7 +54,7 @@ public abstract class AbstractShaderRenderer
 	
 	protected void onInit() {}
 	
-	protected void onApplyUniforms(float partialTicks) {}
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks) {}
 	
-	protected void onRender() {}
+	protected void onRender(CommandContext ctx) {}
 }

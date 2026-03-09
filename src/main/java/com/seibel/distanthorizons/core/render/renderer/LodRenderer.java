@@ -281,7 +281,7 @@ public class LodRenderer
 			{
 				// If MC's framebuffer is being used the depth needs to be cleared to prevent rendering on top of MC.
 				// This should only happen when Optifine shaders are being used.
-				CommandContext ctx = VulkanicAPI.getImmediateContext();
+				CommandContext ctx = VulkanicAPI.getCommandContext();
 				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 			
@@ -371,21 +371,21 @@ public class LodRenderer
 		//==========//
 		// bindings //
 		//==========//
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		
 		// by default draw everything as triangles
-		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-		VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+		VulkanicAPI.setCullFaceEnabled(ctx, true);
 		
-		VulkanicAPI.blendFunc(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
-		VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
+		VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
 		
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, false);
 		
 		// Enable depth test and depth mask
 		VulkanicAPI.setDepthTestEnabled(ctx, true);
 		VulkanicAPI.setDepthFunc(ctx, VulkanicAPI.GL_LESS);
-		VulkanicAPI.setDepthWriteMask(VulkanicAPI.getImmediateContext(), true);
+		VulkanicAPI.setDepthWriteMask(ctx, true);
 		
 		// This is required for MC versions 1.21.5+
 		// due to MC updating the lightmap by changing the viewport size
@@ -442,11 +442,11 @@ public class LodRenderer
 		boolean clearTextures = !ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeTextureClearEvent.class, renderEventParam);
 		if (clearTextures)
 		{
-			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), 1.0);
+			VulkanicAPI.setClearDepth(ctx, 1.0);
 			
 			float[] clearColorValues = new float[4];
-			VulkanicAPI.getFloatv(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
-			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
+			VulkanicAPI.getFloatv(ctx, VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
+			VulkanicAPI.setClearColor(ctx, clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
 			
 			if (this.usingMcFramebuffer && framebufferOverride == null)
 			{
@@ -570,6 +570,7 @@ public class LodRenderer
 	
 	private void renderLodPass(IDhApiShaderProgram shaderProgram, RenderBufferHandler lodBufferHandler, RenderParams renderEventParam, boolean opaquePass)
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		//=======================//
 		// debug wireframe setup //
 		//=======================//
@@ -577,25 +578,25 @@ public class LodRenderer
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
 		{
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
-			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
+			VulkanicAPI.setCullFaceEnabled(ctx, false);
 		}
 		else
 		{
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
 		if (!opaquePass)
 		{
-			VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), true);
-			VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), true);
-			VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-			VulkanicAPI.setBlendFunction(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+			VulkanicAPI.setBlendEnabled(ctx, true);
+			VulkanicAPI.setDepthTestEnabled(ctx, true);
+			VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
+			VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		}
 		else
 		{
-			VulkanicAPI.setBlendEnabled(VulkanicAPI.getImmediateContext(), false);
+			VulkanicAPI.setBlendEnabled(ctx, false);
 		}
 		
 		
@@ -613,7 +614,7 @@ public class LodRenderer
 			// which causes Sodium to render some water chunks with their normal inverted
 			// https://github.com/IrisShaders/Iris/issues/2582
 			// https://github.com/IrisShaders/Iris/blob/1.21.9/common/src/main/java/net/irisshaders/iris/compat/dh/LodRendererEvents.java#L346
-			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
+			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
 		
@@ -642,7 +643,7 @@ public class LodRenderer
 					vbo.bind();
 					shaderProgram.bindVertexBuffer(vbo.getId());
 					VulkanicAPI.drawElements(
-							VulkanicAPI.getImmediateContext(),
+							ctx,
 							VulkanicAPI.GL_TRIANGLES,
 							(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
 							this.quadIBO.getType(), 0);
@@ -660,8 +661,8 @@ public class LodRenderer
 		if (renderWireframe)
 		{
 			// default back to GL_FILL since all other rendering uses it 
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
 	}
