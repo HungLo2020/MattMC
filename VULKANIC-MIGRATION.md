@@ -167,6 +167,29 @@ VulkanicAPI.generateTextureMipmapDSA(ctx, glId);
 ```
 This reduces VoxelMap's bypass call count from **1** to **0**, bringing the total non-Blaze3D bypass count from 480 to **479**.
 
+### Phase 3 Prep — Readiness Diagnostics + Scoped Context ✅ Complete
+
+Added a concrete Vulkan diagnostics seam that does not implement native Vulkan rendering yet:
+
+- `VulkanReadinessReport` (new immutable diagnostics model)
+- `VulkanBackend.getReadinessReport()` / `refreshReadinessReport()`
+- `VulkanicAPI.getVulkanReadinessReport()` / `describeVulkanReadiness()`
+
+The bootstrap `VulkanBackend` now probes runtime preconditions safely (LWJGL Vulkan binding presence + GLFW Vulkan support probe) and includes structured readiness output in native-operation guard failures. `isNativeVulkanReady()` intentionally remains `false`.
+
+Also added `VulkanicAPI.withCommandContext(ctx)` to provide scoped, idempotent push/pop handling for thread-local command contexts. This reduces migration risk from context-stack leaks and aligns callsites with future command-buffer scoping patterns.
+
+### Phase 3 Prep — Portable Pipeline Descriptor ✅ Complete
+
+`PipelineDescriptor` now carries a backend-agnostic `PortableState` snapshot of pipeline configuration (shaders, defines, samplers, uniforms, depth/cull/blend/write state, vertex format/mode, depth bias).
+
+New APIs:
+- `PipelineDescriptor.fromPortableState(...)`
+- `PipelineDescriptor.getPortableState()`
+- `PipelineDescriptor.requireRenderPipeline()`
+
+OpenGL pipeline compilation now uses `requireRenderPipeline()` so descriptors can be consumed even without storing a native `RenderPipeline` object. This creates a bridge toward future Vulkan pipeline compilation from Vulkanic-owned metadata rather than Blaze3D object identity.
+
 ---
 
 ## 5 · What Needs to Happen Next

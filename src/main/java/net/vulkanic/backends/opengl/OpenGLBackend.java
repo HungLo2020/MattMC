@@ -2390,12 +2390,7 @@ public class OpenGLBackend implements GraphicsBackend {
                 "GlDevice has not been registered with OpenGLBackend. " +
                 "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
         }
-        Object native_ = descriptor.getNativeDescriptor();
-        if (!(native_ instanceof net.blaze3d.pipeline.RenderPipeline renderPipeline)) {
-            throw new IllegalArgumentException(
-                "OpenGL backend expects a RenderPipeline in PipelineDescriptor, got: " +
-                (native_ == null ? "null" : native_.getClass().getName()));
-        }
+        net.blaze3d.pipeline.RenderPipeline renderPipeline = descriptor.requireRenderPipeline();
         net.blaze3d.opengl.GlRenderPipeline glPipeline = glDevice.precompilePipeline(renderPipeline, null);
         return new OpenGLPipelineHandle(glPipeline);
     }

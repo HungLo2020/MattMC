@@ -38,6 +38,7 @@ public class VulkanicAPI {
     private static Thread renderThread;
     @Nullable
     private static GpuDevice device;
+    private static final ThreadLocal<java.util.ArrayDeque<CommandContext>> CONTEXT_STACK = ThreadLocal.withInitial(java.util.ArrayDeque::new);
     private static ProjectionType projectionType = ProjectionType.PERSPECTIVE;
     private static ProjectionType savedProjectionType = ProjectionType.PERSPECTIVE;
     @Nullable
@@ -638,6 +639,32 @@ public class VulkanicAPI {
     public static boolean isNativeVulkanBackendReady() {
         return getBackend().isNativeVulkanReady();
     }
+
+    /**
+     * Returns a diagnostics report describing Vulkan backend readiness and
+     * environment preconditions.
+     *
+     * <p>When Vulkan backend routing is not selected, this returns a report
+     * that explains why Vulkan-specific probes were skipped.</p>
+     */
+    public static VulkanReadinessReport getVulkanReadinessReport() {
+        GraphicsBackend activeBackend = getBackend();
+        if (activeBackend instanceof VulkanBackend vulkanBackend) {
+            return vulkanBackend.getReadinessReport();
+        }
+
+        return VulkanReadinessReport.forNonVulkanBackend(
+            activeBackend.getBackendType(),
+            activeBackend.isNativeVulkanReady()
+        );
+    }
+
+    /**
+     * Returns a human-readable multiline Vulkan readiness summary.
+     */
+    public static String describeVulkanReadiness() {
+        return getVulkanReadinessReport().toMultilineString();
+    }
     
     /**
      * Gets the immediate-mode command context for OpenGL rendering.
@@ -672,7 +699,63 @@ public class VulkanicAPI {
      * @return Immediate-mode command context (OpenGL singleton)
      */
     public static CommandContext getCommandContext() {
+        java.util.ArrayDeque<CommandContext> stack = CONTEXT_STACK.get();
+        if (stack != null && !stack.isEmpty()) {
+            return stack.peek();
+        }
         return getBackend().getCurrentCommandContext();
+    }
+
+    /**
+     * Pushes a CommandContext onto the thread-local stack. Use when entering
+     * a scope where the provided context should be returned by getCommandContext().
+     */
+    public static void pushCommandContext(CommandContext ctx) {
+        if (ctx == null) return;
+        CONTEXT_STACK.get().push(ctx);
+    }
+
+    /**
+     * Pops the current CommandContext from the thread-local stack.
+     */
+    public static void popCommandContext() {
+        java.util.ArrayDeque<CommandContext> stack = CONTEXT_STACK.get();
+        if (!stack.isEmpty()) {
+            stack.pop();
+        }
+        if (stack.isEmpty()) {
+            CONTEXT_STACK.remove();
+        }
+    }
+
+    /**
+     * Pushes a context and returns an AutoCloseable scope that pops it safely.
+     *
+     * <p>Typical usage:</p>
+     * <pre>
+     * try (AutoCloseable scope = VulkanicAPI.withCommandContext(ctx)) {
+     *     // all VulkanicAPI.getCommandContext() calls in this scope return ctx
+     * }
+     * </pre>
+     */
+    public static AutoCloseable withCommandContext(CommandContext ctx) {
+        if (ctx == null) {
+            return () -> {
+            };
+        }
+
+        pushCommandContext(ctx);
+        return new AutoCloseable() {
+            private boolean closed;
+
+            @Override
+            public void close() {
+                if (!closed) {
+                    closed = true;
+                    popCommandContext();
+                }
+            }
+        };
     }
 
     /**

@@ -1,5 +1,14 @@
 package net.vulkanic;
 
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.DepthTestFunction;
+import net.blaze3d.platform.LogicOp;
+import net.blaze3d.platform.PolygonMode;
+import net.blaze3d.shaders.UniformType;
+import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
+import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.backends.opengl.OpenGLBuffer;
 import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import net.vulkanic.backends.opengl.OpenGLTexture;
@@ -188,6 +197,92 @@ public class Phase3ResourceTypesTest {
             () -> PipelineDescriptor.fromRenderPipeline(null));
     }
 
+    @Test
+    public void testPipelineDescriptorPortableStateFromRenderPipeline() {
+        RenderPipeline pipeline = buildTestPipeline();
+
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(pipeline);
+        PipelineDescriptor.PortableState state = descriptor.getPortableState();
+
+        assertTrue(descriptor.hasNativeDescriptor(),
+            "fromRenderPipeline() should preserve native pipeline object for OpenGL path");
+        assertSame(pipeline, descriptor.requireRenderPipeline(),
+            "Native descriptor path should return original RenderPipeline");
+
+        assertEquals(ResourceLocation.withDefaultNamespace("vulkanic/test_pipeline"), state.location());
+        assertEquals(ResourceLocation.withDefaultNamespace("core/test_vertex"), state.vertexShader());
+        assertEquals(ResourceLocation.withDefaultNamespace("core/test_fragment"), state.fragmentShader());
+        assertEquals(DepthTestFunction.GREATER_DEPTH_TEST, state.depthTestFunction());
+        assertEquals(PolygonMode.WIREFRAME, state.polygonMode());
+        assertFalse(state.cull());
+        assertTrue(state.writeColor());
+        assertFalse(state.writeAlpha());
+        assertFalse(state.writeDepth());
+        assertEquals(LogicOp.OR_REVERSE, state.colorLogic());
+        assertEquals(VertexFormat.Mode.QUADS, state.vertexFormatMode());
+        assertEquals(2.5f, state.depthBiasScaleFactor());
+        assertEquals(1.25f, state.depthBiasConstant());
+
+        assertTrue(state.shaderDefineFlags().contains("FLAG_TEST"));
+        assertEquals("123", state.shaderDefineValues().get("VALUE_TEST"));
+        assertEquals(1, state.samplers().size());
+        assertEquals("Sampler0", state.samplers().get(0));
+        assertEquals(2, state.uniforms().size());
+        assertTrue(state.uniforms().stream().anyMatch(uniform ->
+                uniform.name().equals("Globals") && uniform.type() == UniformType.UNIFORM_BUFFER));
+        assertTrue(state.uniforms().stream().anyMatch(uniform ->
+                uniform.name().equals("CloudFaces") &&
+                uniform.type() == UniformType.TEXEL_BUFFER &&
+                uniform.textureFormat() == TextureFormat.RED8I));
+    }
+
+    @Test
+    public void testPipelineDescriptorRoundTripFromPortableState() {
+        RenderPipeline original = buildTestPipeline();
+        PipelineDescriptor originalDescriptor = PipelineDescriptor.fromRenderPipeline(original);
+
+        PipelineDescriptor portableDescriptor = PipelineDescriptor.fromPortableState(
+            originalDescriptor.getPortableState());
+
+        assertFalse(portableDescriptor.hasNativeDescriptor(),
+            "Portable-only descriptor should not expose native object");
+
+        RenderPipeline reconstructed = portableDescriptor.requireRenderPipeline();
+        assertEquals(original.getLocation(), reconstructed.getLocation());
+        assertEquals(original.getVertexShader(), reconstructed.getVertexShader());
+        assertEquals(original.getFragmentShader(), reconstructed.getFragmentShader());
+        assertEquals(original.getDepthTestFunction(), reconstructed.getDepthTestFunction());
+        assertEquals(original.getPolygonMode(), reconstructed.getPolygonMode());
+        assertEquals(original.isCull(), reconstructed.isCull());
+        assertEquals(original.isWriteColor(), reconstructed.isWriteColor());
+        assertEquals(original.isWriteAlpha(), reconstructed.isWriteAlpha());
+        assertEquals(original.isWriteDepth(), reconstructed.isWriteDepth());
+        assertEquals(original.getColorLogic(), reconstructed.getColorLogic());
+        assertEquals(original.getVertexFormatMode(), reconstructed.getVertexFormatMode());
+        assertEquals(original.getDepthBiasScaleFactor(), reconstructed.getDepthBiasScaleFactor());
+        assertEquals(original.getDepthBiasConstant(), reconstructed.getDepthBiasConstant());
+
+        assertEquals(original.getSamplers(), reconstructed.getSamplers());
+        assertEquals(original.getUniforms().size(), reconstructed.getUniforms().size());
+        assertEquals(original.getBlendFunction().isPresent(), reconstructed.getBlendFunction().isPresent());
+        assertEquals(original.getShaderDefines().values(), reconstructed.getShaderDefines().values());
+        assertEquals(original.getShaderDefines().flags(), reconstructed.getShaderDefines().flags());
+    }
+
+    @Test
+    public void testPipelineDescriptorFromPortableStateNull() {
+        assertThrows(IllegalArgumentException.class,
+            () -> PipelineDescriptor.fromPortableState(null));
+    }
+
+    @Test
+    public void testUniformBindingValidation() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.UniformBinding("texelMissingFormat", UniformType.TEXEL_BUFFER, null));
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.UniformBinding("uniformWithFormat", UniformType.UNIFORM_BUFFER, TextureFormat.RGBA8));
+    }
+
     // ---- PipelineHandle tests ----------------------------------------------
 
     @Test
@@ -197,6 +292,28 @@ public class Phase3ResourceTypesTest {
             @Override public void close() {}
         };
         assertInstanceOf(PipelineHandle.class, handle);
+    }
+
+    private static RenderPipeline buildTestPipeline() {
+        return RenderPipeline.builder()
+            .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/test_pipeline"))
+            .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+            .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+            .withShaderDefine("FLAG_TEST")
+            .withShaderDefine("VALUE_TEST", 123)
+            .withSampler("Sampler0")
+            .withUniform("Globals", UniformType.UNIFORM_BUFFER)
+            .withUniform("CloudFaces", UniformType.TEXEL_BUFFER, TextureFormat.RED8I)
+            .withDepthTestFunction(DepthTestFunction.GREATER_DEPTH_TEST)
+            .withPolygonMode(PolygonMode.WIREFRAME)
+            .withCull(false)
+            .withoutBlend()
+            .withColorWrite(true, false)
+            .withDepthWrite(false)
+            .withColorLogic(LogicOp.OR_REVERSE)
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .withDepthBias(2.5f, 1.25f)
+            .build();
     }
 
     // ---- VulkanicAPI.registerDevice / beginCommandBuffer tests -------------

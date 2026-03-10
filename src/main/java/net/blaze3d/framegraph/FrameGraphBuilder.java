@@ -11,6 +11,9 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.function.Consumer;
+import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicAPI;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
@@ -51,6 +54,14 @@ public class FrameGraphBuilder {
 	}
 
 	public void execute(GraphicsResourceAllocator graphicsResourceAllocator, FrameGraphBuilder.Inspector inspector) {
+		this.execute(graphicsResourceAllocator, inspector, VulkanicAPI.getCommandContext());
+	}
+
+	public void execute(GraphicsResourceAllocator graphicsResourceAllocator, CommandContext ctx) {
+		this.execute(graphicsResourceAllocator, FrameGraphBuilder.Inspector.NONE, ctx);
+	}
+
+	public void execute(GraphicsResourceAllocator graphicsResourceAllocator, FrameGraphBuilder.Inspector inspector, CommandContext ctx) {
 		BitSet bitSet = this.identifyPassesToKeep();
 		List<FrameGraphBuilder.Pass> list = new ArrayList(bitSet.cardinality());
 		BitSet bitSet2 = new BitSet(this.passes.size());
@@ -68,7 +79,16 @@ public class FrameGraphBuilder {
 			}
 
 			inspector.beforeExecutePass(pass.name);
-			pass.task.run();
+			if (pass.contextTask != null) {
+				VulkanicAPI.pushCommandContext(ctx);
+				try {
+					pass.contextTask.accept(ctx);
+				} finally {
+					VulkanicAPI.popCommandContext();
+				}
+			} else {
+				pass.task.run();
+			}
 			inspector.afterExecutePass(pass.name);
 
 			for (int i = pass.resourcesToRelease.nextSetBit(0); i >= 0; i = pass.resourcesToRelease.nextSetBit(i + 1)) {
@@ -271,6 +291,7 @@ public class FrameGraphBuilder {
 		final BitSet requiredResourceIds = new BitSet();
 		final BitSet requiredPassIds = new BitSet();
 		Runnable task = () -> {};
+		private Consumer<CommandContext> contextTask = null;
 		final List<FrameGraphBuilder.InternalVirtualResource<?>> resourcesToAcquire = new ArrayList();
 		final BitSet resourcesToRelease = new BitSet();
 		boolean disableCulling;
@@ -335,6 +356,12 @@ public class FrameGraphBuilder {
 		@Override
 		public void executes(Runnable runnable) {
 			this.task = runnable;
+		}
+
+		@Override
+		public void executesWithContext(Consumer<CommandContext> consumer) {
+			this.contextTask = consumer;
+			this.task = () -> {};
 		}
 
 		public String toString() {

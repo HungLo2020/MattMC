@@ -15,9 +15,12 @@
 - Major hotspots migrated to `getCommandContext()`: `GlCommandEncoder`, `IrisRenderSystem`, fence-task helpers, and VoxelMap DSA mipmap path
 - `BackendType.VULKAN` no longer hard-fails at initialization; it now routes through `backends/vulkan/VulkanBackend` bootstrap class
 - Backend readiness seam is now explicit: `getActiveBackendType()`, `isVulkanBackendSelected()`, and `isNativeVulkanBackendReady()`
+- New Vulkan diagnostics seam is live: `VulkanReadinessReport`, `VulkanicAPI.getVulkanReadinessReport()`, and `VulkanicAPI.describeVulkanReadiness()`
+- New scoped command-context helper is available: `VulkanicAPI.withCommandContext(ctx)` for safe push/pop lifecycle handling
+- Pipeline descriptor portability seam is live: `PipelineDescriptor.PortableState` + `fromPortableState(...)` + OpenGL round-trip via `requireRenderPipeline()`
 - Guard tests now enforce this boundary to prevent regression
 
-**Recommendation**: Keep the deprecated compatibility seam temporarily, and continue Phase 3 by implementing backend-specific systems (pipelines, descriptors, render pass orchestration) behind the command-context API.
+**Recommendation**: Keep the deprecated compatibility seam temporarily, use readiness reports to gate environment-dependent Vulkan bring-up work, and continue Phase 3 by implementing backend-specific systems (pipelines, descriptors, render pass orchestration) behind the command-context API.
 
 ---
 
