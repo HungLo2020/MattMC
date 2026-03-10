@@ -237,7 +237,7 @@ public class ShadowRenderer {
 			}
 		}
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
 	private void configureDepthSampler(int glTextureId, PackShadowDirectives.DepthSamplingSettings settings) {
@@ -278,7 +278,7 @@ public class ShadowRenderer {
 			setupMipmappingForTexture(mipmapPass.texture(), mipmapPass.targetFilteringMode());
 		}
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
 	private void setupMipmappingForTexture(int texture, int filteringMode) {

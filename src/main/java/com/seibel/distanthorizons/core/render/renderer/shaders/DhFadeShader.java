@@ -127,7 +127,7 @@ public class DhFadeShader extends AbstractShaderRenderer
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(depthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDhDepthTexture, 0);
 		

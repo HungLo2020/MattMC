@@ -41,7 +41,7 @@ public class OverlayTexture implements AutoCloseable {
 
 	public void setupOverlayColor() {
 		var textureView = this.texture.getTextureView();
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, textureView.texture().iris$getGlId());
+		IrisRenderSystem.bindTextureToUnit(1, textureView.texture().iris$getGlId());
 		TextureTracker.INSTANCE.onSetShaderTexture(1, textureView);
 	}
 
@@ -62,7 +62,7 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void teardownOverlayColor() {
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, 0);
+		IrisRenderSystem.bindTextureToUnit(1, 0);
 		TextureTracker.INSTANCE.onSetShaderTexture(1, null);
 	}
 }

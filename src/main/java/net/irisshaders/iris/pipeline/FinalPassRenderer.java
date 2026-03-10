@@ -238,7 +238,7 @@ public class FinalPassRenderer {
 			IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
 
 			if (!finalPass.mipmappedBuffers.isEmpty()) {
-				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 				for (int index : finalPass.mipmappedBuffers) {
 					setupMipmapping(renderTargets.get(index), finalPass.stageReadsFromAlt.contains(index));
@@ -282,7 +282,7 @@ public class FinalPassRenderer {
 			IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), 0, 0, 0, 0, 0, baseWidth, baseHeight);
 		}
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 		for (int i = 0; i < renderTargets.getRenderTargetCount(); i++) {
 			// Reset mipmapping states at the end of the frame.
@@ -319,7 +319,7 @@ public class FinalPassRenderer {
 			}
 		}
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
 	public void recalculateSwapPassSize() {

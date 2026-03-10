@@ -11,7 +11,7 @@ import java.nio.ByteBuffer;
 
 public class SingleColorTexture extends GlResource {
 	public SingleColorTexture(int red, int green, int blue, int alpha) {
-		super(IrisRenderSystem.createTexture(VulkanicAPI.GL_TEXTURE_2D));
+		super(IrisRenderSystem.createTexture2D());
 		ByteBuffer pixel = BufferUtils.createByteBuffer(4);
 		pixel.put((byte) red);
 		pixel.put((byte) green);

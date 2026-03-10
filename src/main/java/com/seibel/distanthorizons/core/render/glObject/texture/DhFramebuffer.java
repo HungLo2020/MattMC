@@ -76,7 +76,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	{
 		this.bind(ctx);
 		
-		VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + textureIndex, textureId, 0);
+		VulkanicAPI.framebufferColorAttachmentTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, textureIndex, textureId, 0);
 		this.attachments.put(textureIndex, textureId);
 	}
 
@@ -113,7 +113,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 				throw new IllegalArgumentException("Only " + this.maxColorAttachments + " color attachments are supported on this GPU, but an attempt was made to write to a color attachment with index " + buffer);
 			}
 			
-			glBuffers[index++] = VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer;
+			glBuffers[index++] = VulkanicAPI.colorAttachment(buffer);
 		}
 		
 		this.bind(ctx); 
@@ -128,7 +128,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	public void readBuffer(CommandContext ctx, int buffer)
 	{
 		this.bind(ctx);
-		VulkanicAPI.setReadBuffer(ctx, VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
+		VulkanicAPI.setReadBufferColorAttachment(ctx, buffer);
 	}
 	
 	public int getColorAttachment(int index) { return this.attachments.get(index); }

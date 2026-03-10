@@ -305,7 +305,7 @@ public class CompositeRenderer {
 				}
 
 				if (!compositePass.mipmappedBuffers.isEmpty()) {
-					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 					for (int index : compositePass.mipmappedBuffers) {
 						setupMipmapping(CompositeRenderer.this.renderTargets.get(index), compositePass.stageReadsFromAlt.contains(index));
@@ -349,7 +349,7 @@ public class CompositeRenderer {
 			}
 		}
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 		GLDebug.popGroup();
 

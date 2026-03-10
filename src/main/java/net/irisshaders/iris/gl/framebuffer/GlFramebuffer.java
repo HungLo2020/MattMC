@@ -48,7 +48,7 @@ public class GlFramebuffer extends GlResource {
 	public void addColorAttachment(int index, int texture) {
 		int fb = getGlId();
 
-		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + index, texture, 0);
+		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.colorAttachment(index), texture, 0);
 		attachments.put(index, texture);
 	}
 
@@ -69,14 +69,14 @@ public class GlFramebuffer extends GlResource {
 				throw new IllegalArgumentException("Only " + maxColorAttachments + " color attachments are supported on this GPU, but an attempt was made to write to a color attachment with index " + buffer);
 			}
 
-			glBuffers[index++] = VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer;
+			glBuffers[index++] = VulkanicAPI.colorAttachment(buffer);
 		}
 
 		IrisRenderSystem.drawBuffers(getGlId(), glBuffers);
 	}
 
 	public void readBuffer(int buffer) {
-		IrisRenderSystem.readBuffer(getGlId(), VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
+		IrisRenderSystem.readBuffer(getGlId(), VulkanicAPI.colorAttachment(buffer));
 	}
 
 	public int getColorAttachment(int index) {

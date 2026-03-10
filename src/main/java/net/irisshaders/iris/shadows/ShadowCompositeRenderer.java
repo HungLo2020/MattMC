@@ -220,7 +220,7 @@ public class ShadowCompositeRenderer {
 				}
 
 				if (!renderPass.mipmappedBuffers.isEmpty()) {
-					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 					for (int index : renderPass.mipmappedBuffers) {
 						setupMipmapping(renderTargets.get(index), renderPass.stageReadsFromAlt.contains(index));
@@ -258,7 +258,7 @@ public class ShadowCompositeRenderer {
 		}
 		 */
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
 	// TODO: Don't just copy this from DeferredWorldRenderingPipeline

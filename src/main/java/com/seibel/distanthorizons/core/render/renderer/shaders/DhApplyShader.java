@@ -87,7 +87,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		//VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
 		//VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
@@ -142,7 +142,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		//VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
 		//VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
@@ -152,7 +152,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		
 		
-		VulkanicAPI.framebufferTexture(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, targetColorTextureId, 0);
+		VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, targetColorTextureId, 0);
 		
 		// Copy to MC's texture via MC's framebuffer
 		VulkanicAPI.bindFramebuffer(ctx, dhFrameBufferId);

@@ -1360,6 +1360,27 @@ public class VulkanicAPI {
     }
 
     /**
+     * Returns the framebuffer color-attachment enum for a zero-based attachment index.
+     */
+    public static int colorAttachment(int colorAttachmentIndex) {
+        return GL_COLOR_ATTACHMENT0 + colorAttachmentIndex;
+    }
+
+    /**
+     * Attaches a 2D texture to a framebuffer color attachment by index.
+     */
+    public static void framebufferColorAttachmentTexture2D(CommandContext ctx, int target, int colorAttachmentIndex, int texture, int level) {
+        framebufferTexture2D(ctx, target, colorAttachment(colorAttachmentIndex), texture, level);
+    }
+
+    /**
+     * Attaches a 2D texture to a framebuffer color attachment by index on GL_FRAMEBUFFER.
+     */
+    public static void framebufferColorAttachmentTexture2D(CommandContext ctx, int colorAttachmentIndex, int texture, int level) {
+        framebufferColorAttachmentTexture2D(ctx, GL_FRAMEBUFFER, colorAttachmentIndex, texture, level);
+    }
+
+    /**
      * Attaches a 2D texture to color attachment 0 of a framebuffer target.
      */
     public static void framebufferColorAttachment0Texture2D(CommandContext ctx, int target, int texture, int level) {
@@ -1770,6 +1791,13 @@ public class VulkanicAPI {
     
     public static void setReadBuffer(CommandContext ctx, int buffer) {
         getBackend().setReadBuffer(ctx, buffer);
+    }
+
+    /**
+     * Sets the read buffer to a color attachment by index.
+     */
+    public static void setReadBufferColorAttachment(CommandContext ctx, int colorAttachmentIndex) {
+        getBackend().setReadBuffer(ctx, colorAttachment(colorAttachmentIndex));
     }
     
     

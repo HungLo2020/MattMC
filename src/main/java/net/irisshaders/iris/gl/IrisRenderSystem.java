@@ -385,6 +385,10 @@ public class IrisRenderSystem {
 		dsaState.bindTextureToUnit(target, unit, texture);
 	}
 
+	public static void bindTextureToUnit(int unit, int texture) {
+		dsaState.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, unit, texture);
+	}
+
 	public static int getUniformBlockIndex(int program, String uniformBlockName) {
 		RenderSystem.assertOnRenderThread();
 		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getCommandContext(), program, uniformBlockName);
@@ -417,6 +421,10 @@ public class IrisRenderSystem {
 
 	public static int createTexture(int target) {
 		return dsaState.createTexture(target);
+	}
+
+	public static int createTexture2D() {
+		return dsaState.createTexture(VulkanicAPI.GL_TEXTURE_2D);
 	}
 
 	private static int lastTex = -1;

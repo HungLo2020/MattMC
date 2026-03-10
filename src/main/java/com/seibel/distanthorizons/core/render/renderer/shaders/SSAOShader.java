@@ -122,7 +122,7 @@ public class SSAOShader extends AbstractShaderRenderer
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		
 		ScreenQuad.INSTANCE.render();

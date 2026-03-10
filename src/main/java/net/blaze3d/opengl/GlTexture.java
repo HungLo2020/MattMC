@@ -96,6 +96,10 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 			this.modesDirty = false;
 		}
 	}
+
+	public void flushModeChanges2D() {
+		this.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
+	}
 	
 	// Iris: From MixinGpuTexture - helper method for DSA texture parameter setting with mipmap non-linear handling
 	private void iris$texParameterDSA(int target, int pname, int param) {
@@ -116,7 +120,7 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	// Iris: From MixinGpuTexture - GpuTextureInterface implementation
 	@Override
 	public int iris$getGlId() {
-		this.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
+		this.flushModeChanges2D();
 		return this.glId();
 	}
 	

@@ -291,7 +291,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		customTextureManager = new CustomTextureManager(programSet.getPackDirectives(), programSet.getPack().getCustomTextureDataMap(), programSet.getPack().getIrisCustomTextureDataMap(), programSet.getPack().getCustomNoiseTexture());
 		whitePixel = new NativeImageBackedSingleColorTexture(255, 255, 255, 255);
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 		BufferFlipper flipper = new BufferFlipper();
 
@@ -855,7 +855,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		}
 
 		// Make sure we're using texture unit 0 for this.
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 		Vector4f emptyClearColor = new Vector4f(1.0F);
 
 		GLDebug.pushGroup(100, "Clear textures");
@@ -1186,7 +1186,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		// Set the active texture unit to unit 0
 		//
 		// This seems to be what most code expects. It's a sane default in any case.
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 		for (int i = 0; i < 12; i++) {
 			IrisRenderSystem.setTextureBinding(i, 0);

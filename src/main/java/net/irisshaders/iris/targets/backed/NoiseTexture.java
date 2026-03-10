@@ -18,7 +18,7 @@ public class NoiseTexture extends GlResource {
 	int height;
 
 	public NoiseTexture(int width, int height) {
-		super(IrisRenderSystem.createTexture(VulkanicAPI.GL_TEXTURE_2D));
+		super(IrisRenderSystem.createTexture2D());
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		int texture = getGlId();

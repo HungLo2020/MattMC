@@ -58,7 +58,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(this.fogTexture);
 		VulkanicAPI.setUniform1i(ctx, this.colorTextureUniform, 0);
 		

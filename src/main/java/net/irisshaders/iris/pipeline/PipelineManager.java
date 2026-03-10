@@ -107,6 +107,6 @@ public class PipelineManager {
 		// Set the active texture unit to unit 0
 		//
 		// This seems to be what most code expects. It's a sane default in any case.
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 }

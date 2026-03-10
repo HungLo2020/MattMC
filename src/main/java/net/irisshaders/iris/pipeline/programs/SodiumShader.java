@@ -191,16 +191,16 @@ public class SodiumShader implements ChunkShaderInterface {
 
 	private void bindTextures(GpuTextureView atlas) {
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
-		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0, atlas.texture().iris$getGlId());
+		((GlTexture) atlas.texture()).flushModeChanges2D();
+		IrisRenderSystem.bindTextureToUnit(0, atlas.texture().iris$getGlId());
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 		VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, atlas.baseMipLevel());
 		VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, atlas.baseMipLevel() + atlas.mipLevels() - 1);
-		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
+		((GlTexture) atlas.texture()).flushModeChanges2D();
 
 		GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
-		((GlTexture) lightmap.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, lightmap.texture().iris$getGlId());
+		((GlTexture) lightmap.texture()).flushModeChanges2D();
+		IrisRenderSystem.bindTextureToUnit(2, lightmap.texture().iris$getGlId());
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(IrisSamplers.LIGHTMAP_TEXTURE_UNIT);
 	}
 

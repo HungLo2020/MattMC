@@ -8,7 +8,7 @@ import net.vulkanic.VulkanicAPI;
 
 public class DepthTexture extends GlResource {
 	public DepthTexture(String name, int width, int height, DepthBufferFormat format) {
-		super(IrisRenderSystem.createTexture(VulkanicAPI.GL_TEXTURE_2D));
+		super(IrisRenderSystem.createTexture2D());
 		int texture = getGlId();
 
 		resize(width, height, format);

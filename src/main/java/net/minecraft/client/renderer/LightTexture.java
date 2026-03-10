@@ -81,12 +81,12 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOffLightLayer() {
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, 0);
+		IrisRenderSystem.bindTextureToUnit(2, 0);
 		TextureTracker.INSTANCE.onSetShaderTexture(2, null);
 	}
 
 	public void turnOnLightLayer() {
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, this.texture.iris$getGlId());
+		IrisRenderSystem.bindTextureToUnit(2, this.texture.iris$getGlId());
 		TextureTracker.INSTANCE.onSetShaderTexture(2, this.textureView);
 	}
 

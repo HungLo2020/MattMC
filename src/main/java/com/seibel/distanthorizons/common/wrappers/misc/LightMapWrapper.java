@@ -51,7 +51,7 @@ public class LightMapWrapper implements ILightMapWrapper
 	@Override
 	public void bind()
 	{
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(this.textureId);
 	}
 	
