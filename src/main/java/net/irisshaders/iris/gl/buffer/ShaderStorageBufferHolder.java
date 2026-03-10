@@ -5,6 +5,7 @@ import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,7 +43,7 @@ public class ShaderStorageBufferHolder {
 				buffers[index].createStatic();
 			}
 		});
-		VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), VulkanicBufferTarget.SHADER_STORAGE, 0);
 	}
 
 	private static long toMib(long x) {

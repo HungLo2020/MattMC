@@ -10,6 +10,7 @@ import com.seibel.distanthorizons.core.util.LodUtil;
 import org.jetbrains.annotations.Nullable;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 
 import java.awt.*;
 import java.io.Closeable;
@@ -319,19 +320,19 @@ public class RenderableBoxGroup
 			
 			// Upload transformation matrices
 			CommandContext ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceChunkPosVbo);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceChunkPosVbo);
 			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceSubChunkPosVbo);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceSubChunkPosVbo);
 			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceScaleVbo);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceScaleVbo);
 			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload colors
-			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceColorVbo);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceColorVbo);
 			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload materials
-			VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, this.instanceMaterialVbo);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceMaterialVbo);
 			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
 		}
 		

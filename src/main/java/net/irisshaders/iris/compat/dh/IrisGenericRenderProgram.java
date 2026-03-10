@@ -34,6 +34,7 @@ import net.minecraft.client.Minecraft;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
@@ -283,7 +284,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	@Override
 	public void bindVertexBuffer(int i) {
 		CommandContext ctx = VulkanicAPI.getCommandContext();
-		VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, i);
+		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, i);
 		VulkanicAPI.setVertexAttribPointer(ctx, 0, 3, VulkanicAPI.GL_FLOAT, false, 12, 0);
 	}
 

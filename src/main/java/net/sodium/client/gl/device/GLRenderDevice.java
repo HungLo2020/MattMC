@@ -12,6 +12,7 @@ import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.util.EnumBitField;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 import java.nio.ByteBuffer;
 
 public class GLRenderDevice implements RenderDevice {
@@ -76,7 +77,7 @@ public class GLRenderDevice implements RenderDevice {
 
     @Override
     public int getMaxTextureLodBias() {
-        return VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TEXTURE_MAX_LEVEL);
+        return VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.TEXTURE_MAX_LEVEL);
     }
 
     private void checkDeviceActive() {
@@ -121,7 +122,7 @@ public class GLRenderDevice implements RenderDevice {
         public void bindBuffer(GlBufferTarget target, GlBuffer buffer) {
             if (this.stateTracker.makeBufferActive(target, buffer)) {
                 CommandContext ctx = VulkanicAPI.getCommandContext();
-                VulkanicAPI.bindBuffer(ctx, target.getTargetParameter(), buffer.handle());
+                VulkanicAPI.bindBuffer(ctx, target.toVulkanicBufferTarget(), buffer.handle());
             }
         }
 

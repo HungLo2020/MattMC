@@ -1192,21 +1192,21 @@ public class VulkanicAPI {
      * Binds the pixel-pack buffer used for texture readbacks.
      */
     public static void bindPixelPackBuffer(CommandContext ctx, int buffer) {
-        getBackend().bindBuffer(ctx, GL_PIXEL_PACK_BUFFER, buffer);
+        bindBuffer(ctx, VulkanicBufferTarget.PIXEL_PACK, buffer);
     }
 
     /**
      * Binds the copy-read buffer target.
      */
     public static void bindCopyReadBuffer(CommandContext ctx, int buffer) {
-        getBackend().bindBuffer(ctx, GL_COPY_READ_BUFFER, buffer);
+        bindBuffer(ctx, VulkanicBufferTarget.COPY_READ, buffer);
     }
 
     /**
      * Binds the copy-write buffer target.
      */
     public static void bindCopyWriteBuffer(CommandContext ctx, int buffer) {
-        getBackend().bindBuffer(ctx, GL_COPY_WRITE_BUFFER, buffer);
+        bindBuffer(ctx, VulkanicBufferTarget.COPY_WRITE, buffer);
     }
 
     /**
@@ -1216,7 +1216,7 @@ public class VulkanicAPI {
      * index-buffer binding semantics for the active command context.
      */
     public static void bindIndexBuffer(CommandContext ctx, int buffer) {
-        getBackend().bindBuffer(ctx, GL_ELEMENT_ARRAY_BUFFER, buffer);
+        bindBuffer(ctx, VulkanicBufferTarget.INDEX, buffer);
     }
     
     /**

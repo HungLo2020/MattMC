@@ -3,6 +3,7 @@ package net.irisshaders.iris.pbr.util;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 
 public class TextureManipulationUtil {
 	private static int colorFillFBO = -1;
@@ -13,10 +14,10 @@ public class TextureManipulationUtil {
 			colorFillFBO = VulkanicAPI.createFramebuffer(ctx);
 		}
 
-		int previousFramebufferId = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_FRAMEBUFFER_BINDING);
+		int previousFramebufferId = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.FRAMEBUFFER_BINDING);
 		float[] previousClearColor = new float[4];
 		IrisRenderSystem.getFloatv(VulkanicAPI.GL_COLOR_CLEAR_VALUE, previousClearColor);
-		int previousTextureId = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
+		int previousTextureId = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		int[] previousViewport = new int[4];
 		IrisRenderSystem.getIntegerv(VulkanicAPI.GL_VIEWPORT, previousViewport);
 

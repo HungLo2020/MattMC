@@ -3,6 +3,7 @@ package net.irisshaders.iris.gl.buffer;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -54,7 +55,7 @@ public class ShaderStorageBuffer {
 		IrisRenderSystem.deleteBuffers(id);
 		IrisRenderSystem.incrementTrackedBuffers();
 		int newId = VulkanicAPI.createBuffer(ctx);
-		VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, newId);
+		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.SHADER_STORAGE, newId);
 
 		// Calculation time
 		long newWidth = (long) (width * info.scaleX());
@@ -72,7 +73,7 @@ public class ShaderStorageBuffer {
 
 	public void createStatic() {
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
-		VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, getId());
+		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.SHADER_STORAGE, getId());
 		IrisRenderSystem.bufferStorage(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, info.size(), content == null ? 0 : VulkanicAPI.GL_DYNAMIC_STORAGE_BIT);
 		if (content != null) {
 			VulkanicAPI.bufferSubData(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0L, content);

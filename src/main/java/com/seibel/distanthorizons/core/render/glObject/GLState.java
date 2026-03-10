@@ -10,6 +10,8 @@ import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicStencilCompareOp;
 import net.vulkanic.VulkanicStencilOperation;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicIntegerQuery;
 
 // TODO make this Closable or AutoClosable so it can be used with try-resource blocks
 public class GLState
@@ -69,27 +71,27 @@ public class GLState
 
 	public void saveState(CommandContext ctx)
 	{
-		this.program = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_CURRENT_PROGRAM);
-		this.vao = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_VERTEX_ARRAY_BINDING);
-		this.vbo = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_ARRAY_BUFFER_BINDING);
-		this.ebo = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER_BINDING);
+		this.program = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.CURRENT_PROGRAM);
+		this.vao = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.VERTEX_ARRAY_BINDING);
+		this.vbo = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.ARRAY_BUFFER_BINDING);
+		this.ebo = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.ELEMENT_ARRAY_BUFFER_BINDING);
 		
-		this.fbo = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_FRAMEBUFFER_BINDING);
+		this.fbo = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.FRAMEBUFFER_BINDING);
 		
-		this.texture2D = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
-		this.activeTextureNumber = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_ACTIVE_TEXTURE);
+		this.texture2D = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
+		this.activeTextureNumber = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.ACTIVE_TEXTURE);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
-		this.texture0 = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
+		this.texture0 = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
-		this.texture1 = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
+		this.texture1 = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2); // problem with Iris
-		this.texture2 = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
+		this.texture2 = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		
 		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE3);
-		this.texture3 = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
+		this.texture3 = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		
 		DhTextureState.setActiveTextureUnit(this.activeTextureNumber);
 		
@@ -109,28 +111,28 @@ public class GLState
 		
 		this.blend = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_BLEND);
 		this.scissor = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST);
-		this.blendEqRGB = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_BLEND_EQUATION_RGB);
-		this.blendEqAlpha = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_BLEND_EQUATION_ALPHA);
-		this.blendSrcColor = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_BLEND_SRC_RGB);
-		this.blendSrcAlpha = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_BLEND_SRC_ALPHA);
-		this.blendDstColor = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_BLEND_DST_RGB);
-		this.blendDstAlpha = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_BLEND_DST_ALPHA);
+		this.blendEqRGB = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_EQUATION_RGB);
+		this.blendEqAlpha = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_EQUATION_ALPHA);
+		this.blendSrcColor = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_SRC_RGB);
+		this.blendSrcAlpha = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_SRC_ALPHA);
+		this.blendDstColor = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_DST_RGB);
+		this.blendDstAlpha = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_DST_ALPHA);
 		this.depth = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_DEPTH_TEST);
-		this.writeToDepthBuffer = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_DEPTH_WRITEMASK) == VulkanicAPI.GL_TRUE;
-		this.depthFunc = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_DEPTH_FUNC);
+		this.writeToDepthBuffer = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.DEPTH_WRITEMASK) == VulkanicAPI.GL_TRUE;
+		this.depthFunc = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.DEPTH_FUNC);
 		this.stencil = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_STENCIL_TEST);
-		this.stencilFunc = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_FUNC);
-		this.stencilRef = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_REF);
-		this.stencilMask = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_VALUE_MASK);
-		this.stencilFailOp = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_FAIL);
-		this.stencilDepthFailOp = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_PASS_DEPTH_FAIL);
-		this.stencilDepthPassOp = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_PASS_DEPTH_PASS);
-		this.stencilWriteMask = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_WRITEMASK);
+		this.stencilFunc = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_FUNC);
+		this.stencilRef = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_REF);
+		this.stencilMask = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_VALUE_MASK);
+		this.stencilFailOp = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_FAIL);
+		this.stencilDepthFailOp = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_PASS_DEPTH_FAIL);
+		this.stencilDepthPassOp = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_PASS_DEPTH_PASS);
+		this.stencilWriteMask = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_WRITEMASK);
 		this.view = new int[4];
 		VulkanicAPI.getIntegerv(ctx, VulkanicAPI.GL_VIEWPORT, this.view);
 		this.cull = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_CULL_FACE);
-		this.cullMode = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_CULL_FACE_MODE);
-		this.polyMode = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_POLYGON_MODE);
+		this.cullMode = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.CULL_FACE_MODE);
+		this.polyMode = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.POLYGON_MODE);
 	}
 	
 	@Override
@@ -214,8 +216,8 @@ public class GLState
 		}
 		
 		VulkanicAPI.bindVertexArray(ctx, VulkanicAPI.isVertexArray(ctx, this.vao) ? this.vao : 0);
-		VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, VulkanicAPI.isBuffer(ctx, this.vbo) ? this.vbo : 0);
-		VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, VulkanicAPI.isBuffer(ctx, this.ebo) ? this.ebo: 0);
+		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, VulkanicAPI.isBuffer(ctx, this.vbo) ? this.vbo : 0);
+		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.INDEX, VulkanicAPI.isBuffer(ctx, this.ebo) ? this.ebo: 0);
 		VulkanicAPI.bindShaderProgram(ctx, VulkanicAPI.isProgram(ctx, this.program) ? this.program : 0);
 		
 		if (this.writeToDepthBuffer)

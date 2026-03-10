@@ -4,6 +4,7 @@ import net.irisshaders.iris.gl.IrisRenderSystem;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
@@ -78,7 +79,7 @@ public class TextureInfoCache {
 		private int fetchLevelParameter(int pname) {
 			var ctx = VulkanicAPI.getCommandContext();
 			// Keep track of what texture was bound before
-			int previousTextureBinding = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D);
+			int previousTextureBinding = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 
 			// Bind this texture and grab the parameter from it.
 			VulkanicAPI.bindTexture2D(ctx, id);

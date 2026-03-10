@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 
 public class GlFramebuffer extends GlResource {
 	private final Int2IntMap attachments;
@@ -18,8 +19,8 @@ public class GlFramebuffer extends GlResource {
 		super(IrisRenderSystem.createFramebuffer());
 
 		this.attachments = new Int2IntArrayMap();
-		this.maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS);
-		this.maxColorAttachments = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
+		this.maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_DRAW_BUFFERS);
+		this.maxColorAttachments = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_COLOR_ATTACHMENTS);
 		this.hasDepthAttachment = false;
 	}
 

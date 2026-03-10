@@ -14,6 +14,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureTarget;
 import org.joml.Matrix4fc;
 
 import java.util.EnumMap;
@@ -80,8 +82,8 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
         CommandContext ctx = VulkanicAPI.getCommandContext();
         VulkanicAPI.setActiveTextureUnit(ctx, VulkanicAPI.GL_TEXTURE0 + slot.ordinal());
         VulkanicAPI.bindTexture2D(ctx, tex.glId());
-        VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, textureView.baseMipLevel());
-        VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
+        VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, textureView.baseMipLevel());
+        VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
         tex.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 
         var uniform = this.uniformTextures.get(slot);

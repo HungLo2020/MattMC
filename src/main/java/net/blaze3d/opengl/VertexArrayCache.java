@@ -9,6 +9,7 @@ import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -41,7 +42,7 @@ public abstract class VertexArrayCache {
 				int i = VulkanicAPI.createVertexArray(ctx);
 				VulkanicAPI.bindVertexArray(ctx, i);
 				if (glBuffer != null) {
-					VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle);
+					VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle);
 					setupCombinedAttributes(vertexFormat, true);
 				}
 
@@ -51,7 +52,7 @@ public abstract class VertexArrayCache {
 			} else {
 				VulkanicAPI.bindVertexArray(ctx, vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
-					VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle);
+					VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle);
 					vertexArray.lastVertexBuffer = glBuffer;
 					setupCombinedAttributes(vertexFormat, false);
 				}

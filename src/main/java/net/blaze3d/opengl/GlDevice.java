@@ -274,7 +274,7 @@ public class GlDevice implements GpuDevice {
 	}
 
 	private static int getMaxSupportedTextureSize() {
-		int i = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicAPI.GL_MAX_TEXTURE_SIZE);
+		int i = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicIntegerQuery.MAX_TEXTURE_SIZE);
 
 		for (int j = Math.max(32768, i); j >= 1024; j >>= 1) {
 			uploadTexture2DAndTrack(

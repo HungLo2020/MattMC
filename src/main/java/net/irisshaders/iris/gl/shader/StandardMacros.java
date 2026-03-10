@@ -14,6 +14,7 @@ import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -325,7 +326,7 @@ public class StandardMacros {
 	 */
 	public static Set<String> getGlExtensions() {
 		// In OpenGL Core, we must use a new way of retrieving extensions.
-		int numExtensions = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_NUM_EXTENSIONS);
+		int numExtensions = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.NUM_EXTENSIONS);
 
 		String[] extensions = new String[numExtensions];
 

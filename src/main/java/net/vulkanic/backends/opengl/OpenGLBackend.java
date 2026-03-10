@@ -1603,6 +1603,28 @@ public class OpenGLBackend implements GraphicsBackend {
     private static int toOpenGLIntegerQuery(VulkanicIntegerQuery query) {
         return switch (query) {
             case CONTEXT_FLAGS -> VulkanicAPI.GL_CONTEXT_FLAGS;
+            case CURRENT_PROGRAM -> VulkanicAPI.GL_CURRENT_PROGRAM;
+            case VERTEX_ARRAY_BINDING -> VulkanicAPI.GL_VERTEX_ARRAY_BINDING;
+            case ARRAY_BUFFER_BINDING -> VulkanicAPI.GL_ARRAY_BUFFER_BINDING;
+            case ELEMENT_ARRAY_BUFFER_BINDING -> VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER_BINDING;
+            case ACTIVE_TEXTURE -> VulkanicAPI.GL_ACTIVE_TEXTURE;
+            case BLEND_EQUATION_RGB -> VulkanicAPI.GL_BLEND_EQUATION_RGB;
+            case BLEND_EQUATION_ALPHA -> VulkanicAPI.GL_BLEND_EQUATION_ALPHA;
+            case BLEND_SRC_RGB -> VulkanicAPI.GL_BLEND_SRC_RGB;
+            case BLEND_SRC_ALPHA -> VulkanicAPI.GL_BLEND_SRC_ALPHA;
+            case BLEND_DST_RGB -> VulkanicAPI.GL_BLEND_DST_RGB;
+            case BLEND_DST_ALPHA -> VulkanicAPI.GL_BLEND_DST_ALPHA;
+            case DEPTH_WRITEMASK -> VulkanicAPI.GL_DEPTH_WRITEMASK;
+            case DEPTH_FUNC -> VulkanicAPI.GL_DEPTH_FUNC;
+            case STENCIL_FUNC -> VulkanicAPI.GL_STENCIL_FUNC;
+            case STENCIL_REF -> VulkanicAPI.GL_STENCIL_REF;
+            case STENCIL_VALUE_MASK -> VulkanicAPI.GL_STENCIL_VALUE_MASK;
+            case STENCIL_FAIL -> VulkanicAPI.GL_STENCIL_FAIL;
+            case STENCIL_PASS_DEPTH_FAIL -> VulkanicAPI.GL_STENCIL_PASS_DEPTH_FAIL;
+            case STENCIL_PASS_DEPTH_PASS -> VulkanicAPI.GL_STENCIL_PASS_DEPTH_PASS;
+            case STENCIL_WRITEMASK -> VulkanicAPI.GL_STENCIL_WRITEMASK;
+            case CULL_FACE_MODE -> VulkanicAPI.GL_CULL_FACE_MODE;
+            case POLYGON_MODE -> VulkanicAPI.GL_POLYGON_MODE;
             case MAX_TEXTURE_SIZE -> VulkanicAPI.GL_MAX_TEXTURE_SIZE;
             case MAX_TEXTURE_IMAGE_UNITS -> VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS;
             case MAX_DRAW_BUFFERS -> VulkanicAPI.GL_MAX_DRAW_BUFFERS;

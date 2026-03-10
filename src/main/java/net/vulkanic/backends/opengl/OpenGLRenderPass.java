@@ -4,6 +4,7 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
+import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicRenderPass;
 
@@ -77,7 +78,7 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
                 "OpenGL render pass requires an OpenGLBuffer for vertex buffer, got: " +
                 (buffer == null ? "null" : buffer.getClass().getName()));
         }
-        VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.getGlHandle());
+        VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.getGlHandle());
     }
 
     @Override

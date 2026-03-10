@@ -744,8 +744,12 @@ public class Phase3DrawPathTest {
         assertFalse(source.contains("createFenceSync(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0)"),
             "GLRenderDevice should not create completion fences via raw createFenceSync parameters");
 
-        assertTrue(source.contains("getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TEXTURE_MAX_LEVEL)"),
-            "GLRenderDevice should use VulkanicAPI constant instead of hardcoded texture query literal");
+        assertTrue(source.contains("getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.TEXTURE_MAX_LEVEL)"),
+            "GLRenderDevice should use typed VulkanicIntegerQuery instead of raw texture query constants");
+        assertFalse(source.contains("VulkanicAPI.bindBuffer(ctx, target.getTargetParameter(), buffer.handle())"),
+            "GLRenderDevice should no longer bind buffers through raw GlBufferTarget integer targets where typed targets are available");
+        assertTrue(source.contains("VulkanicAPI.bindBuffer(ctx, target.toVulkanicBufferTarget(), buffer.handle())"),
+            "GLRenderDevice should bind buffers through typed VulkanicBufferTarget mapping");
         assertTrue(source.contains("VulkanicAPI.copyBufferSubDataBetweenCopyTargets("),
             "GLRenderDevice should copy buffer ranges via copyBufferSubDataBetweenCopyTargets helper");
         assertTrue(source.contains("VulkanicAPI.createGpuCompletionFence("),
@@ -845,8 +849,10 @@ public class Phase3DrawPathTest {
             "VertexArrayCache should not bind GL_ARRAY_BUFFER via hardcoded target literal 34962");
         assertFalse(source.contains("GlStateManager._glBindBuffer("),
             "VertexArrayCache should not bind buffers through GlStateManager wrapper");
-        assertTrue(source.contains("VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle)"),
-            "VertexArrayCache should bind array buffers directly via VulkanicAPI.bindBuffer using VulkanicAPI.GL_ARRAY_BUFFER");
+        assertFalse(source.contains("VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.handle)"),
+            "VertexArrayCache should no longer use raw GL_ARRAY_BUFFER target where typed targets are available");
+        assertTrue(source.contains("VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle)"),
+            "VertexArrayCache should bind array buffers through typed VulkanicBufferTarget.VERTEX");
         assertFalse(source.contains("GlStateManager._enableVertexAttribArray("),
             "VertexArrayCache should not enable attributes through GlStateManager wrapper");
         assertFalse(source.contains("GlStateManager._vertexAttribPointer("),
@@ -907,8 +913,8 @@ public class Phase3DrawPathTest {
             "GlDevice texture setup should use VulkanicAPI.setTextureMaxLod helper");
         assertTrue(source.contains("VulkanicAPI.disableTextureCompareMode("),
             "GlDevice depth texture setup should use VulkanicAPI.disableTextureCompareMode helper");
-        assertTrue(source.contains("VulkanicAPI.GL_MAX_TEXTURE_SIZE"),
-            "GlDevice max texture-size probe should use VulkanicAPI.GL_MAX_TEXTURE_SIZE constant");
+        assertTrue(source.contains("VulkanicIntegerQuery.MAX_TEXTURE_SIZE"),
+            "GlDevice max texture-size probe should use typed VulkanicIntegerQuery.MAX_TEXTURE_SIZE");
         assertTrue(source.contains("VulkanicAPI.GL_PROXY_TEXTURE_2D"),
             "GlDevice max texture-size probe should use VulkanicAPI.GL_PROXY_TEXTURE_2D constant");
     }
@@ -971,8 +977,8 @@ public class Phase3DrawPathTest {
         String clearPassSource = Files.readString(clearPassFile);
         assertFalse(clearPassSource.contains("GlStateManager._getInteger("),
             "ClearPassCreator should not query max draw buffers through GlStateManager wrapper");
-        assertTrue(clearPassSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS)"),
-            "ClearPassCreator should query max draw buffers directly through VulkanicAPI");
+        assertTrue(clearPassSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_DRAW_BUFFERS)"),
+            "ClearPassCreator should query max draw buffers through typed VulkanicIntegerQuery");
 
         Path samplerLimitsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/sampler/SamplerLimits.java");
         String samplerLimitsSource = Files.readString(samplerLimitsFile);
@@ -982,8 +988,8 @@ public class Phase3DrawPathTest {
             "SamplerLimits should not hard-wire immediate-context retrieval");
         assertTrue(samplerLimitsSource.contains("var ctx = VulkanicAPI.getCommandContext();"),
             "SamplerLimits should fetch backend-neutral command context");
-        assertTrue(samplerLimitsSource.contains("VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS)"),
-            "SamplerLimits should query limits directly through VulkanicAPI with shared context");
+        assertTrue(samplerLimitsSource.contains("VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.MAX_TEXTURE_IMAGE_UNITS)"),
+            "SamplerLimits should query limits through typed VulkanicIntegerQuery with shared context");
 
         Path standardMacrosFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/StandardMacros.java");
         String standardMacrosSource = Files.readString(standardMacrosFile);
@@ -995,8 +1001,8 @@ public class Phase3DrawPathTest {
             "StandardMacros should not hard-wire immediate-context retrieval");
         assertTrue(standardMacrosSource.contains("VulkanicAPI.getString(VulkanicAPI.getCommandContext(), name)"),
             "StandardMacros should query GL version strings directly through VulkanicAPI");
-        assertTrue(standardMacrosSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_NUM_EXTENSIONS)"),
-            "StandardMacros should query extension count directly through VulkanicAPI");
+        assertTrue(standardMacrosSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.NUM_EXTENSIONS)"),
+            "StandardMacros should query extension count through typed VulkanicIntegerQuery");
 
         Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
         String programCreatorSource = Files.readString(programCreatorFile);
@@ -1064,10 +1070,10 @@ public class Phase3DrawPathTest {
             "GlFramebuffer should not query caps through GlStateManager._getInteger wrapper");
         assertFalse(glFramebufferSource.contains("VulkanicAPI.getImmediateContext()"),
             "GlFramebuffer should not hard-wire immediate-context retrieval");
-        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_DRAW_BUFFERS)"),
-            "GlFramebuffer should query draw-buffer cap directly through VulkanicAPI.getInteger");
-        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS)"),
-            "GlFramebuffer should query color-attachment cap directly through VulkanicAPI.getInteger");
+        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_DRAW_BUFFERS)"),
+            "GlFramebuffer should query draw-buffer cap through typed VulkanicIntegerQuery");
+        assertTrue(glFramebufferSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_COLOR_ATTACHMENTS)"),
+            "GlFramebuffer should query color-attachment cap through typed VulkanicIntegerQuery");
 
         Path textureInfoCacheFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureInfoCache.java");
         String textureInfoCacheSource = Files.readString(textureInfoCacheFile);
@@ -1079,8 +1085,8 @@ public class Phase3DrawPathTest {
             "TextureInfoCache should not hard-wire immediate-context retrieval");
         assertTrue(textureInfoCacheSource.contains("var ctx = VulkanicAPI.getCommandContext();"),
             "TextureInfoCache should fetch backend-neutral command context in level-parameter helper");
-        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
-            "TextureInfoCache should query current texture binding directly through VulkanicAPI.getInteger");
+        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D)"),
+            "TextureInfoCache should query current texture binding through typed VulkanicIntegerQuery");
         assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, pname)"),
             "TextureInfoCache should query texture level params directly through VulkanicAPI.getTextureLevelParameter");
 
@@ -1092,10 +1098,10 @@ public class Phase3DrawPathTest {
             "TextureManipulationUtil should not query tex level dimensions through GlStateManager._getTexLevelParameter wrapper");
         assertFalse(textureManipulationUtilSource.contains("GlStateManager._glFramebufferTexture2D("),
             "TextureManipulationUtil should not attach/detach framebuffer textures through removed GlStateManager._glFramebufferTexture2D wrapper");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_FRAMEBUFFER_BINDING)"),
-            "TextureManipulationUtil should query previous framebuffer directly through VulkanicAPI.getInteger");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_TEXTURE_BINDING_2D)"),
-            "TextureManipulationUtil should query previous texture directly through VulkanicAPI.getInteger");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.FRAMEBUFFER_BINDING)"),
+            "TextureManipulationUtil should query previous framebuffer through typed VulkanicIntegerQuery");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D)"),
+            "TextureManipulationUtil should query previous texture through typed VulkanicIntegerQuery");
         assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_WIDTH)"),
             "TextureManipulationUtil should query mip width directly through VulkanicAPI.getTextureLevelParameter");
         assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER"),
@@ -1107,10 +1113,10 @@ public class Phase3DrawPathTest {
             "SodiumShader should not set base mip level with hardcoded target/pname literals via GlStateManager wrapper");
         assertFalse(sodiumShaderSource.contains("GlStateManager._texParameter(3553, 33085"),
             "SodiumShader should not set max mip level with hardcoded target/pname literals via GlStateManager wrapper");
-        assertTrue(sodiumShaderSource.contains("VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL"),
-            "SodiumShader should set base mip level directly through VulkanicAPI.setTextureParameter");
-        assertTrue(sodiumShaderSource.contains("VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL"),
-            "SodiumShader should set max mip level directly through VulkanicAPI.setTextureParameter");
+        assertTrue(sodiumShaderSource.contains("VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL"),
+            "SodiumShader should set base mip level through typed Vulkanic texture parameter APIs");
+        assertTrue(sodiumShaderSource.contains("VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL"),
+            "SodiumShader should set max mip level through typed Vulkanic texture parameter APIs");
     }
 
     @Test
@@ -1638,6 +1644,8 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should create buffers directly via VulkanicAPI.createBuffer");
         assertTrue(directStateAccessSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(),"),
             "DirectStateAccess should bind/unbind emulated targets directly via VulkanicAPI.bindBuffer");
+        assertTrue(directStateAccessSource.contains("private VulkanicBufferTarget selectBufferBindTarget("),
+            "DirectStateAccess should classify emulated bind targets using typed VulkanicBufferTarget");
         assertTrue(directStateAccessSource.contains("VulkanicAPI.mapBuffer(VulkanicAPI.getCommandContext(),"),
             "DirectStateAccess should map buffers directly via VulkanicAPI.mapBuffer");
         assertTrue(directStateAccessSource.contains("VulkanicAPI.unmapBuffer(VulkanicAPI.getCommandContext(),"),
@@ -1664,8 +1672,10 @@ public class Phase3DrawPathTest {
             "ShaderStorageBuffer should not upload content through removed GlStateManager._glBufferSubData wrapper");
         assertTrue(ssboSource.contains("VulkanicAPI.createBuffer(ctx)"),
             "ShaderStorageBuffer should create buffers directly via VulkanicAPI.createBuffer");
-        assertTrue(ssboSource.contains("VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, getId())"),
-            "ShaderStorageBuffer should bind SSBOs directly via VulkanicAPI.bindBuffer");
+        assertFalse(ssboSource.contains("VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, getId())"),
+            "ShaderStorageBuffer should no longer use raw GL_SHADER_STORAGE_BUFFER target where typed targets are available");
+        assertTrue(ssboSource.contains("VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.SHADER_STORAGE, getId())"),
+            "ShaderStorageBuffer should bind SSBOs through typed VulkanicBufferTarget.SHADER_STORAGE");
         assertTrue(ssboSource.contains("VulkanicAPI.bufferSubData(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0L, content)"),
             "ShaderStorageBuffer should upload content directly via VulkanicAPI.bufferSubData");
 

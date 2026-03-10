@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 
 public class DhFramebuffer implements IDhApiFramebuffer
 {
@@ -26,8 +27,8 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.id = VulkanicAPI.createFramebuffer(ctx);
 
 		this.attachments = new Int2IntArrayMap();
-		this.maxDrawBuffers = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_DRAW_BUFFERS);
-		this.maxColorAttachments = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
+		this.maxDrawBuffers = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.MAX_DRAW_BUFFERS);
+		this.maxColorAttachments = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.MAX_COLOR_ATTACHMENTS);
 		this.hasDepthAttachment = false;
 	}
 
@@ -38,8 +39,8 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		
 		this.attachments = new Int2IntArrayMap();
 		CommandContext ctx = VulkanicAPI.getCommandContext();
-		this.maxDrawBuffers = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_DRAW_BUFFERS);
-		this.maxColorAttachments = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
+		this.maxDrawBuffers = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.MAX_DRAW_BUFFERS);
+		this.maxColorAttachments = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.MAX_COLOR_ATTACHMENTS);
 		this.hasDepthAttachment = false;
 	}
 	
