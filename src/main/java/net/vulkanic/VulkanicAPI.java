@@ -22,8 +22,13 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.glfw.GLFWErrorCallbackI;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -33,6 +38,12 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class VulkanicAPI {
     private static GraphicsBackend backend;
+    @Nullable
+    private static VulkanBackend rawVulkanBackend;
+    private static final Set<String> VULKAN_PROXY_ALLOWED_METHODS = Set.of(
+        "getBackendType",
+        "isNativeVulkanReady"
+    );
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
     @Nullable
     private static Thread renderThread;
@@ -597,9 +608,11 @@ public class VulkanicAPI {
             switch (backendType) {
                 case OPENGL:
                     backend = new OpenGLBackend();
+                    rawVulkanBackend = null;
                     break;
                 case VULKAN:
-                    backend = new VulkanBackend();
+                    rawVulkanBackend = new VulkanBackend();
+                    backend = createFailFastVulkanProxy(rawVulkanBackend);
             }
 
 			readFramebufferBinding = 0;
@@ -648,6 +661,10 @@ public class VulkanicAPI {
      * that explains why Vulkan-specific probes were skipped.</p>
      */
     public static VulkanReadinessReport getVulkanReadinessReport() {
+        if (rawVulkanBackend != null) {
+            return rawVulkanBackend.getReadinessReport();
+        }
+
         GraphicsBackend activeBackend = getBackend();
         if (activeBackend instanceof VulkanBackend vulkanBackend) {
             return vulkanBackend.getReadinessReport();
@@ -664,6 +681,41 @@ public class VulkanicAPI {
      */
     public static String describeVulkanReadiness() {
         return getVulkanReadinessReport().toMultilineString();
+    }
+
+    private static GraphicsBackend createFailFastVulkanProxy(VulkanBackend vulkanBackend) {
+        java.util.Map<Method, Method> methodCache = new ConcurrentHashMap<>();
+
+        return (GraphicsBackend) Proxy.newProxyInstance(
+            GraphicsBackend.class.getClassLoader(),
+            new Class<?>[]{GraphicsBackend.class},
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return method.invoke(vulkanBackend, args);
+                }
+
+                Method backendMethod = methodCache.computeIfAbsent(method, key -> {
+                    try {
+                        return VulkanBackend.class.getMethod(key.getName(), key.getParameterTypes());
+                    } catch (NoSuchMethodException exception) {
+                        throw new IllegalStateException("Could not resolve VulkanBackend method: " + key, exception);
+                    }
+                });
+
+                boolean overriddenInVulkanBackend = backendMethod.getDeclaringClass() == VulkanBackend.class;
+                if (!overriddenInVulkanBackend && !VULKAN_PROXY_ALLOWED_METHODS.contains(method.getName())) {
+                    throw new IllegalStateException(
+                        "Vulkan backend selected but method '" + method.getName() + "' is not implemented natively; "
+                            + "OpenGL fallback is intentionally blocked.");
+                }
+
+                try {
+                    return backendMethod.invoke(vulkanBackend, args);
+                } catch (InvocationTargetException exception) {
+                    throw exception.getTargetException();
+                }
+            }
+        );
     }
     
     /**
@@ -866,6 +918,14 @@ public class VulkanicAPI {
      * @param mode The face culling mode
      */
     public static void setCullFaceMode(CommandContext ctx, int mode) {
+        VulkanicCullFaceMode.fromLegacyGlConstant(mode)
+            .ifPresentOrElse(
+                typedMode -> setCullFaceMode(ctx, typedMode),
+                () -> getBackend().setCullFaceMode(ctx, mode)
+            );
+    }
+
+    public static void setCullFaceMode(CommandContext ctx, VulkanicCullFaceMode mode) {
         getBackend().setCullFaceMode(ctx, mode);
     }
     
@@ -887,21 +947,29 @@ public class VulkanicAPI {
      * @param enabled True to enable, false to disable
      */
     public static void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, cap, enabled);
+        VulkanicCapability.fromLegacyGlConstant(cap)
+            .ifPresentOrElse(
+                capability -> setCapabilityEnabled(ctx, capability, enabled),
+                () -> getBackend().setCapabilityEnabled(ctx, cap, enabled)
+            );
+    }
+
+    public static void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled) {
+        getBackend().setCapabilityEnabled(ctx, capability, enabled);
     }
 
     /**
      * Enables or disables synchronous debug output.
      */
     public static void setDebugOutputSynchronousEnabled(CommandContext ctx, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, GL_DEBUG_OUTPUT_SYNCHRONOUS, enabled);
+        setCapabilityEnabled(ctx, VulkanicCapability.DEBUG_OUTPUT_SYNCHRONOUS, enabled);
     }
 
     /**
      * Enables or disables debug output generation.
      */
     public static void setDebugOutputEnabled(CommandContext ctx, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, GL_DEBUG_OUTPUT, enabled);
+        setCapabilityEnabled(ctx, VulkanicCapability.DEBUG_OUTPUT, enabled);
     }
 
     /**
@@ -920,9 +988,17 @@ public class VulkanicAPI {
     public static void bindTexture2D(CommandContext ctx, int textureId) {
         getBackend().bindTexture2D(ctx, textureId);
     }
+
+    public static void bindTexture(CommandContext ctx, VulkanicTextureTarget target, int textureId) {
+        getBackend().bindTexture(ctx, target, textureId);
+    }
     
     public static void bindTexture(CommandContext ctx, int target, int textureId) {
-        getBackend().bindTexture(ctx, target, textureId);
+        VulkanicTextureTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> bindTexture(ctx, typedTarget, textureId),
+                () -> getBackend().bindTexture(ctx, target, textureId)
+            );
     }
 
     /**
@@ -931,7 +1007,7 @@ public class VulkanicAPI {
      * <p>Transitional convenience wrapper to reduce target-specific integer usage in callsites.
      */
     public static void bindCubemapTexture(CommandContext ctx, int textureId) {
-        getBackend().bindTexture(ctx, GL_TEXTURE_CUBE_MAP, textureId);
+        bindTexture(ctx, VulkanicTextureTarget.TEXTURE_CUBE_MAP, textureId);
     }
 
     /**
@@ -940,7 +1016,7 @@ public class VulkanicAPI {
      * <p>Transitional convenience wrapper to reduce target-specific integer usage in callsites.
      */
     public static void bindTextureBuffer(CommandContext ctx, int textureId) {
-        getBackend().bindTexture(ctx, GL_TEXTURE_BUFFER, textureId);
+        bindTexture(ctx, VulkanicTextureTarget.TEXTURE_BUFFER, textureId);
     }
     
     public static void bindSampler(CommandContext ctx, int unit, int sampler) {
@@ -954,6 +1030,14 @@ public class VulkanicAPI {
      * @param func The depth comparison function
      */
     public static void setDepthTest(CommandContext ctx, int func) {
+        VulkanicDepthCompareOp.fromLegacyGlConstant(func)
+            .ifPresentOrElse(
+                typedFunc -> setDepthTest(ctx, typedFunc),
+                () -> getBackend().setDepthTest(ctx, func)
+            );
+    }
+
+    public static void setDepthTest(CommandContext ctx, VulkanicDepthCompareOp func) {
         getBackend().setDepthTest(ctx, func);
     }
     
@@ -1098,6 +1182,14 @@ public class VulkanicAPI {
      * @param buffer The buffer object ID
      */
     public static void bindBuffer(CommandContext ctx, int target, int buffer) {
+        VulkanicBufferTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> bindBuffer(ctx, typedTarget, buffer),
+                () -> getBackend().bindBuffer(ctx, target, buffer)
+            );
+    }
+
+    public static void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
         getBackend().bindBuffer(ctx, target, buffer);
     }
 
@@ -1294,7 +1386,13 @@ public class VulkanicAPI {
      * @return The queried integer value
      */
     public static int getInteger(CommandContext ctx, int pname) {
-        return getBackend().getInteger(ctx, pname);
+        return VulkanicIntegerQuery.fromLegacyGlPName(pname)
+            .map(query -> getInteger(ctx, query))
+            .orElseGet(() -> getBackend().getInteger(ctx, pname));
+    }
+
+    public static int getInteger(CommandContext ctx, VulkanicIntegerQuery query) {
+        return getBackend().getInteger(ctx, query);
     }
 
     /**
@@ -1308,42 +1406,42 @@ public class VulkanicAPI {
      * Enables or disables program point-size behavior.
      */
     public static void setProgramPointSizeEnabled(CommandContext ctx, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, GL_PROGRAM_POINT_SIZE, enabled);
+        setCapabilityEnabled(ctx, VulkanicCapability.PROGRAM_POINT_SIZE, enabled);
     }
 
     /**
      * Enables or disables face culling.
      */
     public static void setCullFaceEnabled(CommandContext ctx, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, GL_CULL_FACE, enabled);
+        setCapabilityEnabled(ctx, VulkanicCapability.CULL_FACE, enabled);
     }
 
     /**
      * Enables or disables depth testing.
      */
     public static void setDepthTestEnabled(CommandContext ctx, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, GL_DEPTH_TEST, enabled);
+        setCapabilityEnabled(ctx, VulkanicCapability.DEPTH_TEST, enabled);
     }
 
     /**
      * Enables or disables scissor testing.
      */
     public static void setScissorTestEnabled(CommandContext ctx, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, GL_SCISSOR_TEST, enabled);
+        setCapabilityEnabled(ctx, VulkanicCapability.SCISSOR_TEST, enabled);
     }
 
     /**
      * Enables or disables polygon offset for filled primitives.
      */
     public static void setPolygonOffsetFillEnabled(CommandContext ctx, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, GL_POLYGON_OFFSET_FILL, enabled);
+        setCapabilityEnabled(ctx, VulkanicCapability.POLYGON_OFFSET_FILL, enabled);
     }
 
     /**
      * Enables or disables color-logic operations.
      */
     public static void setColorLogicOpEnabled(CommandContext ctx, boolean enabled) {
-        getBackend().setCapabilityEnabled(ctx, GL_COLOR_LOGIC_OP, enabled);
+        setCapabilityEnabled(ctx, VulkanicCapability.COLOR_LOGIC_OP, enabled);
     }
     
     /**
@@ -1575,6 +1673,14 @@ public class VulkanicAPI {
     }
     
     public static void setDepthFunc(CommandContext ctx, int func) {
+        VulkanicDepthCompareOp.fromLegacyGlConstant(func)
+            .ifPresentOrElse(
+                typedFunc -> setDepthFunc(ctx, typedFunc),
+                () -> getBackend().setDepthFunc(ctx, func)
+            );
+    }
+
+    public static void setDepthFunc(CommandContext ctx, VulkanicDepthCompareOp func) {
         getBackend().setDepthFunc(ctx, func);
     }
     
@@ -2738,6 +2844,23 @@ public class VulkanicAPI {
     }
     
     public static void texParameteri(CommandContext ctx, int target, int pname, int param) {
+        VulkanicTextureTarget typedTarget = VulkanicTextureTarget.fromLegacyGlTarget(target).orElse(null);
+        VulkanicTextureParameterName typedParameterName = VulkanicTextureParameterName.fromLegacyGlPName(pname).orElse(null);
+
+        if (typedTarget != null && typedParameterName != null) {
+            texParameteri(ctx, typedTarget, typedParameterName, param);
+            return;
+        }
+
+        getBackend().texParameteri(ctx, target, pname, param);
+    }
+
+    public static void texParameteri(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        int param
+    ) {
         getBackend().texParameteri(ctx, target, pname, param);
     }
     

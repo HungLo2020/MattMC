@@ -32,6 +32,7 @@ import net.irisshaders.iris.uniforms.builtin.BuiltinReplacementUniforms;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -304,7 +305,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		bind(dhApiRenderParam);
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.setDepthTestEnabled(ctx, true);
-		VulkanicAPI.setDepthFunc(ctx, VulkanicAPI.GL_LEQUAL);
+		VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LEQUAL);
 		this.setUniform(this.instancedShaderOffsetChunkUniform,
 			new DhApiVec3i(
 				getChunkPosFromDouble(boxGroup.getOriginBlockPos().x),

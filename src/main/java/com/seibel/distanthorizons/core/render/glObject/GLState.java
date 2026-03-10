@@ -2,6 +2,9 @@ package com.seibel.distanthorizons.core.render.glObject;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicCapability;
+import net.vulkanic.VulkanicCullFaceMode;
+import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicAPI;
 
 // TODO make this Closable or AutoClosable so it can be used with try-resource blocks
@@ -222,15 +225,19 @@ public class GLState
 		{
 			VulkanicAPI.setDepthTestEnabled(ctx, false);
 		}
-		VulkanicAPI.setDepthFunc(ctx, this.depthFunc);
+		VulkanicDepthCompareOp.fromLegacyGlConstant(this.depthFunc)
+			.ifPresentOrElse(
+				op -> VulkanicAPI.setDepthFunc(ctx, op),
+				() -> VulkanicAPI.setDepthFunc(ctx, this.depthFunc)
+			);
 		
 		if (this.stencil)
 		{
-			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_STENCIL_TEST, true);
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.STENCIL_TEST, true);
 		}
 		else
 		{
-			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_STENCIL_TEST, false);
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.STENCIL_TEST, false);
 		}
 		VulkanicAPI.setStencilFunc(ctx, this.stencilFunc, this.stencilRef, this.stencilMask);
 		
@@ -243,7 +250,11 @@ public class GLState
 		{
 			VulkanicAPI.setCullFaceEnabled(ctx, false);
 		}
-		VulkanicAPI.setCullFaceMode(ctx, this.cullMode);
+		VulkanicCullFaceMode.fromLegacyGlConstant(this.cullMode)
+			.ifPresentOrElse(
+				mode -> VulkanicAPI.setCullFaceMode(ctx, mode),
+				() -> VulkanicAPI.setCullFaceMode(ctx, this.cullMode)
+			);
 		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, this.polyMode);
 	}
 }

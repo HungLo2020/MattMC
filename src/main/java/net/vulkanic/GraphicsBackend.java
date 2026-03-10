@@ -124,6 +124,11 @@ public interface GraphicsBackend {
      * @param mode The face culling mode (GL_FRONT, GL_BACK, GL_FRONT_AND_BACK)
      */
     void setCullFaceMode(CommandContext ctx, int mode);
+
+    /**
+     * Sets the face culling mode using backend-neutral cull semantics.
+     */
+    void setCullFaceMode(CommandContext ctx, VulkanicCullFaceMode mode);
     
     /**
      * Binds a shader program for use.
@@ -147,6 +152,11 @@ public interface GraphicsBackend {
      * @param enabled True to enable, false to disable
      */
     void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled);
+
+    /**
+     * Sets a state capability using backend-neutral capability semantics.
+     */
+    void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled);
     
     /**
      * Binds a 2D texture to the current texture unit.
@@ -170,6 +180,11 @@ public interface GraphicsBackend {
      * @param textureId The texture ID to bind
      */
     void bindTexture(CommandContext ctx, int target, int textureId);
+
+    /**
+     * Binds a texture using backend-neutral target semantics.
+     */
+    void bindTexture(CommandContext ctx, VulkanicTextureTarget target, int textureId);
     
     /**
      * Binds a level of a texture to an image unit.
@@ -283,6 +298,11 @@ public interface GraphicsBackend {
      * @param func The depth comparison function
      */
     void setDepthTest(CommandContext ctx, int func);
+
+    /**
+     * Sets the depth test comparison operation using backend-neutral semantics.
+     */
+    void setDepthTest(CommandContext ctx, VulkanicDepthCompareOp func);
     
     /**
      * Sets the depth write mask.
@@ -498,6 +518,11 @@ public interface GraphicsBackend {
      * @param buffer The buffer object ID
      */
     void bindBuffer(CommandContext ctx, int target, int buffer);
+
+    /**
+     * Binds a buffer using backend-neutral target semantics.
+     */
+    void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer);
     
     /**
      * Binds a buffer to an indexed buffer target.
@@ -753,6 +778,11 @@ public interface GraphicsBackend {
      * @param func The depth comparison function
      */
     void setDepthFunc(CommandContext ctx, int func);
+
+    /**
+     * Sets the depth comparison operation using backend-neutral semantics.
+     */
+    void setDepthFunc(CommandContext ctx, VulkanicDepthCompareOp func);
     
     /**
      * Specifies which color buffer to read from for read operations.
@@ -859,6 +889,11 @@ public interface GraphicsBackend {
      * @return The queried integer value
      */
     int getInteger(CommandContext ctx, int pname);
+
+    /**
+     * Queries an integer state value using a backend-neutral key.
+     */
+    int getInteger(CommandContext ctx, VulkanicIntegerQuery query);
     
     /**
      * Sets uniform values for a vec3 shader variable.
@@ -2487,6 +2522,11 @@ public interface GraphicsBackend {
      * @param param The integer parameter value
      */
     void texParameteri(CommandContext ctx, int target, int pname, int param);
+
+    /**
+     * Sets an integer texture parameter using backend-neutral keys.
+     */
+    void texParameteri(CommandContext ctx, VulkanicTextureTarget target, VulkanicTextureParameterName pname, int param);
     
     
     // Additional rendering operations

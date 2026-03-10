@@ -91,8 +91,10 @@ public class Phase3DrawPathTest {
 
         Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         String apiSource = Files.readString(apiFile);
-        assertTrue(apiSource.contains("backend = new VulkanBackend();"),
-            "VulkanicAPI should route BackendType.VULKAN through the bootstrap VulkanBackend");
+        assertTrue(apiSource.contains("rawVulkanBackend = new VulkanBackend();"),
+            "VulkanicAPI should construct VulkanBackend for BackendType.VULKAN routing");
+        assertTrue(apiSource.contains("backend = createFailFastVulkanProxy(rawVulkanBackend);"),
+            "VulkanicAPI should route Vulkan backend calls through fail-fast proxy protection");
         assertFalse(apiSource.contains("throw new UnsupportedOperationException(\"Vulkan backend not yet implemented\")"),
             "VulkanicAPI should no longer hard-fail backend selection for BackendType.VULKAN");
     }
@@ -121,8 +123,8 @@ public class Phase3DrawPathTest {
             "Bootstrap Vulkan backend should report Vulkan backend identity");
         assertTrue(vulkanBackendSource.contains("public boolean isNativeVulkanReady()"),
             "Bootstrap Vulkan backend should define native readiness contract");
-        assertTrue(vulkanBackendSource.contains("return false;"),
-            "Bootstrap Vulkan backend should remain explicitly non-native-ready until Vulkan internals land");
+        assertTrue(vulkanBackendSource.contains("return nativeSpine != null;"),
+            "Bootstrap Vulkan backend should report native readiness based on native spine initialization state");
     }
 
     // ── Task 1: drawFromBuffers routes directly through VulkanicAPI ───────────
@@ -2051,6 +2053,68 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should no longer expose blend wrapper methods");
         assertFalse(dhWrapperSource.contains("public void disableBlend("),
             "MinecraftGLWrapper should no longer expose blend wrapper methods");
+    }
+
+    @Test
+    public void testCapabilityCallsitesUseTypedEnumsForKnownStateToggles() throws IOException {
+        Path blendStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/BlendModeStorage.java");
+        String blendStorageSource = Files.readString(blendStorageFile);
+        assertTrue(blendStorageSource.contains("VulkanicCapability.BLEND"),
+            "BlendModeStorage should use typed VulkanicCapability.BLEND for blend toggles");
+        assertFalse(blendStorageSource.contains("setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND"),
+            "BlendModeStorage should avoid raw GL_BLEND constants in capability toggles");
+
+        Path dhStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/GLState.java");
+        String dhStateSource = readSourceIfExists(dhStateFile);
+        assertTrue(dhStateSource.contains("VulkanicCapability.STENCIL_TEST"),
+            "Distant Horizons GLState should use typed stencil capability toggles");
+        assertFalse(dhStateSource.contains("setCapabilityEnabled(ctx, VulkanicAPI.GL_STENCIL_TEST"),
+            "Distant Horizons GLState should avoid raw GL_STENCIL_TEST constants in capability toggles");
+
+        Path lodRendererEventsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/LodRendererEvents.java");
+        String lodRendererEventsSource = readSourceIfExists(lodRendererEventsFile);
+        assertTrue(lodRendererEventsSource.contains("VulkanicCapability.CULL_FACE"),
+            "LodRendererEvents should use typed cull-face capability toggles");
+        assertFalse(lodRendererEventsSource.contains("setCapabilityEnabled(ctx, VulkanicAPI.GL_CULL_FACE"),
+            "LodRendererEvents should avoid raw GL_CULL_FACE constants in capability toggles");
+
+        Path lodRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String lodRendererSource = readSourceIfExists(lodRendererFile);
+        assertTrue(lodRendererSource.contains("VulkanicCapability.SCISSOR_TEST"),
+            "LodRenderer should use typed scissor-test capability toggles");
+        assertFalse(lodRendererSource.contains("setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST"),
+            "LodRenderer should avoid raw GL_SCISSOR_TEST constants in capability toggles");
+    }
+
+    @Test
+    public void testDepthAndCullCallsitesUseTypedEnumsForKnownState() throws IOException {
+        Path lodRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String lodRendererSource = readSourceIfExists(lodRendererFile);
+        assertTrue(lodRendererSource.contains("VulkanicDepthCompareOp.LESS"),
+            "LodRenderer should use typed depth-compare enum for known depth state");
+        assertFalse(lodRendererSource.contains("setDepthFunc(ctx, VulkanicAPI.GL_LESS"),
+            "LodRenderer should avoid raw GL_LESS depth constant in known state setup");
+
+        Path dhProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
+        String dhProgramSource = readSourceIfExists(dhProgramFile);
+        assertTrue(dhProgramSource.contains("VulkanicDepthCompareOp.LEQUAL"),
+            "IrisGenericRenderProgram should use typed depth-compare enum for known depth state");
+        assertFalse(dhProgramSource.contains("setDepthFunc(ctx, VulkanicAPI.GL_LEQUAL"),
+            "IrisGenericRenderProgram should avoid raw GL_LEQUAL depth constant in known state setup");
+
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = readSourceIfExists(encoderFile);
+        assertTrue(encoderSource.contains("toVulkanicDepthCompareOp(renderPipeline.getDepthTestFunction())"),
+            "GlCommandEncoder should map pipeline depth-test function to typed Vulkanic depth compare enum");
+        assertFalse(encoderSource.contains("setDepthFunc(ctx, GlConst.toGl(renderPipeline.getDepthTestFunction()))"),
+            "GlCommandEncoder should avoid direct GL int conversion for depth compare setup");
+
+        Path glStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/GLState.java");
+        String glStateSource = readSourceIfExists(glStateFile);
+        assertTrue(glStateSource.contains("VulkanicDepthCompareOp.fromLegacyGlConstant(this.depthFunc)"),
+            "GLState restore should resolve saved depth function through typed conversion helper");
+        assertTrue(glStateSource.contains("VulkanicCullFaceMode.fromLegacyGlConstant(this.cullMode)"),
+            "GLState restore should resolve saved cull mode through typed conversion helper");
     }
 
     @Test

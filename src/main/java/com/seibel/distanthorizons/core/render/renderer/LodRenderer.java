@@ -33,6 +33,8 @@ import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicCapability;
+import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
@@ -380,11 +382,11 @@ public class LodRenderer
 		VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
 		
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, false);
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.SCISSOR_TEST, false);
 		
 		// Enable depth test and depth mask
 		VulkanicAPI.setDepthTestEnabled(ctx, true);
-		VulkanicAPI.setDepthFunc(ctx, VulkanicAPI.GL_LESS);
+		VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);
 		VulkanicAPI.setDepthWriteMask(ctx, true);
 		
 		// This is required for MC versions 1.21.5+

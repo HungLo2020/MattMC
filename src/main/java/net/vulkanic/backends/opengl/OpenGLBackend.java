@@ -5,6 +5,13 @@ import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicCapability;
+import net.vulkanic.VulkanicCullFaceMode;
+import net.vulkanic.VulkanicDepthCompareOp;
+import net.vulkanic.VulkanicIntegerQuery;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureTarget;
 import org.lwjgl.opengl.*;
 
 /**
@@ -127,6 +134,11 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL11.glCullFace(mode);
     }
+
+    @Override
+    public void setCullFaceMode(CommandContext ctx, VulkanicCullFaceMode mode) {
+        setCullFaceMode(ctx, toOpenGLCullFaceMode(mode));
+    }
     
     @Override
     public void bindShaderProgram(CommandContext ctx, int programId) {
@@ -146,6 +158,11 @@ public class OpenGLBackend implements GraphicsBackend {
         } else {
             GL11.glDisable(cap);
         }
+    }
+
+    @Override
+    public void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled) {
+        setCapabilityEnabled(ctx, toOpenGLCapability(capability), enabled);
     }
     
     @Override
@@ -172,6 +189,11 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL11.glBindTexture(target, textureId);
     }
+
+    @Override
+    public void bindTexture(CommandContext ctx, VulkanicTextureTarget target, int textureId) {
+        bindTexture(ctx, toOpenGLTextureTarget(target), textureId);
+    }
     
     @Override
     public void bindSampler(CommandContext ctx, int unit, int sampler) {
@@ -187,6 +209,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glDepthFunc(func);
+    }
+
+    @Override
+    public void setDepthTest(CommandContext ctx, VulkanicDepthCompareOp func) {
+        setDepthTest(ctx, toOpenGLDepthCompareOp(func));
     }
     
     @Override
@@ -235,6 +262,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL15.glBindBuffer(target, buffer);
+    }
+
+    @Override
+    public void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
+        bindBuffer(ctx, toOpenGLBufferTarget(target), buffer);
     }
     
     @Override
@@ -458,6 +490,11 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL11.glDepthFunc(func);
     }
+
+    @Override
+    public void setDepthFunc(CommandContext ctx, VulkanicDepthCompareOp func) {
+        setDepthFunc(ctx, toOpenGLDepthCompareOp(func));
+    }
     
     @Override
     public void setReadBuffer(CommandContext ctx, int buffer) {
@@ -505,6 +542,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return GL11.glGetInteger(pname);
+    }
+
+    @Override
+    public int getInteger(CommandContext ctx, VulkanicIntegerQuery query) {
+        return getInteger(ctx, toOpenGLIntegerQuery(query));
     }
     
     @Override
@@ -1502,6 +1544,103 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL11.glTexParameteri(target, pname, param);
+    }
+
+    @Override
+    public void texParameteri(CommandContext ctx, VulkanicTextureTarget target, VulkanicTextureParameterName pname, int param) {
+        texParameteri(ctx, toOpenGLTextureTarget(target), toOpenGLTextureParameterName(pname), param);
+    }
+
+    private static int toOpenGLTextureTarget(VulkanicTextureTarget target) {
+        return switch (target) {
+            case TEXTURE_2D -> VulkanicAPI.GL_TEXTURE_2D;
+            case TEXTURE_3D -> VulkanicAPI.GL_TEXTURE_3D;
+            case TEXTURE_BUFFER -> VulkanicAPI.GL_TEXTURE_BUFFER;
+            case TEXTURE_CUBE_MAP -> VulkanicAPI.GL_TEXTURE_CUBE_MAP;
+            case TEXTURE_RECTANGLE -> VulkanicAPI.GL_TEXTURE_RECTANGLE;
+        };
+    }
+
+    private static int toOpenGLBufferTarget(VulkanicBufferTarget target) {
+        return switch (target) {
+            case VERTEX -> VulkanicAPI.GL_ARRAY_BUFFER;
+            case INDEX -> VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER;
+            case COPY_READ -> VulkanicAPI.GL_COPY_READ_BUFFER;
+            case COPY_WRITE -> VulkanicAPI.GL_COPY_WRITE_BUFFER;
+            case PIXEL_PACK -> VulkanicAPI.GL_PIXEL_PACK_BUFFER;
+            case SHADER_STORAGE -> VulkanicAPI.GL_SHADER_STORAGE_BUFFER;
+            case UNIFORM -> VulkanicAPI.GL_UNIFORM_BUFFER;
+        };
+    }
+
+    private static int toOpenGLIntegerQuery(VulkanicIntegerQuery query) {
+        return switch (query) {
+            case CONTEXT_FLAGS -> VulkanicAPI.GL_CONTEXT_FLAGS;
+            case MAX_TEXTURE_SIZE -> VulkanicAPI.GL_MAX_TEXTURE_SIZE;
+            case MAX_TEXTURE_IMAGE_UNITS -> VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS;
+            case MAX_DRAW_BUFFERS -> VulkanicAPI.GL_MAX_DRAW_BUFFERS;
+            case MAX_SHADER_STORAGE_BUFFER_BINDINGS -> VulkanicAPI.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS;
+            case UNIFORM_BUFFER_OFFSET_ALIGNMENT -> VulkanicAPI.GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT;
+            case TEXTURE_BINDING_2D -> VulkanicAPI.GL_TEXTURE_BINDING_2D;
+            case FRAMEBUFFER_BINDING -> VulkanicAPI.GL_FRAMEBUFFER_BINDING;
+            case MAX_COLOR_ATTACHMENTS -> VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS;
+            case NUM_EXTENSIONS -> VulkanicAPI.GL_NUM_EXTENSIONS;
+            case MAX_LABEL_LENGTH -> VulkanicAPI.GL_MAX_LABEL_LENGTH;
+            case TEXTURE_MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
+        };
+    }
+
+    private static int toOpenGLTextureParameterName(VulkanicTextureParameterName pname) {
+        return switch (pname) {
+            case MIN_FILTER -> VulkanicAPI.GL_TEXTURE_MIN_FILTER;
+            case MAG_FILTER -> VulkanicAPI.GL_TEXTURE_MAG_FILTER;
+            case WRAP_S -> VulkanicAPI.GL_TEXTURE_WRAP_S;
+            case WRAP_T -> VulkanicAPI.GL_TEXTURE_WRAP_T;
+            case WRAP_R -> VulkanicAPI.GL_TEXTURE_WRAP_R;
+            case MIN_LOD -> VulkanicAPI.GL_TEXTURE_MIN_LOD;
+            case MAX_LOD -> VulkanicAPI.GL_TEXTURE_MAX_LOD;
+            case LOD_BIAS -> VulkanicAPI.GL_TEXTURE_LOD_BIAS;
+            case BASE_LEVEL -> VulkanicAPI.GL_TEXTURE_BASE_LEVEL;
+            case MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
+            case COMPARE_MODE -> VulkanicAPI.GL_TEXTURE_COMPARE_MODE;
+            case SWIZZLE_RGBA -> VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA;
+        };
+    }
+
+    private static int toOpenGLCapability(VulkanicCapability capability) {
+        return switch (capability) {
+            case BLEND -> VulkanicAPI.GL_BLEND;
+            case CULL_FACE -> VulkanicAPI.GL_CULL_FACE;
+            case DEPTH_TEST -> VulkanicAPI.GL_DEPTH_TEST;
+            case SCISSOR_TEST -> VulkanicAPI.GL_SCISSOR_TEST;
+            case POLYGON_OFFSET_FILL -> VulkanicAPI.GL_POLYGON_OFFSET_FILL;
+            case COLOR_LOGIC_OP -> VulkanicAPI.GL_COLOR_LOGIC_OP;
+            case PROGRAM_POINT_SIZE -> VulkanicAPI.GL_PROGRAM_POINT_SIZE;
+            case DEBUG_OUTPUT -> VulkanicAPI.GL_DEBUG_OUTPUT;
+            case DEBUG_OUTPUT_SYNCHRONOUS -> VulkanicAPI.GL_DEBUG_OUTPUT_SYNCHRONOUS;
+            case STENCIL_TEST -> VulkanicAPI.GL_STENCIL_TEST;
+        };
+    }
+
+    private static int toOpenGLCullFaceMode(VulkanicCullFaceMode mode) {
+        return switch (mode) {
+            case FRONT -> VulkanicAPI.GL_FRONT;
+            case BACK -> VulkanicAPI.GL_BACK;
+            case FRONT_AND_BACK -> VulkanicAPI.GL_FRONT_AND_BACK;
+        };
+    }
+
+    private static int toOpenGLDepthCompareOp(VulkanicDepthCompareOp op) {
+        return switch (op) {
+            case NEVER -> VulkanicAPI.GL_NEVER;
+            case LESS -> VulkanicAPI.GL_LESS;
+            case EQUAL -> VulkanicAPI.GL_EQUAL;
+            case LEQUAL -> VulkanicAPI.GL_LEQUAL;
+            case GREATER -> VulkanicAPI.GL_GREATER;
+            case NOTEQUAL -> VulkanicAPI.GL_NOTEQUAL;
+            case GEQUAL -> VulkanicAPI.GL_GEQUAL;
+            case ALWAYS -> VulkanicAPI.GL_ALWAYS;
+        };
     }
     
     

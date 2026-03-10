@@ -35,7 +35,7 @@ public class VulkanReadinessReportTest {
         assertFalse(report.isNativeVulkanReady(),
             "Bootstrap Vulkan backend should remain non-native-ready");
         assertTrue(report.getBlockers().stream().anyMatch(blocker ->
-                blocker.contains("Native Vulkan command/pipeline implementation has not been integrated yet")),
+                blocker.contains("Native Vulkan command/pipeline integration is partial")),
             "Readiness blockers should include the explicit implementation gap");
     }
 

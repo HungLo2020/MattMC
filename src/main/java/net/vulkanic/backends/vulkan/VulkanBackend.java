@@ -6,14 +6,47 @@ import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanReadinessReport;
 import net.vulkanic.backends.opengl.OpenGLBackend;
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.KHRSurface;
+import org.lwjgl.vulkan.KHRSwapchain;
+import org.lwjgl.vulkan.VK;
+import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkApplicationInfo;
+import org.lwjgl.vulkan.VkCommandBuffer;
+import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
+import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
+import org.lwjgl.vulkan.VkCommandPoolCreateInfo;
+import org.lwjgl.vulkan.VkDevice;
+import org.lwjgl.vulkan.VkDeviceCreateInfo;
+import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
+import org.lwjgl.vulkan.VkExtent2D;
+import org.lwjgl.vulkan.VkInstance;
+import org.lwjgl.vulkan.VkInstanceCreateInfo;
+import org.lwjgl.vulkan.VkPhysicalDevice;
+import org.lwjgl.vulkan.VkQueue;
+import org.lwjgl.vulkan.VkQueueFamilyProperties;
+import org.lwjgl.vulkan.VkSubmitInfo;
+import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
+import org.lwjgl.vulkan.VkSurfaceFormatKHR;
+import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
+
+import static org.lwjgl.system.MemoryStack.stackPush;
 
 public class VulkanBackend extends OpenGLBackend {
 
+    private final Object nativeInitLock = new Object();
+    private volatile NativeSpine nativeSpine;
+    private volatile boolean nativeBringUpAttempted;
+    private volatile String nativeBringUpFailure;
+
     private volatile VulkanReadinessReport cachedReadinessReport;
+    private volatile CommandContext currentCommandContext;
 
     @Override
     public GraphicsBackendType getBackendType() {
@@ -22,7 +55,7 @@ public class VulkanBackend extends OpenGLBackend {
 
     @Override
     public boolean isNativeVulkanReady() {
-        return false;
+        return nativeSpine != null;
     }
 
     /**
@@ -62,6 +95,23 @@ public class VulkanBackend extends OpenGLBackend {
             bindingsStatus = "unavailable (" + compactThrowable(throwable) + ")";
         }
 
+        boolean lwjglLoaderReachable = false;
+        String loaderStatus;
+        if (lwjglBindingsPresent) {
+            try {
+                int supportedVersion = VK.getInstanceVersionSupported();
+                lwjglLoaderReachable = supportedVersion >= VK10.VK_API_VERSION_1_0;
+                loaderStatus = lwjglLoaderReachable
+                    ? "reachable (instanceVersion=0x" + Integer.toHexString(supportedVersion) + ")"
+                    : "unreachable (VK.getInstanceVersionSupported returned 0x"
+                        + Integer.toHexString(supportedVersion) + ")";
+            } catch (Throwable throwable) {
+                loaderStatus = "unreachable (" + compactThrowable(throwable) + ")";
+            }
+        } else {
+            loaderStatus = "skipped (LWJGL Vulkan bindings unavailable)";
+        }
+
         boolean glfwVulkanSupported = false;
         String glfwProbeStatus;
         if (lwjglBindingsPresent) {
@@ -75,15 +125,54 @@ public class VulkanBackend extends OpenGLBackend {
             glfwProbeStatus = "skipped (LWJGL Vulkan bindings unavailable)";
         }
 
+        boolean glfwRequiredExtensionsPresent = false;
+        String glfwExtensionsStatus;
+        if (lwjglBindingsPresent) {
+            try {
+                org.lwjgl.PointerBuffer requiredExtensions = GLFWVulkan.glfwGetRequiredInstanceExtensions();
+                glfwRequiredExtensionsPresent = requiredExtensions != null && requiredExtensions.remaining() > 0;
+                glfwExtensionsStatus = glfwRequiredExtensionsPresent
+                    ? "available (count=" + requiredExtensions.remaining() + ")"
+                    : "unavailable (glfwGetRequiredInstanceExtensions returned null/empty)";
+            } catch (Throwable throwable) {
+                glfwExtensionsStatus = "probe failed (" + compactThrowable(throwable) + ")";
+            }
+        } else {
+            glfwExtensionsStatus = "skipped (LWJGL Vulkan bindings unavailable)";
+        }
+
+        String bringUpStatus;
+        if (isNativeVulkanReady()) {
+            bringUpStatus = "native spine initialized";
+        } else if (nativeBringUpAttempted) {
+            bringUpStatus = nativeBringUpFailure == null
+                ? "attempted but unavailable"
+                : "failed (" + nativeBringUpFailure + ")";
+        } else {
+            bringUpStatus = "not attempted";
+        }
+
         List<String> blockers = new ArrayList<>();
-        blockers.add("Native Vulkan command/pipeline implementation has not been integrated yet.");
+        blockers.add("Native Vulkan command/pipeline integration is partial; non-overridden GraphicsBackend methods remain blocked to prevent OpenGL fallback.");
 
         if (!lwjglBindingsPresent) {
             blockers.add("LWJGL Vulkan bindings are not available: " + bindingsStatus + ".");
         }
 
+        if (!lwjglLoaderReachable) {
+            blockers.add("Vulkan loader/API level probe did not pass: " + loaderStatus + ".");
+        }
+
         if (!glfwVulkanSupported) {
             blockers.add("GLFW Vulkan support probe did not pass: " + glfwProbeStatus + ".");
+        }
+
+        if (!glfwRequiredExtensionsPresent) {
+            blockers.add("GLFW required Vulkan instance extensions are not available: " + glfwExtensionsStatus + ".");
+        }
+
+        if (!isNativeVulkanReady()) {
+            blockers.add("Native Vulkan spine status: " + bringUpStatus + ".");
         }
 
         return new VulkanReadinessReport(
@@ -99,6 +188,8 @@ public class VulkanBackend extends OpenGLBackend {
 
 
     private void ensureNativeReady(String operation) {
+        attemptNativeBringUp();
+
         if (isNativeVulkanReady()) {
             return;
         }
@@ -117,6 +208,50 @@ public class VulkanBackend extends OpenGLBackend {
         sb.append(" - If OpenGL is desired, select/initialize the OpenGL backend instead.\n");
 
         throw new IllegalStateException(sb.toString());
+    }
+
+    private void attemptNativeBringUp() {
+        if (nativeSpine != null || nativeBringUpAttempted) {
+            return;
+        }
+
+        synchronized (nativeInitLock) {
+            if (nativeSpine != null || nativeBringUpAttempted) {
+                return;
+            }
+
+            nativeBringUpAttempted = true;
+            try {
+                nativeSpine = NativeSpine.create();
+                nativeBringUpFailure = null;
+            } catch (Throwable throwable) {
+                nativeBringUpFailure = compactThrowable(throwable);
+                nativeSpine = null;
+            } finally {
+                cachedReadinessReport = null;
+            }
+        }
+    }
+
+    @Override
+    public CommandContext getCurrentCommandContext() {
+        ensureNativeReady("getCurrentCommandContext");
+
+        CommandContext context = currentCommandContext;
+        if (context == null) {
+            NativeSpine spine = nativeSpine;
+            if (spine == null) {
+                throw new IllegalStateException("Native Vulkan spine disappeared while resolving current command context.");
+            }
+
+            context = new VulkanCommandContext(
+                spine.primaryCommandBufferHandle(),
+                "Vulkan-CurrentCommandBuffer"
+            );
+            currentCommandContext = context;
+        }
+
+        return context;
     }
 
     @Override
@@ -181,13 +316,34 @@ public class VulkanBackend extends OpenGLBackend {
     @Override
     public CommandContext beginCommandBuffer() {
         ensureNativeReady("beginCommandBuffer");
-        throw new UnsupportedOperationException("Vulkan-native command buffer lifecycle is not implemented yet.");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        long commandBufferHandle = spine.beginPrimaryCommandBuffer();
+        CommandContext context = new VulkanCommandContext(commandBufferHandle, "Vulkan-PrimaryCommandBuffer");
+        currentCommandContext = context;
+        return context;
     }
 
     @Override
     public void submitCommandBuffer(CommandContext ctx) {
         ensureNativeReady("submitCommandBuffer");
-        throw new UnsupportedOperationException("Vulkan-native command buffer submission is not implemented yet.");
+
+        if (!(ctx instanceof VulkanCommandContext)) {
+            throw new IllegalArgumentException(
+                "submitCommandBuffer requires VulkanCommandContext when Vulkan backend is selected; got: "
+                    + (ctx == null ? "null" : ctx.getClass().getName()));
+        }
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.submitPrimaryCommandBuffer(ctx.getHandle());
+        currentCommandContext = null;
     }
 
     @Override
@@ -217,5 +373,406 @@ public class VulkanBackend extends OpenGLBackend {
 
     public boolean isFallbackMode() {
         return !isNativeVulkanReady();
+    }
+
+    private static final class NativeSpine {
+        private VkInstance instance;
+        private VkPhysicalDevice physicalDevice;
+        private VkDevice logicalDevice;
+        private VkQueue graphicsQueue;
+
+        private long surface;
+        private long swapchain;
+        private long commandPool;
+
+        private VkCommandBuffer primaryCommandBuffer;
+        private int graphicsQueueFamilyIndex;
+        private long windowHandle;
+        private boolean commandBufferRecording;
+
+        private static NativeSpine create() {
+            NativeSpine spine = new NativeSpine();
+            try {
+                spine.initialize();
+                return spine;
+            } catch (Throwable throwable) {
+                spine.close();
+                throw throwable;
+            }
+        }
+
+        private void initialize() {
+            windowHandle = GLFW.glfwGetCurrentContext();
+            if (windowHandle == 0L) {
+                throw new IllegalStateException(
+                    "No current GLFW window/context. Vulkan native spine requires an active GLFW context for surface/swapchain bring-up.");
+            }
+
+            createInstance();
+            createSurface();
+            pickPhysicalDeviceAndQueueFamily();
+            createLogicalDeviceAndQueue();
+            createSwapchain();
+            createCommandPoolAndPrimaryBuffer();
+        }
+
+        private void createInstance() {
+            try (MemoryStack stack = stackPush()) {
+                org.lwjgl.PointerBuffer requiredExtensions = GLFWVulkan.glfwGetRequiredInstanceExtensions();
+                if (requiredExtensions == null || requiredExtensions.remaining() == 0) {
+                    throw new IllegalStateException(
+                        "GLFW did not provide Vulkan required instance extensions (null/empty result).");
+                }
+
+                VkApplicationInfo appInfo = VkApplicationInfo.calloc(stack)
+                    .sType$Default()
+                    .pApplicationName(stack.UTF8("Vulkanic"))
+                    .applicationVersion(VK10.VK_MAKE_API_VERSION(0, 0, 1, 0))
+                    .pEngineName(stack.UTF8("Vulkanic"))
+                    .engineVersion(VK10.VK_MAKE_API_VERSION(0, 0, 1, 0))
+                    .apiVersion(Math.max(VK.getInstanceVersionSupported(), VK10.VK_API_VERSION_1_0));
+
+                VkInstanceCreateInfo createInfo = VkInstanceCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .pApplicationInfo(appInfo)
+                    .ppEnabledExtensionNames(requiredExtensions);
+
+                org.lwjgl.PointerBuffer pInstance = stack.mallocPointer(1);
+                checkVk("vkCreateInstance", VK10.vkCreateInstance(createInfo, null, pInstance));
+                instance = new VkInstance(pInstance.get(0), createInfo);
+            }
+        }
+
+        private void createSurface() {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.LongBuffer pSurface = stack.mallocLong(1);
+                checkVk("glfwCreateWindowSurface",
+                    GLFWVulkan.glfwCreateWindowSurface(instance, windowHandle, null, pSurface));
+                surface = pSurface.get(0);
+            }
+        }
+
+        private void pickPhysicalDeviceAndQueueFamily() {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer count = stack.ints(0);
+                checkVk("vkEnumeratePhysicalDevices(count)",
+                    VK10.vkEnumeratePhysicalDevices(instance, count, null));
+
+                int deviceCount = count.get(0);
+                if (deviceCount <= 0) {
+                    throw new IllegalStateException("No Vulkan physical devices were found.");
+                }
+
+                org.lwjgl.PointerBuffer physicalDevices = stack.mallocPointer(deviceCount);
+                checkVk("vkEnumeratePhysicalDevices(list)",
+                    VK10.vkEnumeratePhysicalDevices(instance, count, physicalDevices));
+
+                for (int index = 0; index < deviceCount; index++) {
+                    VkPhysicalDevice candidate = new VkPhysicalDevice(physicalDevices.get(index), instance);
+                    OptionalInt queueFamily = findGraphicsPresentQueueFamily(candidate);
+                    if (queueFamily.isPresent()) {
+                        physicalDevice = candidate;
+                        graphicsQueueFamilyIndex = queueFamily.getAsInt();
+                        return;
+                    }
+                }
+
+                throw new IllegalStateException(
+                    "No physical device with combined graphics+present queue support for GLFW surface was found.");
+            }
+        }
+
+        private OptionalInt findGraphicsPresentQueueFamily(VkPhysicalDevice device) {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer queueCount = stack.ints(0);
+                VK10.vkGetPhysicalDeviceQueueFamilyProperties(device, queueCount, null);
+
+                int count = queueCount.get(0);
+                if (count <= 0) {
+                    return OptionalInt.empty();
+                }
+
+                VkQueueFamilyProperties.Buffer queueFamilies = VkQueueFamilyProperties.malloc(count, stack);
+                VK10.vkGetPhysicalDeviceQueueFamilyProperties(device, queueCount, queueFamilies);
+
+                for (int familyIndex = 0; familyIndex < count; familyIndex++) {
+                    VkQueueFamilyProperties properties = queueFamilies.get(familyIndex);
+                    boolean graphicsSupported = (properties.queueFlags() & VK10.VK_QUEUE_GRAPHICS_BIT) != 0;
+                    if (!graphicsSupported) {
+                        continue;
+                    }
+
+                    java.nio.IntBuffer supported = stack.ints(VK10.VK_FALSE);
+                    checkVk("vkGetPhysicalDeviceSurfaceSupportKHR",
+                        KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, surface, supported));
+                    if (supported.get(0) == VK10.VK_TRUE) {
+                        return OptionalInt.of(familyIndex);
+                    }
+                }
+
+                return OptionalInt.empty();
+            }
+        }
+
+        private void createLogicalDeviceAndQueue() {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.FloatBuffer priorities = stack.floats(1.0f);
+
+                VkDeviceQueueCreateInfo.Buffer queueCreateInfos = VkDeviceQueueCreateInfo.calloc(1, stack);
+                queueCreateInfos.get(0)
+                    .sType$Default()
+                    .queueFamilyIndex(graphicsQueueFamilyIndex)
+                    .pQueuePriorities(priorities);
+
+                org.lwjgl.PointerBuffer enabledExtensions = stack.pointers(
+                    stack.UTF8(KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME)
+                );
+
+                VkDeviceCreateInfo createInfo = VkDeviceCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .pQueueCreateInfos(queueCreateInfos)
+                    .ppEnabledExtensionNames(enabledExtensions);
+
+                org.lwjgl.PointerBuffer pDevice = stack.mallocPointer(1);
+                checkVk("vkCreateDevice", VK10.vkCreateDevice(physicalDevice, createInfo, null, pDevice));
+                logicalDevice = new VkDevice(pDevice.get(0), physicalDevice, createInfo);
+
+                org.lwjgl.PointerBuffer pQueue = stack.mallocPointer(1);
+                VK10.vkGetDeviceQueue(logicalDevice, graphicsQueueFamilyIndex, 0, pQueue);
+                graphicsQueue = new VkQueue(pQueue.get(0), logicalDevice);
+            }
+        }
+
+        private void createSwapchain() {
+            try (MemoryStack stack = stackPush()) {
+                VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc(stack);
+                checkVk("vkGetPhysicalDeviceSurfaceCapabilitiesKHR",
+                    KHRSurface.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, capabilities));
+
+                java.nio.IntBuffer formatCount = stack.ints(0);
+                checkVk("vkGetPhysicalDeviceSurfaceFormatsKHR(count)",
+                    KHRSurface.vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, formatCount, null));
+                if (formatCount.get(0) <= 0) {
+                    throw new IllegalStateException("No Vulkan surface formats were reported for swapchain creation.");
+                }
+
+                VkSurfaceFormatKHR.Buffer surfaceFormats = VkSurfaceFormatKHR.malloc(formatCount.get(0), stack);
+                checkVk("vkGetPhysicalDeviceSurfaceFormatsKHR(list)",
+                    KHRSurface.vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, formatCount, surfaceFormats));
+
+                VkSurfaceFormatKHR chosenFormat = chooseSurfaceFormat(surfaceFormats);
+
+                java.nio.IntBuffer presentModeCount = stack.ints(0);
+                checkVk("vkGetPhysicalDeviceSurfacePresentModesKHR(count)",
+                    KHRSurface.vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, presentModeCount, null));
+                if (presentModeCount.get(0) <= 0) {
+                    throw new IllegalStateException("No Vulkan present modes were reported for swapchain creation.");
+                }
+
+                java.nio.IntBuffer presentModes = stack.mallocInt(presentModeCount.get(0));
+                checkVk("vkGetPhysicalDeviceSurfacePresentModesKHR(list)",
+                    KHRSurface.vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, presentModeCount, presentModes));
+
+                int presentMode = choosePresentMode(presentModes);
+                VkExtent2D extent = chooseSwapExtent(capabilities, stack);
+
+                int minImageCount = capabilities.minImageCount() + 1;
+                if (capabilities.maxImageCount() > 0 && minImageCount > capabilities.maxImageCount()) {
+                    minImageCount = capabilities.maxImageCount();
+                }
+
+                VkSwapchainCreateInfoKHR createInfo = VkSwapchainCreateInfoKHR.calloc(stack)
+                    .sType$Default()
+                    .surface(surface)
+                    .minImageCount(minImageCount)
+                    .imageFormat(chosenFormat.format())
+                    .imageColorSpace(chosenFormat.colorSpace())
+                    .imageExtent(extent)
+                    .imageArrayLayers(1)
+                    .imageUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+                    .imageSharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE)
+                    .preTransform(capabilities.currentTransform())
+                    .compositeAlpha(KHRSurface.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
+                    .presentMode(presentMode)
+                    .clipped(true)
+                    .oldSwapchain(VK10.VK_NULL_HANDLE);
+
+                java.nio.LongBuffer pSwapchain = stack.mallocLong(1);
+                checkVk("vkCreateSwapchainKHR",
+                    KHRSwapchain.vkCreateSwapchainKHR(logicalDevice, createInfo, null, pSwapchain));
+                swapchain = pSwapchain.get(0);
+            }
+        }
+
+        private static VkSurfaceFormatKHR chooseSurfaceFormat(VkSurfaceFormatKHR.Buffer formats) {
+            for (int index = 0; index < formats.remaining(); index++) {
+                VkSurfaceFormatKHR format = formats.get(index);
+                if (format.format() == VK10.VK_FORMAT_B8G8R8A8_SRGB
+                    && format.colorSpace() == KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                    return format;
+                }
+            }
+            return formats.get(0);
+        }
+
+        private static int choosePresentMode(java.nio.IntBuffer presentModes) {
+            for (int index = 0; index < presentModes.remaining(); index++) {
+                int mode = presentModes.get(index);
+                if (mode == KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR) {
+                    return mode;
+                }
+            }
+            return KHRSurface.VK_PRESENT_MODE_FIFO_KHR;
+        }
+
+        private VkExtent2D chooseSwapExtent(VkSurfaceCapabilitiesKHR capabilities, MemoryStack stack) {
+            if (capabilities.currentExtent().width() != 0xFFFFFFFF) {
+                return VkExtent2D.malloc(stack)
+                    .set(capabilities.currentExtent().width(), capabilities.currentExtent().height());
+            }
+
+            java.nio.IntBuffer width = stack.ints(0);
+            java.nio.IntBuffer height = stack.ints(0);
+            GLFW.glfwGetFramebufferSize(windowHandle, width, height);
+
+            int clampedWidth = Math.max(
+                capabilities.minImageExtent().width(),
+                Math.min(capabilities.maxImageExtent().width(), width.get(0))
+            );
+            int clampedHeight = Math.max(
+                capabilities.minImageExtent().height(),
+                Math.min(capabilities.maxImageExtent().height(), height.get(0))
+            );
+
+            return VkExtent2D.malloc(stack).set(clampedWidth, clampedHeight);
+        }
+
+        private void createCommandPoolAndPrimaryBuffer() {
+            try (MemoryStack stack = stackPush()) {
+                VkCommandPoolCreateInfo poolCreateInfo = VkCommandPoolCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .queueFamilyIndex(graphicsQueueFamilyIndex)
+                    .flags(VK10.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+                java.nio.LongBuffer pCommandPool = stack.mallocLong(1);
+                checkVk("vkCreateCommandPool",
+                    VK10.vkCreateCommandPool(logicalDevice, poolCreateInfo, null, pCommandPool));
+                commandPool = pCommandPool.get(0);
+
+                VkCommandBufferAllocateInfo allocateInfo = VkCommandBufferAllocateInfo.calloc(stack)
+                    .sType$Default()
+                    .commandPool(commandPool)
+                    .level(VK10.VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+                    .commandBufferCount(1);
+
+                org.lwjgl.PointerBuffer pCommandBuffer = stack.mallocPointer(1);
+                checkVk("vkAllocateCommandBuffers",
+                    VK10.vkAllocateCommandBuffers(logicalDevice, allocateInfo, pCommandBuffer));
+                primaryCommandBuffer = new VkCommandBuffer(pCommandBuffer.get(0), logicalDevice);
+            }
+        }
+
+        private long beginPrimaryCommandBuffer() {
+            if (primaryCommandBuffer == null) {
+                throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
+            }
+
+            if (commandBufferRecording) {
+                throw new IllegalStateException("Primary command buffer is already recording.");
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                checkVk("vkResetCommandPool", VK10.vkResetCommandPool(logicalDevice, commandPool, 0));
+
+                VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack)
+                    .sType$Default()
+                    .flags(VK10.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+                checkVk("vkBeginCommandBuffer", VK10.vkBeginCommandBuffer(primaryCommandBuffer, beginInfo));
+                commandBufferRecording = true;
+                return primaryCommandBuffer.address();
+            }
+        }
+
+        private void submitPrimaryCommandBuffer(long commandBufferHandle) {
+            if (primaryCommandBuffer == null) {
+                throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
+            }
+
+            if (commandBufferHandle != primaryCommandBuffer.address()) {
+                throw new IllegalArgumentException(
+                    "submitCommandBuffer received unknown VkCommandBuffer handle. Expected 0x"
+                        + Long.toHexString(primaryCommandBuffer.address())
+                        + " but got 0x" + Long.toHexString(commandBufferHandle));
+            }
+
+            if (!commandBufferRecording) {
+                throw new IllegalStateException("Primary command buffer is not in recording state.");
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                checkVk("vkEndCommandBuffer", VK10.vkEndCommandBuffer(primaryCommandBuffer));
+
+                VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
+                    .sType$Default();
+                org.lwjgl.PointerBuffer commandBuffers = stack.mallocPointer(1);
+                commandBuffers.put(0, primaryCommandBuffer.address());
+                submitInfos.pCommandBuffers(commandBuffers);
+
+                checkVk("vkQueueSubmit",
+                    VK10.vkQueueSubmit(graphicsQueue, submitInfos, VK10.VK_NULL_HANDLE));
+                checkVk("vkQueueWaitIdle", VK10.vkQueueWaitIdle(graphicsQueue));
+                commandBufferRecording = false;
+            }
+        }
+
+        private long primaryCommandBufferHandle() {
+            if (primaryCommandBuffer == null) {
+                return 0L;
+            }
+            return primaryCommandBuffer.address();
+        }
+
+        private void close() {
+            if (logicalDevice != null) {
+                try {
+                    VK10.vkDeviceWaitIdle(logicalDevice);
+                } catch (Throwable ignored) {
+                }
+
+                if (swapchain != VK10.VK_NULL_HANDLE) {
+                    KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, swapchain, null);
+                    swapchain = VK10.VK_NULL_HANDLE;
+                }
+
+                if (commandPool != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyCommandPool(logicalDevice, commandPool, null);
+                    commandPool = VK10.VK_NULL_HANDLE;
+                }
+
+                VK10.vkDestroyDevice(logicalDevice, null);
+                logicalDevice = null;
+                graphicsQueue = null;
+                primaryCommandBuffer = null;
+                commandBufferRecording = false;
+            }
+
+            if (instance != null) {
+                if (surface != VK10.VK_NULL_HANDLE) {
+                    KHRSurface.vkDestroySurfaceKHR(instance, surface, null);
+                    surface = VK10.VK_NULL_HANDLE;
+                }
+
+                VK10.vkDestroyInstance(instance, null);
+                instance = null;
+                physicalDevice = null;
+            }
+        }
+
+        private static void checkVk(String operation, int result) {
+            if (result != VK10.VK_SUCCESS) {
+                throw new IllegalStateException(operation + " failed with VkResult=" + result);
+            }
+        }
     }
 }

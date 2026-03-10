@@ -27,6 +27,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicIndexType;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -871,7 +872,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				
 				if (renderPipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST) {
 					VulkanicAPI.setDepthTestEnabled(ctx, true);
-					VulkanicAPI.setDepthFunc(ctx, GlConst.toGl(renderPipeline.getDepthTestFunction()));
+					VulkanicAPI.setDepthFunc(ctx, toVulkanicDepthCompareOp(renderPipeline.getDepthTestFunction()));
 				} else {
 					VulkanicAPI.setDepthTestEnabled(ctx, false);
 				}
@@ -1061,7 +1062,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.lastPipeline = renderPipeline;
 			if (renderPipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST) {
 				VulkanicAPI.setDepthTestEnabled(ctx, true);
-				VulkanicAPI.setDepthFunc(ctx, GlConst.toGl(renderPipeline.getDepthTestFunction()));
+				VulkanicAPI.setDepthFunc(ctx, toVulkanicDepthCompareOp(renderPipeline.getDepthTestFunction()));
 			} else {
 				VulkanicAPI.setDepthTestEnabled(ctx, false);
 			}
@@ -1129,6 +1130,16 @@ public class GlCommandEncoder implements CommandEncoder {
 		this.activeRenderPassContext = null;
 
 		this.device.debugLabels().popDebugGroup();
+	}
+
+	private static VulkanicDepthCompareOp toVulkanicDepthCompareOp(DepthTestFunction depthTestFunction) {
+		return switch (depthTestFunction) {
+			case LESS_DEPTH_TEST -> VulkanicDepthCompareOp.LESS;
+			case LEQUAL_DEPTH_TEST -> VulkanicDepthCompareOp.LEQUAL;
+			case GREATER_DEPTH_TEST -> VulkanicDepthCompareOp.GREATER;
+			case EQUAL_DEPTH_TEST -> VulkanicDepthCompareOp.EQUAL;
+			case NO_DEPTH_TEST -> throw new IllegalArgumentException("NO_DEPTH_TEST has no depth compare op");
+		};
 	}
 
 	/**

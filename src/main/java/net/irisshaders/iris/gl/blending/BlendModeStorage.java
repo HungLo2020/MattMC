@@ -3,6 +3,7 @@ package net.irisshaders.iris.gl.blending;
 import net.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicAPI;
 
 public class BlendModeStorage {
@@ -70,14 +71,14 @@ public class BlendModeStorage {
 			blendEnabled = enabled;
 			blendStateUnknown = false;
 			CommandContext ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND, enabled);
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.BLEND, enabled);
 			return;
 		}
 
 		if (enabled != blendEnabled) {
 			blendEnabled = enabled;
 			CommandContext ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND, enabled);
+			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.BLEND, enabled);
 		}
 	}
 
