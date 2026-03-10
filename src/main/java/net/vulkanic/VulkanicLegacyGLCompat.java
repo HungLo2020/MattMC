@@ -31,6 +31,50 @@ public final class VulkanicLegacyGLCompat {
         VulkanicAPI.setDepthFunc(ctx, func);
     }
 
+    public static void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        VulkanicAPI.setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+
+    public static void setBlendEquation(CommandContext ctx, int mode) {
+        VulkanicAPI.setBlendEquation(ctx, mode);
+    }
+
+    public static void blendFunc(CommandContext ctx, int sfactor, int dfactor) {
+        VulkanicAPI.blendFunc(ctx, sfactor, dfactor);
+    }
+
+    public static void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        VulkanicAPI.blendFuncSeparatei(ctx, buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+    }
+
+    public static void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        VulkanicAPI.setBlendEquationSeparate(ctx, modeRGB, modeAlpha);
+    }
+
+    public static void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        VulkanicAPI.setStencilFunc(ctx, func, ref, mask);
+    }
+
+    public static void setStencilOp(CommandContext ctx, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        VulkanicAPI.setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    public static void setStencilWriteMask(CommandContext ctx, int mask) {
+        VulkanicAPI.setStencilWriteMask(ctx, mask);
+    }
+
+    public static void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask) {
+        VulkanicAPI.setStencilFuncSeparate(ctx, face, func, ref, mask);
+    }
+
+    public static void setStencilOpSeparate(CommandContext ctx, int face, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        VulkanicAPI.setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    public static void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask) {
+        VulkanicAPI.setStencilWriteMaskSeparate(ctx, face, mask);
+    }
+
     public static void texParameteri(CommandContext ctx, int target, int pname, int param) {
         VulkanicAPI.texParameteri(ctx, target, pname, param);
     }

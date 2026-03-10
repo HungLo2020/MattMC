@@ -750,6 +750,17 @@ public interface GraphicsBackend {
      * @param dstAlpha Destination alpha blend factor
      */
     void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
+
+    /**
+     * Sets blend factors using backend-neutral blend-factor semantics.
+     */
+    void setBlendFunction(
+        CommandContext ctx,
+        VulkanicBlendFactor srcRgb,
+        VulkanicBlendFactor dstRgb,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    );
     
     /**
      * Sets the blend equation for both RGB and alpha components.
@@ -764,6 +775,11 @@ public interface GraphicsBackend {
      * @param mode The blend equation mode
      */
     void setBlendEquation(CommandContext ctx, int mode);
+
+    /**
+     * Sets the blend equation using backend-neutral semantics.
+     */
+    void setBlendEquation(CommandContext ctx, VulkanicBlendEquation mode);
     
     /**
      * Sets the depth comparison function.
@@ -862,6 +878,11 @@ public interface GraphicsBackend {
      * @param dfactor Destination blend factor
      */
     void blendFunc(CommandContext ctx, int sfactor, int dfactor);
+
+    /**
+     * Sets source/destination blend factors using backend-neutral semantics.
+     */
+    void blendFunc(CommandContext ctx, VulkanicBlendFactor sfactor, VulkanicBlendFactor dfactor);
     
     /**
      * Sets the blend function for a specific draw buffer.
@@ -877,6 +898,18 @@ public interface GraphicsBackend {
      * @param dstAlpha Destination alpha blend factor
      */
     void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
+
+    /**
+     * Sets per-buffer blend factors using backend-neutral semantics.
+     */
+    void blendFuncSeparatei(
+        CommandContext ctx,
+        int buffer,
+        VulkanicBlendFactor srcRGB,
+        VulkanicBlendFactor dstRGB,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    );
     
     /**
      * Queries an integer state variable.
@@ -2161,7 +2194,6 @@ public interface GraphicsBackend {
     int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length);
     
     // Graphics Capabilities
-    GraphicsCapabilities obtainGraphicsCapabilities();
     GraphicsCapabilities initializeGraphicsCapabilities();
     boolean checkFunctionAvailable(String functionName);
     
@@ -2536,7 +2568,7 @@ public interface GraphicsBackend {
     // High-level debug callback wrapper methods
     void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallback callback);
     void setupDebugMessageCallbackKHR(VulkanicAPI.DebugMessageCallback callback);
-    void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallbackARB callback);
+    void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallback callback);
     void setupDebugMessageCallbackAMD(VulkanicAPI.DebugMessageCallbackAMD callback);
     void clearDebugMessageCallback();
     void clearDebugMessageCallbackKHR();
@@ -2651,6 +2683,11 @@ public interface GraphicsBackend {
      * @param modeAlpha Blend equation for the alpha component
      */
     void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha);
+
+    /**
+     * Sets RGB/alpha blend equations using backend-neutral semantics.
+     */
+    void setBlendEquationSeparate(CommandContext ctx, VulkanicBlendEquation modeRGB, VulkanicBlendEquation modeAlpha);
     
     /**
      * Sets the stencil test function and reference value.
@@ -2664,6 +2701,82 @@ public interface GraphicsBackend {
      * @param mask Mask ANDed with both the reference and the stored stencil value
      */
     void setStencilFunc(CommandContext ctx, int func, int ref, int mask);
+
+    /**
+     * Sets the stencil test function using backend-neutral stencil compare semantics.
+     */
+    void setStencilFunc(CommandContext ctx, VulkanicStencilCompareOp func, int ref, int mask);
+
+    /**
+     * Sets the stencil test function for a specific face.
+     *
+     * In OpenGL: Maps to glStencilFuncSeparate()
+     * In Vulkan: Maps to per-face compare mask/reference dynamic state
+     */
+    void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask);
+
+    /**
+     * Sets the stencil test function for a specific face using backend-neutral semantics.
+     */
+    void setStencilFuncSeparate(CommandContext ctx, VulkanicStencilFace face, VulkanicStencilCompareOp func, int ref, int mask);
+
+    /**
+     * Sets stencil operations for stencil-fail, depth-fail, and depth-pass outcomes.
+     *
+     * In OpenGL: Maps to glStencilOp()
+     * In Vulkan: Maps to VkStencilOpState failOp/passOp/depthFailOp
+     */
+    void setStencilOp(CommandContext ctx, int stencilFailOp, int depthFailOp, int depthPassOp);
+
+    /**
+     * Sets stencil operations using backend-neutral semantics.
+     */
+    void setStencilOp(
+        CommandContext ctx,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    );
+
+    /**
+     * Sets stencil operations for a specific face.
+     *
+     * In OpenGL: Maps to glStencilOpSeparate()
+     * In Vulkan: Maps to VkStencilOpState for front/back face
+     */
+    void setStencilOpSeparate(CommandContext ctx, int face, int stencilFailOp, int depthFailOp, int depthPassOp);
+
+    /**
+     * Sets stencil operations for a specific face using backend-neutral semantics.
+     */
+    void setStencilOpSeparate(
+        CommandContext ctx,
+        VulkanicStencilFace face,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    );
+
+    /**
+     * Sets the stencil write mask.
+     *
+     * In OpenGL: Maps to glStencilMask()
+     * In Vulkan: Maps to VkStencilOpState.writeMask
+     */
+    void setStencilWriteMask(CommandContext ctx, int mask);
+
+    /**
+     * Sets the stencil write mask for a specific face.
+     *
+     * In OpenGL: Maps to glStencilMaskSeparate()
+     * In Vulkan: Maps to per-face stencil write-mask dynamic state
+     */
+    void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask);
+
+    /**
+     * Sets the stencil write mask for a specific face using backend-neutral semantics.
+     */
+    void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask);
     
     // Additional texture methods
     

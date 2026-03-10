@@ -115,11 +115,6 @@ public class VulkanicAPI {
     }
     
     @FunctionalInterface
-    public interface DebugMessageCallbackARB {
-        void invoke(int source, int type, int id, int severity, String message);
-    }
-    
-    @FunctionalInterface
     public interface DebugMessageCallbackAMD {
         void invoke(int id, int category, int severity, String message);
     }
@@ -304,6 +299,10 @@ public class VulkanicAPI {
     // OpenGL Constants - Blend State
     public static final int GL_BLEND = 0x0BE2;
     public static final int GL_FUNC_ADD = 0x8006;
+    public static final int GL_FUNC_SUBTRACT = 0x800A;
+    public static final int GL_FUNC_REVERSE_SUBTRACT = 0x800B;
+    public static final int GL_MIN = 0x8007;
+    public static final int GL_MAX = 0x8008;
 
     // OpenGL Constants - Color Logic
     public static final int GL_COLOR_LOGIC_OP = 0x0BF2;
@@ -501,6 +500,10 @@ public class VulkanicAPI {
     public static final int GL_STENCIL_FUNC = 0x0B92;
     public static final int GL_STENCIL_REF = 0x0B97;
     public static final int GL_STENCIL_VALUE_MASK = 0x0B93;
+    public static final int GL_STENCIL_FAIL = 0x0B94;
+    public static final int GL_STENCIL_PASS_DEPTH_FAIL = 0x0B95;
+    public static final int GL_STENCIL_PASS_DEPTH_PASS = 0x0B96;
+    public static final int GL_STENCIL_WRITEMASK = 0x0B98;
     public static final int GL_CULL_FACE_MODE = 0x0B45;
     public static final int GL_POLYGON_MODE = 0x0B40;
     
@@ -585,25 +588,17 @@ public class VulkanicAPI {
     public static final int GL_FLOAT_32_UNSIGNED_INT_24_8_REV = 0x8DAD;
     
     /**
-     * Backend types supported by Vulkanic.
-     */
-    public enum BackendType {
-        OPENGL,
-        VULKAN
-    }
-    
-    /**
      * Initialize the Vulkanic API with the default backend (OpenGL).
      */
     public static void initialize() {
-        initialize(BackendType.OPENGL);
+        initialize(GraphicsBackendType.OPENGL);
     }
     
     /**
      * Initialize the Vulkanic API with a specific backend.
      * @param backendType The backend type to use
      */
-    public static synchronized void initialize(BackendType backendType) {
+    public static synchronized void initialize(GraphicsBackendType backendType) {
         if (backend == null) {
             switch (backendType) {
                 case OPENGL:
@@ -1375,6 +1370,18 @@ public class VulkanicAPI {
      * @param dfactor Destination blend factor
      */
     public static void blendFunc(CommandContext ctx, int sfactor, int dfactor) {
+        java.util.Optional<VulkanicBlendFactor> typedSFactor = VulkanicBlendFactor.fromLegacyGlConstant(sfactor);
+        java.util.Optional<VulkanicBlendFactor> typedDFactor = VulkanicBlendFactor.fromLegacyGlConstant(dfactor);
+
+        if (typedSFactor.isPresent() && typedDFactor.isPresent()) {
+            blendFunc(ctx, typedSFactor.get(), typedDFactor.get());
+            return;
+        }
+
+        getBackend().blendFunc(ctx, sfactor, dfactor);
+    }
+
+    public static void blendFunc(CommandContext ctx, VulkanicBlendFactor sfactor, VulkanicBlendFactor dfactor) {
         getBackend().blendFunc(ctx, sfactor, dfactor);
     }
     
@@ -1665,10 +1672,38 @@ public class VulkanicAPI {
     }
     
     public static void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        java.util.Optional<VulkanicBlendFactor> typedSrcRgb = VulkanicBlendFactor.fromLegacyGlConstant(srcRgb);
+        java.util.Optional<VulkanicBlendFactor> typedDstRgb = VulkanicBlendFactor.fromLegacyGlConstant(dstRgb);
+        java.util.Optional<VulkanicBlendFactor> typedSrcAlpha = VulkanicBlendFactor.fromLegacyGlConstant(srcAlpha);
+        java.util.Optional<VulkanicBlendFactor> typedDstAlpha = VulkanicBlendFactor.fromLegacyGlConstant(dstAlpha);
+
+        if (typedSrcRgb.isPresent() && typedDstRgb.isPresent() && typedSrcAlpha.isPresent() && typedDstAlpha.isPresent()) {
+            setBlendFunction(ctx, typedSrcRgb.get(), typedDstRgb.get(), typedSrcAlpha.get(), typedDstAlpha.get());
+            return;
+        }
+
+        getBackend().setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+
+    public static void setBlendFunction(
+        CommandContext ctx,
+        VulkanicBlendFactor srcRgb,
+        VulkanicBlendFactor dstRgb,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
         getBackend().setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
     public static void setBlendEquation(CommandContext ctx, int mode) {
+        VulkanicBlendEquation.fromLegacyGlConstant(mode)
+            .ifPresentOrElse(
+                typedMode -> setBlendEquation(ctx, typedMode),
+                () -> getBackend().setBlendEquation(ctx, mode)
+            );
+    }
+
+    public static void setBlendEquation(CommandContext ctx, VulkanicBlendEquation mode) {
         getBackend().setBlendEquation(ctx, mode);
     }
     
@@ -2754,10 +2789,6 @@ public class VulkanicAPI {
         return getBackend().getSynci(ctx, sync, GL_SYNC_STATUS, length);
     }
     
-    public static GraphicsCapabilities obtainGraphicsCapabilities() {
-        return getBackend().obtainGraphicsCapabilities();
-    }
-    
     public static GraphicsCapabilities initializeGraphicsCapabilities() {
         return getBackend().initializeGraphicsCapabilities();
     }
@@ -2962,6 +2993,34 @@ public class VulkanicAPI {
     
     
     public static void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        java.util.Optional<VulkanicBlendFactor> typedSrcRgb = VulkanicBlendFactor.fromLegacyGlConstant(srcRGB);
+        java.util.Optional<VulkanicBlendFactor> typedDstRgb = VulkanicBlendFactor.fromLegacyGlConstant(dstRGB);
+        java.util.Optional<VulkanicBlendFactor> typedSrcAlpha = VulkanicBlendFactor.fromLegacyGlConstant(srcAlpha);
+        java.util.Optional<VulkanicBlendFactor> typedDstAlpha = VulkanicBlendFactor.fromLegacyGlConstant(dstAlpha);
+
+        if (typedSrcRgb.isPresent() && typedDstRgb.isPresent() && typedSrcAlpha.isPresent() && typedDstAlpha.isPresent()) {
+            blendFuncSeparatei(
+                ctx,
+                buffer,
+                typedSrcRgb.get(),
+                typedDstRgb.get(),
+                typedSrcAlpha.get(),
+                typedDstAlpha.get()
+            );
+            return;
+        }
+
+        getBackend().blendFuncSeparatei(ctx, buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+    }
+
+    public static void blendFuncSeparatei(
+        CommandContext ctx,
+        int buffer,
+        VulkanicBlendFactor srcRGB,
+        VulkanicBlendFactor dstRGB,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
         getBackend().blendFuncSeparatei(ctx, buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
     
@@ -3213,7 +3272,7 @@ public class VulkanicAPI {
         getBackend().setupDebugMessageCallbackKHR(callback);
     }
     
-    public static void setupDebugMessageCallbackARB(DebugMessageCallbackARB callback) {
+    public static void setupDebugMessageCallbackARB(DebugMessageCallback callback) {
         getBackend().setupDebugMessageCallbackARB(callback);
     }
     
@@ -3394,6 +3453,18 @@ public class VulkanicAPI {
      * Sets the RGB blend equation and the alpha blend equation separately.
      */
     public static void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        java.util.Optional<VulkanicBlendEquation> typedRgb = VulkanicBlendEquation.fromLegacyGlConstant(modeRGB);
+        java.util.Optional<VulkanicBlendEquation> typedAlpha = VulkanicBlendEquation.fromLegacyGlConstant(modeAlpha);
+
+        if (typedRgb.isPresent() && typedAlpha.isPresent()) {
+            setBlendEquationSeparate(ctx, typedRgb.get(), typedAlpha.get());
+            return;
+        }
+
+        getBackend().setBlendEquationSeparate(ctx, modeRGB, modeAlpha);
+    }
+
+    public static void setBlendEquationSeparate(CommandContext ctx, VulkanicBlendEquation modeRGB, VulkanicBlendEquation modeAlpha) {
         getBackend().setBlendEquationSeparate(ctx, modeRGB, modeAlpha);
     }
     
@@ -3401,7 +3472,126 @@ public class VulkanicAPI {
      * Sets the stencil test function.
      */
     public static void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        VulkanicStencilCompareOp.fromLegacyGlConstant(func)
+            .ifPresentOrElse(
+                typedFunc -> setStencilFunc(ctx, typedFunc, ref, mask),
+                () -> getBackend().setStencilFunc(ctx, func, ref, mask)
+            );
+    }
+
+    public static void setStencilFunc(CommandContext ctx, VulkanicStencilCompareOp func, int ref, int mask) {
         getBackend().setStencilFunc(ctx, func, ref, mask);
+    }
+
+    /**
+     * Sets the stencil test function for a specific face.
+     */
+    public static void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask) {
+        java.util.Optional<VulkanicStencilFace> typedFace = VulkanicStencilFace.fromLegacyGlConstant(face);
+        java.util.Optional<VulkanicStencilCompareOp> typedFunc = VulkanicStencilCompareOp.fromLegacyGlConstant(func);
+
+        if (typedFace.isPresent() && typedFunc.isPresent()) {
+            setStencilFuncSeparate(ctx, typedFace.get(), typedFunc.get(), ref, mask);
+            return;
+        }
+
+        getBackend().setStencilFuncSeparate(ctx, face, func, ref, mask);
+    }
+
+    /**
+     * Sets the stencil test function for a specific face using backend-neutral semantics.
+     */
+    public static void setStencilFuncSeparate(CommandContext ctx, VulkanicStencilFace face, VulkanicStencilCompareOp func, int ref, int mask) {
+        getBackend().setStencilFuncSeparate(ctx, face, func, ref, mask);
+    }
+
+    /**
+     * Sets stencil operations for stencil-fail, depth-fail, and depth-pass outcomes.
+     */
+    public static void setStencilOp(CommandContext ctx, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        java.util.Optional<VulkanicStencilOperation> typedStencilFailOp = VulkanicStencilOperation.fromLegacyGlConstant(stencilFailOp);
+        java.util.Optional<VulkanicStencilOperation> typedDepthFailOp = VulkanicStencilOperation.fromLegacyGlConstant(depthFailOp);
+        java.util.Optional<VulkanicStencilOperation> typedDepthPassOp = VulkanicStencilOperation.fromLegacyGlConstant(depthPassOp);
+
+        if (typedStencilFailOp.isPresent() && typedDepthFailOp.isPresent() && typedDepthPassOp.isPresent()) {
+            setStencilOp(ctx, typedStencilFailOp.get(), typedDepthFailOp.get(), typedDepthPassOp.get());
+            return;
+        }
+
+        getBackend().setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    /**
+     * Sets stencil operations using backend-neutral semantics.
+     */
+    public static void setStencilOp(
+        CommandContext ctx,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        getBackend().setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    /**
+     * Sets stencil operations for a specific face.
+     */
+    public static void setStencilOpSeparate(CommandContext ctx, int face, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        java.util.Optional<VulkanicStencilFace> typedFace = VulkanicStencilFace.fromLegacyGlConstant(face);
+        java.util.Optional<VulkanicStencilOperation> typedStencilFailOp = VulkanicStencilOperation.fromLegacyGlConstant(stencilFailOp);
+        java.util.Optional<VulkanicStencilOperation> typedDepthFailOp = VulkanicStencilOperation.fromLegacyGlConstant(depthFailOp);
+        java.util.Optional<VulkanicStencilOperation> typedDepthPassOp = VulkanicStencilOperation.fromLegacyGlConstant(depthPassOp);
+
+        if (typedFace.isPresent() && typedStencilFailOp.isPresent() && typedDepthFailOp.isPresent() && typedDepthPassOp.isPresent()) {
+            setStencilOpSeparate(
+                ctx,
+                typedFace.get(),
+                typedStencilFailOp.get(),
+                typedDepthFailOp.get(),
+                typedDepthPassOp.get()
+            );
+            return;
+        }
+
+        getBackend().setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    /**
+     * Sets stencil operations for a specific face using backend-neutral semantics.
+     */
+    public static void setStencilOpSeparate(
+        CommandContext ctx,
+        VulkanicStencilFace face,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        getBackend().setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    /**
+     * Sets the stencil write mask.
+     */
+    public static void setStencilWriteMask(CommandContext ctx, int mask) {
+        getBackend().setStencilWriteMask(ctx, mask);
+    }
+
+    /**
+     * Sets the stencil write mask for a specific face.
+     */
+    public static void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask) {
+        VulkanicStencilFace.fromLegacyGlConstant(face)
+            .ifPresentOrElse(
+                typedFace -> setStencilWriteMaskSeparate(ctx, typedFace, mask),
+                () -> getBackend().setStencilWriteMaskSeparate(ctx, face, mask)
+            );
+    }
+
+    /**
+     * Sets the stencil write mask for a specific face using backend-neutral semantics.
+     */
+    public static void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask) {
+        getBackend().setStencilWriteMaskSeparate(ctx, face, mask);
     }
     
     

@@ -124,7 +124,7 @@ public class NvidiaWorkarounds {
         // On Windows, the NVIDIA drivers do not have any environment variable to control whether
         // "Threaded Optimizations" are enabled. But we can enable the "GL_DEBUG_OUTPUT_SYNCHRONOUS" option to
         // achieve the same effect.
-        var capabilities = VulkanicAPI.obtainGraphicsCapabilities();
+        var capabilities = VulkanicAPI.getGraphicsCapabilities();
 
         if (capabilities.GL_KHR_debug) {
             LOGGER.info("Enabling GL_DEBUG_OUTPUT_SYNCHRONOUS to force the NVIDIA driver to disable threaded " +

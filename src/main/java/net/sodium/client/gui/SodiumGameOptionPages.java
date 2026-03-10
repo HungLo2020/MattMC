@@ -439,7 +439,7 @@ public class SodiumGameOptionPages {
     }
 
     private static boolean supportsNoErrorContext() {
-        var capabilities = VulkanicAPI.obtainGraphicsCapabilities();
+        var capabilities = VulkanicAPI.getGraphicsCapabilities();
         return (capabilities.OpenGL46 || capabilities.GL_KHR_no_error)
                 && !Workarounds.isWorkaroundEnabled(Workarounds.Reference.NO_ERROR_CONTEXT_UNSUPPORTED);
     }

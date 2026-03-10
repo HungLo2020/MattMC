@@ -18,7 +18,7 @@ public interface DepthCopyStrategy {
 		//
 		// Perhaps calling GL43.isAvailable would be a different option, but we only need one
 		// function, so we just check for that function.
-		if (VulkanicAPI.obtainGraphicsCapabilities().OpenGL43 && VulkanicAPI.checkFunctionAvailable("glCopyImageSubData")) {
+		if (VulkanicAPI.getGraphicsCapabilities().OpenGL43 && VulkanicAPI.checkFunctionAvailable("glCopyImageSubData")) {
 			return new Gl43CopyImage();
 		}
 

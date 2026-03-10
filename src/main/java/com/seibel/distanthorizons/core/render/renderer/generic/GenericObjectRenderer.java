@@ -31,6 +31,8 @@ import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.apache.logging.log4j.LogManager;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryUtil;
 
@@ -389,8 +391,14 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		}
 		
 		VulkanicAPI.setBlendEnabled(ctx, true);
-		VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
-		VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
+		VulkanicAPI.setBlendFunction(
+			ctx,
+			VulkanicBlendFactor.SRC_ALPHA,
+			VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+			VulkanicBlendFactor.ONE,
+			VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA
+		);
 		
 		IDhApiGenericObjectShaderProgram shaderProgram = useInstancedRendering ? this.instancedShaderProgram : this.directShaderProgram;
 		IDhApiGenericObjectShaderProgram shaderProgramOverride = OverrideInjector.INSTANCE.get(IDhApiGenericObjectShaderProgram.class);

@@ -2,9 +2,13 @@ package com.seibel.distanthorizons.core.render.glObject;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicCullFaceMode;
 import net.vulkanic.VulkanicDepthCompareOp;
+import net.vulkanic.VulkanicStencilCompareOp;
+import net.vulkanic.VulkanicStencilOperation;
 import net.vulkanic.VulkanicAPI;
 
 // TODO make this Closable or AutoClosable so it can be used with try-resource blocks
@@ -43,6 +47,10 @@ public class GLState
 	public int stencilFunc;
 	public int stencilRef;
 	public int stencilMask;
+	public int stencilFailOp;
+	public int stencilDepthFailOp;
+	public int stencilDepthPassOp;
+	public int stencilWriteMask;
 	public int[] view;
 	public boolean cull;
 	public int cullMode;
@@ -114,6 +122,10 @@ public class GLState
 		this.stencilFunc = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_FUNC);
 		this.stencilRef = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_REF);
 		this.stencilMask = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_VALUE_MASK);
+		this.stencilFailOp = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_FAIL);
+		this.stencilDepthFailOp = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_PASS_DEPTH_FAIL);
+		this.stencilDepthPassOp = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_PASS_DEPTH_PASS);
+		this.stencilWriteMask = VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_STENCIL_WRITEMASK);
 		this.view = new int[4];
 		VulkanicAPI.getIntegerv(ctx, VulkanicAPI.GL_VIEWPORT, this.view);
 		this.cull = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_CULL_FACE);
@@ -134,6 +146,8 @@ public class GLState
 				", depth=" + this.depth +
 				", depthFunc=" + GLEnums.getString(this.depthFunc) + ", stencil=" + this.stencil +
 				", stencilFunc=" + GLEnums.getString(this.stencilFunc) + ", stencilRef=" + this.stencilRef + ", stencilMask=" + this.stencilMask +
+				", stencilOp={" + GLEnums.getString(this.stencilFailOp) + ", " + GLEnums.getString(this.stencilDepthFailOp) + ", " + GLEnums.getString(this.stencilDepthPassOp) + "}" +
+				", stencilWriteMask=" + this.stencilWriteMask +
 				", view={x:" + this.view[0] + ", y:" + this.view[1] +
 				", w:" + this.view[2] + ", h:" + this.view[3] + "}" + ", cull=" + this.cull +
 				", cullMode=" + GLEnums.getString(this.cullMode) + ", polyMode=" + GLEnums.getString(this.polyMode) +
@@ -213,9 +227,31 @@ public class GLState
 			VulkanicAPI.setDepthWriteMask(ctx, false);
 		}
 		
-		VulkanicAPI.blendFunc(ctx, this.blendSrcColor, this.blendDstColor);
-		VulkanicAPI.setBlendEquationSeparate(ctx, this.blendEqRGB, this.blendEqAlpha);
-		VulkanicAPI.setBlendFunction(ctx, this.blendSrcColor, this.blendDstColor, this.blendSrcAlpha, this.blendDstAlpha);
+		VulkanicBlendFactor.fromLegacyGlConstant(this.blendSrcColor)
+			.flatMap(src -> VulkanicBlendFactor.fromLegacyGlConstant(this.blendDstColor)
+				.map(dst -> new VulkanicBlendFactor[]{src, dst}))
+			.ifPresentOrElse(
+				factors -> VulkanicAPI.blendFunc(ctx, factors[0], factors[1]),
+				() -> VulkanicAPI.blendFunc(ctx, this.blendSrcColor, this.blendDstColor)
+			);
+
+		VulkanicBlendEquation.fromLegacyGlConstant(this.blendEqRGB)
+			.flatMap(rgb -> VulkanicBlendEquation.fromLegacyGlConstant(this.blendEqAlpha)
+				.map(alpha -> new VulkanicBlendEquation[]{rgb, alpha}))
+			.ifPresentOrElse(
+				equations -> VulkanicAPI.setBlendEquationSeparate(ctx, equations[0], equations[1]),
+				() -> VulkanicAPI.setBlendEquationSeparate(ctx, this.blendEqRGB, this.blendEqAlpha)
+			);
+
+		java.util.Optional<VulkanicBlendFactor> typedSrcRgb = VulkanicBlendFactor.fromLegacyGlConstant(this.blendSrcColor);
+		java.util.Optional<VulkanicBlendFactor> typedDstRgb = VulkanicBlendFactor.fromLegacyGlConstant(this.blendDstColor);
+		java.util.Optional<VulkanicBlendFactor> typedSrcAlpha = VulkanicBlendFactor.fromLegacyGlConstant(this.blendSrcAlpha);
+		java.util.Optional<VulkanicBlendFactor> typedDstAlpha = VulkanicBlendFactor.fromLegacyGlConstant(this.blendDstAlpha);
+		if (typedSrcRgb.isPresent() && typedDstRgb.isPresent() && typedSrcAlpha.isPresent() && typedDstAlpha.isPresent()) {
+			VulkanicAPI.setBlendFunction(ctx, typedSrcRgb.get(), typedDstRgb.get(), typedSrcAlpha.get(), typedDstAlpha.get());
+		} else {
+			VulkanicAPI.setBlendFunction(ctx, this.blendSrcColor, this.blendDstColor, this.blendSrcAlpha, this.blendDstAlpha);
+		}
 		
 		if (this.depth)
 		{
@@ -239,7 +275,20 @@ public class GLState
 		{
 			VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.STENCIL_TEST, false);
 		}
-		VulkanicAPI.setStencilFunc(ctx, this.stencilFunc, this.stencilRef, this.stencilMask);
+		VulkanicStencilCompareOp.fromLegacyGlConstant(this.stencilFunc)
+			.ifPresentOrElse(
+				op -> VulkanicAPI.setStencilFunc(ctx, op, this.stencilRef, this.stencilMask),
+				() -> VulkanicAPI.setStencilFunc(ctx, this.stencilFunc, this.stencilRef, this.stencilMask)
+			);
+		java.util.Optional<VulkanicStencilOperation> typedStencilFailOp = VulkanicStencilOperation.fromLegacyGlConstant(this.stencilFailOp);
+		java.util.Optional<VulkanicStencilOperation> typedStencilDepthFailOp = VulkanicStencilOperation.fromLegacyGlConstant(this.stencilDepthFailOp);
+		java.util.Optional<VulkanicStencilOperation> typedStencilDepthPassOp = VulkanicStencilOperation.fromLegacyGlConstant(this.stencilDepthPassOp);
+		if (typedStencilFailOp.isPresent() && typedStencilDepthFailOp.isPresent() && typedStencilDepthPassOp.isPresent()) {
+			VulkanicAPI.setStencilOp(ctx, typedStencilFailOp.get(), typedStencilDepthFailOp.get(), typedStencilDepthPassOp.get());
+		} else {
+			VulkanicAPI.setStencilOp(ctx, this.stencilFailOp, this.stencilDepthFailOp, this.stencilDepthPassOp);
+		}
+		VulkanicAPI.setStencilWriteMask(ctx, this.stencilWriteMask);
 		
 		VulkanicAPI.setViewport(ctx, this.view[0], this.view[1], this.view[2], this.view[3]);
 		if (this.cull)

@@ -5,11 +5,16 @@ import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicCullFaceMode;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicIntegerQuery;
+import net.vulkanic.VulkanicStencilCompareOp;
+import net.vulkanic.VulkanicStencilFace;
+import net.vulkanic.VulkanicStencilOperation;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
 import org.lwjgl.opengl.*;
@@ -474,6 +479,23 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
+
+    @Override
+    public void setBlendFunction(
+        CommandContext ctx,
+        VulkanicBlendFactor srcRgb,
+        VulkanicBlendFactor dstRgb,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
+        setBlendFunction(
+            ctx,
+            toOpenGLBlendFactor(srcRgb),
+            toOpenGLBlendFactor(dstRgb),
+            toOpenGLBlendFactor(srcAlpha),
+            toOpenGLBlendFactor(dstAlpha)
+        );
+    }
     
     @Override
     public void setBlendEquation(CommandContext ctx, int mode) {
@@ -481,6 +503,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL14.glBlendEquation(mode);
+    }
+
+    @Override
+    public void setBlendEquation(CommandContext ctx, VulkanicBlendEquation mode) {
+        setBlendEquation(ctx, toOpenGLBlendEquation(mode));
     }
     
     @Override
@@ -534,6 +561,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glBlendFunc(sfactor, dfactor);
+    }
+
+    @Override
+    public void blendFunc(CommandContext ctx, VulkanicBlendFactor sfactor, VulkanicBlendFactor dfactor) {
+        blendFunc(ctx, toOpenGLBlendFactor(sfactor), toOpenGLBlendFactor(dfactor));
     }
     
     @Override
@@ -1425,11 +1457,6 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public GraphicsCapabilities obtainGraphicsCapabilities() {
-        return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
-    }
-    
-    @Override
     public GraphicsCapabilities initializeGraphicsCapabilities() {
         return convertCapabilities(org.lwjgl.opengl.GL.createCapabilities());
     }
@@ -1642,6 +1669,70 @@ public class OpenGLBackend implements GraphicsBackend {
             case ALWAYS -> VulkanicAPI.GL_ALWAYS;
         };
     }
+
+    private static int toOpenGLStencilCompareOp(VulkanicStencilCompareOp op) {
+        return switch (op) {
+            case NEVER -> VulkanicAPI.GL_NEVER;
+            case LESS -> VulkanicAPI.GL_LESS;
+            case EQUAL -> VulkanicAPI.GL_EQUAL;
+            case LEQUAL -> VulkanicAPI.GL_LEQUAL;
+            case GREATER -> VulkanicAPI.GL_GREATER;
+            case NOTEQUAL -> VulkanicAPI.GL_NOTEQUAL;
+            case GEQUAL -> VulkanicAPI.GL_GEQUAL;
+            case ALWAYS -> VulkanicAPI.GL_ALWAYS;
+        };
+    }
+
+    private static int toOpenGLStencilFace(VulkanicStencilFace face) {
+        return switch (face) {
+            case FRONT -> VulkanicAPI.GL_FRONT;
+            case BACK -> VulkanicAPI.GL_BACK;
+            case FRONT_AND_BACK -> VulkanicAPI.GL_FRONT_AND_BACK;
+        };
+    }
+
+    private static int toOpenGLStencilOp(VulkanicStencilOperation op) {
+        return switch (op) {
+            case KEEP -> VulkanicAPI.GL_KEEP;
+            case ZERO -> VulkanicAPI.GL_ZERO;
+            case REPLACE -> VulkanicAPI.GL_REPLACE;
+            case INCREMENT_CLAMP -> VulkanicAPI.GL_INCR;
+            case DECREMENT_CLAMP -> VulkanicAPI.GL_DECR;
+            case INVERT -> VulkanicAPI.GL_INVERT;
+            case INCREMENT_WRAP -> VulkanicAPI.GL_INCR_WRAP;
+            case DECREMENT_WRAP -> VulkanicAPI.GL_DECR_WRAP;
+        };
+    }
+
+    private static int toOpenGLBlendFactor(VulkanicBlendFactor factor) {
+        return switch (factor) {
+            case ZERO -> VulkanicAPI.GL_ZERO;
+            case ONE -> VulkanicAPI.GL_ONE;
+            case SRC_COLOR -> VulkanicAPI.GL_SRC_COLOR;
+            case ONE_MINUS_SRC_COLOR -> VulkanicAPI.GL_ONE_MINUS_SRC_COLOR;
+            case DST_COLOR -> VulkanicAPI.GL_DST_COLOR;
+            case ONE_MINUS_DST_COLOR -> VulkanicAPI.GL_ONE_MINUS_DST_COLOR;
+            case SRC_ALPHA -> VulkanicAPI.GL_SRC_ALPHA;
+            case ONE_MINUS_SRC_ALPHA -> VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA;
+            case DST_ALPHA -> VulkanicAPI.GL_DST_ALPHA;
+            case ONE_MINUS_DST_ALPHA -> VulkanicAPI.GL_ONE_MINUS_DST_ALPHA;
+            case SRC_ALPHA_SATURATE -> VulkanicAPI.GL_SRC_ALPHA_SATURATE;
+            case CONSTANT_COLOR -> VulkanicAPI.GL_CONSTANT_COLOR;
+            case ONE_MINUS_CONSTANT_COLOR -> VulkanicAPI.GL_ONE_MINUS_CONSTANT_COLOR;
+            case CONSTANT_ALPHA -> VulkanicAPI.GL_CONSTANT_ALPHA;
+            case ONE_MINUS_CONSTANT_ALPHA -> VulkanicAPI.GL_ONE_MINUS_CONSTANT_ALPHA;
+        };
+    }
+
+    private static int toOpenGLBlendEquation(VulkanicBlendEquation equation) {
+        return switch (equation) {
+            case ADD -> VulkanicAPI.GL_FUNC_ADD;
+            case SUBTRACT -> VulkanicAPI.GL_FUNC_SUBTRACT;
+            case REVERSE_SUBTRACT -> VulkanicAPI.GL_FUNC_REVERSE_SUBTRACT;
+            case MIN -> VulkanicAPI.GL_MIN;
+            case MAX -> VulkanicAPI.GL_MAX;
+        };
+    }
     
     
     
@@ -1761,6 +1852,25 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.ARBDrawBuffersBlend.glBlendFuncSeparateiARB(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+    }
+
+    @Override
+    public void blendFuncSeparatei(
+        CommandContext ctx,
+        int buffer,
+        VulkanicBlendFactor srcRGB,
+        VulkanicBlendFactor dstRGB,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
+        blendFuncSeparatei(
+            ctx,
+            buffer,
+            toOpenGLBlendFactor(srcRGB),
+            toOpenGLBlendFactor(dstRGB),
+            toOpenGLBlendFactor(srcAlpha),
+            toOpenGLBlendFactor(dstAlpha)
+        );
     }
     
     
@@ -2093,7 +2203,7 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallbackARB callback) {
+    public void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallback callback) {
         org.lwjgl.opengl.GLDebugMessageARBCallback proc = org.lwjgl.opengl.GLDebugMessageARBCallback.create(
             (source, type, id, severity, length, message, userParam) -> {
                 String messageStr = org.lwjgl.opengl.GLDebugMessageARBCallback.getMessage(length, message);
@@ -2254,6 +2364,11 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         org.lwjgl.opengl.GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
     }
+
+    @Override
+    public void setBlendEquationSeparate(CommandContext ctx, VulkanicBlendEquation modeRGB, VulkanicBlendEquation modeAlpha) {
+        setBlendEquationSeparate(ctx, toOpenGLBlendEquation(modeRGB), toOpenGLBlendEquation(modeAlpha));
+    }
     
     @Override
     public void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
@@ -2261,6 +2376,93 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
+    }
+
+    @Override
+    public void setStencilFunc(CommandContext ctx, VulkanicStencilCompareOp func, int ref, int mask) {
+        setStencilFunc(ctx, toOpenGLStencilCompareOp(func), ref, mask);
+    }
+
+    @Override
+    public void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilFuncSeparate(face, func, ref, mask);
+    }
+
+    @Override
+    public void setStencilFuncSeparate(CommandContext ctx, VulkanicStencilFace face, VulkanicStencilCompareOp func, int ref, int mask) {
+        setStencilFuncSeparate(ctx, toOpenGLStencilFace(face), toOpenGLStencilCompareOp(func), ref, mask);
+    }
+
+    @Override
+    public void setStencilOp(CommandContext ctx, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glStencilOp(stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    @Override
+    public void setStencilOp(
+        CommandContext ctx,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        setStencilOp(
+            ctx,
+            toOpenGLStencilOp(stencilFailOp),
+            toOpenGLStencilOp(depthFailOp),
+            toOpenGLStencilOp(depthPassOp)
+        );
+    }
+
+    @Override
+    public void setStencilOpSeparate(CommandContext ctx, int face, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilOpSeparate(face, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    @Override
+    public void setStencilOpSeparate(
+        CommandContext ctx,
+        VulkanicStencilFace face,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        setStencilOpSeparate(
+            ctx,
+            toOpenGLStencilFace(face),
+            toOpenGLStencilOp(stencilFailOp),
+            toOpenGLStencilOp(depthFailOp),
+            toOpenGLStencilOp(depthPassOp)
+        );
+    }
+
+    @Override
+    public void setStencilWriteMask(CommandContext ctx, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glStencilMask(mask);
+    }
+
+    @Override
+    public void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilMaskSeparate(face, mask);
+    }
+
+    @Override
+    public void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask) {
+        setStencilWriteMaskSeparate(ctx, toOpenGLStencilFace(face), mask);
     }
     
     

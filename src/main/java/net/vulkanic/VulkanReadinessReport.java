@@ -47,7 +47,7 @@ public final class VulkanReadinessReport {
             false,
             false,
             "skipped (Vulkan backend not selected)",
-            List.of("Vulkan backend is not currently selected. Initialize with BackendType.VULKAN to run Vulkan diagnostics.")
+            List.of("Vulkan backend is not currently selected. Initialize with GraphicsBackendType.VULKAN to run Vulkan diagnostics.")
         );
     }
 

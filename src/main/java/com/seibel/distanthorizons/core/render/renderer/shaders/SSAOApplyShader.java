@@ -8,6 +8,8 @@ import com.seibel.distanthorizons.core.render.renderer.SSAORenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -105,8 +107,14 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	protected void onRender(CommandContext ctx)
 	{
 		VulkanicAPI.setBlendEnabled(ctx, true);
-		VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
-		VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_ONE);
+		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
+		VulkanicAPI.setBlendFunction(
+			ctx,
+			VulkanicBlendFactor.ZERO,
+			VulkanicBlendFactor.SRC_ALPHA,
+			VulkanicBlendFactor.ZERO,
+			VulkanicBlendFactor.ONE
+		);
 
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 

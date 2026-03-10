@@ -33,6 +33,8 @@ import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicAPI;
@@ -379,8 +381,14 @@ public class LodRenderer
 		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 		VulkanicAPI.setCullFaceEnabled(ctx, true);
 		
-		VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
-		VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
+		VulkanicAPI.blendFunc(ctx, VulkanicBlendFactor.SRC_ALPHA, VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendFunction(
+			ctx,
+			VulkanicBlendFactor.SRC_ALPHA,
+			VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+			VulkanicBlendFactor.ONE,
+			VulkanicBlendFactor.ZERO
+		);
 		
 		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.SCISSOR_TEST, false);
 		
@@ -593,8 +601,14 @@ public class LodRenderer
 		{
 			VulkanicAPI.setBlendEnabled(ctx, true);
 			VulkanicAPI.setDepthTestEnabled(ctx, true);
-			VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
-			VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+			VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
+			VulkanicAPI.setBlendFunction(
+				ctx,
+				VulkanicBlendFactor.SRC_ALPHA,
+				VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+				VulkanicBlendFactor.ONE,
+				VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA
+			);
 		}
 		else
 		{

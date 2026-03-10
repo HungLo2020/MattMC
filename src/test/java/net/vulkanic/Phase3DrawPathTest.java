@@ -92,11 +92,11 @@ public class Phase3DrawPathTest {
         Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         String apiSource = Files.readString(apiFile);
         assertTrue(apiSource.contains("rawVulkanBackend = new VulkanBackend();"),
-            "VulkanicAPI should construct VulkanBackend for BackendType.VULKAN routing");
+            "VulkanicAPI should construct VulkanBackend for GraphicsBackendType.VULKAN routing");
         assertTrue(apiSource.contains("backend = createFailFastVulkanProxy(rawVulkanBackend);"),
             "VulkanicAPI should route Vulkan backend calls through fail-fast proxy protection");
         assertFalse(apiSource.contains("throw new UnsupportedOperationException(\"Vulkan backend not yet implemented\")"),
-            "VulkanicAPI should no longer hard-fail backend selection for BackendType.VULKAN");
+            "VulkanicAPI should no longer hard-fail backend selection for GraphicsBackendType.VULKAN");
     }
 
     @Test
@@ -2115,6 +2115,52 @@ public class Phase3DrawPathTest {
             "GLState restore should resolve saved depth function through typed conversion helper");
         assertTrue(glStateSource.contains("VulkanicCullFaceMode.fromLegacyGlConstant(this.cullMode)"),
             "GLState restore should resolve saved cull mode through typed conversion helper");
+        assertTrue(glStateSource.contains("VulkanicStencilCompareOp.fromLegacyGlConstant(this.stencilFunc)"),
+            "GLState restore should resolve saved stencil function through typed conversion helper");
+        assertTrue(glStateSource.contains("VulkanicStencilOperation.fromLegacyGlConstant(this.stencilFailOp)"),
+            "GLState restore should resolve saved stencil operations through typed conversion helper");
+        assertTrue(glStateSource.contains("VulkanicAPI.setStencilWriteMask(ctx, this.stencilWriteMask)"),
+            "GLState restore should restore stencil write mask through VulkanicAPI helper");
+    }
+
+    @Test
+    public void testBlendCallsitesUseTypedEnumsForKnownState() throws IOException {
+        Path lodRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String lodRendererSource = readSourceIfExists(lodRendererFile);
+        assertTrue(lodRendererSource.contains("VulkanicBlendFactor.SRC_ALPHA"),
+            "LodRenderer should use typed blend-factor enums for known blend setup");
+        assertTrue(lodRendererSource.contains("VulkanicBlendEquation.ADD"),
+            "LodRenderer should use typed blend-equation enum for known blend setup");
+        assertFalse(lodRendererSource.contains("setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD"),
+            "LodRenderer should avoid raw GL_FUNC_ADD constant in known blend setup");
+
+        Path fogApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogApplyShader.java");
+        String fogApplySource = readSourceIfExists(fogApplyFile);
+        assertTrue(fogApplySource.contains("VulkanicBlendEquation.ADD"),
+            "FogApplyShader should use typed blend-equation enum for known blend setup");
+        assertTrue(fogApplySource.contains("VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA"),
+            "FogApplyShader should use typed blend-factor enums for known blend setup");
+
+        Path ssaoApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOApplyShader.java");
+        String ssaoApplySource = readSourceIfExists(ssaoApplyFile);
+        assertTrue(ssaoApplySource.contains("VulkanicBlendFactor.ZERO"),
+            "SSAOApplyShader should use typed blend-factor enums for known blend setup");
+        assertTrue(ssaoApplySource.contains("VulkanicBlendFactor.SRC_ALPHA"),
+            "SSAOApplyShader should use typed blend-factor enums for known blend setup");
+
+        Path genericRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/generic/GenericObjectRenderer.java");
+        String genericRendererSource = readSourceIfExists(genericRendererFile);
+        assertTrue(genericRendererSource.contains("VulkanicBlendEquation.ADD"),
+            "GenericObjectRenderer should use typed blend-equation enum for known blend setup");
+        assertTrue(genericRendererSource.contains("VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA"),
+            "GenericObjectRenderer should use typed blend-factor enums for known blend setup");
+
+        Path glStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/GLState.java");
+        String glStateSource = readSourceIfExists(glStateFile);
+        assertTrue(glStateSource.contains("VulkanicBlendFactor.fromLegacyGlConstant(this.blendSrcColor)"),
+            "GLState restore should resolve saved blend factors through typed conversion helper");
+        assertTrue(glStateSource.contains("VulkanicBlendEquation.fromLegacyGlConstant(this.blendEqRGB)"),
+            "GLState restore should resolve saved blend equations through typed conversion helper");
     }
 
     @Test

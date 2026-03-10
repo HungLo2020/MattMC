@@ -204,6 +204,299 @@ public class VulkanicTypedApiRoutingTest {
         assertEquals(VulkanicCullFaceMode.FRONT, convertedInvocation.args[1]);
     }
 
+    @Test
+    public void testBlendFunctionRoutingUsesTypedMethodForKnownConstants() {
+        VulkanicCoreAPI.setBlendFunction(
+            TEST_CONTEXT,
+            VulkanicBlendFactor.SRC_ALPHA,
+            VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+            VulkanicBlendFactor.ONE,
+            VulkanicBlendFactor.ZERO
+        );
+
+        RecordedInvocation typedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(typedInvocation);
+        assertEquals("setBlendFunction", typedInvocation.method.getName());
+        assertEquals(VulkanicBlendFactor.class, typedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicBlendFactor.SRC_ALPHA, typedInvocation.args[1]);
+        assertEquals(VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA, typedInvocation.args[2]);
+        assertEquals(VulkanicBlendFactor.ONE, typedInvocation.args[3]);
+        assertEquals(VulkanicBlendFactor.ZERO, typedInvocation.args[4]);
+
+        VulkanicLegacyGLCompat.setBlendFunction(
+            TEST_CONTEXT,
+            VulkanicAPI.GL_SRC_ALPHA,
+            VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA,
+            VulkanicAPI.GL_ONE,
+            VulkanicAPI.GL_ZERO
+        );
+
+        RecordedInvocation convertedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(convertedInvocation);
+        assertEquals("setBlendFunction", convertedInvocation.method.getName());
+        assertEquals(VulkanicBlendFactor.class, convertedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicBlendFactor.SRC_ALPHA, convertedInvocation.args[1]);
+    }
+
+    @Test
+    public void testBlendFunctionRoutingFallsBackForUnknownConstant() {
+        int unknownBlendFactor = 0x7FFF_1003;
+        VulkanicLegacyGLCompat.setBlendFunction(
+            TEST_CONTEXT,
+            unknownBlendFactor,
+            VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA,
+            VulkanicAPI.GL_ONE,
+            VulkanicAPI.GL_ZERO
+        );
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setBlendFunction", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(unknownBlendFactor, invocation.args[1]);
+    }
+
+    @Test
+    public void testBlendEquationRoutingUsesTypedMethodForKnownConstant() {
+        VulkanicCoreAPI.setBlendEquation(TEST_CONTEXT, VulkanicBlendEquation.ADD);
+
+        RecordedInvocation typedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(typedInvocation);
+        assertEquals("setBlendEquation", typedInvocation.method.getName());
+        assertEquals(VulkanicBlendEquation.class, typedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicBlendEquation.ADD, typedInvocation.args[1]);
+
+        VulkanicLegacyGLCompat.setBlendEquation(TEST_CONTEXT, VulkanicAPI.GL_FUNC_ADD);
+
+        RecordedInvocation convertedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(convertedInvocation);
+        assertEquals("setBlendEquation", convertedInvocation.method.getName());
+        assertEquals(VulkanicBlendEquation.class, convertedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicBlendEquation.ADD, convertedInvocation.args[1]);
+    }
+
+    @Test
+    public void testBlendEquationRoutingFallsBackForUnknownConstant() {
+        int unknownEquation = 0x7FFF_1004;
+        VulkanicLegacyGLCompat.setBlendEquation(TEST_CONTEXT, unknownEquation);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setBlendEquation", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(unknownEquation, invocation.args[1]);
+    }
+
+    @Test
+    public void testStencilFuncRoutingUsesTypedMethodForKnownConstant() {
+        VulkanicCoreAPI.setStencilFunc(TEST_CONTEXT, VulkanicStencilCompareOp.LEQUAL, 5, 0xFF);
+
+        RecordedInvocation typedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(typedInvocation);
+        assertEquals("setStencilFunc", typedInvocation.method.getName());
+        assertEquals(VulkanicStencilCompareOp.class, typedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilCompareOp.LEQUAL, typedInvocation.args[1]);
+
+        VulkanicLegacyGLCompat.setStencilFunc(TEST_CONTEXT, VulkanicAPI.GL_ALWAYS, 2, 0x0F);
+
+        RecordedInvocation convertedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(convertedInvocation);
+        assertEquals("setStencilFunc", convertedInvocation.method.getName());
+        assertEquals(VulkanicStencilCompareOp.class, convertedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilCompareOp.ALWAYS, convertedInvocation.args[1]);
+    }
+
+    @Test
+    public void testStencilFuncRoutingFallsBackForUnknownConstant() {
+        int unknownStencilFunc = 0x7FFF_1005;
+        VulkanicLegacyGLCompat.setStencilFunc(TEST_CONTEXT, unknownStencilFunc, 1, 0xFF);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setStencilFunc", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(unknownStencilFunc, invocation.args[1]);
+    }
+
+    @Test
+    public void testStencilOpRoutingUsesTypedMethodForKnownConstants() {
+        VulkanicCoreAPI.setStencilOp(
+            TEST_CONTEXT,
+            VulkanicStencilOperation.KEEP,
+            VulkanicStencilOperation.REPLACE,
+            VulkanicStencilOperation.INCREMENT_CLAMP
+        );
+
+        RecordedInvocation typedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(typedInvocation);
+        assertEquals("setStencilOp", typedInvocation.method.getName());
+        assertEquals(VulkanicStencilOperation.class, typedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilOperation.KEEP, typedInvocation.args[1]);
+
+        VulkanicLegacyGLCompat.setStencilOp(
+            TEST_CONTEXT,
+            VulkanicAPI.GL_KEEP,
+            VulkanicAPI.GL_REPLACE,
+            VulkanicAPI.GL_INCR
+        );
+
+        RecordedInvocation convertedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(convertedInvocation);
+        assertEquals("setStencilOp", convertedInvocation.method.getName());
+        assertEquals(VulkanicStencilOperation.class, convertedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilOperation.KEEP, convertedInvocation.args[1]);
+        assertEquals(VulkanicStencilOperation.REPLACE, convertedInvocation.args[2]);
+        assertEquals(VulkanicStencilOperation.INCREMENT_CLAMP, convertedInvocation.args[3]);
+    }
+
+    @Test
+    public void testStencilOpRoutingFallsBackForUnknownConstant() {
+        int unknownStencilOp = 0x7FFF_1006;
+        VulkanicLegacyGLCompat.setStencilOp(TEST_CONTEXT, unknownStencilOp, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_REPLACE);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setStencilOp", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(unknownStencilOp, invocation.args[1]);
+    }
+
+    @Test
+    public void testStencilWriteMaskRoutingUsesRawMaskMethod() {
+        VulkanicCoreAPI.setStencilWriteMask(TEST_CONTEXT, 0x0F);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setStencilWriteMask", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(0x0F, invocation.args[1]);
+
+        VulkanicLegacyGLCompat.setStencilWriteMask(TEST_CONTEXT, 0xF0);
+
+        RecordedInvocation legacyInvocation = invocationHandler.lastInvocation;
+        assertNotNull(legacyInvocation);
+        assertEquals("setStencilWriteMask", legacyInvocation.method.getName());
+        assertEquals(int.class, legacyInvocation.method.getParameterTypes()[1]);
+        assertEquals(0xF0, legacyInvocation.args[1]);
+    }
+
+    @Test
+    public void testStencilFuncSeparateRoutingUsesTypedMethodForKnownConstants() {
+        VulkanicCoreAPI.setStencilFuncSeparate(TEST_CONTEXT, VulkanicStencilFace.FRONT, VulkanicStencilCompareOp.ALWAYS, 3, 0xFF);
+
+        RecordedInvocation typedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(typedInvocation);
+        assertEquals("setStencilFuncSeparate", typedInvocation.method.getName());
+        assertEquals(VulkanicStencilFace.class, typedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilCompareOp.class, typedInvocation.method.getParameterTypes()[2]);
+        assertEquals(VulkanicStencilFace.FRONT, typedInvocation.args[1]);
+        assertEquals(VulkanicStencilCompareOp.ALWAYS, typedInvocation.args[2]);
+
+        VulkanicLegacyGLCompat.setStencilFuncSeparate(TEST_CONTEXT, VulkanicAPI.GL_BACK, VulkanicAPI.GL_LEQUAL, 1, 0x0F);
+
+        RecordedInvocation convertedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(convertedInvocation);
+        assertEquals("setStencilFuncSeparate", convertedInvocation.method.getName());
+        assertEquals(VulkanicStencilFace.class, convertedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilCompareOp.class, convertedInvocation.method.getParameterTypes()[2]);
+        assertEquals(VulkanicStencilFace.BACK, convertedInvocation.args[1]);
+        assertEquals(VulkanicStencilCompareOp.LEQUAL, convertedInvocation.args[2]);
+    }
+
+    @Test
+    public void testStencilFuncSeparateRoutingFallsBackForUnknownFace() {
+        int unknownFace = 0x7FFF_1007;
+        VulkanicLegacyGLCompat.setStencilFuncSeparate(TEST_CONTEXT, unknownFace, VulkanicAPI.GL_ALWAYS, 0, 0xFF);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setStencilFuncSeparate", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(unknownFace, invocation.args[1]);
+    }
+
+    @Test
+    public void testStencilOpSeparateRoutingUsesTypedMethodForKnownConstants() {
+        VulkanicCoreAPI.setStencilOpSeparate(
+            TEST_CONTEXT,
+            VulkanicStencilFace.BACK,
+            VulkanicStencilOperation.KEEP,
+            VulkanicStencilOperation.INCREMENT_WRAP,
+            VulkanicStencilOperation.DECREMENT_WRAP
+        );
+
+        RecordedInvocation typedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(typedInvocation);
+        assertEquals("setStencilOpSeparate", typedInvocation.method.getName());
+        assertEquals(VulkanicStencilFace.class, typedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilOperation.class, typedInvocation.method.getParameterTypes()[2]);
+        assertEquals(VulkanicStencilFace.BACK, typedInvocation.args[1]);
+        assertEquals(VulkanicStencilOperation.INCREMENT_WRAP, typedInvocation.args[3]);
+
+        VulkanicLegacyGLCompat.setStencilOpSeparate(
+            TEST_CONTEXT,
+            VulkanicAPI.GL_FRONT,
+            VulkanicAPI.GL_REPLACE,
+            VulkanicAPI.GL_INCR,
+            VulkanicAPI.GL_DECR
+        );
+
+        RecordedInvocation convertedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(convertedInvocation);
+        assertEquals("setStencilOpSeparate", convertedInvocation.method.getName());
+        assertEquals(VulkanicStencilFace.class, convertedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilOperation.class, convertedInvocation.method.getParameterTypes()[2]);
+        assertEquals(VulkanicStencilFace.FRONT, convertedInvocation.args[1]);
+        assertEquals(VulkanicStencilOperation.REPLACE, convertedInvocation.args[2]);
+        assertEquals(VulkanicStencilOperation.INCREMENT_CLAMP, convertedInvocation.args[3]);
+        assertEquals(VulkanicStencilOperation.DECREMENT_CLAMP, convertedInvocation.args[4]);
+    }
+
+    @Test
+    public void testStencilOpSeparateRoutingFallsBackForUnknownOperation() {
+        int unknownStencilOp = 0x7FFF_1008;
+        VulkanicLegacyGLCompat.setStencilOpSeparate(TEST_CONTEXT, VulkanicAPI.GL_BACK, unknownStencilOp, VulkanicAPI.GL_KEEP, VulkanicAPI.GL_REPLACE);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setStencilOpSeparate", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[2]);
+        assertEquals(unknownStencilOp, invocation.args[2]);
+    }
+
+    @Test
+    public void testStencilWriteMaskSeparateRoutingUsesTypedFaceForKnownConstant() {
+        VulkanicCoreAPI.setStencilWriteMaskSeparate(TEST_CONTEXT, VulkanicStencilFace.FRONT_AND_BACK, 0xAA);
+
+        RecordedInvocation typedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(typedInvocation);
+        assertEquals("setStencilWriteMaskSeparate", typedInvocation.method.getName());
+        assertEquals(VulkanicStencilFace.class, typedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilFace.FRONT_AND_BACK, typedInvocation.args[1]);
+        assertEquals(0xAA, typedInvocation.args[2]);
+
+        VulkanicLegacyGLCompat.setStencilWriteMaskSeparate(TEST_CONTEXT, VulkanicAPI.GL_FRONT, 0x55);
+
+        RecordedInvocation convertedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(convertedInvocation);
+        assertEquals("setStencilWriteMaskSeparate", convertedInvocation.method.getName());
+        assertEquals(VulkanicStencilFace.class, convertedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicStencilFace.FRONT, convertedInvocation.args[1]);
+        assertEquals(0x55, convertedInvocation.args[2]);
+    }
+
+    @Test
+    public void testStencilWriteMaskSeparateRoutingFallsBackForUnknownFace() {
+        int unknownFace = 0x7FFF_1009;
+        VulkanicLegacyGLCompat.setStencilWriteMaskSeparate(TEST_CONTEXT, unknownFace, 0x7F);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setStencilWriteMaskSeparate", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(unknownFace, invocation.args[1]);
+    }
+
     private static void resetBackendState() throws Exception {
         Field backendField = VulkanicAPI.class.getDeclaredField("backend");
         backendField.setAccessible(true);

@@ -27,7 +27,7 @@ public class VulkanFailFastRoutingTest {
 
     @Test
     public void testVulkanInitializationUsesFailFastProxyAndReadinessStillAccessible() {
-        VulkanicAPI.initialize(VulkanicAPI.BackendType.VULKAN);
+        VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
 
         GraphicsBackend backend = VulkanicAPI.getBackend();
         assertNotNull(backend);
@@ -44,7 +44,7 @@ public class VulkanFailFastRoutingTest {
 
     @Test
     public void testProxyRejectsInheritedOpenGLMethods() {
-        VulkanicAPI.initialize(VulkanicAPI.BackendType.VULKAN);
+        VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
 
         IllegalStateException exception = assertThrows(IllegalStateException.class,
             () -> VulkanicAPI.getBackend().setDynamicViewport(null, 0, 0, 1, 1));
@@ -54,7 +54,7 @@ public class VulkanFailFastRoutingTest {
 
     @Test
     public void testOverriddenVulkanMethodStillReturnsReadinessDiagnostics() {
-        VulkanicAPI.initialize(VulkanicAPI.BackendType.VULKAN);
+        VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
 
         IllegalStateException exception = assertThrows(IllegalStateException.class,
             VulkanicAPI::beginCommandBuffer);

@@ -33,6 +33,59 @@ public final class VulkanicCoreAPI {
         VulkanicAPI.setDepthFunc(ctx, op);
     }
 
+    public static void setBlendFunction(
+        CommandContext ctx,
+        VulkanicBlendFactor srcRgb,
+        VulkanicBlendFactor dstRgb,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
+        VulkanicAPI.setBlendFunction(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+
+    public static void setBlendEquation(CommandContext ctx, VulkanicBlendEquation equation) {
+        VulkanicAPI.setBlendEquation(ctx, equation);
+    }
+
+    public static void blendFunc(CommandContext ctx, VulkanicBlendFactor sfactor, VulkanicBlendFactor dfactor) {
+        VulkanicAPI.blendFunc(ctx, sfactor, dfactor);
+    }
+
+    public static void setStencilFunc(CommandContext ctx, VulkanicStencilCompareOp func, int ref, int mask) {
+        VulkanicAPI.setStencilFunc(ctx, func, ref, mask);
+    }
+
+    public static void setStencilOp(
+        CommandContext ctx,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        VulkanicAPI.setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    public static void setStencilWriteMask(CommandContext ctx, int mask) {
+        VulkanicAPI.setStencilWriteMask(ctx, mask);
+    }
+
+    public static void setStencilFuncSeparate(CommandContext ctx, VulkanicStencilFace face, VulkanicStencilCompareOp func, int ref, int mask) {
+        VulkanicAPI.setStencilFuncSeparate(ctx, face, func, ref, mask);
+    }
+
+    public static void setStencilOpSeparate(
+        CommandContext ctx,
+        VulkanicStencilFace face,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        VulkanicAPI.setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    public static void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask) {
+        VulkanicAPI.setStencilWriteMaskSeparate(ctx, face, mask);
+    }
+
     public static void texParameteri(
         CommandContext ctx,
         VulkanicTextureTarget target,

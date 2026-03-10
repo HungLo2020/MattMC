@@ -6,6 +6,8 @@ import com.seibel.distanthorizons.core.render.renderer.FogRenderer;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -76,8 +78,14 @@ public class FogApplyShader extends AbstractShaderRenderer
 	protected void onRender(CommandContext ctx)
 	{
 		VulkanicAPI.setBlendEnabled(ctx, true);
-		VulkanicAPI.setBlendEquation(ctx, VulkanicAPI.GL_FUNC_ADD);
-		VulkanicAPI.setBlendFunction(ctx, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
+		VulkanicAPI.setBlendFunction(
+			ctx,
+			VulkanicBlendFactor.SRC_ALPHA,
+			VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+			VulkanicBlendFactor.ONE,
+			VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA
+		);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
