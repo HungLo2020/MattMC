@@ -194,7 +194,7 @@ public class CompositeRenderer {
 		this.passes = passes.build();
 		this.flippedAtLeastOnceFinal = flippedAtLeastOnce.build();
 
-		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getCommandContext(), 0);
 	}
 
 	private boolean hasComputes(ComputeSource[][] computes) {
@@ -318,7 +318,7 @@ public class CompositeRenderer {
 				float scaledHeight = compositePass.viewHeight * compositePass.viewportScale.scale();
 				int beginWidth = (int) (compositePass.viewWidth * compositePass.viewportScale.viewportX());
 				int beginHeight = (int) (compositePass.viewHeight * compositePass.viewportScale.viewportY());
-				VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
+				VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
 
 				compositePass.program.use();
 
@@ -345,7 +345,7 @@ public class CompositeRenderer {
 			// NB: This is necessary for shader pack reloading to work propely
 			if (net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(i) != 0) {
 				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
-				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 			}
 		}
 

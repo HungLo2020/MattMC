@@ -35,7 +35,7 @@ public abstract class VertexArrayCache {
 
 		@Override
 		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GlBuffer glBuffer) {
-			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			VertexArrayCache.VertexArray vertexArray = (VertexArrayCache.VertexArray)this.cache.get(vertexFormat);
 			if (vertexArray == null) {
 				int i = VulkanicAPI.createVertexArray(ctx);
@@ -59,7 +59,7 @@ public abstract class VertexArrayCache {
 		}
 
 		private static void setupCombinedAttributes(VertexFormat vertexFormat, boolean bl) {
-			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			int i = vertexFormat.getVertexSize();
 			List<VertexFormatElement> list = vertexFormat.getElements();
 
@@ -95,8 +95,8 @@ public abstract class VertexArrayCache {
 
 		public Separate(GlDebugLabel glDebugLabel) {
 			this.debugLabels = glDebugLabel;
-			if ("Mesa".equals(VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_VENDOR))) {
-				String string = VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_VERSION);
+			if ("Mesa".equals(VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR))) {
+				String string = VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VERSION);
 				this.needsMesaWorkaround = string.contains("25.0.0") || string.contains("25.0.1") || string.contains("25.0.2");
 			} else {
 				this.needsMesaWorkaround = false;
@@ -105,7 +105,7 @@ public abstract class VertexArrayCache {
 
 		@Override
 		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GlBuffer glBuffer) {
-			net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			VertexArrayCache.VertexArray vertexArray = (VertexArrayCache.VertexArray)this.cache.get(vertexFormat);
 			if (vertexArray != null) {
 				VulkanicAPI.bindVertexArray(ctx, vertexArray.id);

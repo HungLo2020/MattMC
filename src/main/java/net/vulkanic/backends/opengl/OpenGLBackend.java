@@ -2,6 +2,7 @@ package net.vulkanic.backends.opengl;
 
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
+import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.opengl.*;
@@ -56,6 +57,16 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public CommandContext getCurrentCommandContext() {
         return OpenGLCommandContext.IMMEDIATE;
+    }
+
+    @Override
+    public GraphicsBackendType getBackendType() {
+        return GraphicsBackendType.OPENGL;
+    }
+
+    @Override
+    public boolean isNativeVulkanReady() {
+        return false;
     }
     
     /**

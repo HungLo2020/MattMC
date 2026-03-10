@@ -64,6 +64,18 @@ public class CommandContextTest {
         assertSame(OpenGLCommandContext.IMMEDIATE, ctx,
             "getCommandContext() should return OpenGL immediate context on OpenGL backend");
     }
+
+    @Test
+    public void testDefaultBackendReadinessMetadata() {
+        VulkanicAPI.initialize();
+
+        assertEquals(GraphicsBackendType.OPENGL, VulkanicAPI.getActiveBackendType(),
+            "Default backend should report OPENGL backend identity");
+        assertFalse(VulkanicAPI.isVulkanBackendSelected(),
+            "Default backend should not report Vulkan-selected state");
+        assertFalse(VulkanicAPI.isNativeVulkanBackendReady(),
+            "Default backend should not report native Vulkan readiness");
+    }
     
     @Test
     public void testSetDynamicViewportWithContext() {

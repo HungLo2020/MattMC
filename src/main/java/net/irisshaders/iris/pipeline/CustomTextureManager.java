@@ -150,7 +150,7 @@ public class CustomTextureManager {
 						int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
 						texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
 						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(tex);
-						VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), binding);
+						VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), binding);
 					}
 					return texture != null ? texture.getTexture().iris$getGlId() : textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture().iris$getGlId();
 				}, TextureType.TEXTURE_2D);
@@ -167,7 +167,7 @@ public class CustomTextureManager {
 							int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
 							texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
 							net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(tex);
-							VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), binding);
+							VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), binding);
 						}
 						int id = texture.getTexture().iris$getGlId();
 						PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(id);
@@ -179,9 +179,9 @@ public class CustomTextureManager {
 						TextureFormat textureFormat = TextureFormatLoader.getFormat();
 						if (textureFormat != null) {
 							int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
-							VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), pbrTexture.getTexture().iris$getGlId());
+							VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), pbrTexture.getTexture().iris$getGlId());
 							textureFormat.setupTextureParameters(pbrType, pbrTexture);
-							VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousBinding);
+							VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousBinding);
 						}
 
 						return pbrTexture.getTexture().iris$getGlId();

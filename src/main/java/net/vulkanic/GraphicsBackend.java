@@ -29,6 +29,19 @@ public interface GraphicsBackend {
      * @return Current command context
      */
     CommandContext getCurrentCommandContext();
+
+    /**
+     * Returns the high-level backend identity currently serving the graphics API.
+     */
+    GraphicsBackendType getBackendType();
+
+    /**
+     * Returns true only when a native Vulkan command/pipeline backend is active.
+     *
+     * <p>During bootstrap/fallback phases this should return false even if Vulkan
+     * backend selection is active but delegated to OpenGL behavior.</p>
+     */
+    boolean isNativeVulkanReady();
     
     /**
      * Sets the dynamic viewport state for rendering.

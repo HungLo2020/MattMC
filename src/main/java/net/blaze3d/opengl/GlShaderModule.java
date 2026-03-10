@@ -25,7 +25,7 @@ public class GlShaderModule implements AutoCloseable {
 			throw new IllegalStateException("Already closed");
 		} else {
 			RenderSystem.assertOnRenderThread();
-			net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), this.shaderId);
+			net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getCommandContext(), this.shaderId);
 			this.shaderId = -1;
 		}
 	}

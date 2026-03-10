@@ -50,7 +50,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 	}
 
 	public static GlProgram link(GlShaderModule glShaderModule, GlShaderModule glShaderModule2, VertexFormat vertexFormat, String string) throws ShaderManager.CompilationException {
-		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		int i = VulkanicAPI.createShaderProgram(ctx);
 		if (i <= 0) {
 			throw new ShaderManager.CompilationException("Could not create shader program (returned program ID " + i + ")");
@@ -95,18 +95,18 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 					if (this instanceof net.irisshaders.iris.pipeline.programs.IrisProgram is) {
 						k = is.iris$getBlockIndex(this.programId, string);
 					} else {
-						k = VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), this.programId, string);
+						k = VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getCommandContext(), this.programId, string);
 					}
 					if (k == -1) {
 						yield null;
 					} else {
 						int l = i++;
-						VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), this.programId, k, l);
+						VulkanicAPI.uniformBlockBinding(VulkanicAPI.getCommandContext(), this.programId, k, l);
 						yield new Uniform.Ubo(l);
 					}
 				}
 				case TEXEL_BUFFER -> {
-					int k = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), this.programId, string);
+					int k = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), this.programId, string);
 					if (k == -1) {
 						// Iris: Silence warnings for known shaders (merged from MixinCompiledShaderProgram)
 						if (!isKnownShader()) {
@@ -126,7 +126,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 		}
 
 		for (String string2 : list2) {
-			int m = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), this.programId, string2);
+			int m = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), this.programId, string2);
 			if (m == -1) {
 				// Iris: Silence warnings for known shaders (merged from MixinCompiledShaderProgram)
 				if (!isKnownShader()) {
@@ -138,14 +138,14 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 			}
 		}
 
-		int o = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), this.programId, 35382);
+		int o = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), this.programId, 35382);
 
 		for (int p = 0; p < o; p++) {
-			String string = VulkanicAPI.retrieveActiveUniformBlockName(VulkanicAPI.getImmediateContext(), this.programId, p);
+			String string = VulkanicAPI.retrieveActiveUniformBlockName(VulkanicAPI.getCommandContext(), this.programId, p);
 			if (!this.uniformsByName.containsKey(string)) {
 				if (!list2.contains(string) && BUILT_IN_UNIFORMS.contains(string)) {
 					int n = i++;
-					VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), this.programId, p, n);
+					VulkanicAPI.uniformBlockBinding(VulkanicAPI.getCommandContext(), this.programId, p, n);
 					this.uniformsByName.put(string, new Uniform.Ubo(n));
 				} else if (string.startsWith("iris_")) {
 					// Silently skip Iris-injected uniforms
@@ -159,7 +159,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 
 	public void close() {
 		this.uniformsByName.values().forEach(Uniform::close);
-		VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), this.programId);
+		VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), this.programId);
 	}
 
 	@Nullable

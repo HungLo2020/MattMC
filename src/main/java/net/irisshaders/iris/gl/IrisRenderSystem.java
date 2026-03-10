@@ -77,12 +77,12 @@ public class IrisRenderSystem {
 
 	public static void getIntegerv(int pname, int[] params) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.getIntegerv(VulkanicAPI.getImmediateContext(), pname, params);
+		VulkanicAPI.getIntegerv(VulkanicAPI.getCommandContext(), pname, params);
 	}
 
 	public static void getFloatv(int pname, float[] params) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.getFloatv(VulkanicAPI.getImmediateContext(), pname, params);
+		VulkanicAPI.getFloatv(VulkanicAPI.getCommandContext(), pname, params);
 	}
 
 	public static void generateMipmaps(int texture, int mipmapTarget) {
@@ -92,75 +92,75 @@ public class IrisRenderSystem {
 
 	public static void bindAttributeLocation(int program, int index, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), program, index, name);
+		VulkanicAPI.setAttributeLocation(VulkanicAPI.getCommandContext(), program, index, name);
 	}
 
 	public static void texImage1D(int texture, int target, int level, int internalformat, int width, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		VulkanicAPI.uploadTexture1D(VulkanicAPI.getImmediateContext(), target, level, internalformat, width, border, format, type, pixels);
+		VulkanicAPI.uploadTexture1D(VulkanicAPI.getCommandContext(), target, level, internalformat, width, border, format, type, pixels);
 	}
 
 	public static void texImage2D(int texture, int target, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), target, level, internalformat, width, height, border, format, type, pixels);
+		VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, internalformat, width, height, border, format, type, pixels);
 	}
 
 	public static void texImage3D(int texture, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		VulkanicAPI.uploadTexture3D(VulkanicAPI.getImmediateContext(), target, level, internalformat, width, height, depth, border, format, type, pixels);
+		VulkanicAPI.uploadTexture3D(VulkanicAPI.getCommandContext(), target, level, internalformat, width, height, depth, border, format, type, pixels);
 	}
 
 	public static void uniformMatrix4fv(int location, boolean transpose, FloatBuffer matrix) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, transpose, matrix);
+		VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getCommandContext(), location, transpose, matrix);
 	}
 
 	public static void uniformMatrix4fv(int location, boolean transpose, float[] matrix) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), location, transpose, matrix);
+		VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getCommandContext(), location, transpose, matrix);
 	}
 
 	public static void copyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.copyTexImage2D(VulkanicAPI.getImmediateContext(), target, level, internalFormat, x, y, width, height, border);
+		VulkanicAPI.copyTexImage2D(VulkanicAPI.getCommandContext(), target, level, internalFormat, x, y, width, height, border);
 	}
 
 	public static void uniform1f(int location, float v0) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), location, v0);
+		VulkanicAPI.setUniform1f(VulkanicAPI.getCommandContext(), location, v0);
 	}
 
 	public static void uniform2f(int location, float v0, float v1) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniform2f(VulkanicAPI.getImmediateContext(), location, v0, v1);
+		VulkanicAPI.setUniform2f(VulkanicAPI.getCommandContext(), location, v0, v1);
 	}
 
 	public static void uniform2i(int location, int v0, int v1) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniform2i(VulkanicAPI.getImmediateContext(), location, v0, v1);
+		VulkanicAPI.setUniform2i(VulkanicAPI.getCommandContext(), location, v0, v1);
 	}
 
 	public static void uniform3f(int location, float v0, float v1, float v2) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniform3f(VulkanicAPI.getImmediateContext(), location, v0, v1, v2);
+		VulkanicAPI.setUniform3f(VulkanicAPI.getCommandContext(), location, v0, v1, v2);
 	}
 
 	public static void uniform3i(int location, int v0, int v1, int v2) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniform3i(VulkanicAPI.getImmediateContext(), location, v0, v1, v2);
+		VulkanicAPI.setUniform3i(VulkanicAPI.getCommandContext(), location, v0, v1, v2);
 	}
 
 	public static void uniform4f(int location, float v0, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniform4f(VulkanicAPI.getImmediateContext(), location, v0, v1, v2, v3);
+		VulkanicAPI.setUniform4f(VulkanicAPI.getCommandContext(), location, v0, v1, v2, v3);
 	}
 
 	public static void uniform4i(int location, int v0, int v1, int v2, int v3) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniform4i(VulkanicAPI.getImmediateContext(), location, v0, v1, v2, v3);
+		VulkanicAPI.setUniform4i(VulkanicAPI.getCommandContext(), location, v0, v1, v2, v3);
 	}
 
 	public static void texParameteriv(int texture, int target, int pname, int[] params) {
@@ -173,7 +173,7 @@ public class IrisRenderSystem {
 	 */
 	public static void texParameterivDirect(int target, int pname, int[] params) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.texParameteriv(VulkanicAPI.getImmediateContext(), target, pname, params);
+		VulkanicAPI.texParameteriv(VulkanicAPI.getCommandContext(), target, pname, params);
 	}
 
 	public static void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
@@ -192,12 +192,12 @@ public class IrisRenderSystem {
 
 	public static String getProgramInfoLog(int program) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), program);
+		return VulkanicAPI.getProgramInfoLog(VulkanicAPI.getCommandContext(), program);
 	}
 
 	public static String getShaderInfoLog(int shader) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), shader);
+		return VulkanicAPI.getShaderInfoLog(VulkanicAPI.getCommandContext(), shader);
 	}
 
 	public static void drawBuffers(int framebuffer, int[] buffers) {
@@ -227,17 +227,17 @@ public class IrisRenderSystem {
 
 	public static String getActiveUniform(int program, int index, int size, IntBuffer type, IntBuffer name) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.getActiveUniform(VulkanicAPI.getImmediateContext(), program, index, size, type, name);
+		return VulkanicAPI.getActiveUniform(VulkanicAPI.getCommandContext(), program, index, size, type, name);
 	}
 
 	public static void readPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.readPixels(VulkanicAPI.getImmediateContext(), x, y, width, height, format, type, pixels);
+		VulkanicAPI.readPixels(VulkanicAPI.getCommandContext(), x, y, width, height, format, type, pixels);
 	}
 
 	public static void bufferData(int target, float[] data, int usage) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), target, data, usage);
+		VulkanicAPI.bufferData(VulkanicAPI.getCommandContext(), target, data, usage);
 	}
 
 	public static int bufferStorage(int target, float[] data, int usage) {
@@ -248,22 +248,22 @@ public class IrisRenderSystem {
 	public static void bufferStorage(int target, long size, int flags) {
 		RenderSystem.assertOnRenderThread();
 		// The ARB version is identical to GL44 and redirects, so this should work on ARB as well.
-		VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), target, size, flags);
+		VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), target, size, flags);
 	}
 
 	public static void bindBufferBase(int target, Integer index, int buffer) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.bindBufferBase(VulkanicAPI.getImmediateContext(), target, index, buffer);
+		VulkanicAPI.bindBufferBase(VulkanicAPI.getCommandContext(), target, index, buffer);
 	}
 
 	public static void vertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setVertexAttrib4f(VulkanicAPI.getImmediateContext(), index, v0, v1, v2, v3);
+		VulkanicAPI.setVertexAttrib4f(VulkanicAPI.getCommandContext(), index, v0, v1, v2, v3);
 	}
 
 	public static void detachShader(int program, int shader) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.detachShader(VulkanicAPI.getImmediateContext(), program, shader);
+		VulkanicAPI.detachShader(VulkanicAPI.getCommandContext(), program, shader);
 	}
 
 	public static void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
@@ -277,11 +277,11 @@ public class IrisRenderSystem {
 
 	public static void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.bindImageTexture(VulkanicAPI.getImmediateContext(), unit, texture, level, layered, layer, access, format);
+		VulkanicAPI.bindImageTexture(VulkanicAPI.getCommandContext(), unit, texture, level, layered, layer, access, format);
 	}
 
 	public static int getMaxImageUnits() {
-		return VulkanicAPI.getMaxImageUnits(VulkanicAPI.getImmediateContext());
+		return VulkanicAPI.getMaxImageUnits(VulkanicAPI.getCommandContext());
 	}
 
 	public static boolean supportsSSBO() {
@@ -293,30 +293,30 @@ public class IrisRenderSystem {
 	}
 
 	public static void genBuffers(int[] buffers) {
-		VulkanicAPI.createBuffers(VulkanicAPI.getImmediateContext(), buffers);
+		VulkanicAPI.createBuffers(VulkanicAPI.getCommandContext(), buffers);
 	}
 
 	public static void clearBufferSubData(int glShaderStorageBuffer, int glR8, long offset, long size, int glRed, int glByte, int[] ints) {
-		VulkanicAPI.clearBufferSubData(VulkanicAPI.getImmediateContext(), glShaderStorageBuffer, glR8, offset, size, glRed, glByte, ints);
+		VulkanicAPI.clearBufferSubData(VulkanicAPI.getCommandContext(), glShaderStorageBuffer, glR8, offset, size, glRed, glByte, ints);
 	}
 
 	public static void getProgramiv(int program, int value, int[] storage) {
-		VulkanicAPI.getProgramiv(VulkanicAPI.getImmediateContext(), program, value, storage);
+		VulkanicAPI.getProgramiv(VulkanicAPI.getCommandContext(), program, value, storage);
 	}
 
 	public static void dispatchCompute(int workX, int workY, int workZ) {
-		VulkanicAPI.dispatchCompute(VulkanicAPI.getImmediateContext(), workX, workY, workZ);
+		VulkanicAPI.dispatchCompute(VulkanicAPI.getCommandContext(), workX, workY, workZ);
 	}
 
 	public static void dispatchCompute(Vector3i workGroups) {
-		VulkanicAPI.dispatchCompute(VulkanicAPI.getImmediateContext(), workGroups.x, workGroups.y, workGroups.z);
+		VulkanicAPI.dispatchCompute(VulkanicAPI.getCommandContext(), workGroups.x, workGroups.y, workGroups.z);
 	}
 
 	public static void memoryBarrier(int barriers) {
 		RenderSystem.assertOnRenderThread();
 
 		if (supportsCompute) {
-			VulkanicAPI.memoryBarrier(VulkanicAPI.getImmediateContext(), barriers);
+			VulkanicAPI.memoryBarrier(VulkanicAPI.getCommandContext(), barriers);
 		}
 	}
 
@@ -326,19 +326,19 @@ public class IrisRenderSystem {
 
 	public static void disableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_BLEND, buffer, false);
+		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_BLEND, buffer, false);
 		BlendModeStorage.markBlendStateUnknown();
 	}
 
 	public static void enableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_BLEND, buffer, true);
+		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_BLEND, buffer, true);
 		BlendModeStorage.markBlendStateUnknown();
 	}
 
 	public static void blendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.blendFuncSeparatei(VulkanicAPI.getImmediateContext(), buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+		VulkanicAPI.blendFuncSeparatei(VulkanicAPI.getCommandContext(), buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
 	}
 
 	// These functions are deprecated and unavailable in the core profile.
@@ -349,12 +349,12 @@ public class IrisRenderSystem {
 
 	public static int getUniformBlockIndex(int program, String uniformBlockName) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), program, uniformBlockName);
+		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getCommandContext(), program, uniformBlockName);
 	}
 
 	public static void uniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), program, uniformBlockIndex, uniformBlockBinding);
+		VulkanicAPI.uniformBlockBinding(VulkanicAPI.getCommandContext(), program, uniformBlockIndex, uniformBlockBinding);
 	}
 
 	public static void setShadowProjection(Matrix4f shadowProjection) {
@@ -387,12 +387,12 @@ public class IrisRenderSystem {
 		if (glType == VulkanicAPI.GL_TEXTURE_2D) {
 			lastTex = getBoundTextureOnActiveUnit();
 		}
-		VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), glType, glId);
+		VulkanicAPI.bindTexture(VulkanicAPI.getCommandContext(), glType, glId);
 	}
 
 	public static void restoreTexture() {
 		if (lastTex != -1) {
-			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			CommandContext ctx = VulkanicAPI.getCommandContext();
 			VulkanicAPI.bindTexture2D(ctx, lastTex);
 			lastTex = -1;
 		}
@@ -407,11 +407,11 @@ public class IrisRenderSystem {
 	}
 
 	public static int genSampler() {
-		return VulkanicAPI.createSampler(VulkanicAPI.getImmediateContext());
+		return VulkanicAPI.createSampler(VulkanicAPI.getCommandContext());
 	}
 
 	public static void destroySampler(int glId) {
-		VulkanicAPI.deleteSampler(VulkanicAPI.getImmediateContext(), glId);
+		VulkanicAPI.deleteSampler(VulkanicAPI.getCommandContext(), glId);
 	}
 
 	public static void bindSamplerToUnit(int unit, int sampler) {
@@ -419,7 +419,7 @@ public class IrisRenderSystem {
 			return;
 		}
 
-		VulkanicAPI.bindSampler(VulkanicAPI.getImmediateContext(), unit, sampler);
+		VulkanicAPI.bindSampler(VulkanicAPI.getCommandContext(), unit, sampler);
 
 		samplers[unit] = sampler;
 	}
@@ -429,31 +429,31 @@ public class IrisRenderSystem {
 		for (int i = 0; i < samplers.length; i++) {
 			if (samplers[i] != 0) {
 				usedASampler = true;
-				if (!hasMultibind) VulkanicAPI.bindSampler(VulkanicAPI.getImmediateContext(), i, 0);
+				if (!hasMultibind) VulkanicAPI.bindSampler(VulkanicAPI.getCommandContext(), i, 0);
 				samplers[i] = 0;
 			}
 		}
 		if (usedASampler && hasMultibind) {
-			VulkanicAPI.bindSamplers(VulkanicAPI.getImmediateContext(), 0, emptyArray);
+			VulkanicAPI.bindSamplers(VulkanicAPI.getCommandContext(), 0, emptyArray);
 		}
 	}
 
 
 	public static void samplerParameteri(int sampler, int pname, int param) {
-		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getImmediateContext(), sampler, pname, param);
+		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getCommandContext(), sampler, pname, param);
 	}
 
 	public static void samplerParameterf(int sampler, int pname, float param) {
-		VulkanicAPI.setSamplerParameterf(VulkanicAPI.getImmediateContext(), sampler, pname, param);
+		VulkanicAPI.setSamplerParameterf(VulkanicAPI.getCommandContext(), sampler, pname, param);
 	}
 
 	public static void samplerParameteriv(int sampler, int pname, int[] params) {
-		VulkanicAPI.setSamplerParameteriv(VulkanicAPI.getImmediateContext(), sampler, pname, params);
+		VulkanicAPI.setSamplerParameteriv(VulkanicAPI.getCommandContext(), sampler, pname, params);
 	}
 
 	public static long getVRAM() {
 		if (VulkanicAPI.getGraphicsCapabilities().GL_NVX_gpu_memory_info) {
-			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			CommandContext ctx = VulkanicAPI.getCommandContext();
 			return VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX) * 1024L;
 		} else {
 			return 4294967296L;
@@ -462,13 +462,13 @@ public class IrisRenderSystem {
 
 	public static void deleteBuffers(int glId) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), glId);
+		VulkanicAPI.deleteBuffer(VulkanicAPI.getCommandContext(), glId);
 	}
 
 	public static void setPolygonMode(int mode) {
 		if (mode != polygonMode) {
 			polygonMode = mode;
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, mode);
+			VulkanicAPI.setPolygonMode(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_FRONT_AND_BACK, mode);
 		}
 	}
 
@@ -483,11 +483,11 @@ public class IrisRenderSystem {
 	}
 
 	public static void dispatchComputeIndirect(long offset) {
-		VulkanicAPI.dispatchComputeIndirect(VulkanicAPI.getImmediateContext(), offset);
+		VulkanicAPI.dispatchComputeIndirect(VulkanicAPI.getCommandContext(), offset);
 	}
 
 	public static void bindBuffer(int target, int buffer) {
-		VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer);
+		VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), target, buffer);
 	}
 
 	public static int createBuffers() {
@@ -495,11 +495,11 @@ public class IrisRenderSystem {
 	}
 
 	public static String getStringi(int glEnum, int index) {
-		return VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), glEnum, index);
+		return VulkanicAPI.getString(VulkanicAPI.getCommandContext(), glEnum, index);
 	}
 
 	public static void copyImageSubData(int sourceTexture, int target, int mip, int srcX, int srcY, int srcZ, int destTexture, int dstTarget, int dstMip, int dstX, int dstY, int dstZ, int width, int height, int depth) {
-		VulkanicAPI.copyImageSubData(VulkanicAPI.getImmediateContext(), 
+		VulkanicAPI.copyImageSubData(VulkanicAPI.getCommandContext(), 
 			sourceTexture, target, mip, srcX, srcY, srcZ, 
 			destTexture, dstTarget, dstMip, dstX, dstY, dstZ, 
 			width, height, depth);
@@ -534,7 +534,7 @@ public class IrisRenderSystem {
 
 		onProgramUse();
 		currentProgram = program;
-		VulkanicAPI.bindShaderProgram(VulkanicAPI.getImmediateContext(), program);
+		VulkanicAPI.bindShaderProgram(VulkanicAPI.getCommandContext(), program);
 		net.irisshaders.iris.vertices.ImmediateState.usingTessellation = false;
 	}
 
@@ -549,7 +549,7 @@ public class IrisRenderSystem {
 
 		if (activeTextureUnitIndex != textureUnitIndex) {
 			activeTextureUnitIndex = textureUnitIndex;
-			VulkanicAPI.setActiveTextureUnit(VulkanicAPI.getImmediateContext(), textureUnit);
+			VulkanicAPI.setActiveTextureUnit(VulkanicAPI.getCommandContext(), textureUnit);
 		}
 	}
 
@@ -584,7 +584,7 @@ public class IrisRenderSystem {
 	public static int createTextureId() {
 		RenderSystem.assertOnRenderThread();
 		incrementTrackedTextures();
-		return VulkanicAPI.createTexture2D(VulkanicAPI.getImmediateContext());
+		return VulkanicAPI.createTexture2D(VulkanicAPI.getCommandContext());
 	}
 
 	public static void incrementTrackedTextures() {
@@ -615,7 +615,7 @@ public class IrisRenderSystem {
 
 	public static void deleteTextureId(int textureId) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.deleteTexture(VulkanicAPI.getImmediateContext(), textureId);
+		VulkanicAPI.deleteTexture(VulkanicAPI.getCommandContext(), textureId);
 
 		for (int textureUnitIndex = 0; textureUnitIndex < textureBindings.length; textureUnitIndex++) {
 			if (textureBindings[textureUnitIndex] == textureId) {
@@ -631,26 +631,26 @@ public class IrisRenderSystem {
 	}
 
 	public static int checkFramebufferStatus(int glFramebuffer) {
-		return VulkanicAPI.checkFramebufferStatus(VulkanicAPI.getImmediateContext(), glFramebuffer);
+		return VulkanicAPI.checkFramebufferStatus(VulkanicAPI.getCommandContext(), glFramebuffer);
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, FloatBuffer buf) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniformMatrix3fv(VulkanicAPI.getImmediateContext(), index, b, buf);
+		VulkanicAPI.setUniformMatrix3fv(VulkanicAPI.getCommandContext(), index, b, buf);
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, float[] buf) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setUniformMatrix3fv(VulkanicAPI.getImmediateContext(), index, b, buf);
+		VulkanicAPI.setUniformMatrix3fv(VulkanicAPI.getCommandContext(), index, b, buf);
 	}
 
 	public static void clearColor(float v, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), v, v1, v2, v3);
+		VulkanicAPI.setClearColor(VulkanicAPI.getCommandContext(), v, v1, v2, v3);
 	}
 
 	public static int getAttribLocation(int handle, String irisNormal) {
-		return VulkanicAPI.getAttributeLocation(VulkanicAPI.getImmediateContext(), handle, irisNormal);
+		return VulkanicAPI.getAttributeLocation(VulkanicAPI.getCommandContext(), handle, irisNormal);
 	}
 
 	public interface DSAAccess {
@@ -699,58 +699,58 @@ public class IrisRenderSystem {
 
 		@Override
 		public void generateMipmaps(int texture, int target) {
-			VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getImmediateContext(), texture);
+			VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getCommandContext(), texture);
 		}
 
 		@Override
 		public void texParameteri(int texture, int target, int pname, int param) {
-			VulkanicAPI.textureParameteri(VulkanicAPI.getImmediateContext(), texture, pname, param);
+			VulkanicAPI.textureParameteri(VulkanicAPI.getCommandContext(), texture, pname, param);
 		}
 
 		@Override
 		public void texParameterf(int texture, int target, int pname, float param) {
-			VulkanicAPI.textureParameterf(VulkanicAPI.getImmediateContext(), texture, pname, param);
+			VulkanicAPI.textureParameterf(VulkanicAPI.getCommandContext(), texture, pname, param);
 		}
 
 		@Override
 		public void texParameteriv(int texture, int target, int pname, int[] params) {
-			VulkanicAPI.textureParameteriv(VulkanicAPI.getImmediateContext(), texture, pname, params);
+			VulkanicAPI.textureParameteriv(VulkanicAPI.getCommandContext(), texture, pname, params);
 		}
 
 
 		@Override
 		public void readBuffer(int framebuffer, int buffer) {
-			VulkanicAPI.namedFramebufferReadBuffer(VulkanicAPI.getImmediateContext(), framebuffer, buffer);
+			VulkanicAPI.namedFramebufferReadBuffer(VulkanicAPI.getCommandContext(), framebuffer, buffer);
 		}
 
 		@Override
 		public void drawBuffers(int framebuffer, int[] buffers) {
-			VulkanicAPI.namedFramebufferDrawBuffers(VulkanicAPI.getImmediateContext(), framebuffer, buffers);
+			VulkanicAPI.namedFramebufferDrawBuffers(VulkanicAPI.getCommandContext(), framebuffer, buffers);
 		}
 
 		@Override
 		public void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
-			VulkanicAPI.clearNamedFramebufferfv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.clearNamedFramebufferfv(VulkanicAPI.getCommandContext(), framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			VulkanicAPI.clearNamedFramebufferiv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.clearNamedFramebufferiv(VulkanicAPI.getCommandContext(), framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			VulkanicAPI.clearNamedFramebufferuiv(VulkanicAPI.getImmediateContext(), framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.clearNamedFramebufferuiv(VulkanicAPI.getCommandContext(), framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public int getTexParameteri(int texture, int target, int pname) {
-			return VulkanicAPI.getTextureParameteri(VulkanicAPI.getImmediateContext(), texture, pname);
+			return VulkanicAPI.getTextureParameteri(VulkanicAPI.getCommandContext(), texture, pname);
 		}
 
 		@Override
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
-			VulkanicAPI.copyTextureSubImage2D(VulkanicAPI.getImmediateContext(), destTexture, i, i1, i2, i3, i4, width, height);
+			VulkanicAPI.copyTextureSubImage2D(VulkanicAPI.getCommandContext(), destTexture, i, i1, i2, i3, i4, width, height);
 		}
 
 		@Override
@@ -760,45 +760,45 @@ public class IrisRenderSystem {
 					return;
 				}
 
-				VulkanicAPI.bindTextureUnit(VulkanicAPI.getImmediateContext(), unit, texture);
+				VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), unit, texture);
 
 				// Manually fix GLStateManager bindings...
 				setTextureBinding(unit, texture);
 			} else {
-				VulkanicAPI.bindTextureUnit(VulkanicAPI.getImmediateContext(), unit, texture);
+				VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), unit, texture);
 			}
 		}
 
 		@Override
 		public int bufferStorage(int target, float[] data, int usage) {
-			int buffer = VulkanicAPI.createBuffers(VulkanicAPI.getImmediateContext());
-			VulkanicAPI.namedBufferData(VulkanicAPI.getImmediateContext(), buffer, data, usage);
+			int buffer = VulkanicAPI.createBuffers(VulkanicAPI.getCommandContext());
+			VulkanicAPI.namedBufferData(VulkanicAPI.getCommandContext(), buffer, data, usage);
 			return buffer;
 		}
 
 		@Override
 		public int createBuffers() {
-			return VulkanicAPI.createBuffers(VulkanicAPI.getImmediateContext());
+			return VulkanicAPI.createBuffers(VulkanicAPI.getCommandContext());
 		}
 
 		@Override
 		public void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
-			VulkanicAPI.blitNamedFramebuffer(VulkanicAPI.getImmediateContext(), source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
+			VulkanicAPI.blitNamedFramebuffer(VulkanicAPI.getCommandContext(), source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 		}
 
 		@Override
 		public void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
-			VulkanicAPI.namedFramebufferTexture(VulkanicAPI.getImmediateContext(), fb, attachment, texture, levels);
+			VulkanicAPI.namedFramebufferTexture(VulkanicAPI.getCommandContext(), fb, attachment, texture, levels);
 		}
 
 		@Override
 		public int createFramebuffer() {
-			return VulkanicAPI.createFramebuffers(VulkanicAPI.getImmediateContext());
+			return VulkanicAPI.createFramebuffers(VulkanicAPI.getCommandContext());
 		}
 
 		@Override
 		public int createTexture(int target) {
-			return VulkanicAPI.createTextures(VulkanicAPI.getImmediateContext(), target);
+			return VulkanicAPI.createTextures(VulkanicAPI.getCommandContext(), target);
 		}
 	}
 
@@ -806,81 +806,81 @@ public class IrisRenderSystem {
 		@Override
 		public void generateMipmaps(int texture, int target) {
 			int previous = getBoundTextureOnActiveUnit();
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), texture);
-			VulkanicAPI.generateMipmap(VulkanicAPI.getImmediateContext(), target);
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previous);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), texture);
+			VulkanicAPI.generateMipmap(VulkanicAPI.getCommandContext(), target);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previous);
 		}
 
 		@Override
 		public void texParameteri(int texture, int target, int pname, int param) {
 			bindTextureForSetup(target, texture);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), target, pname, param);
+			VulkanicAPI.setTextureParameter(VulkanicAPI.getCommandContext(), target, pname, param);
 			restoreTexture();
 		}
 
 		@Override
 		public void texParameterf(int texture, int target, int pname, float param) {
 			bindTextureForSetup(target, texture);
-			VulkanicAPI.texParameterf(VulkanicAPI.getImmediateContext(), target, pname, param);
+			VulkanicAPI.texParameterf(VulkanicAPI.getCommandContext(), target, pname, param);
 			restoreTexture();
 		}
 
 		@Override
 		public void texParameteriv(int texture, int target, int pname, int[] params) {
 			bindTextureForSetup(target, texture);
-			VulkanicAPI.texParameteriv(VulkanicAPI.getImmediateContext(), target, pname, params);
+			VulkanicAPI.texParameteriv(VulkanicAPI.getCommandContext(), target, pname, params);
 			restoreTexture();
 		}
 
 		@Override
 		public void readBuffer(int framebuffer, int buffer) {
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
-			VulkanicAPI.setReadBuffer(VulkanicAPI.getImmediateContext(), buffer);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), framebuffer);
+			VulkanicAPI.setReadBuffer(VulkanicAPI.getCommandContext(), buffer);
 		}
 
 		@Override
 		public void drawBuffers(int framebuffer, int[] buffers) {
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
-			VulkanicAPI.drawBuffers(VulkanicAPI.getImmediateContext(), buffers);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), framebuffer);
+			VulkanicAPI.drawBuffers(VulkanicAPI.getCommandContext(), buffers);
 		}
 
 		@Override
 		public void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
-			VulkanicAPI.clearBufferfv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), framebuffer);
+			VulkanicAPI.clearBufferfv(VulkanicAPI.getCommandContext(), buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
-			VulkanicAPI.clearBufferiv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), framebuffer);
+			VulkanicAPI.clearBufferiv(VulkanicAPI.getCommandContext(), buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
-			VulkanicAPI.clearBufferuiv(VulkanicAPI.getImmediateContext(), buffer, drawbuffer, values);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), framebuffer);
+			VulkanicAPI.clearBufferuiv(VulkanicAPI.getCommandContext(), buffer, drawbuffer, values);
 		}
 
 		@Override
 		public int getTexParameteri(int texture, int target, int pname) {
 			bindTextureForSetup(target, texture);
-			return VulkanicAPI.getTexParameteri(VulkanicAPI.getImmediateContext(), target, pname);
+			return VulkanicAPI.getTexParameteri(VulkanicAPI.getCommandContext(), target, pname);
 		}
 
 		@Override
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
 			int previous = getBoundTextureOnActiveUnit();
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), destTexture);
-			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getImmediateContext(), target, i, i1, i2, i3, i4, width, height);
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previous);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), destTexture);
+			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), target, i, i1, i2, i3, i4, width, height);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previous);
 		}
 
 		@Override
 		public void bindTextureToUnit(int target, int unit, int texture) {
 			int activeTexture = getActiveTextureUnitIndex();
 			setActiveTextureUnitIndex(unit);
-			VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), target, texture);
+			VulkanicAPI.bindTexture(VulkanicAPI.getCommandContext(), target, texture);
 			if (target == VulkanicAPI.GL_TEXTURE_2D) {
 				setTextureBinding(unit, texture);
 			}
@@ -890,31 +890,31 @@ public class IrisRenderSystem {
 		@Override
 		public int bufferStorage(int target, float[] data, int usage) {
 			incrementTrackedBuffers();
-			int buffer = VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
-			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer);
+			int buffer = VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext());
+			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), target, buffer);
 			bufferData(target, data, usage);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, 0);
+			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), target, 0);
 
 			return buffer;
 		}
 
 		@Override
 		public void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
-			VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), source);
-			VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getImmediateContext(), dest);
-			VulkanicAPI.blitFramebuffer(VulkanicAPI.getImmediateContext(), offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
+			VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getCommandContext(), source);
+			VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getCommandContext(), dest);
+			VulkanicAPI.blitFramebuffer(VulkanicAPI.getCommandContext(), offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 		}
 
 		@Override
 		public void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), fbtarget, fb);
-			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), fbtarget, attachment, target, texture, levels);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), fbtarget, fb);
+			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getCommandContext(), fbtarget, attachment, target, texture, levels);
 		}
 
 		@Override
 		public int createFramebuffer() {
-			int framebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), framebuffer);
+			int framebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getCommandContext());
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), framebuffer);
 			return framebuffer;
 		}
 
@@ -929,7 +929,7 @@ public class IrisRenderSystem {
 		@Override
 		public int createBuffers() {
 			incrementTrackedBuffers();
-			return VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext());
+			return VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext());
 		}
 	}
 
@@ -945,7 +945,7 @@ public class IrisRenderSystem {
 		} else {
 			for (int binding : bindings) {
 				setActiveTexture(startingTexture);
-				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), binding);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), binding);
 				startingTexture++;
 			}
 		}

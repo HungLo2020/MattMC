@@ -7,12 +7,12 @@ import net.vulkanic.VulkanicAPI;
 
 @Environment(EnvType.CLIENT)
 public class GlFence implements GpuFence {
-	private long handle = VulkanicAPI.createGpuCompletionFence(VulkanicAPI.getImmediateContext());
+	private long handle = VulkanicAPI.createGpuCompletionFence(VulkanicAPI.getCommandContext());
 
 	@Override
 	public void close() {
 		if (this.handle != 0L) {
-			VulkanicAPI.destroySync(VulkanicAPI.getImmediateContext(), this.handle);
+			VulkanicAPI.destroySync(VulkanicAPI.getCommandContext(), this.handle);
 			this.handle = 0L;
 		}
 	}
@@ -22,7 +22,7 @@ public class GlFence implements GpuFence {
 		if (this.handle == 0L) {
 			return true;
 		} else {
-			int i = VulkanicAPI.waitForSync(VulkanicAPI.getImmediateContext(), this.handle, 0, l);
+			int i = VulkanicAPI.waitForSync(VulkanicAPI.getCommandContext(), this.handle, 0, l);
 			if (VulkanicAPI.isSyncWaitTimeout(i)) {
 				return false;
 			} else if (VulkanicAPI.isSyncWaitFailed(i)) {

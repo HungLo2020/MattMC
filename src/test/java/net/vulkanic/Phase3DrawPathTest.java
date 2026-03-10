@@ -7,6 +7,8 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -37,6 +39,90 @@ public class Phase3DrawPathTest {
             return "";
         }
         return Files.readString(path);
+    }
+
+    @Test
+    public void testImmediateContextUsageRestrictedToLegacySeam() throws IOException {
+        Path legacyFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        Path legacyRelative = Paths.get("net/vulkanic/VulkanicAPI.java");
+        assertTrue(Files.exists(legacyFile), "VulkanicAPI.java must exist for migration seam validation");
+
+        List<String> offenders = new ArrayList<>();
+        try (var paths = Files.walk(SRC_MAIN_JAVA)) {
+            for (Path file : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(file) || !file.toString().endsWith(".java")) {
+                    continue;
+                }
+
+                String source = Files.readString(file);
+                if (!source.contains("getImmediateContext(")) {
+                    continue;
+                }
+
+                Path relative = SRC_MAIN_JAVA.relativize(file);
+                if (relative.equals(legacyRelative)) {
+                    String withoutDeclaration = source.replace("public static CommandContext getImmediateContext() {", "");
+                    if (withoutDeclaration.contains("getImmediateContext(")) {
+                        offenders.add(relative + " (additional references)");
+                    }
+                } else {
+                    offenders.add(relative.toString());
+                }
+            }
+        }
+
+        assertTrue(offenders.isEmpty(),
+            "Only VulkanicAPI.getImmediateContext() compatibility seam may remain; offenders: " + offenders);
+
+        String legacySource = Files.readString(legacyFile);
+        assertTrue(legacySource.contains("@Deprecated"),
+            "VulkanicAPI.getImmediateContext() must remain explicitly deprecated");
+    }
+
+    @Test
+    public void testVulkanBackendBootstrapPathExists() throws IOException {
+        Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        assertTrue(Files.exists(vulkanBackendFile),
+            "Vulkan backend bootstrap class should exist for incremental backend bring-up");
+
+        String vulkanBackendSource = Files.readString(vulkanBackendFile);
+        assertTrue(vulkanBackendSource.contains("class VulkanBackend extends OpenGLBackend"),
+            "Vulkan backend bootstrap should inherit stable OpenGL behavior to avoid regressions during bring-up");
+
+        Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String apiSource = Files.readString(apiFile);
+        assertTrue(apiSource.contains("backend = new VulkanBackend();"),
+            "VulkanicAPI should route BackendType.VULKAN through the bootstrap VulkanBackend");
+        assertFalse(apiSource.contains("throw new UnsupportedOperationException(\"Vulkan backend not yet implemented\")"),
+            "VulkanicAPI should no longer hard-fail backend selection for BackendType.VULKAN");
+    }
+
+    @Test
+    public void testBackendReadinessSeamExistsForPrepOnlyVulkanPath() throws IOException {
+        Path backendInterfaceFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
+        String backendInterfaceSource = Files.readString(backendInterfaceFile);
+        assertTrue(backendInterfaceSource.contains("GraphicsBackendType getBackendType();"),
+            "GraphicsBackend should expose active backend identity for explicit routing");
+        assertTrue(backendInterfaceSource.contains("boolean isNativeVulkanReady();"),
+            "GraphicsBackend should expose native Vulkan readiness capability check");
+
+        Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String apiSource = Files.readString(apiFile);
+        assertTrue(apiSource.contains("public static GraphicsBackendType getActiveBackendType()"),
+            "VulkanicAPI should expose active backend identity helper");
+        assertTrue(apiSource.contains("public static boolean isVulkanBackendSelected()"),
+            "VulkanicAPI should expose Vulkan-selection helper");
+        assertTrue(apiSource.contains("public static boolean isNativeVulkanBackendReady()"),
+            "VulkanicAPI should expose native Vulkan readiness helper");
+
+        Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String vulkanBackendSource = Files.readString(vulkanBackendFile);
+        assertTrue(vulkanBackendSource.contains("return GraphicsBackendType.VULKAN;"),
+            "Bootstrap Vulkan backend should report Vulkan backend identity");
+        assertTrue(vulkanBackendSource.contains("public boolean isNativeVulkanReady()"),
+            "Bootstrap Vulkan backend should define native readiness contract");
+        assertTrue(vulkanBackendSource.contains("return false;"),
+            "Bootstrap Vulkan backend should remain explicitly non-native-ready until Vulkan internals land");
     }
 
     // ── Task 1: drawFromBuffers routes directly through VulkanicAPI ───────────
@@ -112,8 +198,8 @@ public class Phase3DrawPathTest {
         String source = Files.readString(file);
 
         // Verify that drawFromBuffers obtains the context once and reuses it (ctx variable),
-        // rather than calling getImmediateContext() repeatedly.
-        assertTrue(source.contains("CommandContext ctx = VulkanicAPI.getImmediateContext();"),
+        // rather than calling getCommandContext() repeatedly.
+        assertTrue(source.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
             "drawFromBuffers should obtain a single CommandContext and reuse it");
     }
 
@@ -237,7 +323,7 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should bind copy-write via VulkanicAPI.bindCopyWriteBuffer");
         assertTrue(source.contains("VulkanicAPI.copyBufferSubDataBetweenCopyTargets("),
             "DirectStateAccess should copy via VulkanicAPI.copyBufferSubDataBetweenCopyTargets");
-        assertTrue(source.contains("VulkanicAPI.blitFramebuffer(VulkanicAPI.getImmediateContext()"),
+        assertTrue(source.contains("VulkanicAPI.blitFramebuffer(VulkanicAPI.getCommandContext()"),
             "DirectStateAccess should blit framebuffers directly via VulkanicAPI.blitFramebuffer");
     }
 
@@ -300,7 +386,7 @@ public class Phase3DrawPathTest {
         String renderTargetSource = Files.readString(renderTargetFile);
         assertFalse(renderTargetSource.contains("IrisRenderSystem.bindFramebuffer("),
             "RenderTarget iris$bindFramebuffer path should not bind through IrisRenderSystem helper wrappers");
-        assertTrue(renderTargetSource.contains("VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext()"),
+        assertTrue(renderTargetSource.contains("VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext()"),
             "RenderTarget iris$bindFramebuffer path should bind through VulkanicAPI helper");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
@@ -495,7 +581,7 @@ public class Phase3DrawPathTest {
         String directStateAccessSource = Files.readString(directStateAccessFile);
         assertFalse(directStateAccessSource.contains("GlStateManager.glGenFramebuffers("),
             "DirectStateAccess should not create FBOs through removed GlStateManager.glGenFramebuffers wrapper");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext())"),
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getCommandContext())"),
             "DirectStateAccess should create FBOs directly through VulkanicAPI.createFramebuffer");
 
         Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
@@ -516,7 +602,7 @@ public class Phase3DrawPathTest {
         String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
         assertFalse(irisRenderSystemSource.contains("GlStateManager.glGenFramebuffers("),
             "IrisRenderSystem should not create FBOs through removed GlStateManager.glGenFramebuffers wrapper");
-        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext())"),
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getCommandContext())"),
             "IrisRenderSystem should create FBOs directly through VulkanicAPI.createFramebuffer");
 
         Path textureManipulationUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
@@ -623,12 +709,25 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should bind/unbind default framebuffer through VulkanicAPI.bindDefaultFramebuffer");
         assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
             "GlCommandEncoder should clear buffers via VulkanicAPI.clearBuffersWithMacosWorkaround");
-        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT)"),
+        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT)"),
             "GlCommandEncoder should clear color via VulkanicAPI.clearBuffersWithMacosWorkaround + VulkanicAPI.GL_COLOR_BUFFER_BIT");
-        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
+        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
             "GlCommandEncoder should clear color+depth via VulkanicAPI.clearBuffersWithMacosWorkaround");
-        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
+        assertTrue(source.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
             "GlCommandEncoder should clear depth via VulkanicAPI.clearBuffersWithMacosWorkaround + VulkanicAPI.GL_DEPTH_BUFFER_BIT");
+    }
+
+    @Test
+    public void testGlCommandEncoderUsesCommandBufferLifecycleForRenderPass() throws IOException {
+        Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String source = Files.readString(file);
+
+        assertTrue(source.contains("CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();"),
+            "GlCommandEncoder should begin an explicit command-buffer scope for backend render-pass recording");
+        assertTrue(source.contains("VulkanicAPI.beginRenderPass(") && source.contains("renderPassCtx, supplier,"),
+            "GlCommandEncoder should pass explicit command-buffer context into VulkanicAPI.beginRenderPass");
+        assertTrue(source.contains("VulkanicAPI.submitCommandBuffer(renderPassCtx);"),
+            "GlCommandEncoder should submit command-buffer scope when finishing Vulkanic render passes");
     }
 
     @Test
@@ -1099,7 +1198,7 @@ public class Phase3DrawPathTest {
             "GlProgram should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
         assertTrue(glProgramSource.contains("VulkanicAPI.setAttributeLocation(ctx"),
             "GlProgram should bind attributes directly via VulkanicAPI.setAttributeLocation");
-        assertTrue(glProgramSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getImmediateContext(), this.programId"),
+        assertTrue(glProgramSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), this.programId"),
             "GlProgram should query uniforms via VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
 
         Path vertexFormatFile = SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java");
@@ -1186,7 +1285,7 @@ public class Phase3DrawPathTest {
             "GlProgram should query link status directly through VulkanicAPI.getProgramParameter");
         assertTrue(glProgramSource.contains("VulkanicAPI.getProgramInfoLog(ctx, i)"),
             "GlProgram should query program info log directly through VulkanicAPI.getProgramInfoLog");
-        assertTrue(glProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), this.programId)"),
+        assertTrue(glProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), this.programId)"),
             "GlProgram should delete programs directly through VulkanicAPI.deleteProgram");
 
         Path shaderCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ShaderCreator.java");
@@ -1257,9 +1356,9 @@ public class Phase3DrawPathTest {
             "GlDevice AMD workaround should not create programs through removed GlStateManager.glCreateProgram wrapper");
         assertFalse(glDeviceSource.contains("GlStateManager.glDeleteProgram("),
             "GlDevice AMD workaround should not delete programs through removed GlStateManager.glDeleteProgram wrapper");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShaderProgram(net.vulkanic.VulkanicAPI.getImmediateContext())"),
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShaderProgram(net.vulkanic.VulkanicAPI.getCommandContext())"),
             "GlDevice AMD workaround should create programs directly through VulkanicAPI.createShaderProgram");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.deleteProgram(net.vulkanic.VulkanicAPI.getImmediateContext(), j)"),
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.deleteProgram(net.vulkanic.VulkanicAPI.getCommandContext(), j)"),
             "GlDevice AMD workaround should delete programs directly through VulkanicAPI.deleteProgram");
     }
 
@@ -1340,19 +1439,19 @@ public class Phase3DrawPathTest {
             "GlDevice should not query shader status through removed GlStateManager.glGetShaderi wrapper");
         assertFalse(glDeviceSource.contains("GlStateManager.glGetShaderInfoLog("),
             "GlDevice should not query shader logs through removed GlStateManager.glGetShaderInfoLog wrapper");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getImmediateContext()"),
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getCommandContext()"),
             "GlDevice should create shaders directly through VulkanicAPI.createShader");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.attachShader(net.vulkanic.VulkanicAPI.getImmediateContext(), j, i)"),
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.attachShader(net.vulkanic.VulkanicAPI.getCommandContext(), j, i)"),
             "GlDevice should attach shaders directly through VulkanicAPI.attachShader");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i)"),
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getCommandContext(), i)"),
             "GlDevice should delete shaders directly through VulkanicAPI.deleteShader");
         assertTrue(glDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(i, string2)"),
             "GlDevice should upload shader source via ShaderWorkarounds.safeShaderSource");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getImmediateContext(), i)"),
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getCommandContext(), i)"),
             "GlDevice should compile shaders directly through VulkanicAPI.compileShader");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderParameter(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 35713)"),
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderParameter(net.vulkanic.VulkanicAPI.getCommandContext(), i, 35713)"),
             "GlDevice should query compile status directly through VulkanicAPI.getShaderParameter");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderInfoLog(net.vulkanic.VulkanicAPI.getImmediateContext(), i)"),
+        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderInfoLog(net.vulkanic.VulkanicAPI.getCommandContext(), i)"),
             "GlDevice should query shader logs directly through VulkanicAPI.getShaderInfoLog");
 
         Path glShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/GlShader.java");
@@ -1385,7 +1484,7 @@ public class Phase3DrawPathTest {
         String shaderModuleSource = Files.readString(shaderModuleFile);
         assertFalse(shaderModuleSource.contains("GlStateManager.glDeleteShader("),
             "GlShaderModule should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
-        assertTrue(shaderModuleSource.contains("net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getImmediateContext(), this.shaderId)"),
+        assertTrue(shaderModuleSource.contains("net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getCommandContext(), this.shaderId)"),
             "GlShaderModule should delete shaders directly through VulkanicAPI.deleteShader");
     }
 
@@ -1448,9 +1547,9 @@ public class Phase3DrawPathTest {
             "VertexArrayCache should not query GL_VENDOR via hardcoded literal through GlStateManager._getString wrapper");
         assertFalse(source.contains("GlStateManager._getString(7938)"),
             "VertexArrayCache should not query GL_VERSION via hardcoded literal through GlStateManager._getString wrapper");
-        assertTrue(source.contains("VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_VENDOR)"),
+        assertTrue(source.contains("VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR)"),
             "VertexArrayCache should query vendor directly through VulkanicAPI.getString + VulkanicAPI.GL_VENDOR");
-        assertTrue(source.contains("VulkanicAPI.getString(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_VERSION)"),
+        assertTrue(source.contains("VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VERSION)"),
             "VertexArrayCache should query version directly through VulkanicAPI.getString + VulkanicAPI.GL_VERSION");
     }
 
@@ -1463,7 +1562,7 @@ public class Phase3DrawPathTest {
             "BufferStorage map failure paths should not query errors through GlStateManager._getError wrapper");
         assertFalse(source.contains("GlStateManager.clearGlErrors()"),
             "BufferStorage map failure paths should not clear errors through GlStateManager.clearGlErrors wrapper");
-        assertTrue(source.contains("VulkanicAPI.getError(VulkanicAPI.getImmediateContext())"),
+        assertTrue(source.contains("VulkanicAPI.getError(VulkanicAPI.getCommandContext())"),
             "BufferStorage map failure paths should query errors directly through VulkanicAPI.getError");
     }
 
@@ -1533,13 +1632,13 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should no longer increment tracked buffers through GlStateManager");
         assertTrue(directStateAccessSource.contains("IrisRenderSystem.incrementTrackedBuffers();"),
             "DirectStateAccess should increment tracked buffers through IrisRenderSystem helper");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext())"),
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext())"),
             "DirectStateAccess should create buffers directly via VulkanicAPI.createBuffer");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(),"),
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(),"),
             "DirectStateAccess should bind/unbind emulated targets directly via VulkanicAPI.bindBuffer");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.mapBuffer(VulkanicAPI.getImmediateContext(),"),
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.mapBuffer(VulkanicAPI.getCommandContext(),"),
             "DirectStateAccess should map buffers directly via VulkanicAPI.mapBuffer");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.unmapBuffer(VulkanicAPI.getImmediateContext(),"),
+        assertTrue(directStateAccessSource.contains("VulkanicAPI.unmapBuffer(VulkanicAPI.getCommandContext(),"),
             "DirectStateAccess should unmap buffers directly via VulkanicAPI.unmapBuffer");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
@@ -1548,9 +1647,9 @@ public class Phase3DrawPathTest {
             "IrisRenderSystem should not create buffers through removed GlStateManager._glGenBuffers wrapper");
         assertFalse(irisRenderSystemSource.contains("GlStateManager._glBindBuffer("),
             "IrisRenderSystem should not bind buffers through removed GlStateManager._glBindBuffer wrapper");
-        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getImmediateContext())"),
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext())"),
             "IrisRenderSystem should create buffers directly via VulkanicAPI.createBuffer");
-        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), target, buffer)"),
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), target, buffer)"),
             "IrisRenderSystem should bind new buffers directly via VulkanicAPI.bindBuffer");
 
         Path ssboFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/buffer/ShaderStorageBuffer.java");
@@ -1574,7 +1673,7 @@ public class Phase3DrawPathTest {
             "GlBuffer should not delete buffers through removed GlStateManager._glDeleteBuffers wrapper");
         assertTrue(glBufferSource.contains("IrisRenderSystem.decrementTrackedBuffers();"),
             "GlBuffer should preserve tracked-buffer decrement through IrisRenderSystem helper when closing");
-        assertTrue(glBufferSource.contains("VulkanicAPI.deleteBuffer(VulkanicAPI.getImmediateContext(), this.handle)"),
+        assertTrue(glBufferSource.contains("VulkanicAPI.deleteBuffer(VulkanicAPI.getCommandContext(), this.handle)"),
             "GlBuffer should delete buffers directly via VulkanicAPI.deleteBuffer");
 
         Path dsaFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
@@ -1583,9 +1682,9 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should not call removed GlStateManager._glBufferData wrappers");
         assertFalse(dsaSource.contains("GlStateManager._glBufferSubData("),
             "DirectStateAccess should not call removed GlStateManager._glBufferSubData wrapper");
-        assertTrue(dsaSource.contains("VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext()"),
+        assertTrue(dsaSource.contains("VulkanicAPI.bufferData(VulkanicAPI.getCommandContext()"),
             "DirectStateAccess should upload buffer data directly via VulkanicAPI.bufferData");
-        assertTrue(dsaSource.contains("VulkanicAPI.bufferSubData(VulkanicAPI.getImmediateContext()"),
+        assertTrue(dsaSource.contains("VulkanicAPI.bufferSubData(VulkanicAPI.getCommandContext()"),
             "DirectStateAccess should update buffer ranges directly via VulkanicAPI.bufferSubData");
     }
 
@@ -1627,9 +1726,9 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should not call removed GlStateManager._scissorBox wrapper");
         assertFalse(encoderSource.contains("GlStateManager._polygonMode("),
             "GlCommandEncoder should not call removed GlStateManager._polygonMode wrapper");
-        assertTrue(encoderSource.contains("VulkanicAPI.setDynamicScissor(VulkanicAPI.getImmediateContext()"),
+        assertTrue(encoderSource.contains("VulkanicAPI.setDynamicScissor(ctx,"),
             "GlCommandEncoder should set scissor directly through VulkanicAPI.setDynamicScissor");
-        assertTrue(encoderSource.contains("VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext()"),
+        assertTrue(encoderSource.contains("VulkanicAPI.setPolygonMode(ctx, 1032"),
             "GlCommandEncoder should set polygon mode directly through VulkanicAPI.setPolygonMode");
     }
 
@@ -1659,7 +1758,7 @@ public class Phase3DrawPathTest {
 
         assertTrue(encoderSource.contains("VulkanicAPI.setColorLogicOpEnabled("),
             "GlCommandEncoder should enable/disable color logic directly through VulkanicAPI.setColorLogicOpEnabled");
-        assertTrue(encoderSource.contains("VulkanicAPI.setLogicOp(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_OR_REVERSE)"),
+        assertTrue(encoderSource.contains("VulkanicAPI.setLogicOp(ctx, VulkanicAPI.GL_OR_REVERSE)"),
             "GlCommandEncoder should set OR_REVERSE logic op through VulkanicAPI.GL_OR_REVERSE");
     }
 

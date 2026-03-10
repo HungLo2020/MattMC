@@ -150,7 +150,7 @@ public class ShadowCompositeRenderer {
 		this.passes = passes.build();
 		this.flippedAtLeastOnceFinal = flippedAtLeastOnce.build();
 
-		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getCommandContext(), 0);
 	}
 
 	private static void setupMipmapping(net.irisshaders.iris.targets.RenderTarget target, boolean readFromAlt) {
@@ -233,7 +233,7 @@ public class ShadowCompositeRenderer {
 				float scaledHeight = renderTargets.getResolution() * renderPass.viewportScale.scale();
 				int beginWidth = (int) (renderTargets.getResolution() * renderPass.viewportScale.viewportX());
 				int beginHeight = (int) (renderTargets.getResolution() * renderPass.viewportScale.viewportY());
-				VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
+				VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
 
 				renderPass.framebuffer.bind();
 				renderPass.program.use();

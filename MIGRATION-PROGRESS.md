@@ -1,20 +1,23 @@
 # Vulkanic Migration Progress Tracking
 
-**Current Phase**: Phase 2.5 - API Redesign for Vulkan Compatibility  
-**Overall Progress**: Phase 1 & 2 Complete, Phase 2.5 Required  
-**Last Updated**: 2026-02-19  
-**Status**: ⚠️ API Incompatibility Identified - Redesign In Progress
+**Current Phase**: Phase 3 Prep - Backend Bootstrap + Readiness Gating  
+**Overall Progress**: Phase 1/2/2.5 complete; runtime immediate-context usage removed from `src/main/java` (legacy seam only)  
+**Last Updated**: 2026-03-10  
+**Status**: ✅ Migration seam stabilization complete; bootstrap + readiness gating now wired
 
 ---
 
-## ⚠️ Critical Status Update (2026-02-16)
+## ✅ Verified Status Update (2026-03-10)
 
-**Finding**: Analysis reveals current VulkanicAPI is fundamentally incompatible with Vulkan architecture.
-- 99% of API uses OpenGL immediate-mode design
-- Only 2 of 213 methods use CommandContext (Vulkan-compatible)
-- Missing all critical Vulkan systems (pipelines, descriptors, render passes)
+**Current findings (code-verified):**
+- Runtime callsites of `getImmediateContext()` in `src/main/java`: **0**
+- Remaining `getImmediateContext(` occurrence in `src/main/java`: **1** (the intentional legacy accessor in `VulkanicAPI`)
+- Major hotspots migrated to `getCommandContext()`: `GlCommandEncoder`, `IrisRenderSystem`, fence-task helpers, and VoxelMap DSA mipmap path
+- `BackendType.VULKAN` no longer hard-fails at initialization; it now routes through `backends/vulkan/VulkanBackend` bootstrap class
+- Backend readiness seam is now explicit: `getActiveBackendType()`, `isVulkanBackendSelected()`, and `isNativeVulkanBackendReady()`
+- Guard tests now enforce this boundary to prevent regression
 
-**Recommendation**: Phase 2.5 API redesign required (270-400 hours) before Phase 3 can begin.
+**Recommendation**: Keep the deprecated compatibility seam temporarily, and continue Phase 3 by implementing backend-specific systems (pipelines, descriptors, render pass orchestration) behind the command-context API.
 
 ---
 
@@ -24,10 +27,13 @@
 |--------|---------|--------|--------|
 | **Phase 1: Blaze3D/GlStateManager** | ✅ Complete | Complete | 100% |
 | **Phase 2: Mod Integration** | ✅ Complete | Complete | 100% |
-| **Phase 2.5: API Redesign** | ✅ COMPLETE (verified 0 @Deprecated) | Complete | 100% |
-| **Phase 3: Vulkan Backend** | ⏸️ Blocked | Complete | N/A |
+| **Phase 2.5: API Redesign** | ✅ Complete | Complete | 100% |
+| **Phase 3: Vulkan Backend** | 🟡 In Progress (implementation work pending) | Complete | N/A |
 | **Architectural Tests** | ✅ Passing | ✅ Passing | 100% |
-| **API Vulkan Compatibility** | 🟢 100% | 100% | **🎉🎉 MIGRATION COMPLETE! All 283 deprecated methods removed!** |
+| **ImmediateContext Runtime Calls (`src/main/java`)** | ✅ 0 | 0 | 100% |
+| **Legacy Compatibility Seam Definitions** | ⚠️ 1 | 1 (temporary) | Controlled |
+
+> Historical sections below are retained as an audit trail; where older snapshots conflict with this header, treat this verified status block as authoritative.
 
 ---
 

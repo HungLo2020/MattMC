@@ -835,7 +835,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 				int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
 				textureFormat.setupTextureParameters(PBRType.NORMAL, pbrHolder.normalTexture());
 				textureFormat.setupTextureParameters(PBRType.SPECULAR, pbrHolder.specularTexture());
-				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), previousBinding);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousBinding);
 			}
 
 			PBRTextureManager.notifyPBRTexturesChanged();
@@ -876,7 +876,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 				// Clear depth first, regardless of any color clearing.
 				shadowRenderTargets.getDepthSourceFb().bind();
 				net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
-				VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 
 				ImmutableList<ClearPass> passes;
 
@@ -1180,7 +1180,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		for (int i = 0; i < 16; i++) {
 			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
 			IrisRenderSystem.unbindAllSamplers();
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 		}
 
 		// Set the active texture unit to unit 0
@@ -1206,7 +1206,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 		horizonRenderer.destroy();
 
-		VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getImmediateContext());
+		VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getCommandContext());
 
 		renderTargets.destroy();
 		dhCompat.clearPipeline();

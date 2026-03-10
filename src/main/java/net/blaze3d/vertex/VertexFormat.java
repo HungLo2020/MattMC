@@ -145,7 +145,7 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 	@Override
 	public void bindAttributesIris(boolean isFallback, int programId) {
 		com.google.common.collect.ImmutableSet<String> ATTRIBUTE_LIST = com.google.common.collect.ImmutableSet.of("Position", "Color", "Normal", "UV0", "UV1", "UV2");
-		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		int j = 0;
 
 		for (String string : this.getElementAttributeNames()) {

@@ -179,7 +179,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	// Iris: RenderTargetInterface implementation
 	@Override
 	public void iris$bindFramebuffer() {
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(),
+		VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(),
 			((GlTexture) this.colorTexture).getFbo(
 				((GlDevice) net.vulkanic.VulkanicAPI.getDevice()).directStateAccess(),
 				this.depthTexture));

@@ -14,6 +14,7 @@ import net.minecraft.client.renderer.DynamicUniforms;
 import net.minecraft.util.Mth;
 import net.minecraft.util.TimeSource.NanoTimeSource;
 import net.vulkanic.backends.opengl.OpenGLBackend;
+import net.vulkanic.backends.vulkan.VulkanBackend;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
@@ -576,7 +577,7 @@ public class VulkanicAPI {
      */
     public enum BackendType {
         OPENGL,
-        VULKAN  // Future implementation
+        VULKAN
     }
     
     /**
@@ -597,7 +598,7 @@ public class VulkanicAPI {
                     backend = new OpenGLBackend();
                     break;
                 case VULKAN:
-                    throw new UnsupportedOperationException("Vulkan backend not yet implemented");
+                    backend = new VulkanBackend();
             }
 
 			readFramebufferBinding = 0;
@@ -614,6 +615,29 @@ public class VulkanicAPI {
         }
         return backend;
     }
+
+    /**
+     * Gets the currently active backend identity.
+     */
+    public static GraphicsBackendType getActiveBackendType() {
+        return getBackend().getBackendType();
+    }
+
+    /**
+     * Returns true when Vulkan backend routing is active.
+     *
+     * <p>Note: this may still be running in OpenGL-delegated bootstrap mode.</p>
+     */
+    public static boolean isVulkanBackendSelected() {
+        return getActiveBackendType() == GraphicsBackendType.VULKAN;
+    }
+
+    /**
+     * Returns true only when native Vulkan internals are active and ready.
+     */
+    public static boolean isNativeVulkanBackendReady() {
+        return getBackend().isNativeVulkanReady();
+    }
     
     /**
      * Gets the immediate-mode command context for OpenGL rendering.
@@ -629,7 +653,7 @@ public class VulkanicAPI {
      *     operation and reuse it for multiple API calls. This matches Vulkan's command buffer model:
      *     <pre>
      *     // Get context once
-     *     CommandContext ctx = VulkanicAPI.getImmediateContext(); // or beginCommandBuffer() for Vulkan
+    *     CommandContext ctx = VulkanicAPI.getCommandContext(); // or beginCommandBuffer() for Vulkan
      *     
      *     // Reuse for multiple operations
      *     VulkanicAPI.setDynamicViewport(ctx, ...);
@@ -638,7 +662,7 @@ public class VulkanicAPI {
      *     VulkanicAPI.drawIndexed(ctx, ...);
      *     </pre>
      * </li>
-     * <li><b>Low-level utilities (GlStateManager):</b> Calling getImmediateContext() internally
+    * <li><b>Low-level utilities (GlStateManager):</b> Calling the legacy immediate-context accessor internally
      *     is acceptable since they're OpenGL-specific and called from framework code we don't control.</li>
      * </ul>
      * 
@@ -654,6 +678,7 @@ public class VulkanicAPI {
     /**
      * @deprecated Use {@link #getCommandContext()} for backend-neutral command-context retrieval.
      */
+    @Deprecated
     public static CommandContext getImmediateContext() {
         return getCommandContext();
     }
@@ -1796,7 +1821,7 @@ public class VulkanicAPI {
      * Enqueues a callback to run after all currently submitted GPU work completes.
      */
     public static void queueFencedTask(Runnable runnable) {
-        long syncObject = createGpuCompletionFence(getImmediateContext());
+        long syncObject = createGpuCompletionFence(getCommandContext());
         PENDING_FENCED_TASKS.addLast(new GpuAsyncTask(runnable, syncObject));
     }
 
@@ -1804,7 +1829,7 @@ public class VulkanicAPI {
      * Executes queued fenced callbacks whose GPU fences have signaled.
      */
     public static void executePendingFenceTasks() {
-        CommandContext ctx = getImmediateContext();
+        CommandContext ctx = getCommandContext();
 
         for (GpuAsyncTask task = PENDING_FENCED_TASKS.peekFirst();
              task != null;

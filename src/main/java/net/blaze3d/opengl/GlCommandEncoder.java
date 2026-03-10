@@ -55,6 +55,8 @@ public class GlCommandEncoder implements CommandEncoder {
 	 */
 	@Nullable
 	private net.vulkanic.VulkanicRenderPass activeVulkanicRenderPass;
+	@Nullable
+	private net.vulkanic.CommandContext activeRenderPassContext;
 
 	protected GlCommandEncoder(GlDevice glDevice) {
 		this.device = glDevice;
@@ -111,37 +113,40 @@ public class GlCommandEncoder implements CommandEncoder {
 					int i = ((GlTexture)gpuTextureView.texture()).getFbo(this.device.directStateAccess(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
 					this.iris$tempFBO = i;
 					this.activeVulkanicRenderPass = null;
+					this.activeRenderPassContext = null;
 
 					// Perform requested clears on whatever FBO is currently bound
 					int j = 0;
 					if (optionalInt.isPresent()) {
 						int k = optionalInt.getAsInt();
-						VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(k), ARGB.greenFloat(k), ARGB.blueFloat(k), ARGB.alphaFloat(k));
+						VulkanicAPI.setClearColor(VulkanicAPI.getCommandContext(), ARGB.redFloat(k), ARGB.greenFloat(k), ARGB.blueFloat(k), ARGB.alphaFloat(k));
 						j |= 16384;
 					}
 					if (gpuTextureView2 != null && optionalDouble.isPresent()) {
-						VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), optionalDouble.getAsDouble());
+						VulkanicAPI.setClearDepth(VulkanicAPI.getCommandContext(), optionalDouble.getAsDouble());
 						j |= 256;
 					}
 					if (j != 0) {
-						VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
+						VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getCommandContext(), false);
 						net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
 						net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
-						VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), j);
+						VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), j);
 					}
 					if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-						VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), 0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
+						VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
 					}
 				} else {
 					// Normal path: delegate FBO creation, attachment, clear and viewport to VulkanicAPI.
 					// VulkanicAPI.beginRenderPass() routes through GraphicsBackend → OpenGLBackend,
 					// which creates a fresh FBO, attaches the textures, clears, and sets the viewport.
+					net.vulkanic.CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
 					this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(
-						VulkanicAPI.getImmediateContext(), supplier,
+						renderPassCtx, supplier,
 						toVulkanicTextureView((GlTextureView) gpuTextureView), optionalInt,
 						gpuTextureView2 != null ? toVulkanicTextureView((GlTextureView) gpuTextureView2) : null,
 						optionalDouble
 					);
+					this.activeRenderPassContext = renderPassCtx;
 				}
 
 				this.lastPipeline = null;
@@ -172,12 +177,12 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyColorTexture(gpuTexture);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTexture).id, 0, 0, VulkanicAPI.GL_FRAMEBUFFER);
-			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
-			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
+			VulkanicAPI.setClearColor(VulkanicAPI.getCommandContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getCommandContext(), false);
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
-			VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT);
-			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, 0, 0);
-			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getImmediateContext());
+			VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_FRAMEBUFFER, 0, 0);
+			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getCommandContext());
 		}
 	}
 
@@ -189,14 +194,14 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.verifyColorTexture(gpuTexture);
 			this.verifyDepthTexture(gpuTexture2);
 			int j = ((GlTexture)gpuTexture).getFbo(this.device.directStateAccess(), gpuTexture2);
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), j);
-			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
-			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
-			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), j);
+			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getCommandContext(), false);
+			VulkanicAPI.setClearDepth(VulkanicAPI.getCommandContext(), d);
+			VulkanicAPI.setClearColor(VulkanicAPI.getCommandContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
-			VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
-			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getImmediateContext());
+			VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getCommandContext());
 		}
 	}
 
@@ -209,15 +214,15 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.verifyDepthTexture(gpuTexture2);
 			this.verifyRegion(gpuTexture, j, k, l, m);
 			int n = ((GlTexture)gpuTexture).getFbo(this.device.directStateAccess(), gpuTexture2);
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), n);
-			VulkanicAPI.setDynamicScissor(VulkanicAPI.getImmediateContext(), j, k, l, m);
-			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), true);
-			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
-			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), n);
+			VulkanicAPI.setDynamicScissor(VulkanicAPI.getCommandContext(), j, k, l, m);
+			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getCommandContext(), true);
+			VulkanicAPI.setClearDepth(VulkanicAPI.getCommandContext(), d);
+			VulkanicAPI.setClearColor(VulkanicAPI.getCommandContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
-			VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
-			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getImmediateContext());
+			VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getCommandContext());
 		}
 	}
 
@@ -244,14 +249,14 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyDepthTexture(gpuTexture);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, 0, ((GlTexture)gpuTexture).id, 0, VulkanicAPI.GL_FRAMEBUFFER);
-			VulkanicAPI.setDrawBufferNone(VulkanicAPI.getImmediateContext());
-			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), d);
+			VulkanicAPI.setDrawBufferNone(VulkanicAPI.getCommandContext());
+			VulkanicAPI.setClearDepth(VulkanicAPI.getCommandContext(), d);
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
-			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
-			VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT);
-			VulkanicAPI.setDrawBufferColorAttachment0(VulkanicAPI.getImmediateContext());
-			VulkanicAPI.framebufferDepthAttachmentTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, 0, 0);
-			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getImmediateContext());
+			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getCommandContext(), false);
+			VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+			VulkanicAPI.setDrawBufferColorAttachment0(VulkanicAPI.getCommandContext());
+			VulkanicAPI.framebufferDepthAttachmentTexture2D(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_FRAMEBUFFER, 0, 0);
+			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getCommandContext());
 		}
 	}
 
@@ -454,14 +459,14 @@ public class GlCommandEncoder implements CommandEncoder {
 			} else if (j >= gpuTexture.getDepthOrLayers()) {
 				throw new UnsupportedOperationException("Depth or layer is out of range, must be >= 0 and < " + gpuTexture.getDepthOrLayers());
 			} else {
-				net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 				int q;
 				if ((gpuTexture.usage() & 16) != 0) {
 					q = GlConst.CUBEMAP_TARGETS[j % 6];
 					VulkanicAPI.bindCubemapTexture(ctx, ((GlTexture)gpuTexture).id);
 				} else {
 					q = VulkanicAPI.GL_TEXTURE_2D;
-					VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture2D(ctx, ((GlTexture)gpuTexture).id);
 				}
 
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ROW_LENGTH, nativeImage.getWidth());
@@ -507,14 +512,14 @@ public class GlCommandEncoder implements CommandEncoder {
 			} else if (j >= gpuTexture.getDepthOrLayers()) {
 				throw new UnsupportedOperationException("Depth or layer is out of range, must be >= 0 and < " + gpuTexture.getDepthOrLayers());
 			} else {
-				net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 				int o;
 				if ((gpuTexture.usage() & 16) != 0) {
 					o = GlConst.CUBEMAP_TARGETS[j % 6];
 					VulkanicAPI.bindCubemapTexture(ctx, ((GlTexture)gpuTexture).id);
 				} else {
 					o = VulkanicAPI.GL_TEXTURE_2D;
-					VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture2D(ctx, ((GlTexture)gpuTexture).id);
 				}
 
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ROW_LENGTH, m);
@@ -581,16 +586,16 @@ public class GlCommandEncoder implements CommandEncoder {
 			} else if (gpuTexture.getDepthOrLayers() > 1) {
 				throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for copying");
 			} else {
-				while (VulkanicAPI.getError(VulkanicAPI.getImmediateContext()) != 0) {
+				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+				while (VulkanicAPI.getError(ctx) != 0) {
 				}
-				net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
 				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, ((GlTexture)gpuTexture).glId(), 0, j, VulkanicAPI.GL_READ_FRAMEBUFFER);
 				VulkanicAPI.bindPixelPackBuffer(ctx, ((GlBuffer)gpuBuffer).handle);
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_PACK_ROW_LENGTH, m);
 				VulkanicAPI.readPixels(ctx, k, l, m, n, GlConst.toGlExternalId(gpuTexture.getFormat()), GlConst.toGlType(gpuTexture.getFormat()), i);
 				VulkanicAPI.queueFencedTask(runnable);
 				VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_READ_FRAMEBUFFER, 0, j);
-				VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
+				VulkanicAPI.bindReadFramebuffer(ctx, 0);
 				VulkanicAPI.bindPixelPackBuffer(ctx, 0);
 				int o = VulkanicAPI.getError(ctx);
 				if (o != 0) {
@@ -650,16 +655,17 @@ public class GlCommandEncoder implements CommandEncoder {
 			} else if (gpuTexture2.getDepthOrLayers() > 1) {
 				throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for copying");
 			} else {
-				while (VulkanicAPI.getError(VulkanicAPI.getImmediateContext()) != 0) {
+				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+				while (VulkanicAPI.getError(ctx) != 0) {
 				}
-				VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
+				VulkanicAPI.setScissorTestEnabled(ctx, false);
 				boolean bl = gpuTexture.getFormat().hasDepthAspect();
 				int p = ((GlTexture)gpuTexture).glId();
 				int q = ((GlTexture)gpuTexture2).glId();
 				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, bl ? 0 : p, bl ? p : 0, 0, 0);
 				this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, bl ? 0 : q, bl ? q : 0, 0, 0);
 				this.device.directStateAccess().blitFrameBuffers(this.readFbo, this.drawFbo, l, m, n, o, j, k, n, o, bl ? 256 : 16384, 9728);
-				int r = VulkanicAPI.getError(VulkanicAPI.getImmediateContext());
+				int r = VulkanicAPI.getError(ctx);
 				if (r != 0) {
 					throw new IllegalStateException(
 						"Couldn't perform copyToTexture for texture " + gpuTexture.getLabel() + " to " + gpuTexture2.getLabel() + ": GL error " + r
@@ -682,8 +688,9 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else if (gpuTextureView.texture().getDepthOrLayers() > 1) {
 			throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for presentation");
 		} else {
-			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
-			VulkanicAPI.setDynamicViewport(VulkanicAPI.getImmediateContext(), 0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.setScissorTestEnabled(ctx, false);
+			VulkanicAPI.setDynamicViewport(ctx, 0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTextureView.texture()).glId(), 0, 0, 0);
@@ -743,7 +750,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (biConsumer != null) {
 					biConsumer.accept(object, (RenderPass.UniformUploader)(string, gpuBufferSlice) -> {
 						if (glRenderPass.pipeline.program().getUniform(string) instanceof Uniform.Ubo(int i)) {
-							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getImmediateContext(), i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
+							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getCommandContext(), i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
 						}
 					});
 				}
@@ -794,7 +801,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		this.device.vertexArrayCache().bindVertexArray(glRenderPipeline.info().getVertexFormat(), (GlBuffer)glRenderPass.vertexBuffers[0]);
 		// Obtain a single context for all VulkanicAPI calls in this draw — avoids repeated singleton lookups
 		// and makes explicit that every draw operation flows through VulkanicAPI → OpenGLBackend.
-		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		if (indexType != null) {
 			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.
@@ -838,7 +845,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		net.irisshaders.iris.gl.blending.DepthColorStorage.unlockDepthColor();
 		
 		if (net.irisshaders.iris.vertices.ImmediateState.safeToMultiply && !(glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader)) {
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getImmediateContext(), iris$tempFBO);
+			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), iris$tempFBO);
 		}
 		
 		iris$lastPass = glRenderPass;
@@ -846,52 +853,53 @@ public class GlCommandEncoder implements CommandEncoder {
 		// Handle Iris custom pass
 		if (glRenderPass.iris$getCustomPass() != null) {
 			this.lastProgram = null;
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			
 			((net.irisshaders.iris.mixinterface.CustomPass)glRenderPass.iris$getCustomPass()).setupState();
 			
 			RenderPipeline renderPipeline = glRenderPass.pipeline.info();
 			
 			if (glRenderPass.isScissorEnabled()) {
-				VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), true);
-				VulkanicAPI.setDynamicScissor(VulkanicAPI.getImmediateContext(), glRenderPass.getScissorX(), glRenderPass.getScissorY(), glRenderPass.getScissorWidth(), glRenderPass.getScissorHeight());
+				VulkanicAPI.setScissorTestEnabled(ctx, true);
+				VulkanicAPI.setDynamicScissor(ctx, glRenderPass.getScissorX(), glRenderPass.getScissorY(), glRenderPass.getScissorWidth(), glRenderPass.getScissorHeight());
 			} else {
-				VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
+				VulkanicAPI.setScissorTestEnabled(ctx, false);
 			}
 			
 			if (this.lastPipeline != renderPipeline) {
 				this.lastPipeline = renderPipeline;
 				
 				if (renderPipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST) {
-					VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), true);
-					VulkanicAPI.setDepthFunc(VulkanicAPI.getImmediateContext(), GlConst.toGl(renderPipeline.getDepthTestFunction()));
+					VulkanicAPI.setDepthTestEnabled(ctx, true);
+					VulkanicAPI.setDepthFunc(ctx, GlConst.toGl(renderPipeline.getDepthTestFunction()));
 				} else {
-					VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
+					VulkanicAPI.setDepthTestEnabled(ctx, false);
 				}
 				
 				if (renderPipeline.isCull()) {
-					VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
+					VulkanicAPI.setCullFaceEnabled(ctx, true);
 				} else {
-					VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
+					VulkanicAPI.setCullFaceEnabled(ctx, false);
 				}
 				
-				VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), 1032, GlConst.toGl(renderPipeline.getPolygonMode()));
+				VulkanicAPI.setPolygonMode(ctx, 1032, GlConst.toGl(renderPipeline.getPolygonMode()));
 				net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(renderPipeline.isWriteDepth());
 				net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteAlpha());
 				
 				if (renderPipeline.getDepthBiasConstant() == 0.0F && renderPipeline.getDepthBiasScaleFactor() == 0.0F) {
-					VulkanicAPI.setPolygonOffsetFillEnabled(VulkanicAPI.getImmediateContext(), false);
+					VulkanicAPI.setPolygonOffsetFillEnabled(ctx, false);
 				} else {
-					VulkanicAPI.setPolygonOffset(VulkanicAPI.getImmediateContext(), renderPipeline.getDepthBiasScaleFactor(), renderPipeline.getDepthBiasConstant());
-					VulkanicAPI.setPolygonOffsetFillEnabled(VulkanicAPI.getImmediateContext(), true);
+					VulkanicAPI.setPolygonOffset(ctx, renderPipeline.getDepthBiasScaleFactor(), renderPipeline.getDepthBiasConstant());
+					VulkanicAPI.setPolygonOffsetFillEnabled(ctx, true);
 				}
 				
 				switch (renderPipeline.getColorLogic()) {
 					case NONE:
-						VulkanicAPI.setColorLogicOpEnabled(VulkanicAPI.getImmediateContext(), false);
+						VulkanicAPI.setColorLogicOpEnabled(ctx, false);
 						break;
 					case OR_REVERSE:
-						VulkanicAPI.setColorLogicOpEnabled(VulkanicAPI.getImmediateContext(), true);
-						VulkanicAPI.setLogicOp(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_OR_REVERSE);
+						VulkanicAPI.setColorLogicOpEnabled(ctx, true);
+						VulkanicAPI.setLogicOp(ctx, VulkanicAPI.GL_OR_REVERSE);
 				}
 			}
 			
@@ -964,7 +972,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		RenderPipeline renderPipeline = glRenderPass.pipeline.info();
 		GlProgram glProgram = glRenderPass.pipeline.program();
 		this.applyPipelineState(renderPipeline);
-		net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		boolean bl = this.lastProgram != glProgram;
 		if (bl) {
 			net.irisshaders.iris.gl.IrisRenderSystem.useProgram(glProgram.getProgramId());
@@ -1014,7 +1022,7 @@ public class GlCommandEncoder implements CommandEncoder {
 							VulkanicAPI.bindCubemapTexture(ctx, glTexture.id);
 					} else {
 							o = VulkanicAPI.GL_TEXTURE_2D;
-						VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), glTexture.id);
+						VulkanicAPI.bindTexture2D(ctx, glTexture.id);
 					}
 
 						VulkanicAPI.setTextureParameter(ctx, o, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, glTextureView2x.baseMipLevel());
@@ -1028,10 +1036,10 @@ public class GlCommandEncoder implements CommandEncoder {
 
 		glRenderPass.dirtyUniforms.clear();
 		if (glRenderPass.isScissorEnabled()) {
-			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), true);
-			VulkanicAPI.setDynamicScissor(VulkanicAPI.getImmediateContext(), glRenderPass.getScissorX(), glRenderPass.getScissorY(), glRenderPass.getScissorWidth(), glRenderPass.getScissorHeight());
+			VulkanicAPI.setScissorTestEnabled(ctx, true);
+			VulkanicAPI.setDynamicScissor(ctx, glRenderPass.getScissorX(), glRenderPass.getScissorY(), glRenderPass.getScissorWidth(), glRenderPass.getScissorHeight());
 		} else {
-			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getImmediateContext(), false);
+			VulkanicAPI.setScissorTestEnabled(ctx, false);
 		}
 
 		// Iris: From MixinGlCommandEncoder - Setup IrisProgram state if needed
@@ -1049,18 +1057,19 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	public void applyPipelineState(RenderPipeline renderPipeline) { // Made public for Sodium shader rendering integration
 		if (this.lastPipeline != renderPipeline) {
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			this.lastPipeline = renderPipeline;
 			if (renderPipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST) {
-				VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), true);
-				VulkanicAPI.setDepthFunc(VulkanicAPI.getImmediateContext(), GlConst.toGl(renderPipeline.getDepthTestFunction()));
+				VulkanicAPI.setDepthTestEnabled(ctx, true);
+				VulkanicAPI.setDepthFunc(ctx, GlConst.toGl(renderPipeline.getDepthTestFunction()));
 			} else {
-				VulkanicAPI.setDepthTestEnabled(VulkanicAPI.getImmediateContext(), false);
+				VulkanicAPI.setDepthTestEnabled(ctx, false);
 			}
 
 			if (renderPipeline.isCull()) {
-				VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), true);
+				VulkanicAPI.setCullFaceEnabled(ctx, true);
 			} else {
-				VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getImmediateContext(), false);
+				VulkanicAPI.setCullFaceEnabled(ctx, false);
 			}
 
 			if (renderPipeline.getBlendFunction().isPresent()) {
@@ -1076,23 +1085,23 @@ public class GlCommandEncoder implements CommandEncoder {
 				net.irisshaders.iris.gl.blending.BlendModeStorage.setBlendEnabled(false);
 			}
 
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), 1032, GlConst.toGl(renderPipeline.getPolygonMode()));
+			VulkanicAPI.setPolygonMode(ctx, 1032, GlConst.toGl(renderPipeline.getPolygonMode()));
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(renderPipeline.isWriteDepth());
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteAlpha());
 			if (renderPipeline.getDepthBiasConstant() == 0.0F && renderPipeline.getDepthBiasScaleFactor() == 0.0F) {
-				VulkanicAPI.setPolygonOffsetFillEnabled(VulkanicAPI.getImmediateContext(), false);
+				VulkanicAPI.setPolygonOffsetFillEnabled(ctx, false);
 			} else {
-				VulkanicAPI.setPolygonOffset(VulkanicAPI.getImmediateContext(), renderPipeline.getDepthBiasScaleFactor(), renderPipeline.getDepthBiasConstant());
-				VulkanicAPI.setPolygonOffsetFillEnabled(VulkanicAPI.getImmediateContext(), true);
+				VulkanicAPI.setPolygonOffset(ctx, renderPipeline.getDepthBiasScaleFactor(), renderPipeline.getDepthBiasConstant());
+				VulkanicAPI.setPolygonOffsetFillEnabled(ctx, true);
 			}
 
 			switch (renderPipeline.getColorLogic()) {
 				case NONE:
-					VulkanicAPI.setColorLogicOpEnabled(VulkanicAPI.getImmediateContext(), false);
+					VulkanicAPI.setColorLogicOpEnabled(ctx, false);
 					break;
 				case OR_REVERSE:
-					VulkanicAPI.setColorLogicOpEnabled(VulkanicAPI.getImmediateContext(), true);
-					VulkanicAPI.setLogicOp(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_OR_REVERSE);
+					VulkanicAPI.setColorLogicOpEnabled(ctx, true);
+					VulkanicAPI.setLogicOp(ctx, VulkanicAPI.GL_OR_REVERSE);
 			}
 		}
 	}
@@ -1106,13 +1115,18 @@ public class GlCommandEncoder implements CommandEncoder {
 
 		if (this.activeVulkanicRenderPass != null) {
 			// Normal path: VulkanicRenderPass.close() unbinds and deletes the FBO it created.
+			net.vulkanic.CommandContext renderPassCtx = this.activeRenderPassContext;
 			this.activeVulkanicRenderPass.close();
 			this.activeVulkanicRenderPass = null;
+			if (renderPassCtx != null) {
+				VulkanicAPI.submitCommandBuffer(renderPassCtx);
+			}
 		} else if (!net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
 			// Iris shadow/safeMultiply path: manually unbind the GlTexture cached FBO.
 			// Don't unbind when in safe-multiply state (Iris manages that separately).
-			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getImmediateContext());
+			VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getCommandContext());
 		}
+		this.activeRenderPassContext = null;
 
 		this.device.debugLabels().popDebugGroup();
 	}

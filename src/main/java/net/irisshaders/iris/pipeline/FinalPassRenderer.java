@@ -154,7 +154,7 @@ public class FinalPassRenderer {
 
 		this.swapPasses = swapPasses.build();
 
-		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getImmediateContext(), 0);
+		VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getCommandContext(), 0);
 	}
 
 	private static void setupMipmapping(RenderTarget target, boolean readFromAlt) {
@@ -195,7 +195,7 @@ public class FinalPassRenderer {
 		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
 		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
 
-		VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 	}
 
 	public void renderFinalPass() {
@@ -300,8 +300,8 @@ public class FinalPassRenderer {
 			// Also note that RenderTargets already calls readBuffer(0) for us.
 			swapPass.from.bind();
 
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), swapPass.targetTexture);
-			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), swapPass.targetTexture);
+			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
 		}
 
 		// Make sure to reset the viewport to how it was before... Otherwise weird issues could occur.
@@ -315,7 +315,7 @@ public class FinalPassRenderer {
 			// NB: This is necessary for shader pack reloading to work properly
 			if (net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(i) != 0) {
 				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
-				VulkanicAPI.bindTexture2D(VulkanicAPI.getImmediateContext(), 0);
+				VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 			}
 		}
 
