@@ -190,6 +190,66 @@ New APIs:
 
 OpenGL pipeline compilation now uses `requireRenderPipeline()` so descriptors can be consumed even without storing a native `RenderPipeline` object. This creates a bridge toward future Vulkan pipeline compilation from Vulkanic-owned metadata rather than Blaze3D object identity.
 
+### Phase 3 Prep — Resource Layout + Stable Cache Key ✅ Complete
+
+`PipelineDescriptor` now exposes backend-agnostic resource binding metadata and deterministic pipeline identity hashing, without implementing native Vulkan execution.
+
+New APIs:
+- `PipelineDescriptor.getResourceLayout()`
+- `PipelineDescriptor.ResourceLayout` / `ResourceBinding` / `ResourceType`
+- `PipelineDescriptor.getStableCacheKey()`
+
+The current layout policy is explicit and deterministic (set `0`, samplers first, then uniforms in declaration order), with duplicate resource-name detection to prevent ambiguous descriptor mapping. The stable cache key canonicalizes portable pipeline state and hashes it (SHA-256), creating a future-proof seam for Vulkan pipeline-cache and descriptor-layout reuse.
+
+### Phase 3 Prep — Descriptor-Style Resource Updates ✅ Complete
+
+Vulkanic now has an explicit resource-update contract for compiled pipelines, without implementing native Vulkan execution yet.
+
+New APIs:
+- `PipelineResourceBindings` (typed sampler/uniform-buffer/texel-buffer binding model)
+- `GraphicsBackend.bindPipelineResources(...)`
+- `VulkanicAPI.bindPipelineResources(...)`
+
+OpenGL now applies descriptor-layout-driven resource updates via this seam (including layout conformance validation), while bootstrap `VulkanBackend` explicitly guards the call until native descriptor-set updates are implemented.
+
+### Phase 3 Prep — Descriptor Pool/Set Lifecycle Metadata ✅ Complete
+
+Vulkanic now has an explicit descriptor-pool and descriptor-set lifecycle seam, without implementing native Vulkan execution yet.
+
+New APIs:
+- `DescriptorPoolDescriptor` (`maxSets` policy)
+- `DescriptorPoolHandle` / `DescriptorSetHandle`
+- `GraphicsBackend.createDescriptorPool(...)`
+- `GraphicsBackend.allocateDescriptorSet(...)`
+- `GraphicsBackend.updateDescriptorSet(...)`
+- `GraphicsBackend.bindDescriptorSet(...)`
+- `GraphicsBackend.resetDescriptorPool(...)`
+- matching `VulkanicAPI` dispatch methods
+
+OpenGL models allocation/reset/update semantics with logical handles and reuses existing `bindPipelineResources(...)` behavior at bind-time. Bootstrap `VulkanBackend` explicitly guards these entrypoints until native descriptor pool/set mapping is implemented.
+
+### Phase 3 Prep — Render-Pass Descriptor Metadata ✅ Complete
+
+Vulkanic now supports a backend-agnostic render-pass descriptor object carrying explicit attachment load/store intent.
+
+New APIs:
+- `VulkanicRenderPassDescriptor` (color/depth attachment metadata + `LoadOp`/`StoreOp`)
+- `GraphicsBackend.beginRenderPass(ctx, descriptor)`
+- `VulkanicAPI.beginRenderPass(ctx, descriptor)`
+
+Existing optional-clear overloads remain and are now routed through descriptor construction, preserving callsite compatibility while making render-pass semantics explicit and Vulkan-ready.
+
+### Phase 3 Prep — Resource Barrier Metadata ✅ Complete
+
+Vulkanic now has a backend-agnostic synchronization/resource-barrier descriptor seam instead of relying only on raw GL bitfields.
+
+New APIs:
+- `VulkanicResourceBarriers` (typed barrier domains + convenience preset)
+- `GraphicsBackend.applyResourceBarriers(ctx, barriers)`
+- `VulkanicAPI.applyResourceBarriers(ctx, barriers)`
+
+OpenGL maps this seam to `glMemoryBarrier` bitfields, while bootstrap `VulkanBackend` explicitly guards the call until native Vulkan barrier translation is implemented.
+
 ---
 
 ## 5 · What Needs to Happen Next

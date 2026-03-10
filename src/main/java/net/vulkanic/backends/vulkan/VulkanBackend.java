@@ -126,6 +126,59 @@ public class VulkanBackend extends OpenGLBackend {
     }
 
     @Override
+    public net.vulkanic.DescriptorPoolHandle createDescriptorPool(
+            net.vulkanic.DescriptorPoolDescriptor descriptor) {
+        ensureNativeReady("createDescriptorPool");
+        throw new UnsupportedOperationException("Vulkan-native descriptor pool lifecycle is not implemented yet.");
+    }
+
+    @Override
+    public net.vulkanic.DescriptorSetHandle allocateDescriptorSet(
+            net.vulkanic.DescriptorPoolHandle pool,
+            PipelineDescriptor descriptor) {
+        ensureNativeReady("allocateDescriptorSet");
+        throw new UnsupportedOperationException("Vulkan-native descriptor set allocation is not implemented yet.");
+    }
+
+    @Override
+    public void updateDescriptorSet(net.vulkanic.DescriptorSetHandle descriptorSet,
+            net.vulkanic.PipelineResourceBindings bindings) {
+        ensureNativeReady("updateDescriptorSet");
+        throw new UnsupportedOperationException("Vulkan-native descriptor set updates are not implemented yet.");
+    }
+
+    @Override
+    public void bindDescriptorSet(CommandContext ctx,
+            PipelineHandle pipeline,
+            PipelineDescriptor descriptor,
+            net.vulkanic.DescriptorSetHandle descriptorSet) {
+        ensureNativeReady("bindDescriptorSet");
+        throw new UnsupportedOperationException("Vulkan-native descriptor set binding is not implemented yet.");
+    }
+
+    @Override
+    public void resetDescriptorPool(net.vulkanic.DescriptorPoolHandle pool) {
+        ensureNativeReady("resetDescriptorPool");
+        throw new UnsupportedOperationException("Vulkan-native descriptor pool reset is not implemented yet.");
+    }
+
+    @Override
+    public void bindPipelineResources(CommandContext ctx,
+            PipelineHandle pipeline,
+            PipelineDescriptor descriptor,
+            net.vulkanic.PipelineResourceBindings bindings) {
+        ensureNativeReady("bindPipelineResources");
+        throw new UnsupportedOperationException("Vulkan-native descriptor set updates are not implemented yet.");
+    }
+
+    @Override
+    public void applyResourceBarriers(CommandContext ctx,
+            net.vulkanic.VulkanicResourceBarriers barriers) {
+        ensureNativeReady("applyResourceBarriers");
+        throw new UnsupportedOperationException("Vulkan-native resource barrier mapping is not implemented yet.");
+    }
+
+    @Override
     public CommandContext beginCommandBuffer() {
         ensureNativeReady("beginCommandBuffer");
         throw new UnsupportedOperationException("Vulkan-native command buffer lifecycle is not implemented yet.");
@@ -151,6 +204,13 @@ public class VulkanBackend extends OpenGLBackend {
             net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor,
             @org.jetbrains.annotations.Nullable net.vulkanic.VulkanicTextureView depthTarget,
             java.util.OptionalDouble clearDepth) {
+        ensureNativeReady("beginRenderPass");
+        throw new UnsupportedOperationException("Vulkan-native render pass lifecycle is not implemented yet.");
+    }
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            net.vulkanic.VulkanicRenderPassDescriptor descriptor) {
         ensureNativeReady("beginRenderPass");
         throw new UnsupportedOperationException("Vulkan-native render pass lifecycle is not implemented yet.");
     }

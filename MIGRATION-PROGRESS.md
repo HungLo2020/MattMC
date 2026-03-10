@@ -1,9 +1,9 @@
 # Vulkanic Migration Progress Tracking
 
-**Current Phase**: Phase 3 Prep - Backend Bootstrap + Readiness Gating  
+**Current Phase**: Phase 3 Prep - Descriptor Lifecycle + Synchronization Metadata  
 **Overall Progress**: Phase 1/2/2.5 complete; runtime immediate-context usage removed from `src/main/java` (legacy seam only)  
 **Last Updated**: 2026-03-10  
-**Status**: ✅ Migration seam stabilization complete; bootstrap + readiness gating now wired
+**Status**: ✅ Migration seam stabilization complete; readiness + portable pipeline metadata seams now wired
 
 ---
 
@@ -18,9 +18,14 @@
 - New Vulkan diagnostics seam is live: `VulkanReadinessReport`, `VulkanicAPI.getVulkanReadinessReport()`, and `VulkanicAPI.describeVulkanReadiness()`
 - New scoped command-context helper is available: `VulkanicAPI.withCommandContext(ctx)` for safe push/pop lifecycle handling
 - Pipeline descriptor portability seam is live: `PipelineDescriptor.PortableState` + `fromPortableState(...)` + OpenGL round-trip via `requireRenderPipeline()`
+- Pipeline resource-binding seam is live: `PipelineDescriptor.ResourceLayout` + deterministic `getStableCacheKey()` for backend-agnostic descriptor mapping and pipeline cache identity
+- Descriptor update seam is now live in API/backend contracts: `PipelineResourceBindings` + `bindPipelineResources(...)` with layout validation and OpenGL binding path
+- Descriptor pool/allocation lifecycle seam is now live: `DescriptorPoolDescriptor`, `DescriptorPoolHandle`, `DescriptorSetHandle` + `createDescriptorPool(...)` / `allocateDescriptorSet(...)` / `updateDescriptorSet(...)` / `bindDescriptorSet(...)` / `resetDescriptorPool(...)`
+- Render-pass descriptor seam is now live: `VulkanicRenderPassDescriptor` + `beginRenderPass(ctx, descriptor)` with explicit load/store/clear metadata
+- Synchronization/resource-barrier metadata seam is now live: `VulkanicResourceBarriers` + `applyResourceBarriers(ctx, ...)` with OpenGL mapping and Vulkan bootstrap guard
 - Guard tests now enforce this boundary to prevent regression
 
-**Recommendation**: Keep the deprecated compatibility seam temporarily, use readiness reports to gate environment-dependent Vulkan bring-up work, and continue Phase 3 by implementing backend-specific systems (pipelines, descriptors, render pass orchestration) behind the command-context API.
+**Recommendation**: Keep the deprecated compatibility seam temporarily, use readiness reports to gate environment-dependent Vulkan bring-up work, and continue Phase 3 by adding richer stage/access barrier modeling plus descriptor write-template/update-frequency metadata on top of the new resource-layout, descriptor-update, descriptor-lifecycle, render-pass, and resource-barrier seams.
 
 ---
 

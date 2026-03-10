@@ -2824,6 +2824,15 @@ public class VulkanicAPI {
     public static void memoryBarrier(CommandContext ctx, int barriers) {
         getBackend().memoryBarrier(ctx, barriers);
     }
+
+    /**
+     * Applies backend-agnostic resource barrier metadata.
+     *
+     * <p>This is the preferred pre-Vulkan seam over raw OpenGL barrier bitfields.</p>
+     */
+    public static void applyResourceBarriers(CommandContext ctx, VulkanicResourceBarriers barriers) {
+        getBackend().applyResourceBarriers(ctx, barriers);
+    }
     
     
     
@@ -3424,6 +3433,61 @@ public class VulkanicAPI {
         return getBackend().createPipeline(PipelineDescriptor.fromRenderPipeline(pipeline));
     }
 
+    /**
+     * Creates a descriptor-pool-style allocation domain for descriptor sets.
+     */
+    public static DescriptorPoolHandle createDescriptorPool(DescriptorPoolDescriptor descriptor) {
+        return getBackend().createDescriptorPool(descriptor);
+    }
+
+    /**
+     * Allocates a descriptor set from a pool for a specific pipeline descriptor layout.
+     */
+    public static DescriptorSetHandle allocateDescriptorSet(DescriptorPoolHandle pool,
+            PipelineDescriptor descriptor) {
+        return getBackend().allocateDescriptorSet(pool, descriptor);
+    }
+
+    /**
+     * Updates resources for a descriptor set allocation.
+     */
+    public static void updateDescriptorSet(DescriptorSetHandle descriptorSet,
+            PipelineResourceBindings bindings) {
+        getBackend().updateDescriptorSet(descriptorSet, bindings);
+    }
+
+    /**
+     * Binds an allocated descriptor set for the given pipeline.
+     */
+    public static void bindDescriptorSet(CommandContext ctx,
+            PipelineHandle pipeline,
+            PipelineDescriptor descriptor,
+            DescriptorSetHandle descriptorSet) {
+        getBackend().bindDescriptorSet(ctx, pipeline, descriptor, descriptorSet);
+    }
+
+    /**
+     * Resets/recycles all descriptor-set allocations in a pool.
+     */
+    public static void resetDescriptorPool(DescriptorPoolHandle pool) {
+        getBackend().resetDescriptorPool(pool);
+    }
+
+    /**
+     * Binds descriptor-style resources for a compiled pipeline.
+     *
+     * @param ctx command context
+     * @param pipeline compiled pipeline handle
+     * @param descriptor pipeline descriptor containing resource layout metadata
+     * @param bindings resources keyed by descriptor resource names
+     */
+    public static void bindPipelineResources(CommandContext ctx,
+            PipelineHandle pipeline,
+            PipelineDescriptor descriptor,
+            PipelineResourceBindings bindings) {
+        getBackend().bindPipelineResources(ctx, pipeline, descriptor, bindings);
+    }
+
     // =========================================================================
     // Phase 3d: Command Buffer Lifecycle
     // =========================================================================
@@ -3498,7 +3562,8 @@ public class VulkanicAPI {
     public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
             java.util.function.Supplier<String> label,
             VulkanicTextureView colorTarget, java.util.OptionalInt clearColor) {
-        return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor);
+        return beginRenderPass(ctx,
+            VulkanicRenderPassDescriptor.color(label, colorTarget, clearColor));
     }
 
     /**
@@ -3517,7 +3582,20 @@ public class VulkanicAPI {
             VulkanicTextureView colorTarget, java.util.OptionalInt clearColor,
             @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
             java.util.OptionalDouble clearDepth) {
-        return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor,
-            depthTarget, clearDepth);
+        return beginRenderPass(ctx,
+            VulkanicRenderPassDescriptor.colorAndDepth(
+                label, colorTarget, clearColor, depthTarget, clearDepth));
+    }
+
+    /**
+     * Begins a render pass using backend-agnostic attachment load/store metadata.
+     *
+     * @param ctx command context (from {@link #beginCommandBuffer()})
+     * @param descriptor render-pass descriptor (attachments + load/store/clear semantics)
+     * @return an active {@link VulkanicRenderPass}
+     */
+    public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            VulkanicRenderPassDescriptor descriptor) {
+        return getBackend().beginRenderPass(ctx, descriptor);
     }
 }

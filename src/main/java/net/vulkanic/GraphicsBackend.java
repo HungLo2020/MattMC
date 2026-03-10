@@ -1738,6 +1738,17 @@ public interface GraphicsBackend {
      * @param barriers Bitfield of memory barrier flags
      */
     void memoryBarrier(CommandContext ctx, int barriers);
+
+    /**
+     * Applies backend-agnostic resource barrier metadata.
+     *
+     * <p>In OpenGL: translates to {@code glMemoryBarrier()} bitfields.
+     * In Vulkan: translates to explicit pipeline/resource barrier commands.</p>
+     *
+     * @param ctx command context for recording this command
+     * @param barriers typed barrier metadata descriptor
+     */
+    void applyResourceBarriers(CommandContext ctx, VulkanicResourceBarriers barriers);
     
     // Synchronization
     /**
@@ -2854,6 +2865,66 @@ public interface GraphicsBackend {
      */
     PipelineHandle createPipeline(PipelineDescriptor descriptor);
 
+    /**
+     * Creates a descriptor-pool-style allocation domain for pipeline resource sets.
+     *
+     * <p>In OpenGL: provides lifecycle/accounting semantics over descriptor-style bindings.
+     * In Vulkan: maps to {@code vkCreateDescriptorPool}.
+     */
+    DescriptorPoolHandle createDescriptorPool(DescriptorPoolDescriptor descriptor);
+
+    /**
+     * Allocates a descriptor-style resource set from the given pool for a pipeline layout.
+     *
+     * <p>In OpenGL: allocates a validated binding container tied to descriptor layout identity.
+     * In Vulkan: maps to {@code vkAllocateDescriptorSets}.
+     */
+    DescriptorSetHandle allocateDescriptorSet(DescriptorPoolHandle pool, PipelineDescriptor descriptor);
+
+    /**
+     * Updates resource bindings for a previously allocated descriptor set.
+     *
+     * <p>In OpenGL: validates and stores bindings for later bind-time application.
+     * In Vulkan: maps to {@code vkUpdateDescriptorSets}.</p>
+     */
+    void updateDescriptorSet(DescriptorSetHandle descriptorSet, PipelineResourceBindings bindings);
+
+    /**
+     * Binds a descriptor set for use with a compiled pipeline.
+     *
+     * <p>In OpenGL: applies stored bindings to the active program according to descriptor layout.
+     * In Vulkan: maps to {@code vkCmdBindDescriptorSets}.</p>
+     */
+    void bindDescriptorSet(CommandContext ctx,
+                           PipelineHandle pipeline,
+                           PipelineDescriptor descriptor,
+                           DescriptorSetHandle descriptorSet);
+
+    /**
+     * Resets/recycles all descriptor-set allocations in the given pool.
+     *
+     * <p>In OpenGL: invalidates currently allocated logical descriptor sets.
+     * In Vulkan: maps to descriptor pool reset semantics.</p>
+     */
+    void resetDescriptorPool(DescriptorPoolHandle pool);
+
+    /**
+     * Binds descriptor-style pipeline resources for a compiled pipeline.
+     *
+     * <p>In OpenGL: applies sampler/uniform-buffer/texel-buffer bindings to the active
+     * shader program using the descriptor-derived resource layout.
+     * In Vulkan: maps to descriptor set writes + {@code vkCmdBindDescriptorSets}.
+     *
+     * @param ctx command context
+     * @param pipeline compiled pipeline handle
+     * @param descriptor pipeline descriptor used to derive resource layout metadata
+     * @param bindings bound resources keyed by descriptor resource names
+     */
+    void bindPipelineResources(CommandContext ctx,
+                               PipelineHandle pipeline,
+                               PipelineDescriptor descriptor,
+                               PipelineResourceBindings bindings);
+
     // =========================================================================
     // Phase 3d: Command Buffer Lifecycle
     // =========================================================================
@@ -2921,4 +2992,12 @@ public interface GraphicsBackend {
                                         VulkanicTextureView colorTarget, OptionalInt clearColor,
                                         @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
                                         OptionalDouble clearDepth);
+
+    /**
+     * Begins a render pass from a backend-agnostic pass descriptor.
+     *
+     * <p>In OpenGL: maps descriptor load/clear metadata to framebuffer setup + optional clears.
+     * In Vulkan: maps descriptor attachment metadata to render-pass begin info.
+     */
+    VulkanicRenderPass beginRenderPass(CommandContext ctx, VulkanicRenderPassDescriptor descriptor);
 }

@@ -270,6 +270,166 @@ public class Phase3ResourceTypesTest {
     }
 
     @Test
+    public void testPipelineDescriptorResourceLayoutFromPortableState() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+
+        assertEquals(3, layout.bindings().size(),
+            "Sampler + two uniforms should produce three resource bindings");
+
+        PipelineDescriptor.ResourceBinding samplerBinding = layout.bindings().get(0);
+        assertEquals(0, samplerBinding.set());
+        assertEquals(0, samplerBinding.binding());
+        assertEquals("Sampler0", samplerBinding.name());
+        assertEquals(PipelineDescriptor.ResourceType.SAMPLER, samplerBinding.type());
+        assertNull(samplerBinding.textureFormat());
+
+        PipelineDescriptor.ResourceBinding uniformBinding = layout.bindings().get(1);
+        assertEquals(1, uniformBinding.binding());
+        assertEquals("Globals", uniformBinding.name());
+        assertEquals(PipelineDescriptor.ResourceType.UNIFORM_BUFFER, uniformBinding.type());
+
+        PipelineDescriptor.ResourceBinding texelBinding = layout.bindings().get(2);
+        assertEquals(2, texelBinding.binding());
+        assertEquals("CloudFaces", texelBinding.name());
+        assertEquals(PipelineDescriptor.ResourceType.TEXEL_BUFFER, texelBinding.type());
+        assertEquals(TextureFormat.RED8I, texelBinding.textureFormat());
+
+        assertTrue(layout.findByName("Sampler0").isPresent());
+        assertTrue(layout.findByName("CloudFaces").isPresent());
+        assertTrue(layout.findByName("Missing").isEmpty());
+    }
+
+    @Test
+    public void testPipelineDescriptorResourceLayoutRejectsDuplicateNames() {
+        PipelineDescriptor.PortableState base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline())
+            .getPortableState();
+
+        PipelineDescriptor.PortableState duplicate = new PipelineDescriptor.PortableState(
+            base.location(),
+            base.vertexShader(),
+            base.fragmentShader(),
+            base.shaderDefineValues(),
+            base.shaderDefineFlags(),
+            java.util.List.of("SharedName"),
+            java.util.List.of(new PipelineDescriptor.UniformBinding("SharedName", UniformType.UNIFORM_BUFFER, null)),
+            base.blendState(),
+            base.depthTestFunction(),
+            base.polygonMode(),
+            base.cull(),
+            base.writeColor(),
+            base.writeAlpha(),
+            base.writeDepth(),
+            base.colorLogic(),
+            base.vertexFormat(),
+            base.vertexFormatMode(),
+            base.depthBiasScaleFactor(),
+            base.depthBiasConstant()
+        );
+
+        assertThrows(IllegalStateException.class, duplicate::toResourceLayout,
+            "Duplicate sampler/uniform names must fail to ensure deterministic layout mapping");
+    }
+
+    @Test
+    public void testPipelineDescriptorStableCacheKeyRoundTrip() {
+        PipelineDescriptor original = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        PipelineDescriptor reconstructed = PipelineDescriptor.fromPortableState(original.getPortableState());
+
+        String keyA = original.getStableCacheKey();
+        String keyB = reconstructed.getStableCacheKey();
+
+        assertEquals(keyA, keyB,
+            "Stable cache key should match when portable state is semantically identical");
+        assertEquals(64, keyA.length(),
+            "Stable cache key should be SHA-256 hex");
+    }
+
+    @Test
+    public void testPipelineDescriptorStableCacheKeyChangesWithState() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        PipelineDescriptor altered = PipelineDescriptor.fromRenderPipeline(
+            RenderPipeline.builder()
+                .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/test_pipeline_changed"))
+                .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+                .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+                .withShaderDefine("FLAG_TEST")
+                .withShaderDefine("VALUE_TEST", 123)
+                .withSampler("Sampler0")
+                .withUniform("Globals", UniformType.UNIFORM_BUFFER)
+                .withUniform("CloudFaces", UniformType.TEXEL_BUFFER, TextureFormat.RED8I)
+                .withDepthTestFunction(DepthTestFunction.GREATER_DEPTH_TEST)
+                .withPolygonMode(PolygonMode.WIREFRAME)
+                .withCull(false)
+                .withoutBlend()
+                .withColorWrite(true, false)
+                .withDepthWrite(false)
+                .withColorLogic(LogicOp.OR_REVERSE)
+                .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+                .withDepthBias(2.5f, 1.25f)
+                .build());
+
+        assertNotEquals(base.getStableCacheKey(), altered.getStableCacheKey(),
+            "Stable cache key should change when pipeline semantics change");
+    }
+
+    @Test
+    public void testPipelineResourceBindingsValidateAgainstLayout() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", 0)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(
+                new OpenGLBuffer(7, VulkanicBuffer.USAGE_UNIFORM, 256), 0, 256))
+            .bindTexelBuffer("CloudFaces", 3)
+            .build();
+
+        assertDoesNotThrow(() -> bindings.validateAgainst(descriptor.getResourceLayout()));
+    }
+
+    @Test
+    public void testPipelineResourceBindingsMissingResourceFailsValidation() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", 0)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(
+                new OpenGLBuffer(8, VulkanicBuffer.USAGE_UNIFORM, 256), 0, 256))
+            .build();
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+            () -> bindings.validateAgainst(descriptor.getResourceLayout()));
+        assertTrue(error.getMessage().contains("CloudFaces"));
+    }
+
+    @Test
+    public void testPipelineResourceBindingsUnknownNameFailsValidation() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", 0)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(
+                new OpenGLBuffer(9, VulkanicBuffer.USAGE_UNIFORM, 256), 0, 256))
+            .bindTexelBuffer("CloudFaces", 3)
+            .bindSampler("UnexpectedResource", 4)
+            .build();
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+            () -> bindings.validateAgainst(descriptor.getResourceLayout()));
+        assertTrue(error.getMessage().contains("UnexpectedResource"));
+    }
+
+    @Test
+    public void testPipelineResourceBindingsBuilderRejectsDuplicateNames() {
+        OpenGLBuffer buffer = new OpenGLBuffer(10, VulkanicBuffer.USAGE_UNIFORM, 128);
+
+        assertThrows(IllegalArgumentException.class,
+            () -> PipelineResourceBindings.builder()
+                .bindSampler("SharedName", 0)
+                .bindUniformBuffer("SharedName", new VulkanicBufferSlice(buffer, 0, 64)));
+    }
+
+    @Test
     public void testPipelineDescriptorFromPortableStateNull() {
         assertThrows(IllegalArgumentException.class,
             () -> PipelineDescriptor.fromPortableState(null));
@@ -281,6 +441,12 @@ public class Phase3ResourceTypesTest {
             () -> new PipelineDescriptor.UniformBinding("texelMissingFormat", UniformType.TEXEL_BUFFER, null));
         assertThrows(IllegalArgumentException.class,
             () -> new PipelineDescriptor.UniformBinding("uniformWithFormat", UniformType.UNIFORM_BUFFER, TextureFormat.RGBA8));
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.ResourceBinding(0, 0, "samplerWithFormat",
+                PipelineDescriptor.ResourceType.SAMPLER, TextureFormat.RGBA8));
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.ResourceBinding(0, 0, "texelMissingFormat",
+                PipelineDescriptor.ResourceType.TEXEL_BUFFER, null));
     }
 
     // ---- PipelineHandle tests ----------------------------------------------

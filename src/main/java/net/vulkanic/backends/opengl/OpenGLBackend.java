@@ -1604,6 +1604,13 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         org.lwjgl.opengl.GL45C.glMemoryBarrier(barriers);
     }
+
+    @Override
+    public void applyResourceBarriers(CommandContext ctx, net.vulkanic.VulkanicResourceBarriers barriers) {
+        net.vulkanic.VulkanicResourceBarriers safeBarriers =
+            java.util.Objects.requireNonNull(barriers, "barriers must not be null");
+        memoryBarrier(ctx, safeBarriers.toOpenGLBarrierBits());
+    }
     
     
     
@@ -2395,6 +2402,173 @@ public class OpenGLBackend implements GraphicsBackend {
         return new OpenGLPipelineHandle(glPipeline);
     }
 
+    @Override
+    public net.vulkanic.DescriptorPoolHandle createDescriptorPool(
+        net.vulkanic.DescriptorPoolDescriptor descriptor
+    ) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+        return new OpenGLDescriptorPoolHandle(descriptor.maxSets());
+    }
+
+    @Override
+    public net.vulkanic.DescriptorSetHandle allocateDescriptorSet(
+        net.vulkanic.DescriptorPoolHandle pool,
+        net.vulkanic.PipelineDescriptor descriptor
+    ) {
+        if (!(pool instanceof OpenGLDescriptorPoolHandle openGLPool)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorPoolHandle, got: " +
+                    (pool == null ? "null" : pool.getClass().getName()));
+        }
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        return openGLPool.allocate(descriptor.getStableCacheKey(), descriptor.getResourceLayout());
+    }
+
+    @Override
+    public void updateDescriptorSet(
+        net.vulkanic.DescriptorSetHandle descriptorSet,
+        net.vulkanic.PipelineResourceBindings bindings
+    ) {
+        if (!(descriptorSet instanceof OpenGLDescriptorSetHandle openGLDescriptorSet)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorSetHandle, got: " +
+                    (descriptorSet == null ? "null" : descriptorSet.getClass().getName()));
+        }
+
+        openGLDescriptorSet.updateBindings(bindings);
+    }
+
+    @Override
+    public void bindDescriptorSet(
+        CommandContext ctx,
+        net.vulkanic.PipelineHandle pipeline,
+        net.vulkanic.PipelineDescriptor descriptor,
+        net.vulkanic.DescriptorSetHandle descriptorSet
+    ) {
+        if (!(descriptorSet instanceof OpenGLDescriptorSetHandle openGLDescriptorSet)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorSetHandle, got: " +
+                    (descriptorSet == null ? "null" : descriptorSet.getClass().getName()));
+        }
+
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        String expectedLayoutKey = descriptor.getStableCacheKey();
+        if (!expectedLayoutKey.equals(openGLDescriptorSet.layoutKey())) {
+            throw new IllegalArgumentException(
+                "Descriptor set layout key mismatch. Expected " + expectedLayoutKey +
+                    " but got " + openGLDescriptorSet.layoutKey());
+        }
+
+        bindPipelineResources(ctx, pipeline, descriptor, openGLDescriptorSet.requireBindings());
+    }
+
+    @Override
+    public void resetDescriptorPool(net.vulkanic.DescriptorPoolHandle pool) {
+        if (!(pool instanceof OpenGLDescriptorPoolHandle openGLPool)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorPoolHandle, got: " +
+                    (pool == null ? "null" : pool.getClass().getName()));
+        }
+        openGLPool.reset();
+    }
+
+    @Override
+    public void bindPipelineResources(
+        CommandContext ctx,
+        net.vulkanic.PipelineHandle pipeline,
+        net.vulkanic.PipelineDescriptor descriptor,
+        net.vulkanic.PipelineResourceBindings bindings
+    ) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (!(pipeline instanceof OpenGLPipelineHandle glPipelineHandle)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLPipelineHandle, got: " +
+                    (pipeline == null ? "null" : pipeline.getClass().getName()));
+        }
+
+        if (!glPipelineHandle.isValid()) {
+            throw new IllegalArgumentException("Cannot bind resources for an invalid pipeline handle");
+        }
+
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        if (bindings == null) {
+            throw new IllegalArgumentException("bindings must not be null");
+        }
+
+        net.vulkanic.PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+        bindings.validateAgainst(layout);
+
+        int program = glPipelineHandle.getGlRenderPipeline().program().getProgramId();
+
+        for (net.vulkanic.PipelineDescriptor.ResourceBinding resource : layout.bindings()) {
+            switch (resource.type()) {
+                case SAMPLER -> {
+                    net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
+                        bindings.getSamplerBinding(resource.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing sampler binding for '" + resource.name() + "' after validation"));
+
+                    int location = getUniformLocation(ctx, program, resource.name());
+                    if (location >= 0) {
+                        setUniform1i(ctx, location, samplerBinding.textureUnit());
+                    }
+
+                    if (samplerBinding.samplerObject() != null) {
+                        bindSampler(ctx, samplerBinding.textureUnit(), samplerBinding.samplerObject());
+                    }
+                }
+                case UNIFORM_BUFFER -> {
+                    net.vulkanic.VulkanicBufferSlice slice = bindings.getUniformBufferBinding(resource.name())
+                        .orElseThrow(() -> new IllegalStateException(
+                            "Missing uniform-buffer binding for '" + resource.name() + "' after validation"));
+
+                    if (!(slice.buffer() instanceof OpenGLBuffer glBuffer)) {
+                        throw new IllegalArgumentException(
+                            "Uniform-buffer binding '" + resource.name() + "' must use OpenGLBuffer in OpenGL backend");
+                    }
+
+                    int uniformBlockIndex = getUniformBlockIndex(ctx, program, resource.name());
+                    if (uniformBlockIndex >= 0) {
+                        uniformBlockBinding(ctx, program, uniformBlockIndex, resource.binding());
+                    }
+
+                    bindUniformBufferRange(
+                        ctx,
+                        VulkanicAPI.GL_UNIFORM_BUFFER,
+                        resource.binding(),
+                        glBuffer.getGlHandle(),
+                        slice.offset(),
+                        slice.length());
+                }
+                case TEXEL_BUFFER -> {
+                    net.vulkanic.PipelineResourceBindings.TexelBufferBinding texelBufferBinding =
+                        bindings.getTexelBufferBinding(resource.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing texel-buffer binding for '" + resource.name() + "' after validation"));
+
+                    int location = getUniformLocation(ctx, program, resource.name());
+                    if (location >= 0) {
+                        setUniform1i(ctx, location, texelBufferBinding.textureUnit());
+                    }
+                }
+            }
+        }
+    }
+
     // =========================================================================
     // Phase 3d: Command Buffer Lifecycle
     // =========================================================================
@@ -2504,5 +2678,41 @@ public class OpenGLBackend implements GraphicsBackend {
         net.vulkanic.VulkanicAPI.setDynamicViewport(ctx, 0, 0, width, height);
 
         return new OpenGLRenderPass(fbo, ctx);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        net.vulkanic.VulkanicRenderPassDescriptor descriptor
+    ) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        net.vulkanic.VulkanicRenderPassDescriptor.ColorAttachment color = descriptor.colorAttachment();
+        net.vulkanic.VulkanicRenderPassDescriptor.DepthAttachment depth = descriptor.depthAttachment();
+
+        java.util.OptionalInt clearColor =
+            color.loadOp() == net.vulkanic.VulkanicRenderPassDescriptor.LoadOp.CLEAR
+                ? color.clearColor()
+                : java.util.OptionalInt.empty();
+
+        net.vulkanic.VulkanicTextureView depthTarget = null;
+        java.util.OptionalDouble clearDepth = java.util.OptionalDouble.empty();
+        if (depth != null) {
+            depthTarget = depth.target();
+            if (depth.loadOp() == net.vulkanic.VulkanicRenderPassDescriptor.LoadOp.CLEAR) {
+                clearDepth = depth.clearDepth();
+            }
+        }
+
+        return beginRenderPass(
+            ctx,
+            descriptor.label(),
+            color.target(),
+            clearColor,
+            depthTarget,
+            clearDepth
+        );
     }
 }
