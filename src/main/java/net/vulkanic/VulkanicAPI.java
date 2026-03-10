@@ -3437,4 +3437,65 @@ public class VulkanicAPI {
         return getBackend().beginRenderPass(ctx, label, colorTarget, clearColor,
             depthTarget, clearDepth);
     }
+
+    // =========================================================================
+    // Phase 3b+: Render Pass — Attachment Descriptor Overloads
+    // =========================================================================
+
+    /**
+     * Begins a render pass using an explicit color attachment descriptor.
+     *
+     * <p>Preferred over the {@code (VulkanicTextureView, OptionalInt)} overloads because
+     * it carries the complete attachment metadata — {@code loadOp}, {@code storeOp}, and
+     * clear value — needed by the Vulkan backend.
+     *
+     * <p>Example:
+     * <pre>
+     * RenderPassColorAttachment color = RenderPassColorAttachment.clear(colorView, 0xFF000000);
+     * try (VulkanicRenderPass pass = VulkanicAPI.beginRenderPass(ctx, () -&gt; "main", color)) {
+     *     pass.setPipeline(pipeline);
+     *     pass.draw(0, 36);
+     * }
+     * </pre>
+     *
+     * @param ctx             command context (from {@link #beginCommandBuffer()})
+     * @param label           debug label for profiling tools (may be null supplier)
+     * @param colorAttachment color attachment descriptor (view + loadOp + storeOp + clearColor)
+     * @return an active {@link VulkanicRenderPass}
+     */
+    public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            RenderPassColorAttachment colorAttachment) {
+        return getBackend().beginRenderPass(ctx, label, colorAttachment);
+    }
+
+    /**
+     * Begins a render pass using explicit color and depth attachment descriptors.
+     *
+     * <p>Both attachments carry the full load/store metadata needed by the Vulkan backend.
+     *
+     * <p>Example:
+     * <pre>
+     * RenderPassColorAttachment color = RenderPassColorAttachment.clear(colorView, 0xFF87CEEB);
+     * RenderPassDepthAttachment depth = RenderPassDepthAttachment.clear(depthView);
+     * try (VulkanicRenderPass pass = VulkanicAPI.beginRenderPass(ctx, () -&gt; "scene", color, depth)) {
+     *     pass.setPipeline(pipeline);
+     *     pass.setVertexBuffer(0, vbo);
+     *     pass.setIndexBuffer(ibo, VulkanicIndexType.INT);
+     *     pass.drawIndexed(0, indexCount, 0, 1);
+     * }
+     * </pre>
+     *
+     * @param ctx             command context (from {@link #beginCommandBuffer()})
+     * @param label           debug label for profiling tools (may be null supplier)
+     * @param colorAttachment color attachment descriptor (view + loadOp + storeOp + clearColor)
+     * @param depthAttachment depth attachment descriptor (view + loadOp + storeOp + clearDepth)
+     * @return an active {@link VulkanicRenderPass}
+     */
+    public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            RenderPassColorAttachment colorAttachment,
+            RenderPassDepthAttachment depthAttachment) {
+        return getBackend().beginRenderPass(ctx, label, colorAttachment, depthAttachment);
+    }
 }

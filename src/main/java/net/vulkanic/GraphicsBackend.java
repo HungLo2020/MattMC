@@ -2921,4 +2921,52 @@ public interface GraphicsBackend {
                                         VulkanicTextureView colorTarget, OptionalInt clearColor,
                                         @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
                                         OptionalDouble clearDepth);
+
+    // =========================================================================
+    // Phase 3b+: Render Pass — Attachment Descriptor Overloads
+    // =========================================================================
+
+    /**
+     * Begins a new render pass with an explicit color attachment descriptor.
+     *
+     * <p>Preferred over the {@code (VulkanicTextureView, OptionalInt)} overload because
+     * it expresses all attachment semantics required by the Vulkan backend:
+     * {@code loadOp}, {@code storeOp}, and the clear value are bundled in
+     * {@link RenderPassColorAttachment} rather than being inferred from an
+     * {@code Optional}.
+     *
+     * <p>In OpenGL: delegates to the existing FBO + clear implementation.
+     * In Vulkan: provides the full {@code VkAttachmentDescription} data needed by
+     * {@code vkCmdBeginRenderPass}.
+     *
+     * @param ctx             command context
+     * @param label           debug label for profiling tools (may be null)
+     * @param colorAttachment color attachment descriptor (view + loadOp + storeOp + clearColor)
+     * @return an active render pass for recording draw commands
+     */
+    VulkanicRenderPass beginRenderPass(CommandContext ctx, Supplier<String> label,
+                                        RenderPassColorAttachment colorAttachment);
+
+    /**
+     * Begins a new render pass with explicit color and depth attachment descriptors.
+     *
+     * <p>Both attachments carry full load/store metadata required by the Vulkan backend.
+     * For the depth-only variant where a depth test is needed but the rendered color
+     * is not needed afterwards, combine with {@link AttachmentStoreOp#DONT_CARE} on
+     * the depth attachment.
+     *
+     * <p>In OpenGL: delegates to the existing FBO + clear implementation.
+     * In Vulkan: provides the full {@code VkAttachmentDescription} data for both
+     * color and depth, enabling the driver to optimise memory access patterns
+     * (especially on tile-based GPUs).
+     *
+     * @param ctx             command context
+     * @param label           debug label for profiling tools (may be null)
+     * @param colorAttachment color attachment descriptor (view + loadOp + storeOp + clearColor)
+     * @param depthAttachment depth attachment descriptor (view + loadOp + storeOp + clearDepth)
+     * @return an active render pass for recording draw commands
+     */
+    VulkanicRenderPass beginRenderPass(CommandContext ctx, Supplier<String> label,
+                                        RenderPassColorAttachment colorAttachment,
+                                        RenderPassDepthAttachment depthAttachment);
 }

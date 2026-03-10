@@ -2510,4 +2510,48 @@ public class OpenGLBackend implements GraphicsBackend {
 
         return new OpenGLRenderPass(fbo, ctx);
     }
+
+    // =========================================================================
+    // Phase 3b+: Render Pass — Attachment Descriptor Overloads
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            net.vulkanic.RenderPassColorAttachment colorAttachment) {
+        // Map AttachmentLoadOp → OptionalInt clearColor.
+        // CLEAR  → supply the packed ARGB value so the existing path calls glClear().
+        // LOAD / DONT_CARE → empty (no clear; OpenGL preserves existing contents in both cases).
+        // DONT_CARE is treated identically to LOAD in OpenGL because there is no cheap
+        // "invalidate before load" path; the difference matters for Vulkan (tile memory).
+        java.util.OptionalInt clearColor = colorAttachment.loadOp == net.vulkanic.AttachmentLoadOp.CLEAR
+            ? java.util.OptionalInt.of(colorAttachment.clearColor)
+            : java.util.OptionalInt.empty();
+        // storeOp is noted but not acted on in this OpenGL implementation.
+        // TODO: When AttachmentStoreOp.DONT_CARE is set, call glInvalidateFramebuffer()
+        //       in OpenGLRenderPass.close() to allow tile-based GPUs to skip the writeback.
+        return beginRenderPass(ctx, label, colorAttachment.view, clearColor);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            net.vulkanic.RenderPassColorAttachment colorAttachment,
+            net.vulkanic.RenderPassDepthAttachment depthAttachment) {
+        // Map color loadOp → OptionalInt clearColor.
+        java.util.OptionalInt clearColor = colorAttachment.loadOp == net.vulkanic.AttachmentLoadOp.CLEAR
+            ? java.util.OptionalInt.of(colorAttachment.clearColor)
+            : java.util.OptionalInt.empty();
+        // Map depth loadOp → OptionalDouble clearDepth.
+        java.util.OptionalDouble clearDepth = depthAttachment.loadOp == net.vulkanic.AttachmentLoadOp.CLEAR
+            ? java.util.OptionalDouble.of(depthAttachment.clearDepth)
+            : java.util.OptionalDouble.empty();
+        // storeOp is noted but not acted on in this OpenGL implementation.
+        // TODO: When AttachmentStoreOp.DONT_CARE is set on either attachment, call
+        //       glInvalidateFramebuffer() in OpenGLRenderPass.close() to allow the
+        //       driver to skip the writeback on tile-based GPUs.
+        return beginRenderPass(ctx, label,
+            colorAttachment.view, clearColor,
+            depthAttachment.view, clearDepth);
+    }
 }
