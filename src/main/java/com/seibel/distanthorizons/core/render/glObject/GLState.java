@@ -81,25 +81,25 @@ public class GLState
 		this.texture2D = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		this.activeTextureNumber = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.ACTIVE_TEXTURE);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnitIndex(0);
 		this.texture0 = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnitIndex(1);
 		this.texture1 = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2); // problem with Iris
+		DhTextureState.setActiveTextureUnitIndex(2); // problem with Iris
 		this.texture2 = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE3);
+		DhTextureState.setActiveTextureUnitIndex(3);
 		this.texture3 = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		
 		DhTextureState.setActiveTextureUnit(this.activeTextureNumber);
 		
 		if (this.fbo != 0)
 		{
-			this.frameBufferTexture0 = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-			this.frameBufferTexture1 = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT1, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-			this.frameBufferDepthTexture = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+			this.frameBufferTexture0 = VulkanicAPI.getFramebufferColorAttachment0ObjectName(ctx);
+			this.frameBufferTexture1 = VulkanicAPI.getFramebufferColorAttachment1ObjectName(ctx);
+			this.frameBufferDepthTexture = VulkanicAPI.getFramebufferDepthAttachmentObjectName(ctx);
 		}
 		else
 		{
@@ -109,18 +109,18 @@ public class GLState
 			this.frameBufferDepthTexture = 0;
 		}
 		
-		this.blend = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_BLEND);
-		this.scissor = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST);
+		this.blend = VulkanicAPI.isEnabled(ctx, VulkanicCapability.BLEND);
+		this.scissor = VulkanicAPI.isEnabled(ctx, VulkanicCapability.SCISSOR_TEST);
 		this.blendEqRGB = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_EQUATION_RGB);
 		this.blendEqAlpha = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_EQUATION_ALPHA);
 		this.blendSrcColor = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_SRC_RGB);
 		this.blendSrcAlpha = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_SRC_ALPHA);
 		this.blendDstColor = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_DST_RGB);
 		this.blendDstAlpha = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_DST_ALPHA);
-		this.depth = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_DEPTH_TEST);
+		this.depth = VulkanicAPI.isEnabled(ctx, VulkanicCapability.DEPTH_TEST);
 		this.writeToDepthBuffer = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.DEPTH_WRITEMASK) == VulkanicAPI.GL_TRUE;
 		this.depthFunc = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.DEPTH_FUNC);
-		this.stencil = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_STENCIL_TEST);
+		this.stencil = VulkanicAPI.isEnabled(ctx, VulkanicCapability.STENCIL_TEST);
 		this.stencilFunc = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_FUNC);
 		this.stencilRef = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_REF);
 		this.stencilMask = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_VALUE_MASK);
@@ -130,7 +130,7 @@ public class GLState
 		this.stencilWriteMask = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_WRITEMASK);
 		this.view = new int[4];
 		VulkanicAPI.getIntegerv(ctx, VulkanicAPI.GL_VIEWPORT, this.view);
-		this.cull = VulkanicAPI.isEnabled(ctx, VulkanicAPI.GL_CULL_FACE);
+		this.cull = VulkanicAPI.isEnabled(ctx, VulkanicCapability.CULL_FACE);
 		this.cullMode = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.CULL_FACE_MODE);
 		this.polyMode = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.POLYGON_MODE);
 	}
@@ -192,16 +192,16 @@ public class GLState
 			VulkanicAPI.setScissorTestEnabled(ctx, false);
 		}
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0);
+		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(ctx, this.texture0) ? this.texture0 : 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnitIndex(1);
 		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(ctx, this.texture1) ? this.texture1 : 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2);
+		DhTextureState.setActiveTextureUnitIndex(2);
 		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(ctx, this.texture2) ? this.texture2 : 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE3);
+		DhTextureState.setActiveTextureUnitIndex(3);
 		DhTextureState.bindTexture2D(VulkanicAPI.isTexture(ctx, this.texture3) ? this.texture3 : 0);
 		
 		DhTextureState.setActiveTextureUnit(this.activeTextureNumber);
@@ -210,9 +210,9 @@ public class GLState
 		// attempting to set textures on the default frame buffer (ID 0) will throw errors
 		if (frameBufferSet)
 		{
-			VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferTexture0, 0);
-			VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT1, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferTexture1, 0);
-			VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferDepthTexture, 0);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, this.frameBufferTexture0, 0);
+			VulkanicAPI.framebufferColorAttachment1Texture2D(ctx, this.frameBufferTexture1, 0);
+			VulkanicAPI.framebufferDepthAttachmentTexture2D(ctx, this.frameBufferDepthTexture, 0);
 		}
 		
 		VulkanicAPI.bindVertexArray(ctx, VulkanicAPI.isVertexArray(ctx, this.vao) ? this.vao : 0);

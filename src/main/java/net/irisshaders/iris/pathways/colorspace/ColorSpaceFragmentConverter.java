@@ -86,7 +86,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		builder.addDynamicSampler(() -> target.glId(), "readImage");
 
 		swapTexture = IrisRenderSystem.createTextureId();
-		IrisRenderSystem.texImage2D(swapTexture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, null);
+		IrisRenderSystem.texImage2D(swapTexture, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, null);
 
 		this.framebuffer = new GlFramebuffer();
 		framebuffer.addColorAttachment(0, swapTexture);
@@ -114,6 +114,6 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		}
 		Program.unbind();
 		framebuffer.bindAsReadBuffer();
-		IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+		IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), 0, 0, 0, 0, 0, width, height);
 	}
 }

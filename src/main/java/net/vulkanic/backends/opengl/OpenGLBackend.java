@@ -1636,6 +1636,7 @@ public class OpenGLBackend implements GraphicsBackend {
             case NUM_EXTENSIONS -> VulkanicAPI.GL_NUM_EXTENSIONS;
             case MAX_LABEL_LENGTH -> VulkanicAPI.GL_MAX_LABEL_LENGTH;
             case TEXTURE_MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
+            case GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX -> VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX;
         };
     }
 
@@ -2513,6 +2514,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return org.lwjgl.opengl.GL11.glIsEnabled(cap);
+    }
+
+    @Override
+    public boolean isEnabled(CommandContext ctx, VulkanicCapability capability) {
+        return isEnabled(ctx, toOpenGLCapability(capability));
     }
     
     @Override

@@ -83,7 +83,7 @@ public class TextureInfoCache {
 
 			// Bind this texture and grab the parameter from it.
 			VulkanicAPI.bindTexture2D(ctx, id);
-			int parameter = VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, pname);
+			int parameter = VulkanicAPI.getTexture2DLevelParameter(ctx, 0, pname);
 
 			// Make sure to re-bind the previous texture to avoid issues.
 			VulkanicAPI.bindTexture2D(ctx, previousTextureBinding);

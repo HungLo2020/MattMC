@@ -72,10 +72,10 @@ public class FogRenderer
 		this.fogTexture = VulkanicAPI.createTexture2D(ctx);
 		{
 			DhTextureState.bindTexture2D(this.fogTexture);
-			VulkanicAPI.uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
+			VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MIN_FILTER, VulkanicAPI.GL_LINEAR);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAG_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fogTexture, 0);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, this.fogTexture, 0);
 			
 			// disable mip-mapping since DH is just going to draw straight to the screen
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, 0);

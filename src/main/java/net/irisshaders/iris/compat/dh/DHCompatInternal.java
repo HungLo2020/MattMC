@@ -271,7 +271,7 @@ public class DHCompatInternal {
 			translucentDepthDirty = false;
 			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), depthTexNoTranslucent.getTextureId());
 			dhTerrainFramebuffer.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, DepthBufferFormat.DEPTH32F.getGlInternalFormat(), 0, 0, width, height, 0);
+			IrisRenderSystem.copyTexImage2D(0, DepthBufferFormat.DEPTH32F.getGlInternalFormat(), 0, 0, width, height, 0);
 		} else {
 			DepthCopyStrategy.fastest(false).copy(dhTerrainFramebuffer, storedDepthTex, null, depthTexNoTranslucent.getTextureId(), width, height);
 		}

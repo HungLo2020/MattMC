@@ -72,7 +72,7 @@ public class SSAORenderer
 		this.ssaoTexture = VulkanicAPI.createTexture2D(ctx);
 		{
 			DhTextureState.bindTexture2D(this.ssaoTexture);
-			VulkanicAPI.uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_R16F, width, height, 0, VulkanicAPI.GL_RED, VulkanicAPI.GL_HALF_FLOAT, (ByteBuffer) null);
+			VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_R16F, width, height, 0, VulkanicAPI.GL_RED, VulkanicAPI.GL_HALF_FLOAT, (ByteBuffer) null);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MIN_FILTER, VulkanicAPI.GL_LINEAR);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAG_FILTER, VulkanicAPI.GL_LINEAR);
 			
@@ -81,7 +81,7 @@ public class SSAORenderer
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, 0);
 		}
 		
-		VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.ssaoTexture, 0);
+		VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, this.ssaoTexture, 0);
 	}
 	
 	

@@ -74,7 +74,7 @@ public class DhColorTexture
 	private void resizeTexture(CommandContext ctx, int texture, int width, int height)
 	{
 		VulkanicAPI.bindTexture(ctx, VulkanicTextureTarget.TEXTURE_2D, texture);
-		VulkanicAPI.uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
+		VulkanicAPI.uploadTexture2D(ctx, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
 	}
 	
 	void resize(Vector2i textureScaleOverride) { this.resize(textureScaleOverride.x, textureScaleOverride.y); }

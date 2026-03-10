@@ -25,6 +25,10 @@ public final class VulkanicCoreAPI {
         VulkanicAPI.setCapabilityEnabled(ctx, capability, enabled);
     }
 
+    public static boolean isEnabled(CommandContext ctx, VulkanicCapability capability) {
+        return VulkanicAPI.isEnabled(ctx, capability);
+    }
+
     public static void setCullFaceMode(CommandContext ctx, VulkanicCullFaceMode mode) {
         VulkanicAPI.setCullFaceMode(ctx, mode);
     }

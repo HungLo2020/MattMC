@@ -243,13 +243,13 @@ public class ShadowRenderer {
 	private void configureDepthSampler(int glTextureId, PackShadowDirectives.DepthSamplingSettings settings) {
 		if (settings.getHardwareFiltering() && !separateHardwareSamplers) {
 			// We have to do this or else shadow hardware filtering breaks entirely!
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_COMPARE_MODE, VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE);
+			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_COMPARE_MODE, VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE);
 		}
 
 		// Workaround for issues with old shader packs like Chocapic v4.
 		// They expected the driver to put the depth value in z, but it's supposed to only
 		// be available in r. So we set up the swizzle to fix that.
-		IrisRenderSystem.texParameteriv(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
+		IrisRenderSystem.texParameteriv(glTextureId, VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
 			new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_ONE});
 
 		configureSampler(glTextureId, settings);
@@ -263,11 +263,11 @@ public class ShadowRenderer {
 
 		if (!settings.getNearest()) {
 			// Make sure that things are smoothed
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
+			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
 		} else {
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST);
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_NEAREST);
+			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST);
+			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_NEAREST);
 		}
 	}
 
@@ -282,8 +282,8 @@ public class ShadowRenderer {
 	}
 
 	private void setupMipmappingForTexture(int texture, int filteringMode) {
-		IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filteringMode);
+		IrisRenderSystem.generateMipmaps(texture);
+		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filteringMode);
 	}
 
 	private FrustumHolder createShadowFrustum(float renderMultiplier, FrustumHolder holder) {

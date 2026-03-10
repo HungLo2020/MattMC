@@ -16,6 +16,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3i;
@@ -90,6 +91,10 @@ public class IrisRenderSystem {
 		dsaState.generateMipmaps(texture, mipmapTarget);
 	}
 
+	public static void generateMipmaps(int texture) {
+		generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
+	}
+
 	public static void bindAttributeLocation(int program, int index, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
 		VulkanicAPI.setAttributeLocation(VulkanicAPI.getCommandContext(), program, index, name);
@@ -105,6 +110,10 @@ public class IrisRenderSystem {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
 		VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, internalformat, width, height, border, format, type, pixels);
+	}
+
+	public static void texImage2D(int texture, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
+		texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, level, internalformat, width, height, border, format, type, pixels);
 	}
 
 	public static void texImage3D(int texture, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, @Nullable ByteBuffer pixels) {
@@ -126,6 +135,11 @@ public class IrisRenderSystem {
 	public static void copyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
 		RenderSystem.assertOnRenderThread();
 		VulkanicAPI.copyTexImage2D(VulkanicAPI.getCommandContext(), target, level, internalFormat, x, y, width, height, border);
+	}
+
+	public static void copyTexImage2D(int level, int internalFormat, int x, int y, int width, int height, int border) {
+		RenderSystem.assertOnRenderThread();
+		VulkanicAPI.copyTexImage2D(VulkanicAPI.getCommandContext(), level, internalFormat, x, y, width, height, border);
 	}
 
 	public static void uniform1f(int location, float v0) {
@@ -168,6 +182,10 @@ public class IrisRenderSystem {
 		dsaState.texParameteriv(texture, target, pname, params);
 	}
 
+	public static void texParameteriv(int texture, int pname, int[] params) {
+		texParameteriv(texture, VulkanicAPI.GL_TEXTURE_2D, pname, params);
+	}
+
 	/**
 	 * Internal API for use when you don't know the target texture. Should use {@link IrisRenderSystem#texParameteriv(int, int, int, int[])} instead unless you know what you're doing!
 	 */
@@ -180,14 +198,26 @@ public class IrisRenderSystem {
 		dsaState.copyTexSubImage2D(destTexture, target, i, i1, i2, i3, i4, width, height);
 	}
 
+	public static void copyTexSubImage2D(int destTexture, int level, int i1, int i2, int i3, int i4, int width, int height) {
+		copyTexSubImage2D(destTexture, VulkanicAPI.GL_TEXTURE_2D, level, i1, i2, i3, i4, width, height);
+	}
+
 	public static void texParameteri(int texture, int target, int pname, int param) {
 		RenderSystem.assertOnRenderThread();
 		dsaState.texParameteri(texture, target, pname, param);
 	}
 
+	public static void texParameteri(int texture, int pname, int param) {
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, pname, param);
+	}
+
 	public static void texParameterf(int texture, int target, int pname, float param) {
 		RenderSystem.assertOnRenderThread();
 		dsaState.texParameterf(texture, target, pname, param);
+	}
+
+	public static void texParameterf(int texture, int pname, float param) {
+		texParameterf(texture, VulkanicAPI.GL_TEXTURE_2D, pname, param);
 	}
 
 	public static String getProgramInfoLog(int program) {
@@ -270,9 +300,17 @@ public class IrisRenderSystem {
 		dsaState.framebufferTexture2D(fb, fbtarget, attachment, target, texture, levels);
 	}
 
+	public static void framebufferTexture2D(int fb, int fbtarget, int attachment, int texture, int levels) {
+		dsaState.framebufferTexture2D(fb, fbtarget, attachment, VulkanicAPI.GL_TEXTURE_2D, texture, levels);
+	}
+
 	public static int getTexParameteri(int texture, int target, int pname) {
 		RenderSystem.assertOnRenderThread();
 		return dsaState.getTexParameteri(texture, target, pname);
+	}
+
+	public static int getTexParameteri(int texture, int pname) {
+		return getTexParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, pname);
 	}
 
 	public static void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
@@ -454,7 +492,7 @@ public class IrisRenderSystem {
 	public static long getVRAM() {
 		if (VulkanicAPI.getGraphicsCapabilities().GL_NVX_gpu_memory_info) {
 			CommandContext ctx = VulkanicAPI.getCommandContext();
-			return VulkanicAPI.getInteger(ctx, VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX) * 1024L;
+			return VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX) * 1024L;
 		} else {
 			return 4294967296L;
 		}

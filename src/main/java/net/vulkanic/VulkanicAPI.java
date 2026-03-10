@@ -1240,6 +1240,13 @@ public class VulkanicAPI {
     public static void setActiveTextureUnit(CommandContext ctx, int unit) {
         getBackend().setActiveTextureUnit(ctx, unit);
     }
+
+    /**
+     * Sets the active texture unit by index (0 -> texture unit 0, etc.).
+     */
+    public static void setActiveTextureUnitIndex(CommandContext ctx, int unitIndex) {
+        setActiveTextureUnit(ctx, GL_TEXTURE0 + unitIndex);
+    }
     
     /**
      * Sets a texture parameter.
@@ -1297,6 +1304,13 @@ public class VulkanicAPI {
     public static void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
         getBackend().copyTexSubImage2D(ctx, target, level, xoffset, yoffset, x, y, width, height);
     }
+
+    /**
+     * Copies a region from the framebuffer to the currently bound 2D texture.
+     */
+    public static void copyTexSubImage2D(CommandContext ctx, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        getBackend().copyTexSubImage2D(ctx, GL_TEXTURE_2D, level, xoffset, yoffset, x, y, width, height);
+    }
     
     /**
      * Gets a texture parameter value.
@@ -1339,6 +1353,13 @@ public class VulkanicAPI {
     }
 
     /**
+     * Attaches a 2D texture image to a framebuffer attachment point.
+     */
+    public static void framebufferTexture2D(CommandContext ctx, int target, int attachment, int texture, int level) {
+        getBackend().framebufferTexture2D(ctx, target, attachment, GL_TEXTURE_2D, texture, level);
+    }
+
+    /**
      * Attaches a 2D texture to color attachment 0 of a framebuffer target.
      */
     public static void framebufferColorAttachment0Texture2D(CommandContext ctx, int target, int texture, int level) {
@@ -1346,10 +1367,38 @@ public class VulkanicAPI {
     }
 
     /**
+     * Attaches a 2D texture to color attachment 1 of a framebuffer target.
+     */
+    public static void framebufferColorAttachment1Texture2D(CommandContext ctx, int target, int texture, int level) {
+        getBackend().framebufferTexture2D(ctx, target, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, texture, level);
+    }
+
+    /**
      * Attaches a 2D texture to the depth attachment of a framebuffer target.
      */
     public static void framebufferDepthAttachmentTexture2D(CommandContext ctx, int target, int texture, int level) {
         getBackend().framebufferTexture2D(ctx, target, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture, level);
+    }
+
+    /**
+     * Attaches a 2D texture to color attachment 0 of the default framebuffer target.
+     */
+    public static void framebufferColorAttachment0Texture2D(CommandContext ctx, int texture, int level) {
+        framebufferColorAttachment0Texture2D(ctx, GL_FRAMEBUFFER, texture, level);
+    }
+
+    /**
+     * Attaches a 2D texture to color attachment 1 of the default framebuffer target.
+     */
+    public static void framebufferColorAttachment1Texture2D(CommandContext ctx, int texture, int level) {
+        framebufferColorAttachment1Texture2D(ctx, GL_FRAMEBUFFER, texture, level);
+    }
+
+    /**
+     * Attaches a 2D texture to the depth attachment of the default framebuffer target.
+     */
+    public static void framebufferDepthAttachmentTexture2D(CommandContext ctx, int texture, int level) {
+        framebufferDepthAttachmentTexture2D(ctx, GL_FRAMEBUFFER, texture, level);
     }
     
     /**
@@ -1732,6 +1781,14 @@ public class VulkanicAPI {
     public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
                                         int border, int format, int type, java.nio.ByteBuffer pixels) {
         getBackend().uploadTexture2D(ctx, target, level, internalFormat, width, height, border, format, type, pixels);
+    }
+
+    /**
+     * Uploads a 2D texture image to the currently bound 2D texture target.
+     */
+    public static void uploadTexture2D(CommandContext ctx, int level, int internalFormat, int width, int height,
+                                       int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture2D(ctx, GL_TEXTURE_2D, level, internalFormat, width, height, border, format, type, pixels);
     }
     
     public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
@@ -2442,6 +2499,27 @@ public class VulkanicAPI {
     public static int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
         return getBackend().getTextureLevelParameter(ctx, target, level, pname);
     }
+
+    /**
+     * Queries a level parameter from the currently bound 2D texture.
+     */
+    public static int getTexture2DLevelParameter(CommandContext ctx, int level, int pname) {
+        return getBackend().getTextureLevelParameter(ctx, GL_TEXTURE_2D, level, pname);
+    }
+
+    /**
+     * Queries the width of a mip level from the currently bound 2D texture.
+     */
+    public static int getTexture2DLevelWidth(CommandContext ctx, int level) {
+        return getTexture2DLevelParameter(ctx, level, GL_TEXTURE_WIDTH);
+    }
+
+    /**
+     * Queries the height of a mip level from the currently bound 2D texture.
+     */
+    public static int getTexture2DLevelHeight(CommandContext ctx, int level) {
+        return getTexture2DLevelParameter(ctx, level, GL_TEXTURE_HEIGHT);
+    }
     
     public static void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         getBackend().uploadShaderSource(ctx, shader, pointerBufferAddress, stringCount, lengthsPointer);
@@ -2834,6 +2912,13 @@ public class VulkanicAPI {
     
     public static void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
         getBackend().copyTexImage2D(ctx, target, level, internalFormat, x, y, width, height, border);
+    }
+
+    /**
+     * Copies pixels from the framebuffer to the currently bound 2D texture.
+     */
+    public static void copyTexImage2D(CommandContext ctx, int level, int internalFormat, int x, int y, int width, int height, int border) {
+        getBackend().copyTexImage2D(ctx, GL_TEXTURE_2D, level, internalFormat, x, y, width, height, border);
     }
     
     
@@ -3257,6 +3342,55 @@ public class VulkanicAPI {
     public static int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname) {
         return getBackend().getFramebufferAttachmentParameteri(ctx, target, attachment, pname);
     }
+
+    /**
+     * Queries the attached object name for a framebuffer attachment.
+     */
+    public static int getFramebufferAttachmentObjectName(CommandContext ctx, int target, int attachment) {
+        return getBackend().getFramebufferAttachmentParameteri(ctx, target, attachment, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+    }
+
+    /**
+     * Queries the object name attached to COLOR_ATTACHMENT0.
+     */
+    public static int getFramebufferColorAttachment0ObjectName(CommandContext ctx, int target) {
+        return getFramebufferAttachmentObjectName(ctx, target, GL_COLOR_ATTACHMENT0);
+    }
+
+    /**
+     * Queries the object name attached to COLOR_ATTACHMENT1.
+     */
+    public static int getFramebufferColorAttachment1ObjectName(CommandContext ctx, int target) {
+        return getFramebufferAttachmentObjectName(ctx, target, GL_COLOR_ATTACHMENT1);
+    }
+
+    /**
+     * Queries the object name attached to DEPTH_ATTACHMENT.
+     */
+    public static int getFramebufferDepthAttachmentObjectName(CommandContext ctx, int target) {
+        return getFramebufferAttachmentObjectName(ctx, target, GL_DEPTH_ATTACHMENT);
+    }
+
+    /**
+     * Queries the object name attached to COLOR_ATTACHMENT0 on GL_FRAMEBUFFER.
+     */
+    public static int getFramebufferColorAttachment0ObjectName(CommandContext ctx) {
+        return getFramebufferColorAttachment0ObjectName(ctx, GL_FRAMEBUFFER);
+    }
+
+    /**
+     * Queries the object name attached to COLOR_ATTACHMENT1 on GL_FRAMEBUFFER.
+     */
+    public static int getFramebufferColorAttachment1ObjectName(CommandContext ctx) {
+        return getFramebufferColorAttachment1ObjectName(ctx, GL_FRAMEBUFFER);
+    }
+
+    /**
+     * Queries the object name attached to DEPTH_ATTACHMENT on GL_FRAMEBUFFER.
+     */
+    public static int getFramebufferDepthAttachmentObjectName(CommandContext ctx) {
+        return getFramebufferDepthAttachmentObjectName(ctx, GL_FRAMEBUFFER);
+    }
     
     
     
@@ -3623,6 +3757,13 @@ public class VulkanicAPI {
     
     public static boolean isEnabled(CommandContext ctx, int cap) {
         return getBackend().isEnabled(ctx, cap);
+    }
+
+    /**
+     * Tests whether a capability is enabled using backend-neutral semantics.
+     */
+    public static boolean isEnabled(CommandContext ctx, VulkanicCapability capability) {
+        return getBackend().isEnabled(ctx, capability);
     }
     
     /**

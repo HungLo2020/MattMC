@@ -45,7 +45,7 @@ public class DHDepthTexture
 	public void resize(CommandContext ctx, int width, int height, EDhDepthBufferFormat format)
 	{
 		VulkanicAPI.bindTexture(ctx, VulkanicTextureTarget.TEXTURE_2D, this.getTextureId());
-		VulkanicAPI.uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, format.getGlInternalFormat(), width, height, 0,
+		VulkanicAPI.uploadTexture2D(ctx, 0, format.getGlInternalFormat(), width, height, 0,
 				format.getGlType(), format.getGlFormat(), (ByteBuffer) null);
 	}
 	

@@ -2827,6 +2827,11 @@ public interface GraphicsBackend {
      * @return true if the capability is enabled
      */
     boolean isEnabled(CommandContext ctx, int cap);
+
+    /**
+     * Tests whether a capability is enabled using a backend-neutral key.
+     */
+    boolean isEnabled(CommandContext ctx, VulkanicCapability capability);
     
     /**
      * Sets texture parameters using an array of integers.

@@ -173,14 +173,14 @@ public class FinalPassRenderer {
 		//
 		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
 		// unlikely that this issue occurs in practice with most shader packs.
-		IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
+		IrisRenderSystem.generateMipmaps(texture);
 
 		int filter = VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
 			filter = VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
 	}
 
 	private static void resetRenderTarget(RenderTarget target) {
@@ -192,8 +192,8 @@ public class FinalPassRenderer {
 			filter = VulkanicAPI.GL_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
-		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
 
 		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 	}
@@ -279,7 +279,7 @@ public class FinalPassRenderer {
 			// https://stackoverflow.com/a/23994979/18166885
 			this.baseline.bindAsReadBuffer();
 
-			IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, baseWidth, baseHeight);
+			IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), 0, 0, 0, 0, 0, baseWidth, baseHeight);
 		}
 
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0);
@@ -301,7 +301,7 @@ public class FinalPassRenderer {
 			swapPass.from.bind();
 
 			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), swapPass.targetTexture);
-			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
+			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
 		}
 
 		// Make sure to reset the viewport to how it was before... Otherwise weird issues could occur.

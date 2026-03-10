@@ -39,7 +39,8 @@ public enum VulkanicIntegerQuery {
     MAX_COLOR_ATTACHMENTS,
     NUM_EXTENSIONS,
     MAX_LABEL_LENGTH,
-    TEXTURE_MAX_LEVEL;
+    TEXTURE_MAX_LEVEL,
+    GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX;
 
     /**
      * Converts a legacy GL integer pname constant into a typed query when known.
@@ -80,6 +81,7 @@ public enum VulkanicIntegerQuery {
             case VulkanicAPI.GL_NUM_EXTENSIONS -> Optional.of(NUM_EXTENSIONS);
             case VulkanicAPI.GL_MAX_LABEL_LENGTH -> Optional.of(MAX_LABEL_LENGTH);
             case VulkanicAPI.GL_TEXTURE_MAX_LEVEL -> Optional.of(TEXTURE_MAX_LEVEL);
+            case VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX -> Optional.of(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX);
             default -> Optional.empty();
         };
     }

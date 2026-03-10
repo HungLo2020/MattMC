@@ -480,6 +480,14 @@ public class Phase3DrawPathTest {
             "DhFramebuffer should bind read framebuffer through VulkanicAPI helper");
         assertTrue(dhFramebufferSource.contains("VulkanicAPI.bindDrawFramebuffer("),
             "DhFramebuffer should bind draw framebuffer through VulkanicAPI helper");
+        assertFalse(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, depthAttachment, VulkanicAPI.GL_TEXTURE_2D"),
+            "DhFramebuffer should not pass explicit GL_TEXTURE_2D in depth attachment path");
+        assertFalse(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + textureIndex, VulkanicAPI.GL_TEXTURE_2D"),
+            "DhFramebuffer should not pass explicit GL_TEXTURE_2D in color attachment path");
+        assertTrue(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, depthAttachment, textureId, 0)"),
+            "DhFramebuffer should attach depth textures through VulkanicAPI default-2D framebufferTexture2D overload");
+        assertTrue(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + textureIndex, textureId, 0)"),
+            "DhFramebuffer should attach color textures through VulkanicAPI default-2D framebufferTexture2D overload");
 
         Path fogApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogApplyShader.java");
         String fogApplySource = Files.readString(fogApplyFile);
@@ -524,6 +532,16 @@ public class Phase3DrawPathTest {
             "GLState should not restore culling through GLMC wrapper methods");
         assertFalse(glStateSource.contains("GLMC.disableFaceCulling("),
             "GLState should not restore culling through GLMC wrapper methods");
+        assertFalse(glStateSource.contains("DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0)"),
+            "GLState should not select texture unit 0 through raw GL_TEXTURE0 constants");
+        assertTrue(glStateSource.contains("DhTextureState.setActiveTextureUnitIndex(0)"),
+            "GLState should select texture unit 0 through index-based helper");
+        assertFalse(glStateSource.contains("getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER"),
+            "GLState should not query framebuffer attachment names via raw GL_FRAMEBUFFER constants");
+        assertTrue(glStateSource.contains("getFramebufferColorAttachment0ObjectName(ctx)"),
+            "GLState should query framebuffer color attachment 0 through VulkanicAPI helper");
+        assertTrue(glStateSource.contains("framebufferColorAttachment1Texture2D(ctx, this.frameBufferTexture1, 0)"),
+            "GLState should restore framebuffer color attachment 1 through VulkanicAPI helper");
 
         Path fogRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/FogRenderer.java");
         String fogRendererSource = Files.readString(fogRendererFile);
@@ -1004,6 +1022,13 @@ public class Phase3DrawPathTest {
         assertTrue(standardMacrosSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.NUM_EXTENSIONS)"),
             "StandardMacros should query extension count through typed VulkanicIntegerQuery");
 
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        assertFalse(irisRenderSystemSource.contains("getInteger(ctx, VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)"),
+            "IrisRenderSystem should not query NVX VRAM through raw GL pname constants");
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)"),
+            "IrisRenderSystem should query NVX VRAM through typed VulkanicIntegerQuery");
+
         Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
         String programCreatorSource = Files.readString(programCreatorFile);
         assertFalse(programCreatorSource.contains("GlStateManager._glBindAttribLocation("),
@@ -1087,8 +1112,8 @@ public class Phase3DrawPathTest {
             "TextureInfoCache should fetch backend-neutral command context in level-parameter helper");
         assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D)"),
             "TextureInfoCache should query current texture binding through typed VulkanicIntegerQuery");
-        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, 0, pname)"),
-            "TextureInfoCache should query texture level params directly through VulkanicAPI.getTextureLevelParameter");
+        assertTrue(textureInfoCacheSource.contains("VulkanicAPI.getTexture2DLevelParameter(ctx, 0, pname)"),
+            "TextureInfoCache should query texture level params through VulkanicAPI 2D level helper");
 
         Path textureManipulationUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
         String textureManipulationUtilSource = Files.readString(textureManipulationUtilFile);
@@ -1102,10 +1127,12 @@ public class Phase3DrawPathTest {
             "TextureManipulationUtil should query previous framebuffer through typed VulkanicIntegerQuery");
         assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D)"),
             "TextureManipulationUtil should query previous texture through typed VulkanicIntegerQuery");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_WIDTH)"),
-            "TextureManipulationUtil should query mip width directly through VulkanicAPI.getTextureLevelParameter");
-        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER"),
-            "TextureManipulationUtil should attach/detach color attachments directly through VulkanicAPI.framebufferColorAttachment0Texture2D");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getTexture2DLevelWidth(ctx, level)"),
+            "TextureManipulationUtil should query mip width through VulkanicAPI 2D width helper");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.getTexture2DLevelHeight(ctx, level)"),
+            "TextureManipulationUtil should query mip height through VulkanicAPI 2D height helper");
+        assertTrue(textureManipulationUtilSource.contains("VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, textureId, level)"),
+            "TextureManipulationUtil should attach color attachments through VulkanicAPI.framebufferColorAttachment0Texture2D default-target helper");
 
         Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
         String sodiumShaderSource = Files.readString(sodiumShaderFile);
@@ -2080,6 +2107,10 @@ public class Phase3DrawPathTest {
             "Distant Horizons GLState should use typed stencil capability toggles");
         assertFalse(dhStateSource.contains("setCapabilityEnabled(ctx, VulkanicAPI.GL_STENCIL_TEST"),
             "Distant Horizons GLState should avoid raw GL_STENCIL_TEST constants in capability toggles");
+        assertFalse(dhStateSource.contains("isEnabled(ctx, VulkanicAPI.GL_BLEND"),
+            "Distant Horizons GLState should avoid raw GL_BLEND constants in capability queries");
+        assertTrue(dhStateSource.contains("isEnabled(ctx, VulkanicCapability.BLEND)"),
+            "Distant Horizons GLState should use typed VulkanicCapability.BLEND in capability queries");
 
         Path lodRendererEventsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/LodRendererEvents.java");
         String lodRendererEventsSource = readSourceIfExists(lodRendererEventsFile);
@@ -2352,6 +2383,47 @@ public class Phase3DrawPathTest {
             "FinalPassRenderer should not read texture bindings directly from GlStateManager");
         assertTrue(finalPassRendererSource.contains("IrisRenderSystem.getTextureBinding("),
             "FinalPassRenderer should check bindings through IrisRenderSystem helper");
+        assertFalse(finalPassRendererSource.contains("IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), VulkanicAPI.GL_TEXTURE_2D"),
+            "FinalPassRenderer should not pass explicit GL_TEXTURE_2D when copying into main color target");
+        assertTrue(finalPassRendererSource.contains("IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), 0"),
+            "FinalPassRenderer should copy into main color target through IrisRenderSystem default-2D helper");
+        assertFalse(finalPassRendererSource.contains("VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TEXTURE_2D"),
+            "FinalPassRenderer should not pass explicit GL_TEXTURE_2D in VulkanicAPI copyTexSubImage2D path");
+        assertTrue(finalPassRendererSource.contains("VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), 0"),
+            "FinalPassRenderer should use VulkanicAPI default-2D copyTexSubImage2D overload");
+
+        Path shadowRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderer.java");
+        String shadowRendererSource = Files.readString(shadowRendererFile);
+        assertFalse(shadowRendererSource.contains("IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D"),
+            "ShadowRenderer should not pass explicit GL_TEXTURE_2D when generating mipmaps");
+        assertTrue(shadowRendererSource.contains("IrisRenderSystem.generateMipmaps(texture);"),
+            "ShadowRenderer should generate mipmaps through IrisRenderSystem default-2D helper");
+        assertFalse(shadowRendererSource.contains("IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D"),
+            "ShadowRenderer should not pass explicit GL_TEXTURE_2D in texture parameter setup");
+        assertTrue(shadowRendererSource.contains("IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
+            "ShadowRenderer should set texture filters through IrisRenderSystem 2D parameter helper");
+
+        Path colorSpaceConverterFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/colorspace/ColorSpaceFragmentConverter.java");
+        String colorSpaceConverterSource = Files.readString(colorSpaceConverterFile);
+        assertFalse(colorSpaceConverterSource.contains("IrisRenderSystem.texImage2D(swapTexture, VulkanicAPI.GL_TEXTURE_2D"),
+            "ColorSpaceFragmentConverter should not pass explicit GL_TEXTURE_2D when allocating swap texture");
+        assertTrue(colorSpaceConverterSource.contains("IrisRenderSystem.texImage2D(swapTexture, 0"),
+            "ColorSpaceFragmentConverter should allocate swap texture through IrisRenderSystem default-2D helper");
+        assertFalse(colorSpaceConverterSource.contains("IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), VulkanicAPI.GL_TEXTURE_2D"),
+            "ColorSpaceFragmentConverter should not pass explicit GL_TEXTURE_2D in copyTexSubImage2D");
+        assertTrue(colorSpaceConverterSource.contains("IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), 0"),
+            "ColorSpaceFragmentConverter should copy texture data through IrisRenderSystem default-2D helper");
+
+        Path glFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
+        String glFramebufferSource = Files.readString(glFramebufferFile);
+        assertFalse(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D"),
+            "GlFramebuffer should not pass explicit GL_TEXTURE_2D for depth attachment");
+        assertFalse(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + index, VulkanicAPI.GL_TEXTURE_2D"),
+            "GlFramebuffer should not pass explicit GL_TEXTURE_2D for color attachment");
+        assertTrue(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, texture, 0)"),
+            "GlFramebuffer should use IrisRenderSystem default-2D framebufferTexture2D helper for bypass depth attachment");
+        assertTrue(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + index, texture, 0)"),
+            "GlFramebuffer should use IrisRenderSystem default-2D framebufferTexture2D helper for color attachment");
 
         Path pipelineFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java");
         String pipelineSource = Files.readString(pipelineFile);
@@ -2799,6 +2871,17 @@ public class Phase3DrawPathTest {
             "RenderTargets should not call removed GlStateManager._bindTexture wrapper");
         assertTrue(renderTargetsSource.contains("VulkanicAPI.bindTexture2D("),
             "RenderTargets should bind textures through VulkanicAPI.bindTexture2D");
+        assertFalse(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D"),
+            "RenderTargets should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
+        assertTrue(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(0"),
+            "RenderTargets should use IrisRenderSystem default-2D copyTexImage2D helper");
+
+        Path dhCompatInternalFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/DHCompatInternal.java");
+        String dhCompatInternalSource = Files.readString(dhCompatInternalFile);
+        assertFalse(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D"),
+            "DHCompatInternal should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
+        assertTrue(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D(0"),
+            "DHCompatInternal should use IrisRenderSystem default-2D copyTexImage2D helper");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = readSourceIfExists(dhWrapperFile);
@@ -2928,6 +3011,26 @@ public class Phase3DrawPathTest {
             "GlDevice texture allocation paths should upload directly through VulkanicAPI.uploadTexture2D");
         assertTrue(glDeviceSource.contains("net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D("),
             "GlDevice texture allocation paths should preserve TextureInfoCache tracking after wrapper removal");
+    }
+
+    @Test
+    public void testDistantHorizonsTextureUploadsUseDefault2DHelper() throws IOException {
+        Path[] files = new Path[]{
+            SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/DhFadeRenderer.java"),
+            SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/SSAORenderer.java"),
+            SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java"),
+            SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/FogRenderer.java"),
+            SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/texture/DhColorTexture.java"),
+            SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/texture/DHDepthTexture.java")
+        };
+
+        for (Path file : files) {
+            String source = Files.readString(file);
+            assertFalse(source.contains("uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D"),
+                file.getFileName() + " should not pass explicit GL_TEXTURE_2D in uploadTexture2D");
+            assertTrue(source.contains("uploadTexture2D(ctx, 0"),
+                file.getFileName() + " should use VulkanicAPI default-2D uploadTexture2D overload");
+        }
     }
 
     @Test

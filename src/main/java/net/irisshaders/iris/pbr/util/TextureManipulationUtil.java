@@ -30,12 +30,12 @@ public class TextureManipulationUtil {
 		);
 		VulkanicAPI.bindTexture2D(ctx, textureId);
 		for (int level = 0; level <= maxLevel; ++level) {
-			int width = VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_WIDTH);
-			int height = VulkanicAPI.getTextureLevelParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, level, VulkanicAPI.GL_TEXTURE_HEIGHT);
+			int width = VulkanicAPI.getTexture2DLevelWidth(ctx, level);
+			int height = VulkanicAPI.getTexture2DLevelHeight(ctx, level);
 			VulkanicAPI.setDynamicViewport(ctx, 0, 0, width, height);
-			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, textureId, level);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, textureId, level);
 			VulkanicAPI.clearBuffersWithMacosWorkaround(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT);
-			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, 0, level);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, 0, level);
 		}
 
 		VulkanicAPI.bindFramebuffer(ctx, previousFramebufferId);
