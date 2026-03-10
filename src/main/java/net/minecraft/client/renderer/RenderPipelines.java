@@ -417,10 +417,9 @@ public class RenderPipelines {
 	public static final RenderPipeline GUI_TEXT = register(
 		RenderPipeline.builder(GUI_TEXT_SNIPPET, FOG_SNIPPET)
 			.withLocation("pipeline/gui_text")
-			.withVertexShader("core/rendertype_text")
-			.withFragmentShader("core/rendertype_text")
+			.withVertexShader("core/rendertype_text_see_through")
+			.withFragmentShader("core/rendertype_text_see_through")
 			.withSampler("Sampler0")
-			.withSampler("Sampler2")
 			.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 			.build()
 	);
@@ -446,10 +445,9 @@ public class RenderPipelines {
 	public static final RenderPipeline GUI_TEXT_INTENSITY = register(
 		RenderPipeline.builder(GUI_TEXT_SNIPPET, FOG_SNIPPET)
 			.withLocation("pipeline/gui_text_intensity")
-			.withVertexShader("core/rendertype_text_intensity")
-			.withFragmentShader("core/rendertype_text_intensity")
+			.withVertexShader("core/rendertype_text_intensity_see_through")
+			.withFragmentShader("core/rendertype_text_intensity_see_through")
 			.withSampler("Sampler0")
-			.withSampler("Sampler2")
 			.build()
 	);
 	public static final RenderPipeline TEXT_POLYGON_OFFSET = register(
