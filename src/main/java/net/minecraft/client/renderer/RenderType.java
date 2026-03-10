@@ -23,7 +23,6 @@ import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.renderer.blockentity.AbstractEndPortalRenderer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
-import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Vector3f;
@@ -985,9 +984,9 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 					for (int i = 0; i < 12; i++) {
 						int textureId = IrisRenderSystem.getTextureBinding(i);
 						if (textureId > 0) {
-							AbstractTexture texture = TextureTracker.INSTANCE.getTexture(textureId);
-							if (texture != null) {
-								renderPass.bindSampler("Sampler" + i, texture.getTextureView());
+							GpuTextureView textureView = TextureTracker.INSTANCE.getTextureView(textureId);
+							if (textureView != null) {
+								renderPass.bindSampler("Sampler" + i, textureView);
 							}
 						}
 					}

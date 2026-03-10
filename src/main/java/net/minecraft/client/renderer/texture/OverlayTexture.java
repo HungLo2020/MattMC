@@ -2,6 +2,7 @@ package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.NativeImage;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
@@ -39,7 +40,9 @@ public class OverlayTexture implements AutoCloseable {
 	}
 
 	public void setupOverlayColor() {
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, this.texture.getTexture().iris$getGlId());
+		var textureView = this.texture.getTextureView();
+		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, textureView.texture().iris$getGlId());
+		TextureTracker.INSTANCE.onSetShaderTexture(1, textureView);
 	}
 
 	public static int u(float f) {
@@ -60,5 +63,6 @@ public class OverlayTexture implements AutoCloseable {
 
 	public void teardownOverlayColor() {
 		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, 0);
+		TextureTracker.INSTANCE.onSetShaderTexture(1, null);
 	}
 }

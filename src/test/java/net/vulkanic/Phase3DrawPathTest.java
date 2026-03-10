@@ -2453,8 +2453,8 @@ public class Phase3DrawPathTest {
             "RenderStateShard multi-texture setup should bind texture units through IrisRenderSystem.bindTextureToUnit");
         assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0"),
             "RenderStateShard single-texture setup should bind texture unit 0 through IrisRenderSystem.bindTextureToUnit");
-        assertTrue(renderStateShardSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, textureView)"),
-            "RenderStateShard texture unit 0 setup should notify TextureTracker for Iris PBR state updates");
+        assertTrue(renderStateShardSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(i, textureView)"),
+            "RenderStateShard multi-texture setup should notify TextureTracker for each texture unit binding");
 
         Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
         String renderTypeSource = Files.readString(renderTypeFile);
@@ -2462,8 +2462,13 @@ public class Phase3DrawPathTest {
             "RenderType draw path should not fetch samplers through RenderSystem.getShaderTexture");
         assertTrue(renderTypeSource.contains("IrisRenderSystem.getTextureBinding(i)"),
             "RenderType draw path should fetch sampler bindings through IrisRenderSystem.getTextureBinding");
-        assertTrue(renderTypeSource.contains("TextureTracker.INSTANCE.getTexture(textureId)"),
+        assertTrue(renderTypeSource.contains("TextureTracker.INSTANCE.getTextureView(textureId)"),
             "RenderType draw path should resolve texture views through TextureTracker before binding samplers");
+
+        Path abstractTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/AbstractTexture.java");
+        String abstractTextureSource = Files.readString(abstractTextureFile);
+        assertTrue(abstractTextureSource.contains("TextureTracker.INSTANCE.trackTexture(lastChecked.iris$getGlId(), this)"),
+            "AbstractTexture should track textures when getTextureView() is used so RenderType sampler binding cannot silently drop GUI/item textures");
 
         Path lightTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java");
         String lightTextureSource = Files.readString(lightTextureFile);
@@ -2730,10 +2735,14 @@ public class Phase3DrawPathTest {
             "OverlayTexture should not route overlay setup through RenderSystem.setupOverlayColor");
         assertFalse(overlayTextureSource.contains("RenderSystem.teardownOverlayColor("),
             "OverlayTexture should not route overlay teardown through RenderSystem.teardownOverlayColor");
-        assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, this.texture.getTexture().iris$getGlId())"),
+        assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, textureView.texture().iris$getGlId())"),
             "OverlayTexture should bind overlay texture directly through IrisRenderSystem.bindTextureToUnit");
+        assertTrue(overlayTextureSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(1, textureView)"),
+            "OverlayTexture should publish Sampler1 texture view updates to TextureTracker");
         assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 1, 0)"),
             "OverlayTexture should clear overlay texture binding directly through IrisRenderSystem.bindTextureToUnit");
+        assertTrue(overlayTextureSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(1, null)"),
+            "OverlayTexture should clear Sampler1 texture view updates from TextureTracker when unbinding");
     }
 
     @Test

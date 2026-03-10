@@ -13,6 +13,7 @@ import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import java.util.OptionalInt;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -81,10 +82,12 @@ public class LightTexture implements AutoCloseable {
 
 	public void turnOffLightLayer() {
 		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, 0);
+		TextureTracker.INSTANCE.onSetShaderTexture(2, null);
 	}
 
 	public void turnOnLightLayer() {
 		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, this.texture.iris$getGlId());
+		TextureTracker.INSTANCE.onSetShaderTexture(2, this.textureView);
 	}
 
 	private float calculateDarknessScale(LivingEntity livingEntity, float f, float g) {

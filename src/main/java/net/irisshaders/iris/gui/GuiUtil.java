@@ -1,6 +1,7 @@
 package net.irisshaders.iris.gui;
 
 import net.blaze3d.textures.GpuTextureView;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.client.Minecraft;
@@ -40,6 +41,7 @@ public final class GuiUtil {
 	 */
 	public static void bindIrisWidgetsTexture() {
 		GpuTextureView textureView = Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView();
+		IrisRenderSystem.bindTextureToUnit(net.vulkanic.VulkanicAPI.GL_TEXTURE_2D, 0, textureView.texture().iris$getGlId());
 		TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 	}
 

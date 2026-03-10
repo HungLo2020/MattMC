@@ -204,9 +204,7 @@ public abstract class RenderStateShard {
 					abstractTexture.setUseMipmaps(entry.mipmap);
 					var textureView = abstractTexture.getTextureView();
 					IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, i, textureView.texture().iris$getGlId());
-					if (i == 0) {
-						TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
-					}
+					TextureTracker.INSTANCE.onSetShaderTexture(i, textureView);
 				}
 			}, () -> {});
 			this.cutoutTexture = list.isEmpty() ? Optional.empty() : Optional.of(((RenderStateShard.MultiTextureStateShard.Entry)list.getFirst()).id);

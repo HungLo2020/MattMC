@@ -21,6 +21,7 @@ public class TextureTracker {
 	}
 
 	private final Int2ObjectMap<AbstractTexture> textures = new Int2ObjectOpenHashMap<>();
+	private final Int2ObjectMap<GpuTextureView> textureViews = new Int2ObjectOpenHashMap<>();
 
 	private boolean lockBindCallback;
 
@@ -29,6 +30,10 @@ public class TextureTracker {
 
 	public void trackTexture(int id, AbstractTexture texture) {
 		textures.put(id, texture);
+		try {
+			textureViews.put(id, texture.getTextureView());
+		} catch (IllegalStateException ignored) {
+		}
 	}
 
 	@Nullable
@@ -36,9 +41,27 @@ public class TextureTracker {
 		return textures.get(id);
 	}
 
+	@Nullable
+	public GpuTextureView getTextureView(int id) {
+		AbstractTexture texture = textures.get(id);
+		if (texture != null) {
+			try {
+				GpuTextureView view = texture.getTextureView();
+				textureViews.put(id, view);
+				return view;
+			} catch (IllegalStateException ignored) {
+			}
+		}
+
+		return textureViews.get(id);
+	}
+
 	public void onSetShaderTexture(int unit, GpuTextureView id) {
 		if (lockBindCallback) {
 			return;
+		}
+		if (id != null) {
+			textureViews.put(id.texture().iris$getGlId(), id);
 		}
 		if (unit == 0) {
 			lockBindCallback = true;
@@ -57,5 +80,6 @@ public class TextureTracker {
 
 	public void onDeleteTexture(int id) {
 		textures.remove(id);
+		textureViews.remove(id);
 	}
 }
