@@ -110,8 +110,9 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 
 	public abstract boolean isClosed();
 
+	@Deprecated
 	public int glId() {
-		return this.iris$getGlId();
+		return 0;
 	}
 
 	public void flushModeChanges(int target) {
@@ -121,10 +122,6 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 	}
 
 	// Iris compatibility methods
-	public int iris$getGlId() {
-		return 0; // Subclasses should override
-	}
-
 	public void iris$markMipmapNonLinear() {
 		// No-op by default
 	}

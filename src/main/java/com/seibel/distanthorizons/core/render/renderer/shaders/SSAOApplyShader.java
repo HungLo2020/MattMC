@@ -106,6 +106,12 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
+		int drawFramebuffer = LodRenderer.INSTANCE.getActiveFramebufferId();
+		if (SSAOShader.INSTANCE.frameBuffer == -1 || drawFramebuffer == -1)
+		{
+			return;
+		}
+		
 		VulkanicAPI.setBlendEnabled(ctx, true);
 		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
 		VulkanicAPI.setBlendFunction(
@@ -123,7 +129,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		
 		// apply the rendered SSAO to the LODs 
 		VulkanicAPI.bindReadFramebuffer(ctx, SSAOShader.INSTANCE.frameBuffer);
-		VulkanicAPI.bindDrawFramebuffer(ctx, LodRenderer.INSTANCE.getActiveFramebufferId());
+		VulkanicAPI.bindDrawFramebuffer(ctx, drawFramebuffer);
 		
 		
 		ScreenQuad.INSTANCE.render();

@@ -23,7 +23,7 @@ public class SSAOShader extends AbstractShaderRenderer
 	public static SSAOShader INSTANCE = new SSAOShader();
 	
 	
-	public int frameBuffer;
+	public int frameBuffer = -1;
 	
 	private Mat4f projection;
 	private Mat4f invertedProjection;
@@ -117,13 +117,19 @@ public class SSAOShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
+		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		if (this.frameBuffer == -1 || depthTextureId == -1)
+		{
+			return;
+		}
+
 		VulkanicAPI.bindFramebuffer(ctx, this.frameBuffer);
 		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.bindTexture2D(depthTextureId);
 		
 		ScreenQuad.INSTANCE.render();
 	}

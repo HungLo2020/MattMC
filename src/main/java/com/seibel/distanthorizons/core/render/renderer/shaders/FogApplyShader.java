@@ -77,6 +77,12 @@ public class FogApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
+		int drawFramebuffer = LodRenderer.INSTANCE.getActiveFramebufferId();
+		if (FogShader.INSTANCE.frameBuffer == -1 || drawFramebuffer == -1)
+		{
+			return;
+		}
+		
 		VulkanicAPI.setBlendEnabled(ctx, true);
 		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
 		VulkanicAPI.setBlendFunction(
@@ -95,7 +101,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 		
 		// apply the rendered Fog to DH's framebuffer
 		VulkanicAPI.bindReadFramebuffer(ctx, FogShader.INSTANCE.frameBuffer);
-		VulkanicAPI.bindDrawFramebuffer(ctx, LodRenderer.INSTANCE.getActiveFramebufferId());
+		VulkanicAPI.bindDrawFramebuffer(ctx, drawFramebuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		

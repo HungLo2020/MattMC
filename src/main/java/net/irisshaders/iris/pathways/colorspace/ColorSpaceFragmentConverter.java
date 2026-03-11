@@ -114,6 +114,6 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		}
 		Program.unbind();
 		framebuffer.bindAsReadBuffer();
-		IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), 0, 0, 0, 0, 0, width, height);
+		IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(targetImage), 0, 0, 0, 0, 0, width, height);
 	}
 }

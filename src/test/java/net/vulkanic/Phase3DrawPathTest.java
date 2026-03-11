@@ -80,6 +80,150 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testIrisGetGlIdRestrictedToDeprecatedCompatibilitySeams() throws IOException {
+        Path interfaceFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/mixinterface/GpuTextureInterface.java");
+        Path interfaceRelative = Paths.get("net/irisshaders/iris/mixinterface/GpuTextureInterface.java");
+        Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
+        Path glTextureRelative = Paths.get("net/blaze3d/opengl/GlTexture.java");
+        Path gpuTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java");
+
+        String interfaceSource = Files.readString(interfaceFile);
+        String glTextureSource = Files.readString(glTextureFile);
+        String gpuTextureSource = Files.readString(gpuTextureFile);
+
+        assertTrue(interfaceSource.contains("@Deprecated"),
+            "GpuTextureInterface.iris$getGlId should remain explicitly deprecated as a compatibility seam");
+        assertTrue(interfaceSource.contains("default int iris$getGlId()"),
+            "GpuTextureInterface should remain the compatibility declaration owner for iris$getGlId");
+        assertTrue(glTextureSource.contains("@Deprecated"),
+            "GlTexture.iris$getGlId should remain explicitly deprecated as a compatibility seam");
+        assertTrue(glTextureSource.contains("public int iris$getGlId()"),
+            "GlTexture should keep the only concrete iris$getGlId implementation in main sources");
+        assertFalse(gpuTextureSource.contains("iris$getGlId("),
+            "GpuTexture should not declare iris$getGlId after compatibility-surface reduction");
+
+        List<String> declarationOffenders = new ArrayList<>();
+        List<String> invocationOffenders = new ArrayList<>();
+        try (var paths = Files.walk(SRC_MAIN_JAVA)) {
+            for (Path file : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(file) || !file.toString().endsWith(".java")) {
+                    continue;
+                }
+
+                String source = Files.readString(file);
+                Path relative = SRC_MAIN_JAVA.relativize(file);
+                if (source.contains("iris$getGlId(")
+                    && !relative.equals(interfaceRelative)
+                    && !relative.equals(glTextureRelative)) {
+                    declarationOffenders.add(relative.toString());
+                }
+
+                if (source.contains(".iris$getGlId(")) {
+                    invocationOffenders.add(relative.toString());
+                }
+            }
+        }
+
+        assertTrue(declarationOffenders.isEmpty(),
+            "iris$getGlId declarations should remain restricted to compatibility seams; offenders: " + declarationOffenders);
+        assertTrue(invocationOffenders.isEmpty(),
+            "Runtime iris$getGlId invocations should remain eliminated; offenders: " + invocationOffenders);
+    }
+
+    @Test
+    public void testGlIdRestrictedToDeprecatedDeclarationsAndNoRuntimeInvocations() throws IOException {
+        Path gpuTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java");
+        Path gpuTextureRelative = Paths.get("net/blaze3d/textures/GpuTexture.java");
+        Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
+        Path glTextureRelative = Paths.get("net/blaze3d/opengl/GlTexture.java");
+
+        String gpuTextureSource = Files.readString(gpuTextureFile);
+        String glTextureSource = Files.readString(glTextureFile);
+
+        assertTrue(gpuTextureSource.contains("@Deprecated"),
+            "GpuTexture.glId should remain explicitly deprecated as a compatibility seam");
+        assertTrue(gpuTextureSource.contains("public int glId()"),
+            "GpuTexture should keep glId declaration for compatibility while migration is in progress");
+        assertTrue(glTextureSource.contains("@Deprecated"),
+            "GlTexture.glId should remain explicitly deprecated as a compatibility seam");
+        assertTrue(glTextureSource.contains("public int glId()"),
+            "GlTexture should keep the concrete glId compatibility implementation");
+
+        List<String> declarationOffenders = new ArrayList<>();
+        List<String> invocationOffenders = new ArrayList<>();
+        try (var paths = Files.walk(SRC_MAIN_JAVA)) {
+            for (Path file : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(file) || !file.toString().endsWith(".java")) {
+                    continue;
+                }
+
+                String source = Files.readString(file);
+                Path relative = SRC_MAIN_JAVA.relativize(file);
+
+                if (source.contains(" glId(")
+                    && !relative.equals(gpuTextureRelative)
+                    && !relative.equals(glTextureRelative)) {
+                    declarationOffenders.add(relative.toString());
+                }
+
+                if (source.contains(".glId(")) {
+                    invocationOffenders.add(relative.toString());
+                }
+            }
+        }
+
+        assertTrue(declarationOffenders.isEmpty(),
+            "glId declarations should remain restricted to compatibility seam files; offenders: " + declarationOffenders);
+        assertTrue(invocationOffenders.isEmpty(),
+            "Runtime .glId invocations should remain eliminated; offenders: " + invocationOffenders);
+    }
+
+    @Test
+    public void testGlTextureHandleExtractionRestrictedToOpenGLBackendSeams() throws IOException {
+        Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
+        Path glTextureRelative = Paths.get("net/blaze3d/opengl/GlTexture.java");
+        Path openGlBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
+        Path openGlBackendRelative = Paths.get("net/vulkanic/backends/opengl/OpenGLBackend.java");
+        Path openGlTextureViewFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLTextureView.java");
+        Path openGlTextureViewRelative = Paths.get("net/vulkanic/backends/opengl/OpenGLTextureView.java");
+
+        String glTextureSource = Files.readString(glTextureFile);
+        String openGlBackendSource = Files.readString(openGlBackendFile);
+        String openGlTextureViewSource = Files.readString(openGlTextureViewFile);
+
+        assertTrue(glTextureSource.contains("public int getGlHandle()"),
+            "GlTexture should expose getGlHandle for backend seam extraction");
+        assertTrue(openGlBackendSource.contains("glTexture.getGlHandle()"),
+            "OpenGLBackend should extract GlTexture handles via getGlHandle in the backend seam");
+        assertTrue(openGlTextureViewSource.contains("return t.getGlHandle();"),
+            "OpenGLTextureView should extract GlTexture handles via getGlHandle in the backend seam");
+
+        List<String> offenders = new ArrayList<>();
+        try (var paths = Files.walk(SRC_MAIN_JAVA)) {
+            for (Path file : (Iterable<Path>) paths::iterator) {
+                if (!Files.isRegularFile(file) || !file.toString().endsWith(".java")) {
+                    continue;
+                }
+
+                Path relative = SRC_MAIN_JAVA.relativize(file);
+                if (relative.equals(glTextureRelative)
+                    || relative.equals(openGlBackendRelative)
+                    || relative.equals(openGlTextureViewRelative)) {
+                    continue;
+                }
+
+                String source = Files.readString(file);
+                if (source.contains("GlTexture") && source.contains(".getGlHandle(")) {
+                    offenders.add(relative.toString());
+                }
+            }
+        }
+
+        assertTrue(offenders.isEmpty(),
+            "GlTexture.getGlHandle usage should remain confined to OpenGL backend seam files; offenders: " + offenders);
+    }
+
+    @Test
     public void testVulkanBackendBootstrapPathExists() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         assertTrue(Files.exists(vulkanBackendFile),
@@ -125,6 +269,42 @@ public class Phase3DrawPathTest {
             "Bootstrap Vulkan backend should define native readiness contract");
         assertTrue(vulkanBackendSource.contains("return nativeSpine != null;"),
             "Bootstrap Vulkan backend should report native readiness based on native spine initialization state");
+    }
+
+    @Test
+    public void testTextureHandleResolutionOwnedByBackendSeam() throws IOException {
+        Path backendInterfaceFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
+        String backendInterfaceSource = Files.readString(backendInterfaceFile);
+        assertTrue(backendInterfaceSource.contains("default int resolveTextureHandle(CommandContext ctx, VulkanicTexture texture)"),
+            "GraphicsBackend should expose resolveTextureHandle seam for backend-owned texture-handle resolution");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        assertFalse(vulkanicApiSource.contains("return texture.glId();"),
+            "VulkanicAPI.getTextureHandle should not directly call texture.glId after backend-seam migration");
+        assertTrue(vulkanicApiSource.contains("return getBackend().resolveTextureHandle(getCommandContext(), target);"),
+            "VulkanicAPI.getTextureHandle should delegate handle extraction to GraphicsBackend.resolveTextureHandle");
+
+        Path openGlBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
+        String openGlBackendSource = Files.readString(openGlBackendFile);
+        assertTrue(openGlBackendSource.contains("public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture)"),
+            "OpenGLBackend should implement resolveTextureHandle for OpenGL-backed texture ids");
+        assertTrue(openGlBackendSource.contains("texture instanceof net.vulkanic.backends.opengl.OpenGLTexture openGLTexture"),
+            "OpenGLBackend resolveTextureHandle should support Vulkanic OpenGLTexture wrappers");
+        assertTrue(openGlBackendSource.contains("texture instanceof net.blaze3d.opengl.GlTexture glTexture"),
+            "OpenGLBackend resolveTextureHandle should support Blaze3D GlTexture instances");
+
+        Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
+        String glTextureSource = Files.readString(glTextureFile);
+        assertTrue(glTextureSource.contains("public int getGlHandle()"),
+            "GlTexture should expose getGlHandle for backend-local OpenGL handle extraction");
+
+        Path openGlTextureViewFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLTextureView.java");
+        String openGlTextureViewSource = Files.readString(openGlTextureViewFile);
+        assertFalse(openGlTextureViewSource.contains("return VulkanicAPI.getTextureHandle(t);"),
+            "OpenGLTextureView should not route GlTexture handle extraction back through VulkanicAPI");
+        assertTrue(openGlTextureViewSource.contains("return t.getGlHandle();"),
+            "OpenGLTextureView should extract GlTexture handles directly through getGlHandle");
     }
 
     // ── Task 1: drawFromBuffers routes directly through VulkanicAPI ───────────
@@ -2615,9 +2795,9 @@ public class Phase3DrawPathTest {
             "FinalPassRenderer should not read texture bindings directly from GlStateManager");
         assertTrue(finalPassRendererSource.contains("IrisRenderSystem.getTextureBinding("),
             "FinalPassRenderer should check bindings through IrisRenderSystem helper");
-        assertFalse(finalPassRendererSource.contains("IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), VulkanicAPI.GL_TEXTURE_2D"),
+        assertFalse(finalPassRendererSource.contains("IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(main.getColorTexture()), VulkanicAPI.GL_TEXTURE_2D"),
             "FinalPassRenderer should not pass explicit GL_TEXTURE_2D when copying into main color target");
-        assertTrue(finalPassRendererSource.contains("IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), 0"),
+        assertTrue(finalPassRendererSource.contains("IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(main.getColorTexture()), 0"),
             "FinalPassRenderer should copy into main color target through IrisRenderSystem default-2D helper");
         assertFalse(finalPassRendererSource.contains("VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TEXTURE_2D"),
             "FinalPassRenderer should not pass explicit GL_TEXTURE_2D in VulkanicAPI copyTexSubImage2D path");
@@ -2645,9 +2825,9 @@ public class Phase3DrawPathTest {
             "ColorSpaceFragmentConverter should not pass explicit GL_TEXTURE_2D when allocating swap texture");
         assertTrue(colorSpaceConverterSource.contains("IrisRenderSystem.texImage2D(swapTexture, 0"),
             "ColorSpaceFragmentConverter should allocate swap texture through IrisRenderSystem default-2D helper");
-        assertFalse(colorSpaceConverterSource.contains("IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), VulkanicAPI.GL_TEXTURE_2D"),
+        assertFalse(colorSpaceConverterSource.contains("IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(targetImage), VulkanicAPI.GL_TEXTURE_2D"),
             "ColorSpaceFragmentConverter should not pass explicit GL_TEXTURE_2D in copyTexSubImage2D");
-        assertTrue(colorSpaceConverterSource.contains("IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), 0"),
+        assertTrue(colorSpaceConverterSource.contains("IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(targetImage), 0"),
             "ColorSpaceFragmentConverter should copy texture data through IrisRenderSystem default-2D helper");
 
         Path glFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
@@ -2788,9 +2968,9 @@ public class Phase3DrawPathTest {
             "RenderStateShard single-texture setup should not bind shader texture 0 through RenderSystem.setShaderTexture");
         assertFalse(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D"),
             "RenderStateShard texture setup should not pass explicit GL_TEXTURE_2D when binding texture units");
-        assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(i, textureView.texture().iris$getGlId())"),
+        assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(i, VulkanicAPI.getTextureHandle(textureView.texture()))"),
             "RenderStateShard multi-texture setup should bind texture units through IrisRenderSystem default-2D helper");
-        assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(0, textureView.texture().iris$getGlId())"),
+        assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(textureView.texture()))"),
             "RenderStateShard single-texture setup should bind texture unit 0 through IrisRenderSystem default-2D helper");
         assertTrue(renderStateShardSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(i, textureView)"),
             "RenderStateShard multi-texture setup should notify TextureTracker for each texture unit binding");
@@ -2815,7 +2995,7 @@ public class Phase3DrawPathTest {
 
         Path abstractTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/AbstractTexture.java");
         String abstractTextureSource = Files.readString(abstractTextureFile);
-        assertTrue(abstractTextureSource.contains("TextureTracker.INSTANCE.trackTexture(lastChecked.iris$getGlId(), this)"),
+        assertTrue(abstractTextureSource.contains("TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicAPI.getTextureHandle(lastChecked), this)"),
             "AbstractTexture should track textures when getTextureView() is used so RenderType sampler binding cannot silently drop GUI/item textures");
 
         Path lightTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java");
@@ -2828,7 +3008,7 @@ public class Phase3DrawPathTest {
             "LightTexture should not pass explicit GL_TEXTURE_2D when binding the light layer");
         assertTrue(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(2, 0)"),
             "LightTexture should disable light layer via IrisRenderSystem default-2D helper");
-        assertTrue(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(2, this.texture.iris$getGlId())"),
+        assertTrue(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(2, VulkanicAPI.getTextureHandle(this.texture))"),
             "LightTexture should enable light layer via IrisRenderSystem default-2D helper");
 
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
@@ -3087,7 +3267,7 @@ public class Phase3DrawPathTest {
             "OverlayTexture should not route overlay teardown through RenderSystem.teardownOverlayColor");
         assertFalse(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D"),
             "OverlayTexture should not pass explicit GL_TEXTURE_2D when binding overlay texture");
-        assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(1, textureView.texture().iris$getGlId())"),
+        assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(1, VulkanicAPI.getTextureHandle(textureView.texture()))"),
             "OverlayTexture should bind overlay texture directly through IrisRenderSystem default-2D helper");
         assertTrue(overlayTextureSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(1, textureView)"),
             "OverlayTexture should publish Sampler1 texture view updates to TextureTracker");
@@ -3378,6 +3558,116 @@ public class Phase3DrawPathTest {
             assertTrue(source.contains("uploadTexture2D(ctx, 0"),
                 file.getFileName() + " should use VulkanicAPI default-2D uploadTexture2D overload");
         }
+    }
+
+    @Test
+    public void testDistantHorizonsTargetFramebufferUsesRenderTargetResolutionSeam() throws IOException {
+        Path wrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftRenderWrapper.java");
+        String wrapperSource = Files.readString(wrapperFile);
+
+        assertFalse(wrapperSource.contains("return 0; // 0 is the ID for the default frame buffer"),
+            "MinecraftRenderWrapper.getTargetFramebuffer should not hardcode default FBO 0");
+        assertTrue(wrapperSource.contains("VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture())"),
+            "MinecraftRenderWrapper.getTargetFramebuffer should resolve framebuffer via VulkanicAPI texture-pair seam");
+        assertTrue(wrapperSource.contains("this.finalLevelFrameBufferId = framebufferId == 0 ? -1 : framebufferId;"),
+            "MinecraftRenderWrapper.getTargetFramebuffer should map unresolved framebuffers to -1 per IMinecraftRenderWrapper contract");
+        assertFalse(wrapperSource.contains("return 0;"),
+            "MinecraftRenderWrapper should not expose 0 as an unresolved texture/framebuffer sentinel in DH-facing seams");
+        assertFalse(wrapperSource.contains("this.getRenderTarget().getDepthTexture()"),
+            "MinecraftRenderWrapper.getDepthTextureId should avoid direct chained dereference and use null-safe local renderTarget checks");
+        assertFalse(wrapperSource.contains("this.getRenderTarget().getColorTexture()"),
+            "MinecraftRenderWrapper.getColorTextureId should avoid direct chained dereference and use null-safe local renderTarget checks");
+        assertTrue(wrapperSource.contains("if (depthTexture == null)"),
+            "MinecraftRenderWrapper.getDepthTextureId should guard null depth texture before resolving a handle");
+        assertTrue(wrapperSource.contains("if (colorTexture == null)"),
+            "MinecraftRenderWrapper.getColorTextureId should guard null color texture before resolving a handle");
+        assertFalse(wrapperSource.contains("catch (Exception e)"),
+            "MinecraftRenderWrapper texture-handle resolution should avoid exception-driven control flow and use sentinel checks instead");
+        assertFalse(wrapperSource.contains("colorTextureCastFailLogged"),
+            "MinecraftRenderWrapper should not rely on one-time exception logging flags for color texture handle resolution");
+        assertFalse(wrapperSource.contains("depthTextureCastFailLogged"),
+            "MinecraftRenderWrapper should not rely on one-time exception logging flags for depth texture handle resolution");
+        assertTrue(wrapperSource.contains("if (textureId <= 0)"),
+            "MinecraftRenderWrapper texture-handle resolution should map unresolved/invalid handles to -1 via deterministic sentinel checks");
+        assertFalse(wrapperSource.contains("return this.getRenderTarget().width;"),
+            "MinecraftRenderWrapper viewport width query should not assume render target is always available");
+        assertFalse(wrapperSource.contains("return this.getRenderTarget().height;"),
+            "MinecraftRenderWrapper viewport height query should not assume render target is always available");
+        assertTrue(wrapperSource.contains("return renderTarget == null ? 0 : renderTarget.width;"),
+            "MinecraftRenderWrapper viewport width query should use null-safe fallback semantics");
+        assertTrue(wrapperSource.contains("return renderTarget == null ? 0 : renderTarget.height;"),
+            "MinecraftRenderWrapper viewport height query should use null-safe fallback semantics");
+    }
+
+    @Test
+    public void testDistantHorizonsRenderPathsGuardUnresolvedFramebufferIds() throws IOException {
+        Path testRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/TestRenderer.java");
+        String testRendererSource = Files.readString(testRendererFile);
+        assertTrue(testRendererSource.contains("if (targetFramebuffer == -1)"),
+            "TestRenderer should skip rendering when target framebuffer is unresolved (-1)");
+
+        Path dhApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/DhApplyShader.java");
+        String dhApplySource = Files.readString(dhApplyFile);
+        assertTrue(dhApplySource.contains("if (dhColorTextureId == -1 || dhDepthTextureId == -1)"),
+            "DhApplyShader should skip apply passes when DH color/depth textures are unresolved");
+
+        Path fadeApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FadeApplyShader.java");
+        String fadeApplySource = Files.readString(fadeApplyFile);
+        assertTrue(fadeApplySource.contains("if (this.readFramebuffer == -1 || this.drawFramebuffer == -1)"),
+            "FadeApplyShader should guard unresolved read/draw framebuffer ids before binding");
+
+        Path fogApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogApplyShader.java");
+        String fogApplySource = Files.readString(fogApplyFile);
+        assertTrue(fogApplySource.contains("if (FogShader.INSTANCE.frameBuffer == -1 || drawFramebuffer == -1)"),
+            "FogApplyShader should guard unresolved source/destination framebuffer ids before binding");
+
+        Path ssaoApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOApplyShader.java");
+        String ssaoApplySource = Files.readString(ssaoApplyFile);
+        assertTrue(ssaoApplySource.contains("if (SSAOShader.INSTANCE.frameBuffer == -1 || drawFramebuffer == -1)"),
+            "SSAOApplyShader should guard unresolved source/destination framebuffer ids before binding");
+
+        Path dhFadeShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/DhFadeShader.java");
+        String dhFadeShaderSource = Files.readString(dhFadeShaderFile);
+        assertTrue(dhFadeShaderSource.contains("int mcColorTextureId = MC_RENDER.getColorTextureId();"),
+            "DhFadeShader should resolve MC color texture handle once before binding");
+        assertTrue(dhFadeShaderSource.contains("|| mcColorTextureId == -1"),
+            "DhFadeShader should guard unresolved MC color texture handles before rendering");
+        assertTrue(dhFadeShaderSource.contains("|| this.frameBuffer == -1)"),
+            "DhFadeShader should guard unresolved fade framebuffer ids before binding");
+
+        Path vanillaFadeShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/VanillaFadeShader.java");
+        String vanillaFadeShaderSource = Files.readString(vanillaFadeShaderFile);
+        assertTrue(vanillaFadeShaderSource.contains("int mcDepthTextureId = MC_RENDER.getDepthTextureId();"),
+            "VanillaFadeShader should resolve MC depth texture handle once before binding");
+        assertTrue(vanillaFadeShaderSource.contains("int mcColorTextureId = MC_RENDER.getColorTextureId();"),
+            "VanillaFadeShader should resolve MC color texture handle once before binding");
+        assertTrue(vanillaFadeShaderSource.contains("|| mcDepthTextureId == -1"),
+            "VanillaFadeShader should guard unresolved MC depth texture handles before rendering");
+        assertTrue(vanillaFadeShaderSource.contains("|| mcColorTextureId == -1"),
+            "VanillaFadeShader should guard unresolved MC color texture handles before rendering");
+        assertTrue(vanillaFadeShaderSource.contains("|| this.frameBuffer == -1)"),
+            "VanillaFadeShader should guard unresolved fade framebuffer ids before binding");
+
+        Path fogShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogShader.java");
+        String fogShaderSource = Files.readString(fogShaderFile);
+        assertTrue(fogShaderSource.contains("public int frameBuffer = -1;"),
+            "FogShader should initialize framebuffer id to unresolved sentinel -1");
+        assertTrue(fogShaderSource.contains("if (this.frameBuffer == -1 || depthTextureId == -1)"),
+            "FogShader should guard unresolved framebuffer/depth texture ids before binding");
+
+        Path ssaoShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOShader.java");
+        String ssaoShaderSource = Files.readString(ssaoShaderFile);
+        assertTrue(ssaoShaderSource.contains("public int frameBuffer = -1;"),
+            "SSAOShader should initialize framebuffer id to unresolved sentinel -1");
+        assertTrue(ssaoShaderSource.contains("if (this.frameBuffer == -1 || depthTextureId == -1)"),
+            "SSAOShader should guard unresolved framebuffer/depth texture ids before binding");
+
+        Path vanillaFadeRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java");
+        String vanillaFadeRendererSource = Files.readString(vanillaFadeRendererFile);
+        assertTrue(vanillaFadeRendererSource.contains("if (!MC_RENDER.mcRendersToFrameBuffer())"),
+            "VanillaFadeRenderer should branch MC-color attachment setup based on render-target path");
+        assertTrue(vanillaFadeRendererSource.contains("if (mcColorTextureId == -1)"),
+            "VanillaFadeRenderer should skip fade setup when MC color texture handle is unresolved");
     }
 
     @Test
@@ -4170,7 +4460,7 @@ public class Phase3DrawPathTest {
         String renderTypeSource = Files.readString(renderTypeFile);
         assertTrue(renderTypeSource.contains("GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(i);"),
             "RenderType draw path should first resolve sampler views from TextureTracker unit bindings");
-        assertTrue(renderTypeSource.contains("if (textureView != null && textureId > 0 && textureView.texture().iris$getGlId() != textureId)"),
+        assertTrue(renderTypeSource.contains("if (textureView != null && textureId > 0 && VulkanicAPI.getTextureHandle(textureView.texture()) != textureId)"),
             "RenderType draw path should reject stale tracked sampler views when they no longer match Iris texture binding IDs");
         assertTrue(renderTypeSource.contains("if (textureView == null)"),
             "RenderType draw path should only fall back to Iris texture binding ids when no tracked unit view exists");

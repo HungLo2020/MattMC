@@ -88,7 +88,13 @@ public class TestRenderer
 		this.init();
 		
 		CommandContext ctx = VulkanicAPI.getCommandContext();
-		VulkanicAPI.bindFramebuffer(ctx, MC_RENDER.getTargetFramebuffer());
+		int targetFramebuffer = MC_RENDER.getTargetFramebuffer();
+		if (targetFramebuffer == -1)
+		{
+			return;
+		}
+		
+		VulkanicAPI.bindFramebuffer(ctx, targetFramebuffer);
 		VulkanicAPI.setDynamicViewport(ctx, 0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
 		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 		

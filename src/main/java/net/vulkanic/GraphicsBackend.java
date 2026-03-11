@@ -2243,6 +2243,20 @@ public interface GraphicsBackend {
     GraphicsCapabilities getGraphicsCapabilities();
 
     /**
+     * Resolves a backend-native texture handle for transitional integrations.
+     *
+     * <p>In OpenGL this corresponds to the GL texture object name.
+     * In Vulkan this may return a backend-managed token while texture-id shims remain.</p>
+     *
+     * @param ctx Command context for recording this command
+     * @param texture Texture target to resolve
+     * @return Backend-native texture handle, or {@code 0} when not applicable
+     */
+    default int resolveTextureHandle(CommandContext ctx, VulkanicTexture texture) {
+        return 0;
+    }
+
+    /**
      * Resolves a backend-native framebuffer handle for the given color/depth textures.
      *
      * <p>In OpenGL this may return a cached FBO name associated with the texture pair.

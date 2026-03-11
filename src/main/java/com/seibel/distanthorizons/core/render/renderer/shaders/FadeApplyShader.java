@@ -1,11 +1,9 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.VanillaFadeRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
@@ -19,8 +17,6 @@ import net.vulkanic.VulkanicAPI;
 public class FadeApplyShader extends AbstractShaderRenderer
 {
 	public static FadeApplyShader INSTANCE = new FadeApplyShader();
-	
-	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
 	
 	
@@ -76,6 +72,11 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
+		if (this.readFramebuffer == -1 || this.drawFramebuffer == -1)
+		{
+			return;
+		}
+		
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.

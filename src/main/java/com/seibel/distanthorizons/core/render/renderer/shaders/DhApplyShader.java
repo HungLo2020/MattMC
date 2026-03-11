@@ -71,6 +71,13 @@ public class DhApplyShader extends AbstractShaderRenderer
 		{
 			return;
 		}
+
+		int dhColorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
+		int dhDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		if (dhColorTextureId == -1 || dhDepthTextureId == -1)
+		{
+			return;
+		}
 		
 		
 		GLState state = new GLState(ctx);
@@ -88,11 +95,11 @@ public class DhApplyShader extends AbstractShaderRenderer
 		//VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
+		DhTextureState.bindTexture2D(dhColorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
-		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.bindTexture2D(dhDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 1);
 		
 		// Copy to MC's framebuffer
@@ -125,6 +132,13 @@ public class DhApplyShader extends AbstractShaderRenderer
 		{
 			return;
 		}
+
+		int dhColorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
+		int dhDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		if (dhColorTextureId == -1 || dhDepthTextureId == -1)
+		{
+			return;
+		}
 		
 		
 		
@@ -143,11 +157,11 @@ public class DhApplyShader extends AbstractShaderRenderer
 		//VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
+		DhTextureState.bindTexture2D(dhColorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
-		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.bindTexture2D(dhDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 1);
 		
 		

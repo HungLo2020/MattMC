@@ -14,7 +14,7 @@ import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixinterface.GpuTextureInterface {
+public class GlTexture extends GpuTexture {
 	protected final int id;
 	private final Int2IntMap fboCache = new Int2IntOpenHashMap();
 	protected boolean closed;
@@ -113,15 +113,27 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 		net.irisshaders.iris.gl.IrisRenderSystem.texParameteri(this.id, target, pname, newId);
 	}
 
+	@Deprecated
 	public int glId() {
+		return this.id;
+	}
+
+	/**
+	 * Returns the raw OpenGL texture object name for backend seam extraction.
+	 *
+	 * <p>Prefer backend-neutral handle resolution at callsites. This accessor exists
+	 * so OpenGL backend bridge code can extract a concrete GL handle when required.</p>
+	 */
+	public int getGlHandle() {
 		return this.id;
 	}
 
 	// Iris: From MixinGpuTexture - GpuTextureInterface implementation
 	@Override
+	@Deprecated
 	public int iris$getGlId() {
 		this.flushModeChanges2D();
-		return this.glId();
+		return this.id;
 	}
 	
 	@Override

@@ -2791,15 +2791,19 @@ public class VulkanicAPI {
     /**
      * Returns the backend-native texture handle for transitional integrations.
      *
-     * <p>Current OpenGL-backed runtimes return the GL texture id via the texture abstraction,
-     * without requiring callsites to cast to implementation-specific texture classes.</p>
+     * <p>Resolution is delegated to the active backend so callsites stay backend-neutral
+     * while GL/Vulkan-specific handle semantics remain backend-owned.</p>
      */
     public static int getTextureHandle(@Nullable GpuTexture texture) {
         if (texture == null) {
             return 0;
         }
 
-        return texture.iris$getGlId();
+        if (!(texture instanceof VulkanicTexture target)) {
+            return 0;
+        }
+
+        return getBackend().resolveTextureHandle(getCommandContext(), target);
     }
 
     /**

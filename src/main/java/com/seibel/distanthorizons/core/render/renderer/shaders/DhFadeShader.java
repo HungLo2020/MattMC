@@ -110,9 +110,12 @@ public class DhFadeShader extends AbstractShaderRenderer
 	{
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
 		int colorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
+		int mcColorTextureId = MC_RENDER.getColorTextureId();
 		
 		if (depthTextureId == -1
-			|| colorTextureId == -1)
+			|| colorTextureId == -1
+			|| mcColorTextureId == -1
+			|| this.frameBuffer == -1)
 		{
 			// the renderer is currently being re-built and/or inactive,
 			// we don't need to/can't render fading
@@ -132,7 +135,7 @@ public class DhFadeShader extends AbstractShaderRenderer
 		VulkanicAPI.setUniform1i(ctx, this.uDhDepthTexture, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
-		DhTextureState.bindTexture2D(MC_RENDER.getColorTextureId());
+		DhTextureState.bindTexture2D(mcColorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uMcColorTexture, 1);
 		
 		DhTextureState.setActiveTextureUnitIndex(2);

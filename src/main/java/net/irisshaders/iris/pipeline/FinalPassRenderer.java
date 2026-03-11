@@ -125,7 +125,7 @@ public class FinalPassRenderer {
 		// passes that write to framebuffers).
 		this.baseline = renderTargets.createGbufferFramebuffer(flippedBuffers, new int[]{0});
 		this.colorHolder = new GlFramebuffer();
-		this.lastColorTextureId = Minecraft.getInstance().getMainRenderTarget().getColorTexture().iris$getGlId();
+		this.lastColorTextureId = VulkanicAPI.getTextureHandle(Minecraft.getInstance().getMainRenderTarget().getColorTexture());
 		this.lastColorTextureVersion = ((Blaze3dRenderTargetExt) Minecraft.getInstance().getMainRenderTarget()).iris$getColorBufferVersion();
 		this.colorHolder.addColorAttachment(0, lastColorTextureId);
 
@@ -218,9 +218,9 @@ public class FinalPassRenderer {
 		//
 		// This is not a concern for depthtex1 / depthtex2 since the copy call extracts the depth values, and the
 		// shader pack only ever uses them to read the depth values.
-		if (((Blaze3dRenderTargetExt) main).iris$getColorBufferVersion() != lastColorTextureVersion || main.getColorTexture().iris$getGlId() != lastColorTextureId) {
+		if (((Blaze3dRenderTargetExt) main).iris$getColorBufferVersion() != lastColorTextureVersion || VulkanicAPI.getTextureHandle(main.getColorTexture()) != lastColorTextureId) {
 			lastColorTextureVersion = ((Blaze3dRenderTargetExt) main).iris$getColorBufferVersion();
-			this.lastColorTextureId = main.getColorTexture().iris$getGlId();
+			this.lastColorTextureId = VulkanicAPI.getTextureHandle(main.getColorTexture());
 			colorHolder.addColorAttachment(0, lastColorTextureId);
 		}
 
@@ -281,7 +281,7 @@ public class FinalPassRenderer {
 			// https://stackoverflow.com/a/23994979/18166885
 			this.baseline.bindAsReadBuffer();
 
-			IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), 0, 0, 0, 0, 0, baseWidth, baseHeight);
+			IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(main.getColorTexture()), 0, 0, 0, 0, 0, baseWidth, baseHeight);
 		}
 
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);

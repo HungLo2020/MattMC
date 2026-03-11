@@ -62,7 +62,7 @@ public class VanillaFadeRenderer
 		FadeApplyShader.INSTANCE.init();
 	}
 	
-	private void createFramebuffer(CommandContext ctx, int width, int height)
+	private void createFramebuffer(CommandContext ctx, int width, int height, int mcColorTextureId)
 	{
 		if (this.fadeFramebuffer != -1)
 		{
@@ -93,7 +93,7 @@ public class VanillaFadeRenderer
 		}
 		else
 		{
-			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, MC_RENDER.getColorTextureId(), 0);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, mcColorTextureId, 0);
 		}
 	}
 	
@@ -128,6 +128,15 @@ public class VanillaFadeRenderer
 			profiler.push("Vanilla Fade Generate");
 			
 			this.init();
+			int mcColorTextureId = -1;
+			if (!MC_RENDER.mcRendersToFrameBuffer())
+			{
+				mcColorTextureId = MC_RENDER.getColorTextureId();
+				if (mcColorTextureId == -1)
+				{
+					return;
+				}
+			}
 			
 			// resize the framebuffer if necessary
 			int width = MC_RENDER.getTargetFramebufferViewportWidth();
@@ -136,7 +145,7 @@ public class VanillaFadeRenderer
 			{
 				this.width = width;
 				this.height = height;
-				this.createFramebuffer(ctx, width, height);
+				this.createFramebuffer(ctx, width, height, mcColorTextureId);
 			}
 			
 			

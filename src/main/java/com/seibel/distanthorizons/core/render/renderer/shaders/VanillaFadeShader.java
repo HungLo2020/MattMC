@@ -140,9 +140,14 @@ public class VanillaFadeShader extends AbstractShaderRenderer
 	{
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
 		int colorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
+		int mcDepthTextureId = MC_RENDER.getDepthTextureId();
+		int mcColorTextureId = MC_RENDER.getColorTextureId();
 		
 		if (depthTextureId == -1
-			|| colorTextureId == -1)
+			|| colorTextureId == -1
+			|| mcDepthTextureId == -1
+			|| mcColorTextureId == -1
+			|| this.frameBuffer == -1)
 		{
 			// the renderer is currently being re-built and/or inactive,
 			// we don't need to/can't render fading
@@ -157,7 +162,7 @@ public class VanillaFadeShader extends AbstractShaderRenderer
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(MC_RENDER.getDepthTextureId());
+		DhTextureState.bindTexture2D(mcDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uMcDepthTexture, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
@@ -165,7 +170,7 @@ public class VanillaFadeShader extends AbstractShaderRenderer
 		VulkanicAPI.setUniform1i(ctx, this.uDhDepthTexture, 1);
 		
 		DhTextureState.setActiveTextureUnitIndex(2);
-		DhTextureState.bindTexture2D(MC_RENDER.getColorTextureId());
+		DhTextureState.bindTexture2D(mcColorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uCombinedMcDhColorTexture, 2);
 		
 		DhTextureState.setActiveTextureUnitIndex(3);

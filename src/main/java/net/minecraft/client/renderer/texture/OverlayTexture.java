@@ -41,7 +41,7 @@ public class OverlayTexture implements AutoCloseable {
 
 	public void setupOverlayColor() {
 		var textureView = this.texture.getTextureView();
-		IrisRenderSystem.bindTextureToUnit(1, textureView.texture().iris$getGlId());
+		IrisRenderSystem.bindTextureToUnit(1, VulkanicAPI.getTextureHandle(textureView.texture()));
 		TextureTracker.INSTANCE.onSetShaderTexture(1, textureView);
 	}
 

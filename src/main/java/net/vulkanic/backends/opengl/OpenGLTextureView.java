@@ -68,7 +68,7 @@ public class OpenGLTextureView extends VulkanicTextureView {
             return o.getGlHandle();
         }
         if (texture instanceof GlTexture t) {
-            return t.glId();
+            return t.getGlHandle();
         }
         throw new IllegalStateException(
             "OpenGLTextureView backed by unsupported texture type: " + texture.getClass().getName() +

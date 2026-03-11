@@ -11,7 +11,6 @@ import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
 import com.seibel.distanthorizons.core.config.Config;
 
 import com.seibel.distanthorizons.core.enums.EDhDirection;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 
 import net.minecraft.client.renderer.fog.FogRenderer;
@@ -31,7 +30,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.effect.MobEffects;
 
 import net.minecraft.world.phys.Vec3;
-import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector4f;
 
@@ -48,7 +46,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 {
 	public static final MinecraftRenderWrapper INSTANCE = new MinecraftRenderWrapper();
 	
-	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	private static final Minecraft MC = Minecraft.getInstance();
 	
 	/** 
@@ -62,9 +59,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	 * This is used for Optifine shader support so we can render directly to Optifine's level frame buffer.
 	 */
 	public int finalLevelFrameBufferId = -1;
-	
-	public boolean colorTextureCastFailLogged = false;
-	public boolean depthTextureCastFailLogged = false;
 	
 	private static FogRenderer mcFogRenderer = null;
 	
@@ -185,9 +179,16 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public int getTargetFramebuffer()
 	{
-		// MC renders to a texture and then directly to the default FBO now
-		// we need to draw to their texture instead of the FBO
-		return 0; // 0 is the ID for the default frame buffer
+		RenderTarget renderTarget = this.getRenderTarget();
+		if (renderTarget == null)
+		{
+			this.finalLevelFrameBufferId = -1;
+			return -1;
+		}
+
+		int framebufferId = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
+		this.finalLevelFrameBufferId = framebufferId == 0 ? -1 : framebufferId;
+		return this.finalLevelFrameBufferId;
 	}
 	
 	@Override
@@ -196,65 +197,62 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public int getDepthTextureId()
 	{
-		try
-		{		
-			int textureId = VulkanicAPI.getTextureHandle(this.getRenderTarget().getDepthTexture());
-			if (textureId == 0)
-			{
-				// shouldn't happen, but just in case
-				return 0;
-			}
-
-			return textureId;
-			
-		}
-		catch (Exception e)
+		RenderTarget renderTarget = this.getRenderTarget();
+		if (renderTarget == null)
 		{
-			// only log this error once per session
-			if (!this.depthTextureCastFailLogged)
-			{
-				this.depthTextureCastFailLogged = true;
-				LOGGER.error("Unable to resolve render target depth texture handle. MC or a rendering mod may have changed the object type.", e);
-			}
-			return 0;
+			return -1;
 		}
+
+		net.blaze3d.textures.GpuTexture depthTexture = renderTarget.getDepthTexture();
+		if (depthTexture == null)
+		{
+			return -1;
+		}
+
+		int textureId = VulkanicAPI.getTextureHandle(depthTexture);
+		if (textureId <= 0)
+		{
+			return -1;
+		}
+
+		return textureId;
 	}
 	@Override
 	public int getColorTextureId() 
 	{
-		try
+		RenderTarget renderTarget = this.getRenderTarget();
+		if (renderTarget == null)
 		{
-			int textureId = VulkanicAPI.getTextureHandle(this.getRenderTarget().getColorTexture());
-			if (textureId == 0)
-			{
-				// shouldn't happen, but just in case
-				return 0;
-			}
-			
-			return textureId;
+			return -1;
 		}
-		catch (Exception e)
+
+		net.blaze3d.textures.GpuTexture colorTexture = renderTarget.getColorTexture();
+		if (colorTexture == null)
 		{
-			// only log this error once per session
-			if (!this.colorTextureCastFailLogged)
-			{
-				this.colorTextureCastFailLogged = true;
-				LOGGER.error("Unable to resolve render target color texture handle. MC or a rendering mod may have changed the object type.", e);
-			}
-			return 0;
+			return -1;
 		}
+
+		int textureId = VulkanicAPI.getTextureHandle(colorTexture);
+		if (textureId <= 0)
+		{
+			return -1;
+		}
+		
+		return textureId;
 	}
 	
 	@Override
 	public int getTargetFramebufferViewportWidth()
 	{
-		return this.getRenderTarget().width;
+		RenderTarget renderTarget = this.getRenderTarget();
+		return renderTarget == null ? 0 : renderTarget.width;
 	}
 	
 	@Override
 	public int getTargetFramebufferViewportHeight()
 	{
-		return this.getRenderTarget().height;
+		RenderTarget renderTarget = this.getRenderTarget();
+		return renderTarget == null ? 0 : renderTarget.height;
 	}
 	
 	@Override

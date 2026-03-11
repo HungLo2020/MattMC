@@ -1496,6 +1496,23 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
+    public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (texture instanceof net.vulkanic.backends.opengl.OpenGLTexture openGLTexture) {
+            return openGLTexture.getGlHandle();
+        }
+
+        if (texture instanceof net.blaze3d.opengl.GlTexture glTexture) {
+            return glTexture.getGlHandle();
+        }
+
+        return 0;
+    }
+
+    @Override
     public int resolveFramebufferForTextures(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
