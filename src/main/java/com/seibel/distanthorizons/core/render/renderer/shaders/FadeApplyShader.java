@@ -20,10 +20,13 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	
 	
 	
-	public int fadeTexture;
+	public int fadeTexture = -1;
 	
-	public int readFramebuffer;
-	public int drawFramebuffer;
+	public int readFramebuffer = -1;
+	public int drawFramebuffer = -1;
+
+	private int activeReadFramebuffer = -1;
+	private int activeDrawFramebuffer = -1;
 	
 	// uniforms
 	public int uFadeColorTextureUniform = -1;
@@ -55,6 +58,16 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
+	{
+		this.activeReadFramebuffer = this.readFramebuffer;
+		this.activeDrawFramebuffer = this.drawFramebuffer;
+		return this.fadeTexture != -1
+			&& this.activeReadFramebuffer != -1
+			&& this.activeDrawFramebuffer != -1;
+	}
+
+	@Override
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		DhTextureState.setActiveTextureUnitIndex(0);
@@ -72,11 +85,6 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
-		if (this.readFramebuffer == -1 || this.drawFramebuffer == -1)
-		{
-			return;
-		}
-		
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
@@ -86,8 +94,8 @@ public class FadeApplyShader extends AbstractShaderRenderer
 		
 		
 		// apply the rendered Fade to Minecraft's framebuffer
-		VulkanicAPI.bindReadFramebuffer(ctx, this.readFramebuffer);
-		VulkanicAPI.bindDrawFramebuffer(ctx, this.drawFramebuffer);
+		VulkanicAPI.bindReadFramebuffer(ctx, this.activeReadFramebuffer);
+		VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		

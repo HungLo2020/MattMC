@@ -101,11 +101,23 @@ public class FogRenderer
 		// resize the framebuffer if necessary
 		int width = MC_RENDER.getTargetFramebufferViewportWidth();
 		int height = MC_RENDER.getTargetFramebufferViewportHeight();
+		if (width <= 0 || height <= 0)
+		{
+			this.width = -1;
+			this.height = -1;
+			return;
+		}
+
 		if (this.width != width || this.height != height)
 		{
 			this.width = width;
 			this.height = height;
 			this.createFramebuffer(ctx, width, height);
+		}
+
+		if (this.fogFramebuffer == -1 || this.fogTexture == -1)
+		{
+			return;
 		}
 		
 		FogShader.INSTANCE.frameBuffer = this.fogFramebuffer;

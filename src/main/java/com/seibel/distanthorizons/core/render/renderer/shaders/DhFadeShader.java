@@ -19,6 +19,10 @@ public class DhFadeShader extends AbstractShaderRenderer
 	
 	
 	public int frameBuffer = -1;
+	private int activeFrameBuffer = -1;
+	private int activeDepthTextureId = -1;
+	private int activeColorTextureId = -1;
+	private int activeMcColorTextureId = -1;
 	
 	private Mat4f inverseDhMvmProjMatrix;
 	
@@ -104,42 +108,52 @@ public class DhFadeShader extends AbstractShaderRenderer
 	//========//
 	// render //
 	//========//
-	
+
 	@Override
-	protected void onRender(CommandContext ctx)
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
 		int colorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
 		int mcColorTextureId = MC_RENDER.getColorTextureId();
-		
+
 		if (depthTextureId == -1
 			|| colorTextureId == -1
 			|| mcColorTextureId == -1
 			|| this.frameBuffer == -1)
 		{
-			// the renderer is currently being re-built and/or inactive,
-			// we don't need to/can't render fading
-			return;
+			this.activeDepthTextureId = -1;
+			this.activeColorTextureId = -1;
+			this.activeMcColorTextureId = -1;
+			this.activeFrameBuffer = -1;
+			return false;
 		}
-		
-		
-		
-		VulkanicAPI.bindFramebuffer(ctx, this.frameBuffer);
+
+		this.activeDepthTextureId = depthTextureId;
+		this.activeColorTextureId = colorTextureId;
+		this.activeMcColorTextureId = mcColorTextureId;
+		this.activeFrameBuffer = this.frameBuffer;
+		return true;
+	}
+	
+	@Override
+	protected void onRender(CommandContext ctx)
+	{
+		VulkanicAPI.bindFramebuffer(ctx, this.activeFrameBuffer);
 		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(depthTextureId);
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDhDepthTexture, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
-		DhTextureState.bindTexture2D(mcColorTextureId);
+		DhTextureState.bindTexture2D(this.activeMcColorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uMcColorTexture, 1);
 		
 		DhTextureState.setActiveTextureUnitIndex(2);
-		DhTextureState.bindTexture2D(colorTextureId);
+		DhTextureState.bindTexture2D(this.activeColorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDhColorTexture, 2);
 		
 		

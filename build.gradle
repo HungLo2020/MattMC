@@ -1002,6 +1002,12 @@ tasks.named('compileJava') {
     finalizedBy test
 }
 
+// Also enforce boundaries before launching the game client so `runClient`
+// cannot execute with architectural violations.
+tasks.named('runClient') {
+    dependsOn test
+}
+
 // Task to run all tests (both misc and performance)
 tasks.register('testAll', Test) {
     group = 'verification'

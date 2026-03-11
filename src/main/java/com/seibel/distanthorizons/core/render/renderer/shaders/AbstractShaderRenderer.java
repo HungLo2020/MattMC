@@ -30,18 +30,30 @@ public abstract class AbstractShaderRenderer
 	{
 		this.init();
 		CommandContext ctx = VulkanicAPI.getCommandContext();
-		
-		this.shader.bind(ctx);
-		
-		this.onApplyUniforms(ctx, partialTicks);
-		
+
 		int width = MC_RENDER.getTargetFramebufferViewportWidth();
 		int height = MC_RENDER.getTargetFramebufferViewportHeight();
-		VulkanicAPI.setViewport(ctx, 0, 0, width, height);
+		if (width <= 0 || height <= 0)
+		{
+			return;
+		}
+
+		if (!this.onPreRender(ctx, partialTicks))
+		{
+			return;
+		}
 		
-		this.onRender(ctx);
-		
-		this.shader.unbind(ctx);
+		this.shader.bind(ctx);
+		try
+		{
+			this.onApplyUniforms(ctx, partialTicks);
+			VulkanicAPI.setViewport(ctx, 0, 0, width, height);
+			this.onRender(ctx);
+		}
+		finally
+		{
+			this.shader.unbind(ctx);
+		}
 	}
 	
 	public void free()
@@ -53,6 +65,8 @@ public abstract class AbstractShaderRenderer
 	}
 	
 	protected void onInit() {}
+
+	protected boolean onPreRender(CommandContext ctx, float partialTicks) { return true; }
 	
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks) {}
 	

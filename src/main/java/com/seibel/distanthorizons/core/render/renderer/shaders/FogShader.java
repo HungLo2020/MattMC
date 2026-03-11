@@ -28,6 +28,8 @@ public class FogShader extends AbstractShaderRenderer
 	
 	
 	public int frameBuffer = -1;
+	private int activeFrameBuffer = -1;
+	private int activeDepthTextureId = -1;
 	
 	private Mat4f inverseMvmProjMatrix; 
 	
@@ -231,23 +233,33 @@ public class FogShader extends AbstractShaderRenderer
 	//========//
 	// render //
 	//========//
-	
+
 	@Override
-	protected void onRender(CommandContext ctx)
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
 		if (this.frameBuffer == -1 || depthTextureId == -1)
 		{
-			return;
+			this.activeFrameBuffer = -1;
+			this.activeDepthTextureId = -1;
+			return false;
 		}
 
-		VulkanicAPI.bindFramebuffer(ctx, this.frameBuffer);
+		this.activeFrameBuffer = this.frameBuffer;
+		this.activeDepthTextureId = depthTextureId;
+		return true;
+	}
+	
+	@Override
+	protected void onRender(CommandContext ctx)
+	{
+		VulkanicAPI.bindFramebuffer(ctx, this.activeFrameBuffer);
 		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(depthTextureId);
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDepthMap, 0);
 		
 		// this is necessary for Legacy OpenGL support

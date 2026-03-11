@@ -5,7 +5,6 @@ import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanReadinessReport;
-import net.vulkanic.backends.opengl.OpenGLBackend;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
@@ -38,7 +37,7 @@ import java.util.OptionalInt;
 
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-public class VulkanBackend extends OpenGLBackend {
+public class VulkanBackend {
 
     private final Object nativeInitLock = new Object();
     private volatile NativeSpine nativeSpine;
@@ -48,12 +47,10 @@ public class VulkanBackend extends OpenGLBackend {
     private volatile VulkanReadinessReport cachedReadinessReport;
     private volatile CommandContext currentCommandContext;
 
-    @Override
     public GraphicsBackendType getBackendType() {
         return GraphicsBackendType.VULKAN;
     }
 
-    @Override
     public boolean isNativeVulkanReady() {
         return nativeSpine != null;
     }
@@ -153,7 +150,7 @@ public class VulkanBackend extends OpenGLBackend {
         }
 
         List<String> blockers = new ArrayList<>();
-        blockers.add("Native Vulkan command/pipeline integration is partial; non-overridden GraphicsBackend methods remain blocked to prevent OpenGL fallback.");
+        blockers.add("Native Vulkan command/pipeline integration is partial; non-implemented GraphicsBackend methods remain blocked with fail-fast behavior.");
 
         if (!lwjglBindingsPresent) {
             blockers.add("LWJGL Vulkan bindings are not available: " + bindingsStatus + ".");
@@ -233,7 +230,6 @@ public class VulkanBackend extends OpenGLBackend {
         }
     }
 
-    @Override
     public CommandContext getCurrentCommandContext() {
         ensureNativeReady("getCurrentCommandContext");
 
@@ -254,20 +250,17 @@ public class VulkanBackend extends OpenGLBackend {
         return context;
     }
 
-    @Override
     public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
         ensureNativeReady("createPipeline");
         throw new UnsupportedOperationException("Vulkan-native pipeline creation is not implemented yet.");
     }
 
-    @Override
     public net.vulkanic.DescriptorPoolHandle createDescriptorPool(
             net.vulkanic.DescriptorPoolDescriptor descriptor) {
         ensureNativeReady("createDescriptorPool");
         throw new UnsupportedOperationException("Vulkan-native descriptor pool lifecycle is not implemented yet.");
     }
 
-    @Override
     public net.vulkanic.DescriptorSetHandle allocateDescriptorSet(
             net.vulkanic.DescriptorPoolHandle pool,
             PipelineDescriptor descriptor) {
@@ -275,14 +268,12 @@ public class VulkanBackend extends OpenGLBackend {
         throw new UnsupportedOperationException("Vulkan-native descriptor set allocation is not implemented yet.");
     }
 
-    @Override
     public void updateDescriptorSet(net.vulkanic.DescriptorSetHandle descriptorSet,
             net.vulkanic.PipelineResourceBindings bindings) {
         ensureNativeReady("updateDescriptorSet");
         throw new UnsupportedOperationException("Vulkan-native descriptor set updates are not implemented yet.");
     }
 
-    @Override
     public void bindDescriptorSet(CommandContext ctx,
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
@@ -291,13 +282,11 @@ public class VulkanBackend extends OpenGLBackend {
         throw new UnsupportedOperationException("Vulkan-native descriptor set binding is not implemented yet.");
     }
 
-    @Override
     public void resetDescriptorPool(net.vulkanic.DescriptorPoolHandle pool) {
         ensureNativeReady("resetDescriptorPool");
         throw new UnsupportedOperationException("Vulkan-native descriptor pool reset is not implemented yet.");
     }
 
-    @Override
     public void bindPipelineResources(CommandContext ctx,
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
@@ -306,14 +295,12 @@ public class VulkanBackend extends OpenGLBackend {
         throw new UnsupportedOperationException("Vulkan-native descriptor set updates are not implemented yet.");
     }
 
-    @Override
     public void applyResourceBarriers(CommandContext ctx,
             net.vulkanic.VulkanicResourceBarriers barriers) {
         ensureNativeReady("applyResourceBarriers");
         throw new UnsupportedOperationException("Vulkan-native resource barrier mapping is not implemented yet.");
     }
 
-    @Override
     public CommandContext beginCommandBuffer() {
         ensureNativeReady("beginCommandBuffer");
         NativeSpine spine = nativeSpine;
@@ -327,7 +314,6 @@ public class VulkanBackend extends OpenGLBackend {
         return context;
     }
 
-    @Override
     public void submitCommandBuffer(CommandContext ctx) {
         ensureNativeReady("submitCommandBuffer");
 
@@ -346,7 +332,6 @@ public class VulkanBackend extends OpenGLBackend {
         currentCommandContext = null;
     }
 
-    @Override
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
             java.util.function.Supplier<String> label,
             net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor) {
@@ -354,7 +339,6 @@ public class VulkanBackend extends OpenGLBackend {
         throw new UnsupportedOperationException("Vulkan-native render pass lifecycle is not implemented yet.");
     }
 
-    @Override
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
             java.util.function.Supplier<String> label,
             net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor,
@@ -364,7 +348,6 @@ public class VulkanBackend extends OpenGLBackend {
         throw new UnsupportedOperationException("Vulkan-native render pass lifecycle is not implemented yet.");
     }
 
-    @Override
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
             net.vulkanic.VulkanicRenderPassDescriptor descriptor) {
         ensureNativeReady("beginRenderPass");

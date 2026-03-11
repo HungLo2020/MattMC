@@ -141,11 +141,28 @@ public class VanillaFadeRenderer
 			// resize the framebuffer if necessary
 			int width = MC_RENDER.getTargetFramebufferViewportWidth();
 			int height = MC_RENDER.getTargetFramebufferViewportHeight();
+			if (width <= 0 || height <= 0)
+			{
+				this.width = -1;
+				this.height = -1;
+				return;
+			}
+
 			if (this.width != width || this.height != height)
 			{
 				this.width = width;
 				this.height = height;
 				this.createFramebuffer(ctx, width, height, mcColorTextureId);
+			}
+
+			if (this.fadeFramebuffer == -1)
+			{
+				return;
+			}
+
+			if (MC_RENDER.mcRendersToFrameBuffer() && this.fadeTexture == -1)
+			{
+				return;
 			}
 			
 			

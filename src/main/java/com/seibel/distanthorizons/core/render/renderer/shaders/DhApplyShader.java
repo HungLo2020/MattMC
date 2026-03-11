@@ -23,6 +23,14 @@ public class DhApplyShader extends AbstractShaderRenderer
 	// uniforms
 	public int gDhColorTextureUniform;
 	public int gDepthMapUniform;
+
+	private boolean activeRenderToFrameBuffer = false;
+	private int activeTargetFrameBuffer = -1;
+	private int activeTargetColorTextureId = -1;
+	private int activeDhFrameBufferId = -1;
+	private int activeMcFrameBufferId = -1;
+	private int activeDhColorTextureId = -1;
+	private int activeDhDepthTextureId = -1;
 	
 	
 	
@@ -50,11 +58,46 @@ public class DhApplyShader extends AbstractShaderRenderer
 	//========//
 	// render //
 	//========//
+
+	@Override
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
+	{
+		this.activeRenderToFrameBuffer = MC_RENDER.mcRendersToFrameBuffer();
+		this.activeDhColorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
+		this.activeDhDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+
+		if (this.activeDhColorTextureId == -1 || this.activeDhDepthTextureId == -1)
+		{
+			this.activeTargetFrameBuffer = -1;
+			this.activeTargetColorTextureId = -1;
+			this.activeDhFrameBufferId = -1;
+			this.activeMcFrameBufferId = -1;
+			return false;
+		}
+
+		if (this.activeRenderToFrameBuffer)
+		{
+			this.activeTargetFrameBuffer = MC_RENDER.getTargetFramebuffer();
+			this.activeTargetColorTextureId = -1;
+			this.activeDhFrameBufferId = -1;
+			this.activeMcFrameBufferId = -1;
+			return this.activeTargetFrameBuffer != -1;
+		}
+
+		this.activeTargetFrameBuffer = -1;
+		this.activeTargetColorTextureId = MC_RENDER.getColorTextureId();
+		this.activeDhFrameBufferId = LodRenderer.INSTANCE.getActiveFramebufferId();
+		this.activeMcFrameBufferId = MC_RENDER.getTargetFramebuffer();
+
+		return this.activeTargetColorTextureId != -1
+			&& this.activeDhFrameBufferId != -1
+			&& this.activeMcFrameBufferId != -1;
+	}
 	
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
-		if (MC_RENDER.mcRendersToFrameBuffer())
+		if (this.activeRenderToFrameBuffer)
 		{
 			this.renderToFrameBuffer(ctx);
 		}
@@ -66,20 +109,6 @@ public class DhApplyShader extends AbstractShaderRenderer
 	// TODO merge duplicate code between these to render methods
 	private void renderToFrameBuffer(CommandContext ctx)
 	{
-		int targetFrameBuffer = MC_RENDER.getTargetFramebuffer();
-		if (targetFrameBuffer == -1)
-		{
-			return;
-		}
-
-		int dhColorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
-		int dhDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
-		if (dhColorTextureId == -1 || dhDepthTextureId == -1)
-		{
-			return;
-		}
-		
-		
 		GLState state = new GLState(ctx);
 		
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
@@ -95,53 +124,26 @@ public class DhApplyShader extends AbstractShaderRenderer
 		//VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(dhColorTextureId);
+		DhTextureState.bindTexture2D(this.activeDhColorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
-		DhTextureState.bindTexture2D(dhDepthTextureId);
+		DhTextureState.bindTexture2D(this.activeDhDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 1);
 		
 		// Copy to MC's framebuffer
-		VulkanicAPI.bindFramebuffer(ctx, targetFrameBuffer);
+		VulkanicAPI.bindFramebuffer(ctx, this.activeTargetFrameBuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore(ctx);
-		VulkanicAPI.bindFramebuffer(ctx, targetFrameBuffer);
+		VulkanicAPI.bindFramebuffer(ctx, this.activeTargetFrameBuffer);
 		
 	}
 	private void renderToMcTexture(CommandContext ctx)
 	{
-		int targetColorTextureId = MC_RENDER.getColorTextureId();
-		if (targetColorTextureId == -1)
-		{
-			return;
-		}
-		
-		int dhFrameBufferId = LodRenderer.INSTANCE.getActiveFramebufferId();
-		if (dhFrameBufferId == -1)
-		{
-			return;
-		}
-		
-		int mcFrameBufferId = MC_RENDER.getTargetFramebuffer();
-		if (mcFrameBufferId == -1)
-		{
-			return;
-		}
-
-		int dhColorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
-		int dhDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
-		if (dhColorTextureId == -1 || dhDepthTextureId == -1)
-		{
-			return;
-		}
-		
-		
-		
 		GLState state = new GLState(ctx);
 		
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
@@ -157,26 +159,26 @@ public class DhApplyShader extends AbstractShaderRenderer
 		//VulkanicAPI.blendFunc(ctx, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(dhColorTextureId);
+		DhTextureState.bindTexture2D(this.activeDhColorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
-		DhTextureState.bindTexture2D(dhDepthTextureId);
+		DhTextureState.bindTexture2D(this.activeDhDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 1);
 		
 		
 		
-		VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, targetColorTextureId, 0);
+		VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.activeTargetColorTextureId, 0);
 		
 		// Copy to MC's texture via MC's framebuffer
-		VulkanicAPI.bindFramebuffer(ctx, dhFrameBufferId);
+		VulkanicAPI.bindFramebuffer(ctx, this.activeDhFrameBufferId);
 		
 		ScreenQuad.INSTANCE.render();
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore(ctx);
-		VulkanicAPI.bindFramebuffer(ctx, mcFrameBufferId);
+		VulkanicAPI.bindFramebuffer(ctx, this.activeMcFrameBufferId);
 		
 	}
 	

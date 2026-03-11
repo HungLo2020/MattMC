@@ -22,11 +22,14 @@ public class FogApplyShader extends AbstractShaderRenderer
 	public static FogApplyShader INSTANCE = new FogApplyShader();
 	
 	
-	public int fogTexture;
+	public int fogTexture = -1;
 	
 	// uniforms
 	public int colorTextureUniform;
 	public int depthTextureUniform;
+
+	private int activeDepthTextureId = -1;
+	private int activeDrawFramebuffer = -1;
 	
 	
 	
@@ -56,6 +59,17 @@ public class FogApplyShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
+	{
+		this.activeDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		this.activeDrawFramebuffer = LodRenderer.INSTANCE.getActiveFramebufferId();
+		return this.fogTexture != -1
+			&& this.activeDepthTextureId != -1
+			&& FogShader.INSTANCE.frameBuffer != -1
+			&& this.activeDrawFramebuffer != -1;
+	}
+
+	@Override
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		DhTextureState.setActiveTextureUnitIndex(0);
@@ -63,7 +77,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 		VulkanicAPI.setUniform1i(ctx, this.colorTextureUniform, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
-		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.depthTextureUniform, 1);
 		
 	}
@@ -77,12 +91,6 @@ public class FogApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
-		int drawFramebuffer = LodRenderer.INSTANCE.getActiveFramebufferId();
-		if (FogShader.INSTANCE.frameBuffer == -1 || drawFramebuffer == -1)
-		{
-			return;
-		}
-		
 		VulkanicAPI.setBlendEnabled(ctx, true);
 		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
 		VulkanicAPI.setBlendFunction(
@@ -101,7 +109,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 		
 		// apply the rendered Fog to DH's framebuffer
 		VulkanicAPI.bindReadFramebuffer(ctx, FogShader.INSTANCE.frameBuffer);
-		VulkanicAPI.bindDrawFramebuffer(ctx, drawFramebuffer);
+		VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		

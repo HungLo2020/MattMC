@@ -28,7 +28,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,10 +41,6 @@ public class VulkanicAPI {
     @Nullable
     private static VulkanBackend rawVulkanBackend;
 
-    private static final Set<String> VULKAN_PROXY_ALLOWED_METHODS = Set.of(
-        "getBackendType",
-        "isNativeVulkanReady"
-    );
     private static final boolean IS_MACOS = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("mac");
     @Nullable
     private static Thread renderThread;
@@ -682,7 +677,7 @@ public class VulkanicAPI {
     }
 
     private static GraphicsBackend createFailFastVulkanProxy(VulkanBackend vulkanBackend) {
-        java.util.Map<Method, Method> methodCache = new ConcurrentHashMap<>();
+        java.util.Map<Method, java.util.Optional<Method>> methodCache = new ConcurrentHashMap<>();
 
         return (GraphicsBackend) Proxy.newProxyInstance(
             GraphicsBackend.class.getClassLoader(),
@@ -692,23 +687,22 @@ public class VulkanicAPI {
                     return method.invoke(vulkanBackend, args);
                 }
 
-                Method backendMethod = methodCache.computeIfAbsent(method, key -> {
+                java.util.Optional<Method> backendMethod = methodCache.computeIfAbsent(method, key -> {
                     try {
-                        return VulkanBackend.class.getMethod(key.getName(), key.getParameterTypes());
-                    } catch (NoSuchMethodException exception) {
-                        throw new IllegalStateException("Could not resolve VulkanBackend method: " + key, exception);
+                        return java.util.Optional.of(VulkanBackend.class.getMethod(key.getName(), key.getParameterTypes()));
+                    } catch (NoSuchMethodException ignored) {
+                        return java.util.Optional.empty();
                     }
                 });
 
-                boolean overriddenInVulkanBackend = backendMethod.getDeclaringClass() == VulkanBackend.class;
-                if (!overriddenInVulkanBackend && !VULKAN_PROXY_ALLOWED_METHODS.contains(method.getName())) {
+                if (backendMethod.isEmpty()) {
                     throw new IllegalStateException(
                         "Vulkan backend selected but method '" + method.getName() + "' is not implemented natively; "
                             + "OpenGL fallback is intentionally blocked.");
                 }
 
                 try {
-                    return backendMethod.invoke(vulkanBackend, args);
+                    return backendMethod.get().invoke(vulkanBackend, args);
                 } catch (InvocationTargetException exception) {
                     throw exception.getTargetException();
                 }

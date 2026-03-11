@@ -47,6 +47,10 @@ public class ArchitecturalBoundaryTest {
     private static final Pattern OPENGL_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+org\\.lwjgl\\.opengl\\.[^;]+;", Pattern.MULTILINE);
     private static final Pattern VULKAN_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+org\\.lwjgl\\.vulkan\\.[^;]+;", Pattern.MULTILINE);
     private static final Pattern BACKEND_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+net\\.vulkanic\\.backends\\.[^;]+;", Pattern.MULTILINE);
+    private static final Pattern OPENGL_BACKEND_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+net\\.vulkanic\\.backends\\.opengl\\.[^;]+;", Pattern.MULTILINE);
+    private static final Pattern VULKAN_BACKEND_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+net\\.vulkanic\\.backends\\.vulkan\\.[^;]+;", Pattern.MULTILINE);
+    private static final Pattern OPENGL_BACKEND_REFERENCE_PATTERN = Pattern.compile("\\bnet\\.vulkanic\\.backends\\.opengl\\.");
+    private static final Pattern VULKAN_BACKEND_REFERENCE_PATTERN = Pattern.compile("\\bnet\\.vulkanic\\.backends\\.vulkan\\.");
     
     @Test
     public void testOpenGLImportsOnlyInBackend() throws IOException {
@@ -96,6 +100,36 @@ public class ArchitecturalBoundaryTest {
             fail(buildBackendViolationMessage(violations));
         }
     }
+
+    @Test
+    public void testOpenGLBackendDoesNotReferenceVulkanBackendImplementation() throws IOException {
+        List<String> violations = checkForbiddenBackendReferences(
+            OPENGL_BACKEND_PATH,
+            VULKAN_BACKEND_IMPORT_PATTERN,
+            VULKAN_BACKEND_REFERENCE_PATTERN,
+            "OpenGL",
+            "Vulkan"
+        );
+
+        if (!violations.isEmpty()) {
+            fail(buildCrossBackendViolationMessage("OpenGL", "Vulkan", violations));
+        }
+    }
+
+    @Test
+    public void testVulkanBackendDoesNotReferenceOpenGLBackendImplementation() throws IOException {
+        List<String> violations = checkForbiddenBackendReferences(
+            VULKAN_BACKEND_PATH,
+            OPENGL_BACKEND_IMPORT_PATTERN,
+            OPENGL_BACKEND_REFERENCE_PATTERN,
+            "Vulkan",
+            "OpenGL"
+        );
+
+        if (!violations.isEmpty()) {
+            fail(buildCrossBackendViolationMessage("Vulkan", "OpenGL", violations));
+        }
+    }
     
     /**
      * Scans Java source files for import violations.
@@ -142,6 +176,59 @@ public class ArchitecturalBoundaryTest {
             }
         }
         
+        return violations;
+    }
+
+    private List<String> checkForbiddenBackendReferences(
+        Path backendPath,
+        Pattern forbiddenImportPattern,
+        Pattern forbiddenReferencePattern,
+        String ownerBackend,
+        String forbiddenBackend
+    ) throws IOException {
+        List<String> violations = new ArrayList<>();
+
+        try (Stream<Path> paths = Files.walk(backendPath)) {
+            List<Path> javaFiles = paths
+                .filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".java"))
+                .collect(Collectors.toList());
+
+            for (Path file : javaFiles) {
+                String content = Files.readString(file);
+                List<String> illegalEntries = new ArrayList<>();
+
+                Matcher importMatcher = forbiddenImportPattern.matcher(content);
+                while (importMatcher.find()) {
+                    illegalEntries.add(importMatcher.group().trim());
+                }
+
+                String[] lines = content.split("\\R", -1);
+                for (int index = 0; index < lines.length; index++) {
+                    String line = lines[index];
+                    String trimmed = line.trim();
+                    if (trimmed.startsWith("import ")) {
+                        continue;
+                    }
+
+                    if (forbiddenReferencePattern.matcher(line).find()) {
+                        illegalEntries.add("line " + (index + 1) + ": " + trimmed);
+                    }
+                }
+
+                if (!illegalEntries.isEmpty()) {
+                    String relativePath = SRC_MAIN_JAVA.relativize(file).toString();
+                    violations.add(String.format(
+                        "File: %s\n  %s backend illegally references %s backend symbols:\n    %s",
+                        relativePath,
+                        ownerBackend,
+                        forbiddenBackend,
+                        String.join("\n    ", illegalEntries)
+                    ));
+                }
+            }
+        }
+
         return violations;
     }
     
@@ -208,6 +295,32 @@ public class ArchitecturalBoundaryTest {
         errorMessage.append("        See src/main/java/net/vulkanic/README.md for architectural guidance.\n");
         errorMessage.append("================================================================================\n");
         
+        return errorMessage.toString();
+    }
+
+    private String buildCrossBackendViolationMessage(String sourceBackend, String forbiddenBackend, List<String> violations) {
+        StringBuilder errorMessage = new StringBuilder();
+        errorMessage.append("\n");
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("ARCHITECTURAL BOUNDARY VIOLATION: Cross-Backend Dependency Detected\n");
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("\n");
+        errorMessage.append(sourceBackend).append(" backend code must not import or reference ")
+            .append(forbiddenBackend).append(" backend implementation types.\n");
+        errorMessage.append("\n");
+        errorMessage.append("REASON: Backends must remain fully isolated so backend selection never\n");
+        errorMessage.append("        relies on implementation code from another backend.\n");
+        errorMessage.append("\n");
+        errorMessage.append("VIOLATIONS FOUND:\n");
+        errorMessage.append("--------------------------------------------------------------------------------\n");
+        for (String violation : violations) {
+            errorMessage.append(violation).append("\n\n");
+        }
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("TO FIX: Remove cross-backend imports/references and route interactions through\n");
+        errorMessage.append("        net.vulkanic frontend abstractions only.\n");
+        errorMessage.append("================================================================================\n");
+
         return errorMessage.toString();
     }
     

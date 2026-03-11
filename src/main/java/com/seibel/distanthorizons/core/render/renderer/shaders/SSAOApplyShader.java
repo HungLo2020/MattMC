@@ -24,7 +24,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	public static SSAOApplyShader INSTANCE = new SSAOApplyShader();
 	
 	
-	public int ssaoTexture;
+	public int ssaoTexture = -1;
 	
 	// uniforms
 	public int gSSAOMapUniform;
@@ -33,6 +33,9 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	public int gBlurRadiusUniform;
 	public int gNearUniform;
 	public int gFarUniform;
+
+	private int activeDepthTextureId = -1;
+	private int activeDrawFramebuffer = -1;
 	
 	
 	
@@ -65,10 +68,21 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
+	{
+		this.activeDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		this.activeDrawFramebuffer = LodRenderer.INSTANCE.getActiveFramebufferId();
+		return this.ssaoTexture != -1
+			&& this.activeDepthTextureId != -1
+			&& SSAOShader.INSTANCE.frameBuffer != -1
+			&& this.activeDrawFramebuffer != -1;
+	}
+
+	@Override
 	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		DhTextureState.setActiveTextureUnitIndex(0);
-		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 0);
 		
 		DhTextureState.setActiveTextureUnitIndex(1);
@@ -106,12 +120,6 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
-		int drawFramebuffer = LodRenderer.INSTANCE.getActiveFramebufferId();
-		if (SSAOShader.INSTANCE.frameBuffer == -1 || drawFramebuffer == -1)
-		{
-			return;
-		}
-		
 		VulkanicAPI.setBlendEnabled(ctx, true);
 		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
 		VulkanicAPI.setBlendFunction(
@@ -129,7 +137,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		
 		// apply the rendered SSAO to the LODs 
 		VulkanicAPI.bindReadFramebuffer(ctx, SSAOShader.INSTANCE.frameBuffer);
-		VulkanicAPI.bindDrawFramebuffer(ctx, drawFramebuffer);
+		VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);
 		
 		
 		ScreenQuad.INSTANCE.render();
