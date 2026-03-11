@@ -14,10 +14,8 @@ public class DepthTexture extends GlResource {
 		resize(width, height, format);
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, name);
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_NEAREST);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		IrisRenderSystem.setTextureNearestFiltering(texture);
+		IrisRenderSystem.setTextureWrapMode2D(texture, true);
 
 		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 	}

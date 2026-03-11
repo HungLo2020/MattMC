@@ -61,7 +61,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.bind(ctx);
 		
 		int depthAttachment = isCombinedStencil ? VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT : VulkanicAPI.GL_DEPTH_ATTACHMENT;
-		VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, depthAttachment, textureId, 0);
+		VulkanicAPI.framebufferTexture2D(ctx, depthAttachment, textureId, 0);
 		
 		this.hasDepthAttachment = true;
 	}
@@ -76,7 +76,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	{
 		this.bind(ctx);
 		
-		VulkanicAPI.framebufferColorAttachmentTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, textureIndex, textureId, 0);
+		VulkanicAPI.framebufferColorAttachmentTexture2D(ctx, textureIndex, textureId, 0);
 		this.attachments.put(textureIndex, textureId);
 	}
 
@@ -179,7 +179,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	public int getStatus(CommandContext ctx)
 	{
 		this.bind(ctx); 
-		int status = VulkanicAPI.checkFramebufferStatus(ctx, VulkanicAPI.GL_FRAMEBUFFER);
+		int status = VulkanicAPI.checkFramebufferStatus(ctx);
 		return status;
 	}
 	

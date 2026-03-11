@@ -91,7 +91,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnitIndex(1);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 1);
 		
@@ -146,7 +146,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveColorTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.gDhColorTextureUniform, 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnitIndex(1);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 1);
 		

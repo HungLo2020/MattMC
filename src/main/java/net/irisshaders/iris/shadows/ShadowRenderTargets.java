@@ -183,10 +183,8 @@ public class ShadowRenderTargets {
 	public void copyPreTranslucentDepth() {
 		if (translucentDepthDirty) {
 			translucentDepthDirty = false;
-			IrisRenderSystem.blitFramebuffer(depthSourceFb.getId(), noTranslucentsDestFb.getId(), 0, 0, resolution, resolution,
-				0, 0, resolution, resolution,
-				VulkanicAPI.GL_DEPTH_BUFFER_BIT,
-				VulkanicAPI.GL_NEAREST);
+			IrisRenderSystem.blitDepthBufferNearest(depthSourceFb.getId(), noTranslucentsDestFb.getId(), 0, 0, resolution, resolution,
+				0, 0, resolution, resolution);
 		} else {
 			DepthCopyStrategy.fastest(false).copy(depthSourceFb, mainDepth.iris$getGlId(), noTranslucentsDestFb, noTranslucents.iris$getGlId(),
 				resolution, resolution);
@@ -318,7 +316,7 @@ public class ShadowRenderTargets {
 		framebuffer.readBuffer(0);
 
 		int status = framebuffer.getStatus();
-		if (status != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE) {
+		if (!VulkanicAPI.isFramebufferComplete(status)) {
 			throw new IllegalStateException("Unexpected error while creating framebuffer");
 		}
 

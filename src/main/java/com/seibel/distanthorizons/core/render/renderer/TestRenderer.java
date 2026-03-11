@@ -102,7 +102,7 @@ public class TestRenderer
 		
 		// Render the square
 		VulkanicAPI.drawArrays(ctx, VulkanicAPI.GL_TRIANGLE_FAN, 0, 4);
-		VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+		VulkanicAPI.clearDepthBuffer(ctx);
 	}
 	
 	

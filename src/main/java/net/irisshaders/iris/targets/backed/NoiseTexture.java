@@ -22,15 +22,9 @@ public class NoiseTexture extends GlResource {
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		int texture = getGlId();
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_REPEAT);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_REPEAT);
-
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_LOD, 0);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAX_LOD, 0);
-		IrisRenderSystem.texParameterf(texture, VulkanicAPI.GL_TEXTURE_LOD_BIAS, 0.0F);
+		IrisRenderSystem.setTextureLinearFiltering(texture);
+		IrisRenderSystem.setTextureWrapMode2D(texture, false);
+		IrisRenderSystem.resetTextureLodRangeToZero(texture);
 		resize(texture, width, height);
 
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, "noise texture");

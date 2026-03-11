@@ -71,7 +71,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnitIndex(1);
 		DhTextureState.bindTexture2D(this.ssaoTexture);
 		VulkanicAPI.setUniform1i(ctx, this.gSSAOMapUniform, 1);
 		

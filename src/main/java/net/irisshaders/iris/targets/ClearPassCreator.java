@@ -67,10 +67,10 @@ public class ClearPassCreator {
 
 				// No need to clear the depth buffer, since we're using Minecraft's depth buffer.
 				clearPasses.add(new ClearPass(clearInfo.getColor(), clearInfo::getWidth, clearInfo::getHeight,
-					renderTargets.createClearFramebuffer(true, clearBuffers), VulkanicAPI.GL_COLOR_BUFFER_BIT));
+					renderTargets.createClearFramebuffer(true, clearBuffers)));
 
 				clearPasses.add(new ClearPass(clearInfo.getColor(), clearInfo::getWidth, clearInfo::getHeight,
-					renderTargets.createClearFramebuffer(false, clearBuffers), VulkanicAPI.GL_COLOR_BUFFER_BIT));
+					renderTargets.createClearFramebuffer(false, clearBuffers)));
 			}
 		}));
 
@@ -119,10 +119,10 @@ public class ClearPassCreator {
 
 				// No need to clear the depth buffer, since we're using Minecraft's depth buffer.
 				clearPasses.add(new ClearPass(clearColor, renderTargets::getResolution, renderTargets::getResolution,
-					renderTargets.createFramebufferWritingToAlt(clearBuffers), VulkanicAPI.GL_COLOR_BUFFER_BIT));
+					renderTargets.createFramebufferWritingToAlt(clearBuffers)));
 
 				clearPasses.add(new ClearPass(clearColor, renderTargets::getResolution, renderTargets::getResolution,
-					renderTargets.createFramebufferWritingToMain(clearBuffers), VulkanicAPI.GL_COLOR_BUFFER_BIT));
+					renderTargets.createFramebufferWritingToMain(clearBuffers)));
 			}
 		});
 

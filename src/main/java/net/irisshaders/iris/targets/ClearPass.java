@@ -13,14 +13,12 @@ public class ClearPass {
 	private final IntSupplier viewportX;
 	private final IntSupplier viewportY;
 	private final GlFramebuffer framebuffer;
-	private final int clearFlags;
 
-	public ClearPass(Vector4f color, IntSupplier viewportX, IntSupplier viewportY, GlFramebuffer framebuffer, int clearFlags) {
+	public ClearPass(Vector4f color, IntSupplier viewportX, IntSupplier viewportY, GlFramebuffer framebuffer) {
 		this.color = color;
 		this.viewportX = viewportX;
 		this.viewportY = viewportY;
 		this.framebuffer = framebuffer;
-		this.clearFlags = clearFlags;
 	}
 
 	public void execute(Vector4f defaultClearColor) {
@@ -34,7 +32,7 @@ public class ClearPass {
 		}
 
 		IrisRenderSystem.clearColor(color.x, color.y, color.z, color.w);
-		VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), clearFlags);
+		VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext());
 	}
 
 	public GlFramebuffer getFramebuffer() {

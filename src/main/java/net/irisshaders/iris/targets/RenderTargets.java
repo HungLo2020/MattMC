@@ -378,7 +378,7 @@ public class RenderTargets {
 
 
 		int status = framebuffer.getStatus();
-		if (status != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE) {
+		if (!VulkanicAPI.isFramebufferComplete(status)) {
 			throw new IllegalStateException("Unexpected error while creating framebuffer: Draw buffers " + Arrays.toString(actualDrawBuffers) + " Status: " + status);
 		}
 

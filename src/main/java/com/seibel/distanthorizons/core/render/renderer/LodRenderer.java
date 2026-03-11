@@ -286,7 +286,7 @@ public class LodRenderer
 				// If MC's framebuffer is being used the depth needs to be cleared to prevent rendering on top of MC.
 				// This should only happen when Optifine shaders are being used.
 				CommandContext ctx = VulkanicAPI.getCommandContext();
-				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearDepthBuffer(ctx);
 			}
 			
 			
@@ -444,7 +444,7 @@ public class LodRenderer
 		else
 		{
 			// get MC's color texture
-			this.activeColorTextureId = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+			this.activeColorTextureId = VulkanicAPI.getFramebufferColorAttachment0ObjectName(ctx);
 		}
 		
 		
@@ -466,11 +466,11 @@ public class LodRenderer
 				
 				
 				// don't clear the color texture, that removes the sky
-				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearDepthBuffer(ctx);
 			}
 			else if (firstPass)
 			{
-				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearColorAndDepthBuffers(ctx);
 			}
 		}
 		
@@ -505,7 +505,7 @@ public class LodRenderer
 		// create and bind the necessary textures
 		this.createAndBindTextures();
 		
-		if(this.framebuffer.getStatus() != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE)
+		if(!VulkanicAPI.isFramebufferComplete(this.framebuffer.getStatus()))
 		{
 			// This generally means something wasn't bound, IE missing either the color or depth texture
 			LOGGER.warn("Framebuffer ["+this.framebuffer.getId()+"] isn't complete.");

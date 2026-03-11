@@ -5,12 +5,6 @@ import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.vulkanic.VulkanicAPI;
 
 public interface DepthCopyStrategy {
-	// GL constants (from GL20C, GL30C, GL43C)
-	int GL_TEXTURE_2D = 0x0DE1;
-	int GL_DEPTH_BUFFER_BIT = 0x00000100;
-	int GL_STENCIL_BUFFER_BIT = 0x00000400;
-	int GL_NEAREST = 0x2600;
-	
 	static DepthCopyStrategy fastest(boolean combinedStencilRequired) {
 		// Check whether glCopyImageSubData is available by checking the function directly...
 		// Gl.getCapabilities().OpenGL43 can be false even if OpenGL 4.3 functions are supported,
@@ -61,7 +55,7 @@ public interface DepthCopyStrategy {
 			IrisRenderSystem.copyTexSubImage2D(
 				destTexture,
 				// target
-				GL_TEXTURE_2D,
+				VulkanicAPI.GL_TEXTURE_2D,
 				// level
 				0,
 				// xoffset, yoffset
@@ -90,10 +84,8 @@ public interface DepthCopyStrategy {
 
 		@Override
 		public void copy(GlFramebuffer sourceFb, int sourceTexture, GlFramebuffer destFb, int destTexture, int width, int height) {
-			IrisRenderSystem.blitFramebuffer(sourceFb.getId(), destFb.getId(), 0, 0, width, height,
-				0, 0, width, height,
-				GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT,
-				GL_NEAREST);
+			IrisRenderSystem.blitDepthAndStencilBuffersNearest(sourceFb.getId(), destFb.getId(), 0, 0, width, height,
+				0, 0, width, height);
 		}
 	}
 
@@ -113,13 +105,13 @@ public interface DepthCopyStrategy {
 		public void copy(GlFramebuffer sourceFb, int sourceTexture, GlFramebuffer destFb, int destTexture, int width, int height) {
 			IrisRenderSystem.copyImageSubData(
 				sourceTexture,
-				GL_TEXTURE_2D,
+				VulkanicAPI.GL_TEXTURE_2D,
 				0,
 				0,
 				0,
 				0,
 				destTexture,
-				GL_TEXTURE_2D,
+				VulkanicAPI.GL_TEXTURE_2D,
 				0,
 				0,
 				0,

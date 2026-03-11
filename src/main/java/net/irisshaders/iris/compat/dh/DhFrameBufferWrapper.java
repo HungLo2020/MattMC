@@ -37,7 +37,7 @@ public class DhFrameBufferWrapper implements IDhApiFramebuffer {
 	@Override
 	public int getStatus() {
 		this.bind();
-		return IrisRenderSystem.checkFramebufferStatus(VulkanicAPI.GL_FRAMEBUFFER);
+		return IrisRenderSystem.checkFramebufferStatus();
 	}
 
 	@Override

@@ -286,7 +286,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		);
 
 		// Don't clobber anything in texture unit 0. It probably won't cause issues, but we're just being cautious here.
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE2);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(2);
 
 		customTextureManager = new CustomTextureManager(programSet.getPackDirectives(), programSet.getPack().getCustomTextureDataMap(), programSet.getPack().getIrisCustomTextureDataMap(), programSet.getPack().getCustomNoiseTexture());
 		whitePixel = new NativeImageBackedSingleColorTexture(255, 255, 255, 255);
@@ -876,7 +876,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 				// Clear depth first, regardless of any color clearing.
 				shadowRenderTargets.getDepthSourceFb().bind();
 				net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
-				VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext());
 
 				ImmutableList<ClearPass> passes;
 

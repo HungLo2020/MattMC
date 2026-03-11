@@ -31,7 +31,7 @@ public class GlFramebuffer extends GlResource {
 		//if (texture.getFormat().hasStencilAspect()) {
 		//	IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, texture, 0);
 		//} else {
-			IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, ((GlTexture) texture).glId(), 0);
+			IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_DEPTH_ATTACHMENT, ((GlTexture) texture).glId(), 0);
 		//}
 
 		this.hasDepthAttachment = true;
@@ -40,7 +40,7 @@ public class GlFramebuffer extends GlResource {
 	public void addDepthAttachmentBypass(int texture) {
 		int fb = getGlId();
 
-		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, texture, 0);
+		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_DEPTH_ATTACHMENT, texture, 0);
 
 		this.hasDepthAttachment = true;
 	}
@@ -48,7 +48,7 @@ public class GlFramebuffer extends GlResource {
 	public void addColorAttachment(int index, int texture) {
 		int fb = getGlId();
 
-		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.colorAttachment(index), texture, 0);
+		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.colorAttachment(index), texture, 0);
 		attachments.put(index, texture);
 	}
 
@@ -115,7 +115,7 @@ public class GlFramebuffer extends GlResource {
 	public int getStatus() {
 		bind();
 
-		return IrisRenderSystem.checkFramebufferStatus(VulkanicAPI.GL_FRAMEBUFFER);
+		return IrisRenderSystem.checkFramebufferStatus();
 	}
 
 	public int getId() {

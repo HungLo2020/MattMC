@@ -220,6 +220,29 @@ public class IrisRenderSystem {
 		texParameterf(texture, VulkanicAPI.GL_TEXTURE_2D, pname, param);
 	}
 
+	public static void setTextureLinearFiltering(int texture) {
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+	}
+
+	public static void setTextureNearestFiltering(int texture) {
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST);
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_NEAREST);
+	}
+
+	public static void setTextureWrapMode2D(int texture, boolean clampToEdge) {
+		int wrapMode = clampToEdge ? VulkanicAPI.GL_CLAMP_TO_EDGE : VulkanicAPI.GL_REPEAT;
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S, wrapMode);
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_T, wrapMode);
+	}
+
+	public static void resetTextureLodRangeToZero(int texture) {
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_LOD, 0);
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAX_LOD, 0);
+		texParameterf(texture, VulkanicAPI.GL_TEXTURE_LOD_BIAS, 0.0F);
+	}
+
 	public static String getProgramInfoLog(int program) {
 		RenderSystem.assertOnRenderThread();
 		return VulkanicAPI.getProgramInfoLog(VulkanicAPI.getCommandContext(), program);
@@ -302,6 +325,10 @@ public class IrisRenderSystem {
 
 	public static void framebufferTexture2D(int fb, int fbtarget, int attachment, int texture, int levels) {
 		dsaState.framebufferTexture2D(fb, fbtarget, attachment, VulkanicAPI.GL_TEXTURE_2D, texture, levels);
+	}
+
+	public static void framebufferTexture2D(int fb, int attachment, int texture, int levels) {
+		framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, attachment, texture, levels);
 	}
 
 	public static int getTexParameteri(int texture, int target, int pname) {
@@ -413,6 +440,18 @@ public class IrisRenderSystem {
 
 	public static void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
 		dsaState.blitFramebuffer(source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
+	}
+
+	public static void blitColorBufferNearest(int source, int dest, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1) {
+		blitFramebuffer(source, dest, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, VulkanicAPI.GL_COLOR_BUFFER_BIT, VulkanicAPI.GL_NEAREST);
+	}
+
+	public static void blitDepthBufferNearest(int source, int dest, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1) {
+		blitFramebuffer(source, dest, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, VulkanicAPI.GL_DEPTH_BUFFER_BIT, VulkanicAPI.GL_NEAREST);
+	}
+
+	public static void blitDepthAndStencilBuffersNearest(int source, int dest, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1) {
+		blitFramebuffer(source, dest, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, VulkanicAPI.GL_DEPTH_BUFFER_BIT | VulkanicAPI.GL_STENCIL_BUFFER_BIT, VulkanicAPI.GL_NEAREST);
 	}
 
 	public static int createFramebuffer() {
@@ -590,17 +629,23 @@ public class IrisRenderSystem {
 
 	public static void setActiveTexture(int textureUnit) {
 		RenderSystem.assertOnRenderThread();
-		int textureUnitIndex = textureUnit - VulkanicAPI.GL_TEXTURE0;
+		int textureUnitIndex = VulkanicAPI.textureUnitToIndex(textureUnit);
 		validateTextureUnitIndex(textureUnitIndex);
 
 		if (activeTextureUnitIndex != textureUnitIndex) {
 			activeTextureUnitIndex = textureUnitIndex;
-			VulkanicAPI.setActiveTextureUnit(VulkanicAPI.getCommandContext(), textureUnit);
+			VulkanicAPI.setActiveTextureUnitIndex(VulkanicAPI.getCommandContext(), textureUnitIndex);
 		}
 	}
 
 	public static void setActiveTextureUnitIndex(int textureUnitIndex) {
-		setActiveTexture(VulkanicAPI.GL_TEXTURE0 + textureUnitIndex);
+		RenderSystem.assertOnRenderThread();
+		validateTextureUnitIndex(textureUnitIndex);
+
+		if (activeTextureUnitIndex != textureUnitIndex) {
+			activeTextureUnitIndex = textureUnitIndex;
+			VulkanicAPI.setActiveTextureUnitIndex(VulkanicAPI.getCommandContext(), textureUnitIndex);
+		}
 	}
 
 	public static int getActiveTextureUnitIndex() {
@@ -678,6 +723,10 @@ public class IrisRenderSystem {
 
 	public static int checkFramebufferStatus(int glFramebuffer) {
 		return VulkanicAPI.checkFramebufferStatus(VulkanicAPI.getCommandContext(), glFramebuffer);
+	}
+
+	public static int checkFramebufferStatus() {
+		return VulkanicAPI.checkFramebufferStatus(VulkanicAPI.getCommandContext());
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, FloatBuffer buf) {

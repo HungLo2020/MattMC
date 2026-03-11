@@ -24,24 +24,16 @@ public class GlTexture extends GlResource implements TextureAccess {
 		target.apply(this.getGlId(), sizeX, sizeY, sizeZ, internalFormat, format, pixelType, buffer);
 		MemoryUtil.memFree(buffer);
 
-		int texture = this.getGlId();
+		var ctx = VulkanicAPI.getCommandContext();
 
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MIN_FILTER, filteringData.shouldBlur() ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAG_FILTER, filteringData.shouldBlur() ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_WRAP_S, filteringData.shouldClamp() ? VulkanicAPI.GL_CLAMP_TO_EDGE : VulkanicAPI.GL_REPEAT);
-
-		if (sizeY > 0) {
-			IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_WRAP_T, filteringData.shouldClamp() ? VulkanicAPI.GL_CLAMP_TO_EDGE : VulkanicAPI.GL_REPEAT);
+		if (filteringData.shouldBlur()) {
+			VulkanicAPI.setTextureLinearFiltering(ctx, target.getGlType());
+		} else {
+			VulkanicAPI.setTextureNearestFiltering(ctx, target.getGlType());
 		}
 
-		if (sizeZ > 0) {
-			IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_WRAP_R, filteringData.shouldClamp() ? VulkanicAPI.GL_CLAMP_TO_EDGE : VulkanicAPI.GL_REPEAT);
-		}
-
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MIN_LOD, 0);
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAX_LOD, 0);
-		IrisRenderSystem.texParameterf(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_LOD_BIAS, 0.0F);
+		VulkanicAPI.setTextureWrapMode(ctx, target.getGlType(), filteringData.shouldClamp(), sizeY > 0, sizeZ > 0);
+		VulkanicAPI.resetTextureLodRangeToZero(ctx, target.getGlType());
 
 		IrisRenderSystem.bindTextureForSetup(target.getGlType(), 0);
 

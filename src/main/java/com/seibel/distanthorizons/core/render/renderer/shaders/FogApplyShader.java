@@ -62,7 +62,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 		DhTextureState.bindTexture2D(this.fogTexture);
 		VulkanicAPI.setUniform1i(ctx, this.colorTextureUniform, 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnitIndex(1);
 		DhTextureState.bindTexture2D(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.depthTextureUniform, 1);
 		

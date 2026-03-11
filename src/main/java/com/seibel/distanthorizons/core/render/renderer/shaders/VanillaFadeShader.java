@@ -160,15 +160,15 @@ public class VanillaFadeShader extends AbstractShaderRenderer
 		DhTextureState.bindTexture2D(MC_RENDER.getDepthTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.uMcDepthTexture, 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnitIndex(1);
 		DhTextureState.bindTexture2D(depthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDhDepthTexture, 1);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2);
+		DhTextureState.setActiveTextureUnitIndex(2);
 		DhTextureState.bindTexture2D(MC_RENDER.getColorTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.uCombinedMcDhColorTexture, 2);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE3);
+		DhTextureState.setActiveTextureUnitIndex(3);
 		DhTextureState.bindTexture2D(colorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDhColorTexture, 3);
 		

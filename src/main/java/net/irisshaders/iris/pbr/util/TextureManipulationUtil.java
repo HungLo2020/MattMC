@@ -34,7 +34,7 @@ public class TextureManipulationUtil {
 			int height = VulkanicAPI.getTexture2DLevelHeight(ctx, level);
 			VulkanicAPI.setDynamicViewport(ctx, 0, 0, width, height);
 			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, textureId, level);
-			VulkanicAPI.clearBuffersWithMacosWorkaround(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT);
+			VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx);
 			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, 0, level);
 		}
 

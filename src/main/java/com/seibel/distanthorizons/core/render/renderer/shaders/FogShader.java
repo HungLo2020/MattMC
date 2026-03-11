@@ -253,7 +253,7 @@ public class FogShader extends AbstractShaderRenderer
 			VulkanicAPI.getFloatv(ctx, VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
 			VulkanicAPI.setClearColor(ctx, clearColorValues[0], clearColorValues[1], clearColorValues[2], 0.0f);
 
-			VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+			VulkanicAPI.clearColorAndDepthBuffers(ctx);
 		}
 		
 		

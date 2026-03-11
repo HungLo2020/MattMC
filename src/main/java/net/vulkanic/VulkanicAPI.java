@@ -40,6 +40,7 @@ public class VulkanicAPI {
     private static GraphicsBackend backend;
     @Nullable
     private static VulkanBackend rawVulkanBackend;
+
     private static final Set<String> VULKAN_PROXY_ALLOWED_METHODS = Set.of(
         "getBackendType",
         "isNativeVulkanReady"
@@ -392,6 +393,7 @@ public class VulkanicAPI {
     // OpenGL Constants - Clear Bits
     public static final int GL_COLOR_BUFFER_BIT = 0x00004000;
     public static final int GL_DEPTH_BUFFER_BIT = 0x00000100;
+    public static final int GL_STENCIL_BUFFER_BIT = 0x00000400;
     
     // OpenGL Constants - Pixel Types and Formats
     public static final int GL_UNSIGNED_BYTE = 0x1401;
@@ -874,6 +876,18 @@ public class VulkanicAPI {
         getBackend().clearBuffers(ctx, mask);
     }
 
+    public static void clearColorBuffer(CommandContext ctx) {
+        clearBuffers(ctx, GL_COLOR_BUFFER_BIT);
+    }
+
+    public static void clearDepthBuffer(CommandContext ctx) {
+        clearBuffers(ctx, GL_DEPTH_BUFFER_BIT);
+    }
+
+    public static void clearColorAndDepthBuffers(CommandContext ctx) {
+        clearBuffers(ctx, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+
     /**
      * Clears buffers and drains the error queue on macOS for compatibility with legacy GL behavior.
      */
@@ -882,6 +896,18 @@ public class VulkanicAPI {
         if (IS_MACOS) {
             getBackend().getError(ctx);
         }
+    }
+
+    public static void clearColorBufferWithMacosWorkaround(CommandContext ctx) {
+        clearBuffersWithMacosWorkaround(ctx, GL_COLOR_BUFFER_BIT);
+    }
+
+    public static void clearDepthBufferWithMacosWorkaround(CommandContext ctx) {
+        clearBuffersWithMacosWorkaround(ctx, GL_DEPTH_BUFFER_BIT);
+    }
+
+    public static void clearColorAndDepthBuffersWithMacosWorkaround(CommandContext ctx) {
+        clearBuffersWithMacosWorkaround(ctx, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
     
     /**
@@ -1245,7 +1271,21 @@ public class VulkanicAPI {
      * Sets the active texture unit by index (0 -> texture unit 0, etc.).
      */
     public static void setActiveTextureUnitIndex(CommandContext ctx, int unitIndex) {
-        setActiveTextureUnit(ctx, GL_TEXTURE0 + unitIndex);
+        setActiveTextureUnit(ctx, textureUnitFromIndex(unitIndex));
+    }
+
+    /**
+     * Returns a GL texture-unit enum from a zero-based texture unit index.
+     */
+    public static int textureUnitFromIndex(int unitIndex) {
+        return GL_TEXTURE0 + unitIndex;
+    }
+
+    /**
+     * Returns a zero-based texture unit index from a GL texture-unit enum.
+     */
+    public static int textureUnitToIndex(int textureUnit) {
+        return textureUnit - GL_TEXTURE0;
     }
     
     /**
@@ -1279,6 +1319,48 @@ public class VulkanicAPI {
      */
     public static void setTextureMaxLod(CommandContext ctx, int target, int maxLod) {
         getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAX_LOD, maxLod);
+    }
+
+    /**
+     * Sets both min and mag filters to linear sampling for a texture target.
+     */
+    public static void setTextureLinearFiltering(CommandContext ctx, int target) {
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+
+    /**
+     * Sets both min and mag filters to nearest sampling for a texture target.
+     */
+    public static void setTextureNearestFiltering(CommandContext ctx, int target) {
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
+
+    /**
+     * Applies wrap mode for S and optionally T/R coordinates on a texture target.
+     */
+    public static void setTextureWrapMode(CommandContext ctx, int target, boolean clampToEdge, boolean includeWrapT, boolean includeWrapR) {
+        int wrapMode = clampToEdge ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_WRAP_S, wrapMode);
+
+        if (includeWrapT) {
+            getBackend().setTextureParameter(ctx, target, GL_TEXTURE_WRAP_T, wrapMode);
+        }
+
+        if (includeWrapR) {
+            getBackend().setTextureParameter(ctx, target, GL_TEXTURE_WRAP_R, wrapMode);
+        }
+    }
+
+    /**
+     * Resets texture LOD state to base level 0 with no LOD bias.
+     */
+    public static void resetTextureLodRangeToZero(CommandContext ctx, int target) {
+        setTextureMaxLevel(ctx, target, 0);
+        setTextureMinLod(ctx, target, 0);
+        setTextureMaxLod(ctx, target, 0);
+        texParameterf(ctx, target, GL_TEXTURE_LOD_BIAS, 0.0F);
     }
 
     /**
@@ -1357,6 +1439,13 @@ public class VulkanicAPI {
      */
     public static void framebufferTexture2D(CommandContext ctx, int target, int attachment, int texture, int level) {
         getBackend().framebufferTexture2D(ctx, target, attachment, GL_TEXTURE_2D, texture, level);
+    }
+
+    /**
+     * Attaches a 2D texture image to an attachment point on GL_FRAMEBUFFER.
+     */
+    public static void framebufferTexture2D(CommandContext ctx, int attachment, int texture, int level) {
+        framebufferTexture2D(ctx, GL_FRAMEBUFFER, attachment, texture, level);
     }
 
     /**
@@ -1917,6 +2006,21 @@ public class VulkanicAPI {
     public static void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
                                        int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         getBackend().blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+
+    public static void blitColorBufferNearest(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
+                                              int dstX0, int dstY0, int dstX1, int dstY1) {
+        blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
+
+    public static void blitDepthBufferNearest(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
+                                              int dstX0, int dstY0, int dstX1, int dstY1) {
+        blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    }
+
+    public static void blitDepthAndStencilBuffersNearest(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
+                                                          int dstX0, int dstY0, int dstX1, int dstY1) {
+        blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
     }
     
     
@@ -3201,6 +3305,14 @@ public class VulkanicAPI {
     
     public static int checkFramebufferStatus(CommandContext ctx, int target) {
         return getBackend().checkFramebufferStatus(ctx, target);
+    }
+
+    public static int checkFramebufferStatus(CommandContext ctx) {
+        return checkFramebufferStatus(ctx, GL_FRAMEBUFFER);
+    }
+
+    public static boolean isFramebufferComplete(int framebufferStatus) {
+        return framebufferStatus == GL_FRAMEBUFFER_COMPLETE;
     }
     
     

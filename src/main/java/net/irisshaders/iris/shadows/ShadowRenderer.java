@@ -223,7 +223,7 @@ public class ShadowRenderer {
 		final Int2ObjectMap<PackShadowDirectives.SamplingSettings> colorSamplingSettings =
 			shadowDirectives.getColorSamplingSettings();
 
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE4);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(4);
 
 		configureDepthSampler(targets.getDepthTexture().iris$getGlId(), depthSamplingSettings.get(0));
 
@@ -263,16 +263,14 @@ public class ShadowRenderer {
 
 		if (!settings.getNearest()) {
 			// Make sure that things are smoothed
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			IrisRenderSystem.setTextureLinearFiltering(glTextureId);
 		} else {
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST);
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_NEAREST);
+			IrisRenderSystem.setTextureNearestFiltering(glTextureId);
 		}
 	}
 
 	private void generateMipmaps() {
-		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE4);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(4);
 
 		for (MipmapPass mipmapPass : mipmapPasses) {
 			setupMipmappingForTexture(mipmapPass.texture(), mipmapPass.targetFilteringMode());

@@ -23,10 +23,8 @@ public class SingleColorTexture extends GlResource {
 
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, "single color (" + red + ", " + green + "," + blue + "," + alpha + ")");
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_REPEAT);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_REPEAT);
+		IrisRenderSystem.setTextureLinearFiltering(texture);
+		IrisRenderSystem.setTextureWrapMode2D(texture, false);
 
 		TextureUploadHelper.resetTextureUploadState();
 		IrisRenderSystem.texImage2D(texture, 0, VulkanicAPI.GL_RGBA, 1, 1, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, pixel);

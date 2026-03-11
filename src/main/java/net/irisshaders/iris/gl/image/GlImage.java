@@ -43,22 +43,15 @@ public class GlImage extends GlResource {
 
 	protected void setup(int texture, int width, int height, int depth) {
 		boolean isInteger = internalTextureFormat.getPixelFormat().isInteger();
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MIN_FILTER, isInteger ? VulkanicAPI.GL_NEAREST : VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAG_FILTER, isInteger ? VulkanicAPI.GL_NEAREST : VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
-
-		if (height > 0) {
-			IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		var ctx = VulkanicAPI.getCommandContext();
+		if (isInteger) {
+			VulkanicAPI.setTextureNearestFiltering(ctx, target.getGlType());
+		} else {
+			VulkanicAPI.setTextureLinearFiltering(ctx, target.getGlType());
 		}
 
-		if (depth > 0) {
-			IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_WRAP_R, VulkanicAPI.GL_CLAMP_TO_EDGE);
-		}
-
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MIN_LOD, 0);
-		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAX_LOD, 0);
-		IrisRenderSystem.texParameterf(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_LOD_BIAS, 0.0F);
+		VulkanicAPI.setTextureWrapMode(ctx, target.getGlType(), true, height > 0, depth > 0);
+		VulkanicAPI.resetTextureLodRangeToZero(ctx, target.getGlType());
 
 		VulkanicAPI.clearTexImage(VulkanicAPI.getCommandContext(), texture, 0, format.getGlFormat(), pixelType.getGlFormat(), (int[]) null);
 	}

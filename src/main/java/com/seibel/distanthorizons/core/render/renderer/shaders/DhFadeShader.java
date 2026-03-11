@@ -131,11 +131,11 @@ public class DhFadeShader extends AbstractShaderRenderer
 		DhTextureState.bindTexture2D(depthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDhDepthTexture, 0);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE1);
+		DhTextureState.setActiveTextureUnitIndex(1);
 		DhTextureState.bindTexture2D(MC_RENDER.getColorTextureId());
 		VulkanicAPI.setUniform1i(ctx, this.uMcColorTexture, 1);
 		
-		DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE2);
+		DhTextureState.setActiveTextureUnitIndex(2);
 		DhTextureState.bindTexture2D(colorTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDhColorTexture, 2);
 		
