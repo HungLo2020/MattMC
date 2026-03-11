@@ -2801,8 +2801,17 @@ public class Phase3DrawPathTest {
             "RenderType draw path should not fetch samplers through RenderSystem.getShaderTexture");
         assertTrue(renderTypeSource.contains("IrisRenderSystem.getTextureBinding(i)"),
             "RenderType draw path should fetch sampler bindings through IrisRenderSystem.getTextureBinding");
+        assertTrue(renderTypeSource.contains("TextureTracker.INSTANCE.getShaderTexture(i)"),
+            "RenderType draw path should first resolve sampler views from TextureTracker unit bindings");
         assertTrue(renderTypeSource.contains("TextureTracker.INSTANCE.getTextureView(textureId)"),
             "RenderType draw path should resolve texture views through TextureTracker before binding samplers");
+
+        Path textureTrackerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureTracker.java");
+        String textureTrackerSource = Files.readString(textureTrackerFile);
+        assertTrue(textureTrackerSource.contains("private final GpuTextureView[] shaderTexturesByUnit = new GpuTextureView[128];"),
+            "TextureTracker should maintain per-unit shader texture view cache for robust sampler binding");
+        assertTrue(textureTrackerSource.contains("public GpuTextureView getShaderTexture(int unit)"),
+            "TextureTracker should expose per-unit shader texture lookup for RenderType sampler binding");
 
         Path abstractTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/AbstractTexture.java");
         String abstractTextureSource = Files.readString(abstractTextureFile);
@@ -4127,6 +4136,86 @@ public class Phase3DrawPathTest {
             "SkyRenderer should use VulkanicAPI.getSequentialBuffer after migration");
         assertTrue(skyRendererSource.contains("VulkanicAPI.getDynamicUniforms("),
             "SkyRenderer should use VulkanicAPI.getDynamicUniforms after migration");
+    }
+
+    @Test
+    public void testHandPassLayerRoutingKeepsOpaqueItemSubpassesOpaque() throws IOException {
+        Path irisPipelinesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisPipelines.java");
+        String irisPipelinesSource = Files.readString(irisPipelinesFile);
+
+        assertFalse(irisPipelinesSource.contains("HandRenderer.INSTANCE.isRenderingSolid() ? ShaderKey.HAND_CUTOUT : ShaderKey.HAND_TRANSLUCENT"),
+            "IrisPipelines solid hand routing should not remap opaque subpasses to HAND_TRANSLUCENT in translucent pass");
+        assertTrue(irisPipelinesSource.contains("return ShaderKey.HAND_CUTOUT_DIFFUSE;"),
+            "IrisPipelines cutout hand routing should keep opaque/cutout subpasses on HAND_CUTOUT_DIFFUSE shader");
+        assertTrue(irisPipelinesSource.contains("return ShaderKey.HAND_CUTOUT;"),
+            "IrisPipelines solid hand routing should keep opaque subpasses on HAND_CUTOUT shader");
+
+        Path itemInHandRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ItemInHandRenderer.java");
+        String itemInHandRendererSource = Files.readString(itemInHandRendererFile);
+        assertTrue(itemInHandRendererSource.contains("Iris.isPackInUseQuick() && net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isActive()"),
+            "ItemInHandRenderer hand pass filtering should only apply while Iris HandRenderer is actively rendering a hand pass");
+    }
+
+    @Test
+    public void testGuiItemsBypassSodiumFastQuadPath() throws IOException {
+        Path itemRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/entity/ItemRenderer.java");
+        String itemRendererSource = Files.readString(itemRendererFile);
+
+        assertTrue(itemRendererSource.contains("itemDisplayContext != ItemDisplayContext.GUI"),
+            "ItemRenderer should disable Sodium fast quad path for GUI item rendering to preserve vanilla alpha behavior");
+        assertTrue(itemRendererSource.contains("if (allowSodiumFastPath && writer != null && !list.isEmpty())"),
+            "ItemRenderer fast path should be explicitly gated so GUI item rendering falls back to vanilla vertex submission");
+
+        Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
+        String renderTypeSource = Files.readString(renderTypeFile);
+        assertTrue(renderTypeSource.contains("GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(i);"),
+            "RenderType draw path should first resolve sampler views from TextureTracker unit bindings");
+        assertTrue(renderTypeSource.contains("if (textureView != null && textureId > 0 && textureView.texture().iris$getGlId() != textureId)"),
+            "RenderType draw path should reject stale tracked sampler views when they no longer match Iris texture binding IDs");
+        assertTrue(renderTypeSource.contains("if (textureView == null)"),
+            "RenderType draw path should only fall back to Iris texture binding ids when no tracked unit view exists");
+        assertTrue(renderTypeSource.contains("if (textureView == null && i == 2)"),
+            "RenderType draw path should explicitly fall back to live lightmap binding for Sampler2 when tracked state is unavailable");
+
+        Path textureTrackerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureTracker.java");
+        String textureTrackerSource = Files.readString(textureTrackerFile);
+        assertTrue(textureTrackerSource.contains("shaderTexturesByUnit[unit] = id;"),
+            "TextureTracker should always update per-unit shader texture cache on setShaderTexture");
+        assertTrue(textureTrackerSource.contains("if (lockBindCallback)"),
+            "TextureTracker should still suppress recursive callback propagation while retaining per-unit tracking");
+        assertTrue(textureTrackerSource.contains("for (int unit = 0; unit < shaderTexturesByUnit.length; unit++)"),
+            "TextureTracker should scan per-unit shader texture cache during texture deletion to remove stale unit bindings");
+        assertTrue(textureTrackerSource.contains("shaderTexturesByUnit[unit] = null;"),
+            "TextureTracker should clear per-unit cache entries that reference deleted textures");
+
+        Path blockModelWrapperFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/item/BlockModelWrapper.java");
+        String blockModelWrapperSource = Files.readString(blockModelWrapperFile);
+        assertTrue(blockModelWrapperSource.contains("itemDisplayContext == ItemDisplayContext.GUI"),
+            "BlockModelWrapper should apply GUI-only render-type remapping for inventory/hotbar item rendering");
+        assertTrue(blockModelWrapperSource.contains("renderType = Sheets.cutoutBlockSheet();"),
+            "BlockModelWrapper GUI remap should force cutout item sheet for GUI-only item rendering");
+
+        Path itemShaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh");
+        String itemShaderSource = Files.readString(itemShaderFile);
+        assertTrue(itemShaderSource.contains("vec4(lightColor.rgb, 1.0)"),
+            "Item shader should not allow lightmap alpha to modulate item alpha; only lightmap RGB should affect item shading");
+
+        Path entityShaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/minecraft/shaders/core/entity.vsh");
+        String entityShaderSource = Files.readString(entityShaderFile);
+        assertTrue(entityShaderSource.contains("lightMapColor = vec4(lightColor.rgb, 1.0);"),
+            "Entity shader should not allow lightmap alpha to modulate entity/item alpha; lightmap alpha must be clamped to 1.0");
+
+        Path itemStackRenderStateFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/item/ItemStackRenderState.java");
+        String itemStackRenderStateSource = Files.readString(itemStackRenderStateFile);
+        assertTrue(itemStackRenderStateSource.contains("ItemStackRenderState.this.displayContext != ItemDisplayContext.GUI"),
+            "ItemStackRenderState should bypass FRAPI mesh submission for GUI item rendering so GUI follows vanilla submit path");
+
+        Path trackingItemStackRenderStateFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/item/TrackingItemStackRenderState.java");
+        String trackingItemStackRenderStateSource = Files.readString(trackingItemStackRenderStateFile);
+        assertTrue(trackingItemStackRenderStateSource.contains("this.modelIdentityElements.clear();"),
+            "TrackingItemStackRenderState should clear model identity elements when state is cleared so GUI item identity does not leak across updates");
+        assertTrue(trackingItemStackRenderStateSource.contains("return List.copyOf(this.modelIdentityElements);"),
+            "TrackingItemStackRenderState should return immutable identity snapshots so GUI atlas cache keys cannot be mutated after insertion");
     }
 
     // ── Consistency: drawFromBuffers still has all instanced paths ────────────

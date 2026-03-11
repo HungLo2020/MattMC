@@ -13,6 +13,8 @@ import net.minecraft.client.color.item.ItemTintSource;
 import net.minecraft.client.color.item.ItemTintSources;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.FaceBakery;
 import net.minecraft.client.renderer.block.model.TextureSlots;
@@ -95,7 +97,11 @@ public class BlockModelWrapper implements ItemModel {
 		}
 
 		layerRenderState.setExtents(this.extents);
-		layerRenderState.setRenderType(ItemBlockRenderTypes.getRenderType(itemStack));
+		RenderType renderType = ItemBlockRenderTypes.getRenderType(itemStack);
+		if (itemDisplayContext == ItemDisplayContext.GUI) {
+			renderType = Sheets.cutoutBlockSheet();
+		}
+		layerRenderState.setRenderType(renderType);
 		this.properties.applyToLayer(layerRenderState, itemDisplayContext);
 		layerRenderState.prepareQuadList().addAll(this.quads);
 		if (this.animated) {

@@ -21,6 +21,7 @@ import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.blockentity.AbstractEndPortalRenderer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.resources.ResourceLocation;
@@ -982,12 +983,21 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 					renderPass.setVertexBuffer(0, gpuBuffer);
 
 					for (int i = 0; i < 12; i++) {
+						GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(i);
 						int textureId = IrisRenderSystem.getTextureBinding(i);
-						if (textureId > 0) {
-							GpuTextureView textureView = TextureTracker.INSTANCE.getTextureView(textureId);
-							if (textureView != null) {
-								renderPass.bindSampler("Sampler" + i, textureView);
+						if (textureView != null && textureId > 0 && textureView.texture().iris$getGlId() != textureId) {
+							textureView = null;
+						}
+						if (textureView == null) {
+							if (textureId > 0) {
+								textureView = TextureTracker.INSTANCE.getTextureView(textureId);
 							}
+							if (textureView == null && i == 2) {
+								textureView = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
+							}
+						}
+						if (textureView != null) {
+							renderPass.bindSampler("Sampler" + i, textureView);
 						}
 					}
 
