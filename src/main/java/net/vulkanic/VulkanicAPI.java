@@ -1254,7 +1254,15 @@ public class VulkanicAPI {
      * @param buffer The buffer object ID
      */
     public static void bindBufferBase(CommandContext ctx, int target, int index, int buffer) {
-        getBackend().bindBufferBase(ctx, target, index, buffer);
+        VulkanicBufferTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> bindBufferBase(ctx, typedTarget, index, buffer),
+                () -> getBackend().bindBufferBase(ctx, target, index, buffer)
+            );
+    }
+
+    public static void bindBufferBase(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer) {
+        getBackend().bindBufferBase(ctx, target.toLegacyGlTarget(), index, buffer);
     }
     
     /**
@@ -2022,15 +2030,39 @@ public class VulkanicAPI {
     
     
     public static void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
-        getBackend().bufferSubData(ctx, target, offset, data);
+        VulkanicBufferTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> bufferSubData(ctx, typedTarget, offset, data),
+                () -> getBackend().bufferSubData(ctx, target, offset, data)
+            );
+    }
+
+    public static void bufferSubData(CommandContext ctx, VulkanicBufferTarget target, long offset, java.nio.ByteBuffer data) {
+        getBackend().bufferSubData(ctx, target.toLegacyGlTarget(), offset, data);
     }
     
     public static void bufferStorage(CommandContext ctx, int target, long size, int flags) {
-        getBackend().bufferStorage(ctx, target, size, flags);
+        VulkanicBufferTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> bufferStorage(ctx, typedTarget, size, flags),
+                () -> getBackend().bufferStorage(ctx, target, size, flags)
+            );
+    }
+
+    public static void bufferStorage(CommandContext ctx, VulkanicBufferTarget target, long size, int flags) {
+        getBackend().bufferStorage(ctx, target.toLegacyGlTarget(), size, flags);
     }
     
     public static void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
-        getBackend().bufferStorage(ctx, target, data, flags);
+        VulkanicBufferTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> bufferStorage(ctx, typedTarget, data, flags),
+                () -> getBackend().bufferStorage(ctx, target, data, flags)
+            );
+    }
+
+    public static void bufferStorage(CommandContext ctx, VulkanicBufferTarget target, java.nio.ByteBuffer data, int flags) {
+        getBackend().bufferStorage(ctx, target.toLegacyGlTarget(), data, flags);
     }
     
     public static void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
@@ -2134,11 +2166,27 @@ public class VulkanicAPI {
     }
     
     public static int getProgramParameter(CommandContext ctx, int program, int pname) {
+        java.util.Optional<VulkanicProgramParameterName> typedPName = VulkanicProgramParameterName.fromLegacyGlPName(pname);
+        if (typedPName.isPresent()) {
+            return getProgramParameter(ctx, program, typedPName.get());
+        }
         return getBackend().getProgramParameter(ctx, program, pname);
+    }
+
+    public static int getProgramParameter(CommandContext ctx, int program, VulkanicProgramParameterName pname) {
+        return getBackend().getProgramParameter(ctx, program, pname.toLegacyGlPName());
     }
     
     public static int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        java.util.Optional<VulkanicShaderParameterName> typedPName = VulkanicShaderParameterName.fromLegacyGlPName(pname);
+        if (typedPName.isPresent()) {
+            return getShaderParameter(ctx, shader, typedPName.get());
+        }
         return getBackend().getShaderParameter(ctx, shader, pname);
+    }
+
+    public static int getShaderParameter(CommandContext ctx, int shader, VulkanicShaderParameterName pname) {
+        return getBackend().getShaderParameter(ctx, shader, pname.toLegacyGlPName());
     }
     
     public static String getProgramInfoLog(CommandContext ctx, int program) {
@@ -3237,7 +3285,45 @@ public class VulkanicAPI {
      * @param params Array of parameter values
      */
     public static void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
+        VulkanicTextureTarget typedTarget = VulkanicTextureTarget.fromLegacyGlTarget(target).orElse(null);
+        VulkanicTextureParameterName typedParameterName = VulkanicTextureParameterName.fromLegacyGlPName(pname).orElse(null);
+
+        if (typedTarget != null && typedParameterName != null) {
+            texParameteriv(ctx, typedTarget, typedParameterName, params);
+            return;
+        }
+
         getBackend().texParameteriv(ctx, target, pname, params);
+    }
+
+    public static void texParameteriv(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        int[] params
+    ) {
+        getBackend().texParameteriv(ctx, target.toLegacyGlTarget(), pname.toLegacyGlPName(), params);
+    }
+
+    public static void setTextureSwizzleRgba(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureSwizzleComponent red,
+        VulkanicTextureSwizzleComponent green,
+        VulkanicTextureSwizzleComponent blue,
+        VulkanicTextureSwizzleComponent alpha
+    ) {
+        texParameteriv(
+            ctx,
+            target,
+            VulkanicTextureParameterName.SWIZZLE_RGBA,
+            new int[] {
+                red.toLegacyGlConstant(),
+                green.toLegacyGlConstant(),
+                blue.toLegacyGlConstant(),
+                alpha.toLegacyGlConstant()
+            }
+        );
     }
     
     
@@ -3354,12 +3440,29 @@ public class VulkanicAPI {
     
     
     public static void clearBufferSubData(CommandContext ctx, int target, int internalformat, long offset, long size, int format, int type, int[] data) {
-        getBackend().clearBufferSubData(ctx, target, internalformat, offset, size, format, type, data);
+        VulkanicBufferTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> clearBufferSubData(ctx, typedTarget, internalformat, offset, size, format, type, data),
+                () -> getBackend().clearBufferSubData(ctx, target, internalformat, offset, size, format, type, data)
+            );
+    }
+
+    public static void clearBufferSubData(CommandContext ctx, VulkanicBufferTarget target, int internalformat, long offset, long size, int format, int type, int[] data) {
+        getBackend().clearBufferSubData(ctx, target.toLegacyGlTarget(), internalformat, offset, size, format, type, data);
     }
     
     
     public static void getProgramiv(CommandContext ctx, int program, int pname, int[] params) {
+        java.util.Optional<VulkanicProgramParameterName> typedPName = VulkanicProgramParameterName.fromLegacyGlPName(pname);
+        if (typedPName.isPresent()) {
+            getProgramiv(ctx, program, typedPName.get(), params);
+            return;
+        }
         getBackend().getProgramiv(ctx, program, pname, params);
+    }
+
+    public static void getProgramiv(CommandContext ctx, int program, VulkanicProgramParameterName pname, int[] params) {
+        getBackend().getProgramiv(ctx, program, pname.toLegacyGlPName(), params);
     }
     
     

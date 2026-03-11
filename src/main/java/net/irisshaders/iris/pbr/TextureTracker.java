@@ -6,7 +6,6 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
-import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import org.jetbrains.annotations.Nullable;
@@ -77,7 +76,7 @@ public class TextureTracker {
 				pipeline.onSetShaderTexture(id);
 			}
 			// Reset texture state
-			IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), 0, id == null ? 0 : id.texture().iris$getGlId());
+			IrisRenderSystem.bindTextureToUnit(0, id == null ? 0 : id.texture().iris$getGlId());
 			lockBindCallback = false;
 		}
 	}

@@ -11,7 +11,8 @@ public enum VulkanicTextureParameterValue {
     NEAREST_MIPMAP_NEAREST,
     LINEAR_MIPMAP_LINEAR,
     CLAMP_TO_EDGE,
-    REPEAT;
+    REPEAT,
+    COMPARE_REF_TO_TEXTURE;
 
     /**
      * Converts this typed value to its legacy GL constant.
@@ -24,6 +25,7 @@ public enum VulkanicTextureParameterValue {
             case LINEAR_MIPMAP_LINEAR -> VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
             case CLAMP_TO_EDGE -> VulkanicAPI.GL_CLAMP_TO_EDGE;
             case REPEAT -> VulkanicAPI.GL_REPEAT;
+            case COMPARE_REF_TO_TEXTURE -> VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE;
         };
     }
 
@@ -38,6 +40,7 @@ public enum VulkanicTextureParameterValue {
             case VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR -> Optional.of(LINEAR_MIPMAP_LINEAR);
             case VulkanicAPI.GL_CLAMP_TO_EDGE -> Optional.of(CLAMP_TO_EDGE);
             case VulkanicAPI.GL_REPEAT -> Optional.of(REPEAT);
+            case VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE -> Optional.of(COMPARE_REF_TO_TEXTURE);
             default -> Optional.empty();
         };
     }

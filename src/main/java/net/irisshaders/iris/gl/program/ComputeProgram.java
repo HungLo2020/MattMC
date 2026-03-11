@@ -6,6 +6,7 @@ import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.irisshaders.iris.shaderpack.FilledIndirectPointer;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramParameterName;
 import org.joml.Vector2f;
 import org.joml.Vector3i;
 
@@ -25,7 +26,7 @@ public final class ComputeProgram extends GlResource {
 		super(program);
 
 		localSize = new int[3];
-		IrisRenderSystem.getProgramiv(program, VulkanicAPI.GL_COMPUTE_WORK_GROUP_SIZE, localSize);
+		VulkanicAPI.getProgramiv(VulkanicAPI.getCommandContext(), program, VulkanicProgramParameterName.COMPUTE_WORK_GROUP_SIZE, localSize);
 		this.uniforms = uniforms;
 		this.samplers = samplers;
 		this.images = images;
@@ -71,7 +72,7 @@ public final class ComputeProgram extends GlResource {
 
 	public void dispatch(float width, float height) {
 		if (!Iris.getPipelineManager().getPipeline().map(WorldRenderingPipeline::allowConcurrentCompute).orElse(false)) {
-			IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+			IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
 		}
 
 		if (indirectPointer != null) {

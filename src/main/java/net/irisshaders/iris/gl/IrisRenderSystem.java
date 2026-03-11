@@ -11,14 +11,18 @@ import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
-import net.irisshaders.iris.gl.texture.TextureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicIntegerQuery;
 import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicPolygonMode;
+import net.vulkanic.VulkanicResourceBarriers;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicTextureSwizzleComponent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3i;
@@ -52,6 +56,13 @@ public class IrisRenderSystem {
 	private static int numBuffers = 0;
 	private static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
 	private static int numTextures = 0;
+	private static final VulkanicResourceBarriers COMPUTE_WRITES_VISIBLE_TO_TEXTURE_SAMPLING =
+		VulkanicResourceBarriers.computeWritesVisibleToTextureSampling();
+	private static final VulkanicResourceBarriers IMAGE_WRITES_VISIBLE_TO_TEXTURE_SAMPLING =
+		VulkanicResourceBarriers.of(
+			VulkanicResourceBarriers.Barrier.SHADER_IMAGE_ACCESS,
+			VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
+		);
 
 	static {
 		StateUpdateNotifiers.blendFuncNotifier = listener -> blendFuncListener = listener;
@@ -83,9 +94,19 @@ public class IrisRenderSystem {
 		VulkanicAPI.getIntegerv(VulkanicAPI.getCommandContext(), pname, params);
 	}
 
+	public static void getViewport(int[] params) {
+		RenderSystem.assertOnRenderThread();
+		VulkanicAPI.getViewport(VulkanicAPI.getCommandContext(), params);
+	}
+
 	public static void getFloatv(int pname, float[] params) {
 		RenderSystem.assertOnRenderThread();
 		VulkanicAPI.getFloatv(VulkanicAPI.getCommandContext(), pname, params);
+	}
+
+	public static void getClearColor(float[] params) {
+		RenderSystem.assertOnRenderThread();
+		VulkanicAPI.getClearColor(VulkanicAPI.getCommandContext(), params);
 	}
 
 	public static void generateMipmaps(int texture, int mipmapTarget) {
@@ -188,6 +209,45 @@ public class IrisRenderSystem {
 		texParameteriv(texture, VulkanicAPI.GL_TEXTURE_2D, pname, params);
 	}
 
+	public static void texParameteriv(int texture, int target, VulkanicTextureParameterName pname, int[] params) {
+		texParameteriv(texture, target, pname.toLegacyGlPName(), params);
+	}
+
+	public static void texParameteriv(int texture, VulkanicTextureParameterName pname, int[] params) {
+		texParameteriv(texture, VulkanicAPI.GL_TEXTURE_2D, pname, params);
+	}
+
+	public static void setTextureSwizzleRgba(
+		int texture,
+		int target,
+		VulkanicTextureSwizzleComponent red,
+		VulkanicTextureSwizzleComponent green,
+		VulkanicTextureSwizzleComponent blue,
+		VulkanicTextureSwizzleComponent alpha
+	) {
+		texParameteriv(
+			texture,
+			target,
+			VulkanicTextureParameterName.SWIZZLE_RGBA,
+			new int[] {
+				red.toLegacyGlConstant(),
+				green.toLegacyGlConstant(),
+				blue.toLegacyGlConstant(),
+				alpha.toLegacyGlConstant()
+			}
+		);
+	}
+
+	public static void setTextureSwizzleRgba(
+		int texture,
+		VulkanicTextureSwizzleComponent red,
+		VulkanicTextureSwizzleComponent green,
+		VulkanicTextureSwizzleComponent blue,
+		VulkanicTextureSwizzleComponent alpha
+	) {
+		setTextureSwizzleRgba(texture, VulkanicAPI.GL_TEXTURE_2D, red, green, blue, alpha);
+	}
+
 	/**
 	 * Internal API for use when you don't know the target texture. Should use {@link IrisRenderSystem#texParameteriv(int, int, int, int[])} instead unless you know what you're doing!
 	 */
@@ -213,6 +273,14 @@ public class IrisRenderSystem {
 		texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, pname, param);
 	}
 
+	public static void texParameteri(int texture, int target, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
+		texParameteri(texture, target, pname.toLegacyGlPName(), param.toLegacyGlConstant());
+	}
+
+	public static void texParameteri(int texture, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
+		texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, pname, param);
+	}
+
 	public static void texParameterf(int texture, int target, int pname, float param) {
 		RenderSystem.assertOnRenderThread();
 		dsaState.texParameterf(texture, target, pname, param);
@@ -223,19 +291,19 @@ public class IrisRenderSystem {
 	}
 
 	public static void setTextureLinearFiltering(int texture) {
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+		texParameteri(texture, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
+		texParameteri(texture, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
 	}
 
 	public static void setTextureNearestFiltering(int texture) {
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST);
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_NEAREST);
+		texParameteri(texture, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.NEAREST);
+		texParameteri(texture, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.NEAREST);
 	}
 
 	public static void setTextureWrapMode2D(int texture, boolean clampToEdge) {
-		int wrapMode = clampToEdge ? VulkanicAPI.GL_CLAMP_TO_EDGE : VulkanicAPI.GL_REPEAT;
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S, wrapMode);
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_T, wrapMode);
+		VulkanicTextureParameterValue wrapMode = clampToEdge ? VulkanicTextureParameterValue.CLAMP_TO_EDGE : VulkanicTextureParameterValue.REPEAT;
+		texParameteri(texture, VulkanicTextureParameterName.WRAP_S, wrapMode);
+		texParameteri(texture, VulkanicTextureParameterName.WRAP_T, wrapMode);
 	}
 
 	public static void resetTextureLodRangeToZero(int texture) {
@@ -306,7 +374,17 @@ public class IrisRenderSystem {
 		VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), target, size, flags);
 	}
 
+	public static void bufferStorage(VulkanicBufferTarget target, long size, int flags) {
+		RenderSystem.assertOnRenderThread();
+		VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), target, size, flags);
+	}
+
 	public static void bindBufferBase(int target, Integer index, int buffer) {
+		RenderSystem.assertOnRenderThread();
+		VulkanicAPI.bindBufferBase(VulkanicAPI.getCommandContext(), target, index, buffer);
+	}
+
+	public static void bindBufferBase(VulkanicBufferTarget target, Integer index, int buffer) {
 		RenderSystem.assertOnRenderThread();
 		VulkanicAPI.bindBufferBase(VulkanicAPI.getCommandContext(), target, index, buffer);
 	}
@@ -367,6 +445,10 @@ public class IrisRenderSystem {
 		VulkanicAPI.clearBufferSubData(VulkanicAPI.getCommandContext(), glShaderStorageBuffer, glR8, offset, size, glRed, glByte, ints);
 	}
 
+	public static void clearBufferSubData(VulkanicBufferTarget target, int internalFormat, long offset, long size, int format, int type, int[] data) {
+		VulkanicAPI.clearBufferSubData(VulkanicAPI.getCommandContext(), target, internalFormat, offset, size, format, type, data);
+	}
+
 	public static void getProgramiv(int program, int value, int[] storage) {
 		VulkanicAPI.getProgramiv(VulkanicAPI.getCommandContext(), program, value, storage);
 	}
@@ -385,6 +467,22 @@ public class IrisRenderSystem {
 		if (supportsCompute) {
 			VulkanicAPI.memoryBarrier(VulkanicAPI.getCommandContext(), barriers);
 		}
+	}
+
+	public static void memoryBarrier(VulkanicResourceBarriers barriers) {
+		RenderSystem.assertOnRenderThread();
+
+		if (supportsCompute) {
+			VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), barriers);
+		}
+	}
+
+	public static void memoryBarrierComputeWritesVisibleToTextureSampling() {
+		memoryBarrier(COMPUTE_WRITES_VISIBLE_TO_TEXTURE_SAMPLING);
+	}
+
+	public static void memoryBarrierImageWritesVisibleToTextureSampling() {
+		memoryBarrier(IMAGE_WRITES_VISIBLE_TO_TEXTURE_SAMPLING);
 	}
 
 	public static boolean supportsBufferBlending() {
@@ -581,6 +679,10 @@ public class IrisRenderSystem {
 		VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), target, buffer);
 	}
 
+	public static void bindBuffer(VulkanicBufferTarget target, int buffer) {
+		VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), target, buffer);
+	}
+
 	public static int createBuffers() {
 		return dsaState.createBuffers();
 	}
@@ -611,8 +713,13 @@ public class IrisRenderSystem {
 
 	public static void onProgramUse() {
 		for (int i = 0; i < textureToUnswizzle.size(); i++) {
-			texParameteriv(textureToUnswizzle.getInt(i), TextureType.TEXTURE_2D.getGlType(), VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
-				new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_GREEN, VulkanicAPI.GL_BLUE, VulkanicAPI.GL_ALPHA});
+			setTextureSwizzleRgba(
+				textureToUnswizzle.getInt(i),
+				VulkanicTextureSwizzleComponent.RED,
+				VulkanicTextureSwizzleComponent.GREEN,
+				VulkanicTextureSwizzleComponent.BLUE,
+				VulkanicTextureSwizzleComponent.ALPHA
+			);
 		}
 		textureToUnswizzle.clear();
 	}

@@ -22,7 +22,6 @@ import net.irisshaders.iris.gl.program.ProgramImages;
 import net.irisshaders.iris.gl.program.ProgramSamplers;
 import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.sampler.SamplerHolder;
-import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.gl.uniform.DynamicLocationalUniformHolder;
 import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
@@ -37,6 +36,7 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureSwizzleComponent;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -197,8 +197,13 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 			int shaderTextureId = IrisRenderSystem.getTextureBinding(0);
 			if (shaderTextureId > 0) {
 				IrisRenderSystem.addUnswizzle(shaderTextureId);
-				IrisRenderSystem.texParameteriv(shaderTextureId, TextureType.TEXTURE_2D.getGlType(), VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
-					new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED});
+				IrisRenderSystem.setTextureSwizzleRgba(
+					shaderTextureId,
+					VulkanicTextureSwizzleComponent.RED,
+					VulkanicTextureSwizzleComponent.RED,
+					VulkanicTextureSwizzleComponent.RED,
+					VulkanicTextureSwizzleComponent.RED
+				);
 			}
 		}
 

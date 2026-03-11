@@ -15,6 +15,21 @@ public enum VulkanicBufferTarget {
     UNIFORM;
 
     /**
+     * Converts this typed buffer target into its legacy GL target constant.
+     */
+    public int toLegacyGlTarget() {
+        return switch (this) {
+            case VERTEX -> VulkanicAPI.GL_ARRAY_BUFFER;
+            case INDEX -> VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER;
+            case COPY_READ -> VulkanicAPI.GL_COPY_READ_BUFFER;
+            case COPY_WRITE -> VulkanicAPI.GL_COPY_WRITE_BUFFER;
+            case PIXEL_PACK -> VulkanicAPI.GL_PIXEL_PACK_BUFFER;
+            case SHADER_STORAGE -> VulkanicAPI.GL_SHADER_STORAGE_BUFFER;
+            case UNIFORM -> VulkanicAPI.GL_UNIFORM_BUFFER;
+        };
+    }
+
+    /**
      * Converts a legacy GL buffer target constant into a typed target when known.
      */
     public static Optional<VulkanicBufferTarget> fromLegacyGlTarget(int target) {

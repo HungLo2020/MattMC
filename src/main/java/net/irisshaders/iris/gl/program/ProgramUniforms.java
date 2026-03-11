@@ -12,6 +12,7 @@ import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramParameterName;
 import org.lwjgl.BufferUtils;
 
 import java.nio.IntBuffer;
@@ -309,7 +310,7 @@ public class ProgramUniforms {
 		public ProgramUniforms buildUniforms() {
 			// Check for any unsupported uniforms and warn about them so that we can easily figure out what uniforms we
 			// need to add.
-			int activeUniforms = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), program, VulkanicAPI.GL_ACTIVE_UNIFORMS);
+			int activeUniforms = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), program, VulkanicProgramParameterName.ACTIVE_UNIFORMS);
 			IntBuffer sizeBuf = BufferUtils.createIntBuffer(1);
 			IntBuffer typeBuf = BufferUtils.createIntBuffer(1);
 

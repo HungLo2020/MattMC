@@ -13,6 +13,19 @@ public enum VulkanicTextureTarget {
     TEXTURE_RECTANGLE;
 
     /**
+     * Converts this typed target into its legacy GL target constant.
+     */
+    public int toLegacyGlTarget() {
+        return switch (this) {
+            case TEXTURE_2D -> VulkanicAPI.GL_TEXTURE_2D;
+            case TEXTURE_3D -> VulkanicAPI.GL_TEXTURE_3D;
+            case TEXTURE_BUFFER -> VulkanicAPI.GL_TEXTURE_BUFFER;
+            case TEXTURE_CUBE_MAP -> VulkanicAPI.GL_TEXTURE_CUBE_MAP;
+            case TEXTURE_RECTANGLE -> VulkanicAPI.GL_TEXTURE_RECTANGLE;
+        };
+    }
+
+    /**
      * Converts a legacy GL texture target constant into a typed target when known.
      */
     public static Optional<VulkanicTextureTarget> fromLegacyGlTarget(int target) {

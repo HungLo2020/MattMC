@@ -8,7 +8,6 @@ import net.irisshaders.iris.gl.program.ProgramBuilder;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 import net.irisshaders.iris.helpers.StringPair;
 import net.irisshaders.iris.shaderpack.preprocessor.JcppProcessor;
-import net.vulkanic.VulkanicAPI;
 import org.apache.commons.io.IOUtils;
 
 import java.io.IOException;
@@ -66,7 +65,7 @@ public class ColorSpaceComputeConverter implements ColorSpaceConverter {
 		this.target = targetImage;
 		program.use();
 		IrisRenderSystem.dispatchCompute(width / 8, height / 8, 1);
-		IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT);
+		IrisRenderSystem.memoryBarrierImageWritesVisibleToTextureSampling();
 		ComputeProgram.unbind();
 	}
 }

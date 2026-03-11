@@ -55,6 +55,8 @@ import net.irisshaders.iris.vertices.ImmediateState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
 
 import java.util.Arrays;
 import java.util.Locale;
@@ -232,12 +234,12 @@ public class CompositeRenderer {
 		// unlikely that this issue occurs in practice with most shader packs.
 		IrisRenderSystem.generateMipmaps(texture);
 
-		int filter = VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
+		VulkanicTextureParameterValue filter = VulkanicTextureParameterValue.LINEAR_MIPMAP_LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST;
+			filter = VulkanicTextureParameterValue.NEAREST_MIPMAP_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(texture, VulkanicTextureParameterName.MIN_FILTER, filter);
 	}
 
 	public ImmutableSet<Integer> getFlippedAtLeastOnceFinal() {
@@ -294,7 +296,7 @@ public class CompositeRenderer {
 				}
 
 				if (ranCompute) {
-					IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+					IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
 				}
 
 				Program.unbind();

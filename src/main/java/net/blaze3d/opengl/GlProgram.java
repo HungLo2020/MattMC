@@ -65,7 +65,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 			VulkanicAPI.attachShader(ctx, i, glShaderModule.getShaderId());
 			VulkanicAPI.attachShader(ctx, i, glShaderModule2.getShaderId());
 			VulkanicAPI.linkProgram(ctx, i);
-			int k = VulkanicAPI.getProgramParameter(ctx, i, 35714);
+			int k = VulkanicAPI.getProgramParameter(ctx, i, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
 			String string2 = VulkanicAPI.getProgramInfoLog(ctx, i);
 			if (k != 0 && !string2.contains("Failed for unknown reason")) {
 				if (!string2.isEmpty()) {

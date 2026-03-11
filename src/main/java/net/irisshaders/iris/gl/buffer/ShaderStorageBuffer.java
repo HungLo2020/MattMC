@@ -38,14 +38,14 @@ public class ShaderStorageBuffer {
 	}
 
 	protected void destroy() {
-		IrisRenderSystem.bindBufferBase(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, index, 0);
+		IrisRenderSystem.bindBufferBase(VulkanicBufferTarget.SHADER_STORAGE, index, 0);
 		// DO NOT use the GlStateManager version here! On Linux, it will attempt to clear the data using BufferData and cause GL errors.
 		IrisRenderSystem.deleteBuffers(id);
 		MemoryUtil.memFree(content);
 	}
 
 	public void bind() {
-		IrisRenderSystem.bindBufferBase(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, index, id);
+		IrisRenderSystem.bindBufferBase(VulkanicBufferTarget.SHADER_STORAGE, index, id);
 	}
 
 	public void resizeIfRelative(int width, int height) {
@@ -61,9 +61,9 @@ public class ShaderStorageBuffer {
 		long newWidth = (long) (width * info.scaleX());
 		long newHeight = (long) (height * info.scaleY());
 		long finalSize = (newHeight * newWidth) * info.size();
-		IrisRenderSystem.bufferStorage(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, finalSize, 0);
-		IrisRenderSystem.clearBufferSubData(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, VulkanicAPI.GL_R8, 0, finalSize, VulkanicAPI.GL_RED, VulkanicAPI.GL_BYTE, new int[]{0});
-		IrisRenderSystem.bindBufferBase(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, index, newId);
+		IrisRenderSystem.bufferStorage(VulkanicBufferTarget.SHADER_STORAGE, finalSize, 0);
+		IrisRenderSystem.clearBufferSubData(VulkanicBufferTarget.SHADER_STORAGE, VulkanicAPI.GL_R8, 0, finalSize, VulkanicAPI.GL_RED, VulkanicAPI.GL_BYTE, new int[]{0});
+		IrisRenderSystem.bindBufferBase(VulkanicBufferTarget.SHADER_STORAGE, index, newId);
 		id = newId;
 	}
 
@@ -74,11 +74,11 @@ public class ShaderStorageBuffer {
 	public void createStatic() {
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.SHADER_STORAGE, getId());
-		IrisRenderSystem.bufferStorage(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, info.size(), content == null ? 0 : VulkanicAPI.GL_DYNAMIC_STORAGE_BIT);
+		IrisRenderSystem.bufferStorage(VulkanicBufferTarget.SHADER_STORAGE, info.size(), content == null ? 0 : VulkanicAPI.GL_DYNAMIC_STORAGE_BIT);
 		if (content != null) {
-			VulkanicAPI.bufferSubData(ctx, VulkanicAPI.GL_SHADER_STORAGE_BUFFER, 0L, content);
+			VulkanicAPI.bufferSubData(ctx, VulkanicBufferTarget.SHADER_STORAGE, 0L, content);
 		} else {
-			IrisRenderSystem.clearBufferSubData(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, VulkanicAPI.GL_R8, 0, info.size(), VulkanicAPI.GL_RED, VulkanicAPI.GL_BYTE, new int[]{0});
+			IrisRenderSystem.clearBufferSubData(VulkanicBufferTarget.SHADER_STORAGE, VulkanicAPI.GL_R8, 0, info.size(), VulkanicAPI.GL_RED, VulkanicAPI.GL_BYTE, new int[]{0});
 		}
 		bind();
 	}

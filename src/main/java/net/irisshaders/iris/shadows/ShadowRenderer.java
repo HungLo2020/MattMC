@@ -62,6 +62,9 @@ import org.joml.Vector3d;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicTextureSwizzleComponent;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -243,21 +246,28 @@ public class ShadowRenderer {
 	private void configureDepthSampler(int glTextureId, PackShadowDirectives.DepthSamplingSettings settings) {
 		if (settings.getHardwareFiltering() && !separateHardwareSamplers) {
 			// We have to do this or else shadow hardware filtering breaks entirely!
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_COMPARE_MODE, VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE);
+			IrisRenderSystem.texParameteri(glTextureId, VulkanicTextureParameterName.COMPARE_MODE, VulkanicTextureParameterValue.COMPARE_REF_TO_TEXTURE);
 		}
 
 		// Workaround for issues with old shader packs like Chocapic v4.
 		// They expected the driver to put the depth value in z, but it's supposed to only
 		// be available in r. So we set up the swizzle to fix that.
-		IrisRenderSystem.texParameteriv(glTextureId, VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
-			new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_ONE});
+		IrisRenderSystem.setTextureSwizzleRgba(
+			glTextureId,
+			VulkanicTextureSwizzleComponent.RED,
+			VulkanicTextureSwizzleComponent.RED,
+			VulkanicTextureSwizzleComponent.RED,
+			VulkanicTextureSwizzleComponent.ONE
+		);
 
 		configureSampler(glTextureId, settings);
 	}
 
 	private void configureSampler(int glTextureId, PackShadowDirectives.SamplingSettings settings) {
 		if (settings.getMipmap()) {
-			int filteringMode = settings.getNearest() ? VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST : VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
+			VulkanicTextureParameterValue filteringMode = settings.getNearest()
+				? VulkanicTextureParameterValue.NEAREST_MIPMAP_NEAREST
+				: VulkanicTextureParameterValue.LINEAR_MIPMAP_LINEAR;
 			mipmapPasses.add(new MipmapPass(glTextureId, filteringMode));
 		}
 
@@ -279,9 +289,9 @@ public class ShadowRenderer {
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
-	private void setupMipmappingForTexture(int texture, int filteringMode) {
+	private void setupMipmappingForTexture(int texture, VulkanicTextureParameterValue filteringMode) {
 		IrisRenderSystem.generateMipmaps(texture);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filteringMode);
+		IrisRenderSystem.texParameteri(texture, VulkanicTextureParameterName.MIN_FILTER, filteringMode);
 	}
 
 	private FrustumHolder createShadowFrustum(float renderMultiplier, FrustumHolder holder) {
@@ -770,7 +780,7 @@ public class ShadowRenderer {
 
 	}
 
-	private record MipmapPass(int texture, int targetFilteringMode) {
+	private record MipmapPass(int texture, VulkanicTextureParameterValue targetFilteringMode) {
 
 
 	}

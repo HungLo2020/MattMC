@@ -16,10 +16,10 @@ public class TextureManipulationUtil {
 
 		int previousFramebufferId = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.FRAMEBUFFER_BINDING);
 		float[] previousClearColor = new float[4];
-		IrisRenderSystem.getFloatv(VulkanicAPI.GL_COLOR_CLEAR_VALUE, previousClearColor);
+		IrisRenderSystem.getClearColor(previousClearColor);
 		int previousTextureId = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 		int[] previousViewport = new int[4];
-		IrisRenderSystem.getIntegerv(VulkanicAPI.GL_VIEWPORT, previousViewport);
+		IrisRenderSystem.getViewport(previousViewport);
 
 		VulkanicAPI.bindFramebuffer(ctx, colorFillFBO);
 		IrisRenderSystem.clearColor(

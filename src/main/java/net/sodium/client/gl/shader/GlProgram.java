@@ -132,7 +132,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
                 LOGGER.warn("Program link log for " + this.name + ": " + log);
             }
 
-            int result = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), this.program, VulkanicAPI.GL_LINK_STATUS);
+            int result = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), this.program, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
 
             if (result != 1) { // GL_TRUE
                 throw new RuntimeException("Shader program linking failed, see log for details");

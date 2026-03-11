@@ -45,6 +45,8 @@ import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
 
 import java.util.Map;
 import java.util.Objects;
@@ -168,20 +170,23 @@ public class ShadowCompositeRenderer {
 		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
 		// unlikely that this issue occurs in practice with most shader packs.
 		IrisRenderSystem.generateMipmaps(texture);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, target.getInternalFormat().getPixelFormat().isInteger() ? VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST : VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR);
+		VulkanicTextureParameterValue minFilter = target.getInternalFormat().getPixelFormat().isInteger()
+			? VulkanicTextureParameterValue.NEAREST_MIPMAP_NEAREST
+			: VulkanicTextureParameterValue.LINEAR_MIPMAP_LINEAR;
+		IrisRenderSystem.texParameteri(texture, VulkanicTextureParameterName.MIN_FILTER, minFilter);
 	}
 
 	private static void resetRenderTarget(RenderTarget target) {
 		// Resets the sampling mode of the given render target and then unbinds it to prevent accidental sampling of it
 		// elsewhere.
 
-		int filter = VulkanicAPI.GL_LINEAR;
+		VulkanicTextureParameterValue filter = VulkanicTextureParameterValue.LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST;
+			filter = VulkanicTextureParameterValue.NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
-		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicTextureParameterName.MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicTextureParameterName.MIN_FILTER, filter);
 	}
 
 	public ImmutableSet<Integer> getFlippedAtLeastOnceFinal() {
@@ -210,7 +215,7 @@ public class ShadowCompositeRenderer {
 				}
 
 				if (ranCompute) {
-					IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+					IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
 				}
 
 				Program.unbind();

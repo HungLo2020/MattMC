@@ -97,7 +97,7 @@ public class ShaderProgram
 		}
 		VulkanicAPI.linkProgram(ctx, this.id);
 		
-		int status = VulkanicAPI.getProgramParameter(ctx, this.id, VulkanicAPI.GL_LINK_STATUS);
+		int status = VulkanicAPI.getProgramParameter(ctx, this.id, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
 		{
 			String message = "Shader Link Error. Details: " + VulkanicAPI.getProgramInfoLog(ctx, this.id);

@@ -237,7 +237,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 			}
 		} else {
 			for (int i = 0; i < Math.min(16, SamplerLimits.get().getMaxShaderStorageUnits()); i++) {
-				IrisRenderSystem.bindBufferBase(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, i, 0);
+				IrisRenderSystem.bindBufferBase(net.vulkanic.VulkanicBufferTarget.SHADER_STORAGE, i, 0);
 			}
 		}
 

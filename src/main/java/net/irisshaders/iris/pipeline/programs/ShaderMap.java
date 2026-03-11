@@ -40,7 +40,7 @@ public class ShaderMap {
 		int i = shader.id().program();
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 
-		int j = VulkanicAPI.getProgramParameter(ctx, i, 35714);
+		int j = VulkanicAPI.getProgramParameter(ctx, i, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
 		if (j == VulkanicAPI.GL_FALSE) {
 			String string = VulkanicAPI.getProgramInfoLog(ctx, i);
 			throw new ShaderCompileException(

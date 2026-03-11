@@ -20,7 +20,6 @@ import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.shader.GlShader;
 import net.irisshaders.iris.gl.shader.ShaderType;
 import net.irisshaders.iris.gl.state.FogMode;
-import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.pipeline.transform.PatchShaderType;
 import net.irisshaders.iris.pipeline.transform.ShaderPrinter;
@@ -107,7 +106,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		VulkanicAPI.attachShader(ctx, id, frag.getHandle());
 
 		VulkanicAPI.linkProgram(ctx, this.id);
-		int status = VulkanicAPI.getProgramParameter(ctx, this.id, VulkanicAPI.GL_LINK_STATUS);
+		int status = VulkanicAPI.getProgramParameter(ctx, this.id, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
 		if (status != VulkanicAPI.GL_TRUE) {
 			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.getProgramInfoLog(ctx, this.id);
 			this.free();
@@ -262,7 +261,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
 		int lightmapTextureId = IrisRenderSystem.getTextureBinding(2);
-		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, lightmapTextureId);
+		IrisRenderSystem.bindTextureToUnit(IrisSamplers.LIGHTMAP_TEXTURE_UNIT, lightmapTextureId);
 		this.setUniform(this.instancedShaderProjectionModelViewMatrixUniform, toJOML(renderParam.dhProjectionMatrix).mul(toJOML(renderParam.dhModelViewMatrix)));
 
 		samplers.update();

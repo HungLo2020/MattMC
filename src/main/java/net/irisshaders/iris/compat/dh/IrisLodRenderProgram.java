@@ -12,7 +12,6 @@ import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.shader.GlShader;
 import net.irisshaders.iris.gl.shader.ShaderType;
 import net.irisshaders.iris.gl.state.FogMode;
-import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.pipeline.transform.PatchShaderType;
 import net.irisshaders.iris.pipeline.transform.ShaderPrinter;
@@ -94,7 +93,7 @@ public class IrisLodRenderProgram {
 		VulkanicAPI.attachShader(ctx, id, frag.getHandle());
 
 		VulkanicAPI.linkProgram(ctx, this.id);
-		int status = VulkanicAPI.getProgramParameter(ctx, this.id, VulkanicAPI.GL_LINK_STATUS);
+		int status = VulkanicAPI.getProgramParameter(ctx, this.id, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
 		if (status != 1) {
 			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.getProgramInfoLog(ctx, this.id);
 			this.free();
@@ -239,7 +238,7 @@ public class IrisLodRenderProgram {
 
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
 		int lightmapTextureId = IrisRenderSystem.getTextureBinding(2);
-		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, lightmapTextureId);
+		IrisRenderSystem.bindTextureToUnit(IrisSamplers.LIGHTMAP_TEXTURE_UNIT, lightmapTextureId);
 		setUniform(modelViewUniform, modelView);
 		setUniform(modelViewInverseUniform, modelView.invert(new Matrix4f()));
 		setUniform(projectionUniform, projection);

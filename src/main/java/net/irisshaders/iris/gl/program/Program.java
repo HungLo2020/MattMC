@@ -24,7 +24,7 @@ public final class Program extends GlResource {
 	}
 
 	public void use() {
-		IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+		IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
 		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getGlId());
 
 		uniforms.update();

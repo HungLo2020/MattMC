@@ -32,7 +32,7 @@ public class GlShader extends GlObject {
             LOGGER.warn("Include table: {}", Arrays.toString(parsedShader.includeIds()));
         }
 
-        int result = VulkanicAPI.getShaderParameter(ctx, handle, VulkanicAPI.GL_COMPILE_STATUS);
+        int result = VulkanicAPI.getShaderParameter(ctx, handle, net.vulkanic.VulkanicShaderParameterName.COMPILE_STATUS);
 
         if (result != 1) {  // GL_TRUE
             throw new RuntimeException("Shader compilation failed, see log for details");

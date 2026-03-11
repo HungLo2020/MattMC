@@ -20,6 +20,26 @@ public enum VulkanicTextureParameterName {
     SWIZZLE_RGBA;
 
     /**
+     * Converts this typed texture parameter key to its legacy GL pname constant.
+     */
+    public int toLegacyGlPName() {
+        return switch (this) {
+            case MIN_FILTER -> VulkanicAPI.GL_TEXTURE_MIN_FILTER;
+            case MAG_FILTER -> VulkanicAPI.GL_TEXTURE_MAG_FILTER;
+            case WRAP_S -> VulkanicAPI.GL_TEXTURE_WRAP_S;
+            case WRAP_T -> VulkanicAPI.GL_TEXTURE_WRAP_T;
+            case WRAP_R -> VulkanicAPI.GL_TEXTURE_WRAP_R;
+            case MIN_LOD -> VulkanicAPI.GL_TEXTURE_MIN_LOD;
+            case MAX_LOD -> VulkanicAPI.GL_TEXTURE_MAX_LOD;
+            case LOD_BIAS -> VulkanicAPI.GL_TEXTURE_LOD_BIAS;
+            case BASE_LEVEL -> VulkanicAPI.GL_TEXTURE_BASE_LEVEL;
+            case MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
+            case COMPARE_MODE -> VulkanicAPI.GL_TEXTURE_COMPARE_MODE;
+            case SWIZZLE_RGBA -> VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA;
+        };
+    }
+
+    /**
      * Converts a legacy GL texture parameter pname constant into a typed key when known.
      */
     public static Optional<VulkanicTextureParameterName> fromLegacyGlPName(int pname) {

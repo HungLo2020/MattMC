@@ -44,7 +44,7 @@ public class ProgramCreator {
 			LOGGER.warn("Program link log for " + name + ": " + log);
 		}
 
-		int result = VulkanicAPI.getProgramParameter(ctx, program, VulkanicAPI.GL_LINK_STATUS);
+		int result = VulkanicAPI.getProgramParameter(ctx, program, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
 
 		if (result != VulkanicAPI.GL_TRUE) {
 			throw new ShaderCompileException(name, log);

@@ -50,6 +50,8 @@ import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
@@ -175,25 +177,25 @@ public class FinalPassRenderer {
 		// unlikely that this issue occurs in practice with most shader packs.
 		IrisRenderSystem.generateMipmaps(texture);
 
-		int filter = VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
+		VulkanicTextureParameterValue filter = VulkanicTextureParameterValue.LINEAR_MIPMAP_LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST;
+			filter = VulkanicTextureParameterValue.NEAREST_MIPMAP_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(texture, VulkanicTextureParameterName.MIN_FILTER, filter);
 	}
 
 	private static void resetRenderTarget(RenderTarget target) {
 		if (target == null) return;
 		// Resets the sampling mode of the given render target and then unbinds it to prevent accidental sampling of it
 		// elsewhere.
-		int filter = VulkanicAPI.GL_LINEAR;
+		VulkanicTextureParameterValue filter = VulkanicTextureParameterValue.LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST;
+			filter = VulkanicTextureParameterValue.NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
-		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicTextureParameterName.MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicTextureParameterName.MIN_FILTER, filter);
 
 		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 	}
@@ -235,7 +237,7 @@ public class FinalPassRenderer {
 				}
 			}
 
-			IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+			IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
 
 			if (!finalPass.mipmappedBuffers.isEmpty()) {
 				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);

@@ -212,7 +212,7 @@ public class ShaderCreator {
 			Iris.logger.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = VulkanicAPI.getShaderParameter(ctx, shader, VulkanicAPI.GL_COMPILE_STATUS);
+		int result = VulkanicAPI.getShaderParameter(ctx, shader, net.vulkanic.VulkanicShaderParameterName.COMPILE_STATUS);
 
 		if (result != VulkanicAPI.GL_TRUE) {
 			throw new ShaderCompileException(name, log);
