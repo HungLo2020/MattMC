@@ -7,6 +7,7 @@ import net.blaze3d.platform.GLX;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.ScissorState;
+import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.vertex.VertexFormat;
 import net.minecraft.Util;
@@ -929,6 +930,14 @@ public class VulkanicAPI {
      * @param enabled True to enable, false to disable
      */
     public static void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled) {
+        VulkanicCapability.fromLegacyGlConstant(capability)
+            .ifPresentOrElse(
+                typedCapability -> setIndexedEnabled(ctx, typedCapability, index, enabled),
+                () -> getBackend().setIndexedEnabled(ctx, capability, index, enabled)
+            );
+    }
+
+    public static void setIndexedEnabled(CommandContext ctx, VulkanicCapability capability, int index, boolean enabled) {
         getBackend().setIndexedEnabled(ctx, capability, index, enabled);
     }
     
@@ -2129,7 +2138,15 @@ public class VulkanicAPI {
     
     
     public static int createShader(CommandContext ctx, int shaderType) {
+        java.util.Optional<VulkanicShaderStage> typedShaderType = VulkanicShaderStage.fromLegacyGlShaderType(shaderType);
+        if (typedShaderType.isPresent()) {
+            return createShader(ctx, typedShaderType.get());
+        }
         return getBackend().createShader(ctx, shaderType);
+    }
+
+    public static int createShader(CommandContext ctx, VulkanicShaderStage shaderStage) {
+        return getBackend().createShader(ctx, shaderStage);
     }
     
     public static void compileShader(CommandContext ctx, int shader) {
@@ -2769,6 +2786,36 @@ public class VulkanicAPI {
     
     public static GraphicsCapabilities getGraphicsCapabilities() {
         return getBackend().getGraphicsCapabilities();
+    }
+
+    /**
+     * Returns the backend-native texture handle for transitional integrations.
+     *
+     * <p>Current OpenGL-backed runtimes return the GL texture id via the texture abstraction,
+     * without requiring callsites to cast to implementation-specific texture classes.</p>
+     */
+    public static int getTextureHandle(@Nullable GpuTexture texture) {
+        if (texture == null) {
+            return 0;
+        }
+
+        return texture.iris$getGlId();
+    }
+
+    /**
+     * Returns a backend-native framebuffer handle for a color/depth texture pair.
+     */
+    public static int resolveFramebufferForTextures(@Nullable GpuTexture colorTexture, @Nullable GpuTexture depthTexture) {
+        if (colorTexture == null) {
+            return 0;
+        }
+
+        if (!(colorTexture instanceof VulkanicTexture colorTarget)) {
+            return 0;
+        }
+
+        VulkanicTexture depthTarget = depthTexture instanceof VulkanicTexture texture ? texture : null;
+        return getBackend().resolveFramebufferForTextures(getCommandContext(), colorTarget, depthTarget);
     }
     
     public static int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {

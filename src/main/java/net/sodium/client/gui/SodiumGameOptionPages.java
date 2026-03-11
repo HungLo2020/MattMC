@@ -25,6 +25,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.client.PanoramaTheme;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.GraphicsFeature;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -440,7 +441,7 @@ public class SodiumGameOptionPages {
 
     private static boolean supportsNoErrorContext() {
         var capabilities = VulkanicAPI.getGraphicsCapabilities();
-        return (capabilities.OpenGL46 || capabilities.GL_KHR_no_error)
+                return capabilities.supports(GraphicsFeature.NO_ERROR_CONTEXT)
                 && !Workarounds.isWorkaroundEnabled(Workarounds.Reference.NO_ERROR_CONTEXT_UNSUPPORTED);
     }
 

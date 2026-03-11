@@ -1,6 +1,5 @@
 package com.seibel.distanthorizons.fabric.hooks;
 
-import net.blaze3d.opengl.GlTexture;
 import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
@@ -33,7 +32,6 @@ public class DhLightTextureHook implements LightTextureHooks {
             this.renderWrapper = (MinecraftRenderWrapper)SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
         }
 
-        GlTexture glTexture = (GlTexture) lightTexture.texture; // Direct field access - texture is now public
-        this.renderWrapper.setLightmapId(glTexture.glId(), clientLevel);
+        this.renderWrapper.setLightmapId(lightTexture.texture.glId(), clientLevel);
     }
 }

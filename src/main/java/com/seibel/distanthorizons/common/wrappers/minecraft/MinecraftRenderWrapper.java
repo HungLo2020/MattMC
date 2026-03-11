@@ -37,7 +37,7 @@ import org.joml.Vector4f;
 
 import net.minecraft.world.level.material.FogType;
 
-import net.blaze3d.opengl.GlTexture;
+import net.vulkanic.VulkanicAPI;
 
 
 /**
@@ -198,14 +198,14 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	{
 		try
 		{		
-			GlTexture glTexture = (GlTexture) this.getRenderTarget().getDepthTexture();
-			if (glTexture == null)
+			int textureId = VulkanicAPI.getTextureHandle(this.getRenderTarget().getDepthTexture());
+			if (textureId == 0)
 			{
 				// shouldn't happen, but just in case
 				return 0;
 			}
 
-			return glTexture.glId();
+			return textureId;
 			
 		}
 		catch (Exception e)
@@ -214,7 +214,7 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 			if (!this.depthTextureCastFailLogged)
 			{
 				this.depthTextureCastFailLogged = true;
-				LOGGER.error("Unable to cast render Target depth texture to GlTexture. MC or a rendering mod may have changed the object type.", e);
+				LOGGER.error("Unable to resolve render target depth texture handle. MC or a rendering mod may have changed the object type.", e);
 			}
 			return 0;
 		}
@@ -224,14 +224,14 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	{
 		try
 		{
-			GlTexture glTexture = (GlTexture) this.getRenderTarget().getColorTexture();
-			if (glTexture == null)
+			int textureId = VulkanicAPI.getTextureHandle(this.getRenderTarget().getColorTexture());
+			if (textureId == 0)
 			{
 				// shouldn't happen, but just in case
 				return 0;
 			}
 			
-			return glTexture.glId();
+			return textureId;
 		}
 		catch (Exception e)
 		{
@@ -239,7 +239,7 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 			if (!this.colorTextureCastFailLogged)
 			{
 				this.colorTextureCastFailLogged = true;
-				LOGGER.error("Unable to cast render Target color texture to GlTexture. MC or a rendering mod may have changed the object type.", e);
+				LOGGER.error("Unable to resolve render target color texture handle. MC or a rendering mod may have changed the object type.", e);
 			}
 			return 0;
 		}

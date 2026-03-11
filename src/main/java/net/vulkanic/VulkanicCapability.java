@@ -17,6 +17,21 @@ public enum VulkanicCapability {
     DEBUG_OUTPUT_SYNCHRONOUS,
     STENCIL_TEST;
 
+    public int toLegacyGlConstant() {
+        return switch (this) {
+            case BLEND -> VulkanicAPI.GL_BLEND;
+            case CULL_FACE -> VulkanicAPI.GL_CULL_FACE;
+            case DEPTH_TEST -> VulkanicAPI.GL_DEPTH_TEST;
+            case SCISSOR_TEST -> VulkanicAPI.GL_SCISSOR_TEST;
+            case POLYGON_OFFSET_FILL -> VulkanicAPI.GL_POLYGON_OFFSET_FILL;
+            case COLOR_LOGIC_OP -> VulkanicAPI.GL_COLOR_LOGIC_OP;
+            case PROGRAM_POINT_SIZE -> VulkanicAPI.GL_PROGRAM_POINT_SIZE;
+            case DEBUG_OUTPUT -> VulkanicAPI.GL_DEBUG_OUTPUT;
+            case DEBUG_OUTPUT_SYNCHRONOUS -> VulkanicAPI.GL_DEBUG_OUTPUT_SYNCHRONOUS;
+            case STENCIL_TEST -> VulkanicAPI.GL_STENCIL_TEST;
+        };
+    }
+
     /**
      * Converts a legacy GL capability constant to a typed capability when known.
      */

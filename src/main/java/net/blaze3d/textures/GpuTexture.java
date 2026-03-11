@@ -110,6 +110,13 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 
 	public abstract boolean isClosed();
 
+	public int glId() {
+		return this.iris$getGlId();
+	}
+
+	public void flushModeChanges2D() {
+	}
+
 	// Iris compatibility methods
 	public int iris$getGlId() {
 		return 0; // Subclasses should override

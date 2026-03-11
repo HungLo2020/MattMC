@@ -2,7 +2,6 @@ package net.voxelmap.persistent;
 
 import net.voxelmap.VoxelConstants;
 import net.voxelmap.util.CompressionUtils;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.platform.NativeImage;
 import net.blaze3d.platform.NativeImage.Format;
 import java.nio.ByteBuffer;
@@ -102,7 +101,7 @@ public class CompressibleGLBufferedImage {
         this.texture.upload();
         // Use DSA mipmap generation — avoids mutating the global GL texture bind state
         // and requires only a single VulkanicAPI call instead of a bind + generate pair.
-        VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getCommandContext(), ((GlTexture) this.texture.getTexture()).glId());
+        VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getCommandContext(), this.texture.getTexture().glId());
         this.compress();
     }
 

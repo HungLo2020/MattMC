@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.opengl.GlConst;
 import net.blaze3d.opengl.GlProgram;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
@@ -505,7 +504,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 				}
 
 				@Override
-				public void process(GlTexture target) {
+				public void process(GpuTexture target) {
 
 				}
 			};
@@ -1063,7 +1062,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void finalizeGameRendering() {
-		colorSpaceConverter.process((GlTexture) Minecraft.getInstance().getMainRenderTarget().getColorTexture());
+		colorSpaceConverter.process(Minecraft.getInstance().getMainRenderTarget().getColorTexture());
 	}
 
 	@Override

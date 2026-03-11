@@ -1,7 +1,5 @@
 package net.blaze3d.pipeline;
 
-import net.blaze3d.opengl.GlDevice;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
@@ -180,8 +178,6 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	@Override
 	public void iris$bindFramebuffer() {
 		VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(),
-			((GlTexture) this.colorTexture).getFbo(
-				((GlDevice) net.vulkanic.VulkanicAPI.getDevice()).directStateAccess(),
-				this.depthTexture));
+			VulkanicAPI.resolveFramebufferForTextures(this.colorTexture, this.depthTexture));
 	}
 }

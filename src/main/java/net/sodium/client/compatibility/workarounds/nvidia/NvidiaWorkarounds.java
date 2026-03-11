@@ -12,6 +12,7 @@ import net.sodium.client.platform.windows.WindowsFileVersion;
 import net.sodium.client.platform.windows.api.d3dkmt.D3DKMT;
 import org.jetbrains.annotations.Nullable;
 import net.vulkanic.CommandContext;
+import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,7 +127,7 @@ public class NvidiaWorkarounds {
         // achieve the same effect.
         var capabilities = VulkanicAPI.getGraphicsCapabilities();
 
-        if (capabilities.GL_KHR_debug) {
+        if (capabilities.supports(GraphicsFeature.DEBUG_OUTPUT_CONTROL)) {
             LOGGER.info("Enabling GL_DEBUG_OUTPUT_SYNCHRONOUS to force the NVIDIA driver to disable threaded " +
                     "command submission");
             CommandContext ctx = VulkanicAPI.getCommandContext();

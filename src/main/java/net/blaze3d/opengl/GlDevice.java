@@ -343,7 +343,10 @@ public class GlDevice implements GpuDevice {
 	}
 
 	private static void sacrificeShaderToOpenGlAndAmd() {
-		int i = net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getCommandContext(), 35633);
+		int i = net.vulkanic.VulkanicAPI.createShader(
+			net.vulkanic.VulkanicAPI.getCommandContext(),
+			net.vulkanic.VulkanicShaderStage.VERTEX
+		);
 		int j = net.vulkanic.VulkanicAPI.createShaderProgram(net.vulkanic.VulkanicAPI.getCommandContext());
 		net.vulkanic.VulkanicAPI.attachShader(net.vulkanic.VulkanicAPI.getCommandContext(), j, i);
 		net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getCommandContext(), i);

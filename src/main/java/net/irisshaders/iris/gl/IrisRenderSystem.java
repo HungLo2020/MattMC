@@ -14,6 +14,8 @@ import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
 import net.vulkanic.CommandContext;
+import net.vulkanic.GraphicsCapabilities;
+import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicIntegerQuery;
@@ -69,10 +71,12 @@ public class IrisRenderSystem {
 	}
 
 	public static void initRenderer() {
-		if (VulkanicAPI.getGraphicsCapabilities().OpenGL45) {
+		GraphicsCapabilities capabilities = VulkanicAPI.getGraphicsCapabilities();
+
+		if (capabilities.supportsCore(GraphicsFeature.DIRECT_STATE_ACCESS)) {
 			dsaState = new DSACore();
 			Iris.logger.info("OpenGL 4.5 detected, enabling DSA.");
-		} else if (VulkanicAPI.getGraphicsCapabilities().GL_ARB_direct_state_access) {
+		} else if (capabilities.supportsExtension(GraphicsFeature.DIRECT_STATE_ACCESS)) {
 			dsaState = new DSAARB();
 			Iris.logger.info("ARB_direct_state_access detected, enabling DSA.");
 		} else {
@@ -80,11 +84,11 @@ public class IrisRenderSystem {
 			Iris.logger.info("DSA support not detected.");
 		}
 
-		hasMultibind = VulkanicAPI.getGraphicsCapabilities().OpenGL45 || VulkanicAPI.getGraphicsCapabilities().GL_ARB_multi_bind;
+		hasMultibind = capabilities.supports(GraphicsFeature.MULTI_BIND);
 		perspectiveProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("Iris shadow map projection");
 
 		supportsCompute = VulkanicAPI.checkFunctionAvailable("glDispatchCompute");
-		supportsTesselation = VulkanicAPI.getGraphicsCapabilities().GL_ARB_tessellation_shader || VulkanicAPI.getGraphicsCapabilities().OpenGL40;
+		supportsTesselation = capabilities.supports(GraphicsFeature.TESSELLATION_SHADER);
 
 		samplers = new int[SamplerLimits.get().getMaxTextureUnits()];
 	}
@@ -430,11 +434,17 @@ public class IrisRenderSystem {
 	}
 
 	public static boolean supportsSSBO() {
-		return VulkanicAPI.getGraphicsCapabilities().OpenGL44 || (VulkanicAPI.getGraphicsCapabilities().GL_ARB_shader_storage_buffer_object && VulkanicAPI.getGraphicsCapabilities().GL_ARB_buffer_storage);
+		GraphicsCapabilities capabilities = VulkanicAPI.getGraphicsCapabilities();
+		return capabilities.supports(GraphicsFeature.SHADER_STORAGE_BUFFER)
+			&& capabilities.supports(GraphicsFeature.BUFFER_STORAGE);
 	}
 
 	public static boolean supportsImageLoadStore() {
-		return VulkanicAPI.checkFunctionAvailable("glBindImageTexture") || VulkanicAPI.getGraphicsCapabilities().OpenGL42 || ((VulkanicAPI.getGraphicsCapabilities().GL_ARB_shader_image_load_store || VulkanicAPI.getGraphicsCapabilities().GL_EXT_shader_image_load_store) && VulkanicAPI.getGraphicsCapabilities().GL_ARB_buffer_storage);
+		GraphicsCapabilities capabilities = VulkanicAPI.getGraphicsCapabilities();
+		return VulkanicAPI.checkFunctionAvailable("glBindImageTexture")
+			|| capabilities.supportsCore(GraphicsFeature.IMAGE_LOAD_STORE)
+			|| (capabilities.supportsExtension(GraphicsFeature.IMAGE_LOAD_STORE)
+			&& capabilities.supports(GraphicsFeature.BUFFER_STORAGE));
 	}
 
 	public static void genBuffers(int[] buffers) {
@@ -486,7 +496,7 @@ public class IrisRenderSystem {
 	}
 
 	public static boolean supportsBufferBlending() {
-		return VulkanicAPI.getGraphicsCapabilities().GL_ARB_draw_buffers_blend || VulkanicAPI.getGraphicsCapabilities().OpenGL40;
+		return VulkanicAPI.getGraphicsCapabilities().supports(GraphicsFeature.DRAW_BUFFERS_BLEND);
 	}
 
 	public static void disableBufferBlend(int buffer) {

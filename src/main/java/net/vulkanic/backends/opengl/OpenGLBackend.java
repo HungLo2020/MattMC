@@ -1494,6 +1494,27 @@ public class OpenGLBackend implements GraphicsBackend {
     public GraphicsCapabilities getGraphicsCapabilities() {
         return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
     }
+
+    @Override
+    public int resolveFramebufferForTextures(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (!(colorTexture instanceof net.blaze3d.opengl.GlTexture glColorTexture)) {
+            return 0;
+        }
+
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device == null) {
+            return 0;
+        }
+
+        net.blaze3d.textures.GpuTexture depthGpuTexture = depthTexture instanceof net.blaze3d.textures.GpuTexture gpuTexture
+            ? gpuTexture
+            : null;
+        return glColorTexture.getFbo(device.directStateAccess(), depthGpuTexture);
+    }
     
     
     

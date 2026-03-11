@@ -2,9 +2,9 @@ package net.irisshaders.iris.pathways.colorspace;
 
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
@@ -43,7 +43,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 	private GlFramebuffer framebuffer;
 	private int swapTexture;
 
-	private GlTexture target;
+	private GpuTexture target;
 
 	public ColorSpaceFragmentConverter(int width, int height, ColorSpace colorSpace) {
 		rebuildProgram(width, height, colorSpace);
@@ -83,7 +83,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		ProgramBuilder builder = ProgramBuilder.begin("colorSpaceFragment", vertexSource, null, source, ImmutableSet.of());
 
 		builder.uniformMatrix(UniformUpdateFrequency.ONCE, "projection", () -> new Matrix4f(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, -1, -1, 0, 1));
-		builder.addDynamicSampler(() -> target.glId(), "readImage");
+		builder.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(target), "readImage");
 
 		swapTexture = IrisRenderSystem.createTextureId();
 		IrisRenderSystem.texImage2D(swapTexture, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, null);
@@ -93,7 +93,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		this.program = builder.build();
 	}
 
-	public void process(GlTexture targetImage) {
+	public void process(GpuTexture targetImage) {
 		if (colorSpace == ColorSpace.SRGB) return;
 
 		this.target = targetImage;

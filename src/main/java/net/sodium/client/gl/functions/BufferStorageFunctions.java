@@ -5,6 +5,7 @@ import net.sodium.client.gl.buffer.GlBufferTarget;
 import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.gl.util.EnumBitField;
 import net.vulkanic.GraphicsCapabilities;
+import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
 
 public enum BufferStorageFunctions {
@@ -30,9 +31,9 @@ public enum BufferStorageFunctions {
     public static BufferStorageFunctions pickBest(RenderDevice device) {
         GraphicsCapabilities capabilities = device.getCapabilities();
 
-        if (capabilities.OpenGL44) {
+        if (capabilities.supportsCore(GraphicsFeature.BUFFER_STORAGE)) {
             return CORE;
-        } else if (capabilities.GL_ARB_buffer_storage) {
+        } else if (capabilities.supportsExtension(GraphicsFeature.BUFFER_STORAGE)) {
             return ARB;
         } else {
             return NONE;

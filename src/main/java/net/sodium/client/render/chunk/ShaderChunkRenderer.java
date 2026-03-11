@@ -1,7 +1,5 @@
 package net.sodium.client.render.chunk;
 
-import net.blaze3d.opengl.GlDevice;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -117,8 +115,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         }
 
         if (program == null) {
-            CommandContext ctx = VulkanicAPI.getCommandContext();
-            VulkanicAPI.bindFramebuffer(ctx, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
+            target.iris$bindFramebuffer();
             program = this.compileProgram(options);
         }
 

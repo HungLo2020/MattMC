@@ -113,6 +113,13 @@ public interface GraphicsBackend {
      * @param enabled True to enable, false to disable
      */
     void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled);
+
+    /**
+     * Enables or disables a capability for a specific buffer using backend-neutral semantics.
+     */
+    default void setIndexedEnabled(CommandContext ctx, VulkanicCapability capability, int index, boolean enabled) {
+        setIndexedEnabled(ctx, capability.toLegacyGlConstant(), index, enabled);
+    }
     
     /**
      * Sets the face culling mode.
@@ -1355,6 +1362,13 @@ public interface GraphicsBackend {
      * @return The shader object ID
      */
     int createShader(CommandContext ctx, int shaderType);
+
+    /**
+     * Creates a shader using backend-neutral shader stage semantics.
+     */
+    default int createShader(CommandContext ctx, VulkanicShaderStage shaderStage) {
+        return createShader(ctx, shaderStage.toLegacyGlShaderType());
+    }
     
     /**
      * Compiles a shader object.
@@ -2227,6 +2241,21 @@ public interface GraphicsBackend {
     
     // Capabilities
     GraphicsCapabilities getGraphicsCapabilities();
+
+    /**
+     * Resolves a backend-native framebuffer handle for the given color/depth textures.
+     *
+     * <p>In OpenGL this may return a cached FBO name associated with the texture pair.
+     * In backends without explicit FBO objects, this may return {@code 0}.</p>
+     *
+     * @param ctx Command context for recording this command
+     * @param colorTexture Color target texture (required)
+     * @param depthTexture Optional depth target texture (nullable)
+     * @return Backend-native framebuffer handle, or {@code 0} when not applicable
+     */
+    default int resolveFramebufferForTextures(CommandContext ctx, VulkanicTexture colorTexture, VulkanicTexture depthTexture) {
+        return 0;
+    }
     
     // Debug object labeling
     

@@ -1,6 +1,5 @@
 package net.sodium.client.render.chunk.shader;
 
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.sodium.client.gl.device.GLRenderDevice;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat2v;
@@ -78,7 +77,7 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
 
     @Deprecated(forRemoval = true) // should be handled properly in GFX instead.
     private void bindTexture(ChunkShaderTextureSlot slot, GpuTextureView textureView) {
-        GlTexture tex = (GlTexture) textureView.texture();
+        var tex = textureView.texture();
         CommandContext ctx = VulkanicAPI.getCommandContext();
         VulkanicAPI.setActiveTextureUnitIndex(ctx, slot.ordinal());
         VulkanicAPI.bindTexture2D(ctx, tex.glId());
