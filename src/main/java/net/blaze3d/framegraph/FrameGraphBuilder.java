@@ -80,11 +80,15 @@ public class FrameGraphBuilder {
 
 			inspector.beforeExecutePass(pass.name);
 			if (pass.contextTask != null) {
-				VulkanicAPI.pushCommandContext(ctx);
+				AutoCloseable scope = VulkanicAPI.withCommandContext(ctx);
 				try {
 					pass.contextTask.accept(ctx);
 				} finally {
-					VulkanicAPI.popCommandContext();
+					try {
+						scope.close();
+					} catch (Exception exception) {
+						throw new IllegalStateException("Failed to close command-context scope", exception);
+					}
 				}
 			} else {
 				pass.task.run();

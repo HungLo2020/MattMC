@@ -37,6 +37,9 @@ import net.vulkanic.VulkanicBlendEquation;
 import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicDepthCompareOp;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPolygonMode;
+import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
@@ -378,7 +381,7 @@ public class LodRenderer
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		
 		// by default draw everything as triangles
-		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 		VulkanicAPI.setCullFaceEnabled(ctx, true);
 		
 		VulkanicAPI.blendFunc(ctx, VulkanicBlendFactor.SRC_ALPHA, VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA);
@@ -588,12 +591,12 @@ public class LodRenderer
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
 		{
-			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.LINE);
 			VulkanicAPI.setCullFaceEnabled(ctx, false);
 		}
 		else
 		{
-			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
@@ -660,7 +663,7 @@ public class LodRenderer
 					shaderProgram.bindVertexBuffer(vbo.getId());
 					VulkanicAPI.drawElements(
 							ctx,
-							VulkanicAPI.GL_TRIANGLES,
+							VulkanicPrimitiveMode.TRIANGLES,
 							(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
 							this.quadIBO.getType(), 0);
 					vbo.unbind();
@@ -677,7 +680,7 @@ public class LodRenderer
 		if (renderWireframe)
 		{
 			// default back to GL_FILL since all other rendering uses it 
-			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		

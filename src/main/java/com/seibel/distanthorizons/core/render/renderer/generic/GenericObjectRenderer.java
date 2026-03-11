@@ -28,13 +28,15 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAcce
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.coreapi.ModInfo;
-import org.apache.logging.log4j.LogManager;
-import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicBlendEquation;
 import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPolygonMode;
+import net.vulkanic.VulkanicPrimitiveMode;
 import org.lwjgl.system.MemoryUtil;
 
 import java.awt.*;
@@ -382,12 +384,12 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
 		{
-			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.LINE);
 			VulkanicAPI.setCullFaceEnabled(ctx, false);
 		}
 		else
 		{
-			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
@@ -485,7 +487,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		if (renderWireframe)
 		{
 			// default back to GL_FILL since all other rendering uses it 
-			VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
@@ -557,7 +559,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		profiler.popPush("render");
 		if (boxGroup.uploadedBoxCount > 0)
 		{
-			VulkanicAPI.drawIndexedInstanced(ctx, VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0, boxGroup.uploadedBoxCount);
+			VulkanicAPI.drawIndexedInstanced(ctx, VulkanicPrimitiveMode.TRIANGLES, BOX_INDICES.length, VulkanicIndexType.INT, 0, boxGroup.uploadedBoxCount);
 		}
 		
 		
@@ -635,7 +637,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 			Vec3d camPos)
 	{
 		shaderProgram.fillDirectUniformData(renderEventParam, boxGroup, box, camPos);
-		VulkanicAPI.drawElements(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
+		VulkanicAPI.drawElements(VulkanicAPI.getCommandContext(), VulkanicPrimitiveMode.TRIANGLES, BOX_INDICES.length, VulkanicIndexType.INT, 0);
 	}
 	
 	

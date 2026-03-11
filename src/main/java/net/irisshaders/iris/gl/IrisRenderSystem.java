@@ -17,6 +17,8 @@ import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicIntegerQuery;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPolygonMode;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3i;
@@ -553,18 +555,22 @@ public class IrisRenderSystem {
 	public static void setPolygonMode(int mode) {
 		if (mode != polygonMode) {
 			polygonMode = mode;
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_FRONT_AND_BACK, mode);
+			VulkanicAPI.setPolygonMode(VulkanicAPI.getCommandContext(), VulkanicPolygonFace.FRONT_AND_BACK, mode);
 		}
+	}
+
+	public static void setPolygonMode(VulkanicPolygonMode mode) {
+		setPolygonMode(mode.toGlModeConstant());
 	}
 
 	public static void overridePolygonMode() {
 		backupPolygonMode = polygonMode;
-		setPolygonMode(VulkanicAPI.GL_FILL);
+		setPolygonMode(VulkanicPolygonMode.FILL);
 	}
 
 	public static void restorePolygonMode() {
 		setPolygonMode(backupPolygonMode);
-		backupPolygonMode = VulkanicAPI.GL_FILL;
+		backupPolygonMode = VulkanicPolygonMode.FILL.toGlModeConstant();
 	}
 
 	public static void dispatchComputeIndirect(long offset) {

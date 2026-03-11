@@ -9,6 +9,7 @@ import net.vulkanic.VulkanicCullFaceMode;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicStencilCompareOp;
 import net.vulkanic.VulkanicStencilOperation;
+import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicIntegerQuery;
@@ -118,7 +119,7 @@ public class GLState
 		this.blendDstColor = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_DST_RGB);
 		this.blendDstAlpha = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.BLEND_DST_ALPHA);
 		this.depth = VulkanicAPI.isEnabled(ctx, VulkanicCapability.DEPTH_TEST);
-		this.writeToDepthBuffer = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.DEPTH_WRITEMASK) == VulkanicAPI.GL_TRUE;
+		this.writeToDepthBuffer = VulkanicAPI.getBoolean(ctx, VulkanicIntegerQuery.DEPTH_WRITEMASK);
 		this.depthFunc = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.DEPTH_FUNC);
 		this.stencil = VulkanicAPI.isEnabled(ctx, VulkanicCapability.STENCIL_TEST);
 		this.stencilFunc = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.STENCIL_FUNC);
@@ -306,6 +307,6 @@ public class GLState
 				mode -> VulkanicAPI.setCullFaceMode(ctx, mode),
 				() -> VulkanicAPI.setCullFaceMode(ctx, this.cullMode)
 			);
-		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, this.polyMode);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, this.polyMode);
 	}
 }

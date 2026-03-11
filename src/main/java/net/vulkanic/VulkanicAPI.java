@@ -1562,6 +1562,13 @@ public class VulkanicAPI {
     }
 
     /**
+     * Queries a boolean-like integer state variable.
+     */
+    public static boolean getBoolean(CommandContext ctx, VulkanicIntegerQuery query) {
+        return getInteger(ctx, query) != 0;
+    }
+
+    /**
      * Queries the required alignment for uniform-buffer range offsets.
      */
     public static int getUniformBufferOffsetAlignment(CommandContext ctx) {
@@ -1657,7 +1664,32 @@ public class VulkanicAPI {
      * @param mode The rasterization mode
      */
     public static void setPolygonMode(CommandContext ctx, int face, int mode) {
+        java.util.Optional<VulkanicPolygonFace> typedFace = VulkanicPolygonFace.fromLegacyGlConstant(face);
+        java.util.Optional<VulkanicPolygonMode> typedMode = VulkanicPolygonMode.fromLegacyGlConstant(mode);
+        if (typedFace.isPresent() && typedMode.isPresent()) {
+            setPolygonMode(ctx, typedFace.get(), typedMode.get());
+            return;
+        }
+
         getBackend().setPolygonMode(ctx, face, mode);
+    }
+
+    /**
+     * Sets the polygon rasterization mode using backend-neutral typed arguments.
+     */
+    public static void setPolygonMode(CommandContext ctx, VulkanicPolygonFace face, VulkanicPolygonMode mode) {
+        getBackend().setPolygonMode(ctx, face.toGlFaceConstant(), mode.toGlModeConstant());
+    }
+
+    /**
+     * Sets the polygon rasterization mode for a typed face with a legacy mode constant.
+     */
+    public static void setPolygonMode(CommandContext ctx, VulkanicPolygonFace face, int mode) {
+        VulkanicPolygonMode.fromLegacyGlConstant(mode)
+            .ifPresentOrElse(
+                typedMode -> setPolygonMode(ctx, face, typedMode),
+                () -> getBackend().setPolygonMode(ctx, face.toGlFaceConstant(), mode)
+            );
     }
     
     /**
@@ -1816,10 +1848,28 @@ public class VulkanicAPI {
     }
     
     public static void drawArrays(CommandContext ctx, int mode, int first, int count) {
-        getBackend().drawArrays(ctx, mode, first, count);
+        VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+            .ifPresentOrElse(
+                typedMode -> drawArrays(ctx, typedMode, first, count),
+                () -> getBackend().drawArrays(ctx, mode, first, count)
+            );
+    }
+
+    /**
+     * Draws array primitives using a backend-neutral primitive mode.
+     */
+    public static void drawArrays(CommandContext ctx, VulkanicPrimitiveMode mode, int first, int count) {
+        getBackend().drawArrays(ctx, mode.toGlModeConstant(), first, count);
     }
     
     public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        java.util.Optional<VulkanicPrimitiveMode> typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode);
+        java.util.Optional<VulkanicIndexType> typedIndexType = VulkanicIndexType.fromLegacyGlConstant(type);
+        if (typedMode.isPresent() && typedIndexType.isPresent()) {
+            drawElements(ctx, typedMode.get(), count, typedIndexType.get(), indices);
+            return;
+        }
+
         getBackend().drawElements(ctx, mode, count, type, indices);
     }
 
@@ -1827,7 +1877,29 @@ public class VulkanicAPI {
      * Draws indexed primitives using a backend-agnostic index type.
      */
     public static void drawElements(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices) {
-        getBackend().drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices);
+        VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+            .ifPresentOrElse(
+                typedMode -> drawElements(ctx, typedMode, count, indexType, indices),
+                () -> getBackend().drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices)
+            );
+    }
+
+    /**
+     * Draws indexed primitives using a backend-neutral primitive mode with legacy index-type constant.
+     */
+    public static void drawElements(CommandContext ctx, VulkanicPrimitiveMode mode, int count, int type, long indices) {
+        VulkanicIndexType.fromLegacyGlConstant(type)
+            .ifPresentOrElse(
+                typedIndexType -> drawElements(ctx, mode, count, typedIndexType, indices),
+                () -> getBackend().drawElements(ctx, mode.toGlModeConstant(), count, type, indices)
+            );
+    }
+
+    /**
+     * Draws indexed primitives using backend-neutral primitive and index types.
+     */
+    public static void drawElements(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices) {
+        getBackend().drawElements(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices);
     }
     
     public static void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
@@ -2893,10 +2965,28 @@ public class VulkanicAPI {
     }
 
     /**
+     * Renders indexed primitives with instancing and a base vertex using a backend-neutral primitive mode.
+     */
+    public static void drawIndexedInstancedBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        VulkanicIndexType.fromLegacyGlConstant(type)
+            .ifPresentOrElse(
+                typedIndexType -> drawIndexedInstancedBaseVertex(ctx, mode, count, typedIndexType, indices, instanceCount, baseVertex),
+                () -> getBackend().drawIndexedInstancedBaseVertex(ctx, mode.toGlModeConstant(), count, type, indices, instanceCount, baseVertex)
+            );
+    }
+
+    /**
      * Renders indexed primitives with instancing and a base vertex using a backend-agnostic index type.
      */
     public static void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices, int instanceCount, int baseVertex) {
         getBackend().drawIndexedInstancedBaseVertex(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount, baseVertex);
+    }
+
+    /**
+     * Renders indexed primitives with instancing and a base vertex using backend-neutral primitive and index types.
+     */
+    public static void drawIndexedInstancedBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices, int instanceCount, int baseVertex) {
+        getBackend().drawIndexedInstancedBaseVertex(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, instanceCount, baseVertex);
     }
     
     /**
@@ -2908,10 +2998,28 @@ public class VulkanicAPI {
     }
 
     /**
+     * Renders indexed primitives with a base vertex offset using a backend-neutral primitive mode.
+     */
+    public static void drawIndexedBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, int count, int type, long indices, int baseVertex) {
+        VulkanicIndexType.fromLegacyGlConstant(type)
+            .ifPresentOrElse(
+                typedIndexType -> drawIndexedBaseVertex(ctx, mode, count, typedIndexType, indices, baseVertex),
+                () -> getBackend().drawIndexedBaseVertex(ctx, mode.toGlModeConstant(), count, type, indices, baseVertex)
+            );
+    }
+
+    /**
      * Renders indexed primitives with a base vertex offset using a backend-agnostic index type.
      */
     public static void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices, int baseVertex) {
         getBackend().drawIndexedBaseVertex(ctx, mode, count, indexType.toGlTypeConstant(), indices, baseVertex);
+    }
+
+    /**
+     * Renders indexed primitives with a base vertex offset using backend-neutral primitive and index types.
+     */
+    public static void drawIndexedBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices, int baseVertex) {
+        getBackend().drawIndexedBaseVertex(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, baseVertex);
     }
     
     /**
@@ -2919,6 +3027,13 @@ public class VulkanicAPI {
      * @param ctx Command context
      */
     public static void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+        java.util.Optional<VulkanicPrimitiveMode> typedMode = VulkanicPrimitiveMode.fromLegacyGlConstant(mode);
+        java.util.Optional<VulkanicIndexType> typedIndexType = VulkanicIndexType.fromLegacyGlConstant(type);
+        if (typedMode.isPresent() && typedIndexType.isPresent()) {
+            drawIndexedInstanced(ctx, typedMode.get(), count, typedIndexType.get(), indices, instanceCount);
+            return;
+        }
+
         getBackend().drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount);
     }
 
@@ -2926,7 +3041,18 @@ public class VulkanicAPI {
      * Renders indexed primitives with instancing using a backend-agnostic index type.
      */
     public static void drawIndexedInstanced(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices, int instanceCount) {
-        getBackend().drawIndexedInstanced(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount);
+        VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+            .ifPresentOrElse(
+                typedMode -> drawIndexedInstanced(ctx, typedMode, count, indexType, indices, instanceCount),
+                () -> getBackend().drawIndexedInstanced(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount)
+            );
+    }
+
+    /**
+     * Renders indexed primitives with instancing using backend-neutral primitive and index types.
+     */
+    public static void drawIndexedInstanced(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices, int instanceCount) {
+        getBackend().drawIndexedInstanced(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, instanceCount);
     }
     
     /**

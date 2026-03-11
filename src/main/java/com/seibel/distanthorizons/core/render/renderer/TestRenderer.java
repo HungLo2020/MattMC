@@ -12,6 +12,9 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPolygonMode;
+import net.vulkanic.VulkanicPrimitiveMode;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -87,7 +90,7 @@ public class TestRenderer
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindFramebuffer(ctx, MC_RENDER.getTargetFramebuffer());
 		VulkanicAPI.setDynamicViewport(ctx, 0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
-		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 		
 		VulkanicAPI.setCullFaceEnabled(ctx, false);
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
@@ -101,7 +104,7 @@ public class TestRenderer
 		this.va.bindBufferToAllBindingPoints(this.vbo.getId());
 		
 		// Render the square
-		VulkanicAPI.drawArrays(ctx, VulkanicAPI.GL_TRIANGLE_FAN, 0, 4);
+		VulkanicAPI.drawArrays(ctx, VulkanicPrimitiveMode.TRIANGLE_FAN, 0, 4);
 		VulkanicAPI.clearDepthBuffer(ctx);
 	}
 	

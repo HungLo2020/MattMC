@@ -20,6 +20,10 @@ import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPolygonMode;
+import net.vulkanic.VulkanicPrimitiveMode;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -179,7 +183,7 @@ public class DebugRenderer
 		
 		this.init();
 		
-		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.LINE);
 		VulkanicAPI.setDepthTestEnabled(ctx, true);
 		
 		this.basicShader.bind(ctx);
@@ -203,7 +207,7 @@ public class DebugRenderer
 		
 		
 		// box rendering
-		VulkanicAPI.setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 		for (BoxParticle particle : this.particles)
 		{
 			this.renderBox(particle.getBox(), ctx);
@@ -223,7 +227,7 @@ public class DebugRenderer
 		t.multiply(boxTransform);
 		this.basicShader.setUniform(ctx, this.basicShader.getUniformLocation(ctx, "uTransform"), t);
 		this.basicShader.setUniform(ctx, this.basicShader.getUniformLocation(ctx, "uColor"), box.color);
-		VulkanicAPI.drawElements(ctx, VulkanicAPI.GL_LINES, BOX_OUTLINE_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
+		VulkanicAPI.drawElements(ctx, VulkanicPrimitiveMode.LINES, BOX_OUTLINE_INDICES.length, VulkanicIndexType.INT, 0);
 	}
 	
 	

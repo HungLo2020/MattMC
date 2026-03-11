@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractV
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicPrimitiveMode;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -68,7 +69,7 @@ public class ScreenQuad
 		this.va.bind();
 		this.va.bindBufferToAllBindingPoints(this.boxBuffer.getId());
 		
-		VulkanicAPI.drawArrays(ctx, VulkanicAPI.GL_TRIANGLES, 0, 6);
+		VulkanicAPI.drawArrays(ctx, VulkanicPrimitiveMode.TRIANGLES, 0, 6);
 	}
 	
 	private void createBuffer()
