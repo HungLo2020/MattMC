@@ -164,6 +164,8 @@ public class GraphicsCapabilities {
             case DRAW_BUFFERS_BLEND -> OpenGL40;
             case NO_ERROR_CONTEXT -> OpenGL46;
             case DEBUG_OUTPUT_CONTROL -> OpenGL43;
+            case DEBUG_OUTPUT_ARB, DEBUG_OUTPUT_AMD, GPU_MEMORY_INFO -> false;
+            case DEBUG_CONTEXT_FLAGS -> OpenGL30;
         };
     }
 
@@ -178,6 +180,10 @@ public class GraphicsCapabilities {
             case DRAW_BUFFERS_BLEND -> GL_ARB_draw_buffers_blend;
             case NO_ERROR_CONTEXT -> GL_KHR_no_error;
             case DEBUG_OUTPUT_CONTROL -> GL_KHR_debug;
+            case DEBUG_OUTPUT_ARB -> GL_ARB_debug_output;
+            case DEBUG_OUTPUT_AMD -> GL_AMD_debug_output;
+            case GPU_MEMORY_INFO -> GL_NVX_gpu_memory_info;
+            case DEBUG_CONTEXT_FLAGS -> false;
         };
     }
 }

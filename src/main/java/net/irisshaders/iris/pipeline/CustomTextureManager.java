@@ -98,8 +98,7 @@ public class CustomTextureManager {
 		} else if (textureData instanceof CustomTextureData.LightmapMarker) {
 			// Special code path for the light texture. While shader packs hardcode the primary light texture, it's
 			// possible that a mod will create a different light texture, so this code path is robust to that.
-			return new TextureWrapper(() -> Minecraft.getInstance().gameRenderer.lightTexture().texture
-				.iris$getGlId(), TextureType.TEXTURE_2D);
+			return new TextureWrapper(() -> VulkanicAPI.getTextureHandle(Minecraft.getInstance().gameRenderer.lightTexture().texture), TextureType.TEXTURE_2D);
 		} else if (textureData instanceof CustomTextureData.RawData1D rawData1D) {
 			GlTexture texture = new GlTexture(TextureType.TEXTURE_1D, rawData1D.getSizeX(), 0, 0, rawData1D.getInternalFormat().getGlFormat(), rawData1D.getPixelFormat().getGlFormat(), rawData1D.getPixelType().getGlFormat(), rawData1D.getContent(), rawData1D.getFilteringData());
 			ownedRawTextures.add(texture);
@@ -152,7 +151,9 @@ public class CustomTextureManager {
 						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(tex);
 						VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), binding);
 					}
-					return texture != null ? texture.getTexture().iris$getGlId() : textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture().iris$getGlId();
+					return texture != null
+						? VulkanicAPI.getTextureHandle(texture.getTexture())
+						: VulkanicAPI.getTextureHandle(textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture());
 				}, TextureType.TEXTURE_2D);
 			} else {
 				location = location.substring(0, extensionIndex - pbrType.getSuffix().length()) + location.substring(extensionIndex);
@@ -169,7 +170,7 @@ public class CustomTextureManager {
 							net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(tex);
 							VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), binding);
 						}
-						int id = texture.getTexture().iris$getGlId();
+						int id = VulkanicAPI.getTextureHandle(texture.getTexture());
 						PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(id);
 						AbstractTexture pbrTexture = switch (pbrType) {
 							case NORMAL -> pbrHolder.normalTexture();
@@ -179,15 +180,15 @@ public class CustomTextureManager {
 						TextureFormat textureFormat = TextureFormatLoader.getFormat();
 						if (textureFormat != null) {
 							int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
-							VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), pbrTexture.getTexture().iris$getGlId());
+							VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), VulkanicAPI.getTextureHandle(pbrTexture.getTexture()));
 							textureFormat.setupTextureParameters(pbrType, pbrTexture);
 							VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousBinding);
 						}
 
-						return pbrTexture.getTexture().iris$getGlId();
+						return VulkanicAPI.getTextureHandle(pbrTexture.getTexture());
 					}
 
-					return textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture().iris$getGlId();
+					return VulkanicAPI.getTextureHandle(textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture());
 				}, TextureType.TEXTURE_2D);
 			}
 		}

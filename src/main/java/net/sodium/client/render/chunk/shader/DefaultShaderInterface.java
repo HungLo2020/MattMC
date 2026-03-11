@@ -80,7 +80,7 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
         var tex = textureView.texture();
         CommandContext ctx = VulkanicAPI.getCommandContext();
         VulkanicAPI.setActiveTextureUnitIndex(ctx, slot.ordinal());
-        VulkanicAPI.bindTexture2D(ctx, tex.glId());
+        VulkanicAPI.bindTexture2D(ctx, VulkanicAPI.getTextureHandle(tex));
         VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, textureView.baseMipLevel());
         VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
         tex.flushModeChanges2D();

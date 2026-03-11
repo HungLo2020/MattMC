@@ -111,7 +111,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
 						|| net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
 					// Iris shadow/safeMultiply path: use GlTexture's cached FBO but do not bind it.
-					int i = ((GlTexture)gpuTextureView.texture()).getFbo(this.device.directStateAccess(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
+					int i = VulkanicAPI.resolveFramebufferForTextures(gpuTextureView.texture(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
 					this.iris$tempFBO = i;
 					this.activeVulkanicRenderPass = null;
 					this.activeRenderPassContext = null;
@@ -184,7 +184,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			throw new IllegalStateException("Close the existing render pass before creating a new one!");
 		} else {
 			this.verifyColorTexture(gpuTexture);
-			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTexture).id, 0, 0, VulkanicAPI.GL_FRAMEBUFFER);
+			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, VulkanicAPI.getTextureHandle(gpuTexture), 0, 0, VulkanicAPI.GL_FRAMEBUFFER);
 			VulkanicAPI.setClearColor(VulkanicAPI.getCommandContext(), ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
 			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getCommandContext(), false);
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
@@ -201,7 +201,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyColorTexture(gpuTexture);
 			this.verifyDepthTexture(gpuTexture2);
-			int j = ((GlTexture)gpuTexture).getFbo(this.device.directStateAccess(), gpuTexture2);
+			int j = VulkanicAPI.resolveFramebufferForTextures(gpuTexture, gpuTexture2);
 			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), j);
 			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getCommandContext(), false);
 			VulkanicAPI.setClearDepth(VulkanicAPI.getCommandContext(), d);
@@ -221,7 +221,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.verifyColorTexture(gpuTexture);
 			this.verifyDepthTexture(gpuTexture2);
 			this.verifyRegion(gpuTexture, j, k, l, m);
-			int n = ((GlTexture)gpuTexture).getFbo(this.device.directStateAccess(), gpuTexture2);
+			int n = VulkanicAPI.resolveFramebufferForTextures(gpuTexture, gpuTexture2);
 			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), n);
 			VulkanicAPI.setDynamicScissor(VulkanicAPI.getCommandContext(), j, k, l, m);
 			VulkanicAPI.setScissorTestEnabled(VulkanicAPI.getCommandContext(), true);
@@ -256,7 +256,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			throw new IllegalStateException("Close the existing render pass before creating a new one!");
 		} else {
 			this.verifyDepthTexture(gpuTexture);
-			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, 0, ((GlTexture)gpuTexture).id, 0, VulkanicAPI.GL_FRAMEBUFFER);
+			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, 0, VulkanicAPI.getTextureHandle(gpuTexture), 0, VulkanicAPI.GL_FRAMEBUFFER);
 			VulkanicAPI.setDrawBufferNone(VulkanicAPI.getCommandContext());
 			VulkanicAPI.setClearDepth(VulkanicAPI.getCommandContext(), d);
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
@@ -468,13 +468,14 @@ public class GlCommandEncoder implements CommandEncoder {
 				throw new UnsupportedOperationException("Depth or layer is out of range, must be >= 0 and < " + gpuTexture.getDepthOrLayers());
 			} else {
 				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+				int textureHandle = VulkanicAPI.getTextureHandle(gpuTexture);
 				int q;
 				if ((gpuTexture.usage() & 16) != 0) {
 					q = GlConst.CUBEMAP_TARGETS[j % 6];
-					VulkanicAPI.bindCubemapTexture(ctx, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
 				} else {
 					q = VulkanicAPI.GL_TEXTURE_2D;
-					VulkanicAPI.bindTexture2D(ctx, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture2D(ctx, textureHandle);
 				}
 
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ROW_LENGTH, nativeImage.getWidth());
@@ -521,13 +522,14 @@ public class GlCommandEncoder implements CommandEncoder {
 				throw new UnsupportedOperationException("Depth or layer is out of range, must be >= 0 and < " + gpuTexture.getDepthOrLayers());
 			} else {
 				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+				int textureHandle = VulkanicAPI.getTextureHandle(gpuTexture);
 				int o;
 				if ((gpuTexture.usage() & 16) != 0) {
 					o = GlConst.CUBEMAP_TARGETS[j % 6];
-					VulkanicAPI.bindCubemapTexture(ctx, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
 				} else {
 					o = VulkanicAPI.GL_TEXTURE_2D;
-					VulkanicAPI.bindTexture2D(ctx, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture2D(ctx, textureHandle);
 				}
 
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ROW_LENGTH, m);
@@ -597,7 +599,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 				while (VulkanicAPI.getError(ctx) != 0) {
 				}
-				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, ((GlTexture)gpuTexture).glId(), 0, j, VulkanicAPI.GL_READ_FRAMEBUFFER);
+				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, VulkanicAPI.getTextureHandle(gpuTexture), 0, j, VulkanicAPI.GL_READ_FRAMEBUFFER);
 				VulkanicAPI.bindPixelPackBuffer(ctx, ((GlBuffer)gpuBuffer).handle);
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_PACK_ROW_LENGTH, m);
 				VulkanicAPI.readPixels(ctx, k, l, m, n, GlConst.toGlExternalId(gpuTexture.getFormat()), GlConst.toGlType(gpuTexture.getFormat()), i);
@@ -668,8 +670,8 @@ public class GlCommandEncoder implements CommandEncoder {
 				}
 				VulkanicAPI.setScissorTestEnabled(ctx, false);
 				boolean bl = gpuTexture.getFormat().hasDepthAspect();
-				int p = ((GlTexture)gpuTexture).glId();
-				int q = ((GlTexture)gpuTexture2).glId();
+				int p = VulkanicAPI.getTextureHandle(gpuTexture);
+				int q = VulkanicAPI.getTextureHandle(gpuTexture2);
 				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, bl ? 0 : p, bl ? p : 0, 0, 0);
 				this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, bl ? 0 : q, bl ? q : 0, 0, 0);
 				this.device.directStateAccess().blitFrameBuffers(
@@ -714,7 +716,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			VulkanicAPI.setDynamicViewport(ctx, 0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
-			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTextureView.texture()).glId(), 0, 0, 0);
+			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, VulkanicAPI.getTextureHandle(gpuTextureView.texture()), 0, 0, 0);
 			this.device
 				.directStateAccess()
 				.blitFrameBuffers(
@@ -1047,19 +1049,20 @@ public class GlCommandEncoder implements CommandEncoder {
 					}
 
 						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var46);
-					GlTexture glTexture = glTextureView2x.texture();
+					GpuTexture texture = glTextureView2x.texture();
+					int textureHandle = VulkanicAPI.getTextureHandle(texture);
 					int o;
-					if ((glTexture.usage() & 16) != 0) {
+					if ((texture.usage() & 16) != 0) {
 							o = VulkanicAPI.GL_TEXTURE_CUBE_MAP;
-							VulkanicAPI.bindCubemapTexture(ctx, glTexture.id);
+							VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
 					} else {
 							o = VulkanicAPI.GL_TEXTURE_2D;
-						VulkanicAPI.bindTexture2D(ctx, glTexture.id);
+						VulkanicAPI.bindTexture2D(ctx, textureHandle);
 					}
 
 						VulkanicAPI.setTextureParameter(ctx, o, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, glTextureView2x.baseMipLevel());
 						VulkanicAPI.setTextureParameter(ctx, o, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, glTextureView2x.baseMipLevel() + glTextureView2x.mipLevels() - 1);
-					glTexture.flushModeChanges(o);
+					texture.flushModeChanges(o);
 					break;
 				default:
 					throw new MatchException(null, null);

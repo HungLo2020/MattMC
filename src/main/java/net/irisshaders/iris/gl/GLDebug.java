@@ -3,6 +3,7 @@ package net.irisshaders.iris.gl;
 import net.irisshaders.iris.Iris;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsCapabilities;
+import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.APIUtil;
 
@@ -65,9 +66,14 @@ public final class GLDebug {
 
 	public static int setupDebugMessageCallback(PrintStream stream) {
 		GraphicsCapabilities caps = VulkanicAPI.getGraphicsCapabilities();
+		boolean hasCoreDebug = caps.supportsCore(GraphicsFeature.DEBUG_OUTPUT_CONTROL);
+		boolean hasKhrDebug = caps.supportsExtension(GraphicsFeature.DEBUG_OUTPUT_CONTROL);
+		boolean hasArbDebug = caps.supportsExtension(GraphicsFeature.DEBUG_OUTPUT_ARB);
+		boolean hasAmdDebug = caps.supportsExtension(GraphicsFeature.DEBUG_OUTPUT_AMD);
+		boolean hasDebugContextFlags = caps.supportsCore(GraphicsFeature.DEBUG_CONTEXT_FLAGS);
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.setDebugOutputSynchronousEnabled(ctx, true);
-		if (caps.OpenGL43) {
+		if (hasCoreDebug) {
 			Iris.logger.info("[GL] Using OpenGL 4.3 for error logging.");
 			VulkanicAPI.setupDebugMessageCallback((source, type, id, severity, messageStr) -> {
 				stream.println("[LWJGL] OpenGL debug message");
@@ -88,7 +94,7 @@ public final class GLDebug {
 				return 2;
 			}
 			return 1;
-		} else if (caps.GL_KHR_debug) {
+		} else if (hasKhrDebug) {
 			Iris.logger.info("[GL] Using KHR_debug for error logging.");
 			VulkanicAPI.setupDebugMessageCallbackKHR((source, type, id, severity, messageStr) -> {
 				stream.println("[LWJGL] OpenGL debug message");
@@ -103,13 +109,13 @@ public final class GLDebug {
 			VulkanicAPI.setDebugMessageControlAllKHR(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_MEDIUM, false);
 			VulkanicAPI.setDebugMessageControlAllKHR(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, false);
 			VulkanicAPI.setDebugMessageControlAllKHR(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, false);
-			if (caps.OpenGL30 && !VulkanicAPI.isDebugContext(ctx)) {
+			if (hasDebugContextFlags && !VulkanicAPI.isDebugContext(ctx)) {
 				Iris.logger.warn("[GL] Warning: A non-debug context may not produce any debug output.");
 				VulkanicAPI.setDebugOutputEnabled(ctx, true);
 				return 2;
 			}
 			return 1;
-		} else if (caps.GL_ARB_debug_output) {
+		} else if (hasArbDebug) {
 			Iris.logger.info("[GL] Using ARB_debug_output for error logging.");
 			VulkanicAPI.setupDebugMessageCallbackARB((source, type, id, severity, messageStr) -> {
 				stream.println("[LWJGL] ARB_debug_output message");
@@ -125,7 +131,7 @@ public final class GLDebug {
 			VulkanicAPI.setDebugMessageControlAllARB(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_LOW, false);
 			VulkanicAPI.setDebugMessageControlAllARB(ctx, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, false);
 			return 1;
-		} else if (caps.GL_AMD_debug_output) {
+		} else if (hasAmdDebug) {
 			Iris.logger.info("[GL] Using AMD_debug_output for error logging.");
 			VulkanicAPI.setupDebugMessageCallbackAMD((id, category, severity, messageStr) -> {
 				stream.println("[LWJGL] AMD_debug_output message");
@@ -148,20 +154,25 @@ public final class GLDebug {
 
 	public static int disableDebugMessages() {
 		GraphicsCapabilities caps = VulkanicAPI.getGraphicsCapabilities();
+		boolean hasCoreDebug = caps.supportsCore(GraphicsFeature.DEBUG_OUTPUT_CONTROL);
+		boolean hasKhrDebug = caps.supportsExtension(GraphicsFeature.DEBUG_OUTPUT_CONTROL);
+		boolean hasArbDebug = caps.supportsExtension(GraphicsFeature.DEBUG_OUTPUT_ARB);
+		boolean hasAmdDebug = caps.supportsExtension(GraphicsFeature.DEBUG_OUTPUT_AMD);
+		boolean hasDebugContextFlags = caps.supportsCore(GraphicsFeature.DEBUG_CONTEXT_FLAGS);
 		CommandContext ctx = VulkanicAPI.getCommandContext();
-		if (caps.OpenGL43) {
+		if (hasCoreDebug) {
 			VulkanicAPI.clearDebugMessageCallback();
 			return 1;
-		} else if (caps.GL_KHR_debug) {
+		} else if (hasKhrDebug) {
 			VulkanicAPI.clearDebugMessageCallbackKHR();
-			if (caps.OpenGL30 && !VulkanicAPI.isDebugContext(ctx)) {
+			if (hasDebugContextFlags && !VulkanicAPI.isDebugContext(ctx)) {
 				VulkanicAPI.setDebugOutputEnabled(ctx, false);
 			}
 			return 1;
-		} else if (caps.GL_ARB_debug_output) {
+		} else if (hasArbDebug) {
 			VulkanicAPI.clearDebugMessageCallbackARB();
 			return 1;
-		} else if (caps.GL_AMD_debug_output) {
+		} else if (hasAmdDebug) {
 			VulkanicAPI.clearDebugMessageCallbackAMD();
 			return 1;
 		} else {
@@ -289,7 +300,7 @@ public final class GLDebug {
 
 	public static void reloadDebugState() {
 		GraphicsCapabilities caps = VulkanicAPI.getGraphicsCapabilities();
-		if (Iris.getIrisConfig().areDebugOptionsEnabled() && (caps.GL_KHR_debug || caps.OpenGL43)) {
+		if (Iris.getIrisConfig().areDebugOptionsEnabled() && caps.supports(GraphicsFeature.DEBUG_OUTPUT_CONTROL)) {
 			debugState = new KHRDebugState();
 		} else {
 			debugState = new UnsupportedDebugState();

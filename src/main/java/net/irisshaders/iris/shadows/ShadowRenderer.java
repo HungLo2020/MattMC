@@ -228,9 +228,9 @@ public class ShadowRenderer {
 
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(4);
 
-		configureDepthSampler(targets.getDepthTexture().iris$getGlId(), depthSamplingSettings.get(0));
+		configureDepthSampler(VulkanicAPI.getTextureHandle(targets.getDepthTexture()), depthSamplingSettings.get(0));
 
-		configureDepthSampler(targets.getDepthTextureNoTranslucents().iris$getGlId(), depthSamplingSettings.get(1));
+		configureDepthSampler(VulkanicAPI.getTextureHandle(targets.getDepthTextureNoTranslucents()), depthSamplingSettings.get(1));
 
 		for (int i = 0; i < targets.getNumColorTextures(); i++) {
 			if (targets.get(i) != null) {

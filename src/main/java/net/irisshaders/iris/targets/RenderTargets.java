@@ -225,11 +225,11 @@ public class RenderTargets {
 	public void copyPreTranslucentDepth() {
 		if (translucentDepthDirty) {
 			translucentDepthDirty = false;
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), noTranslucents.iris$getGlId());
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), VulkanicAPI.getTextureHandle(noTranslucents));
 			depthSourceFb.bindAsReadBuffer();
 			IrisRenderSystem.copyTexImage2D(0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
 		} else {
-			copyStrategy.copy(depthSourceFb, getDepthTexture().iris$getGlId(), noTranslucentsDestFb, noTranslucents.iris$getGlId(),
+			copyStrategy.copy(depthSourceFb, VulkanicAPI.getTextureHandle(getDepthTexture()), noTranslucentsDestFb, VulkanicAPI.getTextureHandle(noTranslucents),
 				getCurrentWidth(), getCurrentHeight());
 		}
 	}
@@ -237,11 +237,11 @@ public class RenderTargets {
 	public void copyPreHandDepth() {
 		if (handDepthDirty) {
 			handDepthDirty = false;
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), noHand.iris$getGlId());
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), VulkanicAPI.getTextureHandle(noHand));
 			depthSourceFb.bindAsReadBuffer();
 			IrisRenderSystem.copyTexImage2D(0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
 		} else {
-			copyStrategy.copy(depthSourceFb, getDepthTexture().iris$getGlId(), noHandDestFb, noHand.iris$getGlId(),
+			copyStrategy.copy(depthSourceFb, VulkanicAPI.getTextureHandle(getDepthTexture()), noHandDestFb, VulkanicAPI.getTextureHandle(noHand),
 				getCurrentWidth(), getCurrentHeight());
 		}
 	}

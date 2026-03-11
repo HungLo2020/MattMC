@@ -186,7 +186,7 @@ public class ShadowRenderTargets {
 			IrisRenderSystem.blitDepthBufferNearest(depthSourceFb.getId(), noTranslucentsDestFb.getId(), 0, 0, resolution, resolution,
 				0, 0, resolution, resolution);
 		} else {
-			DepthCopyStrategy.fastest(false).copy(depthSourceFb, mainDepth.iris$getGlId(), noTranslucentsDestFb, noTranslucents.iris$getGlId(),
+			DepthCopyStrategy.fastest(false).copy(depthSourceFb, VulkanicAPI.getTextureHandle(mainDepth), noTranslucentsDestFb, VulkanicAPI.getTextureHandle(noTranslucents),
 				resolution, resolution);
 		}
 	}

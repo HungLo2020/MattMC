@@ -14,6 +14,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Class serving as abstraction and
@@ -41,7 +42,7 @@ public final class GuiUtil {
 	 */
 	public static void bindIrisWidgetsTexture() {
 		GpuTextureView textureView = Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView();
-		IrisRenderSystem.bindTextureToUnit(0, textureView.texture().iris$getGlId());
+		IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(textureView.texture()));
 		TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 	}
 

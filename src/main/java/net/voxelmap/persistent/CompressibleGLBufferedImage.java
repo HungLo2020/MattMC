@@ -101,7 +101,7 @@ public class CompressibleGLBufferedImage {
         this.texture.upload();
         // Use DSA mipmap generation — avoids mutating the global GL texture bind state
         // and requires only a single VulkanicAPI call instead of a bind + generate pair.
-        VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getCommandContext(), this.texture.getTexture().glId());
+        VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getCommandContext(), VulkanicAPI.getTextureHandle(this.texture.getTexture()));
         this.compress();
     }
 

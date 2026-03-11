@@ -16,6 +16,7 @@ import net.irisshaders.iris.shadows.ShadowRenderTargets;
 import net.irisshaders.iris.targets.RenderTarget;
 import net.irisshaders.iris.targets.RenderTargets;
 import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.Set;
 import java.util.function.IntSupplier;
@@ -131,12 +132,12 @@ public class IrisSamplers {
 
 		if (waterShadowEnabled) {
 			usesShadows = true;
-			samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> shadowRenderTargets.getDepthTexture().iris$getGlId(), separateHardwareSamplers ? null : shadowRenderTargets.getSamplerFor(0), "shadowtex0", "watershadow");
-			samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> shadowRenderTargets.getDepthTextureNoTranslucents().iris$getGlId(), separateHardwareSamplers ? null : shadowRenderTargets.getSamplerFor(1),
+			samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> VulkanicAPI.getTextureHandle(shadowRenderTargets.getDepthTexture()), separateHardwareSamplers ? null : shadowRenderTargets.getSamplerFor(0), "shadowtex0", "watershadow");
+			samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> VulkanicAPI.getTextureHandle(shadowRenderTargets.getDepthTextureNoTranslucents()), separateHardwareSamplers ? null : shadowRenderTargets.getSamplerFor(1),
 				"shadowtex1", "shadow");
 		} else {
-			usesShadows = samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> shadowRenderTargets.getDepthTexture().iris$getGlId(), separateHardwareSamplers ? null : shadowRenderTargets.getSamplerFor(0), "shadowtex0", "shadow");
-			usesShadows |= samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> shadowRenderTargets.getDepthTextureNoTranslucents().iris$getGlId(), separateHardwareSamplers ? null : shadowRenderTargets.getSamplerFor(1), "shadowtex1");
+			usesShadows = samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> VulkanicAPI.getTextureHandle(shadowRenderTargets.getDepthTexture()), separateHardwareSamplers ? null : shadowRenderTargets.getSamplerFor(0), "shadowtex0", "shadow");
+			usesShadows |= samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> VulkanicAPI.getTextureHandle(shadowRenderTargets.getDepthTextureNoTranslucents()), separateHardwareSamplers ? null : shadowRenderTargets.getSamplerFor(1), "shadowtex1");
 		}
 
 		if (flipped == null) {
@@ -163,11 +164,11 @@ public class IrisSamplers {
 		}
 
 		if (shadowRenderTargets.isHardwareFiltered(0) && separateHardwareSamplers) {
-			samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> shadowRenderTargets.getDepthTexture().iris$getGlId(), shadowRenderTargets.getSamplerFor(0), "shadowtex0HW");
+			samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> VulkanicAPI.getTextureHandle(shadowRenderTargets.getDepthTexture()), shadowRenderTargets.getSamplerFor(0), "shadowtex0HW");
 		}
 
 		if (shadowRenderTargets.isHardwareFiltered(1) && separateHardwareSamplers) {
-			samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> shadowRenderTargets.getDepthTextureNoTranslucents().iris$getGlId(), shadowRenderTargets.getSamplerFor(1), "shadowtex1HW");
+			samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> VulkanicAPI.getTextureHandle(shadowRenderTargets.getDepthTextureNoTranslucents()), shadowRenderTargets.getSamplerFor(1), "shadowtex1HW");
 		}
 
 		return usesShadows;
@@ -182,20 +183,20 @@ public class IrisSamplers {
 			samplers.addExternalSampler(ALBEDO_TEXTURE_UNIT, "tex", "texture", "gtexture");
 		} else {
 			// TODO: Rebind unbound sampler IDs instead of hardcoding a list...
-			samplers.addDynamicSampler(() -> whitePixel.getTexture().iris$getGlId(), "tex", "texture", "gtexture",
+			samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(whitePixel.getTexture()), "tex", "texture", "gtexture",
 				"gcolor", "colortex0");
 		}
 
 		if (hasLightmap) {
 			samplers.addExternalSampler(LIGHTMAP_TEXTURE_UNIT, "lightmap");
 		} else {
-			samplers.addDynamicSampler(() -> whitePixel.getTexture().iris$getGlId(), "lightmap");
+			samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(whitePixel.getTexture()), "lightmap");
 		}
 
 		if (hasOverlay) {
 			samplers.addExternalSampler(OVERLAY_TEXTURE_UNIT, "iris_overlay");
 		} else {
-			samplers.addDynamicSampler(() -> whitePixel.getTexture().iris$getGlId(), "iris_overlay");
+			samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(whitePixel.getTexture()), "iris_overlay");
 		}
 
 		samplers.addDynamicSampler(pipeline::getCurrentNormalTexture, StateUpdateNotifiers.normalTextureChangeNotifier, "normals");
@@ -203,19 +204,19 @@ public class IrisSamplers {
 	}
 
 	public static void addWorldDepthSamplers(SamplerHolder samplers, RenderTargets renderTargets) {
-		samplers.addDynamicSampler(() -> renderTargets.getDepthTexture().iris$getGlId(), "depthtex0");
+		samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(renderTargets.getDepthTexture()), "depthtex0");
 		// TODO: Should depthtex2 be made available to gbuffer / shadow programs?
-		samplers.addDynamicSampler(() -> renderTargets.getDepthTextureNoTranslucents().iris$getGlId(), "depthtex1");
-		samplers.addDynamicSampler(() -> renderTargets.getDepthTextureNoHand().iris$getGlId(),
+		samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(renderTargets.getDepthTextureNoTranslucents()), "depthtex1");
+		samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(renderTargets.getDepthTextureNoHand()),
 			"depthtex2");
 	}
 
 	public static void addCompositeSamplers(SamplerHolder samplers, RenderTargets renderTargets) {
-		samplers.addDynamicSampler(() -> renderTargets.getDepthTexture().iris$getGlId(),
+		samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(renderTargets.getDepthTexture()),
 			"gdepthtex", "depthtex0");
-		samplers.addDynamicSampler(() -> renderTargets.getDepthTextureNoTranslucents().iris$getGlId(),
+		samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(renderTargets.getDepthTextureNoTranslucents()),
 			"depthtex1");
-		samplers.addDynamicSampler(() -> renderTargets.getDepthTextureNoHand().iris$getGlId(),
+		samplers.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(renderTargets.getDepthTextureNoHand()),
 			"depthtex2");
 	}
 

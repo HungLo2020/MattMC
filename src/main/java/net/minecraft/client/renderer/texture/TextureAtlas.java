@@ -24,6 +24,7 @@ import net.minecraft.hooks.TextureAtlasHooks;
 import net.minecraft.ReportedException;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -116,7 +117,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		}
 		
 		// Iris PBR: From texture.pbr.MixinTextureAtlas - track texture after upload
-		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(texture.iris$getGlId(), this);
+		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(VulkanicAPI.getTextureHandle(texture), this);
 	}
 
 	@Override

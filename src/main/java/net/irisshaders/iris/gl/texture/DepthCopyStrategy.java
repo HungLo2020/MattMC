@@ -7,12 +7,12 @@ import net.vulkanic.VulkanicAPI;
 public interface DepthCopyStrategy {
 	static DepthCopyStrategy fastest(boolean combinedStencilRequired) {
 		// Check whether glCopyImageSubData is available by checking the function directly...
-		// Gl.getCapabilities().OpenGL43 can be false even if OpenGL 4.3 functions are supported,
-		// because Minecraft requests an OpenGL 3.2 forward compatible function.
+		// Capability version flags can be false even when specific functions are available,
+		// because Minecraft requests an OpenGL 3.2 forward compatible context.
 		//
 		// Perhaps calling GL43.isAvailable would be a different option, but we only need one
 		// function, so we just check for that function.
-		if (VulkanicAPI.getGraphicsCapabilities().OpenGL43 && VulkanicAPI.checkFunctionAvailable("glCopyImageSubData")) {
+		if (VulkanicAPI.checkFunctionAvailable("glCopyImageSubData")) {
 			return new Gl43CopyImage();
 		}
 

@@ -294,7 +294,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 		BufferFlipper flipper = new BufferFlipper();
 
-		this.centerDepthSampler = new CenterDepthSampler(() -> renderTargets.getDepthTexture().iris$getGlId(), programSet.getPackDirectives().getCenterDepthHalfLife());
+		this.centerDepthSampler = new CenterDepthSampler(() -> VulkanicAPI.getTextureHandle(renderTargets.getDepthTexture()), programSet.getPackDirectives().getCenterDepthHalfLife());
 
 		this.shadowMapResolution = programSet.getPackDirectives().getShadowDirectives().getResolution();
 
@@ -823,11 +823,11 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	@Override
 	public void onSetShaderTexture(GpuTextureView id) {
 		if (shouldBindPBR && isRenderingWorld && id != null) {
-			PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(id.texture().iris$getGlId());
+			PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(VulkanicAPI.getTextureHandle(id.texture()));
 			id.texture().iris$copyStateTo(pbrHolder.normalTexture().getTexture());
 			id.texture().iris$copyStateTo(pbrHolder.specularTexture().getTexture());
-			currentNormalTexture = pbrHolder.normalTexture().getTexture().iris$getGlId();
-			currentSpecularTexture = pbrHolder.specularTexture().getTexture().iris$getGlId();
+			currentNormalTexture = VulkanicAPI.getTextureHandle(pbrHolder.normalTexture().getTexture());
+			currentSpecularTexture = VulkanicAPI.getTextureHandle(pbrHolder.specularTexture().getTexture());
 
 			TextureFormat textureFormat = TextureFormatLoader.getFormat();
 			if (textureFormat != null) {

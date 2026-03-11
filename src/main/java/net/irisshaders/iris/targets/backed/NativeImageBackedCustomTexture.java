@@ -7,6 +7,7 @@ import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.shaderpack.texture.CustomTextureData;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.vulkanic.VulkanicAPI;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -29,7 +30,7 @@ public class NativeImageBackedCustomTexture extends DynamicTexture implements Te
 	}
 
 	private int getId() {
-		return this.texture.iris$getGlId();
+		return VulkanicAPI.getTextureHandle(this.texture);
 	}
 
 	private static NativeImage create(byte[] content) throws IOException {

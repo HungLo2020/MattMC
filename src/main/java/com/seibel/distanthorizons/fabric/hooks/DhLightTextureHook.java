@@ -7,6 +7,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.hooks.LightTextureHooks;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Hook implementation for light texture updates.
@@ -32,6 +33,6 @@ public class DhLightTextureHook implements LightTextureHooks {
             this.renderWrapper = (MinecraftRenderWrapper)SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
         }
 
-        this.renderWrapper.setLightmapId(lightTexture.texture.glId(), clientLevel);
+        this.renderWrapper.setLightmapId(VulkanicAPI.getTextureHandle(lightTexture.texture), clientLevel);
     }
 }

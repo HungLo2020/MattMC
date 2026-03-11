@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.texture.SpriteContents.FrameInfo;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.BufferedWriter;
@@ -126,8 +127,8 @@ public class PBRAtlasTexture extends AbstractTexture implements PBRDumpable {
 		}
 		texture.setTextureFilter(FilterMode.NEAREST, mipLevel > 1);
 
-		TextureManipulationUtil.fillWithColor(texture.iris$getGlId(), mipLevel, type.getDefaultValue());
-		TextureTracker.INSTANCE.trackTexture(this.texture.iris$getGlId(), (AbstractTexture) (Object) this);
+		TextureManipulationUtil.fillWithColor(VulkanicAPI.getTextureHandle(texture), mipLevel, type.getDefaultValue());
+		TextureTracker.INSTANCE.trackTexture(VulkanicAPI.getTextureHandle(this.texture), (AbstractTexture) (Object) this);
 		width = atlasWidth;
 		height = atlasHeight;
 		this.mipLevel = mipLevel;
