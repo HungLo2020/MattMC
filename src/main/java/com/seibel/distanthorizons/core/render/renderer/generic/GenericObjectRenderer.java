@@ -37,6 +37,7 @@ import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicPolygonMode;
 import net.vulkanic.VulkanicPrimitiveMode;
+import net.vulkanic.VulkanicVertexAttributeType;
 import org.lwjgl.system.MemoryUtil;
 
 import java.awt.*;
@@ -531,28 +532,28 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		
 		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, boxGroup.instanceColorVbo);
 		VulkanicAPI.enableVertexAttribArray(ctx, 1);
-		VulkanicAPI.setVertexAttribPointer(ctx, 1, 4, VulkanicAPI.GL_FLOAT, false, 4 * Float.BYTES, 0);
+		VulkanicAPI.setVertexAttribPointer(ctx, 1, 4, VulkanicVertexAttributeType.FLOAT, false, 4 * Float.BYTES, 0);
 		this.vertexAttribDivisor(ctx, 1, 1);
 		
 		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, boxGroup.instanceScaleVbo);
 		VulkanicAPI.enableVertexAttribArray(ctx, 2);
 		this.vertexAttribDivisor(ctx, 2, 1);
-		VulkanicAPI.setVertexAttribPointer(ctx, 2, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.setVertexAttribPointer(ctx, 2, 3, VulkanicVertexAttributeType.FLOAT, false, 3 * Float.BYTES, 0);
 		
 		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, boxGroup.instanceChunkPosVbo);
 		VulkanicAPI.enableVertexAttribArray(ctx, 3);
 		this.vertexAttribDivisor(ctx, 3, 1);
-		VulkanicAPI.setVertexAttribIPointer(ctx, 3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
+		VulkanicAPI.setVertexAttribIPointer(ctx, 3, 3, VulkanicVertexAttributeType.INT, 3 * Integer.BYTES, 0);
 		
 		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, boxGroup.instanceSubChunkPosVbo);
 		VulkanicAPI.enableVertexAttribArray(ctx, 4);
 		this.vertexAttribDivisor(ctx, 4, 1);
-		VulkanicAPI.setVertexAttribPointer(ctx, 4, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.setVertexAttribPointer(ctx, 4, 3, VulkanicVertexAttributeType.FLOAT, false, 3 * Float.BYTES, 0);
 		
 		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, boxGroup.instanceMaterialVbo);
 		VulkanicAPI.enableVertexAttribArray(ctx, 5);
 		this.vertexAttribDivisor(ctx, 5, 1);
-		VulkanicAPI.setVertexAttribIPointer(ctx, 5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
+		VulkanicAPI.setVertexAttribIPointer(ctx, 5, 1, VulkanicVertexAttributeType.BYTE, Byte.BYTES, 0);
 		
 		
 		// Draw instanced

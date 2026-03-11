@@ -30,6 +30,10 @@ public class ApiNeutralityCallsiteTest {
             "Polygon-mode mapping should recognize GL_FILL");
         assertTrue(VulkanicIndexType.fromLegacyGlConstant(VulkanicAPI.GL_UNSIGNED_INT).isPresent(),
             "Index-type mapping should recognize GL_UNSIGNED_INT");
+        assertTrue(VulkanicVertexAttributeType.fromLegacyGlConstant(VulkanicAPI.GL_FLOAT).isPresent(),
+            "Vertex attribute type mapping should recognize GL_FLOAT");
+        assertTrue(VulkanicTextureParameterValue.fromLegacyGlConstant(VulkanicAPI.GL_CLAMP_TO_EDGE).isPresent(),
+            "Texture parameter value mapping should recognize GL_CLAMP_TO_EDGE");
     }
 
     @Test
@@ -64,6 +68,59 @@ public class ApiNeutralityCallsiteTest {
             String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(rawDrawModePattern.matcher(source).find(),
                 "Renderer should use typed draw-mode overloads: " + relative);
+        }
+    }
+
+    @Test
+    public void testKeyRenderersAvoidRawVertexAttributeTypeConstants() throws IOException {
+        Pattern rawVertexAttribPattern = Pattern.compile("setVertexAttrib(?:I)?Pointer\\s*\\([^\\n]*VulkanicAPI\\.GL_");
+
+        List<String> files = List.of(
+            "com/seibel/distanthorizons/core/render/renderer/generic/GenericObjectRenderer.java",
+            "net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java"
+        );
+
+        for (String relative : files) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertFalse(rawVertexAttribPattern.matcher(source).find(),
+                "Renderer should use typed vertex-attribute types: " + relative);
+        }
+    }
+
+    @Test
+    public void testDhTextureSetupAvoidsRawTextureParameterValueConstants() throws IOException {
+        Pattern rawTextureParamValuePattern = Pattern.compile("texParameteri\\s*\\([^\\n]*VulkanicTextureParameterName\\.[A-Z_]+,\\s*VulkanicAPI\\.GL_");
+
+        List<String> files = List.of(
+            "com/seibel/distanthorizons/core/render/glObject/texture/DhColorTexture.java",
+            "com/seibel/distanthorizons/core/render/glObject/texture/DHDepthTexture.java",
+            "com/seibel/distanthorizons/core/render/renderer/DhFadeRenderer.java",
+            "com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java",
+            "com/seibel/distanthorizons/core/render/renderer/FogRenderer.java",
+            "com/seibel/distanthorizons/core/render/renderer/SSAORenderer.java"
+        );
+
+        for (String relative : files) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertFalse(rawTextureParamValuePattern.matcher(source).find(),
+                "Renderer should use typed texture-parameter values: " + relative);
+        }
+    }
+
+    @Test
+    public void testDhRenderersUseTypedViewportAndClearColorQueryHelpers() throws IOException {
+        List<String> files = List.of(
+            "com/seibel/distanthorizons/core/render/glObject/GLState.java",
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java",
+            "com/seibel/distanthorizons/core/render/renderer/shaders/FogShader.java"
+        );
+
+        for (String relative : files) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertFalse(source.contains("GL_VIEWPORT"),
+                "Renderer state queries should avoid raw GL_VIEWPORT constants: " + relative);
+            assertFalse(source.contains("GL_COLOR_CLEAR_VALUE"),
+                "Renderer state queries should avoid raw GL_COLOR_CLEAR_VALUE constants: " + relative);
         }
     }
 }

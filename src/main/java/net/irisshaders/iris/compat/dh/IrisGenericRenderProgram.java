@@ -35,6 +35,7 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicVertexAttributeType;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
@@ -138,7 +139,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 		this.va = VulkanicAPI.createVertexArray(ctx);
 		VulkanicAPI.bindVertexArray(ctx, va);
-		VulkanicAPI.setVertexAttribPointer(ctx, 0, 3, VulkanicAPI.GL_FLOAT, false, 0, 0);
+		VulkanicAPI.setVertexAttribPointer(ctx, 0, 3, VulkanicVertexAttributeType.FLOAT, false, 0, 0);
 		VulkanicAPI.enableVertexAttribArray(ctx, 0);
 
 		projectionUniform = tryGetUniformLocation2("iris_ProjectionMatrix");
@@ -285,7 +286,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	public void bindVertexBuffer(int i) {
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, i);
-		VulkanicAPI.setVertexAttribPointer(ctx, 0, 3, VulkanicAPI.GL_FLOAT, false, 12, 0);
+		VulkanicAPI.setVertexAttribPointer(ctx, 0, 3, VulkanicVertexAttributeType.FLOAT, false, 12, 0);
 	}
 
 	@Override

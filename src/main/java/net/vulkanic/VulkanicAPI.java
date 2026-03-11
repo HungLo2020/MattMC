@@ -2229,6 +2229,18 @@ public class VulkanicAPI {
     public static void setVertexAttribPointer(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {
         getBackend().setVertexAttribPointer(ctx, index, size, type, normalized, stride, pointer);
     }
+
+    public static void setVertexAttribPointer(
+        CommandContext ctx,
+        int index,
+        int size,
+        VulkanicVertexAttributeType type,
+        boolean normalized,
+        int stride,
+        long pointer
+    ) {
+        getBackend().setVertexAttribPointer(ctx, index, size, type.toLegacyGlConstant(), normalized, stride, pointer);
+    }
     
     public static void enableVertexAttribArray(CommandContext ctx, int index) {
         getBackend().enableVertexAttribArray(ctx, index);
@@ -2241,6 +2253,17 @@ public class VulkanicAPI {
     
     public static void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
         getBackend().setVertexAttribIPointer(ctx, index, size, type, stride, pointer);
+    }
+
+    public static void setVertexAttribIPointer(
+        CommandContext ctx,
+        int index,
+        int size,
+        VulkanicVertexAttributeType type,
+        int stride,
+        long pointer
+    ) {
+        getBackend().setVertexAttribIPointer(ctx, index, size, type.toLegacyGlConstant(), stride, pointer);
     }
     
     
@@ -3148,10 +3171,24 @@ public class VulkanicAPI {
     public static void getIntegerv(CommandContext ctx, int pname, int[] params) {
         getBackend().getIntegerv(ctx, pname, params);
     }
+
+    /**
+     * Reads the active viewport as {x, y, width, height}.
+     */
+    public static void getViewport(CommandContext ctx, int[] params) {
+        getBackend().getIntegerv(ctx, GL_VIEWPORT, params);
+    }
     
     
     public static void getFloatv(CommandContext ctx, int pname, float[] params) {
         getBackend().getFloatv(ctx, pname, params);
+    }
+
+    /**
+     * Reads the active clear color as {r, g, b, a}.
+     */
+    public static void getClearColor(CommandContext ctx, float[] params) {
+        getBackend().getFloatv(ctx, GL_COLOR_CLEAR_VALUE, params);
     }
     
     
@@ -3236,6 +3273,15 @@ public class VulkanicAPI {
         int param
     ) {
         getBackend().texParameteri(ctx, target, pname, param);
+    }
+
+    public static void texParameteri(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        VulkanicTextureParameterValue param
+    ) {
+        getBackend().texParameteri(ctx, target, pname, param.toLegacyGlConstant());
     }
     
     

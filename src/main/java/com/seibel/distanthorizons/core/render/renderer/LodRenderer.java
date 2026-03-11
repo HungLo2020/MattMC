@@ -458,7 +458,7 @@ public class LodRenderer
 			VulkanicAPI.setClearDepth(ctx, 1.0);
 			
 			float[] clearColorValues = new float[4];
-			VulkanicAPI.getFloatv(ctx, VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
+			VulkanicAPI.getClearColor(ctx, clearColorValues);
 			VulkanicAPI.setClearColor(ctx, clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
 			
 			if (this.usingMcFramebuffer && framebufferOverride == null)
