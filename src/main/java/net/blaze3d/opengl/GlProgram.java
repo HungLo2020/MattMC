@@ -15,6 +15,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderManager;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramParameterName;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -65,9 +66,9 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 			VulkanicAPI.attachShader(ctx, i, glShaderModule.getShaderId());
 			VulkanicAPI.attachShader(ctx, i, glShaderModule2.getShaderId());
 			VulkanicAPI.linkProgram(ctx, i);
-			int k = VulkanicAPI.getProgramParameter(ctx, i, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
+			boolean linked = VulkanicAPI.isProgramLinkSuccessful(ctx, i);
 			String string2 = VulkanicAPI.getProgramInfoLog(ctx, i);
-			if (k != 0 && !string2.contains("Failed for unknown reason")) {
+			if (linked && !string2.contains("Failed for unknown reason")) {
 				if (!string2.isEmpty()) {
 					LOGGER.info("Info log when linking program containing VS {} and FS {}. Log output: {}", glShaderModule.getId(), glShaderModule2.getId(), string2);
 				}
@@ -138,7 +139,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 			}
 		}
 
-		int o = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), this.programId, 35382);
+		int o = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), this.programId, VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS);
 
 		for (int p = 0; p < o; p++) {
 			String string = VulkanicAPI.retrieveActiveUniformBlockName(VulkanicAPI.getCommandContext(), this.programId, p);

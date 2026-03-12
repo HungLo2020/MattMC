@@ -10,6 +10,7 @@ import java.util.function.Supplier;
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderStage;
 import org.lwjgl.system.MemoryStack;
 
 import com.seibel.distanthorizons.core.util.math.Mat4f;
@@ -79,14 +80,14 @@ public class ShaderProgram
 		
 		for (Supplier<String> vertSupplier : vertSupplierList)
 		{
-			Shader vertShader = new Shader(ctx, VulkanicAPI.GL_VERTEX_SHADER, vertSupplier.get());
+			Shader vertShader = new Shader(ctx, VulkanicShaderStage.VERTEX, vertSupplier.get());
 			VulkanicAPI.attachShader(ctx, this.id, vertShader.id);
 			vertShader.free(ctx); // important!
 		}
 		
 		for (Supplier<String> fragSupplier : fragSupplierList)
 		{
-			Shader fragShader = new Shader(ctx, VulkanicAPI.GL_FRAGMENT_SHADER, fragSupplier.get());
+			Shader fragShader = new Shader(ctx, VulkanicShaderStage.FRAGMENT, fragSupplier.get());
 			VulkanicAPI.attachShader(ctx, this.id, fragShader.id);
 			fragShader.free(ctx); // important!
 		}
@@ -97,8 +98,7 @@ public class ShaderProgram
 		}
 		VulkanicAPI.linkProgram(ctx, this.id);
 		
-		int status = VulkanicAPI.getProgramParameter(ctx, this.id, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
-		if (status != VulkanicAPI.GL_TRUE)
+		if (!VulkanicAPI.isProgramLinkSuccessful(ctx, this.id))
 		{
 			String message = "Shader Link Error. Details: " + VulkanicAPI.getProgramInfoLog(ctx, this.id);
 			this.free(ctx); // important!

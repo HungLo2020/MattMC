@@ -74,6 +74,14 @@ public class ProgramUniforms {
 	}
 
 	private static UniformType getExpectedType(VulkanicUniformReflectionType type) {
+		if (type.isSampler()) {
+			return UniformType.INT;
+		}
+
+		if (type.isImage()) {
+			return null;
+		}
+
 		return switch (type) {
 			case FLOAT -> UniformType.FLOAT;
 			case INT, BOOL -> UniformType.INT;
@@ -86,13 +94,6 @@ public class ProgramUniforms {
 			case FLOAT_MAT2 -> null;
 			case FLOAT_VEC2 -> UniformType.VEC2;
 			case INT_VEC2 -> UniformType.VEC2I;
-			case SAMPLER_1D,
-				SAMPLER_2D,
-				SAMPLER_3D,
-				SAMPLER_1D_SHADOW,
-				SAMPLER_2D_SHADOW,
-				UNSIGNED_INT_SAMPLER_2D,
-				UNSIGNED_INT_SAMPLER_3D -> UniformType.INT;
 			default -> null;
 		};
 	}

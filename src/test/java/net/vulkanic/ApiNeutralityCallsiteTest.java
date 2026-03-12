@@ -65,10 +65,18 @@ public class ApiNeutralityCallsiteTest {
 
         assertTrue(source.contains("VulkanicUniformReflectionType.fromLegacyGlConstant(type)"),
             "ProgramUniforms should route reflected type resolution through VulkanicUniformReflectionType helper: " + relative);
+        assertTrue(source.contains("type.isSampler()"),
+            "ProgramUniforms should classify sampler uniforms using VulkanicUniformReflectionType.isSampler(): " + relative);
+        assertTrue(source.contains("type.isImage()"),
+            "ProgramUniforms should classify image uniforms using VulkanicUniformReflectionType.isImage(): " + relative);
 
         Pattern rawTypeComparisonPattern = Pattern.compile("type\\s*==\\s*VulkanicAPI\\.GL_");
         assertFalse(rawTypeComparisonPattern.matcher(source).find(),
             "ProgramUniforms should avoid raw reflected type comparisons against VulkanicAPI.GL_* constants: " + relative);
+
+        Pattern hardcodedSamplerSwitchPattern = Pattern.compile("case\\s+SAMPLER_1D|case\\s+SAMPLER_2D|case\\s+SAMPLER_3D");
+        assertFalse(hardcodedSamplerSwitchPattern.matcher(source).find(),
+            "ProgramUniforms sampler classification should avoid hardcoded sampler enum cases in favor of typed helpers: " + relative);
     }
 
     @Test
@@ -249,6 +257,62 @@ public class ApiNeutralityCallsiteTest {
             assertFalse(rawStatusQueryPattern.matcher(source).find(),
                 "Shader/program status queries should use typed parameter names: " + relative);
         }
+    }
+
+    @Test
+    public void testSelectedShaderCompilationAndLinkChecksUseStatusHelpers() throws IOException {
+        List<String> programFiles = List.of(
+            "net/blaze3d/opengl/GlProgram.java",
+            "net/irisshaders/iris/gl/shader/ProgramCreator.java",
+            "net/irisshaders/iris/pipeline/programs/ShaderMap.java",
+            "net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java",
+            "net/irisshaders/iris/compat/dh/IrisLodRenderProgram.java",
+            "net/sodium/client/gl/shader/GlProgram.java",
+            "com/seibel/distanthorizons/core/render/glObject/shader/ShaderProgram.java"
+        );
+
+        for (String relative : programFiles) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertTrue(source.contains("isProgramLinkSuccessful("),
+                "Program link checks should route through VulkanicAPI.isProgramLinkSuccessful helper: " + relative);
+            assertFalse(source.contains("!= VulkanicAPI.GL_TRUE"),
+                "Program link checks should avoid raw GL_TRUE comparisons: " + relative);
+            assertFalse(source.contains("== VulkanicAPI.GL_FALSE"),
+                "Program link checks should avoid raw GL_FALSE comparisons: " + relative);
+            assertFalse(source.contains("!= 1"),
+                "Program link checks should avoid raw numeric GL_TRUE comparisons: " + relative);
+        }
+
+        List<String> shaderFiles = List.of(
+            "net/blaze3d/opengl/GlDevice.java",
+            "net/irisshaders/iris/gl/shader/GlShader.java",
+            "net/irisshaders/iris/pipeline/programs/ShaderCreator.java",
+            "net/sodium/client/gl/shader/GlShader.java",
+            "com/seibel/distanthorizons/core/render/glObject/shader/Shader.java"
+        );
+
+        for (String relative : shaderFiles) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertTrue(source.contains("isShaderCompileSuccessful("),
+                "Shader compile checks should route through VulkanicAPI.isShaderCompileSuccessful helper: " + relative);
+            assertFalse(source.contains("!= VulkanicAPI.GL_TRUE"),
+                "Shader compile checks should avoid raw GL_TRUE comparisons: " + relative);
+            assertFalse(source.contains("== VulkanicAPI.GL_FALSE"),
+                "Shader compile checks should avoid raw GL_FALSE comparisons: " + relative);
+            assertFalse(source.contains("!= 1"),
+                "Shader compile checks should avoid raw numeric GL_TRUE comparisons: " + relative);
+        }
+    }
+
+    @Test
+    public void testGlProgramUsesTypedActiveUniformBlockParameterName() throws IOException {
+        String relative = "net/blaze3d/opengl/GlProgram.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        assertFalse(source.contains("getProgramParameter(VulkanicAPI.getCommandContext(), this.programId, 35382)"),
+            "GlProgram should avoid raw numeric active-uniform-block pname queries: " + relative);
+        assertTrue(source.contains("VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS"),
+            "GlProgram should query active uniform blocks via VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS: " + relative);
     }
 
     @Test

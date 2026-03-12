@@ -13,6 +13,7 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderStage;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -52,6 +53,16 @@ public class Shader
 		this(VulkanicAPI.getCommandContext(), type, path, absoluteFilePath);
 	}
 
+	public Shader(VulkanicShaderStage stage, String path, boolean absoluteFilePath)
+	{
+		this(VulkanicAPI.getCommandContext(), stage, path, absoluteFilePath);
+	}
+
+	public Shader(CommandContext ctx, VulkanicShaderStage stage, String path, boolean absoluteFilePath)
+	{
+		this(ctx, stage.toLegacyGlShaderType(), path, absoluteFilePath);
+	}
+
 	public Shader(CommandContext ctx, int type, String path, boolean absoluteFilePath)
 	{
 		LOGGER.info("Loading shader at [" + path + "]");
@@ -67,8 +78,7 @@ public class Shader
 		
 		VulkanicAPI.compileShader(ctx, this.id);
 		// check if the shader compiled
-		int status = VulkanicAPI.getShaderParameter(ctx, this.id, net.vulkanic.VulkanicShaderParameterName.COMPILE_STATUS);
-		if (status != VulkanicAPI.GL_TRUE)
+		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, this.id))
 		{
 			String message = "Shader compiler error. Details: ["+VulkanicAPI.getShaderInfoLog(ctx, this.id)+"].";
 			this.free(ctx); // important!
@@ -80,6 +90,16 @@ public class Shader
 	public Shader(int type, String sourceString)
 	{
 		this(VulkanicAPI.getCommandContext(), type, sourceString);
+	}
+
+	public Shader(VulkanicShaderStage stage, String sourceString)
+	{
+		this(VulkanicAPI.getCommandContext(), stage, sourceString);
+	}
+
+	public Shader(CommandContext ctx, VulkanicShaderStage stage, String sourceString)
+	{
+		this(ctx, stage.toLegacyGlShaderType(), sourceString);
 	}
 
 	public Shader(CommandContext ctx, int type, String sourceString)
@@ -101,8 +121,7 @@ public class Shader
 		safeShaderSource(ctx, this.id, sourceString);
 		VulkanicAPI.compileShader(ctx, this.id);
 		// check if the shader compiled
-		int status = VulkanicAPI.getShaderParameter(ctx, this.id, net.vulkanic.VulkanicShaderParameterName.COMPILE_STATUS);
-		if (status != VulkanicAPI.GL_TRUE)
+		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, this.id))
 		{
 			
 			String message = "Shader compiler error. Details: [" + VulkanicAPI.getShaderInfoLog(ctx, this.id) + "]\n";

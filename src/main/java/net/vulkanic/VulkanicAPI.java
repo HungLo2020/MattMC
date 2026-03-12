@@ -476,6 +476,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Program Query
     public static final int GL_ACTIVE_UNIFORMS = 0x8B86;
+    public static final int GL_ACTIVE_UNIFORM_BLOCKS = 0x8A36;
 
     // OpenGL Constants - EXT_debug_label types
     public static final int GL_BUFFER_OBJECT_EXT = 0x9151;
@@ -2337,6 +2338,27 @@ public class VulkanicAPI {
     public static int getProgramParameter(CommandContext ctx, int program, VulkanicProgramParameterName pname) {
         return getBackend().getProgramParameter(ctx, program, pname.toLegacyGlPName());
     }
+
+    /**
+     * Evaluates a legacy OpenGL boolean-style integer as true when non-zero.
+     */
+    public static boolean isLegacyGlBooleanTrue(int value) {
+        return value != GL_FALSE;
+    }
+
+    /**
+     * Evaluates a legacy OpenGL boolean-style integer as false when zero.
+     */
+    public static boolean isLegacyGlBooleanFalse(int value) {
+        return value == GL_FALSE;
+    }
+
+    /**
+     * Returns true when a program currently reports LINK_STATUS success.
+     */
+    public static boolean isProgramLinkSuccessful(CommandContext ctx, int program) {
+        return isLegacyGlBooleanTrue(getProgramParameter(ctx, program, VulkanicProgramParameterName.LINK_STATUS));
+    }
     
     public static int getShaderParameter(CommandContext ctx, int shader, int pname) {
         java.util.Optional<VulkanicShaderParameterName> typedPName = VulkanicShaderParameterName.fromLegacyGlPName(pname);
@@ -2348,6 +2370,13 @@ public class VulkanicAPI {
 
     public static int getShaderParameter(CommandContext ctx, int shader, VulkanicShaderParameterName pname) {
         return getBackend().getShaderParameter(ctx, shader, pname.toLegacyGlPName());
+    }
+
+    /**
+     * Returns true when a shader currently reports COMPILE_STATUS success.
+     */
+    public static boolean isShaderCompileSuccessful(CommandContext ctx, int shader) {
+        return isLegacyGlBooleanTrue(getShaderParameter(ctx, shader, VulkanicShaderParameterName.COMPILE_STATUS));
     }
     
     public static String getProgramInfoLog(CommandContext ctx, int program) {

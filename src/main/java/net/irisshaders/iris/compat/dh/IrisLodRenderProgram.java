@@ -93,8 +93,7 @@ public class IrisLodRenderProgram {
 		VulkanicAPI.attachShader(ctx, id, frag.getHandle());
 
 		VulkanicAPI.linkProgram(ctx, this.id);
-		int status = VulkanicAPI.getProgramParameter(ctx, this.id, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS);
-		if (status != 1) {
+		if (!VulkanicAPI.isProgramLinkSuccessful(ctx, this.id)) {
 			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.getProgramInfoLog(ctx, this.id);
 			this.free();
 			throw new RuntimeException(message);

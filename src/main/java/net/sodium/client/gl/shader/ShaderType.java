@@ -1,19 +1,23 @@
 package net.sodium.client.gl.shader;
 
+import net.vulkanic.VulkanicShaderStage;
+
 /**
  * An enumeration over the supported OpenGL shader types.
  */
 public enum ShaderType {
-    VERTEX(35633),  // GL_VERTEX_SHADER
-    GEOMETRY(36313),  // GL_GEOMETRY_SHADER
-    TESS_CONTROL(36488),  // GL_TESS_CONTROL_SHADER
-    TESS_EVALUATION(36487),  // GL_TESS_EVALUATION_SHADER
-    FRAGMENT(35632);  // GL_FRAGMENT_SHADER
+    VERTEX(VulkanicShaderStage.VERTEX),
+    GEOMETRY(VulkanicShaderStage.GEOMETRY),
+    TESS_CONTROL(VulkanicShaderStage.TESSELLATION_CONTROL),
+    TESS_EVALUATION(VulkanicShaderStage.TESSELLATION_EVALUATION),
+    FRAGMENT(VulkanicShaderStage.FRAGMENT);
 
     public final int id;
+    public final VulkanicShaderStage stage;
 
-    ShaderType(int id) {
-        this.id = id;
+    ShaderType(VulkanicShaderStage stage) {
+        this.stage = stage;
+        this.id = stage.toLegacyGlShaderType();
     }
 
     public static ShaderType fromGlShaderType(int id) {

@@ -21,7 +21,7 @@ public class GlShader extends GlObject {
         this.name = name;
         CommandContext ctx = VulkanicAPI.getCommandContext();
 
-        int handle = VulkanicAPI.createShader(ctx, type.id);
+        int handle = VulkanicAPI.createShader(ctx, type.stage);
         ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
         VulkanicAPI.compileShader(ctx, handle);
 
@@ -32,9 +32,7 @@ public class GlShader extends GlObject {
             LOGGER.warn("Include table: {}", Arrays.toString(parsedShader.includeIds()));
         }
 
-        int result = VulkanicAPI.getShaderParameter(ctx, handle, net.vulkanic.VulkanicShaderParameterName.COMPILE_STATUS);
-
-        if (result != 1) {  // GL_TRUE
+        if (!VulkanicAPI.isShaderCompileSuccessful(ctx, handle)) {
             throw new RuntimeException("Shader compilation failed, see log for details");
         }
 

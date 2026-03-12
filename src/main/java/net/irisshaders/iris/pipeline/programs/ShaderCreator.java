@@ -203,7 +203,7 @@ public class ShaderCreator {
 	private static int createShader(CommandContext ctx, String name, ShaderType shaderType, String source) {
 		if (source == null) return -1;
 
-		int shader = VulkanicAPI.createShader(ctx, shaderType.id);
+		int shader = VulkanicAPI.createShader(ctx, shaderType.stage);
 		ShaderWorkarounds.safeShaderSource(shader, source);
 		VulkanicAPI.compileShader(ctx, shader);
 		String log = IrisRenderSystem.getShaderInfoLog(shader);
@@ -212,9 +212,7 @@ public class ShaderCreator {
 			Iris.logger.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = VulkanicAPI.getShaderParameter(ctx, shader, net.vulkanic.VulkanicShaderParameterName.COMPILE_STATUS);
-
-		if (result != VulkanicAPI.GL_TRUE) {
+		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, shader)) {
 			throw new ShaderCompileException(name, log);
 		}
 

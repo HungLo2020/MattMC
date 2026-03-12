@@ -1751,8 +1751,11 @@ public class Phase3DrawPathTest {
             "GlProgram should create programs directly through VulkanicAPI.createShaderProgram");
         assertTrue(glProgramSource.contains("VulkanicAPI.linkProgram(ctx, i)"),
             "GlProgram should link programs directly through VulkanicAPI.linkProgram");
-        assertTrue(glProgramSource.contains("VulkanicAPI.getProgramParameter(ctx, i, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS)"),
-            "GlProgram should query link status directly through VulkanicAPI.getProgramParameter");
+        assertTrue(
+            glProgramSource.contains("VulkanicAPI.getProgramParameter(ctx, i, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS)")
+                || glProgramSource.contains("VulkanicAPI.isProgramLinkSuccessful(ctx, i)"),
+            "GlProgram should query link status directly through VulkanicAPI.getProgramParameter or helper-based status API"
+        );
         assertTrue(glProgramSource.contains("VulkanicAPI.getProgramInfoLog(ctx, i)"),
             "GlProgram should query program info log directly through VulkanicAPI.getProgramInfoLog");
         assertTrue(glProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), this.programId)"),
@@ -1781,8 +1784,11 @@ public class Phase3DrawPathTest {
             "ProgramCreator should create programs directly through VulkanicAPI.createShaderProgram");
         assertTrue(programCreatorSource.contains("VulkanicAPI.linkProgram(ctx, program)"),
             "ProgramCreator should link programs directly through VulkanicAPI.linkProgram");
-        assertTrue(programCreatorSource.contains("VulkanicAPI.getProgramParameter(ctx, program, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS)"),
-            "ProgramCreator should query link status directly through VulkanicAPI.getProgramParameter");
+        assertTrue(
+            programCreatorSource.contains("VulkanicAPI.getProgramParameter(ctx, program, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS)")
+                || programCreatorSource.contains("VulkanicAPI.isProgramLinkSuccessful(ctx, program)"),
+            "ProgramCreator should query link status directly through VulkanicAPI.getProgramParameter or helper-based status API"
+        );
 
         Path shaderMapFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ShaderMap.java");
         String shaderMapSource = Files.readString(shaderMapFile);
@@ -1794,8 +1800,11 @@ public class Phase3DrawPathTest {
             "ShaderMap should not query program logs through removed GlStateManager.glGetProgramInfoLog wrapper");
         assertTrue(shaderMapSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), shader.id().program())"),
             "ShaderMap should delete programs directly through VulkanicAPI.deleteProgram");
-        assertTrue(shaderMapSource.contains("VulkanicAPI.getProgramParameter(ctx, i, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS)"),
-            "ShaderMap should query link status directly through VulkanicAPI.getProgramParameter");
+        assertTrue(
+            shaderMapSource.contains("VulkanicAPI.getProgramParameter(ctx, i, net.vulkanic.VulkanicProgramParameterName.LINK_STATUS)")
+                || shaderMapSource.contains("VulkanicAPI.isProgramLinkSuccessful(ctx, i)"),
+            "ShaderMap should query link status directly through VulkanicAPI.getProgramParameter or helper-based status API"
+        );
         assertTrue(shaderMapSource.contains("VulkanicAPI.getProgramInfoLog(ctx, i)"),
             "ShaderMap should query program info logs directly through VulkanicAPI.getProgramInfoLog");
 
@@ -1884,14 +1893,17 @@ public class Phase3DrawPathTest {
             "ShaderCreator should attach shaders directly through VulkanicAPI.attachShader");
         assertTrue(shaderCreatorSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), s)"),
             "ShaderCreator should delete shaders directly through VulkanicAPI.deleteShader");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShader(ctx, shaderType.id)"),
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShader(ctx, shaderType.stage)"),
             "ShaderCreator should create shaders directly through VulkanicAPI.createShader");
         assertTrue(shaderCreatorSource.contains("ShaderWorkarounds.safeShaderSource(shader, source)"),
             "ShaderCreator should upload shader source via ShaderWorkarounds.safeShaderSource");
         assertTrue(shaderCreatorSource.contains("VulkanicAPI.compileShader(ctx, shader)"),
             "ShaderCreator should compile shaders directly through VulkanicAPI.compileShader");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.getShaderParameter(ctx, shader, net.vulkanic.VulkanicShaderParameterName.COMPILE_STATUS)"),
-            "ShaderCreator should query compile status directly through VulkanicAPI.getShaderParameter");
+        assertTrue(
+            shaderCreatorSource.contains("VulkanicAPI.getShaderParameter(ctx, shader, net.vulkanic.VulkanicShaderParameterName.COMPILE_STATUS)")
+                || shaderCreatorSource.contains("VulkanicAPI.isShaderCompileSuccessful(ctx, shader)"),
+            "ShaderCreator should query compile status directly through VulkanicAPI.getShaderParameter or helper-based status API"
+        );
 
         Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
         String glDeviceSource = Files.readString(glDeviceFile);
@@ -1909,20 +1921,34 @@ public class Phase3DrawPathTest {
             "GlDevice should not query shader status through removed GlStateManager.glGetShaderi wrapper");
         assertFalse(glDeviceSource.contains("GlStateManager.glGetShaderInfoLog("),
             "GlDevice should not query shader logs through removed GlStateManager.glGetShaderInfoLog wrapper");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getCommandContext()"),
-            "GlDevice should create shaders directly through VulkanicAPI.createShader");
+        assertTrue(
+            glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getCommandContext()")
+                || glDeviceSource.contains("net.vulkanic.VulkanicAPI.createShader(ctx, toVulkanicShaderStage(shaderCompilationKey.type))"),
+            "GlDevice should create shaders directly through VulkanicAPI.createShader"
+        );
+        assertFalse(glDeviceSource.contains("GlConst.toGl(shaderCompilationKey.type)"),
+            "GlDevice shader creation should avoid OpenGL-specific GlConst shader-type conversion when typed stage mapping is available");
         assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.attachShader(net.vulkanic.VulkanicAPI.getCommandContext(), j, i)"),
             "GlDevice should attach shaders directly through VulkanicAPI.attachShader");
         assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getCommandContext(), i)"),
             "GlDevice should delete shaders directly through VulkanicAPI.deleteShader");
         assertTrue(glDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(i, string2)"),
             "GlDevice should upload shader source via ShaderWorkarounds.safeShaderSource");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getCommandContext(), i)"),
-            "GlDevice should compile shaders directly through VulkanicAPI.compileShader");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderParameter(net.vulkanic.VulkanicAPI.getCommandContext(), i, 35713)"),
-            "GlDevice should query compile status directly through VulkanicAPI.getShaderParameter");
-        assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderInfoLog(net.vulkanic.VulkanicAPI.getCommandContext(), i)"),
-            "GlDevice should query shader logs directly through VulkanicAPI.getShaderInfoLog");
+        assertTrue(
+            glDeviceSource.contains("net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getCommandContext(), i)")
+                || glDeviceSource.contains("net.vulkanic.VulkanicAPI.compileShader(ctx, i)"),
+            "GlDevice should compile shaders directly through VulkanicAPI.compileShader"
+        );
+        assertTrue(
+            glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderParameter(net.vulkanic.VulkanicAPI.getCommandContext(), i, 35713)")
+                || glDeviceSource.contains("net.vulkanic.VulkanicAPI.isShaderCompileSuccessful(ctx, i)"),
+            "GlDevice should query compile status directly through VulkanicAPI.getShaderParameter or helper-based status API"
+        );
+        assertTrue(
+            glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderInfoLog(net.vulkanic.VulkanicAPI.getCommandContext(), i)")
+                || glDeviceSource.contains("net.vulkanic.VulkanicAPI.getShaderInfoLog(ctx, i)"),
+            "GlDevice should query shader logs directly through VulkanicAPI.getShaderInfoLog"
+        );
 
         Path glShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/GlShader.java");
         String glShaderSource = Files.readString(glShaderFile);
@@ -1936,7 +1962,7 @@ public class Phase3DrawPathTest {
             "GlShader should not hard-wire immediate-context retrieval");
         assertTrue(glShaderSource.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
             "GlShader should fetch backend-neutral command context once in shader creation path");
-        assertTrue(glShaderSource.contains("VulkanicAPI.createShader(ctx, type.id)"),
+        assertTrue(glShaderSource.contains("VulkanicAPI.createShader(ctx, type.stage)"),
             "GlShader should create shaders directly through VulkanicAPI.createShader");
         assertTrue(glShaderSource.contains("VulkanicAPI.compileShader(ctx, handle)"),
             "GlShader should compile shaders directly through VulkanicAPI.compileShader");

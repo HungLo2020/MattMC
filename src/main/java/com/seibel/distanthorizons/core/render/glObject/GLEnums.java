@@ -1,6 +1,7 @@
 package com.seibel.distanthorizons.core.render.glObject;
 
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderStage;
 
 // Turns GL int enums back to readable strings
 public class GLEnums
@@ -43,15 +44,24 @@ public class GLEnums
 		}
 		
 		// shader stuff
-		switch (glEnum)
+		java.util.Optional<VulkanicShaderStage> shaderStage = VulkanicShaderStage.fromLegacyGlShaderType(glEnum);
+		if (shaderStage.isPresent())
 		{
-			case VulkanicAPI.GL_VERTEX_SHADER:
-				return "GL_VERTEX_SHADER";
-			case VulkanicAPI.GL_GEOMETRY_SHADER:
-				return "GL_GEOMETRY_SHADER";
-			case VulkanicAPI.GL_FRAGMENT_SHADER:
-				return "GL_FRAGMENT_SHADER";
-			default:
+			switch (shaderStage.get())
+			{
+				case VERTEX:
+					return "GL_VERTEX_SHADER";
+				case FRAGMENT:
+					return "GL_FRAGMENT_SHADER";
+				case GEOMETRY:
+					return "GL_GEOMETRY_SHADER";
+				case COMPUTE:
+					return "GL_COMPUTE_SHADER";
+				case TESSELLATION_CONTROL:
+					return "GL_TESS_CONTROL_SHADER";
+				case TESSELLATION_EVALUATION:
+					return "GL_TESS_EVALUATION_SHADER";
+			}
 		}
 		
 		// stencil stuff

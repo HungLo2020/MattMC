@@ -423,11 +423,12 @@ public class GlDevice implements GpuDevice {
 			return GlShaderModule.INVALID_SHADER;
 		} else {
 			String string2 = GlslPreprocessor.injectDefines(string, shaderCompilationKey.defines);
-			int i = net.vulkanic.VulkanicAPI.createShader(net.vulkanic.VulkanicAPI.getCommandContext(), GlConst.toGl(shaderCompilationKey.type));
+			net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
+			int i = net.vulkanic.VulkanicAPI.createShader(ctx, toVulkanicShaderStage(shaderCompilationKey.type));
 			net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(i, string2);
-			net.vulkanic.VulkanicAPI.compileShader(net.vulkanic.VulkanicAPI.getCommandContext(), i);
-			if (net.vulkanic.VulkanicAPI.getShaderParameter(net.vulkanic.VulkanicAPI.getCommandContext(), i, 35713) == 0) {
-				String string3 = StringUtils.trim(net.vulkanic.VulkanicAPI.getShaderInfoLog(net.vulkanic.VulkanicAPI.getCommandContext(), i));
+			net.vulkanic.VulkanicAPI.compileShader(ctx, i);
+			if (!net.vulkanic.VulkanicAPI.isShaderCompileSuccessful(ctx, i)) {
+				String string3 = StringUtils.trim(net.vulkanic.VulkanicAPI.getShaderInfoLog(ctx, i));
 				LOGGER.error("Couldn't compile {} shader ({}): {}", shaderCompilationKey.type.getName(), shaderCompilationKey.id, string3);
 				return GlShaderModule.INVALID_SHADER;
 			} else {
@@ -436,6 +437,13 @@ public class GlDevice implements GpuDevice {
 				return glShaderModule;
 			}
 		}
+	}
+
+	private static net.vulkanic.VulkanicShaderStage toVulkanicShaderStage(ShaderType shaderType) {
+		return switch (shaderType) {
+			case VERTEX -> net.vulkanic.VulkanicShaderStage.VERTEX;
+			case FRAGMENT -> net.vulkanic.VulkanicShaderStage.FRAGMENT;
+		};
 	}
 
 	private GlRenderPipeline compilePipeline(RenderPipeline renderPipeline, BiFunction<ResourceLocation, ShaderType, String> biFunction) {
