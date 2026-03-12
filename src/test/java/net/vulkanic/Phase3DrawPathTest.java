@@ -2007,7 +2007,8 @@ public class Phase3DrawPathTest {
         );
         assertTrue(
             glDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(i, string2)")
-                || glDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader.value(), string2)"),
+                || glDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader.value(), string2)")
+                || glDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader, string2)"),
             "GlDevice should upload shader source via ShaderWorkarounds.safeShaderSource"
         );
         assertTrue(

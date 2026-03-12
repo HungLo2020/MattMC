@@ -1,6 +1,7 @@
 package net.irisshaders.iris.gl.shader;
 
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderHandle;
 
 /**
  * Contains a workaround for a crash in nglShaderSource on some AMD drivers. Copied from
@@ -18,5 +19,9 @@ public class ShaderWorkarounds {
 	 */
 	public static void safeShaderSource(int glId, CharSequence source) {
 		VulkanicAPI.uploadShaderSource(VulkanicAPI.getCommandContext(), glId, source);
+	}
+
+	public static void safeShaderSource(VulkanicShaderHandle shader, CharSequence source) {
+		VulkanicAPI.uploadShaderSource(VulkanicAPI.getCommandContext(), shader, source);
 	}
 }

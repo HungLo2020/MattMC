@@ -236,7 +236,7 @@ public final class VulkanicCoreAPI {
     }
 
     public static void uploadShaderSource(CommandContext ctx, VulkanicShaderHandle shader, CharSequence source) {
-        VulkanicAPI.uploadShaderSource(ctx, shader.value(), source);
+        VulkanicAPI.uploadShaderSource(ctx, shader, source);
     }
 
     public static VulkanicUniformLocation resolveUniformLocation(CommandContext ctx, int program, CharSequence name) {

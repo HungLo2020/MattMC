@@ -500,6 +500,8 @@ public class ApiNeutralityCallsiteTest {
         String sodiumShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(sodiumShaderRelative));
         assertTrue(sodiumShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type.stage)"),
             "Sodium GlShader should create shaders via typed handle seam: " + sodiumShaderRelative);
+        assertTrue(sodiumShaderSource.contains("ShaderWorkarounds.safeShaderSource(handle, parsedShader.src())"),
+            "Sodium GlShader should upload shader source via typed handle seam: " + sodiumShaderRelative);
         assertTrue(sodiumShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(this.handle()))"),
             "Sodium GlShader should delete shaders via typed handle seam: " + sodiumShaderRelative);
 
@@ -507,6 +509,8 @@ public class ApiNeutralityCallsiteTest {
         String irisShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(irisShaderRelative));
         assertTrue(irisShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type.stage)"),
             "Iris GlShader should create shaders via typed handle seam: " + irisShaderRelative);
+        assertTrue(irisShaderSource.contains("ShaderWorkarounds.safeShaderSource(handle, src)"),
+            "Iris GlShader should upload shader source via typed handle seam: " + irisShaderRelative);
         assertTrue(irisShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(this.getGlId()))"),
             "Iris GlShader should delete shaders via typed handle seam: " + irisShaderRelative);
 
@@ -565,6 +569,8 @@ public class ApiNeutralityCallsiteTest {
         String blazeDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve(blazeDeviceRelative));
         assertTrue(blazeDeviceSource.contains("net.vulkanic.VulkanicAPI.createShaderHandle(ctx, toVulkanicShaderStage(shaderCompilationKey.type))"),
             "Blaze3D GlDevice should create shaders via typed handle seam in shader compilation path: " + blazeDeviceRelative);
+        assertTrue(blazeDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader, string2)"),
+            "Blaze3D GlDevice should upload shader source via typed handle seam in shader compilation path: " + blazeDeviceRelative);
         assertTrue(blazeDeviceSource.contains("net.vulkanic.VulkanicAPI.createShaderProgramHandle(ctx)"),
             "Blaze3D GlDevice should create programs via typed handle seam in AMD workaround path: " + blazeDeviceRelative);
 
@@ -573,6 +579,8 @@ public class ApiNeutralityCallsiteTest {
         assertTrue(dhShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, stage)")
                 || dhShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type)"),
             "Distant Horizons Shader should create shaders via typed handle seam when stage mapping is available: " + dhShaderRelative);
+        assertFalse(dhShaderSource.contains("VulkanicAPI.createShader(ctx, type)"),
+            "Distant Horizons Shader should avoid raw createShader(int) callsites now that typed-handle creation is available: " + dhShaderRelative);
         assertTrue(dhShaderSource.contains("VulkanicAPI.deleteShader(ctx, VulkanicShaderHandle.of(this.id))"),
             "Distant Horizons Shader should delete shaders via typed handle seam: " + dhShaderRelative);
 

@@ -206,7 +206,7 @@ public class ShaderCreator {
 		if (source == null) return -1;
 
 		VulkanicShaderHandle shader = VulkanicAPI.createShaderHandle(ctx, shaderType.stage);
-		ShaderWorkarounds.safeShaderSource(shader.value(), source);
+		ShaderWorkarounds.safeShaderSource(shader, source);
 		VulkanicAPI.compileShader(ctx, shader);
 		String log = VulkanicAPI.getShaderInfoLog(ctx, shader);
 

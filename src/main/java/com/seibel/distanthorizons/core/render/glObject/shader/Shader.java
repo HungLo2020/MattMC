@@ -72,7 +72,7 @@ public class Shader
 		
 		VulkanicShaderHandle shaderHandle = VulkanicShaderHandle.of(this.id);
 		StringBuilder source = loadFile(path, absoluteFilePath, new StringBuilder());
-		safeShaderSource(ctx, this.id, source);
+		safeShaderSource(ctx, shaderHandle, source);
 		
 		VulkanicAPI.compileShader(ctx, shaderHandle);
 		// check if the shader compiled
@@ -117,7 +117,7 @@ public class Shader
 		}
 		
 		VulkanicShaderHandle shaderHandle = VulkanicShaderHandle.of(this.id);
-		safeShaderSource(ctx, this.id, sourceString);
+		safeShaderSource(ctx, shaderHandle, sourceString);
 		VulkanicAPI.compileShader(ctx, shaderHandle);
 		// check if the shader compiled
 		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, shaderHandle))
@@ -148,16 +148,14 @@ public class Shader
 	 * 
 	 * <p>Source: https://github.com/vram-guild/canvas/commit/820bf754092ccaf8d0c169620c2ff575722d7d96
 	 */
-	private static void safeShaderSource(CommandContext ctx, @NativeType("GLuint") int glId, @NativeType("GLchar const **") CharSequence source)
+	private static void safeShaderSource(CommandContext ctx, VulkanicShaderHandle shader, @NativeType("GLchar const **") CharSequence source)
 	{
-		VulkanicAPI.uploadShaderSource(ctx, glId, source);
+		VulkanicAPI.uploadShaderSource(ctx, shader, source);
 	}
 
 	private static int createShaderId(CommandContext ctx, int type)
 	{
-		return VulkanicShaderStage.fromLegacyGlShaderType(type)
-			.map(stage -> VulkanicAPI.createShaderHandle(ctx, stage).value())
-			.orElseGet(() -> VulkanicAPI.createShader(ctx, type));
+		return VulkanicAPI.createShaderHandle(ctx, type).value();
 	}
 	
 	public void free() { this.free(VulkanicAPI.getCommandContext()); }

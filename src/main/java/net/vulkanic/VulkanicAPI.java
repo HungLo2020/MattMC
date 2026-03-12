@@ -3276,6 +3276,10 @@ public class VulkanicAPI {
     public static void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
         getBackend().uploadShaderSource(ctx, shader, source);
     }
+
+    public static void uploadShaderSource(CommandContext ctx, VulkanicShaderHandle shader, CharSequence source) {
+        getBackend().uploadShaderSource(ctx, shader.value(), source);
+    }
     
     public static void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         getBackend().uploadShaderSource(ctx, shader, pointerBufferAddress, stringCount, lengthsPointer);

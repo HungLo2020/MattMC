@@ -27,7 +27,7 @@ public class GlShader extends GlResource {
 	private static int createShader(ShaderType type, String name, String src) {
 		CommandContext ctx = VulkanicAPI.getCommandContext();
 		VulkanicShaderHandle handle = VulkanicAPI.createShaderHandle(ctx, type.stage);
-		ShaderWorkarounds.safeShaderSource(handle.value(), src);
+		ShaderWorkarounds.safeShaderSource(handle, src);
 		VulkanicAPI.compileShader(ctx, handle);
 
 		GLDebug.nameObject(VulkanicAPI.GL_SHADER, handle.value(), name + "(" + type.name().toLowerCase(Locale.ROOT) + ")");

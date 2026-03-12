@@ -23,7 +23,7 @@ public class GlShader extends GlObject {
         CommandContext ctx = VulkanicAPI.getCommandContext();
 
         VulkanicShaderHandle handle = VulkanicAPI.createShaderHandle(ctx, type.stage);
-        ShaderWorkarounds.safeShaderSource(handle.value(), parsedShader.src());
+        ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
         VulkanicAPI.compileShader(ctx, handle);
 
         String log = VulkanicAPI.getShaderInfoLog(ctx, handle);

@@ -453,7 +453,7 @@ public class GlDevice implements GpuDevice {
 			String string2 = GlslPreprocessor.injectDefines(string, shaderCompilationKey.defines);
 			net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
 			net.vulkanic.VulkanicShaderHandle shader = net.vulkanic.VulkanicAPI.createShaderHandle(ctx, toVulkanicShaderStage(shaderCompilationKey.type));
-			net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader.value(), string2);
+			net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader, string2);
 			net.vulkanic.VulkanicAPI.compileShader(ctx, shader);
 			if (!net.vulkanic.VulkanicAPI.isShaderCompileSuccessful(ctx, shader)) {
 				String string3 = StringUtils.trim(net.vulkanic.VulkanicAPI.getShaderInfoLog(ctx, shader));
