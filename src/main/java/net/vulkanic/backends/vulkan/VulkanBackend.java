@@ -1,10 +1,15 @@
 package net.vulkanic.backends.vulkan;
 
+import net.blaze3d.GpuOutOfMemoryException;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanReadinessReport;
+import net.vulkanic.VulkanicBuffer;
+import net.vulkanic.VulkanicTexture;
+import net.vulkanic.VulkanicTextureFormat;
+import net.vulkanic.VulkanicTextureView;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
@@ -20,6 +25,9 @@ import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkApplicationInfo;
+import org.lwjgl.vulkan.VkBufferCreateInfo;
+import org.lwjgl.vulkan.VkImageCreateInfo;
+import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
 import org.lwjgl.vulkan.VkCommandBufferBeginInfo;
@@ -30,7 +38,10 @@ import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
 import org.lwjgl.vulkan.VkExtent2D;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
+import org.lwjgl.vulkan.VkMemoryAllocateInfo;
+import org.lwjgl.vulkan.VkMemoryRequirements;
 import org.lwjgl.vulkan.VkPhysicalDevice;
+import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 import org.lwjgl.vulkan.VkSubmitInfo;
@@ -565,6 +576,127 @@ public class VulkanBackend {
         virtualPrograms.remove(program);
     }
 
+    public VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size) {
+        ensureNativeReady("createManagedBuffer");
+        if (size <= 0) {
+            throw new IllegalArgumentException("Buffer size must be greater than zero, got: " + size);
+        }
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        return spine.createManagedBuffer(label == null ? null : label.get(), usage, size, null);
+    }
+
+    public VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label,
+                                              int usage,
+                                              java.nio.ByteBuffer initialData) {
+        ensureNativeReady("createManagedBuffer");
+        if (initialData == null || !initialData.hasRemaining()) {
+            throw new IllegalArgumentException("initialData must be non-null and have remaining bytes");
+        }
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        java.nio.ByteBuffer initialDataCopy = initialData.duplicate();
+        return spine.createManagedBuffer(label == null ? null : label.get(), usage, initialDataCopy.remaining(), initialDataCopy);
+    }
+
+    public VulkanicBuffer.MappedView mapManagedBuffer(VulkanicBuffer buffer, boolean read, boolean write) {
+        ensureNativeReady("mapManagedBuffer");
+        if (!read && !write) {
+            throw new IllegalArgumentException("At least one of read or write must be true");
+        }
+
+        if (!(buffer instanceof VulkanBuffer vulkanBuffer)) {
+            throw new IllegalArgumentException("Expected VulkanBuffer, got: " + (buffer == null ? "null" : buffer.getClass().getName()));
+        }
+        if (vulkanBuffer.isClosed()) {
+            throw new IllegalStateException("Cannot map a closed VulkanBuffer");
+        }
+
+        if (read && (vulkanBuffer.usage() & VulkanicBuffer.USAGE_MAP_READ) == 0) {
+            throw new IllegalArgumentException("Buffer was not created with USAGE_MAP_READ");
+        }
+        if (write && (vulkanBuffer.usage() & VulkanicBuffer.USAGE_MAP_WRITE) == 0) {
+            throw new IllegalArgumentException("Buffer was not created with USAGE_MAP_WRITE");
+        }
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        return spine.mapManagedBuffer(vulkanBuffer, read, write);
+    }
+
+    public VulkanicTexture createManagedTexture(String label, int usage, VulkanicTextureFormat format,
+                                                 int width, int height, int depthOrLayers, int mipLevels) {
+        // Argument validation runs before ensureNativeReady so callers always get
+        // IllegalArgumentException for bad parameters regardless of runtime state.
+        if (format == null) {
+            throw new IllegalArgumentException("format must not be null");
+        }
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Texture dimensions must be > 0, got " + width + "x" + height);
+        }
+        if (mipLevels < 1) {
+            throw new IllegalArgumentException("mipLevels must be >= 1, got " + mipLevels);
+        }
+        if (depthOrLayers < 1) {
+            throw new IllegalArgumentException("depthOrLayers must be >= 1, got " + depthOrLayers);
+        }
+        ensureNativeReady("createManagedTexture");
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        return spine.createManagedTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
+    }
+
+    public VulkanicTextureView createManagedTextureView(VulkanicTexture texture) {
+        ensureNativeReady("createManagedTextureView");
+        if (!(texture instanceof VulkanTexture vulkanTexture)) {
+            throw new IllegalArgumentException("Expected VulkanTexture, got: "
+                + (texture == null ? "null" : texture.getClass().getName()));
+        }
+        if (vulkanTexture.isClosed()) {
+            throw new IllegalStateException("Cannot create a view of a closed texture");
+        }
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        return spine.createManagedTextureView(vulkanTexture, 0, texture.getMipLevels());
+    }
+
+    public VulkanicTextureView createManagedTextureView(VulkanicTexture texture, int baseMipLevel, int mipLevelCount) {
+        ensureNativeReady("createManagedTextureView");
+        if (!(texture instanceof VulkanTexture vulkanTexture)) {
+            throw new IllegalArgumentException("Expected VulkanTexture, got: "
+                + (texture == null ? "null" : texture.getClass().getName()));
+        }
+        if (vulkanTexture.isClosed()) {
+            throw new IllegalStateException("Cannot create a view of a closed texture");
+        }
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        return spine.createManagedTextureView(vulkanTexture, baseMipLevel, mipLevelCount);
+    }
+
     public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
         ensureNativeReady("createPipeline");
         throw new UnsupportedOperationException("Vulkan-native pipeline creation is not implemented yet.");
@@ -750,6 +882,15 @@ public class VulkanBackend {
         private long swapchain;
         private long commandPool;
 
+        private final Map<Long, Long> managedBufferAllocations = new ConcurrentHashMap<>();
+
+        /** Maps {@code VkImage} handle → {@code VkDeviceMemory} handle for all live managed textures. */
+        private final Map<Long, Long> managedImageAllocations = new ConcurrentHashMap<>();
+        /** Maps {@code VkImage} handle → default {@code VkImageView} handle (covering all mip levels). */
+        private final Map<Long, Long> managedImageDefaultViews = new ConcurrentHashMap<>();
+        /** Tracks extra {@code VkImageView} handles created by {@code createManagedTextureView}. */
+        private final Set<Long> managedExtraImageViews = ConcurrentHashMap.newKeySet();
+
         private int swapchainImageFormat = VK10.VK_FORMAT_UNDEFINED;
         private int swapchainColorSpace = -1;
         private int swapchainPresentMode = -1;
@@ -912,6 +1053,415 @@ public class VulkanBackend {
                 org.lwjgl.PointerBuffer pQueue = stack.mallocPointer(1);
                 VK10.vkGetDeviceQueue(logicalDevice, graphicsQueueFamilyIndex, 0, pQueue);
                 graphicsQueue = new VkQueue(pQueue.get(0), logicalDevice);
+            }
+        }
+
+        private VulkanicBuffer createManagedBuffer(String label,
+                                                   int usage,
+                                                   int size,
+                                                   java.nio.ByteBuffer initialData) {
+            long bufferHandle = VK10.VK_NULL_HANDLE;
+            long memoryHandle = VK10.VK_NULL_HANDLE;
+
+            try (MemoryStack stack = stackPush()) {
+                int bufferUsageFlags = toVkBufferUsageFlags(usage);
+
+                VkBufferCreateInfo bufferCreateInfo = VkBufferCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .size(size)
+                    .usage(bufferUsageFlags)
+                    .sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE);
+
+                java.nio.LongBuffer pBuffer = stack.mallocLong(1);
+                int createBufferResult = VK10.vkCreateBuffer(logicalDevice, bufferCreateInfo, null, pBuffer);
+                checkVkAllocation("vkCreateBuffer", createBufferResult, size, label);
+                bufferHandle = pBuffer.get(0);
+
+                VkMemoryRequirements memoryRequirements = VkMemoryRequirements.malloc(stack);
+                VK10.vkGetBufferMemoryRequirements(logicalDevice, bufferHandle, memoryRequirements);
+
+                int memoryTypeIndex = findMemoryTypeIndex(
+                    memoryRequirements.memoryTypeBits(),
+                    VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK10.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                );
+                if (memoryTypeIndex < 0) {
+                    throw new IllegalStateException(
+                        "No host-visible/coherent memory type available for managed Vulkan buffer allocation.");
+                }
+
+                VkMemoryAllocateInfo memoryAllocateInfo = VkMemoryAllocateInfo.calloc(stack)
+                    .sType$Default()
+                    .allocationSize(memoryRequirements.size())
+                    .memoryTypeIndex(memoryTypeIndex);
+
+                java.nio.LongBuffer pMemory = stack.mallocLong(1);
+                int allocateMemoryResult = VK10.vkAllocateMemory(logicalDevice, memoryAllocateInfo, null, pMemory);
+                checkVkAllocation("vkAllocateMemory", allocateMemoryResult, size, label);
+                memoryHandle = pMemory.get(0);
+
+                checkVk("vkBindBufferMemory", VK10.vkBindBufferMemory(logicalDevice, bufferHandle, memoryHandle, 0));
+
+                if (initialData != null) {
+                    uploadInitialBufferData(memoryHandle, size, initialData);
+                }
+
+                managedBufferAllocations.put(bufferHandle, memoryHandle);
+
+                String debugLabel = (label == null || label.isBlank())
+                    ? "VulkanBuffer-0x" + Long.toHexString(bufferHandle)
+                    : label;
+                long finalBufferHandle = bufferHandle;
+                long finalMemoryHandle = memoryHandle;
+
+                return new VulkanBuffer(
+                    finalBufferHandle,
+                    finalMemoryHandle,
+                    usage,
+                    size,
+                    debugLabel,
+                    () -> destroyManagedBuffer(finalBufferHandle, finalMemoryHandle)
+                );
+            } catch (RuntimeException exception) {
+                if (logicalDevice != null) {
+                    if (bufferHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyBuffer(logicalDevice, bufferHandle, null);
+                    }
+                    if (memoryHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkFreeMemory(logicalDevice, memoryHandle, null);
+                    }
+                }
+                throw exception;
+            }
+        }
+
+        private VulkanicBuffer.MappedView mapManagedBuffer(VulkanBuffer buffer, boolean read, boolean write) {
+            buffer.beginMappedScope();
+            try (MemoryStack stack = stackPush()) {
+                org.lwjgl.PointerBuffer mappedPointer = stack.mallocPointer(1);
+                int mapResult = VK10.vkMapMemory(
+                    logicalDevice,
+                    buffer.getVkMemoryHandle(),
+                    0,
+                    buffer.size(),
+                    0,
+                    mappedPointer
+                );
+
+                checkVkAllocation("vkMapMemory", mapResult, buffer.size(), buffer.toString());
+
+                java.nio.ByteBuffer mappedData = MemoryUtil.memByteBuffer(mappedPointer.get(0), buffer.size());
+                return new VulkanBuffer.VulkanMappedView(
+                    mappedData,
+                    () -> {
+                        VK10.vkUnmapMemory(logicalDevice, buffer.getVkMemoryHandle());
+                        buffer.endMappedScope();
+                    }
+                );
+            } catch (RuntimeException exception) {
+                buffer.endMappedScope();
+                throw exception;
+            }
+        }
+
+        private void uploadInitialBufferData(long memoryHandle, int size, java.nio.ByteBuffer initialData) {
+            try (MemoryStack stack = stackPush()) {
+                org.lwjgl.PointerBuffer mappedPointer = stack.mallocPointer(1);
+                int mapResult = VK10.vkMapMemory(logicalDevice, memoryHandle, 0, size, 0, mappedPointer);
+                checkVkAllocation("vkMapMemory(initial upload)", mapResult, size, "managed buffer initial upload");
+
+                java.nio.ByteBuffer mappedData = MemoryUtil.memByteBuffer(mappedPointer.get(0), size);
+                java.nio.ByteBuffer source = initialData.duplicate();
+                mappedData.put(source);
+                VK10.vkUnmapMemory(logicalDevice, memoryHandle);
+            }
+        }
+
+        private int toVkBufferUsageFlags(int usage) {
+            int flags = 0;
+
+            if ((usage & VulkanicBuffer.USAGE_COPY_SRC) != 0) {
+                flags |= VK10.VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            }
+            if ((usage & VulkanicBuffer.USAGE_COPY_DST) != 0) {
+                flags |= VK10.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            }
+            if ((usage & VulkanicBuffer.USAGE_VERTEX) != 0) {
+                flags |= VK10.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            }
+            if ((usage & VulkanicBuffer.USAGE_INDEX) != 0) {
+                flags |= VK10.VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            }
+            if ((usage & VulkanicBuffer.USAGE_UNIFORM) != 0) {
+                flags |= VK10.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+            }
+            if ((usage & VulkanicBuffer.USAGE_UNIFORM_TEXEL_BUFFER) != 0) {
+                flags |= VK10.VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+            }
+
+            if (flags == 0) {
+                flags = VK10.VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK10.VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            }
+
+            return flags;
+        }
+
+        private int findMemoryTypeIndex(int memoryTypeBits, int requiredProperties) {
+            try (MemoryStack stack = stackPush()) {
+                VkPhysicalDeviceMemoryProperties memoryProperties = VkPhysicalDeviceMemoryProperties.malloc(stack);
+                VK10.vkGetPhysicalDeviceMemoryProperties(physicalDevice, memoryProperties);
+
+                for (int typeIndex = 0; typeIndex < memoryProperties.memoryTypeCount(); typeIndex++) {
+                    boolean typeSupported = (memoryTypeBits & (1 << typeIndex)) != 0;
+                    if (!typeSupported) {
+                        continue;
+                    }
+
+                    int propertyFlags = memoryProperties.memoryTypes(typeIndex).propertyFlags();
+                    if ((propertyFlags & requiredProperties) == requiredProperties) {
+                        return typeIndex;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        private void destroyManagedBuffer(long bufferHandle, long memoryHandle) {
+            Long trackedMemoryHandle = managedBufferAllocations.remove(bufferHandle);
+            long effectiveMemoryHandle = trackedMemoryHandle == null ? memoryHandle : trackedMemoryHandle;
+
+            if (logicalDevice == null) {
+                return;
+            }
+
+            if (bufferHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyBuffer(logicalDevice, bufferHandle, null);
+            }
+            if (effectiveMemoryHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkFreeMemory(logicalDevice, effectiveMemoryHandle, null);
+            }
+        }
+
+        private static void checkVkAllocation(String operation, int result, int size, String label) {
+            if (result == VK10.VK_ERROR_OUT_OF_HOST_MEMORY || result == VK10.VK_ERROR_OUT_OF_DEVICE_MEMORY) {
+                throw new GpuOutOfMemoryException(
+                    operation + " failed with VkResult=" + result + " while allocating managed buffer (size="
+                        + size + ", label=" + label + ")");
+            }
+            checkVk(operation, result);
+        }
+
+        // ===================================================================
+        // Managed Texture Lifecycle
+        // ===================================================================
+
+        private VulkanicTexture createManagedTexture(String label, int usage,
+                                                     VulkanicTextureFormat format,
+                                                     int width, int height,
+                                                     int depthOrLayers, int mipLevels) {
+            long imageHandle = VK10.VK_NULL_HANDLE;
+            long memoryHandle = VK10.VK_NULL_HANDLE;
+            long defaultViewHandle = VK10.VK_NULL_HANDLE;
+
+            try (MemoryStack stack = stackPush()) {
+                int vkFormat = toVkFormat(format);
+                int imageUsageFlags = toVkImageUsageFlags(usage, format);
+
+                VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .imageType(VK10.VK_IMAGE_TYPE_2D)
+                    .format(vkFormat)
+                    .mipLevels(mipLevels)
+                    .arrayLayers(depthOrLayers)
+                    .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                    .tiling(VK10.VK_IMAGE_TILING_OPTIMAL)
+                    .usage(imageUsageFlags)
+                    .sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE)
+                    .initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
+                imageCreateInfo.extent()
+                    .width(width)
+                    .height(height)
+                    .depth(1);
+
+                java.nio.LongBuffer pImage = stack.mallocLong(1);
+                int createImageResult = VK10.vkCreateImage(logicalDevice, imageCreateInfo, null, pImage);
+                checkVkAllocation("vkCreateImage", createImageResult, width * height * format.pixelSize(), label);
+                imageHandle = pImage.get(0);
+
+                VkMemoryRequirements memoryRequirements = VkMemoryRequirements.malloc(stack);
+                VK10.vkGetImageMemoryRequirements(logicalDevice, imageHandle, memoryRequirements);
+
+                int memoryTypeIndex = findMemoryTypeIndex(
+                    memoryRequirements.memoryTypeBits(),
+                    VK10.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+                );
+                if (memoryTypeIndex < 0) {
+                    throw new IllegalStateException(
+                        "No device-local memory type available for managed Vulkan texture allocation.");
+                }
+
+                VkMemoryAllocateInfo memoryAllocateInfo = VkMemoryAllocateInfo.calloc(stack)
+                    .sType$Default()
+                    .allocationSize(memoryRequirements.size())
+                    .memoryTypeIndex(memoryTypeIndex);
+
+                java.nio.LongBuffer pMemory = stack.mallocLong(1);
+                int allocateResult = VK10.vkAllocateMemory(logicalDevice, memoryAllocateInfo, null, pMemory);
+                checkVkAllocation("vkAllocateMemory(texture)", allocateResult,
+                    width * height * format.pixelSize(), label);
+                memoryHandle = pMemory.get(0);
+
+                checkVk("vkBindImageMemory",
+                    VK10.vkBindImageMemory(logicalDevice, imageHandle, memoryHandle, 0));
+
+                int aspectMask = toVkImageAspectMask(format);
+                defaultViewHandle = createVkImageView(stack, imageHandle, vkFormat,
+                    aspectMask, 0, mipLevels, depthOrLayers);
+
+                managedImageAllocations.put(imageHandle, memoryHandle);
+                managedImageDefaultViews.put(imageHandle, defaultViewHandle);
+
+                String debugLabel = (label == null || label.isBlank())
+                    ? "VulkanTexture-0x" + Long.toHexString(imageHandle)
+                    : label;
+                long finalImageHandle = imageHandle;
+                long finalMemoryHandle = memoryHandle;
+                long finalDefaultViewHandle = defaultViewHandle;
+
+                return new VulkanTexture(
+                    finalImageHandle,
+                    finalMemoryHandle,
+                    finalDefaultViewHandle,
+                    usage,
+                    format,
+                    width, height, depthOrLayers, mipLevels,
+                    debugLabel,
+                    () -> destroyManagedTexture(finalImageHandle, finalMemoryHandle, finalDefaultViewHandle)
+                );
+            } catch (RuntimeException exception) {
+                if (logicalDevice != null) {
+                    if (defaultViewHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyImageView(logicalDevice, defaultViewHandle, null);
+                    }
+                    if (imageHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyImage(logicalDevice, imageHandle, null);
+                    }
+                    if (memoryHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkFreeMemory(logicalDevice, memoryHandle, null);
+                    }
+                }
+                throw exception;
+            }
+        }
+
+        private VulkanicTextureView createManagedTextureView(VulkanTexture texture,
+                                                              int baseMipLevel,
+                                                              int mipLevelCount) {
+            try (MemoryStack stack = stackPush()) {
+                int vkFormat = toVkFormat(texture.getVulkanicFormat());
+                int aspectMask = toVkImageAspectMask(texture.getVulkanicFormat());
+                long viewHandle = createVkImageView(stack, texture.getVkImageHandle(), vkFormat,
+                    aspectMask, baseMipLevel, mipLevelCount, texture.getDepthOrLayers());
+
+                managedExtraImageViews.add(viewHandle);
+                long finalViewHandle = viewHandle;
+
+                return new VulkanTextureView(
+                    texture,
+                    finalViewHandle,
+                    baseMipLevel,
+                    mipLevelCount,
+                    () -> destroyManagedImageView(finalViewHandle)
+                );
+            }
+        }
+
+        private long createVkImageView(MemoryStack stack, long imageHandle, int vkFormat,
+                                       int aspectMask, int baseMipLevel, int mipLevelCount,
+                                       int layerCount) {
+            VkImageViewCreateInfo viewCreateInfo = VkImageViewCreateInfo.calloc(stack)
+                .sType$Default()
+                .image(imageHandle)
+                .viewType(VK10.VK_IMAGE_VIEW_TYPE_2D)
+                .format(vkFormat);
+            viewCreateInfo.components()
+                .r(VK10.VK_COMPONENT_SWIZZLE_IDENTITY)
+                .g(VK10.VK_COMPONENT_SWIZZLE_IDENTITY)
+                .b(VK10.VK_COMPONENT_SWIZZLE_IDENTITY)
+                .a(VK10.VK_COMPONENT_SWIZZLE_IDENTITY);
+            viewCreateInfo.subresourceRange()
+                .aspectMask(aspectMask)
+                .baseMipLevel(baseMipLevel)
+                .levelCount(mipLevelCount)
+                .baseArrayLayer(0)
+                .layerCount(layerCount);
+
+            java.nio.LongBuffer pView = stack.mallocLong(1);
+            checkVk("vkCreateImageView", VK10.vkCreateImageView(logicalDevice, viewCreateInfo, null, pView));
+            return pView.get(0);
+        }
+
+        private static int toVkFormat(VulkanicTextureFormat format) {
+            return switch (format) {
+                case RGBA8   -> VK10.VK_FORMAT_R8G8B8A8_UNORM;
+                case RED8    -> VK10.VK_FORMAT_R8_UNORM;
+                case RED8I   -> VK10.VK_FORMAT_R8_SINT;
+                case DEPTH32 -> VK10.VK_FORMAT_D32_SFLOAT;
+            };
+        }
+
+        private static int toVkImageUsageFlags(int usage, VulkanicTextureFormat format) {
+            int flags = 0;
+            if ((usage & VulkanicTexture.USAGE_COPY_SRC) != 0) {
+                flags |= VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            }
+            if ((usage & VulkanicTexture.USAGE_COPY_DST) != 0) {
+                flags |= VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            }
+            if ((usage & VulkanicTexture.USAGE_TEXTURE_BINDING) != 0) {
+                flags |= VK10.VK_IMAGE_USAGE_SAMPLED_BIT;
+            }
+            if ((usage & VulkanicTexture.USAGE_RENDER_ATTACHMENT) != 0) {
+                if (format.hasDepthAspect()) {
+                    flags |= VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+                } else {
+                    flags |= VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+                }
+            }
+            if (flags == 0) {
+                flags = VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            }
+            return flags;
+        }
+
+        private static int toVkImageAspectMask(VulkanicTextureFormat format) {
+            return format.hasDepthAspect()
+                ? VK10.VK_IMAGE_ASPECT_DEPTH_BIT
+                : VK10.VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+
+        private void destroyManagedTexture(long imageHandle, long memoryHandle, long defaultViewHandle) {
+            managedImageAllocations.remove(imageHandle);
+            managedImageDefaultViews.remove(imageHandle);
+
+            if (logicalDevice == null) {
+                return;
+            }
+            if (defaultViewHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyImageView(logicalDevice, defaultViewHandle, null);
+            }
+            if (imageHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyImage(logicalDevice, imageHandle, null);
+            }
+            if (memoryHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkFreeMemory(logicalDevice, memoryHandle, null);
+            }
+        }
+
+        private void destroyManagedImageView(long viewHandle) {
+            managedExtraImageViews.remove(viewHandle);
+            if (logicalDevice != null && viewHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyImageView(logicalDevice, viewHandle, null);
             }
         }
 
@@ -1226,6 +1776,26 @@ public class VulkanBackend {
                 try {
                     VK10.vkDeviceWaitIdle(logicalDevice);
                 } catch (Throwable ignored) {
+                }
+
+                if (!managedBufferAllocations.isEmpty()) {
+                    java.util.List<Map.Entry<Long, Long>> allocations = new ArrayList<>(managedBufferAllocations.entrySet());
+                    for (Map.Entry<Long, Long> allocation : allocations) {
+                        destroyManagedBuffer(allocation.getKey(), allocation.getValue());
+                    }
+                    managedBufferAllocations.clear();
+                }
+
+                if (!managedExtraImageViews.isEmpty()) {
+                    new ArrayList<>(managedExtraImageViews).forEach(this::destroyManagedImageView);
+                }
+
+                if (!managedImageAllocations.isEmpty()) {
+                    new ArrayList<>(managedImageAllocations.entrySet()).forEach(entry -> {
+                        Long defView = managedImageDefaultViews.get(entry.getKey());
+                        destroyManagedTexture(entry.getKey(), entry.getValue(),
+                            defView != null ? defView : VK10.VK_NULL_HANDLE);
+                    });
                 }
 
                 if (swapchain != VK10.VK_NULL_HANDLE) {

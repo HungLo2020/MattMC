@@ -668,6 +668,45 @@ public class VulkanicAPI {
 			drawFramebufferBinding = 0;
         }
     }
+
+    /**
+     * Normalizes a backend option value from {@code options.txt}.
+     *
+     * <p>Accepted values are {@code opengl} and {@code vulkan} (case-insensitive).
+     * Any missing/unknown value falls back to {@code opengl}.
+     */
+    public static String normalizeBackendOptionValue(@Nullable String configuredValue) {
+        if (configuredValue == null) {
+            return "opengl";
+        }
+
+        String normalized = configuredValue.trim().toLowerCase(Locale.ROOT);
+        if (normalized.equals("vulkan")) {
+            return "vulkan";
+        }
+        return "opengl";
+    }
+
+    /**
+     * Converts a backend option value from {@code options.txt} into a backend type.
+     *
+     * <p>Any missing/unknown value maps to {@link GraphicsBackendType#OPENGL}.
+     */
+    public static GraphicsBackendType backendTypeFromOptionsValue(@Nullable String configuredValue) {
+        return normalizeBackendOptionValue(configuredValue).equals("vulkan")
+            ? GraphicsBackendType.VULKAN
+            : GraphicsBackendType.OPENGL;
+    }
+
+    /**
+     * Initializes Vulkanic backend routing from {@code options.txt} value semantics.
+     *
+     * <p>This is intended for startup code that reads hidden options like
+     * {@code graphics_backend=vulkan}. Unknown values default to OpenGL.
+     */
+    public static synchronized void initializeFromOptionsValue(@Nullable String configuredValue) {
+        initialize(backendTypeFromOptionsValue(configuredValue));
+    }
     
     /**
      * Get the current graphics backend.

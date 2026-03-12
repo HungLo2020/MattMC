@@ -270,6 +270,18 @@ public class Phase3DrawPathTest {
             "GraphicsBackend should expose conditional swapchain recreation seam");
         assertTrue(backendInterfaceSource.contains("default VulkanNativeInitializationInfo initializeNativeVulkanRuntime()"),
             "GraphicsBackend should expose explicit native Vulkan initialization seam");
+        assertTrue(backendInterfaceSource.contains("VulkanicBuffer createManagedBuffer(Supplier<String> label, int usage, int size);"),
+            "GraphicsBackend should expose managed GPU buffer creation seam (size variant)");
+        assertTrue(backendInterfaceSource.contains("VulkanicBuffer createManagedBuffer(Supplier<String> label, int usage, java.nio.ByteBuffer initialData);"),
+            "GraphicsBackend should expose managed GPU buffer creation seam (initial-data variant)");
+        assertTrue(backendInterfaceSource.contains("VulkanicBuffer.MappedView mapManagedBuffer(VulkanicBuffer buffer, boolean read, boolean write);"),
+            "GraphicsBackend should expose managed GPU buffer mapping seam");
+        assertTrue(backendInterfaceSource.contains("VulkanicTexture createManagedTexture(String label, int usage, VulkanicTextureFormat format,"),
+            "GraphicsBackend should expose managed GPU texture creation seam");
+        assertTrue(backendInterfaceSource.contains("VulkanicTextureView createManagedTextureView(VulkanicTexture texture);"),
+            "GraphicsBackend should expose managed GPU texture view seam (full-range)");
+        assertTrue(backendInterfaceSource.contains("VulkanicTextureView createManagedTextureView(VulkanicTexture texture, int baseMipLevel, int mipLevelCount);"),
+            "GraphicsBackend should expose managed GPU texture view seam (mip-range)");
 
         Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         String apiSource = Files.readString(apiFile);
@@ -289,6 +301,18 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose explicit swapchain recreation helper");
         assertTrue(apiSource.contains("public static boolean recreateVulkanSwapchainIfNeeded()"),
             "VulkanicAPI should expose conditional swapchain recreation helper");
+        assertTrue(apiSource.contains("public static VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size)"),
+            "VulkanicAPI should expose managed GPU buffer creation helper (size variant)");
+        assertTrue(apiSource.contains("public static VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage,"),
+            "VulkanicAPI should expose managed GPU buffer creation helper (initial-data variant)");
+        assertTrue(apiSource.contains("public static VulkanicBuffer.MappedView mapManagedBuffer(VulkanicBuffer buffer, boolean read, boolean write)"),
+            "VulkanicAPI should expose managed GPU buffer mapping helper");
+        assertTrue(apiSource.contains("public static VulkanicTexture createManagedTexture(String label, int usage,"),
+            "VulkanicAPI should expose managed GPU texture creation helper");
+        assertTrue(apiSource.contains("public static VulkanicTextureView createManagedTextureView(VulkanicTexture texture)"),
+            "VulkanicAPI should expose managed GPU texture view creation helper (full-range variant)");
+        assertTrue(apiSource.contains("public static VulkanicTextureView createManagedTextureView(VulkanicTexture texture,"),
+            "VulkanicAPI should expose managed GPU texture view creation helper (mip-range variant)");
 
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         String vulkanBackendSource = Files.readString(vulkanBackendFile);
@@ -308,6 +332,18 @@ public class Phase3DrawPathTest {
             "Bootstrap Vulkan backend should expose explicit swapchain recreation entrypoint");
         assertTrue(vulkanBackendSource.contains("public boolean recreateVulkanSwapchainIfNeeded()"),
             "Bootstrap Vulkan backend should expose conditional swapchain recreation entrypoint");
+        assertTrue(vulkanBackendSource.contains("public VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size)"),
+            "Bootstrap Vulkan backend should expose managed GPU buffer creation entrypoint (size variant)");
+        assertTrue(vulkanBackendSource.contains("public VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label,"),
+            "Bootstrap Vulkan backend should expose managed GPU buffer creation entrypoint (initial-data variant)");
+        assertTrue(vulkanBackendSource.contains("public VulkanicBuffer.MappedView mapManagedBuffer(VulkanicBuffer buffer, boolean read, boolean write)"),
+            "Bootstrap Vulkan backend should expose managed GPU buffer mapping entrypoint");
+        assertTrue(vulkanBackendSource.contains("public VulkanicTexture createManagedTexture(String label, int usage, VulkanicTextureFormat format,"),
+            "Bootstrap Vulkan backend should expose managed GPU texture creation entrypoint");
+        assertTrue(vulkanBackendSource.contains("public VulkanicTextureView createManagedTextureView(VulkanicTexture texture)"),
+            "Bootstrap Vulkan backend should expose managed GPU texture view creation entrypoint (full-range variant)");
+        assertTrue(vulkanBackendSource.contains("public VulkanicTextureView createManagedTextureView(VulkanicTexture texture, int baseMipLevel, int mipLevelCount)"),
+            "Bootstrap Vulkan backend should expose managed GPU texture view creation entrypoint (mip-range variant)");
         assertTrue(vulkanBackendSource.contains("spine.recreateSwapchainIfFramebufferSizeChanged();"),
             "Bootstrap Vulkan command-buffer begin path should auto-check framebuffer resize and recreate swapchain");
     }
