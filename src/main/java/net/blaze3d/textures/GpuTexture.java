@@ -4,6 +4,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureFormat;
+import net.vulkanic.VulkanicTextureTarget;
 
 @Environment(EnvType.CLIENT)
 public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.GpuTextureInterface, VulkanicTexture {
@@ -116,6 +117,10 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 	}
 
 	public void flushModeChanges(int target) {
+	}
+
+	public void flushModeChanges(VulkanicTextureTarget target) {
+		this.flushModeChanges(target.toLegacyGlTarget());
 	}
 
 	public void flushModeChanges2D() {

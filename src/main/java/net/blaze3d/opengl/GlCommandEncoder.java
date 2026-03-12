@@ -29,6 +29,8 @@ import net.minecraft.util.ARGB;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureTarget;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -1051,18 +1053,18 @@ public class GlCommandEncoder implements CommandEncoder {
 						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var46);
 					GpuTexture texture = glTextureView2x.texture();
 					int textureHandle = VulkanicAPI.getTextureHandle(texture);
-					int o;
+					VulkanicTextureTarget textureTarget;
 					if ((texture.usage() & 16) != 0) {
-							o = VulkanicAPI.GL_TEXTURE_CUBE_MAP;
+							textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
 							VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
 					} else {
-							o = VulkanicAPI.GL_TEXTURE_2D;
+							textureTarget = VulkanicTextureTarget.TEXTURE_2D;
 						VulkanicAPI.bindTexture2D(ctx, textureHandle);
 					}
 
-						VulkanicAPI.setTextureParameter(ctx, o, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, glTextureView2x.baseMipLevel());
-						VulkanicAPI.setTextureParameter(ctx, o, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, glTextureView2x.baseMipLevel() + glTextureView2x.mipLevels() - 1);
-					texture.flushModeChanges(o);
+						VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.BASE_LEVEL, glTextureView2x.baseMipLevel());
+						VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, glTextureView2x.baseMipLevel() + glTextureView2x.mipLevels() - 1);
+					texture.flushModeChanges(textureTarget);
 					break;
 				default:
 					throw new MatchException(null, null);

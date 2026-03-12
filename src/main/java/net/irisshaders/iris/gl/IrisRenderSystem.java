@@ -18,12 +18,14 @@ import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicIntegerQuery;
 import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicPolygonMode;
 import net.vulkanic.VulkanicResourceBarriers;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicTextureTarget;
 import net.vulkanic.VulkanicTextureSwizzleComponent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -118,8 +120,12 @@ public class IrisRenderSystem {
 		dsaState.generateMipmaps(texture, mipmapTarget);
 	}
 
+	public static void generateMipmaps(int texture, VulkanicTextureTarget mipmapTarget) {
+		generateMipmaps(texture, mipmapTarget.toLegacyGlTarget());
+	}
+
 	public static void generateMipmaps(int texture) {
-		generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
+		generateMipmaps(texture, VulkanicTextureTarget.TEXTURE_2D);
 	}
 
 	public static void bindAttributeLocation(int program, int index, CharSequence name) {
@@ -139,8 +145,12 @@ public class IrisRenderSystem {
 		VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, internalformat, width, height, border, format, type, pixels);
 	}
 
+	public static void texImage2D(int texture, VulkanicTextureTarget target, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
+		texImage2D(texture, target.toLegacyGlTarget(), level, internalformat, width, height, border, format, type, pixels);
+	}
+
 	public static void texImage2D(int texture, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
-		texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, level, internalformat, width, height, border, format, type, pixels);
+		texImage2D(texture, VulkanicTextureTarget.TEXTURE_2D, level, internalformat, width, height, border, format, type, pixels);
 	}
 
 	public static void texImage3D(int texture, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, @Nullable ByteBuffer pixels) {
@@ -209,16 +219,24 @@ public class IrisRenderSystem {
 		dsaState.texParameteriv(texture, target, pname, params);
 	}
 
+	public static void texParameteriv(int texture, VulkanicTextureTarget target, int pname, int[] params) {
+		texParameteriv(texture, target.toLegacyGlTarget(), pname, params);
+	}
+
 	public static void texParameteriv(int texture, int pname, int[] params) {
-		texParameteriv(texture, VulkanicAPI.GL_TEXTURE_2D, pname, params);
+		texParameteriv(texture, VulkanicTextureTarget.TEXTURE_2D, pname, params);
 	}
 
 	public static void texParameteriv(int texture, int target, VulkanicTextureParameterName pname, int[] params) {
 		texParameteriv(texture, target, pname.toLegacyGlPName(), params);
 	}
 
+	public static void texParameteriv(int texture, VulkanicTextureTarget target, VulkanicTextureParameterName pname, int[] params) {
+		texParameteriv(texture, target, pname.toLegacyGlPName(), params);
+	}
+
 	public static void texParameteriv(int texture, VulkanicTextureParameterName pname, int[] params) {
-		texParameteriv(texture, VulkanicAPI.GL_TEXTURE_2D, pname, params);
+		texParameteriv(texture, VulkanicTextureTarget.TEXTURE_2D, pname, params);
 	}
 
 	public static void setTextureSwizzleRgba(
@@ -244,12 +262,23 @@ public class IrisRenderSystem {
 
 	public static void setTextureSwizzleRgba(
 		int texture,
+		VulkanicTextureTarget target,
 		VulkanicTextureSwizzleComponent red,
 		VulkanicTextureSwizzleComponent green,
 		VulkanicTextureSwizzleComponent blue,
 		VulkanicTextureSwizzleComponent alpha
 	) {
-		setTextureSwizzleRgba(texture, VulkanicAPI.GL_TEXTURE_2D, red, green, blue, alpha);
+		setTextureSwizzleRgba(texture, target.toLegacyGlTarget(), red, green, blue, alpha);
+	}
+
+	public static void setTextureSwizzleRgba(
+		int texture,
+		VulkanicTextureSwizzleComponent red,
+		VulkanicTextureSwizzleComponent green,
+		VulkanicTextureSwizzleComponent blue,
+		VulkanicTextureSwizzleComponent alpha
+	) {
+		setTextureSwizzleRgba(texture, VulkanicTextureTarget.TEXTURE_2D, red, green, blue, alpha);
 	}
 
 	/**
@@ -264,8 +293,12 @@ public class IrisRenderSystem {
 		dsaState.copyTexSubImage2D(destTexture, target, i, i1, i2, i3, i4, width, height);
 	}
 
+	public static void copyTexSubImage2D(int destTexture, VulkanicTextureTarget target, int i, int i1, int i2, int i3, int i4, int width, int height) {
+		copyTexSubImage2D(destTexture, target.toLegacyGlTarget(), i, i1, i2, i3, i4, width, height);
+	}
+
 	public static void copyTexSubImage2D(int destTexture, int level, int i1, int i2, int i3, int i4, int width, int height) {
-		copyTexSubImage2D(destTexture, VulkanicAPI.GL_TEXTURE_2D, level, i1, i2, i3, i4, width, height);
+		copyTexSubImage2D(destTexture, VulkanicTextureTarget.TEXTURE_2D, level, i1, i2, i3, i4, width, height);
 	}
 
 	public static void texParameteri(int texture, int target, int pname, int param) {
@@ -273,16 +306,36 @@ public class IrisRenderSystem {
 		dsaState.texParameteri(texture, target, pname, param);
 	}
 
+	public static void texParameteri(int texture, VulkanicTextureTarget target, int pname, int param) {
+		texParameteri(texture, target.toLegacyGlTarget(), pname, param);
+	}
+
 	public static void texParameteri(int texture, int pname, int param) {
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, pname, param);
+		texParameteri(texture, VulkanicTextureTarget.TEXTURE_2D, pname, param);
 	}
 
 	public static void texParameteri(int texture, int target, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
 		texParameteri(texture, target, pname.toLegacyGlPName(), param.toLegacyGlConstant());
 	}
 
+	public static void texParameteri(int texture, VulkanicTextureTarget target, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
+		texParameteri(texture, target.toLegacyGlTarget(), pname, param);
+	}
+
+	public static void texParameteri(int texture, int target, VulkanicTextureParameterName pname, int param) {
+		texParameteri(texture, target, pname.toLegacyGlPName(), param);
+	}
+
+	public static void texParameteri(int texture, VulkanicTextureTarget target, VulkanicTextureParameterName pname, int param) {
+		texParameteri(texture, target.toLegacyGlTarget(), pname, param);
+	}
+
 	public static void texParameteri(int texture, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, pname, param);
+		texParameteri(texture, VulkanicTextureTarget.TEXTURE_2D, pname, param);
+	}
+
+	public static void texParameteri(int texture, VulkanicTextureParameterName pname, int param) {
+		texParameteri(texture, VulkanicTextureTarget.TEXTURE_2D, pname, param);
 	}
 
 	public static void texParameterf(int texture, int target, int pname, float param) {
@@ -290,8 +343,24 @@ public class IrisRenderSystem {
 		dsaState.texParameterf(texture, target, pname, param);
 	}
 
+	public static void texParameterf(int texture, VulkanicTextureTarget target, int pname, float param) {
+		texParameterf(texture, target.toLegacyGlTarget(), pname, param);
+	}
+
+	public static void texParameterf(int texture, int target, VulkanicTextureParameterName pname, float param) {
+		texParameterf(texture, target, pname.toLegacyGlPName(), param);
+	}
+
+	public static void texParameterf(int texture, VulkanicTextureTarget target, VulkanicTextureParameterName pname, float param) {
+		texParameterf(texture, target.toLegacyGlTarget(), pname.toLegacyGlPName(), param);
+	}
+
 	public static void texParameterf(int texture, int pname, float param) {
-		texParameterf(texture, VulkanicAPI.GL_TEXTURE_2D, pname, param);
+		texParameterf(texture, VulkanicTextureTarget.TEXTURE_2D, pname, param);
+	}
+
+	public static void texParameterf(int texture, VulkanicTextureParameterName pname, float param) {
+		texParameterf(texture, VulkanicTextureTarget.TEXTURE_2D, pname, param);
 	}
 
 	public static void setTextureLinearFiltering(int texture) {
@@ -311,10 +380,10 @@ public class IrisRenderSystem {
 	}
 
 	public static void resetTextureLodRangeToZero(int texture) {
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_LOD, 0);
-		texParameteri(texture, VulkanicAPI.GL_TEXTURE_MAX_LOD, 0);
-		texParameterf(texture, VulkanicAPI.GL_TEXTURE_LOD_BIAS, 0.0F);
+		texParameteri(texture, VulkanicTextureParameterName.MAX_LEVEL, 0);
+		texParameteri(texture, VulkanicTextureParameterName.MIN_LOD, 0);
+		texParameteri(texture, VulkanicTextureParameterName.MAX_LOD, 0);
+		texParameterf(texture, VulkanicTextureParameterName.LOD_BIAS, 0.0F);
 	}
 
 	public static String getProgramInfoLog(int program) {
@@ -408,7 +477,7 @@ public class IrisRenderSystem {
 	}
 
 	public static void framebufferTexture2D(int fb, int fbtarget, int attachment, int texture, int levels) {
-		dsaState.framebufferTexture2D(fb, fbtarget, attachment, VulkanicAPI.GL_TEXTURE_2D, texture, levels);
+		dsaState.framebufferTexture2D(fb, fbtarget, attachment, VulkanicTextureTarget.TEXTURE_2D.toLegacyGlTarget(), texture, levels);
 	}
 
 	public static void framebufferTexture2D(int fb, int attachment, int texture, int levels) {
@@ -420,8 +489,12 @@ public class IrisRenderSystem {
 		return dsaState.getTexParameteri(texture, target, pname);
 	}
 
+	public static int getTexParameteri(int texture, VulkanicTextureTarget target, int pname) {
+		return getTexParameteri(texture, target.toLegacyGlTarget(), pname);
+	}
+
 	public static int getTexParameteri(int texture, int pname) {
-		return getTexParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, pname);
+		return getTexParameteri(texture, VulkanicTextureTarget.TEXTURE_2D, pname);
 	}
 
 	public static void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
@@ -501,13 +574,13 @@ public class IrisRenderSystem {
 
 	public static void disableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_BLEND, buffer, false);
+		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicCapability.BLEND, buffer, false);
 		BlendModeStorage.markBlendStateUnknown();
 	}
 
 	public static void enableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_BLEND, buffer, true);
+		VulkanicAPI.setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicCapability.BLEND, buffer, true);
 		BlendModeStorage.markBlendStateUnknown();
 	}
 
@@ -519,11 +592,19 @@ public class IrisRenderSystem {
 	// These functions are deprecated and unavailable in the core profile.
 
 	public static void bindTextureToUnit(int target, int unit, int texture) {
-		dsaState.bindTextureToUnit(target, unit, texture);
+		VulkanicTextureTarget.fromLegacyGlTarget(target)
+			.ifPresentOrElse(
+				typedTarget -> bindTextureToUnit(typedTarget, unit, texture),
+				() -> dsaState.bindTextureToUnit(target, unit, texture)
+			);
+	}
+
+	public static void bindTextureToUnit(VulkanicTextureTarget target, int unit, int texture) {
+		dsaState.bindTextureToUnit(target.toLegacyGlTarget(), unit, texture);
 	}
 
 	public static void bindTextureToUnit(int unit, int texture) {
-		dsaState.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, unit, texture);
+		bindTextureToUnit(VulkanicTextureTarget.TEXTURE_2D, unit, texture);
 	}
 
 	public static int getUniformBlockIndex(int program, String uniformBlockName) {
@@ -569,20 +650,34 @@ public class IrisRenderSystem {
 	}
 
 	public static int createTexture(int target) {
-		return dsaState.createTexture(target);
+		return VulkanicTextureTarget.fromLegacyGlTarget(target)
+			.map(IrisRenderSystem::createTexture)
+			.orElseGet(() -> dsaState.createTexture(target));
+	}
+
+	public static int createTexture(VulkanicTextureTarget target) {
+		return dsaState.createTexture(target.toLegacyGlTarget());
 	}
 
 	public static int createTexture2D() {
-		return dsaState.createTexture(VulkanicAPI.GL_TEXTURE_2D);
+		return createTexture(VulkanicTextureTarget.TEXTURE_2D);
 	}
 
 	private static int lastTex = -1;
 
 	public static void bindTextureForSetup(int glType, int glId) {
-		if (glType == VulkanicAPI.GL_TEXTURE_2D) {
+		VulkanicTextureTarget.fromLegacyGlTarget(glType)
+			.ifPresentOrElse(
+				typedTarget -> bindTextureForSetup(typedTarget, glId),
+				() -> VulkanicAPI.bindTexture(VulkanicAPI.getCommandContext(), glType, glId)
+			);
+	}
+
+	public static void bindTextureForSetup(VulkanicTextureTarget target, int glId) {
+		if (target == VulkanicTextureTarget.TEXTURE_2D) {
 			lastTex = getBoundTextureOnActiveUnit();
 		}
-		VulkanicAPI.bindTexture(VulkanicAPI.getCommandContext(), glType, glId);
+		VulkanicAPI.bindTexture(VulkanicAPI.getCommandContext(), target.toLegacyGlTarget(), glId);
 	}
 
 	public static void restoreTexture() {
@@ -635,6 +730,14 @@ public class IrisRenderSystem {
 
 
 	public static void samplerParameteri(int sampler, int pname, int param) {
+		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getCommandContext(), sampler, pname, param);
+	}
+
+	public static void samplerParameteri(int sampler, VulkanicTextureParameterName pname, int param) {
+		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getCommandContext(), sampler, pname, param);
+	}
+
+	public static void samplerParameteri(int sampler, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
 		VulkanicAPI.setSamplerParameteri(VulkanicAPI.getCommandContext(), sampler, pname, param);
 	}
 
@@ -707,6 +810,77 @@ public class IrisRenderSystem {
 			destTexture, dstTarget, dstMip, dstX, dstY, dstZ, 
 			width, height, depth);
   }
+
+	public static void copyImageSubData(
+		int sourceTexture,
+		VulkanicTextureTarget sourceTarget,
+		int mip,
+		int srcX,
+		int srcY,
+		int srcZ,
+		int destTexture,
+		VulkanicTextureTarget destTarget,
+		int dstMip,
+		int dstX,
+		int dstY,
+		int dstZ,
+		int width,
+		int height,
+		int depth
+	) {
+		VulkanicAPI.copyImageSubData(
+			VulkanicAPI.getCommandContext(),
+			sourceTexture,
+			sourceTarget,
+			mip,
+			srcX,
+			srcY,
+			srcZ,
+			destTexture,
+			destTarget,
+			dstMip,
+			dstX,
+			dstY,
+			dstZ,
+			width,
+			height,
+			depth
+		);
+	}
+
+	public static void copyImageSubData2D(
+		int sourceTexture,
+		int mip,
+		int srcX,
+		int srcY,
+		int srcZ,
+		int destTexture,
+		int dstMip,
+		int dstX,
+		int dstY,
+		int dstZ,
+		int width,
+		int height,
+		int depth
+	) {
+		copyImageSubData(
+			sourceTexture,
+			VulkanicTextureTarget.TEXTURE_2D,
+			mip,
+			srcX,
+			srcY,
+			srcZ,
+			destTexture,
+			VulkanicTextureTarget.TEXTURE_2D,
+			dstMip,
+			dstX,
+			dstY,
+			dstZ,
+			width,
+			height,
+			depth
+		);
+	}
 
 
   private static boolean cullingState;

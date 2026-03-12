@@ -36,6 +36,10 @@ public class ApiNeutralityCallsiteTest {
             "Texture parameter value mapping should recognize GL_CLAMP_TO_EDGE");
         assertTrue(VulkanicTextureParameterValue.fromLegacyGlConstant(VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE).isPresent(),
             "Texture parameter value mapping should recognize GL_COMPARE_REF_TO_TEXTURE");
+        assertTrue(VulkanicTextureParameterValue.fromLegacyGlConstant(VulkanicAPI.GL_LINEAR_MIPMAP_NEAREST).isPresent(),
+            "Texture parameter value mapping should recognize GL_LINEAR_MIPMAP_NEAREST");
+        assertTrue(VulkanicTextureParameterValue.fromLegacyGlConstant(VulkanicAPI.GL_NEAREST_MIPMAP_LINEAR).isPresent(),
+            "Texture parameter value mapping should recognize GL_NEAREST_MIPMAP_LINEAR");
         assertTrue(VulkanicTextureSwizzleComponent.fromLegacyGlConstant(VulkanicAPI.GL_RED).isPresent(),
             "Texture swizzle component mapping should recognize GL_RED");
     }
@@ -250,5 +254,108 @@ public class ApiNeutralityCallsiteTest {
             assertFalse(source.contains("TextureType.TEXTURE_2D.getGlType()"),
                 "Iris callsite should use typed/default-2D overloads instead of explicit GL target arguments: " + relative);
         }
+    }
+
+    @Test
+    public void testIrisBufferBlendToggleUsesTypedCapabilityEnum() throws IOException {
+        String relative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        assertFalse(source.contains("setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_BLEND"),
+            "Iris indexed blend toggles should use VulkanicCapability.BLEND: " + relative);
+    }
+
+    @Test
+    public void testGlCommandEncoderMipRangeUsesTypedTextureParameterNames() throws IOException {
+        String relative = "net/blaze3d/opengl/GlCommandEncoder.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        Pattern rawMipParameterPattern = Pattern.compile("setTextureParameter\\s*\\([^\\n]*GL_TEXTURE_(?:BASE_LEVEL|MAX_LEVEL)");
+        assertFalse(rawMipParameterPattern.matcher(source).find(),
+            "GlCommandEncoder mip parameter setup should use typed texture-parameter names: " + relative);
+    }
+
+    @Test
+    public void testIrisGlSamplerUsesTypedSamplerParameterEnums() throws IOException {
+        String relative = "net/irisshaders/iris/gl/sampler/GlSampler.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        Pattern rawSamplerCallPattern = Pattern.compile("samplerParameteri\\s*\\([^\\n]*GL_");
+        assertFalse(rawSamplerCallPattern.matcher(source).find(),
+            "Iris GlSampler should use typed sampler parameter enums instead of raw GL constants: " + relative);
+        assertFalse(source.contains("private static final int GL_TEXTURE_"),
+            "Iris GlSampler should not define raw GL texture parameter constants: " + relative);
+    }
+
+    @Test
+    public void testBlaze3dGlTextureFlushModeUsesTypedTextureParameterEnums() throws IOException {
+        String relative = "net/blaze3d/opengl/GlTexture.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        Pattern rawNumericTextureParamPattern = Pattern.compile("iris\\$texParameterDSA\\s*\\([^\\n]*\\b(?:10240|10241|10242|10243|9728|9729|9984|9985|9986|9987)\\b");
+        assertFalse(rawNumericTextureParamPattern.matcher(source).find(),
+            "GlTexture flush-mode parameter path should use typed texture parameter names/values: " + relative);
+    }
+
+    @Test
+    public void testIrisDepthCopyStrategyAvoidsExplicitTexture2dTargets() throws IOException {
+        String relative = "net/irisshaders/iris/gl/texture/DepthCopyStrategy.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        assertFalse(source.contains("VulkanicAPI.GL_TEXTURE_2D"),
+            "DepthCopyStrategy should use typed/default-2D helper overloads instead of explicit GL texture target constants: " + relative);
+    }
+
+    @Test
+    public void testIrisTextureWrapperDefaultsUseTypedTexture2dHelpers() throws IOException {
+        String relative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        assertFalse(source.contains("generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D)"),
+            "Iris wrapper defaults should route through typed 2D helper overloads for mipmaps: " + relative);
+        assertFalse(source.contains("texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D"),
+            "Iris wrapper defaults should route through typed 2D helper overloads for texImage2D: " + relative);
+        assertFalse(source.contains("texParameteriv(texture, VulkanicAPI.GL_TEXTURE_2D"),
+            "Iris wrapper defaults should route through typed 2D helper overloads for texParameteriv: " + relative);
+        assertFalse(source.contains("setTextureSwizzleRgba(texture, VulkanicAPI.GL_TEXTURE_2D"),
+            "Iris wrapper defaults should route through typed 2D helper overloads for swizzle setup: " + relative);
+        assertFalse(source.contains("copyTexSubImage2D(destTexture, VulkanicAPI.GL_TEXTURE_2D"),
+            "Iris wrapper defaults should route through typed 2D helper overloads for copyTexSubImage2D: " + relative);
+        assertFalse(source.contains("texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D"),
+            "Iris wrapper defaults should route through typed 2D helper overloads for texParameteri: " + relative);
+        assertFalse(source.contains("texParameterf(texture, VulkanicAPI.GL_TEXTURE_2D"),
+            "Iris wrapper defaults should route through typed 2D helper overloads for texParameterf: " + relative);
+        assertFalse(source.contains("getTexParameteri(texture, VulkanicAPI.GL_TEXTURE_2D"),
+            "Iris wrapper defaults should route through typed 2D helper overloads for getTexParameteri: " + relative);
+    }
+
+    @Test
+    public void testIrisTextureBindingAndCreationDefaultsUseTypedTexture2dHelpers() throws IOException {
+        String relative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        assertFalse(source.contains("dsaState.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, unit, texture)"),
+            "Iris bindTextureToUnit 2D default should route through typed texture-target helper overloads: " + relative);
+        assertFalse(source.contains("return dsaState.createTexture(VulkanicAPI.GL_TEXTURE_2D);"),
+            "Iris createTexture2D should route through typed texture-target helper overloads: " + relative);
+        assertFalse(source.contains("if (glType == VulkanicAPI.GL_TEXTURE_2D)"),
+            "Iris bindTextureForSetup should avoid raw GL_TEXTURE_2D comparisons when typed target mapping is available: " + relative);
+    }
+
+    @Test
+    public void testBlaze3dTextureStatePathsAvoidLegacyTargetUnwrapping() throws IOException {
+        String commandEncoderRelative = "net/blaze3d/opengl/GlCommandEncoder.java";
+        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve(commandEncoderRelative));
+
+        assertFalse(commandEncoderSource.contains("texture.flushModeChanges(textureTarget.toLegacyGlTarget())"),
+            "GlCommandEncoder should use typed texture-target overload for flushModeChanges: " + commandEncoderRelative);
+
+        String deviceRelative = "net/blaze3d/opengl/GlDevice.java";
+        String deviceSource = Files.readString(SRC_MAIN_JAVA.resolve(deviceRelative));
+
+        assertFalse(deviceSource.contains("setTextureMaxLevel(ctx, o, m - 1)"),
+            "GlDevice texture setup should use typed texture-target overloads for mip configuration: " + deviceRelative);
+        assertFalse(deviceSource.contains("disableTextureCompareMode(ctx, o)"),
+            "GlDevice depth texture setup should use typed texture-target overloads for compare mode: " + deviceRelative);
     }
 }

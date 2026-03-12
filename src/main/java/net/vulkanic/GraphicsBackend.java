@@ -268,6 +268,20 @@ public interface GraphicsBackend {
      * @param param The parameter value
      */
     void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param);
+
+    /**
+     * Sets an integer sampler parameter using backend-neutral parameter semantics.
+     */
+    default void setSamplerParameteri(CommandContext ctx, int sampler, VulkanicTextureParameterName pname, int param) {
+        setSamplerParameteri(ctx, sampler, pname.toLegacyGlPName(), param);
+    }
+
+    /**
+     * Sets an integer sampler parameter using backend-neutral parameter/value semantics.
+     */
+    default void setSamplerParameteri(CommandContext ctx, int sampler, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
+        setSamplerParameteri(ctx, sampler, pname.toLegacyGlPName(), param.toLegacyGlConstant());
+    }
     
     /**
      * Sets a float sampler parameter.
@@ -567,6 +581,30 @@ public interface GraphicsBackend {
      * @param param The parameter value
      */
     void setTextureParameter(CommandContext ctx, int target, int pname, int param);
+
+    /**
+     * Sets a texture parameter using backend-neutral target/parameter semantics.
+     */
+    default void setTextureParameter(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        int param
+    ) {
+        setTextureParameter(ctx, target.toLegacyGlTarget(), pname.toLegacyGlPName(), param);
+    }
+
+    /**
+     * Sets a texture parameter using backend-neutral target/parameter/value semantics.
+     */
+    default void setTextureParameter(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        VulkanicTextureParameterValue param
+    ) {
+        setTextureParameter(ctx, target.toLegacyGlTarget(), pname.toLegacyGlPName(), param.toLegacyGlConstant());
+    }
     
     /**
      * Copies a region from the framebuffer to a texture subregion.

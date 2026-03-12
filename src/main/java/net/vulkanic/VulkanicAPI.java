@@ -326,6 +326,8 @@ public class VulkanicAPI {
     public static final int GL_LINEAR = 0x2601;
     public static final int GL_NEAREST = 0x2600;
     public static final int GL_NEAREST_MIPMAP_NEAREST = 0x2700;
+    public static final int GL_LINEAR_MIPMAP_NEAREST = 0x2701;
+    public static final int GL_NEAREST_MIPMAP_LINEAR = 0x2702;
     public static final int GL_LINEAR_MIPMAP_LINEAR = 0x2703;
     public static final int GL_CLAMP_TO_EDGE = 0x812F;
     public static final int GL_TEXTURE_COMPARE_MODE = 0x884C;
@@ -1308,6 +1310,54 @@ public class VulkanicAPI {
      * @param param The parameter value
      */
     public static void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        VulkanicTextureTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> VulkanicTextureParameterName.fromLegacyGlPName(pname)
+                    .ifPresentOrElse(
+                        typedParameterName -> setTextureParameter(ctx, typedTarget, typedParameterName, param),
+                        () -> getBackend().setTextureParameter(ctx, target, pname, param)
+                    ),
+                () -> getBackend().setTextureParameter(ctx, target, pname, param)
+            );
+    }
+
+    public static void setTextureParameter(
+        CommandContext ctx,
+        int target,
+        VulkanicTextureParameterName pname,
+        int param
+    ) {
+        VulkanicTextureTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> setTextureParameter(ctx, typedTarget, pname, param),
+                () -> getBackend().setTextureParameter(ctx, target, pname.toLegacyGlPName(), param)
+            );
+    }
+
+    public static void setTextureParameter(
+        CommandContext ctx,
+        int target,
+        VulkanicTextureParameterName pname,
+        VulkanicTextureParameterValue param
+    ) {
+        setTextureParameter(ctx, target, pname, param.toLegacyGlConstant());
+    }
+
+    public static void setTextureParameter(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        int param
+    ) {
+        getBackend().setTextureParameter(ctx, target, pname, param);
+    }
+
+    public static void setTextureParameter(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        VulkanicTextureParameterValue param
+    ) {
         getBackend().setTextureParameter(ctx, target, pname, param);
     }
 
@@ -1315,52 +1365,109 @@ public class VulkanicAPI {
      * Sets the maximum mip level that can be sampled from a texture target.
      */
     public static void setTextureMaxLevel(CommandContext ctx, int target, int maxLevel) {
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAX_LEVEL, maxLevel);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MAX_LEVEL, maxLevel);
+    }
+
+    /**
+     * Sets the maximum mip level that can be sampled from a texture target.
+     */
+    public static void setTextureMaxLevel(CommandContext ctx, VulkanicTextureTarget target, int maxLevel) {
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MAX_LEVEL, maxLevel);
     }
 
     /**
      * Sets the minimum level-of-detail clamp for a texture target.
      */
     public static void setTextureMinLod(CommandContext ctx, int target, int minLod) {
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MIN_LOD, minLod);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MIN_LOD, minLod);
+    }
+
+    /**
+     * Sets the minimum level-of-detail clamp for a texture target.
+     */
+    public static void setTextureMinLod(CommandContext ctx, VulkanicTextureTarget target, int minLod) {
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MIN_LOD, minLod);
     }
 
     /**
      * Sets the maximum level-of-detail clamp for a texture target.
      */
     public static void setTextureMaxLod(CommandContext ctx, int target, int maxLod) {
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAX_LOD, maxLod);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MAX_LOD, maxLod);
+    }
+
+    /**
+     * Sets the maximum level-of-detail clamp for a texture target.
+     */
+    public static void setTextureMaxLod(CommandContext ctx, VulkanicTextureTarget target, int maxLod) {
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MAX_LOD, maxLod);
     }
 
     /**
      * Sets both min and mag filters to linear sampling for a texture target.
      */
     public static void setTextureLinearFiltering(CommandContext ctx, int target) {
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
+    }
+
+    /**
+     * Sets both min and mag filters to linear sampling for a texture target.
+     */
+    public static void setTextureLinearFiltering(CommandContext ctx, VulkanicTextureTarget target) {
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
     }
 
     /**
      * Sets both min and mag filters to nearest sampling for a texture target.
      */
     public static void setTextureNearestFiltering(CommandContext ctx, int target) {
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.NEAREST);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.NEAREST);
+    }
+
+    /**
+     * Sets both min and mag filters to nearest sampling for a texture target.
+     */
+    public static void setTextureNearestFiltering(CommandContext ctx, VulkanicTextureTarget target) {
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.NEAREST);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.NEAREST);
     }
 
     /**
      * Applies wrap mode for S and optionally T/R coordinates on a texture target.
      */
     public static void setTextureWrapMode(CommandContext ctx, int target, boolean clampToEdge, boolean includeWrapT, boolean includeWrapR) {
-        int wrapMode = clampToEdge ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_WRAP_S, wrapMode);
+        VulkanicTextureParameterValue wrapMode = clampToEdge
+            ? VulkanicTextureParameterValue.CLAMP_TO_EDGE
+            : VulkanicTextureParameterValue.REPEAT;
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.WRAP_S, wrapMode);
 
         if (includeWrapT) {
-            getBackend().setTextureParameter(ctx, target, GL_TEXTURE_WRAP_T, wrapMode);
+            setTextureParameter(ctx, target, VulkanicTextureParameterName.WRAP_T, wrapMode);
         }
 
         if (includeWrapR) {
-            getBackend().setTextureParameter(ctx, target, GL_TEXTURE_WRAP_R, wrapMode);
+            setTextureParameter(ctx, target, VulkanicTextureParameterName.WRAP_R, wrapMode);
+        }
+    }
+
+    /**
+     * Applies wrap mode for S and optionally T/R coordinates on a texture target.
+     */
+    public static void setTextureWrapMode(CommandContext ctx, VulkanicTextureTarget target, boolean clampToEdge, boolean includeWrapT, boolean includeWrapR) {
+        VulkanicTextureParameterValue wrapMode = clampToEdge
+            ? VulkanicTextureParameterValue.CLAMP_TO_EDGE
+            : VulkanicTextureParameterValue.REPEAT;
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.WRAP_S, wrapMode);
+
+        if (includeWrapT) {
+            setTextureParameter(ctx, target, VulkanicTextureParameterName.WRAP_T, wrapMode);
+        }
+
+        if (includeWrapR) {
+            setTextureParameter(ctx, target, VulkanicTextureParameterName.WRAP_R, wrapMode);
         }
     }
 
@@ -1375,10 +1482,27 @@ public class VulkanicAPI {
     }
 
     /**
+     * Resets texture LOD state to base level 0 with no LOD bias.
+     */
+    public static void resetTextureLodRangeToZero(CommandContext ctx, VulkanicTextureTarget target) {
+        setTextureMaxLevel(ctx, target, 0);
+        setTextureMinLod(ctx, target, 0);
+        setTextureMaxLod(ctx, target, 0);
+        texParameterf(ctx, target.toLegacyGlTarget(), GL_TEXTURE_LOD_BIAS, 0.0F);
+    }
+
+    /**
      * Disables depth-compare mode for a depth texture target.
      */
     public static void disableTextureCompareMode(CommandContext ctx, int target) {
-        getBackend().setTextureParameter(ctx, target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.COMPARE_MODE, GL_NONE);
+    }
+
+    /**
+     * Disables depth-compare mode for a depth texture target.
+     */
+    public static void disableTextureCompareMode(CommandContext ctx, VulkanicTextureTarget target) {
+        setTextureParameter(ctx, target, VulkanicTextureParameterName.COMPARE_MODE, GL_NONE);
     }
     
     /**
@@ -3581,6 +3705,32 @@ public class VulkanicAPI {
     
     
     public static void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
+        VulkanicTextureParameterName.fromLegacyGlPName(pname)
+            .ifPresentOrElse(
+                typedParameterName -> VulkanicTextureParameterValue.fromLegacyGlConstant(param)
+                    .ifPresentOrElse(
+                        typedValue -> setSamplerParameteri(ctx, sampler, typedParameterName, typedValue),
+                        () -> setSamplerParameteri(ctx, sampler, typedParameterName, param)
+                    ),
+                () -> getBackend().setSamplerParameteri(ctx, sampler, pname, param)
+            );
+    }
+
+    public static void setSamplerParameteri(
+        CommandContext ctx,
+        int sampler,
+        VulkanicTextureParameterName pname,
+        int param
+    ) {
+        getBackend().setSamplerParameteri(ctx, sampler, pname, param);
+    }
+
+    public static void setSamplerParameteri(
+        CommandContext ctx,
+        int sampler,
+        VulkanicTextureParameterName pname,
+        VulkanicTextureParameterValue param
+    ) {
         getBackend().setSamplerParameteri(ctx, sampler, pname, param);
     }
     
@@ -3620,6 +3770,80 @@ public class VulkanicAPI {
         getBackend().copyImageSubData(ctx, srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
                                       dstName, dstTarget, dstLevel, dstX, dstY, dstZ, 
                                       width, height, depth);
+    }
+
+    public static void copyImageSubData(
+        CommandContext ctx,
+        int srcName,
+        VulkanicTextureTarget srcTarget,
+        int srcLevel,
+        int srcX,
+        int srcY,
+        int srcZ,
+        int dstName,
+        VulkanicTextureTarget dstTarget,
+        int dstLevel,
+        int dstX,
+        int dstY,
+        int dstZ,
+        int width,
+        int height,
+        int depth
+    ) {
+        copyImageSubData(
+            ctx,
+            srcName,
+            srcTarget.toLegacyGlTarget(),
+            srcLevel,
+            srcX,
+            srcY,
+            srcZ,
+            dstName,
+            dstTarget.toLegacyGlTarget(),
+            dstLevel,
+            dstX,
+            dstY,
+            dstZ,
+            width,
+            height,
+            depth
+        );
+    }
+
+    public static void copyImageSubData2D(
+        CommandContext ctx,
+        int srcName,
+        int srcLevel,
+        int srcX,
+        int srcY,
+        int srcZ,
+        int dstName,
+        int dstLevel,
+        int dstX,
+        int dstY,
+        int dstZ,
+        int width,
+        int height,
+        int depth
+    ) {
+        copyImageSubData(
+            ctx,
+            srcName,
+            VulkanicTextureTarget.TEXTURE_2D,
+            srcLevel,
+            srcX,
+            srcY,
+            srcZ,
+            dstName,
+            VulkanicTextureTarget.TEXTURE_2D,
+            dstLevel,
+            dstX,
+            dstY,
+            dstZ,
+            width,
+            height,
+            depth
+        );
     }
     
     

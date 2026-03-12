@@ -54,8 +54,6 @@ public interface DepthCopyStrategy {
 
 			IrisRenderSystem.copyTexSubImage2D(
 				destTexture,
-				// target
-				VulkanicAPI.GL_TEXTURE_2D,
 				// level
 				0,
 				// xoffset, yoffset
@@ -103,15 +101,13 @@ public interface DepthCopyStrategy {
 
 		@Override
 		public void copy(GlFramebuffer sourceFb, int sourceTexture, GlFramebuffer destFb, int destTexture, int width, int height) {
-			IrisRenderSystem.copyImageSubData(
+			IrisRenderSystem.copyImageSubData2D(
 				sourceTexture,
-				VulkanicAPI.GL_TEXTURE_2D,
 				0,
 				0,
 				0,
 				0,
 				destTexture,
-				VulkanicAPI.GL_TEXTURE_2D,
 				0,
 				0,
 				0,

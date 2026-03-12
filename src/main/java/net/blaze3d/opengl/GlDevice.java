@@ -29,6 +29,7 @@ import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureTarget;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -128,20 +129,22 @@ public class GlDevice implements GpuDevice {
 
 			net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
 
-			int o;
+			VulkanicTextureTarget textureTarget;
+			int glTarget;
 			if (bl) {
 				net.vulkanic.VulkanicAPI.bindCubemapTexture(ctx, n);
-				o = net.vulkanic.VulkanicAPI.GL_TEXTURE_CUBE_MAP;
+				textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
 			} else {
 				VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), n);
-				o = net.vulkanic.VulkanicAPI.GL_TEXTURE_2D;
+				textureTarget = VulkanicTextureTarget.TEXTURE_2D;
 			}
+			glTarget = textureTarget.toLegacyGlTarget();
 
-			net.vulkanic.VulkanicAPI.setTextureMaxLevel(ctx, o, m - 1);
-			net.vulkanic.VulkanicAPI.setTextureMinLod(ctx, o, 0);
-			net.vulkanic.VulkanicAPI.setTextureMaxLod(ctx, o, m - 1);
+			net.vulkanic.VulkanicAPI.setTextureMaxLevel(ctx, textureTarget, m - 1);
+			net.vulkanic.VulkanicAPI.setTextureMinLod(ctx, textureTarget, 0);
+			net.vulkanic.VulkanicAPI.setTextureMaxLod(ctx, textureTarget, m - 1);
 			if (textureFormat.hasDepthAspect()) {
-				net.vulkanic.VulkanicAPI.disableTextureCompareMode(ctx, o);
+				net.vulkanic.VulkanicAPI.disableTextureCompareMode(ctx, textureTarget);
 			}
 
 			if (bl) {
@@ -155,7 +158,7 @@ public class GlDevice implements GpuDevice {
 			} else {
 				for (int r = 0; r < m; r++) {
 					uploadTexture2DAndTrack(
-						o, r, GlConst.toGlInternalId(textureFormat), j >> r, k >> r, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
+						glTarget, r, GlConst.toGlInternalId(textureFormat), j >> r, k >> r, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
 					);
 				}
 			}

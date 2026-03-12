@@ -9,6 +9,8 @@ public enum VulkanicTextureParameterValue {
     NEAREST,
     LINEAR,
     NEAREST_MIPMAP_NEAREST,
+    LINEAR_MIPMAP_NEAREST,
+    NEAREST_MIPMAP_LINEAR,
     LINEAR_MIPMAP_LINEAR,
     CLAMP_TO_EDGE,
     REPEAT,
@@ -22,6 +24,8 @@ public enum VulkanicTextureParameterValue {
             case NEAREST -> VulkanicAPI.GL_NEAREST;
             case LINEAR -> VulkanicAPI.GL_LINEAR;
             case NEAREST_MIPMAP_NEAREST -> VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST;
+            case LINEAR_MIPMAP_NEAREST -> VulkanicAPI.GL_LINEAR_MIPMAP_NEAREST;
+            case NEAREST_MIPMAP_LINEAR -> VulkanicAPI.GL_NEAREST_MIPMAP_LINEAR;
             case LINEAR_MIPMAP_LINEAR -> VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
             case CLAMP_TO_EDGE -> VulkanicAPI.GL_CLAMP_TO_EDGE;
             case REPEAT -> VulkanicAPI.GL_REPEAT;
@@ -37,6 +41,8 @@ public enum VulkanicTextureParameterValue {
             case VulkanicAPI.GL_NEAREST -> Optional.of(NEAREST);
             case VulkanicAPI.GL_LINEAR -> Optional.of(LINEAR);
             case VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST -> Optional.of(NEAREST_MIPMAP_NEAREST);
+            case VulkanicAPI.GL_LINEAR_MIPMAP_NEAREST -> Optional.of(LINEAR_MIPMAP_NEAREST);
+            case VulkanicAPI.GL_NEAREST_MIPMAP_LINEAR -> Optional.of(NEAREST_MIPMAP_LINEAR);
             case VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR -> Optional.of(LINEAR_MIPMAP_LINEAR);
             case VulkanicAPI.GL_CLAMP_TO_EDGE -> Optional.of(CLAMP_TO_EDGE);
             case VulkanicAPI.GL_REPEAT -> Optional.of(REPEAT);
