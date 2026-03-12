@@ -8,7 +8,8 @@ import java.util.Optional;
 public enum VulkanicPrimitiveMode {
     LINES,
     TRIANGLES,
-    TRIANGLE_FAN;
+    TRIANGLE_FAN,
+    PATCHES;
 
     /**
      * Converts a legacy GL primitive mode constant into a typed mode when known.
@@ -18,6 +19,7 @@ public enum VulkanicPrimitiveMode {
             case VulkanicAPI.GL_LINES -> Optional.of(LINES);
             case VulkanicAPI.GL_TRIANGLES -> Optional.of(TRIANGLES);
             case VulkanicAPI.GL_TRIANGLE_FAN -> Optional.of(TRIANGLE_FAN);
+            case VulkanicAPI.GL_PATCHES -> Optional.of(PATCHES);
             default -> Optional.empty();
         };
     }
@@ -30,6 +32,7 @@ public enum VulkanicPrimitiveMode {
             case LINES -> VulkanicAPI.GL_LINES;
             case TRIANGLES -> VulkanicAPI.GL_TRIANGLES;
             case TRIANGLE_FAN -> VulkanicAPI.GL_TRIANGLE_FAN;
+            case PATCHES -> VulkanicAPI.GL_PATCHES;
         };
     }
 }

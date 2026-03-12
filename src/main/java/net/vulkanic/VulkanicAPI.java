@@ -2119,10 +2119,36 @@ public class VulkanicAPI {
                                                 int width, int height, int format, int type, long pixels) {
         getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
+
+    public static void uploadTexture2DSubImage(CommandContext ctx, VulkanicTextureTarget target, int level, int xOffset, int yOffset,
+                                                int width, int height, int format, int type, long pixels) {
+        uploadTexture2DSubImage(ctx, target.toLegacyGlTarget(), level, xOffset, yOffset, width, height, format, type, pixels);
+    }
+
+    /**
+     * Uploads a 2D texture sub-image to the currently bound 2D texture target.
+     */
+    public static void uploadTexture2DSubImage(CommandContext ctx, int level, int xOffset, int yOffset,
+                                                int width, int height, int format, int type, long pixels) {
+        getBackend().uploadTexture2DSubImage(ctx, GL_TEXTURE_2D, level, xOffset, yOffset, width, height, format, type, pixels);
+    }
     
     public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
                                                 int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
         getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
+    }
+
+    public static void uploadTexture2DSubImage(CommandContext ctx, VulkanicTextureTarget target, int level, int xOffset, int yOffset,
+                                                int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        uploadTexture2DSubImage(ctx, target.toLegacyGlTarget(), level, xOffset, yOffset, width, height, format, type, pixels);
+    }
+
+    /**
+     * Uploads a 2D texture sub-image to the currently bound 2D texture target.
+     */
+    public static void uploadTexture2DSubImage(CommandContext ctx, int level, int xOffset, int yOffset,
+                                                int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().uploadTexture2DSubImage(ctx, GL_TEXTURE_2D, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
     
@@ -3301,6 +3327,13 @@ public class VulkanicAPI {
      */
     public static void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
         getBackend().drawArraysInstanced(ctx, mode, first, count, instanceCount);
+    }
+
+    /**
+     * Renders primitives using array data with instancing via backend-neutral primitive mode.
+     */
+    public static void drawArraysInstanced(CommandContext ctx, VulkanicPrimitiveMode mode, int first, int count, int instanceCount) {
+        getBackend().drawArraysInstanced(ctx, mode.toGlModeConstant(), first, count, instanceCount);
     }
     
     /**

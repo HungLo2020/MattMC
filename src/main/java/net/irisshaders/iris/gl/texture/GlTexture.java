@@ -14,7 +14,7 @@ public class GlTexture extends GlResource implements TextureAccess {
 
 	public GlTexture(TextureType target, int sizeX, int sizeY, int sizeZ, int internalFormat, int format, int pixelType, byte[] pixels, TextureFilteringData filteringData) {
 		super(net.irisshaders.iris.gl.IrisRenderSystem.createTextureId());
-		IrisRenderSystem.bindTextureForSetup(target.getGlType(), getGlId());
+		target.bindForSetup(getGlId());
 
 		TextureUploadHelper.resetTextureUploadState();
 
@@ -27,15 +27,15 @@ public class GlTexture extends GlResource implements TextureAccess {
 		var ctx = VulkanicAPI.getCommandContext();
 
 		if (filteringData.shouldBlur()) {
-			VulkanicAPI.setTextureLinearFiltering(ctx, target.getGlType());
+			target.setLinearFiltering(ctx);
 		} else {
-			VulkanicAPI.setTextureNearestFiltering(ctx, target.getGlType());
+			target.setNearestFiltering(ctx);
 		}
 
-		VulkanicAPI.setTextureWrapMode(ctx, target.getGlType(), filteringData.shouldClamp(), sizeY > 0, sizeZ > 0);
-		VulkanicAPI.resetTextureLodRangeToZero(ctx, target.getGlType());
+		target.setWrapMode(ctx, filteringData.shouldClamp(), sizeY > 0, sizeZ > 0);
+		target.resetLodRangeToZero(ctx);
 
-		IrisRenderSystem.bindTextureForSetup(target.getGlType(), 0);
+		target.bindForSetup(0);
 
 		this.target = target;
 	}
@@ -45,7 +45,7 @@ public class GlTexture extends GlResource implements TextureAccess {
 	}
 
 	public void bind(int unit) {
-		IrisRenderSystem.bindTextureToUnit(target.getGlType(), unit, getGlId());
+		target.bindToUnit(unit, getGlId());
 	}
 
 	@Override

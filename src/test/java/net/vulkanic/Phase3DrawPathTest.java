@@ -364,13 +364,15 @@ public class Phase3DrawPathTest {
             "net/blaze3d/opengl/GlCommandEncoder.java");
         String source = Files.readString(file);
 
-        // The Iris tessellation override (GL_TRIANGLES → GL_PATCHES) must still be present
+        // The Iris tessellation override (TRIANGLES → PATCHES) must still be present
         // in the non-instanced indexed draw path, since we replaced GlStateManager._drawElements
         // which previously contained it.
         assertTrue(source.contains("usingTessellation"),
             "drawFromBuffers must preserve the Iris tessellation mode override");
-        assertTrue(source.contains("GL_PATCHES"),
-            "drawFromBuffers must substitute GL_PATCHES when tessellation is active");
+        assertTrue(
+            source.contains("VulkanicPrimitiveMode.PATCHES") || source.contains("GL_PATCHES"),
+            "drawFromBuffers must substitute PATCHES when tessellation is active"
+        );
     }
 
     @Test
@@ -1273,14 +1275,26 @@ public class Phase3DrawPathTest {
             "Iris GlTexture should not set wrap S through raw GL_TEXTURE_WRAP_S pname constants");
         assertFalse(irisGlTextureSource.contains("IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAX_LEVEL"),
             "Iris GlTexture should not set max level through raw GL_TEXTURE_MAX_LEVEL pname constants");
-        assertTrue(irisGlTextureSource.contains("VulkanicAPI.setTextureLinearFiltering(ctx, target.getGlType())"),
-            "Iris GlTexture should use VulkanicAPI.setTextureLinearFiltering helper when blur is enabled");
-        assertTrue(irisGlTextureSource.contains("VulkanicAPI.setTextureNearestFiltering(ctx, target.getGlType())"),
-            "Iris GlTexture should use VulkanicAPI.setTextureNearestFiltering helper when blur is disabled");
-        assertTrue(irisGlTextureSource.contains("VulkanicAPI.setTextureWrapMode(ctx, target.getGlType(), filteringData.shouldClamp(), sizeY > 0, sizeZ > 0)"),
-            "Iris GlTexture should use VulkanicAPI.setTextureWrapMode helper");
-        assertTrue(irisGlTextureSource.contains("VulkanicAPI.resetTextureLodRangeToZero(ctx, target.getGlType())"),
-            "Iris GlTexture should use VulkanicAPI.resetTextureLodRangeToZero helper");
+        assertTrue(
+            irisGlTextureSource.contains("VulkanicAPI.setTextureLinearFiltering(ctx, target.getGlType())")
+                || irisGlTextureSource.contains("target.setLinearFiltering(ctx)"),
+            "Iris GlTexture should use VulkanicAPI texture filtering helpers directly or via TextureType typed helper when blur is enabled"
+        );
+        assertTrue(
+            irisGlTextureSource.contains("VulkanicAPI.setTextureNearestFiltering(ctx, target.getGlType())")
+                || irisGlTextureSource.contains("target.setNearestFiltering(ctx)"),
+            "Iris GlTexture should use VulkanicAPI texture filtering helpers directly or via TextureType typed helper when blur is disabled"
+        );
+        assertTrue(
+            irisGlTextureSource.contains("VulkanicAPI.setTextureWrapMode(ctx, target.getGlType(), filteringData.shouldClamp(), sizeY > 0, sizeZ > 0)")
+                || irisGlTextureSource.contains("target.setWrapMode(ctx, filteringData.shouldClamp(), sizeY > 0, sizeZ > 0)"),
+            "Iris GlTexture should use VulkanicAPI wrap helpers directly or via TextureType typed helper"
+        );
+        assertTrue(
+            irisGlTextureSource.contains("VulkanicAPI.resetTextureLodRangeToZero(ctx, target.getGlType())")
+                || irisGlTextureSource.contains("target.resetLodRangeToZero(ctx)"),
+            "Iris GlTexture should use VulkanicAPI LOD-reset helpers directly or via TextureType typed helper"
+        );
 
         Path irisGlImageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/image/GlImage.java");
         String irisGlImageSource = Files.readString(irisGlImageFile);
@@ -1290,14 +1304,26 @@ public class Phase3DrawPathTest {
             "Iris GlImage should not set wrap through raw GL_TEXTURE_WRAP_* pname constants");
         assertFalse(irisGlImageSource.contains("IrisRenderSystem.texParameterf(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_LOD_BIAS"),
             "Iris GlImage should not set LOD bias through raw GL_TEXTURE_LOD_BIAS pname constants");
-        assertTrue(irisGlImageSource.contains("VulkanicAPI.setTextureNearestFiltering(ctx, target.getGlType())"),
-            "Iris GlImage integer format path should use VulkanicAPI.setTextureNearestFiltering helper");
-        assertTrue(irisGlImageSource.contains("VulkanicAPI.setTextureLinearFiltering(ctx, target.getGlType())"),
-            "Iris GlImage non-integer format path should use VulkanicAPI.setTextureLinearFiltering helper");
-        assertTrue(irisGlImageSource.contains("VulkanicAPI.setTextureWrapMode(ctx, target.getGlType(), true, height > 0, depth > 0)"),
-            "Iris GlImage should use VulkanicAPI.setTextureWrapMode helper for clamp setup");
-        assertTrue(irisGlImageSource.contains("VulkanicAPI.resetTextureLodRangeToZero(ctx, target.getGlType())"),
-            "Iris GlImage should use VulkanicAPI.resetTextureLodRangeToZero helper");
+        assertTrue(
+            irisGlImageSource.contains("VulkanicAPI.setTextureNearestFiltering(ctx, target.getGlType())")
+                || irisGlImageSource.contains("target.setNearestFiltering(ctx)"),
+            "Iris GlImage integer format path should use VulkanicAPI filtering helpers directly or via TextureType typed helper"
+        );
+        assertTrue(
+            irisGlImageSource.contains("VulkanicAPI.setTextureLinearFiltering(ctx, target.getGlType())")
+                || irisGlImageSource.contains("target.setLinearFiltering(ctx)"),
+            "Iris GlImage non-integer format path should use VulkanicAPI filtering helpers directly or via TextureType typed helper"
+        );
+        assertTrue(
+            irisGlImageSource.contains("VulkanicAPI.setTextureWrapMode(ctx, target.getGlType(), true, height > 0, depth > 0)")
+                || irisGlImageSource.contains("target.setWrapMode(ctx, true, height > 0, depth > 0)"),
+            "Iris GlImage clamp setup should use VulkanicAPI wrap helpers directly or via TextureType typed helper"
+        );
+        assertTrue(
+            irisGlImageSource.contains("VulkanicAPI.resetTextureLodRangeToZero(ctx, target.getGlType())")
+                || irisGlImageSource.contains("target.resetLodRangeToZero(ctx)"),
+            "Iris GlImage LOD setup should use VulkanicAPI LOD-reset helpers directly or via TextureType typed helper"
+        );
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         String vulkanicApiSource = Files.readString(vulkanicApiFile);
@@ -2176,8 +2202,8 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should not call removed GlStateManager._polygonMode wrapper");
         assertTrue(encoderSource.contains("VulkanicAPI.setDynamicScissor(ctx,"),
             "GlCommandEncoder should set scissor directly through VulkanicAPI.setDynamicScissor");
-        assertTrue(encoderSource.contains("VulkanicAPI.setPolygonMode(ctx, 1032"),
-            "GlCommandEncoder should set polygon mode directly through VulkanicAPI.setPolygonMode");
+        assertTrue(encoderSource.contains("VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK"),
+            "GlCommandEncoder should set polygon mode through VulkanicAPI.setPolygonMode with typed polygon-face semantics");
     }
 
     @Test

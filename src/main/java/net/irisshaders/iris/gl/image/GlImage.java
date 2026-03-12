@@ -19,7 +19,7 @@ public class GlImage extends GlResource {
 	private final boolean clear;
 
 	public GlImage(String name, String samplerName, TextureType target, PixelFormat format, InternalTextureFormat internalFormat, PixelType pixelType, boolean clear, int width, int height, int depth) {
-		super(IrisRenderSystem.createTexture(target.getGlType()));
+		super(target.createTexture());
 
 		this.name = name;
 		this.samplerName = samplerName;
@@ -31,27 +31,27 @@ public class GlImage extends GlResource {
 
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, getGlId(), name);
 
-		IrisRenderSystem.bindTextureForSetup(target.getGlType(), getGlId());
+		target.bindForSetup(getGlId());
 		target.apply(getGlId(), width, height, depth, internalFormat.getGlFormat(), format.getGlFormat(), pixelType.getGlFormat(), null);
 
 		int texture = getGlId();
 
 		setup(texture, width, height, depth);
 
-		IrisRenderSystem.bindTextureForSetup(target.getGlType(), 0);
+		target.bindForSetup(0);
 	}
 
 	protected void setup(int texture, int width, int height, int depth) {
 		boolean isInteger = internalTextureFormat.getPixelFormat().isInteger();
 		var ctx = VulkanicAPI.getCommandContext();
 		if (isInteger) {
-			VulkanicAPI.setTextureNearestFiltering(ctx, target.getGlType());
+			target.setNearestFiltering(ctx);
 		} else {
-			VulkanicAPI.setTextureLinearFiltering(ctx, target.getGlType());
+			target.setLinearFiltering(ctx);
 		}
 
-		VulkanicAPI.setTextureWrapMode(ctx, target.getGlType(), true, height > 0, depth > 0);
-		VulkanicAPI.resetTextureLodRangeToZero(ctx, target.getGlType());
+		target.setWrapMode(ctx, true, height > 0, depth > 0);
+		target.resetLodRangeToZero(ctx);
 
 		VulkanicAPI.clearTexImage(VulkanicAPI.getCommandContext(), texture, 0, format.getGlFormat(), pixelType.getGlFormat(), (int[]) null);
 	}
@@ -122,14 +122,14 @@ public class GlImage extends GlResource {
 
 		@Override
 		public void updateNewSize(int width, int height) {
-			IrisRenderSystem.bindTextureForSetup(target.getGlType(), getGlId());
+			target.bindForSetup(getGlId());
 			target.apply(getGlId(), (int) (width * relativeWidth), (int) (height * relativeHeight), 0, internalTextureFormat.getGlFormat(), format.getGlFormat(), pixelType.getGlFormat(), null);
 
 			int texture = getGlId();
 
 			setup(texture, width, height, 0);
 
-			IrisRenderSystem.bindTextureForSetup(target.getGlType(), 0);
+			target.bindForSetup(0);
 		}
 	}
 }

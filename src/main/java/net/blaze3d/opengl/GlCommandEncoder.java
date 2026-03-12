@@ -29,6 +29,8 @@ import net.minecraft.util.ARGB;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
 import org.jetbrains.annotations.Nullable;
@@ -471,12 +473,12 @@ public class GlCommandEncoder implements CommandEncoder {
 			} else {
 				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 				int textureHandle = VulkanicAPI.getTextureHandle(gpuTexture);
-				int q;
+				boolean cubemap = (gpuTexture.usage() & 16) != 0;
+				int cubemapFaceTarget = 0;
 				if ((gpuTexture.usage() & 16) != 0) {
-					q = GlConst.CUBEMAP_TARGETS[j % 6];
+					cubemapFaceTarget = GlConst.CUBEMAP_TARGETS[j % 6];
 					VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
 				} else {
-					q = VulkanicAPI.GL_TEXTURE_2D;
 					VulkanicAPI.bindTexture2D(ctx, textureHandle);
 				}
 
@@ -484,7 +486,30 @@ public class GlCommandEncoder implements CommandEncoder {
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_PIXELS, o);
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_ROWS, p);
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ALIGNMENT, nativeImage.format().components());
-				VulkanicAPI.uploadTexture2DSubImage(ctx, q, i, k, l, m, n, GlConst.toGl(nativeImage.format()), VulkanicAPI.GL_UNSIGNED_BYTE, nativeImage.getPointer());
+				if (cubemap) {
+					VulkanicAPI.uploadTexture2DSubImage(ctx,
+						cubemapFaceTarget,
+						i,
+						k,
+						l,
+						m,
+						n,
+						GlConst.toGl(nativeImage.format()),
+						VulkanicAPI.GL_UNSIGNED_BYTE,
+						nativeImage.getPointer()
+					);
+				} else {
+					VulkanicAPI.uploadTexture2DSubImage(ctx,
+						i,
+						k,
+						l,
+						m,
+						n,
+						GlConst.toGl(nativeImage.format()),
+						VulkanicAPI.GL_UNSIGNED_BYTE,
+						nativeImage.getPointer()
+					);
+				}
 			}
 		} else {
 			throw new IllegalArgumentException("Invalid mipLevel " + i + ", must be >= 0 and < " + gpuTexture.getMipLevels());
@@ -525,12 +550,12 @@ public class GlCommandEncoder implements CommandEncoder {
 			} else {
 				net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 				int textureHandle = VulkanicAPI.getTextureHandle(gpuTexture);
-				int o;
+				boolean cubemap = (gpuTexture.usage() & 16) != 0;
+				int cubemapFaceTarget = 0;
 				if ((gpuTexture.usage() & 16) != 0) {
-					o = GlConst.CUBEMAP_TARGETS[j % 6];
+					cubemapFaceTarget = GlConst.CUBEMAP_TARGETS[j % 6];
 					VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
 				} else {
-					o = VulkanicAPI.GL_TEXTURE_2D;
 					VulkanicAPI.bindTexture2D(ctx, textureHandle);
 				}
 
@@ -538,7 +563,30 @@ public class GlCommandEncoder implements CommandEncoder {
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_PIXELS, 0);
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_ROWS, 0);
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ALIGNMENT, format.components());
-				VulkanicAPI.uploadTexture2DSubImage(ctx, o, i, k, l, m, n, GlConst.toGl(format), VulkanicAPI.GL_UNSIGNED_BYTE, byteBuffer);
+				if (cubemap) {
+					VulkanicAPI.uploadTexture2DSubImage(ctx,
+						cubemapFaceTarget,
+						i,
+						k,
+						l,
+						m,
+						n,
+						GlConst.toGl(format),
+						VulkanicAPI.GL_UNSIGNED_BYTE,
+						byteBuffer
+					);
+				} else {
+					VulkanicAPI.uploadTexture2DSubImage(ctx,
+						i,
+						k,
+						l,
+						m,
+						n,
+						GlConst.toGl(format),
+						VulkanicAPI.GL_UNSIGNED_BYTE,
+						byteBuffer
+					);
+				}
 			}
 		} else {
 			throw new IllegalArgumentException("Invalid mipLevel, must be >= 0 and < " + gpuTexture.getMipLevels());
@@ -839,6 +887,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		// and makes explicit that every draw operation flows through VulkanicAPI → OpenGLBackend.
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
+		java.util.Optional<VulkanicPrimitiveMode> typedPrimitiveMode = VulkanicPrimitiveMode.fromLegacyGlConstant(glPrimitiveMode);
 		if (indexType != null) {
 			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.
 			VulkanicAPI.bindIndexBuffer(ctx, ((GlBuffer)glRenderPass.indexBuffer).handle);
@@ -846,26 +895,49 @@ public class GlCommandEncoder implements CommandEncoder {
 			long indexOffset = (long)j * indexType.bytes;
 			if (l > 1) {
 				if (i > 0) {
-					VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, l, i);
+					typedPrimitiveMode.ifPresentOrElse(
+						typedMode -> VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, typedMode, k, vkIndexType, indexOffset, l, i),
+						() -> VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, l, i)
+					);
 				} else {
-					VulkanicAPI.drawIndexedInstanced(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, l);
+					typedPrimitiveMode.ifPresentOrElse(
+						typedMode -> VulkanicAPI.drawIndexedInstanced(ctx, typedMode, k, vkIndexType, indexOffset, l),
+						() -> VulkanicAPI.drawIndexedInstanced(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, l)
+					);
 				}
 			} else if (i > 0) {
-				VulkanicAPI.drawIndexedBaseVertex(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, i);
+				typedPrimitiveMode.ifPresentOrElse(
+					typedMode -> VulkanicAPI.drawIndexedBaseVertex(ctx, typedMode, k, vkIndexType, indexOffset, i),
+					() -> VulkanicAPI.drawIndexedBaseVertex(ctx, glPrimitiveMode, k, vkIndexType, indexOffset, i)
+				);
 			} else {
 				// Route non-instanced indexed draw through VulkanicAPI.
 				// Iris: apply tessellation mode override for the non-instanced path, matching the
 				// GlStateManager._drawElements Iris override that this replaces.
-				int drawMode = (glPrimitiveMode == VulkanicAPI.GL_TRIANGLES
-						&& net.irisshaders.iris.vertices.ImmediateState.usingTessellation)
-					? VulkanicAPI.GL_PATCHES : glPrimitiveMode;
-				VulkanicAPI.drawElements(ctx, drawMode, k, vkIndexType, indexOffset);
+				boolean useTessellationMode = typedPrimitiveMode
+					.map(mode -> mode == VulkanicPrimitiveMode.TRIANGLES)
+					.orElse(false)
+					&& net.irisshaders.iris.vertices.ImmediateState.usingTessellation;
+				if (useTessellationMode) {
+					VulkanicAPI.drawElements(ctx, VulkanicPrimitiveMode.PATCHES, k, vkIndexType, indexOffset);
+				} else {
+					typedPrimitiveMode.ifPresentOrElse(
+						typedMode -> VulkanicAPI.drawElements(ctx, typedMode, k, vkIndexType, indexOffset),
+						() -> VulkanicAPI.drawElements(ctx, glPrimitiveMode, k, vkIndexType, indexOffset)
+					);
+				}
 			}
 		} else if (l > 1) {
-			VulkanicAPI.drawArraysInstanced(ctx, glPrimitiveMode, i, k, l);
+			typedPrimitiveMode.ifPresentOrElse(
+				typedMode -> VulkanicAPI.drawArraysInstanced(ctx, typedMode, i, k, l),
+				() -> VulkanicAPI.drawArraysInstanced(ctx, glPrimitiveMode, i, k, l)
+			);
 		} else {
 			// Route non-instanced non-indexed draw through VulkanicAPI rather than the GlStateManager wrapper.
-			VulkanicAPI.drawArrays(ctx, glPrimitiveMode, i, k);
+			typedPrimitiveMode.ifPresentOrElse(
+				typedMode -> VulkanicAPI.drawArrays(ctx, typedMode, i, k),
+				() -> VulkanicAPI.drawArrays(ctx, glPrimitiveMode, i, k)
+			);
 		}
 	}
 
@@ -918,7 +990,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					VulkanicAPI.setCullFaceEnabled(ctx, false);
 				}
 				
-				VulkanicAPI.setPolygonMode(ctx, 1032, GlConst.toGl(renderPipeline.getPolygonMode()));
+				VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, GlConst.toGl(renderPipeline.getPolygonMode()));
 				net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(renderPipeline.isWriteDepth());
 				net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteAlpha());
 				
@@ -1122,7 +1194,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				net.irisshaders.iris.gl.blending.BlendModeStorage.setBlendEnabled(false);
 			}
 
-			VulkanicAPI.setPolygonMode(ctx, 1032, GlConst.toGl(renderPipeline.getPolygonMode()));
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, GlConst.toGl(renderPipeline.getPolygonMode()));
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(renderPipeline.isWriteDepth());
 			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteAlpha());
 			if (renderPipeline.getDepthBiasConstant() == 0.0F && renderPipeline.getDepthBiasScaleFactor() == 0.0F) {

@@ -13,6 +13,7 @@ import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicProgramParameterName;
+import net.vulkanic.VulkanicUniformReflectionType;
 import org.lwjgl.BufferUtils;
 
 import java.nio.IntBuffer;
@@ -61,133 +62,39 @@ public class ProgramUniforms {
 	}
 
 	private static String getTypeName(int type) {
-		String typeName;
-
-		if (type == VulkanicAPI.GL_FLOAT) {
-			typeName = "float";
-		} else if (type == VulkanicAPI.GL_INT) {
-			typeName = "int";
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT4) {
-			typeName = "mat4";
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC4) {
-			typeName = "vec4";
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT3) {
-			typeName = "mat3";
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC3) {
-			typeName = "vec3";
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT2) {
-			typeName = "mat2";
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC2) {
-			typeName = "vec2";
-		} else if (type == VulkanicAPI.GL_INT_VEC2) {
-			typeName = "ivec2";
-		} else if (type == VulkanicAPI.GL_INT_VEC4) {
-			typeName = "ivec4";
-		} else if (type == VulkanicAPI.GL_SAMPLER_3D) {
-			typeName = "sampler3D";
-		} else if (type == VulkanicAPI.GL_SAMPLER_2D) {
-			typeName = "sampler2D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D) {
-			typeName = "usampler2D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D) {
-			typeName = "usampler3D";
-		} else if (type == VulkanicAPI.GL_SAMPLER_1D) {
-			typeName = "sampler1D";
-		} else if (type == VulkanicAPI.GL_SAMPLER_2D_SHADOW) {
-			typeName = "sampler2DShadow";
-		} else if (type == VulkanicAPI.GL_SAMPLER_1D_SHADOW) {
-			typeName = "sampler1DShadow";
-		} else if (type == VulkanicAPI.GL_IMAGE_1D) {
-			typeName = "image1D";
-		} else if (type == VulkanicAPI.GL_IMAGE_2D) {
-			typeName = "image2D";
-		} else if (type == VulkanicAPI.GL_IMAGE_3D) {
-			typeName = "image3D";
-		} else if (type == VulkanicAPI.GL_INT_IMAGE_1D) {
-			typeName = "iimage1D";
-		} else if (type == VulkanicAPI.GL_INT_IMAGE_2D) {
-			typeName = "iimage2D";
-		} else if (type == VulkanicAPI.GL_INT_IMAGE_3D) {
-			typeName = "iimage3D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D) {
-			typeName = "uimage1D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D) {
-			typeName = "uimage2D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D) {
-			typeName = "uimage3D";
-		} else {
-			typeName = "(unknown:" + type + ")";
-		}
-
-		return typeName;
+		return VulkanicUniformReflectionType.fromLegacyGlConstant(type)
+			.map(VulkanicUniformReflectionType::getGlslTypeName)
+			.orElse("(unknown:" + type + ")");
 	}
 
 	private static UniformType getExpectedType(int type) {
-		if (type == VulkanicAPI.GL_FLOAT) {
-			return UniformType.FLOAT;
-		} else if (type == VulkanicAPI.GL_INT) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_BOOL) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT4) {
-			return UniformType.MAT4;
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC4) {
-			return UniformType.VEC4;
-		} else if (type == VulkanicAPI.GL_INT_VEC4) {
-			return UniformType.VEC4I;
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT3) {
-			return UniformType.MAT3;
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC3) {
-			return UniformType.VEC3;
-		} else if (type == VulkanicAPI.GL_INT_VEC3) {
-			return UniformType.VEC3I;
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT2) {
-			return null;
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC2) {
-			return UniformType.VEC2;
-		} else if (type == VulkanicAPI.GL_INT_VEC2) {
-			return UniformType.VEC2I;
-		} else if (type == VulkanicAPI.GL_SAMPLER_3D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_SAMPLER_2D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_SAMPLER_1D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_SAMPLER_2D_SHADOW) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_SAMPLER_1D_SHADOW) {
-			return UniformType.INT;
-		} else {
-			return null;
-		}
+		return VulkanicUniformReflectionType.fromLegacyGlConstant(type)
+			.map(ProgramUniforms::getExpectedType)
+			.orElse(null);
 	}
 
-	private static boolean isSampler(int type) {
-		return type == VulkanicAPI.GL_SAMPLER_1D
-			|| type == VulkanicAPI.GL_SAMPLER_2D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D
-			|| type == VulkanicAPI.GL_SAMPLER_3D
-			|| type == VulkanicAPI.GL_SAMPLER_1D_SHADOW
-			|| type == VulkanicAPI.GL_SAMPLER_2D_SHADOW;
-	}
-
-	private static boolean isImage(int type) {
-		return type == VulkanicAPI.GL_IMAGE_1D
-			|| type == VulkanicAPI.GL_IMAGE_2D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D
-			|| type == VulkanicAPI.GL_INT_IMAGE_1D
-			|| type == VulkanicAPI.GL_INT_IMAGE_2D
-			|| type == VulkanicAPI.GL_INT_IMAGE_3D
-			|| type == VulkanicAPI.GL_IMAGE_3D
-			|| type == VulkanicAPI.GL_IMAGE_1D_ARRAY
-			|| type == VulkanicAPI.GL_IMAGE_2D_ARRAY;
+	private static UniformType getExpectedType(VulkanicUniformReflectionType type) {
+		return switch (type) {
+			case FLOAT -> UniformType.FLOAT;
+			case INT, BOOL -> UniformType.INT;
+			case FLOAT_MAT4 -> UniformType.MAT4;
+			case FLOAT_VEC4 -> UniformType.VEC4;
+			case INT_VEC4 -> UniformType.VEC4I;
+			case FLOAT_MAT3 -> UniformType.MAT3;
+			case FLOAT_VEC3 -> UniformType.VEC3;
+			case INT_VEC3 -> UniformType.VEC3I;
+			case FLOAT_MAT2 -> null;
+			case FLOAT_VEC2 -> UniformType.VEC2;
+			case INT_VEC2 -> UniformType.VEC2I;
+			case SAMPLER_1D,
+				SAMPLER_2D,
+				SAMPLER_3D,
+				SAMPLER_1D_SHADOW,
+				SAMPLER_2D_SHADOW,
+				UNSIGNED_INT_SAMPLER_2D,
+				UNSIGNED_INT_SAMPLER_3D -> UniformType.INT;
+			default -> null;
+		};
 	}
 
 	private void updateStage(ImmutableList<Uniform> uniforms) {

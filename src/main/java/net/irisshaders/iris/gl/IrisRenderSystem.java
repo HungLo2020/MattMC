@@ -969,6 +969,12 @@ public class IrisRenderSystem {
 		}
 	}
 
+	private static boolean isTexture2DTarget(int target) {
+		return VulkanicTextureTarget.fromLegacyGlTarget(target)
+			.map(typedTarget -> typedTarget == VulkanicTextureTarget.TEXTURE_2D)
+			.orElse(false);
+	}
+
 	public static int createTextureId() {
 		RenderSystem.assertOnRenderThread();
 		incrementTrackedTextures();
@@ -1147,7 +1153,7 @@ public class IrisRenderSystem {
 
 		@Override
 		public void bindTextureToUnit(int target, int unit, int texture) {
-			if (target == VulkanicAPI.GL_TEXTURE_2D) {
+			if (isTexture2DTarget(target)) {
 				if (getTextureBinding(unit) == texture) {
 					return;
 				}
@@ -1273,7 +1279,7 @@ public class IrisRenderSystem {
 			int activeTexture = getActiveTextureUnitIndex();
 			setActiveTextureUnitIndex(unit);
 			VulkanicAPI.bindTexture(VulkanicAPI.getCommandContext(), target, texture);
-			if (target == VulkanicAPI.GL_TEXTURE_2D) {
+			if (isTexture2DTarget(target)) {
 				setTextureBinding(unit, texture);
 			}
 			setActiveTextureUnitIndex(activeTexture);

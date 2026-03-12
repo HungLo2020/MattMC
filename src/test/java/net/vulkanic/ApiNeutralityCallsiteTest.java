@@ -24,6 +24,8 @@ public class ApiNeutralityCallsiteTest {
     public void testPrimitiveAndPolygonLegacyMappingsRemainAvailable() {
         assertTrue(VulkanicPrimitiveMode.fromLegacyGlConstant(VulkanicAPI.GL_TRIANGLES).isPresent(),
             "Primitive mode mapping should recognize GL_TRIANGLES");
+        assertTrue(VulkanicPrimitiveMode.fromLegacyGlConstant(VulkanicAPI.GL_PATCHES).isPresent(),
+            "Primitive mode mapping should recognize GL_PATCHES for tessellation draw routing");
         assertTrue(VulkanicPolygonFace.fromLegacyGlConstant(VulkanicAPI.GL_FRONT_AND_BACK).isPresent(),
             "Polygon-face mapping should recognize GL_FRONT_AND_BACK");
         assertTrue(VulkanicPolygonMode.fromLegacyGlConstant(VulkanicAPI.GL_FILL).isPresent(),
@@ -42,6 +44,31 @@ public class ApiNeutralityCallsiteTest {
             "Texture parameter value mapping should recognize GL_NEAREST_MIPMAP_LINEAR");
         assertTrue(VulkanicTextureSwizzleComponent.fromLegacyGlConstant(VulkanicAPI.GL_RED).isPresent(),
             "Texture swizzle component mapping should recognize GL_RED");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_SAMPLER_2D).isPresent(),
+            "Uniform reflection type mapping should recognize GL_SAMPLER_2D");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_IMAGE_2D_ARRAY).isPresent(),
+            "Uniform reflection type mapping should recognize GL_IMAGE_2D_ARRAY");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_SAMPLER_2D)
+                .orElseThrow(() -> new IllegalStateException("Missing reflection mapping for GL_SAMPLER_2D"))
+                .isSampler(),
+            "GL_SAMPLER_2D reflection type should classify as sampler");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_IMAGE_2D_ARRAY)
+                .orElseThrow(() -> new IllegalStateException("Missing reflection mapping for GL_IMAGE_2D_ARRAY"))
+                .isImage(),
+            "GL_IMAGE_2D_ARRAY reflection type should classify as image");
+    }
+
+    @Test
+    public void testProgramUniformsTypeIntrospectionUsesTypedReflectionHelper() throws IOException {
+        String relative = "net/irisshaders/iris/gl/program/ProgramUniforms.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        assertTrue(source.contains("VulkanicUniformReflectionType.fromLegacyGlConstant(type)"),
+            "ProgramUniforms should route reflected type resolution through VulkanicUniformReflectionType helper: " + relative);
+
+        Pattern rawTypeComparisonPattern = Pattern.compile("type\\s*==\\s*VulkanicAPI\\.GL_");
+        assertFalse(rawTypeComparisonPattern.matcher(source).find(),
+            "ProgramUniforms should avoid raw reflected type comparisons against VulkanicAPI.GL_* constants: " + relative);
     }
 
     @Test
@@ -340,6 +367,8 @@ public class ApiNeutralityCallsiteTest {
             "Iris createTexture2D should route through typed texture-target helper overloads: " + relative);
         assertFalse(source.contains("if (glType == VulkanicAPI.GL_TEXTURE_2D)"),
             "Iris bindTextureForSetup should avoid raw GL_TEXTURE_2D comparisons when typed target mapping is available: " + relative);
+        assertFalse(source.contains("if (target == VulkanicAPI.GL_TEXTURE_2D)"),
+            "Iris DSA bindTextureToUnit paths should avoid raw GL_TEXTURE_2D comparisons when typed target mapping is available: " + relative);
     }
 
     @Test
@@ -349,6 +378,14 @@ public class ApiNeutralityCallsiteTest {
 
         assertFalse(commandEncoderSource.contains("texture.flushModeChanges(textureTarget.toLegacyGlTarget())"),
             "GlCommandEncoder should use typed texture-target overload for flushModeChanges: " + commandEncoderRelative);
+        assertFalse(commandEncoderSource.contains("q = VulkanicAPI.GL_TEXTURE_2D;"),
+            "GlCommandEncoder write-to-texture path should avoid explicit GL_TEXTURE_2D target locals when default-2D helpers exist: " + commandEncoderRelative);
+        assertFalse(commandEncoderSource.contains("o = VulkanicAPI.GL_TEXTURE_2D;"),
+            "GlCommandEncoder byte-buffer upload path should avoid explicit GL_TEXTURE_2D target locals when default-2D helpers exist: " + commandEncoderRelative);
+        assertFalse(commandEncoderSource.contains("glPrimitiveMode == VulkanicAPI.GL_TRIANGLES"),
+            "GlCommandEncoder tessellation override should avoid raw GL_TRIANGLES comparisons when typed primitive-mode mapping is available: " + commandEncoderRelative);
+        assertTrue(commandEncoderSource.contains("VulkanicPrimitiveMode.PATCHES"),
+            "GlCommandEncoder tessellation override should use typed VulkanicPrimitiveMode.PATCHES routing: " + commandEncoderRelative);
 
         String deviceRelative = "net/blaze3d/opengl/GlDevice.java";
         String deviceSource = Files.readString(SRC_MAIN_JAVA.resolve(deviceRelative));
@@ -357,5 +394,36 @@ public class ApiNeutralityCallsiteTest {
             "GlDevice texture setup should use typed texture-target overloads for mip configuration: " + deviceRelative);
         assertFalse(deviceSource.contains("disableTextureCompareMode(ctx, o)"),
             "GlDevice depth texture setup should use typed texture-target overloads for compare mode: " + deviceRelative);
+    }
+
+    @Test
+    public void testIrisTextureTypeDrivenCallsitesPreferTypedTargetHelpers() throws IOException {
+        String samplerBindingRelative = "net/irisshaders/iris/gl/sampler/SamplerBinding.java";
+        String samplerBindingSource = Files.readString(SRC_MAIN_JAVA.resolve(samplerBindingRelative));
+
+        assertFalse(samplerBindingSource.contains("bindTextureToUnit(textureType.getGlType(), textureUnit, textureId)"),
+            "SamplerBinding should route texture binding through TextureType typed helper methods: " + samplerBindingRelative);
+
+        String glTextureRelative = "net/irisshaders/iris/gl/texture/GlTexture.java";
+        String glTextureSource = Files.readString(SRC_MAIN_JAVA.resolve(glTextureRelative));
+
+        assertFalse(glTextureSource.contains("bindTextureForSetup(target.getGlType(), getGlId())"),
+            "Iris GlTexture setup should route through TextureType typed helper methods: " + glTextureRelative);
+        assertFalse(glTextureSource.contains("bindTextureToUnit(target.getGlType(), unit, getGlId())"),
+            "Iris GlTexture bind should route through TextureType typed helper methods: " + glTextureRelative);
+
+        String glImageRelative = "net/irisshaders/iris/gl/image/GlImage.java";
+        String glImageSource = Files.readString(SRC_MAIN_JAVA.resolve(glImageRelative));
+
+        assertFalse(glImageSource.contains("IrisRenderSystem.createTexture(target.getGlType())"),
+            "Iris GlImage creation should route through TextureType typed helper methods: " + glImageRelative);
+        assertFalse(glImageSource.contains("bindTextureForSetup(target.getGlType(), getGlId())"),
+            "Iris GlImage setup should route through TextureType typed helper methods: " + glImageRelative);
+
+        String textureTypeRelative = "net/irisshaders/iris/gl/texture/TextureType.java";
+        String textureTypeSource = Files.readString(SRC_MAIN_JAVA.resolve(textureTypeRelative));
+
+        assertFalse(textureTypeSource.contains("TEXTURE_RECTANGLE(VulkanicAPI.GL_TEXTURE_3D)"),
+            "TextureType.TEXTURE_RECTANGLE should map to GL_TEXTURE_RECTANGLE instead of GL_TEXTURE_3D: " + textureTypeRelative);
     }
 }

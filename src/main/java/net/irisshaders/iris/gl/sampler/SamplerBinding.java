@@ -37,6 +37,6 @@ public class SamplerBinding {
 			return;
 		}
 		IrisRenderSystem.bindSamplerToUnit(textureUnit, sampler);
-		IrisRenderSystem.bindTextureToUnit(textureType.getGlType(), textureUnit, textureId);
+		textureType.bindToUnit(textureUnit, textureId);
 	}
 }
