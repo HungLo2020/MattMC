@@ -985,7 +985,7 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 					for (int i = 0; i < 12; i++) {
 						GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(i);
 						int textureId = IrisRenderSystem.getTextureBinding(i);
-						if (textureView != null && textureId > 0 && VulkanicAPI.getTextureHandle(textureView.texture()) != textureId) {
+						if (textureView != null && textureId > 0 && net.vulkanic.VulkanicCoreAPI.textureId(textureView) != textureId) {
 							textureView = null;
 						}
 						if (textureView == null) {

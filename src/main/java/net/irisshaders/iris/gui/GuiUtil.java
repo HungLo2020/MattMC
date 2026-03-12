@@ -42,7 +42,7 @@ public final class GuiUtil {
 	 */
 	public static void bindIrisWidgetsTexture() {
 		GpuTextureView textureView = Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView();
-		IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(textureView.texture()));
+		IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(textureView));
 		TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 	}
 

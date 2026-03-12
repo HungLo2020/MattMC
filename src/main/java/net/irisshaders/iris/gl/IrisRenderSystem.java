@@ -421,6 +421,12 @@ public class IrisRenderSystem {
 		dsaState.clearBufferuiv(framebuffer, buffer, drawbuffer, values);
 	}
 
+	/**
+	 * @deprecated Prefer VulkanicAPI typed reflection metadata helpers
+	 * ({@link VulkanicAPI#getActiveUniformInfo(net.vulkanic.CommandContext, int, int, int)} or
+	 * {@link VulkanicAPI#getActiveUniforms(net.vulkanic.CommandContext, int, int)}).
+	 */
+	@Deprecated
 	public static String getActiveUniform(int program, int index, int size, IntBuffer type, IntBuffer name) {
 		RenderSystem.assertOnRenderThread();
 		return VulkanicAPI.getActiveUniform(VulkanicAPI.getCommandContext(), program, index, size, type, name);

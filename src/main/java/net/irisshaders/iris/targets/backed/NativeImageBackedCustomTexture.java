@@ -30,7 +30,7 @@ public class NativeImageBackedCustomTexture extends DynamicTexture implements Te
 	}
 
 	private int getId() {
-		return VulkanicAPI.getTextureHandle(this.texture);
+		return net.vulkanic.VulkanicCoreAPI.textureId(this.texture);
 	}
 
 	private static NativeImage create(byte[] content) throws IOException {

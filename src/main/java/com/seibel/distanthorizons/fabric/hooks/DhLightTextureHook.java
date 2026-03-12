@@ -33,6 +33,6 @@ public class DhLightTextureHook implements LightTextureHooks {
             this.renderWrapper = (MinecraftRenderWrapper)SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
         }
 
-        this.renderWrapper.setLightmapId(VulkanicAPI.getTextureHandle(lightTexture.texture), clientLevel);
+        this.renderWrapper.setLightmapId(net.vulkanic.VulkanicCoreAPI.textureId(lightTexture.texture), clientLevel);
     }
 }

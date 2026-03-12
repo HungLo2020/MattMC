@@ -28,6 +28,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureTarget;
 import org.apache.commons.lang3.StringUtils;
@@ -60,6 +61,10 @@ public class GlDevice implements GpuDevice {
 	// Iris: Track missing shaders to avoid log spam
 	private Set<RenderPipeline> missingShaders = new HashSet();
 
+	private static CommandContext commandContext() {
+		return VulkanicAPI.getCommandContext();
+	}
+
 	public GlDevice(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		GLFW.glfwMakeContextCurrent(l);
 		net.vulkanic.GraphicsCapabilities gLCapabilities = net.vulkanic.VulkanicAPI.initializeGraphicsCapabilities();
@@ -74,8 +79,8 @@ public class GlDevice implements GpuDevice {
 		this.maxSupportedTextureSize = j;
 		this.defaultShaderSource = biFunction;
 		this.encoder = new GlCommandEncoder(this);
-		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getUniformBufferOffsetAlignment(net.vulkanic.VulkanicAPI.getCommandContext());
-		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
+		CommandContext ctx = commandContext();
+		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getUniformBufferOffsetAlignment(ctx);
 		net.vulkanic.VulkanicAPI.setProgramPointSizeEnabled(ctx, true);
 		// Register this device with the Vulkanic backend so it can delegate
 		// device-level operations (pipeline compilation, etc.) back to this GlDevice.
@@ -120,14 +125,13 @@ public class GlDevice implements GpuDevice {
 				throw new UnsupportedOperationException("Array or 3D textures are not yet supported");
 			}
 
-			while (net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getCommandContext()) != 0) {
+			CommandContext ctx = commandContext();
+			while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
 			}
 			int n = net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
 			if (string == null) {
 				string = String.valueOf(n);
 			}
-
-			net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
 
 			VulkanicTextureTarget textureTarget;
 			int glTarget;
@@ -135,7 +139,7 @@ public class GlDevice implements GpuDevice {
 				net.vulkanic.VulkanicAPI.bindCubemapTexture(ctx, n);
 				textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
 			} else {
-				VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), n);
+				VulkanicAPI.bindTexture2D(ctx, n);
 				textureTarget = VulkanicTextureTarget.TEXTURE_2D;
 			}
 			glTarget = textureTarget.toLegacyGlTarget();
@@ -151,19 +155,37 @@ public class GlDevice implements GpuDevice {
 				for (int p : GlConst.CUBEMAP_TARGETS) {
 					for (int q = 0; q < m; q++) {
 						uploadTexture2DAndTrack(
-							p, q, GlConst.toGlInternalId(textureFormat), j >> q, k >> q, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
+							ctx,
+							p,
+							q,
+							GlConst.toGlInternalId(textureFormat),
+							j >> q,
+							k >> q,
+							0,
+							GlConst.toGlExternalId(textureFormat),
+							GlConst.toGlType(textureFormat),
+							null
 						);
 					}
 				}
 			} else {
 				for (int r = 0; r < m; r++) {
 					uploadTexture2DAndTrack(
-						glTarget, r, GlConst.toGlInternalId(textureFormat), j >> r, k >> r, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
+						ctx,
+						glTarget,
+						r,
+						GlConst.toGlInternalId(textureFormat),
+						j >> r,
+						k >> r,
+						0,
+						GlConst.toGlExternalId(textureFormat),
+						GlConst.toGlType(textureFormat),
+						null
 					);
 				}
 			}
 
-			int r = net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getCommandContext());
+			int r = net.vulkanic.VulkanicAPI.getError(ctx);
 			if (r == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate texture of " + j + "x" + k + " for " + string);
 			} else if (r != 0) {
@@ -199,10 +221,11 @@ public class GlDevice implements GpuDevice {
 		if (j <= 0) {
 			throw new IllegalArgumentException("Buffer size must be greater than zero");
 		} else {
-			while (net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getCommandContext()) != 0) {
+			CommandContext ctx = commandContext();
+			while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
 			}
 			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, j);
-			int k = net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getCommandContext());
+			int k = net.vulkanic.VulkanicAPI.getError(ctx);
 			if (k == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + j + " for " + supplier);
 			} else if (k != 0) {
@@ -219,11 +242,12 @@ public class GlDevice implements GpuDevice {
 		if (!byteBuffer.hasRemaining()) {
 			throw new IllegalArgumentException("Buffer source must not be empty");
 		} else {
-			while (net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getCommandContext()) != 0) {
+			CommandContext ctx = commandContext();
+			while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
 			}
 			long l = byteBuffer.remaining();
 			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, byteBuffer);
-			int j = net.vulkanic.VulkanicAPI.getError(net.vulkanic.VulkanicAPI.getCommandContext());
+			int j = net.vulkanic.VulkanicAPI.getError(ctx);
 			if (j == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + l + " for " + supplier);
 			} else if (j != 0) {
@@ -237,13 +261,14 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getImplementationInformation() {
+		CommandContext ctx = commandContext();
 		return GLFW.glfwGetCurrentContext() == 0L
 			? "NO CONTEXT"
-			: net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicAPI.GL_RENDERER)
+			: net.vulkanic.VulkanicAPI.getString(ctx, net.vulkanic.VulkanicAPI.GL_RENDERER)
 				+ " GL version "
-				+ net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicAPI.GL_VERSION)
+				+ net.vulkanic.VulkanicAPI.getString(ctx, net.vulkanic.VulkanicAPI.GL_VERSION)
 				+ ", "
-				+ net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicAPI.GL_VENDOR);
+				+ net.vulkanic.VulkanicAPI.getString(ctx, net.vulkanic.VulkanicAPI.GL_VENDOR);
 	}
 
 	@Override
@@ -258,12 +283,12 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getRenderer() {
-		return net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicAPI.GL_RENDERER);
+		return net.vulkanic.VulkanicAPI.getString(commandContext(), net.vulkanic.VulkanicAPI.GL_RENDERER);
 	}
 
 	@Override
 	public String getVendor() {
-		return net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicAPI.GL_VENDOR);
+		return net.vulkanic.VulkanicAPI.getString(commandContext(), net.vulkanic.VulkanicAPI.GL_VENDOR);
 	}
 
 	@Override
@@ -273,14 +298,16 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getVersion() {
-		return net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicAPI.GL_VERSION);
+		return net.vulkanic.VulkanicAPI.getString(commandContext(), net.vulkanic.VulkanicAPI.GL_VERSION);
 	}
 
 	private static int getMaxSupportedTextureSize() {
-		int i = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicIntegerQuery.MAX_TEXTURE_SIZE);
+		CommandContext ctx = commandContext();
+		int i = net.vulkanic.VulkanicAPI.getInteger(ctx, net.vulkanic.VulkanicIntegerQuery.MAX_TEXTURE_SIZE);
 
 		for (int j = Math.max(32768, i); j >= 1024; j >>= 1) {
 			uploadTexture2DAndTrack(
+				ctx,
 				net.vulkanic.VulkanicAPI.GL_PROXY_TEXTURE_2D,
 				0,
 				net.vulkanic.VulkanicAPI.GL_RGBA,
@@ -292,7 +319,7 @@ public class GlDevice implements GpuDevice {
 				null
 			);
 			int k = net.vulkanic.VulkanicAPI.getTextureLevelParameter(
-				net.vulkanic.VulkanicAPI.getCommandContext(),
+				ctx,
 				net.vulkanic.VulkanicAPI.GL_PROXY_TEXTURE_2D,
 				0,
 				net.vulkanic.VulkanicAPI.GL_TEXTURE_WIDTH
@@ -307,8 +334,8 @@ public class GlDevice implements GpuDevice {
 		return jx;
 	}
 
-	private static void uploadTexture2DAndTrack(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
-		net.vulkanic.VulkanicAPI.uploadTexture2D(net.vulkanic.VulkanicAPI.getCommandContext(), i, j, k, l, m, n, o, p, byteBuffer);
+	private static void uploadTexture2DAndTrack(CommandContext ctx, int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
+		net.vulkanic.VulkanicAPI.uploadTexture2D(ctx, i, j, k, l, m, n, o, p, byteBuffer);
 		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
 	}
 
@@ -339,7 +366,7 @@ public class GlDevice implements GpuDevice {
 		}
 
 		this.shaderCache.clear();
-		String string = net.vulkanic.VulkanicAPI.getString(net.vulkanic.VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicAPI.GL_RENDERER);
+		String string = net.vulkanic.VulkanicAPI.getString(commandContext(), net.vulkanic.VulkanicAPI.GL_RENDERER);
 		if (string.contains("AMD")) {
 			sacrificeShaderToOpenGlAndAmd();
 		}

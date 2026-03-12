@@ -30,7 +30,7 @@ public class GlFramebuffer extends GlResource {
 		//if (texture.getFormat().hasStencilAspect()) {
 		//	IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, texture, 0);
 		//} else {
-			IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.getTextureHandle(texture), 0);
+			IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_DEPTH_ATTACHMENT, net.vulkanic.VulkanicCoreAPI.textureId(texture), 0);
 		//}
 
 		this.hasDepthAttachment = true;

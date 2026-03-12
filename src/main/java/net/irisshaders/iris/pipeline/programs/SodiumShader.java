@@ -191,7 +191,7 @@ public class SodiumShader implements ChunkShaderInterface {
 	private void bindTextures(GpuTextureView atlas) {
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		atlas.texture().flushModeChanges2D();
-		IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(atlas.texture()));
+		IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(atlas));
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 		VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, atlas.baseMipLevel());
 		VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, atlas.baseMipLevel() + atlas.mipLevels() - 1);
@@ -199,7 +199,7 @@ public class SodiumShader implements ChunkShaderInterface {
 
 		GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
 		lightmap.texture().flushModeChanges2D();
-		IrisRenderSystem.bindTextureToUnit(2, VulkanicAPI.getTextureHandle(lightmap.texture()));
+		IrisRenderSystem.bindTextureToUnit(2, net.vulkanic.VulkanicCoreAPI.textureId(lightmap));
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(IrisSamplers.LIGHTMAP_TEXTURE_UNIT);
 	}
 

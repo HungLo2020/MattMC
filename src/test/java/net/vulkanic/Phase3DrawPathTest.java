@@ -41,6 +41,15 @@ public class Phase3DrawPathTest {
         return Files.readString(path);
     }
 
+    private static boolean containsAny(String source, String... needles) {
+        for (String needle : needles) {
+            if (source.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Test
     public void testImmediateContextUsageRestrictedToLegacySeam() throws IOException {
         Path legacyFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
@@ -525,7 +534,7 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should bind copy-write via VulkanicAPI.bindCopyWriteBuffer");
         assertTrue(source.contains("VulkanicAPI.copyBufferSubDataBetweenCopyTargets("),
             "DirectStateAccess should copy via VulkanicAPI.copyBufferSubDataBetweenCopyTargets");
-        assertTrue(source.contains("VulkanicAPI.blitFramebuffer(VulkanicAPI.getCommandContext()"),
+        assertTrue(source.contains("VulkanicAPI.blitFramebuffer("),
             "DirectStateAccess should blit framebuffers directly via VulkanicAPI.blitFramebuffer");
     }
 
@@ -918,7 +927,9 @@ public class Phase3DrawPathTest {
         String directStateAccessSource = Files.readString(directStateAccessFile);
         assertFalse(directStateAccessSource.contains("GlStateManager.glGenFramebuffers("),
             "DirectStateAccess should not create FBOs through removed GlStateManager.glGenFramebuffers wrapper");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(directStateAccessSource,
+                "VulkanicAPI.createFramebuffer(VulkanicAPI.getCommandContext())",
+                "VulkanicAPI.createFramebuffer(ctx)"),
             "DirectStateAccess should create FBOs directly through VulkanicAPI.createFramebuffer");
 
         Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
@@ -1054,11 +1065,17 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should not clear depth via raw GL_DEPTH_BUFFER_BIT mask");
         assertFalse(source.contains("int j = 0;"),
             "GlCommandEncoder should not compose clear masks through ad-hoc integer bitfields");
-        assertTrue(source.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(source,
+            "VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+            "VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx)"),
             "GlCommandEncoder should clear color through VulkanicAPI clearColorBufferWithMacosWorkaround helper");
-        assertTrue(source.contains("VulkanicAPI.clearColorAndDepthBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(source,
+            "VulkanicAPI.clearColorAndDepthBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+            "VulkanicAPI.clearColorAndDepthBuffersWithMacosWorkaround(ctx)"),
             "GlCommandEncoder should clear color+depth through VulkanicAPI clearColorAndDepthBuffersWithMacosWorkaround helper");
-        assertTrue(source.contains("VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(source,
+            "VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+            "VulkanicAPI.clearDepthBufferWithMacosWorkaround(ctx)"),
             "GlCommandEncoder should clear depth through VulkanicAPI clearDepthBufferWithMacosWorkaround helper");
         assertTrue(source.contains("boolean shouldClearColor = false;"),
             "GlCommandEncoder should track color clear intent explicitly");
@@ -1812,8 +1829,11 @@ public class Phase3DrawPathTest {
         String uniformsSource = Files.readString(uniformsFile);
         assertFalse(uniformsSource.contains("GlStateManager.glGetProgrami("),
             "ProgramUniforms should not query active uniforms through removed GlStateManager.glGetProgrami wrapper");
-        assertTrue(uniformsSource.contains("VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), program, VulkanicProgramParameterName.ACTIVE_UNIFORMS)"),
-            "ProgramUniforms should query active uniforms directly through VulkanicAPI.getProgramParameter");
+        assertTrue(
+            uniformsSource.contains("VulkanicAPI.getActiveUniforms(")
+                || uniformsSource.contains("VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), program, VulkanicProgramParameterName.ACTIVE_UNIFORMS)"),
+            "ProgramUniforms should enumerate active uniforms through VulkanicAPI typed helpers or direct VulkanicAPI program-parameter query"
+        );
 
         Path programFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/Program.java");
         String programSource = Files.readString(programFile);
@@ -2128,16 +2148,24 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should no longer increment tracked buffers through GlStateManager");
         assertTrue(directStateAccessSource.contains("IrisRenderSystem.incrementTrackedBuffers();"),
             "DirectStateAccess should increment tracked buffers through IrisRenderSystem helper");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(directStateAccessSource,
+                "VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext())",
+                "VulkanicAPI.createBuffer(ctx)"),
             "DirectStateAccess should create buffers directly via VulkanicAPI.createBuffer");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(),"),
-            "DirectStateAccess should bind/unbind emulated targets directly via VulkanicAPI.bindBuffer");
+        assertTrue(containsAny(directStateAccessSource,
+                "VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(),",
+                "VulkanicCoreAPI.bindBuffer(ctx,"),
+            "DirectStateAccess should bind/unbind emulated targets through Vulkanic frontend APIs");
         assertTrue(directStateAccessSource.contains("private VulkanicBufferTarget selectBufferBindTarget("),
             "DirectStateAccess should classify emulated bind targets using typed VulkanicBufferTarget");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.mapBuffer(VulkanicAPI.getCommandContext(),"),
-            "DirectStateAccess should map buffers directly via VulkanicAPI.mapBuffer");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.unmapBuffer(VulkanicAPI.getCommandContext(),"),
-            "DirectStateAccess should unmap buffers directly via VulkanicAPI.unmapBuffer");
+        assertTrue(containsAny(directStateAccessSource,
+                "VulkanicAPI.mapBuffer(VulkanicAPI.getCommandContext(),",
+                "VulkanicCoreAPI.mapBufferRange(ctx,"),
+            "DirectStateAccess should map buffers through Vulkanic frontend APIs");
+        assertTrue(containsAny(directStateAccessSource,
+                "VulkanicAPI.unmapBuffer(VulkanicAPI.getCommandContext(),",
+                "VulkanicCoreAPI.unmapBuffer(ctx,"),
+            "DirectStateAccess should unmap buffers through Vulkanic frontend APIs");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
         String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
@@ -2182,10 +2210,14 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should not call removed GlStateManager._glBufferData wrappers");
         assertFalse(dsaSource.contains("GlStateManager._glBufferSubData("),
             "DirectStateAccess should not call removed GlStateManager._glBufferSubData wrapper");
-        assertTrue(dsaSource.contains("VulkanicAPI.bufferData(VulkanicAPI.getCommandContext()"),
-            "DirectStateAccess should upload buffer data directly via VulkanicAPI.bufferData");
-        assertTrue(dsaSource.contains("VulkanicAPI.bufferSubData(VulkanicAPI.getCommandContext()"),
-            "DirectStateAccess should update buffer ranges directly via VulkanicAPI.bufferSubData");
+        assertTrue(containsAny(dsaSource,
+                "VulkanicAPI.bufferData(VulkanicAPI.getCommandContext()",
+                "VulkanicCoreAPI.bufferData(ctx,"),
+            "DirectStateAccess should upload buffer data through Vulkanic frontend APIs");
+        assertTrue(containsAny(dsaSource,
+                "VulkanicAPI.bufferSubData(VulkanicAPI.getCommandContext()",
+                "VulkanicCoreAPI.bufferSubData(ctx,"),
+            "DirectStateAccess should update buffer ranges through Vulkanic frontend APIs");
     }
 
     @Test
@@ -2860,11 +2892,15 @@ public class Phase3DrawPathTest {
             "FinalPassRenderer should check bindings through IrisRenderSystem helper");
         assertFalse(finalPassRendererSource.contains("IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(main.getColorTexture()), VulkanicAPI.GL_TEXTURE_2D"),
             "FinalPassRenderer should not pass explicit GL_TEXTURE_2D when copying into main color target");
-        assertTrue(finalPassRendererSource.contains("IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(main.getColorTexture()), 0"),
+        assertTrue(containsAny(finalPassRendererSource,
+                "IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(main.getColorTexture()), 0",
+                "IrisRenderSystem.copyTexSubImage2D(VulkanicCoreAPI.textureId(main.getColorTexture()), 0"),
             "FinalPassRenderer should copy into main color target through IrisRenderSystem default-2D helper");
         assertFalse(finalPassRendererSource.contains("VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_TEXTURE_2D"),
             "FinalPassRenderer should not pass explicit GL_TEXTURE_2D in VulkanicAPI copyTexSubImage2D path");
-        assertTrue(finalPassRendererSource.contains("VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), 0"),
+        assertTrue(containsAny(finalPassRendererSource,
+                "VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), 0",
+                "VulkanicAPI.copyTexSubImage2D(ctx, 0"),
             "FinalPassRenderer should use VulkanicAPI default-2D copyTexSubImage2D overload");
 
         Path shadowRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderer.java");
@@ -2890,7 +2926,9 @@ public class Phase3DrawPathTest {
             "ColorSpaceFragmentConverter should allocate swap texture through IrisRenderSystem default-2D helper");
         assertFalse(colorSpaceConverterSource.contains("IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(targetImage), VulkanicAPI.GL_TEXTURE_2D"),
             "ColorSpaceFragmentConverter should not pass explicit GL_TEXTURE_2D in copyTexSubImage2D");
-        assertTrue(colorSpaceConverterSource.contains("IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(targetImage), 0"),
+        assertTrue(containsAny(colorSpaceConverterSource,
+                "IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(targetImage), 0",
+                "IrisRenderSystem.copyTexSubImage2D(net.vulkanic.VulkanicCoreAPI.textureId(targetImage), 0"),
             "ColorSpaceFragmentConverter should copy texture data through IrisRenderSystem default-2D helper");
 
         Path glFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
@@ -3031,9 +3069,13 @@ public class Phase3DrawPathTest {
             "RenderStateShard single-texture setup should not bind shader texture 0 through RenderSystem.setShaderTexture");
         assertFalse(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D"),
             "RenderStateShard texture setup should not pass explicit GL_TEXTURE_2D when binding texture units");
-        assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(i, VulkanicAPI.getTextureHandle(textureView.texture()))"),
+        assertTrue(containsAny(renderStateShardSource,
+            "IrisRenderSystem.bindTextureToUnit(i, VulkanicAPI.getTextureHandle(textureView.texture()))",
+            "IrisRenderSystem.bindTextureToUnit(i, net.vulkanic.VulkanicCoreAPI.textureId(textureView))"),
             "RenderStateShard multi-texture setup should bind texture units through IrisRenderSystem default-2D helper");
-        assertTrue(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(textureView.texture()))"),
+        assertTrue(containsAny(renderStateShardSource,
+            "IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(textureView.texture()))",
+            "IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(textureView))"),
             "RenderStateShard single-texture setup should bind texture unit 0 through IrisRenderSystem default-2D helper");
         assertTrue(renderStateShardSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(i, textureView)"),
             "RenderStateShard multi-texture setup should notify TextureTracker for each texture unit binding");
@@ -3058,7 +3100,9 @@ public class Phase3DrawPathTest {
 
         Path abstractTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/AbstractTexture.java");
         String abstractTextureSource = Files.readString(abstractTextureFile);
-        assertTrue(abstractTextureSource.contains("TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicAPI.getTextureHandle(lastChecked), this)"),
+        assertTrue(containsAny(abstractTextureSource,
+            "TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicAPI.getTextureHandle(lastChecked), this)",
+            "TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(lastChecked), this)"),
             "AbstractTexture should track textures when getTextureView() is used so RenderType sampler binding cannot silently drop GUI/item textures");
 
         Path lightTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java");
@@ -3071,7 +3115,9 @@ public class Phase3DrawPathTest {
             "LightTexture should not pass explicit GL_TEXTURE_2D when binding the light layer");
         assertTrue(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(2, 0)"),
             "LightTexture should disable light layer via IrisRenderSystem default-2D helper");
-        assertTrue(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(2, VulkanicAPI.getTextureHandle(this.texture))"),
+        assertTrue(containsAny(lightTextureSource,
+            "IrisRenderSystem.bindTextureToUnit(2, VulkanicAPI.getTextureHandle(this.texture))",
+            "IrisRenderSystem.bindTextureToUnit(2, net.vulkanic.VulkanicCoreAPI.textureId(this.texture))"),
             "LightTexture should enable light layer via IrisRenderSystem default-2D helper");
 
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
@@ -3330,7 +3376,9 @@ public class Phase3DrawPathTest {
             "OverlayTexture should not route overlay teardown through RenderSystem.teardownOverlayColor");
         assertFalse(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D"),
             "OverlayTexture should not pass explicit GL_TEXTURE_2D when binding overlay texture");
-        assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(1, VulkanicAPI.getTextureHandle(textureView.texture()))"),
+        assertTrue(containsAny(overlayTextureSource,
+            "IrisRenderSystem.bindTextureToUnit(1, VulkanicAPI.getTextureHandle(textureView.texture()))",
+            "IrisRenderSystem.bindTextureToUnit(1, net.vulkanic.VulkanicCoreAPI.textureId(textureView))"),
             "OverlayTexture should bind overlay texture directly through IrisRenderSystem default-2D helper");
         assertTrue(overlayTextureSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(1, textureView)"),
             "OverlayTexture should publish Sampler1 texture view updates to TextureTracker");
@@ -3423,11 +3471,17 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should not clear color+depth through raw GL bitmask macOS clear mask");
         assertFalse(encoderSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
             "GlCommandEncoder should not clear depth through raw GL_DEPTH_BUFFER_BIT macOS clear mask");
-        assertTrue(encoderSource.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(encoderSource,
+            "VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+            "VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx)"),
             "GlCommandEncoder should clear color through VulkanicAPI clearColorBufferWithMacosWorkaround helper");
-        assertTrue(encoderSource.contains("VulkanicAPI.clearColorAndDepthBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(encoderSource,
+            "VulkanicAPI.clearColorAndDepthBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+            "VulkanicAPI.clearColorAndDepthBuffersWithMacosWorkaround(ctx)"),
             "GlCommandEncoder should clear color+depth through VulkanicAPI clearColorAndDepthBuffersWithMacosWorkaround helper");
-        assertTrue(encoderSource.contains("VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(encoderSource,
+            "VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+            "VulkanicAPI.clearDepthBufferWithMacosWorkaround(ctx)"),
             "GlCommandEncoder should clear depth through VulkanicAPI clearDepthBufferWithMacosWorkaround helper");
 
         Path clearPassFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/ClearPass.java");
@@ -4610,7 +4664,9 @@ public class Phase3DrawPathTest {
         String renderTypeSource = Files.readString(renderTypeFile);
         assertTrue(renderTypeSource.contains("GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(i);"),
             "RenderType draw path should first resolve sampler views from TextureTracker unit bindings");
-        assertTrue(renderTypeSource.contains("if (textureView != null && textureId > 0 && VulkanicAPI.getTextureHandle(textureView.texture()) != textureId)"),
+        assertTrue(containsAny(renderTypeSource,
+            "if (textureView != null && textureId > 0 && VulkanicAPI.getTextureHandle(textureView.texture()) != textureId)",
+            "if (textureView != null && textureId > 0 && net.vulkanic.VulkanicCoreAPI.textureId(textureView) != textureId)"),
             "RenderType draw path should reject stale tracked sampler views when they no longer match Iris texture binding IDs");
         assertTrue(renderTypeSource.contains("if (textureView == null)"),
             "RenderType draw path should only fall back to Iris texture binding ids when no tracked unit view exists");

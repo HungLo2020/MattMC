@@ -171,7 +171,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		DepthColorStorage.unlockDepthColor();
 
 		if (!hasUV) {
-			IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(pipeline.getWhitePixel().getTexture()));
+			IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(pipeline.getWhitePixel().getTexture()));
 		}
 
 		CapturedRenderingState.INSTANCE.setCurrentAlphaTest(alphaTest);

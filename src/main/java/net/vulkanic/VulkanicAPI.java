@@ -19,6 +19,7 @@ import net.vulkanic.backends.vulkan.VulkanBackend;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.glfw.GLFWErrorCallbackI;
@@ -103,6 +104,36 @@ public class VulkanicAPI {
     }
 
     private record GpuAsyncTask(Runnable callback, long syncObject) {
+    }
+
+    public record ActiveUniformInfo(
+        String name,
+        int arraySize,
+        int legacyType,
+        java.util.Optional<VulkanicUniformReflectionType> reflectionType
+    ) {
+        public ActiveUniformInfo {
+            if (name == null) {
+                name = "";
+            }
+            if (reflectionType == null) {
+                reflectionType = java.util.Optional.empty();
+            }
+        }
+
+        public String reflectionTypeName() {
+            return reflectionType
+                .map(VulkanicUniformReflectionType::getGlslTypeName)
+                .orElse("(unknown:" + legacyType + ")");
+        }
+    }
+
+    public record ActiveUniformBlockInfo(int index, String name) {
+        public ActiveUniformBlockInfo {
+            if (name == null) {
+                name = "";
+            }
+        }
     }
     
     // Functional interfaces for debug callbacks
@@ -444,6 +475,12 @@ public class VulkanicAPI {
     public static final int GL_UNSIGNED_SHORT = 0x1403;
     public static final int GL_HALF_FLOAT = 0x140B;
     public static final int GL_BOOL = 0x8B56;
+    public static final int GL_UNSIGNED_INT_VEC2 = 0x8DC6;
+    public static final int GL_UNSIGNED_INT_VEC3 = 0x8DC7;
+    public static final int GL_UNSIGNED_INT_VEC4 = 0x8DC8;
+    public static final int GL_BOOL_VEC2 = 0x8B57;
+    public static final int GL_BOOL_VEC3 = 0x8B58;
+    public static final int GL_BOOL_VEC4 = 0x8B59;
     public static final int GL_FLOAT_VEC2 = 0x8B50;
     public static final int GL_FLOAT_VEC3 = 0x8B51;
     public static final int GL_FLOAT_VEC4 = 0x8B52;
@@ -456,10 +493,21 @@ public class VulkanicAPI {
     public static final int GL_SAMPLER_1D = 0x8B5D;
     public static final int GL_SAMPLER_2D = 0x8B5E;
     public static final int GL_SAMPLER_3D = 0x8B5F;
+    public static final int GL_SAMPLER_CUBE = 0x8B60;
+    public static final int GL_SAMPLER_2D_ARRAY = 0x8DC1;
     public static final int GL_SAMPLER_1D_SHADOW = 0x8B61;
     public static final int GL_SAMPLER_2D_SHADOW = 0x8B62;
+    public static final int GL_SAMPLER_CUBE_SHADOW = 0x8DC5;
+    public static final int GL_INT_SAMPLER_2D = 0x8DCA;
+    public static final int GL_INT_SAMPLER_3D = 0x8DCB;
+    public static final int GL_INT_SAMPLER_CUBE = 0x8DCC;
+    public static final int GL_INT_SAMPLER_2D_ARRAY = 0x8DCF;
+    public static final int GL_UNSIGNED_INT_SAMPLER_1D = 0x8DD1;
     public static final int GL_UNSIGNED_INT_SAMPLER_2D = 0x8DD2;
     public static final int GL_UNSIGNED_INT_SAMPLER_3D = 0x8DD3;
+    public static final int GL_UNSIGNED_INT_SAMPLER_CUBE = 0x8DD4;
+    public static final int GL_UNSIGNED_INT_SAMPLER_1D_ARRAY = 0x8DD6;
+    public static final int GL_UNSIGNED_INT_SAMPLER_2D_ARRAY = 0x8DD7;
     
     // OpenGL Constants - Image Types (ARB_shader_image_load_store)
     public static final int GL_IMAGE_1D = 0x904C;
@@ -470,9 +518,13 @@ public class VulkanicAPI {
     public static final int GL_INT_IMAGE_1D = 0x9057;
     public static final int GL_INT_IMAGE_2D = 0x9058;
     public static final int GL_INT_IMAGE_3D = 0x9059;
+    public static final int GL_INT_IMAGE_1D_ARRAY = 0x905E;
+    public static final int GL_INT_IMAGE_2D_ARRAY = 0x905F;
     public static final int GL_UNSIGNED_INT_IMAGE_1D = 0x9062;
     public static final int GL_UNSIGNED_INT_IMAGE_2D = 0x9063;
     public static final int GL_UNSIGNED_INT_IMAGE_3D = 0x9064;
+    public static final int GL_UNSIGNED_INT_IMAGE_1D_ARRAY = 0x9069;
+    public static final int GL_UNSIGNED_INT_IMAGE_2D_ARRAY = 0x906A;
     
     // OpenGL Constants - Program Query
     public static final int GL_ACTIVE_UNIFORMS = 0x8B86;
@@ -3028,8 +3080,35 @@ public class VulkanicAPI {
         getBackend().uniformBlockBinding(ctx, program, uniformBlockIndex, uniformBlockBinding);
     }
     
+    /**
+     * @deprecated Prefer {@link #getActiveUniformBlockInfo(CommandContext, int, int)} or
+     * {@link #getActiveUniformBlocks(CommandContext, int)} for backend-neutral typed metadata.
+     */
+    @Deprecated
     public static String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
         return getBackend().retrieveActiveUniformBlockName(ctx, program, uniformBlockIndex);
+    }
+
+    /**
+     * Retrieves active uniform-block metadata at the specified block index.
+     */
+    public static ActiveUniformBlockInfo getActiveUniformBlockInfo(CommandContext ctx, int program, int uniformBlockIndex) {
+        String uniformBlockName = retrieveActiveUniformBlockName(ctx, program, uniformBlockIndex);
+        return new ActiveUniformBlockInfo(uniformBlockIndex, uniformBlockName);
+    }
+
+    /**
+     * Retrieves all active uniform blocks for a program as backend-neutral typed metadata.
+     */
+    public static java.util.List<ActiveUniformBlockInfo> getActiveUniformBlocks(CommandContext ctx, int program) {
+        int activeUniformBlockCount = getProgramParameter(ctx, program, VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS);
+        java.util.ArrayList<ActiveUniformBlockInfo> blocks = new java.util.ArrayList<>(Math.max(activeUniformBlockCount, 0));
+
+        for (int blockIndex = 0; blockIndex < activeUniformBlockCount; blockIndex++) {
+            blocks.add(getActiveUniformBlockInfo(ctx, program, blockIndex));
+        }
+
+        return java.util.List.copyOf(blocks);
     }
     
     public static int generateQueryObject(CommandContext ctx) {
@@ -3621,8 +3700,43 @@ public class VulkanicAPI {
     }
     
     
+    /**
+     * @deprecated Prefer {@link #getActiveUniformInfo(CommandContext, int, int, int)} or
+     * {@link #getActiveUniforms(CommandContext, int, int)} for backend-neutral typed metadata.
+     */
+    @Deprecated
     public static String getActiveUniform(CommandContext ctx, int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
         return getBackend().getActiveUniform(ctx, program, index, size, type, name);
+    }
+
+    /**
+     * Retrieves reflected metadata for an active uniform as a backend-neutral typed structure.
+     */
+    public static ActiveUniformInfo getActiveUniformInfo(CommandContext ctx, int program, int index, int maxNameLength) {
+        java.nio.IntBuffer arraySize = BufferUtils.createIntBuffer(1);
+        java.nio.IntBuffer legacyType = BufferUtils.createIntBuffer(1);
+        String uniformName = getActiveUniform(ctx, program, index, maxNameLength, arraySize, legacyType);
+
+        int reflectedArraySize = arraySize.get(0);
+        int reflectedLegacyType = legacyType.get(0);
+        java.util.Optional<VulkanicUniformReflectionType> typedReflectionType =
+            VulkanicUniformReflectionType.fromLegacyGlConstant(reflectedLegacyType);
+
+        return new ActiveUniformInfo(uniformName, reflectedArraySize, reflectedLegacyType, typedReflectionType);
+    }
+
+    /**
+     * Retrieves all active uniforms for a program as backend-neutral typed metadata.
+     */
+    public static java.util.List<ActiveUniformInfo> getActiveUniforms(CommandContext ctx, int program, int maxNameLength) {
+        int activeUniformCount = getProgramParameter(ctx, program, VulkanicProgramParameterName.ACTIVE_UNIFORMS);
+        java.util.ArrayList<ActiveUniformInfo> uniforms = new java.util.ArrayList<>(Math.max(activeUniformCount, 0));
+
+        for (int uniformIndex = 0; uniformIndex < activeUniformCount; uniformIndex++) {
+            uniforms.add(getActiveUniformInfo(ctx, program, uniformIndex, maxNameLength));
+        }
+
+        return java.util.List.copyOf(uniforms);
     }
     
     

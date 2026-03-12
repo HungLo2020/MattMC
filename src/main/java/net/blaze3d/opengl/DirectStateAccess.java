@@ -5,10 +5,12 @@ import java.nio.ByteBuffer;
 import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicCoreAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -49,77 +51,94 @@ public abstract class DirectStateAccess {
 
 	abstract void copyBufferSubData(int i, int j, int k, int l, int m);
 
+	private static CommandContext commandContext() {
+		return VulkanicAPI.getCommandContext();
+	}
+
 	@Environment(EnvType.CLIENT)
 	static class Core extends DirectStateAccess {
 		@Override
 		int createBuffer() {
 			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
-			return net.vulkanic.VulkanicAPI.createBufferDSA(net.vulkanic.VulkanicAPI.getCommandContext());
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.createBufferDSA(ctx);
 		}
 
 		@Override
 		void bufferData(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, l, GlConst.bufferUsageToGlEnum(j));
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferDataDSA(ctx, i, l, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferDataDSA(ctx, i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
-			net.vulkanic.VulkanicAPI.namedBufferSubDataDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, (long)j, byteBuffer);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferSubDataDSA(ctx, i, (long)j, byteBuffer);
 		}
 
 		@Override
 		void bufferStorage(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, l, GlConst.bufferUsageToGlFlag(j));
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferStorageDSA(ctx, i, l, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Override
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferStorageDSA(ctx, i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
-			return net.vulkanic.VulkanicAPI.mapNamedBufferRangeDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, j, k, l);
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.mapNamedBufferRangeDSA(ctx, i, j, k, l);
 		}
 
 		@Override
 		void unmapBuffer(int i, int j) {
-			net.vulkanic.VulkanicAPI.unmapNamedBufferDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.unmapNamedBufferDSA(ctx, i);
 		}
 
 		@Override
 		public int createFrameBufferObject() {
-			return net.vulkanic.VulkanicAPI.createFramebuffer(net.vulkanic.VulkanicAPI.getCommandContext());
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.createFramebuffer(ctx);
 		}
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.namedFramebufferColorAttachment0DSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, j, l);
-			net.vulkanic.VulkanicAPI.namedFramebufferDepthAttachmentDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, k, l);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedFramebufferColorAttachment0DSA(ctx, i, j, l);
+			VulkanicAPI.namedFramebufferDepthAttachmentDSA(ctx, i, k, l);
 			if (m != 0) {
-				net.vulkanic.VulkanicAPI.bindFramebuffer(net.vulkanic.VulkanicAPI.getCommandContext(), m, i);
+				VulkanicAPI.bindFramebuffer(ctx, m, i);
 			}
 		}
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			net.vulkanic.VulkanicAPI.blitNamedFramebufferDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, j, k, l, m, n, o, p, q, r, s, t);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.blitNamedFramebufferDSA(ctx, i, j, k, l, m, n, o, p, q, r, s, t);
 		}
 
 		@Override
 		void flushMappedBufferRange(int i, int j, int k, int l) {
-			net.vulkanic.VulkanicAPI.flushMappedNamedBufferRangeDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, j, k);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.flushMappedNamedBufferRangeDSA(ctx, i, j, k);
 		}
 
 		@Override
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.copyNamedBufferSubDataDSA(net.vulkanic.VulkanicAPI.getCommandContext(), i, j, k, l, m);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.copyNamedBufferSubDataDSA(ctx, i, j, k, l, m);
 		}
 	}
 
@@ -135,99 +154,90 @@ public abstract class DirectStateAccess {
 			}
 		}
 
-		private int selectBufferDataTarget(int i) {
-			if ((i & 32) != 0) {
-				return VulkanicAPI.GL_ARRAY_BUFFER;
-			} else if ((i & 64) != 0) {
-				return VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER;
-			} else {
-				return (i & 128) != 0 ? VulkanicAPI.GL_UNIFORM_BUFFER : VulkanicAPI.GL_COPY_WRITE_BUFFER;
-			}
-		}
-
 		@Override
 		int createBuffer() {
 			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
-			return VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext());
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.createBuffer(ctx);
 		}
 
 		@Override
 		void bufferData(int i, long l, int j) {
 			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
-			int k = this.selectBufferDataTarget(j);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, i);
-			VulkanicAPI.bufferData(VulkanicAPI.getCommandContext(), k, l, GlConst.bufferUsageToGlEnum(j));
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, 0);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferData(ctx, bindTarget, l, GlConst.bufferUsageToGlEnum(j));
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
 			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
-			int k = this.selectBufferDataTarget(j);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, i);
-			VulkanicAPI.bufferData(VulkanicAPI.getCommandContext(), k, byteBuffer, GlConst.bufferUsageToGlEnum(j));
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, 0);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferData(ctx, bindTarget, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
 			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(k);
-			int l = this.selectBufferDataTarget(k);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, i);
-			VulkanicAPI.bufferSubData(VulkanicAPI.getCommandContext(), l, (long)j, byteBuffer);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, 0);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferSubData(ctx, bindTarget, (long)j, byteBuffer);
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void bufferStorage(int i, long l, int j) {
 			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
-			int k = this.selectBufferDataTarget(j);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, i);
-			VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), k, l, GlConst.bufferUsageToGlFlag(j));
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, 0);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferStorage(ctx, bindTarget, l, GlConst.bufferUsageToGlFlag(j));
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
 			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
-			int k = this.selectBufferDataTarget(j);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, i);
-			VulkanicAPI.bufferStorage(VulkanicAPI.getCommandContext(), k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, 0);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferStorage(ctx, bindTarget, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
 			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(m);
-			int n = this.selectBufferDataTarget(m);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, i);
-			ByteBuffer byteBuffer = VulkanicAPI.mapBuffer(VulkanicAPI.getCommandContext(), n, j, k, l);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, 0);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			ByteBuffer byteBuffer = VulkanicCoreAPI.mapBufferRange(ctx, bindTarget, j, k, l);
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 			return byteBuffer;
 		}
 
 		@Override
 		void unmapBuffer(int i, int j) {
 			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
-			int k = this.selectBufferDataTarget(j);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, i);
-			VulkanicAPI.unmapBuffer(VulkanicAPI.getCommandContext(), k);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, 0);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.unmapBuffer(ctx, bindTarget);
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void flushMappedBufferRange(int i, int j, int k, int l) {
 			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(l);
-			int m = this.selectBufferDataTarget(l);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, i);
-			VulkanicAPI.flushMappedBufferRange(VulkanicAPI.getCommandContext(), m, j, k);
-			VulkanicAPI.bindBuffer(VulkanicAPI.getCommandContext(), bindTarget, 0);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.flushMappedBufferRange(ctx, bindTarget, j, k);
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
-			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+			CommandContext ctx = commandContext();
 			VulkanicAPI.bindCopyReadBuffer(ctx, i);
 			VulkanicAPI.bindCopyWriteBuffer(ctx, j);
 			VulkanicAPI.copyBufferSubDataBetweenCopyTargets(ctx, k, l, m);
@@ -237,17 +247,18 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public int createFrameBufferObject() {
-			return VulkanicAPI.createFramebuffer(VulkanicAPI.getCommandContext());
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.createFramebuffer(ctx);
 		}
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
 			int n = m == 0 ? VulkanicAPI.GL_FRAMEBUFFER : m;
-			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+			CommandContext ctx = commandContext();
 			int o = VulkanicAPI.getFramebufferBinding(n);
 			VulkanicAPI.bindFramebuffer(ctx, n, i);
-			VulkanicAPI.framebufferColorAttachment0Texture2D(VulkanicAPI.getCommandContext(), n, j, l);
-			VulkanicAPI.framebufferDepthAttachmentTexture2D(VulkanicAPI.getCommandContext(), n, k, l);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, n, j, l);
+			VulkanicAPI.framebufferDepthAttachmentTexture2D(ctx, n, k, l);
 			if (m == 0) {
 				VulkanicAPI.bindFramebuffer(ctx, n, o);
 			}
@@ -255,12 +266,12 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+			CommandContext ctx = commandContext();
 			int u = VulkanicAPI.getReadFramebufferBinding();
 			int v = VulkanicAPI.getDrawFramebufferBinding();
 			VulkanicAPI.bindReadFramebuffer(ctx, i);
 			VulkanicAPI.bindDrawFramebuffer(ctx, j);
-			VulkanicAPI.blitFramebuffer(VulkanicAPI.getCommandContext(), k, l, m, n, o, p, q, r, s, t);
+			VulkanicAPI.blitFramebuffer(ctx, k, l, m, n, o, p, q, r, s, t);
 			VulkanicAPI.bindReadFramebuffer(ctx, u);
 			VulkanicAPI.bindDrawFramebuffer(ctx, v);
 		}

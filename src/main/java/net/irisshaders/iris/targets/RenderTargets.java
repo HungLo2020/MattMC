@@ -14,6 +14,7 @@ import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.properties.PackDirectives;
 import net.irisshaders.iris.shaderpack.properties.PackRenderTargetDirectives;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 import org.joml.Vector2i;
 
 import java.util.ArrayList;
@@ -225,11 +226,12 @@ public class RenderTargets {
 	public void copyPreTranslucentDepth() {
 		if (translucentDepthDirty) {
 			translucentDepthDirty = false;
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), VulkanicAPI.getTextureHandle(noTranslucents));
+			var ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(noTranslucents));
 			depthSourceFb.bindAsReadBuffer();
 			IrisRenderSystem.copyTexImage2D(0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
 		} else {
-			copyStrategy.copy(depthSourceFb, VulkanicAPI.getTextureHandle(getDepthTexture()), noTranslucentsDestFb, VulkanicAPI.getTextureHandle(noTranslucents),
+			copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noTranslucentsDestFb, VulkanicCoreAPI.textureId(noTranslucents),
 				getCurrentWidth(), getCurrentHeight());
 		}
 	}
@@ -237,11 +239,12 @@ public class RenderTargets {
 	public void copyPreHandDepth() {
 		if (handDepthDirty) {
 			handDepthDirty = false;
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), VulkanicAPI.getTextureHandle(noHand));
+			var ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(noHand));
 			depthSourceFb.bindAsReadBuffer();
 			IrisRenderSystem.copyTexImage2D(0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
 		} else {
-			copyStrategy.copy(depthSourceFb, VulkanicAPI.getTextureHandle(getDepthTexture()), noHandDestFb, VulkanicAPI.getTextureHandle(noHand),
+			copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noHandDestFb, VulkanicCoreAPI.textureId(noHand),
 				getCurrentWidth(), getCurrentHeight());
 		}
 	}

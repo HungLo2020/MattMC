@@ -127,8 +127,8 @@ public class PBRAtlasTexture extends AbstractTexture implements PBRDumpable {
 		}
 		texture.setTextureFilter(FilterMode.NEAREST, mipLevel > 1);
 
-		TextureManipulationUtil.fillWithColor(VulkanicAPI.getTextureHandle(texture), mipLevel, type.getDefaultValue());
-		TextureTracker.INSTANCE.trackTexture(VulkanicAPI.getTextureHandle(this.texture), (AbstractTexture) (Object) this);
+		TextureManipulationUtil.fillWithColor(net.vulkanic.VulkanicCoreAPI.textureId(texture), mipLevel, type.getDefaultValue());
+		TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(this.texture), (AbstractTexture) (Object) this);
 		width = atlasWidth;
 		height = atlasHeight;
 		this.mipLevel = mipLevel;

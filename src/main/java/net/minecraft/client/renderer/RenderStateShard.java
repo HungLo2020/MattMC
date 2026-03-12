@@ -203,7 +203,7 @@ public abstract class RenderStateShard {
 					AbstractTexture abstractTexture = textureManager.getTexture(entry.id);
 					abstractTexture.setUseMipmaps(entry.mipmap);
 					var textureView = abstractTexture.getTextureView();
-						IrisRenderSystem.bindTextureToUnit(i, VulkanicAPI.getTextureHandle(textureView.texture()));
+						IrisRenderSystem.bindTextureToUnit(i, net.vulkanic.VulkanicCoreAPI.textureId(textureView));
 					TextureTracker.INSTANCE.onSetShaderTexture(i, textureView);
 				}
 			}, () -> {});
@@ -285,7 +285,7 @@ public abstract class RenderStateShard {
 				AbstractTexture abstractTexture = textureManager.getTexture(resourceLocation);
 				abstractTexture.setUseMipmaps(bl);
 				var textureView = abstractTexture.getTextureView();
-				IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(textureView.texture()));
+				IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(textureView));
 				TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 			}, () -> {});
 			this.texture = Optional.of(resourceLocation);

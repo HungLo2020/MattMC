@@ -103,6 +103,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
 import org.joml.Vector4f;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -294,7 +295,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 		BufferFlipper flipper = new BufferFlipper();
 
-		this.centerDepthSampler = new CenterDepthSampler(() -> VulkanicAPI.getTextureHandle(renderTargets.getDepthTexture()), programSet.getPackDirectives().getCenterDepthHalfLife());
+		this.centerDepthSampler = new CenterDepthSampler(() -> VulkanicCoreAPI.textureId(renderTargets.getDepthTexture()), programSet.getPackDirectives().getCenterDepthHalfLife());
 
 		this.shadowMapResolution = programSet.getPackDirectives().getShadowDirectives().getResolution();
 
@@ -823,18 +824,19 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	@Override
 	public void onSetShaderTexture(GpuTextureView id) {
 		if (shouldBindPBR && isRenderingWorld && id != null) {
-			PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(VulkanicAPI.getTextureHandle(id.texture()));
+			PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(VulkanicCoreAPI.textureId(id));
 			id.texture().iris$copyStateTo(pbrHolder.normalTexture().getTexture());
 			id.texture().iris$copyStateTo(pbrHolder.specularTexture().getTexture());
-			currentNormalTexture = VulkanicAPI.getTextureHandle(pbrHolder.normalTexture().getTexture());
-			currentSpecularTexture = VulkanicAPI.getTextureHandle(pbrHolder.specularTexture().getTexture());
+			currentNormalTexture = VulkanicCoreAPI.textureId(pbrHolder.normalTexture().getTexture());
+			currentSpecularTexture = VulkanicCoreAPI.textureId(pbrHolder.specularTexture().getTexture());
 
 			TextureFormat textureFormat = TextureFormatLoader.getFormat();
 			if (textureFormat != null) {
+				var ctx = VulkanicAPI.getCommandContext();
 				int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
 				textureFormat.setupTextureParameters(PBRType.NORMAL, pbrHolder.normalTexture());
 				textureFormat.setupTextureParameters(PBRType.SPECULAR, pbrHolder.specularTexture());
-				VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousBinding);
+				VulkanicAPI.bindTexture2D(ctx, previousBinding);
 			}
 
 			PBRTextureManager.notifyPBRTexturesChanged();

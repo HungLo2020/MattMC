@@ -83,7 +83,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		ProgramBuilder builder = ProgramBuilder.begin("colorSpaceFragment", vertexSource, null, source, ImmutableSet.of());
 
 		builder.uniformMatrix(UniformUpdateFrequency.ONCE, "projection", () -> new Matrix4f(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, -1, -1, 0, 1));
-		builder.addDynamicSampler(() -> VulkanicAPI.getTextureHandle(target), "readImage");
+		builder.addDynamicSampler(() -> net.vulkanic.VulkanicCoreAPI.textureId(target), "readImage");
 
 		swapTexture = IrisRenderSystem.createTextureId();
 		IrisRenderSystem.texImage2D(swapTexture, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, null);
@@ -114,6 +114,6 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		}
 		Program.unbind();
 		framebuffer.bindAsReadBuffer();
-		IrisRenderSystem.copyTexSubImage2D(VulkanicAPI.getTextureHandle(targetImage), 0, 0, 0, 0, 0, width, height);
+		IrisRenderSystem.copyTexSubImage2D(net.vulkanic.VulkanicCoreAPI.textureId(targetImage), 0, 0, 0, 0, 0, width, height);
 	}
 }

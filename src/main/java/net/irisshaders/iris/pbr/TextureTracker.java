@@ -9,6 +9,7 @@ import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 import org.jetbrains.annotations.Nullable;
 
 public class TextureTracker {
@@ -62,7 +63,7 @@ public class TextureTracker {
 			shaderTexturesByUnit[unit] = id;
 		}
 		if (id != null) {
-			textureViews.put(VulkanicAPI.getTextureHandle(id.texture()), id);
+			textureViews.put(VulkanicCoreAPI.textureId(id), id);
 		}
 		if (lockBindCallback) {
 			return;
@@ -77,7 +78,7 @@ public class TextureTracker {
 				pipeline.onSetShaderTexture(id);
 			}
 			// Reset texture state
-			IrisRenderSystem.bindTextureToUnit(0, id == null ? 0 : VulkanicAPI.getTextureHandle(id.texture()));
+			IrisRenderSystem.bindTextureToUnit(0, id == null ? 0 : VulkanicCoreAPI.textureId(id));
 			lockBindCallback = false;
 		}
 	}
@@ -96,7 +97,7 @@ public class TextureTracker {
 		textureViews.remove(id);
 		for (int unit = 0; unit < shaderTexturesByUnit.length; unit++) {
 			GpuTextureView view = shaderTexturesByUnit[unit];
-			if (view != null && VulkanicAPI.getTextureHandle(view.texture()) == id) {
+			if (view != null && VulkanicCoreAPI.textureId(view) == id) {
 				shaderTexturesByUnit[unit] = null;
 			}
 		}

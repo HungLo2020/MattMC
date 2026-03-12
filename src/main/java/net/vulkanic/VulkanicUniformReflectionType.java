@@ -8,23 +8,41 @@ import java.util.Optional;
 public enum VulkanicUniformReflectionType {
     FLOAT(VulkanicAPI.GL_FLOAT, "float", false, false),
     INT(VulkanicAPI.GL_INT, "int", false, false),
+    UINT(VulkanicAPI.GL_UNSIGNED_INT, "uint", false, false),
     BOOL(VulkanicAPI.GL_BOOL, "bool", false, false),
+    BOOL_VEC2(VulkanicAPI.GL_BOOL_VEC2, "bvec2", false, false),
+    BOOL_VEC3(VulkanicAPI.GL_BOOL_VEC3, "bvec3", false, false),
+    BOOL_VEC4(VulkanicAPI.GL_BOOL_VEC4, "bvec4", false, false),
     FLOAT_MAT4(VulkanicAPI.GL_FLOAT_MAT4, "mat4", false, false),
     FLOAT_VEC4(VulkanicAPI.GL_FLOAT_VEC4, "vec4", false, false),
     INT_VEC4(VulkanicAPI.GL_INT_VEC4, "ivec4", false, false),
+    UINT_VEC4(VulkanicAPI.GL_UNSIGNED_INT_VEC4, "uvec4", false, false),
     FLOAT_MAT3(VulkanicAPI.GL_FLOAT_MAT3, "mat3", false, false),
     FLOAT_VEC3(VulkanicAPI.GL_FLOAT_VEC3, "vec3", false, false),
     INT_VEC3(VulkanicAPI.GL_INT_VEC3, "ivec3", false, false),
+    UINT_VEC3(VulkanicAPI.GL_UNSIGNED_INT_VEC3, "uvec3", false, false),
     FLOAT_MAT2(VulkanicAPI.GL_FLOAT_MAT2, "mat2", false, false),
     FLOAT_VEC2(VulkanicAPI.GL_FLOAT_VEC2, "vec2", false, false),
     INT_VEC2(VulkanicAPI.GL_INT_VEC2, "ivec2", false, false),
+    UINT_VEC2(VulkanicAPI.GL_UNSIGNED_INT_VEC2, "uvec2", false, false),
     SAMPLER_1D(VulkanicAPI.GL_SAMPLER_1D, "sampler1D", true, false),
     SAMPLER_2D(VulkanicAPI.GL_SAMPLER_2D, "sampler2D", true, false),
     SAMPLER_3D(VulkanicAPI.GL_SAMPLER_3D, "sampler3D", true, false),
+    SAMPLER_CUBE(VulkanicAPI.GL_SAMPLER_CUBE, "samplerCube", true, false),
+    SAMPLER_2D_ARRAY(VulkanicAPI.GL_SAMPLER_2D_ARRAY, "sampler2DArray", true, false),
     SAMPLER_1D_SHADOW(VulkanicAPI.GL_SAMPLER_1D_SHADOW, "sampler1DShadow", true, false),
     SAMPLER_2D_SHADOW(VulkanicAPI.GL_SAMPLER_2D_SHADOW, "sampler2DShadow", true, false),
+    SAMPLER_CUBE_SHADOW(VulkanicAPI.GL_SAMPLER_CUBE_SHADOW, "samplerCubeShadow", true, false),
+    INT_SAMPLER_2D(VulkanicAPI.GL_INT_SAMPLER_2D, "isampler2D", true, false),
+    INT_SAMPLER_3D(VulkanicAPI.GL_INT_SAMPLER_3D, "isampler3D", true, false),
+    INT_SAMPLER_CUBE(VulkanicAPI.GL_INT_SAMPLER_CUBE, "isamplerCube", true, false),
+    INT_SAMPLER_2D_ARRAY(VulkanicAPI.GL_INT_SAMPLER_2D_ARRAY, "isampler2DArray", true, false),
+    UNSIGNED_INT_SAMPLER_1D(VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_1D, "usampler1D", true, false),
     UNSIGNED_INT_SAMPLER_2D(VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D, "usampler2D", true, false),
     UNSIGNED_INT_SAMPLER_3D(VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D, "usampler3D", true, false),
+    UNSIGNED_INT_SAMPLER_CUBE(VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_CUBE, "usamplerCube", true, false),
+    UNSIGNED_INT_SAMPLER_1D_ARRAY(VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_1D_ARRAY, "usampler1DArray", true, false),
+    UNSIGNED_INT_SAMPLER_2D_ARRAY(VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D_ARRAY, "usampler2DArray", true, false),
     IMAGE_1D(VulkanicAPI.GL_IMAGE_1D, "image1D", false, true),
     IMAGE_2D(VulkanicAPI.GL_IMAGE_2D, "image2D", false, true),
     IMAGE_3D(VulkanicAPI.GL_IMAGE_3D, "image3D", false, true),
@@ -33,9 +51,13 @@ public enum VulkanicUniformReflectionType {
     INT_IMAGE_1D(VulkanicAPI.GL_INT_IMAGE_1D, "iimage1D", false, true),
     INT_IMAGE_2D(VulkanicAPI.GL_INT_IMAGE_2D, "iimage2D", false, true),
     INT_IMAGE_3D(VulkanicAPI.GL_INT_IMAGE_3D, "iimage3D", false, true),
+    INT_IMAGE_1D_ARRAY(VulkanicAPI.GL_INT_IMAGE_1D_ARRAY, "iimage1DArray", false, true),
+    INT_IMAGE_2D_ARRAY(VulkanicAPI.GL_INT_IMAGE_2D_ARRAY, "iimage2DArray", false, true),
     UNSIGNED_INT_IMAGE_1D(VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D, "uimage1D", false, true),
     UNSIGNED_INT_IMAGE_2D(VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D, "uimage2D", false, true),
-    UNSIGNED_INT_IMAGE_3D(VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D, "uimage3D", false, true);
+    UNSIGNED_INT_IMAGE_3D(VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D, "uimage3D", false, true),
+    UNSIGNED_INT_IMAGE_1D_ARRAY(VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D_ARRAY, "uimage1DArray", false, true),
+    UNSIGNED_INT_IMAGE_2D_ARRAY(VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D_ARRAY, "uimage2DArray", false, true);
 
     private final int legacyGlConstant;
     private final String glslTypeName;
@@ -84,23 +106,41 @@ public enum VulkanicUniformReflectionType {
         return switch (glConstant) {
             case VulkanicAPI.GL_FLOAT -> Optional.of(FLOAT);
             case VulkanicAPI.GL_INT -> Optional.of(INT);
+            case VulkanicAPI.GL_UNSIGNED_INT -> Optional.of(UINT);
             case VulkanicAPI.GL_BOOL -> Optional.of(BOOL);
+            case VulkanicAPI.GL_BOOL_VEC2 -> Optional.of(BOOL_VEC2);
+            case VulkanicAPI.GL_BOOL_VEC3 -> Optional.of(BOOL_VEC3);
+            case VulkanicAPI.GL_BOOL_VEC4 -> Optional.of(BOOL_VEC4);
             case VulkanicAPI.GL_FLOAT_MAT4 -> Optional.of(FLOAT_MAT4);
             case VulkanicAPI.GL_FLOAT_VEC4 -> Optional.of(FLOAT_VEC4);
             case VulkanicAPI.GL_INT_VEC4 -> Optional.of(INT_VEC4);
+            case VulkanicAPI.GL_UNSIGNED_INT_VEC4 -> Optional.of(UINT_VEC4);
             case VulkanicAPI.GL_FLOAT_MAT3 -> Optional.of(FLOAT_MAT3);
             case VulkanicAPI.GL_FLOAT_VEC3 -> Optional.of(FLOAT_VEC3);
             case VulkanicAPI.GL_INT_VEC3 -> Optional.of(INT_VEC3);
+            case VulkanicAPI.GL_UNSIGNED_INT_VEC3 -> Optional.of(UINT_VEC3);
             case VulkanicAPI.GL_FLOAT_MAT2 -> Optional.of(FLOAT_MAT2);
             case VulkanicAPI.GL_FLOAT_VEC2 -> Optional.of(FLOAT_VEC2);
             case VulkanicAPI.GL_INT_VEC2 -> Optional.of(INT_VEC2);
+            case VulkanicAPI.GL_UNSIGNED_INT_VEC2 -> Optional.of(UINT_VEC2);
             case VulkanicAPI.GL_SAMPLER_1D -> Optional.of(SAMPLER_1D);
             case VulkanicAPI.GL_SAMPLER_2D -> Optional.of(SAMPLER_2D);
             case VulkanicAPI.GL_SAMPLER_3D -> Optional.of(SAMPLER_3D);
+            case VulkanicAPI.GL_SAMPLER_CUBE -> Optional.of(SAMPLER_CUBE);
+            case VulkanicAPI.GL_SAMPLER_2D_ARRAY -> Optional.of(SAMPLER_2D_ARRAY);
             case VulkanicAPI.GL_SAMPLER_1D_SHADOW -> Optional.of(SAMPLER_1D_SHADOW);
             case VulkanicAPI.GL_SAMPLER_2D_SHADOW -> Optional.of(SAMPLER_2D_SHADOW);
+            case VulkanicAPI.GL_SAMPLER_CUBE_SHADOW -> Optional.of(SAMPLER_CUBE_SHADOW);
+            case VulkanicAPI.GL_INT_SAMPLER_2D -> Optional.of(INT_SAMPLER_2D);
+            case VulkanicAPI.GL_INT_SAMPLER_3D -> Optional.of(INT_SAMPLER_3D);
+            case VulkanicAPI.GL_INT_SAMPLER_CUBE -> Optional.of(INT_SAMPLER_CUBE);
+            case VulkanicAPI.GL_INT_SAMPLER_2D_ARRAY -> Optional.of(INT_SAMPLER_2D_ARRAY);
+            case VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_1D -> Optional.of(UNSIGNED_INT_SAMPLER_1D);
             case VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D -> Optional.of(UNSIGNED_INT_SAMPLER_2D);
             case VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D -> Optional.of(UNSIGNED_INT_SAMPLER_3D);
+            case VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_CUBE -> Optional.of(UNSIGNED_INT_SAMPLER_CUBE);
+            case VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_1D_ARRAY -> Optional.of(UNSIGNED_INT_SAMPLER_1D_ARRAY);
+            case VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D_ARRAY -> Optional.of(UNSIGNED_INT_SAMPLER_2D_ARRAY);
             case VulkanicAPI.GL_IMAGE_1D -> Optional.of(IMAGE_1D);
             case VulkanicAPI.GL_IMAGE_2D -> Optional.of(IMAGE_2D);
             case VulkanicAPI.GL_IMAGE_3D -> Optional.of(IMAGE_3D);
@@ -109,9 +149,13 @@ public enum VulkanicUniformReflectionType {
             case VulkanicAPI.GL_INT_IMAGE_1D -> Optional.of(INT_IMAGE_1D);
             case VulkanicAPI.GL_INT_IMAGE_2D -> Optional.of(INT_IMAGE_2D);
             case VulkanicAPI.GL_INT_IMAGE_3D -> Optional.of(INT_IMAGE_3D);
+            case VulkanicAPI.GL_INT_IMAGE_1D_ARRAY -> Optional.of(INT_IMAGE_1D_ARRAY);
+            case VulkanicAPI.GL_INT_IMAGE_2D_ARRAY -> Optional.of(INT_IMAGE_2D_ARRAY);
             case VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D -> Optional.of(UNSIGNED_INT_IMAGE_1D);
             case VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D -> Optional.of(UNSIGNED_INT_IMAGE_2D);
             case VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D -> Optional.of(UNSIGNED_INT_IMAGE_3D);
+            case VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D_ARRAY -> Optional.of(UNSIGNED_INT_IMAGE_1D_ARRAY);
+            case VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D_ARRAY -> Optional.of(UNSIGNED_INT_IMAGE_2D_ARRAY);
             default -> Optional.empty();
         };
     }

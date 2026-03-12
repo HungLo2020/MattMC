@@ -20,7 +20,7 @@ public class DynamicMoveableTexture extends DynamicTexture {
     }
 
     public int getIndex() {
-        return VulkanicAPI.getTextureHandle(this.getTexture());
+        return net.vulkanic.VulkanicCoreAPI.textureId(this.getTexture());
     }
 
     public void moveX(int offset) {

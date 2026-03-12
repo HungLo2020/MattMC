@@ -1,5 +1,8 @@
 package net.vulkanic;
 
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.GpuTextureView;
+
 import java.util.Objects;
 
 /**
@@ -19,6 +22,46 @@ public final class VulkanicCoreAPI {
 
     public static void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
         VulkanicAPI.bindBuffer(ctx, target, buffer);
+    }
+
+    public static void bufferData(CommandContext ctx, VulkanicBufferTarget target, java.nio.ByteBuffer data, int usage) {
+        VulkanicAPI.bufferData(ctx, target.toLegacyGlTarget(), data, usage);
+    }
+
+    public static void bufferData(CommandContext ctx, VulkanicBufferTarget target, long size, int usage) {
+        VulkanicAPI.bufferData(ctx, target.toLegacyGlTarget(), size, usage);
+    }
+
+    public static void bufferSubData(CommandContext ctx, VulkanicBufferTarget target, long offset, java.nio.ByteBuffer data) {
+        VulkanicAPI.bufferSubData(ctx, target, offset, data);
+    }
+
+    public static void bufferStorage(CommandContext ctx, VulkanicBufferTarget target, java.nio.ByteBuffer data, int flags) {
+        VulkanicAPI.bufferStorage(ctx, target, data, flags);
+    }
+
+    public static void bufferStorage(CommandContext ctx, VulkanicBufferTarget target, long size, int flags) {
+        VulkanicAPI.bufferStorage(ctx, target, size, flags);
+    }
+
+    public static java.nio.ByteBuffer mapBufferRange(CommandContext ctx, VulkanicBufferTarget target, long offset, long length, int access) {
+        return VulkanicAPI.mapBuffer(ctx, target.toLegacyGlTarget(), offset, length, access);
+    }
+
+    public static void unmapBuffer(CommandContext ctx, VulkanicBufferTarget target) {
+        VulkanicAPI.unmapBuffer(ctx, target.toLegacyGlTarget());
+    }
+
+    public static void flushMappedBufferRange(CommandContext ctx, VulkanicBufferTarget target, long offset, long length) {
+        VulkanicAPI.flushMappedBufferRange(ctx, target.toLegacyGlTarget(), offset, length);
+    }
+
+    public static int textureId(GpuTexture texture) {
+        return VulkanicAPI.getTextureHandle(texture);
+    }
+
+    public static int textureId(GpuTextureView textureView) {
+        return textureId(textureView.texture());
     }
 
     public static void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled) {

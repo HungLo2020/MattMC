@@ -117,7 +117,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		}
 		
 		// Iris PBR: From texture.pbr.MixinTextureAtlas - track texture after upload
-		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(VulkanicAPI.getTextureHandle(texture), this);
+		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(texture), this);
 	}
 
 	@Override

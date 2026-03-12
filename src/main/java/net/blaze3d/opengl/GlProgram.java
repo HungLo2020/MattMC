@@ -15,7 +15,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderManager;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.VulkanicProgramParameterName;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -139,11 +138,12 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 			}
 		}
 
-		int o = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), this.programId, VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS);
+		java.util.List<VulkanicAPI.ActiveUniformBlockInfo> activeUniformBlocks = VulkanicAPI.getActiveUniformBlocks(VulkanicAPI.getCommandContext(), this.programId);
 
-		for (int p = 0; p < o; p++) {
-			String string = VulkanicAPI.retrieveActiveUniformBlockName(VulkanicAPI.getCommandContext(), this.programId, p);
+		for (VulkanicAPI.ActiveUniformBlockInfo activeUniformBlock : activeUniformBlocks) {
+			String string = activeUniformBlock.name();
 			if (!this.uniformsByName.containsKey(string)) {
+				int p = activeUniformBlock.index();
 				if (!list2.contains(string) && BUILT_IN_UNIFORMS.contains(string)) {
 					int n = i++;
 					VulkanicAPI.uniformBlockBinding(VulkanicAPI.getCommandContext(), this.programId, p, n);

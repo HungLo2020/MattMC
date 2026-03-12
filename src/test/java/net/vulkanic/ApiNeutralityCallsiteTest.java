@@ -46,16 +46,32 @@ public class ApiNeutralityCallsiteTest {
             "Texture swizzle component mapping should recognize GL_RED");
         assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_SAMPLER_2D).isPresent(),
             "Uniform reflection type mapping should recognize GL_SAMPLER_2D");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_SAMPLER_CUBE).isPresent(),
+            "Uniform reflection type mapping should recognize GL_SAMPLER_CUBE");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_UNSIGNED_INT_VEC3).isPresent(),
+            "Uniform reflection type mapping should recognize GL_UNSIGNED_INT_VEC3");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_BOOL_VEC4).isPresent(),
+            "Uniform reflection type mapping should recognize GL_BOOL_VEC4");
         assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_IMAGE_2D_ARRAY).isPresent(),
             "Uniform reflection type mapping should recognize GL_IMAGE_2D_ARRAY");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_INT_IMAGE_2D_ARRAY).isPresent(),
+            "Uniform reflection type mapping should recognize GL_INT_IMAGE_2D_ARRAY");
         assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_SAMPLER_2D)
                 .orElseThrow(() -> new IllegalStateException("Missing reflection mapping for GL_SAMPLER_2D"))
                 .isSampler(),
             "GL_SAMPLER_2D reflection type should classify as sampler");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_SAMPLER_CUBE)
+                .orElseThrow(() -> new IllegalStateException("Missing reflection mapping for GL_SAMPLER_CUBE"))
+                .isSampler(),
+            "GL_SAMPLER_CUBE reflection type should classify as sampler");
         assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_IMAGE_2D_ARRAY)
                 .orElseThrow(() -> new IllegalStateException("Missing reflection mapping for GL_IMAGE_2D_ARRAY"))
                 .isImage(),
             "GL_IMAGE_2D_ARRAY reflection type should classify as image");
+        assertTrue(VulkanicUniformReflectionType.fromLegacyGlConstant(VulkanicAPI.GL_INT_IMAGE_2D_ARRAY)
+                .orElseThrow(() -> new IllegalStateException("Missing reflection mapping for GL_INT_IMAGE_2D_ARRAY"))
+                .isImage(),
+            "GL_INT_IMAGE_2D_ARRAY reflection type should classify as image");
     }
 
     @Test
@@ -63,12 +79,22 @@ public class ApiNeutralityCallsiteTest {
         String relative = "net/irisshaders/iris/gl/program/ProgramUniforms.java";
         String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
 
-        assertTrue(source.contains("VulkanicUniformReflectionType.fromLegacyGlConstant(type)"),
-            "ProgramUniforms should route reflected type resolution through VulkanicUniformReflectionType helper: " + relative);
+        assertTrue(source.contains("activeUniformInfo.reflectionType()"),
+            "ProgramUniforms should resolve reflected type through ActiveUniformInfo.reflectionType typed metadata: " + relative);
+        assertTrue(source.contains("activeUniformInfo.reflectionTypeName()"),
+            "ProgramUniforms should use ActiveUniformInfo.reflectionTypeName for unsupported-type diagnostics: " + relative);
         assertTrue(source.contains("type.isSampler()"),
             "ProgramUniforms should classify sampler uniforms using VulkanicUniformReflectionType.isSampler(): " + relative);
         assertTrue(source.contains("type.isImage()"),
             "ProgramUniforms should classify image uniforms using VulkanicUniformReflectionType.isImage(): " + relative);
+        assertTrue(source.contains("VulkanicAPI.getActiveUniforms("),
+            "ProgramUniforms should enumerate reflected uniforms through VulkanicAPI.getActiveUniforms typed metadata seam: " + relative);
+        assertFalse(source.contains("IrisRenderSystem.getActiveUniform("),
+            "ProgramUniforms should avoid IrisRenderSystem active-uniform wrapper usage in typed reflection path: " + relative);
+        assertFalse(source.contains("VulkanicProgramParameterName.ACTIVE_UNIFORMS"),
+            "ProgramUniforms should avoid direct ACTIVE_UNIFORMS query plumbing when typed active-uniform enumeration helper is available: " + relative);
+        assertFalse(source.contains("activeUniformInfo.legacyType()"),
+            "ProgramUniforms should avoid direct legacy active-uniform type usage when typed reflection metadata is available: " + relative);
 
         Pattern rawTypeComparisonPattern = Pattern.compile("type\\s*==\\s*VulkanicAPI\\.GL_");
         assertFalse(rawTypeComparisonPattern.matcher(source).find(),
@@ -77,6 +103,43 @@ public class ApiNeutralityCallsiteTest {
         Pattern hardcodedSamplerSwitchPattern = Pattern.compile("case\\s+SAMPLER_1D|case\\s+SAMPLER_2D|case\\s+SAMPLER_3D");
         assertFalse(hardcodedSamplerSwitchPattern.matcher(source).find(),
             "ProgramUniforms sampler classification should avoid hardcoded sampler enum cases in favor of typed helpers: " + relative);
+    }
+
+    @Test
+    public void testActiveUniformReflectionCallsitesPreferTypedMetadataHelpers() throws IOException {
+        List<String> allowedReflectionSeamFiles = List.of(
+            "net/vulkanic/VulkanicAPI.java",
+            "net/irisshaders/iris/gl/IrisRenderSystem.java"
+        );
+
+        List<String> offenders = new java.util.ArrayList<>();
+
+        try (var paths = Files.walk(SRC_MAIN_JAVA)) {
+            paths.filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".java"))
+                .forEach(path -> {
+                    Path relativePath = SRC_MAIN_JAVA.relativize(path);
+                    String relative = relativePath.toString().replace('\\', '/');
+
+                    if (allowedReflectionSeamFiles.contains(relative)) {
+                        return;
+                    }
+
+                    try {
+                        String source = Files.readString(path);
+                        if (source.contains("VulkanicAPI.getActiveUniform(")
+                            || source.contains("VulkanicAPI.retrieveActiveUniformBlockName(")
+                            || source.contains("IrisRenderSystem.getActiveUniform(")) {
+                            offenders.add(relative);
+                        }
+                    } catch (IOException exception) {
+                        throw new RuntimeException(exception);
+                    }
+                });
+        }
+
+        assertTrue(offenders.isEmpty(),
+            "Active-uniform reflection callsites should use typed metadata helpers (getActiveUniforms/getActiveUniformBlocks); offenders: " + offenders);
     }
 
     @Test
@@ -311,8 +374,10 @@ public class ApiNeutralityCallsiteTest {
 
         assertFalse(source.contains("getProgramParameter(VulkanicAPI.getCommandContext(), this.programId, 35382)"),
             "GlProgram should avoid raw numeric active-uniform-block pname queries: " + relative);
-        assertTrue(source.contains("VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS"),
-            "GlProgram should query active uniform blocks via VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS: " + relative);
+        assertTrue(source.contains("VulkanicAPI.getActiveUniformBlocks("),
+            "GlProgram should route active uniform block reflection metadata through VulkanicAPI.getActiveUniformBlocks seam: " + relative);
+        assertFalse(source.contains("retrieveActiveUniformBlockName("),
+            "GlProgram should avoid low-level per-block name queries when typed block metadata helper is available: " + relative);
     }
 
     @Test
@@ -345,6 +410,44 @@ public class ApiNeutralityCallsiteTest {
             assertFalse(source.contains("TextureType.TEXTURE_2D.getGlType()"),
                 "Iris callsite should use typed/default-2D overloads instead of explicit GL target arguments: " + relative);
         }
+    }
+
+    @Test
+    public void testSelectedIrisTextureIdCallsitesPreferTypedCoreApiHelper() throws IOException {
+        List<String> files = List.of(
+            "net/irisshaders/iris/pipeline/CustomTextureManager.java",
+            "net/irisshaders/iris/targets/RenderTargets.java",
+            "net/irisshaders/iris/pipeline/FinalPassRenderer.java",
+            "net/irisshaders/iris/pipeline/IrisRenderingPipeline.java",
+            "net/irisshaders/iris/pbr/TextureTracker.java"
+        );
+
+        for (String relative : files) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertFalse(source.contains("VulkanicAPI.getTextureHandle("),
+                "Selected Iris texture-id callsites should avoid direct VulkanicAPI.getTextureHandle usage: " + relative);
+            assertTrue(source.contains("VulkanicCoreAPI.textureId("),
+                "Selected Iris texture-id callsites should route through VulkanicCoreAPI.textureId helper: " + relative);
+        }
+
+        String coreApiRelative = "net/vulkanic/VulkanicCoreAPI.java";
+        String coreApiSource = Files.readString(SRC_MAIN_JAVA.resolve(coreApiRelative));
+
+        assertTrue(coreApiSource.contains("public static int textureId(GpuTextureView textureView)"),
+            "VulkanicCoreAPI should expose textureId(GpuTextureView) for typed texture-view callsites: " + coreApiRelative);
+        assertTrue(coreApiSource.contains("return textureId(textureView.texture());"),
+            "VulkanicCoreAPI texture-view helper should delegate through typed texture helper: " + coreApiRelative);
+    }
+
+    @Test
+    public void testGlCommandEncoderPrefersTypedTextureIdHelper() throws IOException {
+        String relative = "net/blaze3d/opengl/GlCommandEncoder.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        assertFalse(source.contains("VulkanicAPI.getTextureHandle("),
+            "GlCommandEncoder should avoid direct VulkanicAPI.getTextureHandle usage in frontend callsites: " + relative);
+        assertTrue(source.contains("VulkanicCoreAPI.textureId("),
+            "GlCommandEncoder should resolve texture IDs through VulkanicCoreAPI.textureId typed helper: " + relative);
     }
 
     @Test

@@ -86,7 +86,7 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOnLightLayer() {
-		IrisRenderSystem.bindTextureToUnit(2, VulkanicAPI.getTextureHandle(this.texture));
+		IrisRenderSystem.bindTextureToUnit(2, net.vulkanic.VulkanicCoreAPI.textureId(this.texture));
 		TextureTracker.INSTANCE.onSetShaderTexture(2, this.textureView);
 	}
 

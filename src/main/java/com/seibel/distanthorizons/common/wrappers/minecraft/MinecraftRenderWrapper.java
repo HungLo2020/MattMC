@@ -209,7 +209,7 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 			return -1;
 		}
 
-		int textureId = VulkanicAPI.getTextureHandle(depthTexture);
+		int textureId = net.vulkanic.VulkanicCoreAPI.textureId(depthTexture);
 		if (textureId <= 0)
 		{
 			return -1;
@@ -232,7 +232,7 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 			return -1;
 		}
 
-		int textureId = VulkanicAPI.getTextureHandle(colorTexture);
+		int textureId = net.vulkanic.VulkanicCoreAPI.textureId(colorTexture);
 		if (textureId <= 0)
 		{
 			return -1;

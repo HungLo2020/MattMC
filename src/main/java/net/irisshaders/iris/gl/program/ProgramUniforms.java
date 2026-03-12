@@ -2,7 +2,6 @@ package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableList;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import net.irisshaders.iris.gl.uniform.DynamicLocationalUniformHolder;
 import net.irisshaders.iris.gl.uniform.Uniform;
@@ -12,11 +11,8 @@ import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.VulkanicProgramParameterName;
 import net.vulkanic.VulkanicUniformReflectionType;
-import org.lwjgl.BufferUtils;
 
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -61,14 +57,12 @@ public class ProgramUniforms {
 		return new Builder(name, program);
 	}
 
-	private static String getTypeName(int type) {
-		return VulkanicUniformReflectionType.fromLegacyGlConstant(type)
-			.map(VulkanicUniformReflectionType::getGlslTypeName)
-			.orElse("(unknown:" + type + ")");
+	private static String getTypeName(VulkanicAPI.ActiveUniformInfo activeUniformInfo) {
+		return activeUniformInfo.reflectionTypeName();
 	}
 
-	private static UniformType getExpectedType(int type) {
-		return VulkanicUniformReflectionType.fromLegacyGlConstant(type)
+	private static UniformType getExpectedType(VulkanicAPI.ActiveUniformInfo activeUniformInfo) {
+		return activeUniformInfo.reflectionType()
 			.map(ProgramUniforms::getExpectedType)
 			.orElse(null);
 	}
@@ -84,16 +78,16 @@ public class ProgramUniforms {
 
 		return switch (type) {
 			case FLOAT -> UniformType.FLOAT;
-			case INT, BOOL -> UniformType.INT;
+			case INT, UINT, BOOL -> UniformType.INT;
 			case FLOAT_MAT4 -> UniformType.MAT4;
 			case FLOAT_VEC4 -> UniformType.VEC4;
-			case INT_VEC4 -> UniformType.VEC4I;
+			case INT_VEC4, UINT_VEC4, BOOL_VEC4 -> UniformType.VEC4I;
 			case FLOAT_MAT3 -> UniformType.MAT3;
 			case FLOAT_VEC3 -> UniformType.VEC3;
-			case INT_VEC3 -> UniformType.VEC3I;
+			case INT_VEC3, UINT_VEC3, BOOL_VEC3 -> UniformType.VEC3I;
 			case FLOAT_MAT2 -> null;
 			case FLOAT_VEC2 -> UniformType.VEC2;
-			case INT_VEC2 -> UniformType.VEC2I;
+			case INT_VEC2, UINT_VEC2, BOOL_VEC2 -> UniformType.VEC2I;
 			default -> null;
 		};
 	}
@@ -218,23 +212,16 @@ public class ProgramUniforms {
 		public ProgramUniforms buildUniforms() {
 			// Check for any unsupported uniforms and warn about them so that we can easily figure out what uniforms we
 			// need to add.
-			int activeUniforms = VulkanicAPI.getProgramParameter(VulkanicAPI.getCommandContext(), program, VulkanicProgramParameterName.ACTIVE_UNIFORMS);
-			IntBuffer sizeBuf = BufferUtils.createIntBuffer(1);
-			IntBuffer typeBuf = BufferUtils.createIntBuffer(1);
-
-			for (int index = 0; index < activeUniforms; index++) {
-				String name = IrisRenderSystem.getActiveUniform(program, index, 128, sizeBuf, typeBuf);
+			for (VulkanicAPI.ActiveUniformInfo activeUniformInfo : VulkanicAPI.getActiveUniforms(VulkanicAPI.getCommandContext(), program, 128)) {
+				String name = activeUniformInfo.name();
 
 				if (name.isEmpty()) {
 					// No further information available.
 					continue;
 				}
 
-				int size = sizeBuf.get(0);
-				int type = typeBuf.get(0);
-
 				UniformType provided = uniformNames.get(name);
-				UniformType expected = getExpectedType(type);
+				UniformType expected = getExpectedType(activeUniformInfo);
 
 				if (provided != null && provided != expected) {
 					String expectedName;
@@ -242,7 +229,7 @@ public class ProgramUniforms {
 					if (expected != null) {
 						expectedName = expected.toString();
 					} else {
-						expectedName = "(unsupported type: " + getTypeName(type) + ")";
+						expectedName = "(unsupported type: " + getTypeName(activeUniformInfo) + ")";
 					}
 
 					Iris.logger.error("[" + this.name + "] Wrong uniform type for " + name + ": Iris is providing " + provided + " but the program expects " + expectedName + ". Disabling that uniform.");
