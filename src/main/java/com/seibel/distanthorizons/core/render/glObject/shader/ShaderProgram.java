@@ -10,6 +10,8 @@ import java.util.function.Supplier;
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicUniformLocation;
 import org.lwjgl.system.MemoryStack;
@@ -87,19 +89,20 @@ public class ShaderProgram
 
 	public ShaderProgram(CommandContext ctx, List<Supplier<String>> vertSupplierList, List<Supplier<String>> fragSupplierList, String[] attributes)
 	{
-		this.id = VulkanicAPI.createShaderProgram(ctx);
+		VulkanicProgramHandle program = VulkanicAPI.createShaderProgramHandle(ctx);
+		this.id = program.value();
 		
 		for (Supplier<String> vertSupplier : vertSupplierList)
 		{
 			Shader vertShader = new Shader(ctx, VulkanicShaderStage.VERTEX, vertSupplier.get());
-			VulkanicAPI.attachShader(ctx, this.id, vertShader.id);
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(vertShader.id));
 			vertShader.free(ctx); // important!
 		}
 		
 		for (Supplier<String> fragSupplier : fragSupplierList)
 		{
 			Shader fragShader = new Shader(ctx, VulkanicShaderStage.FRAGMENT, fragSupplier.get());
-			VulkanicAPI.attachShader(ctx, this.id, fragShader.id);
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(fragShader.id));
 			fragShader.free(ctx); // important!
 		}
 		
@@ -107,11 +110,11 @@ public class ShaderProgram
 		{
 			VulkanicAPI.setAttributeLocation(ctx, this.id, i, attributes[i]);
 		}
-		VulkanicAPI.linkProgram(ctx, this.id);
+		VulkanicAPI.linkProgram(ctx, program);
 		
-		if (!VulkanicAPI.isProgramLinkSuccessful(ctx, this.id))
+		if (!VulkanicAPI.isProgramLinkSuccessful(ctx, program))
 		{
-			String message = "Shader Link Error. Details: " + VulkanicAPI.getProgramInfoLog(ctx, this.id);
+			String message = "Shader Link Error. Details: " + VulkanicAPI.getProgramInfoLog(ctx, program);
 			this.free(ctx); // important!
 			throw new RuntimeException(message);
 		}
@@ -127,7 +130,7 @@ public class ShaderProgram
 	public void unbind(CommandContext ctx) { VulkanicAPI.bindShaderProgram(ctx, 0); }
 	
 	public void free() { this.free(commandContext()); }
-	public void free(CommandContext ctx) { VulkanicAPI.deleteProgram(ctx, this.id); }
+	public void free(CommandContext ctx) { VulkanicAPI.deleteProgram(ctx, VulkanicProgramHandle.of(this.id)); }
 	
 	
 	

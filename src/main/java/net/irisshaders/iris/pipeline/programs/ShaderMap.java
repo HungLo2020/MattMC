@@ -4,6 +4,7 @@ import net.blaze3d.opengl.GlProgram;
 import net.irisshaders.iris.gl.shader.ShaderCompileException;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -24,7 +25,7 @@ public class ShaderMap {
 		loadingMap.forAllShaders((key, shader) -> {
 			if (shader != null) {
 				if (deletionFunction.apply(shader)) {
-					VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), shader.id().program());
+					VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(shader.id().program()));
 					return;
 				}
 

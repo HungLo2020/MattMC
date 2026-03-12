@@ -12,6 +12,7 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderHandle;
 import net.vulkanic.VulkanicShaderStage;
 import org.lwjgl.system.NativeType;
 
@@ -63,20 +64,21 @@ public class Shader
 	{
 		LOGGER.info("Loading shader at [" + path + "]");
 		// Create an empty shader object
-		this.id = VulkanicAPI.createShader(ctx, type);
+		this.id = createShaderId(ctx, type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"].");
 		}
 		
+		VulkanicShaderHandle shaderHandle = VulkanicShaderHandle.of(this.id);
 		StringBuilder source = loadFile(path, absoluteFilePath, new StringBuilder());
 		safeShaderSource(ctx, this.id, source);
 		
-		VulkanicAPI.compileShader(ctx, this.id);
+		VulkanicAPI.compileShader(ctx, shaderHandle);
 		// check if the shader compiled
-		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, this.id))
+		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, shaderHandle))
 		{
-			String message = "Shader compiler error. Details: ["+VulkanicAPI.getShaderInfoLog(ctx, this.id)+"].";
+			String message = "Shader compiler error. Details: ["+VulkanicAPI.getShaderInfoLog(ctx, shaderHandle)+"].";
 			this.free(ctx); // important!
 			throw new RuntimeException(message);
 		}
@@ -108,19 +110,20 @@ public class Shader
 		}
 		
 		// Create an empty shader object
-		this.id = VulkanicAPI.createShader(ctx, type);
+		this.id = createShaderId(ctx, type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"] and Source: \n["+sourceString+"].");
 		}
 		
+		VulkanicShaderHandle shaderHandle = VulkanicShaderHandle.of(this.id);
 		safeShaderSource(ctx, this.id, sourceString);
-		VulkanicAPI.compileShader(ctx, this.id);
+		VulkanicAPI.compileShader(ctx, shaderHandle);
 		// check if the shader compiled
-		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, this.id))
+		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, shaderHandle))
 		{
 			
-			String message = "Shader compiler error. Details: [" + VulkanicAPI.getShaderInfoLog(ctx, this.id) + "]\n";
+			String message = "Shader compiler error. Details: [" + VulkanicAPI.getShaderInfoLog(ctx, shaderHandle) + "]\n";
 			message += "Source: \n[" + sourceString + "]";
 			this.free(ctx); // important!
 			throw new RuntimeException(message);
@@ -149,10 +152,17 @@ public class Shader
 	{
 		VulkanicAPI.uploadShaderSource(ctx, glId, source);
 	}
+
+	private static int createShaderId(CommandContext ctx, int type)
+	{
+		return VulkanicShaderStage.fromLegacyGlShaderType(type)
+			.map(stage -> VulkanicAPI.createShaderHandle(ctx, stage).value())
+			.orElseGet(() -> VulkanicAPI.createShader(ctx, type));
+	}
 	
 	public void free() { this.free(VulkanicAPI.getCommandContext()); }
 
-	public void free(CommandContext ctx) { VulkanicAPI.deleteShader(ctx, this.id); }
+	public void free(CommandContext ctx) { VulkanicAPI.deleteShader(ctx, VulkanicShaderHandle.of(this.id)); }
 	
 	public static StringBuilder loadFile(String path, boolean absoluteFilePath, StringBuilder stringBuilder)
 	{

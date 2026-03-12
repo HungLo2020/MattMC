@@ -373,14 +373,15 @@ public class GlDevice implements GpuDevice {
 	}
 
 	private static void sacrificeShaderToOpenGlAndAmd() {
-		int i = net.vulkanic.VulkanicAPI.createShader(
-			net.vulkanic.VulkanicAPI.getCommandContext(),
+		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
+		net.vulkanic.VulkanicShaderHandle shader = net.vulkanic.VulkanicAPI.createShaderHandle(
+			ctx,
 			net.vulkanic.VulkanicShaderStage.VERTEX
 		);
-		int j = net.vulkanic.VulkanicAPI.createShaderProgram(net.vulkanic.VulkanicAPI.getCommandContext());
-		net.vulkanic.VulkanicAPI.attachShader(net.vulkanic.VulkanicAPI.getCommandContext(), j, i);
-		net.vulkanic.VulkanicAPI.deleteShader(net.vulkanic.VulkanicAPI.getCommandContext(), i);
-		net.vulkanic.VulkanicAPI.deleteProgram(net.vulkanic.VulkanicAPI.getCommandContext(), j);
+		net.vulkanic.VulkanicProgramHandle program = net.vulkanic.VulkanicAPI.createShaderProgramHandle(ctx);
+		net.vulkanic.VulkanicAPI.attachShader(ctx, program, shader);
+		net.vulkanic.VulkanicAPI.deleteShader(ctx, shader);
+		net.vulkanic.VulkanicAPI.deleteProgram(ctx, program);
 	}
 
 	@Override
@@ -451,15 +452,15 @@ public class GlDevice implements GpuDevice {
 		} else {
 			String string2 = GlslPreprocessor.injectDefines(string, shaderCompilationKey.defines);
 			net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
-			int i = net.vulkanic.VulkanicAPI.createShader(ctx, toVulkanicShaderStage(shaderCompilationKey.type));
-			net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(i, string2);
-			net.vulkanic.VulkanicAPI.compileShader(ctx, i);
-			if (!net.vulkanic.VulkanicAPI.isShaderCompileSuccessful(ctx, i)) {
-				String string3 = StringUtils.trim(net.vulkanic.VulkanicAPI.getShaderInfoLog(ctx, i));
+			net.vulkanic.VulkanicShaderHandle shader = net.vulkanic.VulkanicAPI.createShaderHandle(ctx, toVulkanicShaderStage(shaderCompilationKey.type));
+			net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader.value(), string2);
+			net.vulkanic.VulkanicAPI.compileShader(ctx, shader);
+			if (!net.vulkanic.VulkanicAPI.isShaderCompileSuccessful(ctx, shader)) {
+				String string3 = StringUtils.trim(net.vulkanic.VulkanicAPI.getShaderInfoLog(ctx, shader));
 				LOGGER.error("Couldn't compile {} shader ({}): {}", shaderCompilationKey.type.getName(), shaderCompilationKey.id, string3);
 				return GlShaderModule.INVALID_SHADER;
 			} else {
-				GlShaderModule glShaderModule = new GlShaderModule(i, shaderCompilationKey.id, shaderCompilationKey.type);
+				GlShaderModule glShaderModule = new GlShaderModule(shader.value(), shaderCompilationKey.id, shaderCompilationKey.type);
 				this.debugLabels.applyLabel(glShaderModule);
 				return glShaderModule;
 			}

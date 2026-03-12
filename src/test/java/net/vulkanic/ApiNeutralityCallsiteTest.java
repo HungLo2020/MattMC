@@ -546,6 +546,51 @@ public class ApiNeutralityCallsiteTest {
             "IrisLodRenderProgram should create programs via typed handle seam: " + dhLodRelative);
         assertTrue(dhLodSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(id))"),
             "IrisLodRenderProgram should delete programs via typed handle seam: " + dhLodRelative);
+
+        String blazeGlProgramRelative = "net/blaze3d/opengl/GlProgram.java";
+        String blazeGlProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(blazeGlProgramRelative));
+        assertTrue(blazeGlProgramSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "Blaze3D GlProgram should create programs via typed handle seam: " + blazeGlProgramRelative);
+        assertTrue(blazeGlProgramSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(glShaderModule.getShaderId()))"),
+            "Blaze3D GlProgram should attach shaders via typed handle seam: " + blazeGlProgramRelative);
+        assertTrue(blazeGlProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(this.programId))"),
+            "Blaze3D GlProgram should delete programs via typed handle seam: " + blazeGlProgramRelative);
+
+        String blazeShaderModuleRelative = "net/blaze3d/opengl/GlShaderModule.java";
+        String blazeShaderModuleSource = Files.readString(SRC_MAIN_JAVA.resolve(blazeShaderModuleRelative));
+        assertTrue(blazeShaderModuleSource.contains("net.vulkanic.VulkanicShaderHandle.of(this.shaderId)"),
+            "Blaze3D GlShaderModule should delete shaders via typed handle seam: " + blazeShaderModuleRelative);
+
+        String blazeDeviceRelative = "net/blaze3d/opengl/GlDevice.java";
+        String blazeDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve(blazeDeviceRelative));
+        assertTrue(blazeDeviceSource.contains("net.vulkanic.VulkanicAPI.createShaderHandle(ctx, toVulkanicShaderStage(shaderCompilationKey.type))"),
+            "Blaze3D GlDevice should create shaders via typed handle seam in shader compilation path: " + blazeDeviceRelative);
+        assertTrue(blazeDeviceSource.contains("net.vulkanic.VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "Blaze3D GlDevice should create programs via typed handle seam in AMD workaround path: " + blazeDeviceRelative);
+
+        String dhShaderRelative = "com/seibel/distanthorizons/core/render/glObject/shader/Shader.java";
+        String dhShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(dhShaderRelative));
+        assertTrue(dhShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, stage)")
+                || dhShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type)"),
+            "Distant Horizons Shader should create shaders via typed handle seam when stage mapping is available: " + dhShaderRelative);
+        assertTrue(dhShaderSource.contains("VulkanicAPI.deleteShader(ctx, VulkanicShaderHandle.of(this.id))"),
+            "Distant Horizons Shader should delete shaders via typed handle seam: " + dhShaderRelative);
+
+        String dhShaderProgramRelative = "com/seibel/distanthorizons/core/render/glObject/shader/ShaderProgram.java";
+        String dhShaderProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(dhShaderProgramRelative));
+        assertTrue(dhShaderProgramSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "Distant Horizons ShaderProgram should create programs via typed handle seam: " + dhShaderProgramRelative);
+        assertTrue(dhShaderProgramSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(vertShader.id))"),
+            "Distant Horizons ShaderProgram should attach vertex shaders via typed handle seam: " + dhShaderProgramRelative);
+        assertTrue(dhShaderProgramSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(fragShader.id))"),
+            "Distant Horizons ShaderProgram should attach fragment shaders via typed handle seam: " + dhShaderProgramRelative);
+        assertTrue(dhShaderProgramSource.contains("VulkanicAPI.deleteProgram(ctx, VulkanicProgramHandle.of(this.id))"),
+            "Distant Horizons ShaderProgram should delete programs via typed handle seam: " + dhShaderProgramRelative);
+
+        String partialShaderRelative = "net/irisshaders/iris/pipeline/programs/PartialShader.java";
+        String partialShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(partialShaderRelative));
+        assertTrue(partialShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(s))"),
+            "Iris PartialShader should delete detached shaders via typed handle seam: " + partialShaderRelative);
     }
 
     @Test

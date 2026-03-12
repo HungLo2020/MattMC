@@ -15,6 +15,8 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderManager;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -51,28 +53,29 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 
 	public static GlProgram link(GlShaderModule glShaderModule, GlShaderModule glShaderModule2, VertexFormat vertexFormat, String string) throws ShaderManager.CompilationException {
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
-		int i = VulkanicAPI.createShaderProgram(ctx);
-		if (i <= 0) {
-			throw new ShaderManager.CompilationException("Could not create shader program (returned program ID " + i + ")");
+		VulkanicProgramHandle program = VulkanicAPI.createShaderProgramHandle(ctx);
+		int programId = program.value();
+		if (!program.isValid()) {
+			throw new ShaderManager.CompilationException("Could not create shader program (returned program ID " + programId + ")");
 		} else {
 			int j = 0;
 
 			for (String string2 : vertexFormat.getElementAttributeNames()) {
-				VulkanicAPI.setAttributeLocation(ctx, i, j, string2);
+				VulkanicAPI.setAttributeLocation(ctx, programId, j, string2);
 				j++;
 			}
 
-			VulkanicAPI.attachShader(ctx, i, glShaderModule.getShaderId());
-			VulkanicAPI.attachShader(ctx, i, glShaderModule2.getShaderId());
-			VulkanicAPI.linkProgram(ctx, i);
-			boolean linked = VulkanicAPI.isProgramLinkSuccessful(ctx, i);
-			String string2 = VulkanicAPI.getProgramInfoLog(ctx, i);
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(glShaderModule.getShaderId()));
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(glShaderModule2.getShaderId()));
+			VulkanicAPI.linkProgram(ctx, program);
+			boolean linked = VulkanicAPI.isProgramLinkSuccessful(ctx, program);
+			String string2 = VulkanicAPI.getProgramInfoLog(ctx, program);
 			if (linked && !string2.contains("Failed for unknown reason")) {
 				if (!string2.isEmpty()) {
 					LOGGER.info("Info log when linking program containing VS {} and FS {}. Log output: {}", glShaderModule.getId(), glShaderModule2.getId(), string2);
 				}
 
-				return new GlProgram(i, string);
+				return new GlProgram(programId, string);
 			} else {
 				throw new ShaderManager.CompilationException(
 					"Error encountered when linking program containing VS " + glShaderModule.getId() + " and FS " + glShaderModule2.getId() + ". Log output: " + string2
@@ -160,7 +163,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 
 	public void close() {
 		this.uniformsByName.values().forEach(Uniform::close);
-		VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), this.programId);
+		VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(this.programId));
 	}
 
 	@Nullable
