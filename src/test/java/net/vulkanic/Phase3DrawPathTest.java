@@ -260,6 +260,16 @@ public class Phase3DrawPathTest {
             "GraphicsBackend should expose active backend identity for explicit routing");
         assertTrue(backendInterfaceSource.contains("boolean isNativeVulkanReady();"),
             "GraphicsBackend should expose native Vulkan readiness capability check");
+        assertTrue(backendInterfaceSource.contains("default VulkanExecutionContextInfo getVulkanExecutionContextInfo()"),
+            "GraphicsBackend should expose backend-neutral Vulkan execution-context seam");
+        assertTrue(backendInterfaceSource.contains("default VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo()"),
+            "GraphicsBackend should expose backend-neutral Vulkan swapchain/surface seam");
+        assertTrue(backendInterfaceSource.contains("default void recreateVulkanSwapchain()"),
+            "GraphicsBackend should expose explicit swapchain recreation seam");
+        assertTrue(backendInterfaceSource.contains("default boolean recreateVulkanSwapchainIfNeeded()"),
+            "GraphicsBackend should expose conditional swapchain recreation seam");
+        assertTrue(backendInterfaceSource.contains("default VulkanNativeInitializationInfo initializeNativeVulkanRuntime()"),
+            "GraphicsBackend should expose explicit native Vulkan initialization seam");
 
         Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         String apiSource = Files.readString(apiFile);
@@ -269,6 +279,16 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose Vulkan-selection helper");
         assertTrue(apiSource.contains("public static boolean isNativeVulkanBackendReady()"),
             "VulkanicAPI should expose native Vulkan readiness helper");
+        assertTrue(apiSource.contains("public static VulkanNativeInitializationInfo initializeNativeVulkanRuntime()"),
+            "VulkanicAPI should expose explicit native Vulkan runtime initialization helper");
+        assertTrue(apiSource.contains("public static VulkanExecutionContextInfo getVulkanExecutionContextInfo()"),
+            "VulkanicAPI should expose Vulkan execution-context diagnostics helper");
+        assertTrue(apiSource.contains("public static VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo()"),
+            "VulkanicAPI should expose Vulkan swapchain/surface diagnostics helper");
+        assertTrue(apiSource.contains("public static void recreateVulkanSwapchain()"),
+            "VulkanicAPI should expose explicit swapchain recreation helper");
+        assertTrue(apiSource.contains("public static boolean recreateVulkanSwapchainIfNeeded()"),
+            "VulkanicAPI should expose conditional swapchain recreation helper");
 
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         String vulkanBackendSource = Files.readString(vulkanBackendFile);
@@ -278,6 +298,18 @@ public class Phase3DrawPathTest {
             "Bootstrap Vulkan backend should define native readiness contract");
         assertTrue(vulkanBackendSource.contains("return nativeSpine != null;"),
             "Bootstrap Vulkan backend should report native readiness based on native spine initialization state");
+        assertTrue(vulkanBackendSource.contains("public VulkanExecutionContextInfo getVulkanExecutionContextInfo()"),
+            "Bootstrap Vulkan backend should expose logical device/queue execution-context diagnostics");
+        assertTrue(vulkanBackendSource.contains("public VulkanNativeInitializationInfo initializeNativeVulkanRuntime()"),
+            "Bootstrap Vulkan backend should expose explicit native Vulkan initialization diagnostics");
+        assertTrue(vulkanBackendSource.contains("public VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo()"),
+            "Bootstrap Vulkan backend should expose surface/swapchain diagnostics");
+        assertTrue(vulkanBackendSource.contains("public void recreateVulkanSwapchain()"),
+            "Bootstrap Vulkan backend should expose explicit swapchain recreation entrypoint");
+        assertTrue(vulkanBackendSource.contains("public boolean recreateVulkanSwapchainIfNeeded()"),
+            "Bootstrap Vulkan backend should expose conditional swapchain recreation entrypoint");
+        assertTrue(vulkanBackendSource.contains("spine.recreateSwapchainIfFramebufferSizeChanged();"),
+            "Bootstrap Vulkan command-buffer begin path should auto-check framebuffer resize and recreate swapchain");
     }
 
     @Test

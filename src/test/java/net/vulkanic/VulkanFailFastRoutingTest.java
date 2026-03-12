@@ -63,6 +63,13 @@ public class VulkanFailFastRoutingTest {
             "Guarded native methods should still emit readiness diagnostics");
     }
 
+    @Test
+    public void testVulkanModeDoesNotExposeOpenGLFallbackBackendState() {
+        assertThrows(NoSuchFieldException.class,
+            () -> VulkanicAPI.class.getDeclaredField("vulkanFallbackBackend"),
+            "Vulkan mode must not include OpenGL fallback backend state");
+    }
+
     private static void resetBackendState() throws Exception {
         Field backendField = VulkanicAPI.class.getDeclaredField("backend");
         backendField.setAccessible(true);

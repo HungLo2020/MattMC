@@ -8,6 +8,9 @@ import net.vulkanic.VulkanReadinessReport;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
+import net.vulkanic.VulkanExecutionContextInfo;
+import net.vulkanic.VulkanNativeInitializationInfo;
+import net.vulkanic.VulkanSwapchainSurfaceInfo;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
@@ -79,6 +82,128 @@ public class VulkanBackend {
 
     public boolean isNativeVulkanReady() {
         return nativeSpine != null;
+    }
+
+    public VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
+        attemptNativeBringUp();
+        VulkanReadinessReport report = refreshReadinessReport();
+
+        if (isNativeVulkanReady()) {
+            return VulkanNativeInitializationInfo.attempted(
+                GraphicsBackendType.VULKAN,
+                true,
+                true,
+                "Native Vulkan runtime initialized successfully.",
+                report.summaryLine()
+            );
+        }
+
+        String status;
+        if (nativeBringUpFailure != null && !nativeBringUpFailure.isBlank()) {
+            status = "Native Vulkan runtime initialization failed: " + nativeBringUpFailure;
+        } else if (nativeBringUpAttempted) {
+            status = "Native Vulkan runtime initialization attempted but did not become ready.";
+        } else {
+            status = "Native Vulkan runtime initialization was not attempted.";
+        }
+
+        return VulkanNativeInitializationInfo.attempted(
+            GraphicsBackendType.VULKAN,
+            false,
+            false,
+            status,
+            report.summaryLine()
+        );
+    }
+
+    public VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
+        attemptNativeBringUp();
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            String status;
+            if (!nativeBringUpAttempted) {
+                status = "Native Vulkan bring-up has not been attempted.";
+            } else if (nativeBringUpFailure != null && !nativeBringUpFailure.isBlank()) {
+                status = "Native Vulkan bring-up failed: " + nativeBringUpFailure;
+            } else {
+                status = "Native Vulkan spine is unavailable.";
+            }
+
+            return VulkanExecutionContextInfo.unavailable(
+                GraphicsBackendType.VULKAN,
+                false,
+                status
+            );
+        }
+
+        CommandContext context = currentCommandContext;
+        long commandBufferHandle = context == null ? spine.primaryCommandBufferHandle() : context.getHandle();
+        String commandContextDebugName = context == null ? "Vulkan-PrimaryCommandBuffer" : context.getDebugName();
+
+        return VulkanExecutionContextInfo.available(
+            GraphicsBackendType.VULKAN,
+            spine.logicalDeviceHandle(),
+            spine.graphicsQueueHandle(),
+            spine.graphicsQueueFamilyIndex(),
+            spine.commandPoolHandle(),
+            commandBufferHandle,
+            commandContextDebugName,
+            "Native Vulkan execution context is available."
+        );
+    }
+
+    public VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
+        attemptNativeBringUp();
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            String status;
+            if (!nativeBringUpAttempted) {
+                status = "Native Vulkan bring-up has not been attempted.";
+            } else if (nativeBringUpFailure != null && !nativeBringUpFailure.isBlank()) {
+                status = "Native Vulkan bring-up failed: " + nativeBringUpFailure;
+            } else {
+                status = "Native Vulkan surface/swapchain is unavailable.";
+            }
+
+            return VulkanSwapchainSurfaceInfo.unavailable(
+                GraphicsBackendType.VULKAN,
+                false,
+                status
+            );
+        }
+
+        return VulkanSwapchainSurfaceInfo.available(
+            GraphicsBackendType.VULKAN,
+            spine.surfaceHandle(),
+            spine.swapchainHandle(),
+            spine.swapchainImageFormat(),
+            spine.swapchainColorSpace(),
+            spine.swapchainPresentMode(),
+            spine.swapchainImageCount(),
+            spine.swapchainWidth(),
+            spine.swapchainHeight(),
+            "Native Vulkan surface/swapchain is available."
+        );
+    }
+
+    public void recreateVulkanSwapchain() {
+        ensureNativeReady("recreateVulkanSwapchain");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.recreateSwapchain();
+    }
+
+    public boolean recreateVulkanSwapchainIfNeeded() {
+        ensureNativeReady("recreateVulkanSwapchainIfNeeded");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.recreateSwapchainIfFramebufferSizeChanged();
     }
 
     /**
@@ -498,6 +623,8 @@ public class VulkanBackend {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
+        spine.recreateSwapchainIfFramebufferSizeChanged();
+
         long commandBufferHandle = spine.beginPrimaryCommandBuffer();
         CommandContext context = new VulkanCommandContext(commandBufferHandle, "Vulkan-PrimaryCommandBuffer");
         currentCommandContext = context;
@@ -622,6 +749,13 @@ public class VulkanBackend {
         private long surface;
         private long swapchain;
         private long commandPool;
+
+        private int swapchainImageFormat = VK10.VK_FORMAT_UNDEFINED;
+        private int swapchainColorSpace = -1;
+        private int swapchainPresentMode = -1;
+        private int swapchainImageCount = 0;
+        private int swapchainWidth = 0;
+        private int swapchainHeight = 0;
 
         private VkCommandBuffer primaryCommandBuffer;
         private int graphicsQueueFamilyIndex;
@@ -782,6 +916,10 @@ public class VulkanBackend {
         }
 
         private void createSwapchain() {
+            createSwapchain(VK10.VK_NULL_HANDLE);
+        }
+
+        private void createSwapchain(long oldSwapchainHandle) {
             try (MemoryStack stack = stackPush()) {
                 VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc(stack);
                 checkVk("vkGetPhysicalDeviceSurfaceCapabilitiesKHR",
@@ -833,12 +971,70 @@ public class VulkanBackend {
                     .compositeAlpha(KHRSurface.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
                     .presentMode(presentMode)
                     .clipped(true)
-                    .oldSwapchain(VK10.VK_NULL_HANDLE);
+                    .oldSwapchain(oldSwapchainHandle);
 
                 java.nio.LongBuffer pSwapchain = stack.mallocLong(1);
                 checkVk("vkCreateSwapchainKHR",
                     KHRSwapchain.vkCreateSwapchainKHR(logicalDevice, createInfo, null, pSwapchain));
                 swapchain = pSwapchain.get(0);
+
+                swapchainImageFormat = chosenFormat.format();
+                swapchainColorSpace = chosenFormat.colorSpace();
+                swapchainPresentMode = presentMode;
+                swapchainWidth = extent.width();
+                swapchainHeight = extent.height();
+                swapchainImageCount = querySwapchainImageCount(stack, swapchain);
+            }
+        }
+
+        private int querySwapchainImageCount(MemoryStack stack, long swapchainHandle) {
+            java.nio.IntBuffer imageCount = stack.ints(0);
+            checkVk("vkGetSwapchainImagesKHR(count)",
+                KHRSwapchain.vkGetSwapchainImagesKHR(logicalDevice, swapchainHandle, imageCount, null));
+            return imageCount.get(0);
+        }
+
+        private void recreateSwapchain() {
+            if (logicalDevice == null) {
+                throw new IllegalStateException("Logical Vulkan device is unavailable for swapchain recreation.");
+            }
+
+            checkVk("vkDeviceWaitIdle", VK10.vkDeviceWaitIdle(logicalDevice));
+
+            long oldSwapchainHandle = swapchain;
+            createSwapchain(oldSwapchainHandle);
+
+            if (oldSwapchainHandle != VK10.VK_NULL_HANDLE) {
+                KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, oldSwapchainHandle, null);
+            }
+        }
+
+        private boolean recreateSwapchainIfFramebufferSizeChanged() {
+            if (!isFramebufferResizeMismatch()) {
+                return false;
+            }
+
+            recreateSwapchain();
+            return true;
+        }
+
+        private boolean isFramebufferResizeMismatch() {
+            if (windowHandle == 0L) {
+                return false;
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer width = stack.ints(0);
+                java.nio.IntBuffer height = stack.ints(0);
+                GLFW.glfwGetFramebufferSize(windowHandle, width, height);
+
+                int currentWidth = width.get(0);
+                int currentHeight = height.get(0);
+                if (currentWidth <= 0 || currentHeight <= 0) {
+                    return false;
+                }
+
+                return currentWidth != swapchainWidth || currentHeight != swapchainHeight;
             }
         }
 
@@ -969,6 +1165,60 @@ public class VulkanBackend {
                 return 0L;
             }
             return primaryCommandBuffer.address();
+        }
+
+        private long logicalDeviceHandle() {
+            if (logicalDevice == null) {
+                return 0L;
+            }
+            return logicalDevice.address();
+        }
+
+        private long graphicsQueueHandle() {
+            if (graphicsQueue == null) {
+                return 0L;
+            }
+            return graphicsQueue.address();
+        }
+
+        private int graphicsQueueFamilyIndex() {
+            return graphicsQueueFamilyIndex;
+        }
+
+        private long commandPoolHandle() {
+            return commandPool;
+        }
+
+        private long surfaceHandle() {
+            return surface;
+        }
+
+        private long swapchainHandle() {
+            return swapchain;
+        }
+
+        private int swapchainImageFormat() {
+            return swapchainImageFormat;
+        }
+
+        private int swapchainColorSpace() {
+            return swapchainColorSpace;
+        }
+
+        private int swapchainPresentMode() {
+            return swapchainPresentMode;
+        }
+
+        private int swapchainImageCount() {
+            return swapchainImageCount;
+        }
+
+        private int swapchainWidth() {
+            return swapchainWidth;
+        }
+
+        private int swapchainHeight() {
+            return swapchainHeight;
         }
 
         private void close() {

@@ -20,6 +20,9 @@ import net.vulkanic.VulkanicStencilFace;
 import net.vulkanic.VulkanicStencilOperation;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
+import net.vulkanic.VulkanExecutionContextInfo;
+import net.vulkanic.VulkanNativeInitializationInfo;
+import net.vulkanic.VulkanSwapchainSurfaceInfo;
 import org.lwjgl.opengl.*;
 
 /**
@@ -82,6 +85,32 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public boolean isNativeVulkanReady() {
         return false;
+    }
+
+    @Override
+    public VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
+        return VulkanExecutionContextInfo.unavailable(
+            GraphicsBackendType.OPENGL,
+            false,
+            "OpenGL backend does not own a native Vulkan logical device or graphics queue."
+        );
+    }
+
+    @Override
+    public VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
+        return VulkanSwapchainSurfaceInfo.unavailable(
+            GraphicsBackendType.OPENGL,
+            false,
+            "OpenGL backend does not own a Vulkan surface or swapchain."
+        );
+    }
+
+    @Override
+    public VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
+        return VulkanNativeInitializationInfo.unsupported(
+            GraphicsBackendType.OPENGL,
+            "OpenGL backend does not support native Vulkan runtime initialization."
+        );
     }
     
     /**

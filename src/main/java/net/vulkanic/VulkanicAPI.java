@@ -732,6 +732,71 @@ public class VulkanicAPI {
         return getVulkanReadinessReport().toMultilineString();
     }
 
+    /**
+     * Returns a snapshot of Vulkan-native execution-context ownership for the
+     * currently active backend.
+     */
+    public static VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
+        return getBackend().getVulkanExecutionContextInfo();
+    }
+
+    /**
+     * Returns a human-readable multiline Vulkan execution-context summary.
+     */
+    public static String describeVulkanExecutionContextInfo() {
+        return getVulkanExecutionContextInfo().toMultilineString();
+    }
+
+    /**
+     * Returns a snapshot of Vulkan surface/swapchain ownership for the
+     * currently active backend.
+     */
+    public static VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
+        return getBackend().getVulkanSwapchainSurfaceInfo();
+    }
+
+    /**
+     * Returns a human-readable multiline Vulkan surface/swapchain summary.
+     */
+    public static String describeVulkanSwapchainSurfaceInfo() {
+        return getVulkanSwapchainSurfaceInfo().toMultilineString();
+    }
+
+    /**
+     * Recreates swapchain-dependent Vulkan resources for the active backend.
+     *
+     * <p>OpenGL backends treat this as a no-op.</p>
+     */
+    public static void recreateVulkanSwapchain() {
+        getBackend().recreateVulkanSwapchain();
+    }
+
+    /**
+     * Recreates swapchain-dependent Vulkan resources only when a resize mismatch
+     * is detected for the active surface.
+     *
+     * @return true when recreation occurred, false when no recreation was required
+     */
+    public static boolean recreateVulkanSwapchainIfNeeded() {
+        return getBackend().recreateVulkanSwapchainIfNeeded();
+    }
+
+    /**
+     * Attempts explicit native Vulkan runtime initialization for the active
+     * backend and returns structured diagnostics about the outcome.
+     */
+    public static VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
+        return getBackend().initializeNativeVulkanRuntime();
+    }
+
+    /**
+     * Returns a human-readable multiline summary of explicit native Vulkan
+     * initialization diagnostics.
+     */
+    public static String describeNativeVulkanInitialization() {
+        return initializeNativeVulkanRuntime().toMultilineString();
+    }
+
     private static GraphicsBackend createFailFastVulkanProxy(VulkanBackend vulkanBackend) {
         java.util.Map<Method, java.util.Optional<Method>> methodCache = new ConcurrentHashMap<>();
 

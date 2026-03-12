@@ -1,22 +1,60 @@
 # Vulkan Backend Readiness
 
+## Coverage Baseline (as of 2026-03-12)
+
+| Backend | Implements `GraphicsBackend` | Coverage |
+|---------|------------------------------|----------|
+| Vulkan  | 34 / 261 methods             | **13.0%** |
+| OpenGL  | 256 / 261 methods            | **98.1%** |
+
+"Implements" means the backend has a declared method of that name.
+It does **not** mean the method works correctly end-to-end.
+
+> 100% coverage = every production `VulkanicAPI.*` callsite delegates to
+> a working implementation in both backends.  We are at **13%** for Vulkan.
+
+### How to measure progress
+
+```bash
+# Verbose report with per-method status and production callsite counts
+python3 DevUtils/VulkanCoverageAudit/vulkan_coverage_audit.py
+
+# One-line summary
+python3 DevUtils/VulkanCoverageAudit/vulkan_coverage_audit.py --brief
+
+# GitHub Markdown table
+python3 DevUtils/VulkanCoverageAudit/vulkan_coverage_audit.py --markdown
+```
+
+The test suite also enforces a regression floor:
+
+```bash
+./gradlew test --tests net.vulkanic.VulkanBackendCoverageTest
+```
+
+`MIN_VULKAN_COVERAGE_PCT` in that test must be raised (never lowered) as
+implementations are added.
+
+---
+
 ## Goal
 
-Determine whether Vulkanic currently provides the minimum abstractions necessary to implement a first working Vulkan backend capable of rendering a basic scene.
+Ship a working Vulkan backend that can render at least one basic MattMC scene.
+100% parity with OpenGL is not required for this milestone.
 
 ## Non-Goals
 
-Out of scope for this document:
+- API perfection, abstraction cleanup, renaming
+- Optimization or feature completeness
+- Speculative improvements
 
-- API perfection
-- abstraction cleanup
-- renaming or stylistic changes
-- optimization
-- feature completeness
-- parity with OpenGL backend
-- speculative improvements
+Only blockers that prevent a Vulkan backend from existing are tracked here.
 
-Only blockers that prevent a Vulkan backend from existing are listed.
+## Vulkan Mode Policy
+
+- Vulkan mode is **fail-hard** by design.
+- OpenGL fallback from Vulkan-selected execution is explicitly forbidden.
+- Missing or unimplemented Vulkan backend methods must surface immediate runtime errors.
 
 ## Required Capabilities
 
@@ -24,33 +62,37 @@ Only blockers that prevent a Vulkan backend from existing are listed.
 
 - **Capability Name:** Renderer Initialization
 - **Description:** Ability to select Vulkan backend routing and initialize core Vulkan runtime objects.
-- **Status:** PARTIAL
+- **Status:** SCAFFOLDING (not integrated into engine startup)
 - **Evidence:**
   - `VulkanicAPI.initialize(GraphicsBackendType)` selects Vulkan and creates `new VulkanBackend()`.
   - `VulkanicAPI.createFailFastVulkanProxy(...)` routes all `GraphicsBackend` calls to Vulkan-native methods only.
   - `VulkanBackend.NativeSpine.initialize()` creates instance, surface, physical/logical device, queue, swapchain, command pool.
-- **Notes:** Initialization exists, but this does not imply render-capable Vulkan execution.
+  - `VulkanBackend.initializeNativeVulkanRuntime()` performs bring-up attempt and returns structured diagnostics.
+  - `VulkanicAPI.initializeNativeVulkanRuntime()` / `describeNativeVulkanInitialization()` exist as API surface.
+- **Notes:** The initialization API exists and is tested in isolation but is **not called from any engine startup path** (`Main.java`, `Minecraft`, `GameRenderer`). Marking "complete" would be wrong — nothing triggers it.
 
 ### Logical Device / Context Abstraction
 
 - **Capability Name:** Logical Device / Context Abstraction
 - **Description:** Backend must expose command context plus internal device/queue ownership needed for command submission.
-- **Status:** PARTIAL
+- **Status:** SCAFFOLDING (not integrated, covers 5 of 261 interface methods)
 - **Evidence:**
-  - `CommandContext` interface (`isImmediate()`, `getHandle()`, `getDebugName()`).
-  - `VulkanCommandContext` wraps a Vulkan command buffer handle.
-  - `VulkanBackend.NativeSpine.createLogicalDeviceAndQueue()` creates `VkDevice` + graphics queue.
-- **Notes:** Device abstraction is internal-only; no complete Vulkan execution surface is exposed through implemented backend methods.
+  - `CommandContext` interface + `VulkanCommandContext` wrapper exist.
+  - `VulkanBackend.NativeSpine` creates `VkDevice` + graphics queue on bring-up.
+  - `VulkanExecutionContextInfo` snapshot type exists for diagnostic reporting.
+  - `VulkanicAPI.getVulkanExecutionContextInfo()` / `describeVulkanExecutionContextInfo()` are dead code — zero production callsites.
+- **Notes:** Abstraction layer exists. No production code calls it. Does not contribute to the 86.6% of missing methods.
 
 ### Swapchain / Surface Handling
 
 - **Capability Name:** Swapchain / Surface Handling
 - **Description:** Backend must create and manage platform surface + swapchain suitable for rendering output.
-- **Status:** PARTIAL
+- **Status:** SCAFFOLDING (not integrated into render loop)
 - **Evidence:**
-  - `VulkanBackend.NativeSpine.createSurface()` uses `glfwCreateWindowSurface`.
-  - `VulkanBackend.NativeSpine.createSwapchain()` uses `vkCreateSwapchainKHR` and selects format/present mode/extent.
-- **Notes:** Creation exists, but acquire/present/recreate paths are missing.
+  - `VulkanBackend.NativeSpine.createSurface()` / `createSwapchain()` exist and run on bring-up.
+  - `VulkanSwapchainSurfaceInfo` snapshot + recreate methods exist.
+  - `VulkanicAPI.recreateVulkanSwapchain()` / `recreateVulkanSwapchainIfNeeded()` are dead code — zero production callsites in `GameRenderer` or `RenderSystem`.
+- **Notes:** Swapchain exists internally. The resize/recreate hooks are not wired into any window-resize or render-loop path.
 
 ### Command Encoder or Command Buffer Abstraction
 
@@ -198,11 +240,13 @@ Only blockers that prevent a Vulkan backend from existing are listed.
 
 - **Capability Name:** Resize / Recreate Framebuffers
 - **Description:** Backend must recreate swapchain-dependent targets on window resize/out-of-date surface.
-- **Status:** MISSING
+- **Status:** SCAFFOLDING (API exists, not wired to window resize events)
 - **Evidence:**
-  - No resize/recreate swapchain API in `GraphicsBackend` or `VulkanicAPI`.
-  - `VulkanBackend` has swapchain creation but no recreate path.
-- **Notes:** Vulkan backend cannot recover from resize/out-of-date swapchain events.
+  - `VulkanBackend.NativeSpine.recreateSwapchainIfFramebufferSizeChanged()` exists and checks GLFW framebuffer size vs stored swapchain extent.
+  - `VulkanBackend.beginCommandBuffer()` auto-checks for mismatch and triggers recreation.
+  - `VulkanicAPI.recreateVulkanSwapchain()` / `recreateVulkanSwapchainIfNeeded()` exist as API surface.
+  - No callsite in `Window`, `Minecraft`, `GameRenderer`, or `RenderSystem` calls these methods on resize events.
+- **Notes:** The resize-recreate logic exists internally in the command-buffer path. Engine-level window callback → swapchain recreation is not wired.
 
 ### Presentation
 
@@ -223,29 +267,34 @@ Only blockers that prevent a Vulkan backend from existing are listed.
   - Vulkan selection uses `VulkanicAPI.createFailFastVulkanProxy(...)`.
   - Proxy throws `IllegalStateException` if `VulkanBackend` lacks a method from `GraphicsBackend`.
   - `VulkanBackend` currently implements only a limited subset of methods and omits many core rendering entry points.
-- **Notes:** This is a hard runtime blocker for using Vulkan backend routing with existing engine call paths.
+- **Notes:** This is a hard runtime blocker for using Vulkan backend routing with existing engine call paths. This fail-hard behavior is intentional and required; no OpenGL fallback is allowed when Vulkan backend routing is selected.
 
 ## Blocking Issues
 
-1. **Vulkan backend does not cover the required `GraphicsBackend` contract.**
-   - **Origin:** `VulkanicAPI.createFailFastVulkanProxy(...)` + limited method surface in `VulkanBackend`.
-   - **Why it blocks Vulkan implementation:** Any engine call into a missing backend method fails immediately, preventing normal render flow.
+1. **Vulkan backend covers only 13% of the `GraphicsBackend` interface.**
+   - **Origin:** `VulkanicAPI.createFailFastVulkanProxy(...)` + 34 of 261 interface methods implemented in `VulkanBackend`.
+   - **Why it blocks:** Any production render call that hits the 226 unimplemented methods immediately throws. Normal render flow is impossible.
+   - **Measure:** `./gradlew test --tests net.vulkanic.VulkanBackendCoverageTest` — raises floor as implementations land.
 
 2. **Pipeline and render pass execution are unimplemented on Vulkan path.**
-   - **Origin:** `VulkanBackend.createPipeline(...)` and all `VulkanBackend.beginRenderPass(...)` overloads throw `UnsupportedOperationException`.
-   - **Why it blocks Vulkan implementation:** A basic scene cannot bind pipeline state or begin a render pass, so no draw is possible.
+   - **Origin:** `VulkanBackend.createPipeline(...)` and all `beginRenderPass(...)` overloads throw `UnsupportedOperationException`.
+   - **Why it blocks:** A basic scene cannot bind pipeline state or begin a render pass, so no draw is possible.
 
 3. **Descriptor/resource binding is unimplemented on Vulkan path.**
-   - **Origin:** `VulkanBackend.createDescriptorPool(...)`, `allocateDescriptorSet(...)`, `updateDescriptorSet(...)`, `bindDescriptorSet(...)`, `bindPipelineResources(...)` all throw unsupported.
-   - **Why it blocks Vulkan implementation:** Shader resources (textures/uniform buffers) cannot be bound for rendering.
+   - **Origin:** `createDescriptorPool`, `allocateDescriptorSet`, `updateDescriptorSet`, `bindDescriptorSet`, `bindPipelineResources` all throw unsupported.
+   - **Why it blocks:** Shader resources (textures/uniform buffers) cannot be bound for rendering.
 
 4. **Vulkan resource creation/upload path for buffers and textures is missing.**
-   - **Origin:** `GraphicsBackend` requires managed buffer/texture creation and upload methods; `VulkanBackend` does not implement these runtime entry points.
-   - **Why it blocks Vulkan implementation:** Geometry, uniform data, and textures cannot be created/populated on Vulkan path.
+   - **Origin:** `GraphicsBackend` requires managed buffer/texture creation and upload methods; `VulkanBackend` does not implement these.
+   - **Why it blocks:** Geometry, uniform data, and textures cannot be created/populated on Vulkan path.
 
-5. **Presentation lifecycle is missing (acquire/present/resize-recreate).**
-   - **Origin:** No presentation or frame lifecycle API in `GraphicsBackend`/`VulkanicAPI`; `VulkanBackend` contains swapchain creation only.
-   - **Why it blocks Vulkan implementation:** Rendered frames cannot be acquired/presented or recovered after resize, so on-screen Vulkan rendering cannot complete.
+5. **Presentation lifecycle is missing (acquire/present).**
+   - **Origin:** No `vkAcquireNextImageKHR` / `vkQueuePresentKHR` in `VulkanBackend`; no `beginFrame`/`endFrame` abstraction.
+   - **Why it blocks:** Rendered frames cannot reach the screen.
+
+6. **Scaffolded APIs have zero production callsites.**
+   - **Origin:** `initializeNativeVulkanRuntime`, `getVulkanExecutionContextInfo`, `getVulkanSwapchainSurfaceInfo`, `recreateVulkanSwapchain*` are called only from tests.
+   - **Why it matters:** These have been counted as "COMPLETE" in the past but contribute nothing to actual render flow. Engine integration code has not been written.
 
 ## First Vulkan Backend Exit Criteria
 

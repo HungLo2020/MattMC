@@ -42,6 +42,68 @@ public interface GraphicsBackend {
      * backend selection is active but delegated to OpenGL behavior.</p>
      */
     boolean isNativeVulkanReady();
+
+    /**
+     * Returns a snapshot of Vulkan-native execution-context ownership for the
+     * active backend.
+     *
+     * <p>OpenGL backends should return an unavailable snapshot. Vulkan backends
+     * should populate logical-device/queue/command-buffer handles when ready.</p>
+     */
+    default VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
+        return VulkanExecutionContextInfo.unavailable(
+            getBackendType(),
+            isNativeVulkanReady(),
+            "Native Vulkan execution context is unavailable for backend " + getBackendType() + "."
+        );
+    }
+
+    /**
+     * Returns a snapshot of Vulkan surface/swapchain ownership for the active
+     * backend.
+     *
+     * <p>OpenGL backends should return an unavailable snapshot. Vulkan backends
+     * should report native surface/swapchain handles and metadata when ready.</p>
+     */
+    default VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
+        return VulkanSwapchainSurfaceInfo.unavailable(
+            getBackendType(),
+            isNativeVulkanReady(),
+            "Vulkan swapchain/surface is unavailable for backend " + getBackendType() + "."
+        );
+    }
+
+    /**
+     * Recreates Vulkan swapchain-dependent state for the active backend.
+     *
+     * <p>Non-Vulkan backends should treat this as a no-op.</p>
+     */
+    default void recreateVulkanSwapchain() {
+        // no-op for non-Vulkan backends
+    }
+
+    /**
+     * Recreates Vulkan swapchain-dependent state only when a resize mismatch is
+     * detected for the active surface.
+     *
+     * @return true when a recreation was performed, false when no recreation was required
+     */
+    default boolean recreateVulkanSwapchainIfNeeded() {
+        return false;
+    }
+
+    /**
+     * Attempts native Vulkan runtime initialization for the active backend and
+     * returns structured diagnostics about the result.
+     *
+     * <p>Non-Vulkan backends should return an unsupported result.</p>
+     */
+    default VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
+        return VulkanNativeInitializationInfo.unsupported(
+            getBackendType(),
+            "Backend " + getBackendType() + " does not support native Vulkan runtime initialization."
+        );
+    }
     
     /**
      * Sets the dynamic viewport state for rendering.
