@@ -495,6 +495,59 @@ public class ApiNeutralityCallsiteTest {
     }
 
     @Test
+    public void testSpirvAndPipelineLayoutPrepSeamsExist() throws IOException {
+        String pipelineDescriptorRelative = "net/vulkanic/PipelineDescriptor.java";
+        String pipelineDescriptorSource = Files.readString(SRC_MAIN_JAVA.resolve(pipelineDescriptorRelative));
+
+        assertTrue(pipelineDescriptorSource.contains("fromPortableStateAndSpirvModules("),
+            "PipelineDescriptor should expose portable-state + SPIR-V module factory seam for Vulkan pipeline bring-up: " + pipelineDescriptorRelative);
+        assertTrue(pipelineDescriptorSource.contains("fromRenderPipelineAndSpirvModules("),
+            "PipelineDescriptor should expose RenderPipeline + SPIR-V module factory seam for staged migration: " + pipelineDescriptorRelative);
+        assertTrue(pipelineDescriptorSource.contains("record PushConstantRange("),
+            "PipelineDescriptor should expose push-constant layout metadata seam for future Vulkan pipeline layouts: " + pipelineDescriptorRelative);
+        assertTrue(pipelineDescriptorSource.contains("getPipelineCompilationKey()"),
+            "PipelineDescriptor should expose deterministic compilation-key seam including SPIR-V/push-constant metadata: " + pipelineDescriptorRelative);
+        assertTrue(pipelineDescriptorSource.contains("withResourceLayout("),
+            "PipelineDescriptor should expose explicit reflected resource-layout override seam for Vulkan descriptor-layout prep: " + pipelineDescriptorRelative);
+        assertTrue(pipelineDescriptorSource.contains("hasExplicitResourceLayout()"),
+            "PipelineDescriptor should expose explicit-layout presence seam for migration-safe callsite behavior: " + pipelineDescriptorRelative);
+
+        String vulkanicApiRelative = "net/vulkanic/VulkanicAPI.java";
+        String vulkanicApiSource = Files.readString(SRC_MAIN_JAVA.resolve(vulkanicApiRelative));
+        assertTrue(vulkanicApiSource.contains("public static PipelineHandle createPipeline(")
+            && vulkanicApiSource.contains("PipelineDescriptor.PortableState portableState")
+            && vulkanicApiSource.contains("java.util.List<VulkanicSpirvModule> spirvModules"),
+            "VulkanicAPI should expose a SPIR-V-aware portable pipeline creation seam: " + vulkanicApiRelative);
+        assertTrue(vulkanicApiSource.contains("createPipelineDescriptor(")
+            && vulkanicApiSource.contains("PipelineDescriptor.PortableState portableState")
+            && vulkanicApiSource.contains("java.util.List<VulkanicSpirvModule> spirvModules"),
+            "VulkanicAPI should expose a SPIR-V-aware descriptor creation seam: " + vulkanicApiRelative);
+        assertTrue(vulkanicApiSource.contains("deriveResourceLayoutFromProgramReflection("),
+            "VulkanicAPI should expose reflection-derived pipeline resource-layout seams for Vulkan descriptor-layout preparation: " + vulkanicApiRelative);
+        assertTrue(vulkanicApiSource.contains("withReflectedResourceLayout("),
+            "VulkanicAPI should expose descriptor enrichment seam from linked-program reflection metadata: " + vulkanicApiRelative);
+        assertTrue(vulkanicApiSource.contains("java.util.Set<VulkanicShaderStage> stages"),
+            "VulkanicAPI reflection/layout prep seams should support explicit stage-visibility metadata for Vulkan descriptor layout synthesis: " + vulkanicApiRelative);
+
+        String coreApiRelative = "net/vulkanic/VulkanicCoreAPI.java";
+        String coreApiSource = Files.readString(SRC_MAIN_JAVA.resolve(coreApiRelative));
+        assertTrue(coreApiSource.contains("public static PipelineHandle createPipeline(")
+            && coreApiSource.contains("PipelineDescriptor.PortableState portableState")
+            && coreApiSource.contains("java.util.List<VulkanicSpirvModule> spirvModules"),
+            "VulkanicCoreAPI should mirror SPIR-V-aware portable pipeline creation seam for typed frontend callsites: " + coreApiRelative);
+        assertTrue(coreApiSource.contains("public static PipelineDescriptor createPipelineDescriptor(")
+            && coreApiSource.contains("PipelineDescriptor.PortableState portableState")
+            && coreApiSource.contains("java.util.List<VulkanicSpirvModule> spirvModules"),
+            "VulkanicCoreAPI should mirror SPIR-V-aware descriptor creation seam for typed frontend callsites: " + coreApiRelative);
+        assertTrue(coreApiSource.contains("deriveResourceLayoutFromProgramReflection("),
+            "VulkanicCoreAPI should mirror reflection-derived resource-layout seams for typed frontend callsites: " + coreApiRelative);
+        assertTrue(coreApiSource.contains("withReflectedResourceLayout("),
+            "VulkanicCoreAPI should mirror descriptor enrichment from reflection metadata: " + coreApiRelative);
+        assertTrue(coreApiSource.contains("java.util.Set<VulkanicShaderStage> stages"),
+            "VulkanicCoreAPI should mirror explicit stage-visibility reflection/layout seams for typed frontend callsites: " + coreApiRelative);
+    }
+
+    @Test
     public void testSelectedShaderLifecycleHotspotsUseTypedHandleSeams() throws IOException {
         String sodiumShaderRelative = "net/sodium/client/gl/shader/GlShader.java";
         String sodiumShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(sodiumShaderRelative));

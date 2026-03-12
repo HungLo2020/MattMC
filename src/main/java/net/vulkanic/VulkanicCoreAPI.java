@@ -292,4 +292,158 @@ public final class VulkanicCoreAPI {
     public static int getInteger(CommandContext ctx, VulkanicIntegerQuery query) {
         return VulkanicAPI.getInteger(ctx, query);
     }
+
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        int program,
+        int maxNameLength
+    ) {
+        return VulkanicAPI.deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength);
+    }
+
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        int program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return VulkanicAPI.deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength, stages);
+    }
+
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        int program
+    ) {
+        return VulkanicAPI.deriveResourceLayoutFromProgramReflection(ctx, program);
+    }
+
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        int program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return VulkanicAPI.deriveResourceLayoutFromProgramReflection(ctx, program, stages);
+    }
+
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        VulkanicProgramHandle program,
+        int maxNameLength
+    ) {
+        return VulkanicAPI.deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength);
+    }
+
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        VulkanicProgramHandle program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return VulkanicAPI.deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength, stages);
+    }
+
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        VulkanicProgramHandle program
+    ) {
+        return VulkanicAPI.deriveResourceLayoutFromProgramReflection(ctx, program);
+    }
+
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        VulkanicProgramHandle program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return VulkanicAPI.deriveResourceLayoutFromProgramReflection(ctx, program, stages);
+    }
+
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        int maxNameLength
+    ) {
+        return VulkanicAPI.withReflectedResourceLayout(ctx, descriptor, program, maxNameLength);
+    }
+
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return VulkanicAPI.withReflectedResourceLayout(ctx, descriptor, program, maxNameLength, stages);
+    }
+
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program
+    ) {
+        return VulkanicAPI.withReflectedResourceLayout(ctx, descriptor, program);
+    }
+
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return VulkanicAPI.withReflectedResourceLayout(ctx, descriptor, program, stages);
+    }
+
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        VulkanicProgramHandle program,
+        int maxNameLength
+    ) {
+        return VulkanicAPI.withReflectedResourceLayout(ctx, descriptor, program, maxNameLength);
+    }
+
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        VulkanicProgramHandle program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return VulkanicAPI.withReflectedResourceLayout(ctx, descriptor, program, maxNameLength, stages);
+    }
+
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        VulkanicProgramHandle program
+    ) {
+        return VulkanicAPI.withReflectedResourceLayout(ctx, descriptor, program);
+    }
+
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        VulkanicProgramHandle program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return VulkanicAPI.withReflectedResourceLayout(ctx, descriptor, program, stages);
+    }
+
+    public static PipelineHandle createPipeline(PipelineDescriptor descriptor) {
+        return VulkanicAPI.createPipeline(descriptor);
+    }
+
+    public static PipelineHandle createPipeline(
+        PipelineDescriptor.PortableState portableState,
+        java.util.List<VulkanicSpirvModule> spirvModules
+    ) {
+        return VulkanicAPI.createPipeline(portableState, spirvModules);
+    }
+
+    public static PipelineDescriptor createPipelineDescriptor(
+        PipelineDescriptor.PortableState portableState,
+        java.util.List<VulkanicSpirvModule> spirvModules
+    ) {
+        return VulkanicAPI.createPipelineDescriptor(portableState, spirvModules);
+    }
 }

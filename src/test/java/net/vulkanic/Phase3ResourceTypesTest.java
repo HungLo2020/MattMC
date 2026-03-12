@@ -283,21 +283,116 @@ public class Phase3ResourceTypesTest {
         assertEquals("Sampler0", samplerBinding.name());
         assertEquals(PipelineDescriptor.ResourceType.SAMPLER, samplerBinding.type());
         assertNull(samplerBinding.textureFormat());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), samplerBinding.stages());
 
         PipelineDescriptor.ResourceBinding uniformBinding = layout.bindings().get(1);
         assertEquals(1, uniformBinding.binding());
         assertEquals("Globals", uniformBinding.name());
         assertEquals(PipelineDescriptor.ResourceType.UNIFORM_BUFFER, uniformBinding.type());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), uniformBinding.stages());
 
         PipelineDescriptor.ResourceBinding texelBinding = layout.bindings().get(2);
         assertEquals(2, texelBinding.binding());
         assertEquals("CloudFaces", texelBinding.name());
         assertEquals(PipelineDescriptor.ResourceType.TEXEL_BUFFER, texelBinding.type());
         assertEquals(TextureFormat.RED8I, texelBinding.textureFormat());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), texelBinding.stages());
 
         assertTrue(layout.findByName("Sampler0").isPresent());
         assertTrue(layout.findByName("CloudFaces").isPresent());
         assertTrue(layout.findByName("Missing").isEmpty());
+    }
+
+    @Test
+    public void testPipelineDescriptorWithExplicitResourceLayoutOverridesPortableLayout() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineDescriptor.ResourceLayout explicitLayout = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "ReflectedSampler",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null
+            )
+        ));
+
+        PipelineDescriptor reflectedDescriptor = descriptor.withResourceLayout(explicitLayout);
+
+        assertFalse(descriptor.hasExplicitResourceLayout(),
+            "RenderPipeline-derived descriptor should start without explicit reflected layout metadata");
+        assertTrue(reflectedDescriptor.hasExplicitResourceLayout(),
+            "withResourceLayout should mark descriptor as carrying explicit reflected layout metadata");
+        assertEquals(explicitLayout, reflectedDescriptor.getResourceLayout(),
+            "Explicit reflected layout should override portable-state derived resource layout");
+    }
+
+    @Test
+    public void testPipelineCompilationKeyTracksExplicitResourceLayoutMetadata() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineDescriptor.ResourceLayout layoutA = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "SamplerA",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null
+            )
+        ));
+
+        PipelineDescriptor.ResourceLayout layoutB = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "SamplerB",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null
+            )
+        ));
+
+        String keyA = base.withResourceLayout(layoutA).getPipelineCompilationKey();
+        String keyB = base.withResourceLayout(layoutB).getPipelineCompilationKey();
+
+        assertNotEquals(keyA, keyB,
+            "Pipeline compilation key should include explicit reflected resource-layout metadata");
+
+        PipelineDescriptor.ResourceLayout layoutC = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "SamplerA",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null,
+                java.util.Set.of(VulkanicShaderStage.FRAGMENT)
+            )
+        ));
+
+        String keyC = base.withResourceLayout(layoutC).getPipelineCompilationKey();
+        assertNotEquals(keyA, keyC,
+            "Pipeline compilation key should include resource stage-visibility metadata");
+    }
+
+    @Test
+    public void testPipelineDescriptorPortableLayoutInfersStagesFromSpirvModules() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineDescriptor descriptor = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(
+                createTestSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[] {1, 2, 3, 4}),
+                createTestSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[] {5, 6, 7, 8})
+            )
+        );
+
+        PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+        for (PipelineDescriptor.ResourceBinding binding : layout.bindings()) {
+            assertEquals(
+                java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT),
+                binding.stages(),
+                "Portable resource layout should inherit stage visibility from attached SPIR-V modules"
+            );
+        }
     }
 
     @Test
@@ -374,6 +469,153 @@ public class Phase3ResourceTypesTest {
     }
 
     @Test
+    public void testPipelineDescriptorFromPortableStateAndSpirvModules() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        VulkanicSpirvModule vertexModule = createTestSpirvModule(
+            VulkanicShaderStage.VERTEX,
+            "main",
+            new byte[] {0x03, 0x02, 0x23, 0x07}
+        );
+        VulkanicSpirvModule fragmentModule = createTestSpirvModule(
+            VulkanicShaderStage.FRAGMENT,
+            "main",
+            new byte[] {0x07, 0x23, 0x02, 0x03}
+        );
+
+        PipelineDescriptor descriptor = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(vertexModule, fragmentModule)
+        );
+
+        assertFalse(descriptor.hasNativeDescriptor(),
+            "Portable+SPIR-V descriptor should remain backend-neutral without native descriptor");
+        assertTrue(descriptor.hasSpirvModules(),
+            "Portable+SPIR-V descriptor should report SPIR-V module presence");
+        assertEquals(2, descriptor.getSpirvModules().size());
+        assertEquals(VulkanicShaderStage.VERTEX, descriptor.getSpirvModules().get(0).stage());
+        assertEquals(VulkanicShaderStage.FRAGMENT, descriptor.getSpirvModules().get(1).stage());
+    }
+
+    @Test
+    public void testPipelineDescriptorRejectsDuplicateSpirvStages() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        VulkanicSpirvModule firstVertex = createTestSpirvModule(
+            VulkanicShaderStage.VERTEX,
+            "main",
+            new byte[] {1, 2, 3, 4}
+        );
+        VulkanicSpirvModule secondVertex = createTestSpirvModule(
+            VulkanicShaderStage.VERTEX,
+            "secondary",
+            new byte[] {4, 3, 2, 1}
+        );
+
+        assertThrows(IllegalArgumentException.class,
+            () -> PipelineDescriptor.fromPortableStateAndSpirvModules(
+                base.getPortableState(),
+                java.util.List.of(firstVertex, secondVertex)
+            ));
+    }
+
+    @Test
+    public void testPipelineDescriptorPushConstantRangesValidation() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineDescriptor.PushConstantRange validRange = new PipelineDescriptor.PushConstantRange(
+            0,
+            64,
+            java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT)
+        );
+
+        PipelineDescriptor withPushConstants = base.withPushConstantRanges(java.util.List.of(validRange));
+
+        assertEquals(1, withPushConstants.getPushConstantRanges().size());
+        assertEquals(64, withPushConstants.getPushConstantRanges().get(0).size());
+
+        PipelineDescriptor.PushConstantRange overlapA = new PipelineDescriptor.PushConstantRange(
+            0,
+            32,
+            java.util.Set.of(VulkanicShaderStage.VERTEX)
+        );
+        PipelineDescriptor.PushConstantRange overlapB = new PipelineDescriptor.PushConstantRange(
+            16,
+            32,
+            java.util.Set.of(VulkanicShaderStage.FRAGMENT)
+        );
+
+        assertThrows(IllegalArgumentException.class,
+            () -> base.withPushConstantRanges(java.util.List.of(overlapA, overlapB)),
+            "Overlapping push-constant ranges should be rejected for deterministic layout derivation");
+    }
+
+    @Test
+    public void testPipelineDescriptorCompilationKeyTracksSpirvAndPushConstants() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        VulkanicSpirvModule vertexModuleA = createTestSpirvModule(
+            VulkanicShaderStage.VERTEX,
+            "main",
+            new byte[] {10, 20, 30, 40}
+        );
+        VulkanicSpirvModule fragmentModuleA = createTestSpirvModule(
+            VulkanicShaderStage.FRAGMENT,
+            "main",
+            new byte[] {11, 21, 31, 41}
+        );
+
+        PipelineDescriptor descriptorA = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(vertexModuleA, fragmentModuleA)
+        ).withPushConstantRanges(java.util.List.of(
+            new PipelineDescriptor.PushConstantRange(
+                0,
+                16,
+                java.util.Set.of(VulkanicShaderStage.VERTEX)
+            )
+        ));
+
+        PipelineDescriptor descriptorB = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(
+                createTestSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[] {10, 20, 30, 40}),
+                createTestSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[] {11, 21, 31, 41})
+            )
+        ).withPushConstantRanges(java.util.List.of(
+            new PipelineDescriptor.PushConstantRange(
+                0,
+                16,
+                java.util.Set.of(VulkanicShaderStage.VERTEX)
+            )
+        ));
+
+        PipelineDescriptor descriptorChanged = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(
+                createTestSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[] {10, 20, 30, 40}),
+                createTestSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[] {99, 88, 77, 66})
+            )
+        ).withPushConstantRanges(java.util.List.of(
+            new PipelineDescriptor.PushConstantRange(
+                0,
+                16,
+                java.util.Set.of(VulkanicShaderStage.VERTEX)
+            )
+        ));
+
+        String keyA = descriptorA.getPipelineCompilationKey();
+        String keyB = descriptorB.getPipelineCompilationKey();
+        String changedKey = descriptorChanged.getPipelineCompilationKey();
+
+        assertEquals(keyA, keyB,
+            "Pipeline compilation key should be deterministic for equivalent SPIR-V/push-constant inputs");
+        assertNotEquals(keyA, changedKey,
+            "Pipeline compilation key should change when SPIR-V payload changes");
+        assertEquals(64, keyA.length(), "Pipeline compilation key should be SHA-256 hex");
+    }
+
+    @Test
     public void testPipelineResourceBindingsValidateAgainstLayout() {
         PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
 
@@ -447,6 +689,15 @@ public class Phase3ResourceTypesTest {
         assertThrows(IllegalArgumentException.class,
             () -> new PipelineDescriptor.ResourceBinding(0, 0, "texelMissingFormat",
                 PipelineDescriptor.ResourceType.TEXEL_BUFFER, null));
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "samplerMissingStages",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null,
+                java.util.Set.of()
+            ));
     }
 
     // ---- PipelineHandle tests ----------------------------------------------
@@ -480,6 +731,20 @@ public class Phase3ResourceTypesTest {
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
             .withDepthBias(2.5f, 1.25f)
             .build();
+    }
+
+    private static VulkanicSpirvModule createTestSpirvModule(
+        VulkanicShaderStage stage,
+        String entryPoint,
+        byte[] bytes
+    ) {
+        return new VulkanicSpirvModule(
+            stage,
+            entryPoint,
+            bytes,
+            "unit-test-" + stage.name().toLowerCase(),
+            "unit-test-compiler"
+        );
     }
 
     // ---- VulkanicAPI.registerDevice / beginCommandBuffer tests -------------

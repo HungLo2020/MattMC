@@ -36,6 +36,7 @@ public class VulkanicTypedApiRoutingTest {
     @BeforeEach
     public void setUp() throws Exception {
         resetBackendState();
+        invocationHandler.configureProgramReflection(java.util.List.of(), java.util.List.of());
 
         GraphicsBackend proxyBackend = (GraphicsBackend) Proxy.newProxyInstance(
             GraphicsBackend.class.getClassLoader(),
@@ -255,6 +256,36 @@ public class VulkanicTypedApiRoutingTest {
         assertEquals(VulkanicShaderHandle.class, attachInvocation.method.getParameterTypes()[2]);
         assertEquals(program, attachInvocation.args[1]);
         assertEquals(shader, attachInvocation.args[2]);
+    }
+
+    @Test
+    public void testReflectionDerivedResourceLayoutRoutingAndNormalization() {
+        invocationHandler.configureProgramReflection(
+            java.util.List.of("Globals"),
+            java.util.List.of(
+                new RecordingInvocationHandler.ReflectedUniform("Sampler0[0]", 1, VulkanicAPI.GL_SAMPLER_2D),
+                new RecordingInvocationHandler.ReflectedUniform("IgnoredScalar", 1, VulkanicAPI.GL_FLOAT)
+            )
+        );
+
+        PipelineDescriptor.ResourceLayout layout = VulkanicCoreAPI.deriveResourceLayoutFromProgramReflection(
+            TEST_CONTEXT,
+            VulkanicProgramHandle.of(88),
+            128,
+            java.util.Set.of(VulkanicShaderStage.FRAGMENT)
+        );
+
+        assertEquals(2, layout.bindings().size());
+        assertEquals("Globals", layout.bindings().get(0).name());
+        assertEquals(PipelineDescriptor.ResourceType.UNIFORM_BUFFER, layout.bindings().get(0).type());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.FRAGMENT), layout.bindings().get(0).stages());
+        assertEquals("Sampler0", layout.bindings().get(1).name());
+        assertEquals(PipelineDescriptor.ResourceType.SAMPLER, layout.bindings().get(1).type());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.FRAGMENT), layout.bindings().get(1).stages());
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("getActiveUniform", invocation.method.getName());
     }
 
     @Test
@@ -653,10 +684,44 @@ public class VulkanicTypedApiRoutingTest {
 
     private static final class RecordingInvocationHandler implements InvocationHandler {
         private RecordedInvocation lastInvocation;
+        private java.util.List<String> reflectedUniformBlocks = java.util.List.of();
+        private java.util.List<ReflectedUniform> reflectedUniforms = java.util.List.of();
+
+        private void configureProgramReflection(
+            java.util.List<String> uniformBlocks,
+            java.util.List<ReflectedUniform> uniforms
+        ) {
+            this.reflectedUniformBlocks = java.util.List.copyOf(uniformBlocks);
+            this.reflectedUniforms = java.util.List.copyOf(uniforms);
+        }
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) {
             this.lastInvocation = new RecordedInvocation(method, args == null ? new Object[0] : args.clone());
+
+            if (method.getName().equals("getProgramParameter")) {
+                int pname = (int) args[2];
+                if (pname == VulkanicProgramParameterName.ACTIVE_UNIFORM_BLOCKS.toLegacyGlPName()) {
+                    return reflectedUniformBlocks.size();
+                }
+                if (pname == VulkanicProgramParameterName.ACTIVE_UNIFORMS.toLegacyGlPName()) {
+                    return reflectedUniforms.size();
+                }
+                return 0;
+            }
+
+            if (method.getName().equals("retrieveActiveUniformBlockName")) {
+                int uniformBlockIndex = (int) args[2];
+                return reflectedUniformBlocks.get(uniformBlockIndex);
+            }
+
+            if (method.getName().equals("getActiveUniform")) {
+                int uniformIndex = (int) args[2];
+                ReflectedUniform reflectedUniform = reflectedUniforms.get(uniformIndex);
+                ((java.nio.IntBuffer) args[4]).put(0, reflectedUniform.arraySize());
+                ((java.nio.IntBuffer) args[5]).put(0, reflectedUniform.legacyType());
+                return reflectedUniform.name();
+            }
 
             if (method.getName().equals("getInteger")) {
                 Class<?> queryType = method.getParameterTypes()[1];
@@ -698,6 +763,9 @@ public class VulkanicTypedApiRoutingTest {
                 return '\0';
             }
             return null;
+        }
+
+        private record ReflectedUniform(String name, int arraySize, int legacyType) {
         }
     }
 }

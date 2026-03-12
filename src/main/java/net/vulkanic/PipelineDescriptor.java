@@ -43,10 +43,23 @@ public final class PipelineDescriptor {
 
     private final Object nativeDescriptor;
     private final PortableState portableState;
+    @Nullable
+    private final ResourceLayout explicitResourceLayout;
+    private final List<VulkanicSpirvModule> spirvModules;
+    private final List<PushConstantRange> pushConstantRanges;
 
-    private PipelineDescriptor(@Nullable Object nativeDescriptor, PortableState portableState) {
+    private PipelineDescriptor(
+        @Nullable Object nativeDescriptor,
+        PortableState portableState,
+        @Nullable ResourceLayout explicitResourceLayout,
+        List<VulkanicSpirvModule> spirvModules,
+        List<PushConstantRange> pushConstantRanges
+    ) {
         this.nativeDescriptor = nativeDescriptor;
         this.portableState = Objects.requireNonNull(portableState, "portableState must not be null");
+        this.explicitResourceLayout = explicitResourceLayout;
+        this.spirvModules = normalizeSpirvModules(spirvModules);
+        this.pushConstantRanges = normalizePushConstantRanges(pushConstantRanges);
     }
 
     /**
@@ -59,7 +72,13 @@ public final class PipelineDescriptor {
         if (pipeline == null) {
             throw new IllegalArgumentException("pipeline must not be null");
         }
-        return new PipelineDescriptor(pipeline, PortableState.fromRenderPipeline(pipeline));
+        return new PipelineDescriptor(
+            pipeline,
+            PortableState.fromRenderPipeline(pipeline),
+            null,
+            List.of(),
+            List.of()
+        );
     }
 
     /**
@@ -72,7 +91,39 @@ public final class PipelineDescriptor {
         if (portableState == null) {
             throw new IllegalArgumentException("portableState must not be null");
         }
-        return new PipelineDescriptor(null, portableState);
+        return new PipelineDescriptor(null, portableState, null, List.of(), List.of());
+    }
+
+    /**
+     * Creates a PipelineDescriptor from portable state plus precompiled SPIR-V modules.
+     */
+    public static PipelineDescriptor fromPortableStateAndSpirvModules(
+        PortableState portableState,
+        List<VulkanicSpirvModule> spirvModules
+    ) {
+        if (portableState == null) {
+            throw new IllegalArgumentException("portableState must not be null");
+        }
+        return new PipelineDescriptor(null, portableState, null, spirvModules, List.of());
+    }
+
+    /**
+     * Creates a PipelineDescriptor from RenderPipeline plus precompiled SPIR-V modules.
+     */
+    public static PipelineDescriptor fromRenderPipelineAndSpirvModules(
+        RenderPipeline pipeline,
+        List<VulkanicSpirvModule> spirvModules
+    ) {
+        if (pipeline == null) {
+            throw new IllegalArgumentException("pipeline must not be null");
+        }
+        return new PipelineDescriptor(
+            pipeline,
+            PortableState.fromRenderPipeline(pipeline),
+            null,
+            spirvModules,
+            List.of()
+        );
     }
 
     /**
@@ -106,7 +157,61 @@ public final class PipelineDescriptor {
      * samplers first, then uniforms in declaration order.
      */
     public ResourceLayout getResourceLayout() {
-        return portableState.toResourceLayout();
+        return explicitResourceLayout != null ? explicitResourceLayout : derivePortableResourceLayout();
+    }
+
+    /**
+     * Returns true when this descriptor carries explicit resource layout metadata.
+     */
+    public boolean hasExplicitResourceLayout() {
+        return explicitResourceLayout != null;
+    }
+
+    /**
+     * Returns precompiled SPIR-V modules associated with this descriptor.
+     */
+    public List<VulkanicSpirvModule> getSpirvModules() {
+        return spirvModules;
+    }
+
+    /**
+     * Returns true when this descriptor carries precompiled SPIR-V modules.
+     */
+    public boolean hasSpirvModules() {
+        return !spirvModules.isEmpty();
+    }
+
+    /**
+     * Returns push-constant range metadata for pipeline layout preparation.
+     */
+    public List<PushConstantRange> getPushConstantRanges() {
+        return pushConstantRanges;
+    }
+
+    /**
+     * Returns a copy of this descriptor with push-constant range metadata attached.
+     */
+    public PipelineDescriptor withPushConstantRanges(List<PushConstantRange> ranges) {
+        return new PipelineDescriptor(
+            this.nativeDescriptor,
+            this.portableState,
+            this.explicitResourceLayout,
+            this.spirvModules,
+            ranges
+        );
+    }
+
+    /**
+     * Returns a copy of this descriptor with explicit resource-layout metadata attached.
+     */
+    public PipelineDescriptor withResourceLayout(ResourceLayout resourceLayout) {
+        return new PipelineDescriptor(
+            this.nativeDescriptor,
+            this.portableState,
+            Objects.requireNonNull(resourceLayout, "resourceLayout must not be null"),
+            this.spirvModules,
+            this.pushConstantRanges
+        );
     }
 
     /**
@@ -116,6 +221,53 @@ public final class PipelineDescriptor {
      */
     public String getStableCacheKey() {
         return portableState.stableCacheKey();
+    }
+
+    /**
+     * Returns deterministic cache key for full pipeline compilation inputs.
+     *
+     * <p>Includes portable state, optional SPIR-V module payload identity, and
+     * push-constant range metadata.</p>
+     */
+    public String getPipelineCompilationKey() {
+        StringBuilder canonical = new StringBuilder(1024);
+        canonical.append("portable=").append(getStableCacheKey()).append(';');
+        canonical.append("explicitLayout=").append(explicitResourceLayout != null).append(';');
+
+        ResourceLayout layout = getResourceLayout();
+        canonical.append("resourceBindingCount=").append(layout.bindings().size()).append(';');
+        for (ResourceBinding binding : layout.bindings()) {
+            canonical.append("set=").append(binding.set()).append(';');
+            canonical.append("binding=").append(binding.binding()).append(';');
+            canonical.append("name=").append(binding.name()).append(';');
+            canonical.append("type=").append(binding.type().name()).append(';');
+            canonical.append("texFormat=").append(binding.textureFormat() == null ? "" : binding.textureFormat().name()).append(';');
+            List<String> stageNames = binding.stages().stream().map(Enum::name).sorted().toList();
+            canonical.append("stages=").append(String.join(",", stageNames)).append(';');
+        }
+
+        canonical.append("spirvCount=").append(spirvModules.size()).append(';');
+        for (VulkanicSpirvModule module : spirvModules) {
+            canonical.append("stage=").append(module.stage().name()).append(';');
+            canonical.append("entry=").append(module.entryPoint()).append(';');
+            canonical.append("source=").append(module.sourceName()).append(';');
+            canonical.append("compiler=").append(module.compilerName()).append(';');
+            canonical.append("size=").append(module.byteSize()).append(';');
+            canonical.append("bytesSha=").append(sha256Hex(module.spirvBytes())).append(';');
+        }
+
+        canonical.append("pushCount=").append(pushConstantRanges.size()).append(';');
+        for (PushConstantRange range : pushConstantRanges) {
+            canonical.append("offset=").append(range.offset()).append(';');
+            canonical.append("size=").append(range.size()).append(';');
+            List<String> stageNames = range.stages().stream()
+                .map(Enum::name)
+                .sorted()
+                .toList();
+            canonical.append("stages=").append(String.join(",", stageNames)).append(';');
+        }
+
+        return sha256Hex(canonical.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -130,6 +282,86 @@ public final class PipelineDescriptor {
             return renderPipeline;
         }
         return portableState.toRenderPipeline();
+    }
+
+    private ResourceLayout derivePortableResourceLayout() {
+        ResourceLayout baseLayout = portableState.toResourceLayout();
+        if (spirvModules.isEmpty()) {
+            return baseLayout;
+        }
+
+        Set<VulkanicShaderStage> inferredStages = spirvModules.stream()
+            .map(VulkanicSpirvModule::stage)
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        if (inferredStages.isEmpty()) {
+            return baseLayout;
+        }
+
+        List<ResourceBinding> bindingsWithInferredStages = baseLayout.bindings().stream()
+            .map(binding -> binding.withStages(inferredStages))
+            .toList();
+        return new ResourceLayout(bindingsWithInferredStages);
+    }
+
+    private static List<VulkanicSpirvModule> normalizeSpirvModules(List<VulkanicSpirvModule> modules) {
+        List<VulkanicSpirvModule> copied = List.copyOf(Objects.requireNonNull(modules, "spirvModules must not be null"));
+        Set<VulkanicShaderStage> seenStages = new LinkedHashSet<>();
+        for (VulkanicSpirvModule module : copied) {
+            Objects.requireNonNull(module, "spirv module entry must not be null");
+            if (!seenStages.add(module.stage())) {
+                throw new IllegalArgumentException(
+                    "Duplicate SPIR-V module stage '" + module.stage() + "' is not allowed for a single pipeline descriptor"
+                );
+            }
+        }
+        return copied;
+    }
+
+    private static List<PushConstantRange> normalizePushConstantRanges(List<PushConstantRange> ranges) {
+        List<PushConstantRange> copied = List.copyOf(Objects.requireNonNull(ranges, "pushConstantRanges must not be null"));
+        List<PushConstantRange> sorted = new ArrayList<>(copied);
+        sorted.sort(java.util.Comparator.comparingInt(PushConstantRange::offset));
+
+        int previousEnd = -1;
+        for (PushConstantRange range : sorted) {
+            Objects.requireNonNull(range, "push constant range entry must not be null");
+            if (range.offset() < previousEnd) {
+                throw new IllegalArgumentException(
+                    "Push constant ranges overlap: previous end=" + previousEnd + ", next offset=" + range.offset()
+                );
+            }
+            previousEnd = range.offset() + range.size();
+        }
+
+        return copied;
+    }
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
+    }
+
+    /**
+     * Backend-agnostic push-constant range metadata for future pipeline layout derivation.
+     */
+    public record PushConstantRange(int offset, int size, Set<VulkanicShaderStage> stages) {
+        public PushConstantRange {
+            if (offset < 0) {
+                throw new IllegalArgumentException("offset must be >= 0");
+            }
+            if (size <= 0) {
+                throw new IllegalArgumentException("size must be > 0");
+            }
+            stages = Set.copyOf(Objects.requireNonNull(stages, "stages must not be null"));
+            if (stages.isEmpty()) {
+                throw new IllegalArgumentException("stages must not be empty");
+            }
+        }
     }
 
     /**
@@ -483,8 +715,13 @@ public final class PipelineDescriptor {
         int binding,
         String name,
         ResourceType type,
-        @Nullable TextureFormat textureFormat
+        @Nullable TextureFormat textureFormat,
+        Set<VulkanicShaderStage> stages
     ) {
+        public ResourceBinding(int set, int binding, String name, ResourceType type, @Nullable TextureFormat textureFormat) {
+            this(set, binding, name, type, textureFormat, defaultGraphicsStages());
+        }
+
         public ResourceBinding {
             if (set < 0) {
                 throw new IllegalArgumentException("set must be >= 0");
@@ -507,6 +744,19 @@ public final class PipelineDescriptor {
                 throw new IllegalArgumentException(
                     "Only texel-buffer resource bindings may include a texture format");
             }
+
+            stages = Set.copyOf(Objects.requireNonNull(stages, "stages must not be null"));
+            if (stages.isEmpty()) {
+                throw new IllegalArgumentException("stages must not be empty");
+            }
+        }
+
+        public ResourceBinding withStages(Set<VulkanicShaderStage> stages) {
+            return new ResourceBinding(set, binding, name, type, textureFormat, stages);
+        }
+
+        private static Set<VulkanicShaderStage> defaultGraphicsStages() {
+            return Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT);
         }
     }
 

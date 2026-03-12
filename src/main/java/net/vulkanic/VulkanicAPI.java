@@ -29,6 +29,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -3319,6 +3320,13 @@ public class VulkanicAPI {
 
         return java.util.List.copyOf(blocks);
     }
+
+    /**
+     * Retrieves all active uniform blocks for a backend-neutral program handle.
+     */
+    public static java.util.List<ActiveUniformBlockInfo> getActiveUniformBlocks(CommandContext ctx, VulkanicProgramHandle program) {
+        return getActiveUniformBlocks(ctx, program.value());
+    }
     
     public static int generateQueryObject(CommandContext ctx) {
         return getBackend().generateQueryObject(ctx);
@@ -3957,6 +3965,18 @@ public class VulkanicAPI {
     }
 
     /**
+     * Retrieves reflected metadata for an active uniform from a backend-neutral program handle.
+     */
+    public static ActiveUniformInfo getActiveUniformInfo(
+        CommandContext ctx,
+        VulkanicProgramHandle program,
+        int index,
+        int maxNameLength
+    ) {
+        return getActiveUniformInfo(ctx, program.value(), index, maxNameLength);
+    }
+
+    /**
      * Retrieves all active uniforms for a program as backend-neutral typed metadata.
      */
     public static java.util.List<ActiveUniformInfo> getActiveUniforms(CommandContext ctx, int program, int maxNameLength) {
@@ -3968,6 +3988,291 @@ public class VulkanicAPI {
         }
 
         return java.util.List.copyOf(uniforms);
+    }
+
+    /**
+     * Retrieves all active uniforms for a backend-neutral program handle.
+     */
+    public static java.util.List<ActiveUniformInfo> getActiveUniforms(
+        CommandContext ctx,
+        VulkanicProgramHandle program,
+        int maxNameLength
+    ) {
+        return getActiveUniforms(ctx, program.value(), maxNameLength);
+    }
+
+    /**
+     * Derives descriptor-style resource layout metadata from linked program reflection.
+     *
+     * <p>This seam prepares frontend callsites for future Vulkan descriptor-layout synthesis
+     * while remaining fully backend-neutral.</p>
+     */
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        int program,
+        int maxNameLength
+    ) {
+        return deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength, defaultReflectedResourceStages());
+    }
+
+    /**
+     * Derives descriptor-style resource layout metadata from linked program reflection.
+     *
+     * <p>All emitted resource bindings are tagged with the provided stage-visibility
+     * metadata for future Vulkan descriptor-layout synthesis.</p>
+     */
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        int program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        if (maxNameLength <= 0) {
+            throw new IllegalArgumentException("maxNameLength must be > 0");
+        }
+        java.util.Set<VulkanicShaderStage> normalizedStages = normalizeReflectedResourceStages(stages);
+
+        java.util.ArrayList<PipelineDescriptor.ResourceBinding> bindings = new java.util.ArrayList<>();
+        java.util.LinkedHashSet<String> seenNames = new java.util.LinkedHashSet<>();
+        int bindingIndex = 0;
+
+        for (ActiveUniformBlockInfo blockInfo : getActiveUniformBlocks(ctx, program)) {
+            String name = normalizeReflectedResourceName(blockInfo.name());
+            if (name.isBlank() || name.startsWith("gl_")) {
+                continue;
+            }
+            if (!seenNames.add(name)) {
+                continue;
+            }
+
+            bindings.add(new PipelineDescriptor.ResourceBinding(
+                0,
+                bindingIndex,
+                name,
+                PipelineDescriptor.ResourceType.UNIFORM_BUFFER,
+                null,
+                normalizedStages
+            ));
+            bindingIndex++;
+        }
+
+        for (ActiveUniformInfo uniformInfo : getActiveUniforms(ctx, program, maxNameLength)) {
+            java.util.Optional<PipelineDescriptor.ResourceType> resourceType = toReflectedResourceType(uniformInfo.reflectionType());
+            if (resourceType.isEmpty()) {
+                continue;
+            }
+
+            String name = normalizeReflectedResourceName(uniformInfo.name());
+            if (name.isBlank() || name.startsWith("gl_")) {
+                continue;
+            }
+            if (!seenNames.add(name)) {
+                continue;
+            }
+
+            bindings.add(new PipelineDescriptor.ResourceBinding(
+                0,
+                bindingIndex,
+                name,
+                resourceType.get(),
+                null,
+                normalizedStages
+            ));
+            bindingIndex++;
+        }
+
+        return new PipelineDescriptor.ResourceLayout(bindings);
+    }
+
+    /**
+     * Derives descriptor-style resource layout metadata using a default max reflected-name length.
+     */
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(CommandContext ctx, int program) {
+        return deriveResourceLayoutFromProgramReflection(ctx, program, 256);
+    }
+
+    /**
+     * Derives descriptor-style resource layout metadata using a default reflected-name
+     * length and explicit stage-visibility metadata.
+     */
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        int program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return deriveResourceLayoutFromProgramReflection(ctx, program, 256, stages);
+    }
+
+    /**
+     * Derives descriptor-style resource layout metadata for a backend-neutral program handle.
+     */
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        VulkanicProgramHandle program,
+        int maxNameLength
+    ) {
+        return deriveResourceLayoutFromProgramReflection(ctx, program.value(), maxNameLength);
+    }
+
+    /**
+     * Derives descriptor-style resource layout metadata for a backend-neutral program handle
+     * using explicit stage-visibility metadata.
+     */
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        VulkanicProgramHandle program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return deriveResourceLayoutFromProgramReflection(ctx, program.value(), maxNameLength, stages);
+    }
+
+    /**
+     * Derives descriptor-style resource layout metadata for a backend-neutral program handle.
+     */
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        VulkanicProgramHandle program
+    ) {
+        return deriveResourceLayoutFromProgramReflection(ctx, program.value(), 256);
+    }
+
+    /**
+     * Derives descriptor-style resource layout metadata for a backend-neutral program handle
+     * using explicit stage-visibility metadata.
+     */
+    public static PipelineDescriptor.ResourceLayout deriveResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        VulkanicProgramHandle program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return deriveResourceLayoutFromProgramReflection(ctx, program.value(), 256, stages);
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata.
+     */
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        int maxNameLength
+    ) {
+        return withReflectedResourceLayout(ctx, descriptor, program, maxNameLength, defaultReflectedResourceStages());
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata.
+     */
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return Objects.requireNonNull(descriptor, "descriptor must not be null")
+            .withResourceLayout(deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength, stages));
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata.
+     */
+    public static PipelineDescriptor withReflectedResourceLayout(CommandContext ctx, PipelineDescriptor descriptor, int program) {
+        return withReflectedResourceLayout(ctx, descriptor, program, 256);
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata.
+     */
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return withReflectedResourceLayout(ctx, descriptor, program, 256, stages);
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata.
+     */
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        VulkanicProgramHandle program,
+        int maxNameLength
+    ) {
+        return withReflectedResourceLayout(ctx, descriptor, program.value(), maxNameLength);
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata.
+     */
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        VulkanicProgramHandle program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return withReflectedResourceLayout(ctx, descriptor, program.value(), maxNameLength, stages);
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata.
+     */
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        VulkanicProgramHandle program
+    ) {
+        return withReflectedResourceLayout(ctx, descriptor, program.value(), 256);
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata.
+     */
+    public static PipelineDescriptor withReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        VulkanicProgramHandle program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        return withReflectedResourceLayout(ctx, descriptor, program.value(), 256, stages);
+    }
+
+    private static java.util.Set<VulkanicShaderStage> defaultReflectedResourceStages() {
+        return java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT);
+    }
+
+    private static java.util.Set<VulkanicShaderStage> normalizeReflectedResourceStages(
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        java.util.Set<VulkanicShaderStage> normalized = java.util.Set.copyOf(
+            Objects.requireNonNull(stages, "stages must not be null")
+        );
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("stages must not be empty");
+        }
+        return normalized;
+    }
+
+    private static java.util.Optional<PipelineDescriptor.ResourceType> toReflectedResourceType(
+        java.util.Optional<VulkanicUniformReflectionType> reflectionType
+    ) {
+        if (reflectionType.isPresent() && reflectionType.get().isSampler()) {
+            return java.util.Optional.of(PipelineDescriptor.ResourceType.SAMPLER);
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static String normalizeReflectedResourceName(String reflectedName) {
+        String normalized = Objects.requireNonNull(reflectedName, "reflectedName must not be null").trim();
+        while (normalized.endsWith("[0]")) {
+            normalized = normalized.substring(0, normalized.length() - 3);
+        }
+        return normalized;
     }
     
     
@@ -4976,6 +5281,29 @@ public class VulkanicAPI {
      */
     public static PipelineHandle createPipeline(net.blaze3d.pipeline.RenderPipeline pipeline) {
         return getBackend().createPipeline(PipelineDescriptor.fromRenderPipeline(pipeline));
+    }
+
+    /**
+     * Convenience overload: creates a pipeline descriptor carrying portable state
+     * and precompiled SPIR-V modules, then compiles through the active backend.
+     */
+    public static PipelineHandle createPipeline(
+        PipelineDescriptor.PortableState portableState,
+        java.util.List<VulkanicSpirvModule> spirvModules
+    ) {
+        return getBackend().createPipeline(
+            PipelineDescriptor.fromPortableStateAndSpirvModules(portableState, spirvModules)
+        );
+    }
+
+    /**
+     * Builds a pipeline descriptor from portable state plus precompiled SPIR-V modules.
+     */
+    public static PipelineDescriptor createPipelineDescriptor(
+        PipelineDescriptor.PortableState portableState,
+        java.util.List<VulkanicSpirvModule> spirvModules
+    ) {
+        return PipelineDescriptor.fromPortableStateAndSpirvModules(portableState, spirvModules);
     }
 
     /**
