@@ -4,6 +4,7 @@ import net.sodium.client.gl.GlObject;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderHandle;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -21,8 +22,8 @@ public class GlShader extends GlObject {
         this.name = name;
         CommandContext ctx = VulkanicAPI.getCommandContext();
 
-        int handle = VulkanicAPI.createShader(ctx, type.stage);
-        ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
+        VulkanicShaderHandle handle = VulkanicAPI.createShaderHandle(ctx, type.stage);
+        ShaderWorkarounds.safeShaderSource(handle.value(), parsedShader.src());
         VulkanicAPI.compileShader(ctx, handle);
 
         String log = VulkanicAPI.getShaderInfoLog(ctx, handle);
@@ -36,7 +37,7 @@ public class GlShader extends GlObject {
             throw new RuntimeException("Shader compilation failed, see log for details");
         }
 
-        this.setHandle(handle);
+        this.setHandle(handle.value());
     }
 
     public ResourceLocation getName() {
@@ -44,7 +45,7 @@ public class GlShader extends GlObject {
     }
 
     public void delete() {
-        VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), this.handle());
+        VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(this.handle()));
 
         this.invalidateHandle();
     }

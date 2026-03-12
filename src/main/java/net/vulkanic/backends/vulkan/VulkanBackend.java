@@ -303,12 +303,16 @@ public class VulkanBackend {
         return Optional.ofNullable(virtualShader.compiledModule);
     }
 
-    public void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+    public void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
         VirtualShader virtualShader = requireVirtualShader(shader);
-        virtualShader.source = decodeShaderSource(pointerBufferAddress, stringCount, lengthsPointer);
+        virtualShader.source = source == null ? "" : source.toString();
         virtualShader.compiledModule = null;
         virtualShader.compileStatus = false;
         virtualShader.infoLog = "";
+    }
+
+    public void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        uploadShaderSource(ctx, shader, decodeShaderSource(pointerBufferAddress, stringCount, lengthsPointer));
     }
 
     public void compileShader(CommandContext ctx, int shader) {

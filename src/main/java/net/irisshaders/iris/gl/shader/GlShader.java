@@ -2,9 +2,9 @@ package net.irisshaders.iris.gl.shader;
 
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.GlResource;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderHandle;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -26,13 +26,13 @@ public class GlShader extends GlResource {
 
 	private static int createShader(ShaderType type, String name, String src) {
 		CommandContext ctx = VulkanicAPI.getCommandContext();
-		int handle = VulkanicAPI.createShader(ctx, type.stage);
-		ShaderWorkarounds.safeShaderSource(handle, src);
+		VulkanicShaderHandle handle = VulkanicAPI.createShaderHandle(ctx, type.stage);
+		ShaderWorkarounds.safeShaderSource(handle.value(), src);
 		VulkanicAPI.compileShader(ctx, handle);
 
-		GLDebug.nameObject(VulkanicAPI.GL_SHADER, handle, name + "(" + type.name().toLowerCase(Locale.ROOT) + ")");
+		GLDebug.nameObject(VulkanicAPI.GL_SHADER, handle.value(), name + "(" + type.name().toLowerCase(Locale.ROOT) + ")");
 
-		String log = IrisRenderSystem.getShaderInfoLog(handle);
+		String log = VulkanicAPI.getShaderInfoLog(ctx, handle);
 
 		if (!log.isEmpty()) {
 			LOGGER.warn("Shader compilation log for " + name + ": " + log);
@@ -42,7 +42,7 @@ public class GlShader extends GlResource {
 			throw new ShaderCompileException(name, log);
 		}
 
-		return handle;
+		return handle.value();
 	}
 
 	public String getName() {
@@ -55,6 +55,6 @@ public class GlShader extends GlResource {
 
 	@Override
 	protected void destroyInternal() {
-		VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), this.getGlId());
+		VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(this.getGlId()));
 	}
 }

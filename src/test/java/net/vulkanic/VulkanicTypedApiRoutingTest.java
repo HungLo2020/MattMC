@@ -208,6 +208,56 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
+    public void testShaderSourceUploadRoutesViaCharSequenceSeam() {
+        VulkanicAPI.uploadShaderSource(TEST_CONTEXT, 41, "#version 450\nvoid main(){}");
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("uploadShaderSource", invocation.method.getName());
+        assertEquals(CharSequence.class, invocation.method.getParameterTypes()[2]);
+        assertEquals(41, invocation.args[1]);
+        assertEquals("#version 450\nvoid main(){}", invocation.args[2]);
+    }
+
+    @Test
+    public void testTypedShaderAndProgramHandleLifecycleRouting() {
+        VulkanicCoreAPI.createShaderHandle(TEST_CONTEXT, VulkanicShaderStage.VERTEX);
+
+        RecordedInvocation createShaderInvocation = invocationHandler.lastInvocation;
+        assertNotNull(createShaderInvocation);
+        assertEquals("createShaderHandle", createShaderInvocation.method.getName());
+        assertEquals(VulkanicShaderStage.class, createShaderInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicShaderStage.VERTEX, createShaderInvocation.args[1]);
+
+        VulkanicCoreAPI.createShaderProgramHandle(TEST_CONTEXT);
+
+        RecordedInvocation createProgramInvocation = invocationHandler.lastInvocation;
+        assertNotNull(createProgramInvocation);
+        assertEquals("createShaderProgramHandle", createProgramInvocation.method.getName());
+
+        VulkanicShaderHandle shader = VulkanicShaderHandle.of(17);
+        VulkanicProgramHandle program = VulkanicProgramHandle.of(23);
+
+        VulkanicCoreAPI.compileShader(TEST_CONTEXT, shader);
+
+        RecordedInvocation compileInvocation = invocationHandler.lastInvocation;
+        assertNotNull(compileInvocation);
+        assertEquals("compileShader", compileInvocation.method.getName());
+        assertEquals(VulkanicShaderHandle.class, compileInvocation.method.getParameterTypes()[1]);
+        assertEquals(shader, compileInvocation.args[1]);
+
+        VulkanicCoreAPI.attachShader(TEST_CONTEXT, program, shader);
+
+        RecordedInvocation attachInvocation = invocationHandler.lastInvocation;
+        assertNotNull(attachInvocation);
+        assertEquals("attachShader", attachInvocation.method.getName());
+        assertEquals(VulkanicProgramHandle.class, attachInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicShaderHandle.class, attachInvocation.method.getParameterTypes()[2]);
+        assertEquals(program, attachInvocation.args[1]);
+        assertEquals(shader, attachInvocation.args[2]);
+    }
+
+    @Test
     public void testCapabilityRoutingUsesTypedMethodForKnownCapability() {
         VulkanicCoreAPI.setCapabilityEnabled(TEST_CONTEXT, VulkanicCapability.SCISSOR_TEST, false);
 

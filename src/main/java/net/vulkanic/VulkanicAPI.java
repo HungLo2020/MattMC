@@ -2371,6 +2371,18 @@ public class VulkanicAPI {
         return getBackend().createShader(ctx, shaderStage);
     }
 
+    public static VulkanicShaderHandle createShaderHandle(CommandContext ctx, int shaderType) {
+        java.util.Optional<VulkanicShaderStage> typedShaderType = VulkanicShaderStage.fromLegacyGlShaderType(shaderType);
+        if (typedShaderType.isPresent()) {
+            return createShaderHandle(ctx, typedShaderType.get());
+        }
+        return getBackend().createShaderHandle(ctx, shaderType);
+    }
+
+    public static VulkanicShaderHandle createShaderHandle(CommandContext ctx, VulkanicShaderStage shaderStage) {
+        return getBackend().createShaderHandle(ctx, shaderStage);
+    }
+
     /**
      * Compiles GLSL source to a SPIR-V module through the active backend.
      */
@@ -2402,17 +2414,36 @@ public class VulkanicAPI {
     public static java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
         return getBackend().getCompiledSpirvModule(ctx, shader);
     }
+
+    /**
+     * Returns compiled SPIR-V for a typed shader handle when the backend tracks it.
+     */
+    public static java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, VulkanicShaderHandle shader) {
+        return getBackend().getCompiledSpirvModule(ctx, shader);
+    }
     
     public static void compileShader(CommandContext ctx, int shader) {
+        getBackend().compileShader(ctx, shader);
+    }
+
+    public static void compileShader(CommandContext ctx, VulkanicShaderHandle shader) {
         getBackend().compileShader(ctx, shader);
     }
     
     public static int createShaderProgram(CommandContext ctx) {
         return getBackend().createShaderProgram(ctx);
     }
+
+    public static VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx) {
+        return getBackend().createShaderProgramHandle(ctx);
+    }
     
     
     public static void deleteShader(CommandContext ctx, int shader) {
+        getBackend().deleteShader(ctx, shader);
+    }
+
+    public static void deleteShader(CommandContext ctx, VulkanicShaderHandle shader) {
         getBackend().deleteShader(ctx, shader);
     }
     
@@ -2422,17 +2453,33 @@ public class VulkanicAPI {
     public static void deleteProgram(CommandContext ctx, int program) {
         getBackend().deleteProgram(ctx, program);
     }
+
+    public static void deleteProgram(CommandContext ctx, VulkanicProgramHandle program) {
+        getBackend().deleteProgram(ctx, program);
+    }
     
     
     public static void attachShader(CommandContext ctx, int program, int shader) {
+        getBackend().attachShader(ctx, program, shader);
+    }
+
+    public static void attachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader) {
         getBackend().attachShader(ctx, program, shader);
     }
     
     public static void detachShader(CommandContext ctx, int program, int shader) {
         getBackend().detachShader(ctx, program, shader);
     }
+
+    public static void detachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader) {
+        getBackend().detachShader(ctx, program, shader);
+    }
     
     public static void linkProgram(CommandContext ctx, int program) {
+        getBackend().linkProgram(ctx, program);
+    }
+
+    public static void linkProgram(CommandContext ctx, VulkanicProgramHandle program) {
         getBackend().linkProgram(ctx, program);
     }
     
@@ -2444,8 +2491,20 @@ public class VulkanicAPI {
         return getBackend().getProgramParameter(ctx, program, pname);
     }
 
+    public static int getProgramParameter(CommandContext ctx, VulkanicProgramHandle program, int pname) {
+        java.util.Optional<VulkanicProgramParameterName> typedPName = VulkanicProgramParameterName.fromLegacyGlPName(pname);
+        if (typedPName.isPresent()) {
+            return getProgramParameter(ctx, program, typedPName.get());
+        }
+        return getBackend().getProgramParameter(ctx, program, pname);
+    }
+
     public static int getProgramParameter(CommandContext ctx, int program, VulkanicProgramParameterName pname) {
         return getBackend().getProgramParameter(ctx, program, pname.toLegacyGlPName());
+    }
+
+    public static int getProgramParameter(CommandContext ctx, VulkanicProgramHandle program, VulkanicProgramParameterName pname) {
+        return getBackend().getProgramParameter(ctx, program, pname);
     }
 
     /**
@@ -2468,8 +2527,20 @@ public class VulkanicAPI {
     public static boolean isProgramLinkSuccessful(CommandContext ctx, int program) {
         return isLegacyGlBooleanTrue(getProgramParameter(ctx, program, VulkanicProgramParameterName.LINK_STATUS));
     }
+
+    public static boolean isProgramLinkSuccessful(CommandContext ctx, VulkanicProgramHandle program) {
+        return isLegacyGlBooleanTrue(getProgramParameter(ctx, program, VulkanicProgramParameterName.LINK_STATUS));
+    }
     
     public static int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        java.util.Optional<VulkanicShaderParameterName> typedPName = VulkanicShaderParameterName.fromLegacyGlPName(pname);
+        if (typedPName.isPresent()) {
+            return getShaderParameter(ctx, shader, typedPName.get());
+        }
+        return getBackend().getShaderParameter(ctx, shader, pname);
+    }
+
+    public static int getShaderParameter(CommandContext ctx, VulkanicShaderHandle shader, int pname) {
         java.util.Optional<VulkanicShaderParameterName> typedPName = VulkanicShaderParameterName.fromLegacyGlPName(pname);
         if (typedPName.isPresent()) {
             return getShaderParameter(ctx, shader, typedPName.get());
@@ -2481,14 +2552,26 @@ public class VulkanicAPI {
         return getBackend().getShaderParameter(ctx, shader, pname.toLegacyGlPName());
     }
 
+    public static int getShaderParameter(CommandContext ctx, VulkanicShaderHandle shader, VulkanicShaderParameterName pname) {
+        return getBackend().getShaderParameter(ctx, shader, pname);
+    }
+
     /**
      * Returns true when a shader currently reports COMPILE_STATUS success.
      */
     public static boolean isShaderCompileSuccessful(CommandContext ctx, int shader) {
         return isLegacyGlBooleanTrue(getShaderParameter(ctx, shader, VulkanicShaderParameterName.COMPILE_STATUS));
     }
+
+    public static boolean isShaderCompileSuccessful(CommandContext ctx, VulkanicShaderHandle shader) {
+        return isLegacyGlBooleanTrue(getShaderParameter(ctx, shader, VulkanicShaderParameterName.COMPILE_STATUS));
+    }
     
     public static String getProgramInfoLog(CommandContext ctx, int program) {
+        return getBackend().getProgramInfoLog(ctx, program);
+    }
+
+    public static String getProgramInfoLog(CommandContext ctx, VulkanicProgramHandle program) {
         return getBackend().getProgramInfoLog(ctx, program);
     }
     
@@ -2498,6 +2581,10 @@ public class VulkanicAPI {
     
     
     public static String getShaderInfoLog(CommandContext ctx, int shader) {
+        return getBackend().getShaderInfoLog(ctx, shader);
+    }
+
+    public static String getShaderInfoLog(CommandContext ctx, VulkanicShaderHandle shader) {
         return getBackend().getShaderInfoLog(ctx, shader);
     }
     
@@ -3181,6 +3268,13 @@ public class VulkanicAPI {
      */
     public static int getTexture2DLevelHeight(CommandContext ctx, int level) {
         return getTexture2DLevelParameter(ctx, level, GL_TEXTURE_HEIGHT);
+    }
+
+    /**
+     * Uploads shader source using a backend-neutral source string API.
+     */
+    public static void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
+        getBackend().uploadShaderSource(ctx, shader, source);
     }
     
     public static void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {

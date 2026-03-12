@@ -1430,6 +1430,20 @@ public interface GraphicsBackend {
     }
 
     /**
+     * Creates a shader and wraps its handle in a backend-neutral value object.
+     */
+    default VulkanicShaderHandle createShaderHandle(CommandContext ctx, int shaderType) {
+        return VulkanicShaderHandle.of(createShader(ctx, shaderType));
+    }
+
+    /**
+     * Creates a shader using a typed stage and returns a typed handle.
+     */
+    default VulkanicShaderHandle createShaderHandle(CommandContext ctx, VulkanicShaderStage shaderStage) {
+        return VulkanicShaderHandle.of(createShader(ctx, shaderStage));
+    }
+
+    /**
      * Compiles GLSL shader source to SPIR-V bytecode using backend-owned tooling.
      */
     default VulkanicSpirvModule compileSpirvModule(
@@ -1462,6 +1476,13 @@ public interface GraphicsBackend {
     default java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
         return java.util.Optional.empty();
     }
+
+    /**
+     * Returns compiled SPIR-V for a typed shader handle when available.
+     */
+    default java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, VulkanicShaderHandle shader) {
+        return getCompiledSpirvModule(ctx, shader.value());
+    }
     
     /**
      * Compiles a shader object.
@@ -1473,6 +1494,13 @@ public interface GraphicsBackend {
      * @param shader The shader object ID to compile
      */
     void compileShader(CommandContext ctx, int shader);
+
+    /**
+     * Compiles a shader identified by a backend-neutral shader handle.
+     */
+    default void compileShader(CommandContext ctx, VulkanicShaderHandle shader) {
+        compileShader(ctx, shader.value());
+    }
     
     /**
      * Creates a new shader program object.
@@ -1484,6 +1512,13 @@ public interface GraphicsBackend {
      * @return The shader program object ID
      */
     int createShaderProgram(CommandContext ctx);
+
+    /**
+     * Creates a shader program and wraps its handle in a backend-neutral value object.
+     */
+    default VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx) {
+        return VulkanicProgramHandle.of(createShaderProgram(ctx));
+    }
     
     /**
      * Attaches a shader to a program object.
@@ -1496,6 +1531,13 @@ public interface GraphicsBackend {
      * @param shader The shader object ID to attach
      */
     void attachShader(CommandContext ctx, int program, int shader);
+
+    /**
+     * Attaches a shader using backend-neutral shader/program handle wrappers.
+     */
+    default void attachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader) {
+        attachShader(ctx, program.value(), shader.value());
+    }
     
     /**
      * Detaches a shader from a program object.
@@ -1508,6 +1550,13 @@ public interface GraphicsBackend {
      * @param shader The shader object ID to detach
      */
     void detachShader(CommandContext ctx, int program, int shader);
+
+    /**
+     * Detaches a shader using backend-neutral shader/program handle wrappers.
+     */
+    default void detachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader) {
+        detachShader(ctx, program.value(), shader.value());
+    }
     
     /**
      * Links a shader program.
@@ -1519,6 +1568,13 @@ public interface GraphicsBackend {
      * @param program The program object ID to link
      */
     void linkProgram(CommandContext ctx, int program);
+
+    /**
+     * Links a shader program identified by a backend-neutral program handle.
+     */
+    default void linkProgram(CommandContext ctx, VulkanicProgramHandle program) {
+        linkProgram(ctx, program.value());
+    }
     
     /**
      * Queries a program parameter.
@@ -1532,6 +1588,20 @@ public interface GraphicsBackend {
      * @return The parameter value
      */
     int getProgramParameter(CommandContext ctx, int program, int pname);
+
+    /**
+     * Queries a program parameter using a backend-neutral program handle.
+     */
+    default int getProgramParameter(CommandContext ctx, VulkanicProgramHandle program, int pname) {
+        return getProgramParameter(ctx, program.value(), pname);
+    }
+
+    /**
+     * Queries a typed program parameter using a backend-neutral program handle.
+     */
+    default int getProgramParameter(CommandContext ctx, VulkanicProgramHandle program, VulkanicProgramParameterName pname) {
+        return getProgramParameter(ctx, program.value(), pname.toLegacyGlPName());
+    }
     
     /**
      * Queries multiple program parameters into an array.
@@ -1558,6 +1628,20 @@ public interface GraphicsBackend {
      * @return The parameter value
      */
     int getShaderParameter(CommandContext ctx, int shader, int pname);
+
+    /**
+     * Queries a shader parameter using a backend-neutral shader handle.
+     */
+    default int getShaderParameter(CommandContext ctx, VulkanicShaderHandle shader, int pname) {
+        return getShaderParameter(ctx, shader.value(), pname);
+    }
+
+    /**
+     * Queries a typed shader parameter using a backend-neutral shader handle.
+     */
+    default int getShaderParameter(CommandContext ctx, VulkanicShaderHandle shader, VulkanicShaderParameterName pname) {
+        return getShaderParameter(ctx, shader.value(), pname.toLegacyGlPName());
+    }
     
     /**
      * Retrieves the information log for a program.
@@ -1570,6 +1654,13 @@ public interface GraphicsBackend {
      * @return The information log string
      */
     String getProgramInfoLog(CommandContext ctx, int program);
+
+    /**
+     * Retrieves a program information log for a backend-neutral program handle.
+     */
+    default String getProgramInfoLog(CommandContext ctx, VulkanicProgramHandle program) {
+        return getProgramInfoLog(ctx, program.value());
+    }
     
     /**
      * Retrieves the information log for a shader.
@@ -1582,6 +1673,13 @@ public interface GraphicsBackend {
      * @return The information log string
      */
     String getShaderInfoLog(CommandContext ctx, int shader);
+
+    /**
+     * Retrieves a shader information log for a backend-neutral shader handle.
+     */
+    default String getShaderInfoLog(CommandContext ctx, VulkanicShaderHandle shader) {
+        return getShaderInfoLog(ctx, shader.value());
+    }
     
     /**
      * Retrieves information about an active uniform variable.
@@ -1952,6 +2050,13 @@ public interface GraphicsBackend {
      * @param program The program object ID to delete
      */
     void deleteProgram(CommandContext ctx, int program);
+
+    /**
+     * Deletes a shader program identified by a backend-neutral program handle.
+     */
+    default void deleteProgram(CommandContext ctx, VulkanicProgramHandle program) {
+        deleteProgram(ctx, program.value());
+    }
     
     /**
      * Deletes a shader object.
@@ -1963,6 +2068,13 @@ public interface GraphicsBackend {
      * @param shader The shader object ID to delete
      */
     void deleteShader(CommandContext ctx, int shader);
+
+    /**
+     * Deletes a shader identified by a backend-neutral shader handle.
+     */
+    default void deleteShader(CommandContext ctx, VulkanicShaderHandle shader) {
+        deleteShader(ctx, shader.value());
+    }
     
     /**
      * Binds an attribute location in a shader program.
@@ -2069,6 +2181,27 @@ public interface GraphicsBackend {
     int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname);
     
     // Shader source (native)
+    /**
+     * Uploads GLSL source code to a shader object using a backend-neutral source string.
+     *
+     * <p>Default implementation bridges to the pointer-based upload path.</p>
+     */
+    default void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
+        final org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackGet();
+        final int stackPointer = stack.getPointer();
+
+        try {
+            final java.nio.ByteBuffer sourceBuffer = org.lwjgl.system.MemoryUtil.memUTF8(source, true);
+            final org.lwjgl.PointerBuffer pointers = stack.mallocPointer(1);
+            pointers.put(sourceBuffer);
+
+            uploadShaderSource(ctx, shader, pointers.address0(), 1, 0L);
+            org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
+        } finally {
+            stack.setPointer(stackPointer);
+        }
+    }
+
     /**
      * Uploads GLSL source code to a shader object using native pointer addresses.
      * 

@@ -13,6 +13,8 @@ import net.vulkanic.VulkanicClearBuffer;
 import net.vulkanic.VulkanicCullFaceMode;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicIntegerQuery;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
 import net.vulkanic.VulkanicStencilCompareOp;
 import net.vulkanic.VulkanicStencilFace;
 import net.vulkanic.VulkanicStencilOperation;
@@ -840,6 +842,14 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         return GL20.glCreateShader(shaderType);
     }
+
+    @Override
+    public VulkanicShaderHandle createShaderHandle(CommandContext ctx, int shaderType) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return VulkanicShaderHandle.of(GL20.glCreateShader(shaderType));
+    }
     
     @Override
     public void compileShader(CommandContext ctx, int shader) {
@@ -855,6 +865,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return GL20.glCreateProgram();
+    }
+
+    @Override
+    public VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return VulkanicProgramHandle.of(GL20.glCreateProgram());
     }
     
     
@@ -1139,6 +1157,27 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return GL11.glGetTexLevelParameteri(target, level, pname);
+    }
+
+    @Override
+    public void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        final org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackGet();
+        final int stackPointer = stack.getPointer();
+
+        try {
+            final java.nio.ByteBuffer sourceBuffer = org.lwjgl.system.MemoryUtil.memUTF8(source, true);
+            final org.lwjgl.PointerBuffer pointers = stack.mallocPointer(1);
+            pointers.put(sourceBuffer);
+
+            org.lwjgl.opengl.GL20C.nglShaderSource(shader, 1, pointers.address0(), 0L);
+            org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
+        } finally {
+            stack.setPointer(stackPointer);
+        }
     }
     
     @Override

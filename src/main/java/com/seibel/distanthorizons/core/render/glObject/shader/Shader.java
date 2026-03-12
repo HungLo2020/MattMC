@@ -6,7 +6,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.ByteBuffer;
 
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
@@ -14,9 +13,6 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicShaderStage;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.NativeType;
 
 /**
@@ -151,22 +147,7 @@ public class Shader
 	 */
 	private static void safeShaderSource(CommandContext ctx, @NativeType("GLuint") int glId, @NativeType("GLchar const **") CharSequence source)
 	{
-		final MemoryStack stack = MemoryStack.stackGet();
-		final int stackPointer = stack.getPointer();
-
-		try
-		{
-			final ByteBuffer sourceBuffer = MemoryUtil.memUTF8(source, true);
-			final PointerBuffer pointers = stack.mallocPointer(1);
-			pointers.put(sourceBuffer);
-
-			VulkanicAPI.uploadShaderSource(ctx, glId, pointers.address0(), 1, 0);
-			org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
-		}
-		finally
-		{
-			stack.setPointer(stackPointer);
-		}
+		VulkanicAPI.uploadShaderSource(ctx, glId, source);
 	}
 	
 	public void free() { this.free(VulkanicAPI.getCommandContext()); }

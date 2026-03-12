@@ -1784,10 +1784,16 @@ public class Phase3DrawPathTest {
             "ShaderCreator should not create programs through removed GlStateManager.glCreateProgram wrapper");
         assertFalse(shaderCreatorSource.contains("GlStateManager.glLinkProgram("),
             "ShaderCreator should not link programs through removed GlStateManager.glLinkProgram wrapper");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShaderProgram(ctx)"),
-            "ShaderCreator should create programs directly through VulkanicAPI.createShaderProgram");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.linkProgram(ctx, i)"),
-            "ShaderCreator should link programs directly through VulkanicAPI.linkProgram");
+        assertTrue(
+            shaderCreatorSource.contains("VulkanicAPI.createShaderProgram(ctx)")
+                || shaderCreatorSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "ShaderCreator should create programs directly through VulkanicAPI.createShaderProgram or createShaderProgramHandle"
+        );
+        assertTrue(
+            shaderCreatorSource.contains("VulkanicAPI.linkProgram(ctx, i)")
+                || shaderCreatorSource.contains("VulkanicAPI.linkProgram(ctx, program)"),
+            "ShaderCreator should link programs directly through VulkanicAPI.linkProgram"
+        );
 
         Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
         String programCreatorSource = Files.readString(programCreatorFile);
@@ -1797,8 +1803,11 @@ public class Phase3DrawPathTest {
             "ProgramCreator should not link programs through removed GlStateManager.glLinkProgram wrapper");
         assertFalse(programCreatorSource.contains("GlStateManager.glGetProgrami("),
             "ProgramCreator should not query link status through removed GlStateManager.glGetProgrami wrapper");
-        assertTrue(programCreatorSource.contains("VulkanicAPI.createShaderProgram(ctx)"),
-            "ProgramCreator should create programs directly through VulkanicAPI.createShaderProgram");
+        assertTrue(
+            programCreatorSource.contains("VulkanicAPI.createShaderProgram(ctx)")
+                || programCreatorSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "ProgramCreator should create programs directly through VulkanicAPI.createShaderProgram or createShaderProgramHandle"
+        );
         assertTrue(programCreatorSource.contains("VulkanicAPI.linkProgram(ctx, program)"),
             "ProgramCreator should link programs directly through VulkanicAPI.linkProgram");
         assertTrue(
@@ -1909,14 +1918,26 @@ public class Phase3DrawPathTest {
             "ShaderCreator should not compile shaders through removed GlStateManager.glCompileShader wrapper");
         assertFalse(shaderCreatorSource.contains("GlStateManager.glGetShaderi("),
             "ShaderCreator should not query shader status through removed GlStateManager.glGetShaderi wrapper");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.attachShader(ctx, i, s)"),
-            "ShaderCreator should attach shaders directly through VulkanicAPI.attachShader");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), s)"),
-            "ShaderCreator should delete shaders directly through VulkanicAPI.deleteShader");
-        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShader(ctx, shaderType.stage)"),
-            "ShaderCreator should create shaders directly through VulkanicAPI.createShader");
-        assertTrue(shaderCreatorSource.contains("ShaderWorkarounds.safeShaderSource(shader, source)"),
-            "ShaderCreator should upload shader source via ShaderWorkarounds.safeShaderSource");
+        assertTrue(
+            shaderCreatorSource.contains("VulkanicAPI.attachShader(ctx, i, s)")
+                || shaderCreatorSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(s))"),
+            "ShaderCreator should attach shaders directly through VulkanicAPI.attachShader"
+        );
+        assertTrue(
+            shaderCreatorSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), s)")
+                || shaderCreatorSource.contains("VulkanicAPI.deleteShader(ctx, VulkanicShaderHandle.of(s))"),
+            "ShaderCreator should delete shaders directly through VulkanicAPI.deleteShader"
+        );
+        assertTrue(
+            shaderCreatorSource.contains("VulkanicAPI.createShader(ctx, shaderType.stage)")
+                || shaderCreatorSource.contains("VulkanicAPI.createShaderHandle(ctx, shaderType.stage)"),
+            "ShaderCreator should create shaders directly through VulkanicAPI.createShader or createShaderHandle"
+        );
+        assertTrue(
+            shaderCreatorSource.contains("ShaderWorkarounds.safeShaderSource(shader, source)")
+                || shaderCreatorSource.contains("ShaderWorkarounds.safeShaderSource(shader.value(), source)"),
+            "ShaderCreator should upload shader source via ShaderWorkarounds.safeShaderSource"
+        );
         assertTrue(shaderCreatorSource.contains("VulkanicAPI.compileShader(ctx, shader)"),
             "ShaderCreator should compile shaders directly through VulkanicAPI.compileShader");
         assertTrue(
@@ -1982,12 +2003,18 @@ public class Phase3DrawPathTest {
             "GlShader should not hard-wire immediate-context retrieval");
         assertTrue(glShaderSource.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
             "GlShader should fetch backend-neutral command context once in shader creation path");
-        assertTrue(glShaderSource.contains("VulkanicAPI.createShader(ctx, type.stage)"),
-            "GlShader should create shaders directly through VulkanicAPI.createShader");
+        assertTrue(
+            glShaderSource.contains("VulkanicAPI.createShader(ctx, type.stage)")
+                || glShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type.stage)"),
+            "GlShader should create shaders directly through VulkanicAPI.createShader or createShaderHandle"
+        );
         assertTrue(glShaderSource.contains("VulkanicAPI.compileShader(ctx, handle)"),
             "GlShader should compile shaders directly through VulkanicAPI.compileShader");
-        assertTrue(glShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), this.getGlId())"),
-            "GlShader should delete shaders directly through VulkanicAPI.deleteShader");
+        assertTrue(
+            glShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), this.getGlId())")
+                || glShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(this.getGlId()))"),
+            "GlShader should delete shaders directly through VulkanicAPI.deleteShader"
+        );
 
         Path partialShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/PartialShader.java");
         String partialShaderSource = Files.readString(partialShaderFile);

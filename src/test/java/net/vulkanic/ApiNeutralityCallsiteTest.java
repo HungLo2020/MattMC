@@ -482,10 +482,70 @@ public class ApiNeutralityCallsiteTest {
             "GraphicsBackend should expose typed logic-op overloads at the backend boundary: " + relative);
         assertTrue(source.contains("default VulkanicUniformLocation resolveUniformLocation("),
             "GraphicsBackend should expose a typed uniform-location resolver at the backend boundary: " + relative);
+        assertTrue(source.contains("default VulkanicShaderHandle createShaderHandle(CommandContext ctx, VulkanicShaderStage shaderStage)"),
+            "GraphicsBackend should expose typed shader-handle creation seams at the backend boundary: " + relative);
+        assertTrue(source.contains("default VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx)"),
+            "GraphicsBackend should expose typed program-handle creation seams at the backend boundary: " + relative);
+        assertTrue(source.contains("default void attachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader)"),
+            "GraphicsBackend should expose typed shader/program attachment seams at the backend boundary: " + relative);
         assertTrue(source.contains("default void bindUniformBufferRange(CommandContext ctx, VulkanicBufferTarget target"),
             "GraphicsBackend should expose typed uniform-buffer range binding overloads at the backend boundary: " + relative);
         assertTrue(source.contains("default void texBuffer(CommandContext ctx, VulkanicTextureTarget target"),
             "GraphicsBackend should expose typed tex-buffer target overloads at the backend boundary: " + relative);
+    }
+
+    @Test
+    public void testSelectedShaderLifecycleHotspotsUseTypedHandleSeams() throws IOException {
+        String sodiumShaderRelative = "net/sodium/client/gl/shader/GlShader.java";
+        String sodiumShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(sodiumShaderRelative));
+        assertTrue(sodiumShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type.stage)"),
+            "Sodium GlShader should create shaders via typed handle seam: " + sodiumShaderRelative);
+        assertTrue(sodiumShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(this.handle()))"),
+            "Sodium GlShader should delete shaders via typed handle seam: " + sodiumShaderRelative);
+
+        String irisShaderRelative = "net/irisshaders/iris/gl/shader/GlShader.java";
+        String irisShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(irisShaderRelative));
+        assertTrue(irisShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type.stage)"),
+            "Iris GlShader should create shaders via typed handle seam: " + irisShaderRelative);
+        assertTrue(irisShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(this.getGlId()))"),
+            "Iris GlShader should delete shaders via typed handle seam: " + irisShaderRelative);
+
+        String sodiumProgramRelative = "net/sodium/client/gl/shader/GlProgram.java";
+        String sodiumProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(sodiumProgramRelative));
+        assertTrue(sodiumProgramSource.contains("VulkanicAPI.createShaderProgramHandle(commandContext())"),
+            "Sodium GlProgram should create programs via typed handle seam: " + sodiumProgramRelative);
+        assertTrue(sodiumProgramSource.contains("VulkanicAPI.attachShader(commandContext(), this.program, VulkanicShaderHandle.of(shader.handle()))"),
+            "Sodium GlProgram should attach shaders via typed handle seam: " + sodiumProgramRelative);
+
+        String programCreatorRelative = "net/irisshaders/iris/gl/shader/ProgramCreator.java";
+        String programCreatorSource = Files.readString(SRC_MAIN_JAVA.resolve(programCreatorRelative));
+        assertTrue(programCreatorSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "Iris ProgramCreator should create programs via typed handle seam: " + programCreatorRelative);
+        assertTrue(programCreatorSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(shader.getHandle()))"),
+            "Iris ProgramCreator should attach shaders via typed handle seam: " + programCreatorRelative);
+
+        String shaderCreatorRelative = "net/irisshaders/iris/pipeline/programs/ShaderCreator.java";
+        String shaderCreatorSource = Files.readString(SRC_MAIN_JAVA.resolve(shaderCreatorRelative));
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "Iris ShaderCreator should create programs via typed handle seam: " + shaderCreatorRelative);
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(s))"),
+            "Iris ShaderCreator should attach shaders via typed handle seam: " + shaderCreatorRelative);
+        assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShaderHandle(ctx, shaderType.stage)"),
+            "Iris ShaderCreator should create shaders via typed handle seam: " + shaderCreatorRelative);
+
+        String dhGenericRelative = "net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java";
+        String dhGenericSource = Files.readString(SRC_MAIN_JAVA.resolve(dhGenericRelative));
+        assertTrue(dhGenericSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "IrisGenericRenderProgram should create programs via typed handle seam: " + dhGenericRelative);
+        assertTrue(dhGenericSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(id))"),
+            "IrisGenericRenderProgram should delete programs via typed handle seam: " + dhGenericRelative);
+
+        String dhLodRelative = "net/irisshaders/iris/compat/dh/IrisLodRenderProgram.java";
+        String dhLodSource = Files.readString(SRC_MAIN_JAVA.resolve(dhLodRelative));
+        assertTrue(dhLodSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
+            "IrisLodRenderProgram should create programs via typed handle seam: " + dhLodRelative);
+        assertTrue(dhLodSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(id))"),
+            "IrisLodRenderProgram should delete programs via typed handle seam: " + dhLodRelative);
     }
 
     @Test
@@ -648,5 +708,24 @@ public class ApiNeutralityCallsiteTest {
 
         assertFalse(textureTypeSource.contains("TEXTURE_RECTANGLE(VulkanicAPI.GL_TEXTURE_3D)"),
             "TextureType.TEXTURE_RECTANGLE should map to GL_TEXTURE_RECTANGLE instead of GL_TEXTURE_3D: " + textureTypeRelative);
+    }
+
+    @Test
+    public void testShaderSourceWorkaroundsUseCharSequenceUploadSeam() throws IOException {
+        List<String> files = List.of(
+            "net/sodium/client/gl/shader/ShaderWorkarounds.java",
+            "net/irisshaders/iris/gl/shader/ShaderWorkarounds.java",
+            "com/seibel/distanthorizons/core/render/glObject/shader/Shader.java"
+        );
+
+        for (String relative : files) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertTrue(source.contains("uploadShaderSource"),
+                "Shader source helper should route through VulkanicAPI.uploadShaderSource seam: " + relative);
+            assertFalse(source.contains("pointers.address0()"),
+                "Shader source helper should avoid pointer-address plumbing at callsites: " + relative);
+            assertFalse(source.contains("MemoryUtil.memUTF8"),
+                "Shader source helper should avoid direct UTF8 native conversion at callsites: " + relative);
+        }
     }
 }

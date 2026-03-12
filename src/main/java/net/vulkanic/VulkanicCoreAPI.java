@@ -179,6 +179,66 @@ public final class VulkanicCoreAPI {
         return VulkanicAPI.getCompiledSpirvModule(ctx, shader);
     }
 
+    public static java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, VulkanicShaderHandle shader) {
+        return VulkanicAPI.getCompiledSpirvModule(ctx, shader);
+    }
+
+    public static VulkanicShaderHandle createShaderHandle(CommandContext ctx, VulkanicShaderStage shaderStage) {
+        return VulkanicAPI.createShaderHandle(ctx, shaderStage);
+    }
+
+    public static VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx) {
+        return VulkanicAPI.createShaderProgramHandle(ctx);
+    }
+
+    public static void compileShader(CommandContext ctx, VulkanicShaderHandle shader) {
+        VulkanicAPI.compileShader(ctx, shader);
+    }
+
+    public static void attachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader) {
+        VulkanicAPI.attachShader(ctx, program, shader);
+    }
+
+    public static void detachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader) {
+        VulkanicAPI.detachShader(ctx, program, shader);
+    }
+
+    public static void linkProgram(CommandContext ctx, VulkanicProgramHandle program) {
+        VulkanicAPI.linkProgram(ctx, program);
+    }
+
+    public static boolean isProgramLinkSuccessful(CommandContext ctx, VulkanicProgramHandle program) {
+        return VulkanicAPI.isProgramLinkSuccessful(ctx, program);
+    }
+
+    public static boolean isShaderCompileSuccessful(CommandContext ctx, VulkanicShaderHandle shader) {
+        return VulkanicAPI.isShaderCompileSuccessful(ctx, shader);
+    }
+
+    public static String getProgramInfoLog(CommandContext ctx, VulkanicProgramHandle program) {
+        return VulkanicAPI.getProgramInfoLog(ctx, program);
+    }
+
+    public static String getShaderInfoLog(CommandContext ctx, VulkanicShaderHandle shader) {
+        return VulkanicAPI.getShaderInfoLog(ctx, shader);
+    }
+
+    public static void deleteShader(CommandContext ctx, VulkanicShaderHandle shader) {
+        VulkanicAPI.deleteShader(ctx, shader);
+    }
+
+    public static void deleteProgram(CommandContext ctx, VulkanicProgramHandle program) {
+        VulkanicAPI.deleteProgram(ctx, program);
+    }
+
+    public static void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
+        VulkanicAPI.uploadShaderSource(ctx, shader, source);
+    }
+
+    public static void uploadShaderSource(CommandContext ctx, VulkanicShaderHandle shader, CharSequence source) {
+        VulkanicAPI.uploadShaderSource(ctx, shader.value(), source);
+    }
+
     public static VulkanicUniformLocation resolveUniformLocation(CommandContext ctx, int program, CharSequence name) {
         return VulkanicAPI.resolveUniformLocation(ctx, program, name);
     }

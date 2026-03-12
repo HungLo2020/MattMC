@@ -5,11 +5,7 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
 import org.junit.jupiter.api.Test;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
 
-import java.nio.ByteBuffer;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -110,11 +106,6 @@ public class VulkanBackendSpirvPathTest {
     }
 
     private static void uploadSource(VulkanBackend backend, int shader, String source) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            ByteBuffer sourceBuffer = stack.UTF8(source);
-            PointerBuffer pointers = stack.mallocPointer(1);
-            pointers.put(0, MemoryUtil.memAddress(sourceBuffer));
-            backend.uploadShaderSource(TEST_CONTEXT, shader, pointers.address0(), 1, 0L);
-        }
+        backend.uploadShaderSource(TEST_CONTEXT, shader, source);
     }
 }

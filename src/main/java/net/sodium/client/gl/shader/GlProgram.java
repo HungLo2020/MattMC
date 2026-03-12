@@ -7,6 +7,8 @@ import net.sodium.client.render.chunk.shader.ShaderBindingContext;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
 import net.vulkanic.VulkanicUniformLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -51,7 +53,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
     }
 
     public void delete() {
-        VulkanicAPI.deleteProgram(commandContext(), this.handle());
+        VulkanicAPI.deleteProgram(commandContext(), VulkanicProgramHandle.of(this.handle()));
 
         this.invalidateHandle();
     }
@@ -110,15 +112,15 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     public static class Builder {
         private final ResourceLocation name;
-        private final int program;
+        private final VulkanicProgramHandle program;
 
         public Builder(ResourceLocation name) {
             this.name = name;
-            this.program = VulkanicAPI.createShaderProgram(commandContext());
+            this.program = VulkanicAPI.createShaderProgramHandle(commandContext());
         }
 
         public Builder attachShader(GlShader shader) {
-            VulkanicAPI.attachShader(commandContext(), this.program, shader.handle());
+            VulkanicAPI.attachShader(commandContext(), this.program, VulkanicShaderHandle.of(shader.handle()));
 
             return this;
         }
@@ -146,17 +148,17 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
                 throw new RuntimeException("Shader program linking failed, see log for details");
             }
 
-            return new GlProgram<>(this.program, factory);
+            return new GlProgram<>(this.program.value(), factory);
         }
 
         public Builder bindAttribute(String name, int index) {
-            VulkanicAPI.setAttributeLocation(commandContext(), this.program, index, name);
+            VulkanicAPI.setAttributeLocation(commandContext(), this.program.value(), index, name);
 
             return this;
         }
 
         public Builder bindFragmentData(String name, int index) {
-            VulkanicAPI.bindFragDataLocation(commandContext(), this.program, index, name);
+            VulkanicAPI.bindFragDataLocation(commandContext(), this.program.value(), index, name);
 
             return this;
         }
