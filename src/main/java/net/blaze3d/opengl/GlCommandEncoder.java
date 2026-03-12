@@ -31,6 +31,7 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicLogicOp;
 import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicTextureParameterName;
@@ -1018,7 +1019,7 @@ public class GlCommandEncoder implements CommandEncoder {
 						break;
 					case OR_REVERSE:
 						VulkanicAPI.setColorLogicOpEnabled(ctx, true);
-						VulkanicAPI.setLogicOp(ctx, VulkanicAPI.GL_OR_REVERSE);
+						VulkanicAPI.setLogicOp(ctx, VulkanicLogicOp.OR_REVERSE);
 				}
 			}
 			
@@ -1221,7 +1222,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					break;
 				case OR_REVERSE:
 					VulkanicAPI.setColorLogicOpEnabled(ctx, true);
-					VulkanicAPI.setLogicOp(ctx, VulkanicAPI.GL_OR_REVERSE);
+					VulkanicAPI.setLogicOp(ctx, VulkanicLogicOp.OR_REVERSE);
 			}
 		}
 	}

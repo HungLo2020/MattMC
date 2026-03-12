@@ -124,6 +124,90 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
+    public void testClearBuffersTypedRoutingUsesClearBufferEnumBits() {
+        VulkanicCoreAPI.clearBuffers(TEST_CONTEXT, VulkanicClearBuffer.COLOR, VulkanicClearBuffer.DEPTH);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("clearBuffers", invocation.method.getName());
+        assertEquals(VulkanicClearBuffer[].class, invocation.method.getParameterTypes()[1]);
+    }
+
+    @Test
+    public void testLogicOpRoutingUsesTypedMethodForKnownConstant() {
+        VulkanicAPI.setLogicOp(TEST_CONTEXT, VulkanicAPI.GL_OR_REVERSE);
+
+        RecordedInvocation typedInvocation = invocationHandler.lastInvocation;
+        assertNotNull(typedInvocation);
+        assertEquals("setLogicOp", typedInvocation.method.getName());
+        assertEquals(VulkanicLogicOp.class, typedInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicLogicOp.OR_REVERSE, typedInvocation.args[1]);
+    }
+
+    @Test
+    public void testLogicOpRoutingFallsBackForUnknownConstant() {
+        int unknownLogicOp = 0x7FFF_1010;
+        VulkanicAPI.setLogicOp(TEST_CONTEXT, unknownLogicOp);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("setLogicOp", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(unknownLogicOp, invocation.args[1]);
+    }
+
+    @Test
+    public void testUniformAndBufferTypedRoutingUsesWrapperTypes() {
+        VulkanicCoreAPI.setUniform1i(TEST_CONTEXT, VulkanicUniformLocation.of(12), 77);
+
+        RecordedInvocation uniformInvocation = invocationHandler.lastInvocation;
+        assertNotNull(uniformInvocation);
+        assertEquals("setUniform1i", uniformInvocation.method.getName());
+        assertEquals(VulkanicUniformLocation.class, uniformInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicUniformLocation.of(12), uniformInvocation.args[1]);
+
+        VulkanicCoreAPI.bindUniformBufferRange(TEST_CONTEXT, VulkanicBufferTarget.UNIFORM, 3, 22, 64L, 128L);
+
+        RecordedInvocation bindInvocation = invocationHandler.lastInvocation;
+        assertNotNull(bindInvocation);
+        assertEquals("bindUniformBufferRange", bindInvocation.method.getName());
+        assertEquals(VulkanicBufferTarget.class, bindInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicBufferTarget.UNIFORM, bindInvocation.args[1]);
+
+        VulkanicCoreAPI.texBuffer(TEST_CONTEXT, VulkanicTextureTarget.TEXTURE_BUFFER, VulkanicAPI.GL_RGBA8, 99);
+
+        RecordedInvocation texBufferInvocation = invocationHandler.lastInvocation;
+        assertNotNull(texBufferInvocation);
+        assertEquals("texBuffer", texBufferInvocation.method.getName());
+        assertEquals(VulkanicTextureTarget.class, texBufferInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicTextureTarget.TEXTURE_BUFFER, texBufferInvocation.args[1]);
+    }
+
+    @Test
+    public void testSpirvCompileRoutingUsesTypedShaderStage() {
+        VulkanicCoreAPI.compileSpirvModule(
+            TEST_CONTEXT,
+            VulkanicShaderStage.VERTEX,
+            "#version 450\nvoid main(){}",
+            "test.vert"
+        );
+
+        RecordedInvocation compileInvocation = invocationHandler.lastInvocation;
+        assertNotNull(compileInvocation);
+        assertEquals("compileSpirvModule", compileInvocation.method.getName());
+        assertEquals(VulkanicShaderStage.class, compileInvocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicShaderStage.VERTEX, compileInvocation.args[1]);
+
+        VulkanicAPI.getCompiledSpirvModule(TEST_CONTEXT, 99);
+
+        RecordedInvocation queryInvocation = invocationHandler.lastInvocation;
+        assertNotNull(queryInvocation);
+        assertEquals("getCompiledSpirvModule", queryInvocation.method.getName());
+        assertEquals(int.class, queryInvocation.method.getParameterTypes()[1]);
+        assertEquals(99, queryInvocation.args[1]);
+    }
+
+    @Test
     public void testCapabilityRoutingUsesTypedMethodForKnownCapability() {
         VulkanicCoreAPI.setCapabilityEnabled(TEST_CONTEXT, VulkanicCapability.SCISSOR_TEST, false);
 

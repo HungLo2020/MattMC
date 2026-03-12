@@ -451,6 +451,62 @@ public class ApiNeutralityCallsiteTest {
     }
 
     @Test
+    public void testSelectedContextHotspotsPreferLocalCommandContextHelper() throws IOException {
+        List<String> files = List.of(
+            "com/seibel/distanthorizons/core/render/glObject/shader/ShaderProgram.java",
+            "net/sodium/client/gl/shader/GlProgram.java",
+            "com/seibel/distanthorizons/core/render/glObject/buffer/GLBuffer.java"
+        );
+
+        Pattern inlineContextPattern = Pattern.compile("VulkanicAPI\\.[A-Za-z0-9_]+\\s*\\(\\s*VulkanicAPI\\.getCommandContext\\s*\\(");
+
+        for (String relative : files) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertTrue(source.contains("private static CommandContext commandContext()"),
+                "Context-heavy frontend wrappers should centralize context acquisition behind a helper: " + relative);
+            assertTrue(source.contains("return VulkanicAPI.getCommandContext();"),
+                "Context helper should delegate to VulkanicAPI.getCommandContext for command-context retrieval: " + relative);
+            assertFalse(inlineContextPattern.matcher(source).find(),
+                "Context-heavy frontend wrappers should avoid inline VulkanicAPI.getCommandContext() in VulkanicAPI calls: " + relative);
+        }
+    }
+
+    @Test
+    public void testGraphicsBackendExposesTypedSeamsForClearLogicAndUniformLocations() throws IOException {
+        String relative = "net/vulkanic/GraphicsBackend.java";
+        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+
+        assertTrue(source.contains("default void clearBuffers(CommandContext ctx, VulkanicClearBuffer... buffers)"),
+            "GraphicsBackend should expose typed clear-buffer overloads at the backend boundary: " + relative);
+        assertTrue(source.contains("default void setLogicOp(CommandContext ctx, VulkanicLogicOp opcode)"),
+            "GraphicsBackend should expose typed logic-op overloads at the backend boundary: " + relative);
+        assertTrue(source.contains("default VulkanicUniformLocation resolveUniformLocation("),
+            "GraphicsBackend should expose a typed uniform-location resolver at the backend boundary: " + relative);
+        assertTrue(source.contains("default void bindUniformBufferRange(CommandContext ctx, VulkanicBufferTarget target"),
+            "GraphicsBackend should expose typed uniform-buffer range binding overloads at the backend boundary: " + relative);
+        assertTrue(source.contains("default void texBuffer(CommandContext ctx, VulkanicTextureTarget target"),
+            "GraphicsBackend should expose typed tex-buffer target overloads at the backend boundary: " + relative);
+    }
+
+    @Test
+    public void testSelectedHotspotsUseTypedUniformLocationAndLogicOpSeams() throws IOException {
+        String shaderProgramRelative = "com/seibel/distanthorizons/core/render/glObject/shader/ShaderProgram.java";
+        String shaderProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(shaderProgramRelative));
+        assertTrue(shaderProgramSource.contains("VulkanicAPI.resolveUniformLocation("),
+            "ShaderProgram should resolve uniforms via typed location helper instead of raw location lookups: " + shaderProgramRelative);
+
+        String glProgramRelative = "net/sodium/client/gl/shader/GlProgram.java";
+        String glProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(glProgramRelative));
+        assertTrue(glProgramSource.contains("VulkanicAPI.resolveUniformLocation("),
+            "Sodium GlProgram should resolve uniforms via typed location helper instead of raw location lookups: " + glProgramRelative);
+
+        String encoderRelative = "net/blaze3d/opengl/GlCommandEncoder.java";
+        String encoderSource = Files.readString(SRC_MAIN_JAVA.resolve(encoderRelative));
+        assertTrue(encoderSource.contains("VulkanicAPI.setLogicOp(ctx, VulkanicLogicOp.OR_REVERSE)"),
+            "GlCommandEncoder should use typed VulkanicLogicOp routing for OR_REVERSE logic-op setup: " + encoderRelative);
+    }
+
+    @Test
     public void testIrisBufferBlendToggleUsesTypedCapabilityEnum() throws IOException {
         String relative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
         String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));

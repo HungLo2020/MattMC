@@ -89,6 +89,13 @@ public interface GraphicsBackend {
      * @param mask Bitwise OR of masks indicating which buffers to clear
      */
     void clearBuffers(CommandContext ctx, int mask);
+
+    /**
+     * Clears buffers using backend-neutral clear-buffer bits.
+     */
+    default void clearBuffers(CommandContext ctx, VulkanicClearBuffer... buffers) {
+        clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(buffers));
+    }
     
     /**
      * Sets blending enabled or disabled.
@@ -557,6 +564,13 @@ public interface GraphicsBackend {
      * @param buffer The buffer object ID to bind
      */
     void bindBufferBase(CommandContext ctx, int target, int index, int buffer);
+
+    /**
+     * Binds a buffer to an indexed buffer target using backend-neutral target semantics.
+     */
+    default void bindBufferBase(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer) {
+        bindBufferBase(ctx, target.toLegacyGlTarget(), index, buffer);
+    }
     
     /**
      * Sets the active texture unit.
@@ -1060,6 +1074,13 @@ public interface GraphicsBackend {
      * @param opcode The logical operation (e.g., GL_COPY, GL_AND, GL_XOR)
      */
     void setLogicOp(CommandContext ctx, int opcode);
+
+    /**
+     * Sets the logical operation using backend-neutral logic-op semantics.
+     */
+    default void setLogicOp(CommandContext ctx, VulkanicLogicOp opcode) {
+        setLogicOp(ctx, opcode.toLegacyGlConstant());
+    }
     
     /**
      * Creates a new framebuffer object.
@@ -1407,6 +1428,40 @@ public interface GraphicsBackend {
     default int createShader(CommandContext ctx, VulkanicShaderStage shaderStage) {
         return createShader(ctx, shaderStage.toLegacyGlShaderType());
     }
+
+    /**
+     * Compiles GLSL shader source to SPIR-V bytecode using backend-owned tooling.
+     */
+    default VulkanicSpirvModule compileSpirvModule(
+        CommandContext ctx,
+        VulkanicShaderStage shaderStage,
+        CharSequence glslSource,
+        String sourceName,
+        String entryPoint
+    ) {
+        throw new UnsupportedOperationException(
+            "SPIR-V module compilation is not supported by backend " + getBackendType()
+        );
+    }
+
+    /**
+     * Compiles GLSL shader source to SPIR-V bytecode using entry point {@code main}.
+     */
+    default VulkanicSpirvModule compileSpirvModule(
+        CommandContext ctx,
+        VulkanicShaderStage shaderStage,
+        CharSequence glslSource,
+        String sourceName
+    ) {
+        return compileSpirvModule(ctx, shaderStage, glslSource, sourceName, "main");
+    }
+
+    /**
+     * Returns compiled SPIR-V for a backend shader handle when available.
+     */
+    default java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
+        return java.util.Optional.empty();
+    }
     
     /**
      * Compiles a shader object.
@@ -1556,6 +1611,13 @@ public interface GraphicsBackend {
      * @return The location of the uniform variable
      */
     int getUniformLocation(CommandContext ctx, int program, CharSequence name);
+
+    /**
+     * Resolves a uniform binding slot using a backend-neutral wrapper value object.
+     */
+    default VulkanicUniformLocation resolveUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        return VulkanicUniformLocation.of(getUniformLocation(ctx, program, name));
+    }
     
     /**
      * Locates an attribute variable in a program.
@@ -1715,6 +1777,76 @@ public interface GraphicsBackend {
      * @param matrix The matrix data array
      */
     void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix);
+
+    /**
+     * Sets an integer uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform1i(CommandContext ctx, VulkanicUniformLocation location, int value) {
+        setUniform1i(ctx, location.value(), value);
+    }
+
+    /**
+     * Sets a float uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform1f(CommandContext ctx, VulkanicUniformLocation location, float value) {
+        setUniform1f(ctx, location.value(), value);
+    }
+
+    /**
+     * Sets a 2-component float vector uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform2f(CommandContext ctx, VulkanicUniformLocation location, float v0, float v1) {
+        setUniform2f(ctx, location.value(), v0, v1);
+    }
+
+    /**
+     * Sets a 3-component integer vector uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform3i(CommandContext ctx, VulkanicUniformLocation location, int v0, int v1, int v2) {
+        setUniform3i(ctx, location.value(), v0, v1, v2);
+    }
+
+    /**
+     * Sets a 4-component float vector uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform4f(CommandContext ctx, VulkanicUniformLocation location, float v0, float v1, float v2, float v3) {
+        setUniform4f(ctx, location.value(), v0, v1, v2, v3);
+    }
+
+    /**
+     * Sets a 4-component integer vector uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform4i(CommandContext ctx, VulkanicUniformLocation location, int v0, int v1, int v2, int v3) {
+        setUniform4i(ctx, location.value(), v0, v1, v2, v3);
+    }
+
+    /**
+     * Sets a 3x3 matrix uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniformMatrix3fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, java.nio.FloatBuffer matrix) {
+        setUniformMatrix3fv(ctx, location.value(), transpose, matrix);
+    }
+
+    /**
+     * Sets a 3x3 matrix uniform value from a float array using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniformMatrix3fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, float[] matrix) {
+        setUniformMatrix3fv(ctx, location.value(), transpose, matrix);
+    }
+
+    /**
+     * Sets a 4x4 matrix uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniformMatrix4fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, java.nio.FloatBuffer matrix) {
+        setUniformMatrix4fv(ctx, location.value(), transpose, matrix);
+    }
+
+    /**
+     * Sets a 4x4 matrix uniform value from a float array using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniformMatrix4fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, float[] matrix) {
+        setUniformMatrix4fv(ctx, location.value(), transpose, matrix);
+    }
     
     /**
      * Configures a vertex attribute pointer.
@@ -2223,6 +2355,13 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      */
     void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size);
+
+    /**
+     * Binds a range of a buffer object using backend-neutral buffer-target semantics.
+     */
+    default void bindUniformBufferRange(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer, long offset, long size) {
+        bindUniformBufferRange(ctx, target.toLegacyGlTarget(), index, buffer, offset, size);
+    }
     
     // Texture buffer operations
     /**
@@ -2232,6 +2371,13 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      */
     void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer);
+
+    /**
+     * Attaches a buffer object to a texture buffer object using backend-neutral texture-target semantics.
+     */
+    default void texBuffer(CommandContext ctx, VulkanicTextureTarget target, int internalFormat, int buffer) {
+        texBuffer(ctx, target.toLegacyGlTarget(), internalFormat, buffer);
+    }
     
     // Uniform operations (additional, all with CommandContext)
     void setUniform2fv(CommandContext ctx, int location, float[] value);

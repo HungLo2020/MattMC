@@ -11,6 +11,7 @@ import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicShaderStage;
+import net.vulkanic.VulkanicUniformLocation;
 import org.lwjgl.system.MemoryStack;
 
 import com.seibel.distanthorizons.core.util.math.Mat4f;
@@ -30,6 +31,16 @@ public class ShaderProgram
 {
 	/** Stores the handle of the program. */
 	public final int id;
+
+	private static CommandContext commandContext()
+	{
+		return VulkanicAPI.getCommandContext();
+	}
+
+	private static VulkanicUniformLocation uniformLocation(int location)
+	{
+		return VulkanicUniformLocation.of(location);
+	}
 	
 	
 	
@@ -40,7 +51,7 @@ public class ShaderProgram
 	 */
 	public ShaderProgram(String vert, String frag, String fragDataOutputName, String[] attributes)
 	{
-		this(VulkanicAPI.getCommandContext(), vert, frag, fragDataOutputName, attributes);
+		this(commandContext(), vert, frag, fragDataOutputName, attributes);
 	}
 
 	public ShaderProgram(CommandContext ctx, String vert, String frag, String fragDataOutputName, String[] attributes)
@@ -55,7 +66,7 @@ public class ShaderProgram
 	
 	public ShaderProgram(Supplier<String> vert, Supplier<String> frag, String fragDataOutputName, String[] attributes)
 	{
-		this(VulkanicAPI.getCommandContext(), vert, frag, fragDataOutputName, attributes);
+		this(commandContext(), vert, frag, fragDataOutputName, attributes);
 	}
 
 	public ShaderProgram(CommandContext ctx, Supplier<String> vert, Supplier<String> frag, String fragDataOutputName, String[] attributes)
@@ -71,7 +82,7 @@ public class ShaderProgram
 	
 	public ShaderProgram(List<Supplier<String>> vertSupplierList, List<Supplier<String>> fragSupplierList, String[] attributes)
 	{
-		this(VulkanicAPI.getCommandContext(), vertSupplierList, fragSupplierList, attributes);
+		this(commandContext(), vertSupplierList, fragSupplierList, attributes);
 	}
 
 	public ShaderProgram(CommandContext ctx, List<Supplier<String>> vertSupplierList, List<Supplier<String>> fragSupplierList, String[] attributes)
@@ -110,12 +121,12 @@ public class ShaderProgram
 	
 	
 	
-	public void bind() { this.bind(VulkanicAPI.getCommandContext()); }
+	public void bind() { this.bind(commandContext()); }
 	public void bind(CommandContext ctx) { VulkanicAPI.bindShaderProgram(ctx, this.id); }
-	public void unbind() { this.unbind(VulkanicAPI.getCommandContext()); }
+	public void unbind() { this.unbind(commandContext()); }
 	public void unbind(CommandContext ctx) { VulkanicAPI.bindShaderProgram(ctx, 0); }
 	
-	public void free() { this.free(VulkanicAPI.getCommandContext()); }
+	public void free() { this.free(commandContext()); }
 	public void free(CommandContext ctx) { VulkanicAPI.deleteProgram(ctx, this.id); }
 	
 	
@@ -131,7 +142,7 @@ public class ShaderProgram
 	 * @throws RuntimeException if attribute not found
 	 */
 	public int getAttributeLocation(CharSequence name)
-	{ return this.getAttributeLocation(VulkanicAPI.getCommandContext(), name); }
+	{ return this.getAttributeLocation(commandContext(), name); }
 
 	public int getAttributeLocation(CommandContext ctx, CharSequence name)
 	{
@@ -144,7 +155,7 @@ public class ShaderProgram
 	 * Returns -1 if the attribute doesn't exist or has been optimized out.
 	 */
 	public int tryGetAttributeLocation(CharSequence name)
-	{ return this.tryGetAttributeLocation(VulkanicAPI.getCommandContext(), name); }
+	{ return this.tryGetAttributeLocation(commandContext(), name); }
 
 	public int tryGetAttributeLocation(CommandContext ctx, CharSequence name)
 	{ return VulkanicAPI.getAttributeLocation(ctx, this.id, name); }
@@ -159,11 +170,11 @@ public class ShaderProgram
 	 * @throws RuntimeException if uniform not found
 	 */
 	public int getUniformLocation(CharSequence name) throws RuntimeException
-	{ return this.getUniformLocation(VulkanicAPI.getCommandContext(), name); }
+	{ return this.getUniformLocation(commandContext(), name); }
 
 	public int getUniformLocation(CommandContext ctx, CharSequence name) throws RuntimeException
 	{
-		int i = VulkanicAPI.getUniformLocation(ctx, id, name);
+		int i = VulkanicAPI.resolveUniformLocation(ctx, id, name).value();
 		if (i == -1)
 		{
 			throw new RuntimeException("Uniform name not found: " + name);
@@ -174,49 +185,49 @@ public class ShaderProgram
 	// Same as above but without throwing errors.
 	// Return -1 if uniform doesn't exist or has been optimized out
 	public int tryGetUniformLocation(CharSequence name)
-	{ return this.tryGetUniformLocation(VulkanicAPI.getCommandContext(), name); }
+	{ return this.tryGetUniformLocation(commandContext(), name); }
 
 	public int tryGetUniformLocation(CommandContext ctx, CharSequence name)
-	{ return VulkanicAPI.getUniformLocation(ctx, this.id, name); }
+	{ return VulkanicAPI.resolveUniformLocation(ctx, this.id, name).value(); }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, boolean value) { this.setUniform(VulkanicAPI.getCommandContext(), location, value); }
-	public void setUniform(CommandContext ctx, int location, boolean value) { VulkanicAPI.setUniform1i(ctx, location, value ? 1 : 0); }
+	public void setUniform(int location, boolean value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, boolean value) { VulkanicAPI.setUniform1i(ctx, uniformLocation(location), value ? 1 : 0); }
 	/** @see ShaderProgram#setUniform(int, boolean) */
 	public void trySetUniform(int location, boolean value) { if (location != -1) { this.setUniform(location, value); } }
 	public void trySetUniform(CommandContext ctx, int location, boolean value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, int value) { this.setUniform(VulkanicAPI.getCommandContext(), location, value); }
-	public void setUniform(CommandContext ctx, int location, int value) { VulkanicAPI.setUniform1i(ctx, location, value); }
+	public void setUniform(int location, int value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, int value) { VulkanicAPI.setUniform1i(ctx, uniformLocation(location), value); }
 	/** @see ShaderProgram#setUniform(int, int) */
 	public void trySetUniform(int location, int value) { if (location != -1) { this.setUniform(location, value); } }
 	public void trySetUniform(CommandContext ctx, int location, int value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, float value) { this.setUniform(VulkanicAPI.getCommandContext(), location, value); }
-	public void setUniform(CommandContext ctx, int location, float value) { VulkanicAPI.setUniform1f(ctx, location, value); }
+	public void setUniform(int location, float value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, float value) { VulkanicAPI.setUniform1f(ctx, uniformLocation(location), value); }
 	/** @see ShaderProgram#setUniform(int, float) */
 	public void trySetUniform(int location, float value) { if (location != -1) { this.setUniform(location, value); } }
 	public void trySetUniform(CommandContext ctx, int location, float value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, Vec3f value) { this.setUniform(VulkanicAPI.getCommandContext(), location, value); }
-	public void setUniform(CommandContext ctx, int location, Vec3f value) { VulkanicAPI.setUniform3f(ctx, location, value.x, value.y, value.z); }
+	public void setUniform(int location, Vec3f value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, Vec3f value) { VulkanicAPI.setUniform3f(ctx, uniformLocation(location).value(), value.x, value.y, value.z); }
 	/** @see ShaderProgram#setUniform(int, Vec3f) */
 	public void trySetUniform(int location, Vec3f value) { if (location != -1) { this.setUniform(location, value); } }
 	public void trySetUniform(CommandContext ctx, int location, Vec3f value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, DhApiVec3i value) { this.setUniform(VulkanicAPI.getCommandContext(), location, value); }
-	public void setUniform(CommandContext ctx, int location, DhApiVec3i value) { VulkanicAPI.setUniform3i(ctx, location, value.x, value.y, value.z); }
+	public void setUniform(int location, DhApiVec3i value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, DhApiVec3i value) { VulkanicAPI.setUniform3i(ctx, uniformLocation(location), value.x, value.y, value.z); }
 	/** @see ShaderProgram#setUniform(int, Mat4f) */
 	public void trySetUniform(int location, DhApiVec3i value) { if (location != -1) { this.setUniform(location, value); } }
 	public void trySetUniform(CommandContext ctx, int location, DhApiVec3i value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
 	public void setUniform(int location, Mat4f value)
-	{ this.setUniform(VulkanicAPI.getCommandContext(), location, value); }
+	{ this.setUniform(commandContext(), location, value); }
 
 	public void setUniform(CommandContext ctx, int location, Mat4f value)
 	{
@@ -224,7 +235,7 @@ public class ShaderProgram
 		{
 			FloatBuffer buffer = stack.mallocFloat(4 * 4);
 			value.store(buffer);
-			VulkanicAPI.setUniformMatrix4fv(ctx, location, false, buffer);
+			VulkanicAPI.setUniformMatrix4fv(ctx, uniformLocation(location), false, buffer);
 		}
 	}
 	/** @see ShaderProgram#setUniform(int, Mat4f) */
@@ -236,11 +247,11 @@ public class ShaderProgram
 	 * Requires a bound ShaderProgram.
 	 */
 	public void setUniform(int location, Color value)
-	{ this.setUniform(VulkanicAPI.getCommandContext(), location, value); }
+	{ this.setUniform(commandContext(), location, value); }
 
 	public void setUniform(CommandContext ctx, int location, Color value)
 	{
-		VulkanicAPI.setUniform4f(ctx, location, 
+		VulkanicAPI.setUniform4f(ctx, uniformLocation(location), 
 				value.getRed()   / 256.0f, 
 				value.getGreen() / 256.0f, 
 				value.getBlue()  / 256.0f, 

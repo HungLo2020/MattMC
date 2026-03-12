@@ -2290,8 +2290,10 @@ public class Phase3DrawPathTest {
 
         assertTrue(encoderSource.contains("VulkanicAPI.setColorLogicOpEnabled("),
             "GlCommandEncoder should enable/disable color logic directly through VulkanicAPI.setColorLogicOpEnabled");
-        assertTrue(encoderSource.contains("VulkanicAPI.setLogicOp(ctx, VulkanicAPI.GL_OR_REVERSE)"),
-            "GlCommandEncoder should set OR_REVERSE logic op through VulkanicAPI.GL_OR_REVERSE");
+        assertTrue(containsAny(encoderSource,
+                "VulkanicAPI.setLogicOp(ctx, VulkanicLogicOp.OR_REVERSE)",
+                "VulkanicAPI.setLogicOp(ctx, VulkanicAPI.GL_OR_REVERSE)"),
+            "GlCommandEncoder should set OR_REVERSE logic op through a typed Vulkanic logic-op seam");
     }
 
     @Test

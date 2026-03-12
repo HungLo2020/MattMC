@@ -5,9 +5,13 @@ import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanReadinessReport;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderStage;
+import net.vulkanic.VulkanicSpirvModule;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK;
@@ -32,8 +36,16 @@ import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.lwjgl.system.MemoryStack.stackPush;
 
@@ -46,6 +58,20 @@ public class VulkanBackend {
 
     private volatile VulkanReadinessReport cachedReadinessReport;
     private volatile CommandContext currentCommandContext;
+
+    private final SpirvCompiler spirvCompiler;
+    private final AtomicInteger nextVirtualShaderId = new AtomicInteger(1);
+    private final AtomicInteger nextVirtualProgramId = new AtomicInteger(1);
+    private final Map<Integer, VirtualShader> virtualShaders = new ConcurrentHashMap<>();
+    private final Map<Integer, VirtualProgram> virtualPrograms = new ConcurrentHashMap<>();
+
+    public VulkanBackend() {
+        this(new GlslangSpirvCompiler());
+    }
+
+    VulkanBackend(SpirvCompiler spirvCompiler) {
+        this.spirvCompiler = Objects.requireNonNull(spirvCompiler, "spirvCompiler must not be null");
+    }
 
     public GraphicsBackendType getBackendType() {
         return GraphicsBackendType.VULKAN;
@@ -250,6 +276,166 @@ public class VulkanBackend {
         return context;
     }
 
+    public int createShader(CommandContext ctx, int shaderType) {
+        VulkanicShaderStage stage = VulkanicShaderStage.fromLegacyGlShaderType(shaderType)
+            .orElseThrow(() -> new IllegalArgumentException("Unsupported shader type for Vulkan SPIR-V path: " + shaderType));
+
+        int shaderId = nextVirtualShaderId.getAndIncrement();
+        virtualShaders.put(shaderId, new VirtualShader(stage));
+        return shaderId;
+    }
+
+    public VulkanicSpirvModule compileSpirvModule(
+        CommandContext ctx,
+        VulkanicShaderStage shaderStage,
+        CharSequence glslSource,
+        String sourceName,
+        String entryPoint
+    ) {
+        return spirvCompiler.compile(shaderStage, glslSource, sourceName, entryPoint);
+    }
+
+    public Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
+        VirtualShader virtualShader = virtualShaders.get(shader);
+        if (virtualShader == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(virtualShader.compiledModule);
+    }
+
+    public void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        VirtualShader virtualShader = requireVirtualShader(shader);
+        virtualShader.source = decodeShaderSource(pointerBufferAddress, stringCount, lengthsPointer);
+        virtualShader.compiledModule = null;
+        virtualShader.compileStatus = false;
+        virtualShader.infoLog = "";
+    }
+
+    public void compileShader(CommandContext ctx, int shader) {
+        VirtualShader virtualShader = requireVirtualShader(shader);
+        if (virtualShader.source == null || virtualShader.source.isBlank()) {
+            virtualShader.compileStatus = false;
+            virtualShader.compiledModule = null;
+            virtualShader.infoLog = "Shader source is empty. uploadShaderSource must be called before compileShader.";
+            return;
+        }
+
+        try {
+            VulkanicSpirvModule compiledModule = compileSpirvModule(
+                ctx,
+                virtualShader.stage,
+                virtualShader.source,
+                "shader-" + shader,
+                "main"
+            );
+            virtualShader.compiledModule = compiledModule;
+            virtualShader.compileStatus = true;
+            virtualShader.infoLog = "";
+        } catch (RuntimeException exception) {
+            virtualShader.compileStatus = false;
+            virtualShader.compiledModule = null;
+            virtualShader.infoLog = exception.getMessage() == null
+                ? exception.getClass().getSimpleName()
+                : exception.getMessage();
+        }
+    }
+
+    public int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        VirtualShader virtualShader = requireVirtualShader(shader);
+        if (pname == VulkanicAPI.GL_COMPILE_STATUS) {
+            return virtualShader.compileStatus ? VulkanicAPI.GL_TRUE : VulkanicAPI.GL_FALSE;
+        }
+        return 0;
+    }
+
+    public String getShaderInfoLog(CommandContext ctx, int shader) {
+        return requireVirtualShader(shader).infoLog;
+    }
+
+    public int createShaderProgram(CommandContext ctx) {
+        int programId = nextVirtualProgramId.getAndIncrement();
+        virtualPrograms.put(programId, new VirtualProgram());
+        return programId;
+    }
+
+    public void attachShader(CommandContext ctx, int program, int shader) {
+        requireVirtualShader(shader);
+        VirtualProgram virtualProgram = requireVirtualProgram(program);
+        virtualProgram.attachedShaderIds.add(shader);
+        virtualProgram.linkStatus = false;
+    }
+
+    public void detachShader(CommandContext ctx, int program, int shader) {
+        VirtualProgram virtualProgram = requireVirtualProgram(program);
+        virtualProgram.attachedShaderIds.remove(shader);
+        virtualProgram.linkStatus = false;
+    }
+
+    public void linkProgram(CommandContext ctx, int program) {
+        VirtualProgram virtualProgram = requireVirtualProgram(program);
+        if (virtualProgram.attachedShaderIds.isEmpty()) {
+            virtualProgram.linkStatus = false;
+            virtualProgram.infoLog = "Program has no attached shaders.";
+            return;
+        }
+
+        List<String> issues = new ArrayList<>();
+        Set<VulkanicShaderStage> seenStages = new HashSet<>();
+        for (int shaderId : virtualProgram.attachedShaderIds) {
+            VirtualShader virtualShader = virtualShaders.get(shaderId);
+            if (virtualShader == null) {
+                issues.add("Attached shader " + shaderId + " does not exist.");
+                continue;
+            }
+            if (!virtualShader.compileStatus || virtualShader.compiledModule == null) {
+                issues.add("Attached shader " + shaderId + " failed compilation: " + virtualShader.infoLog);
+                continue;
+            }
+
+            if (!seenStages.add(virtualShader.stage)) {
+                issues.add("Multiple shaders attached for stage " + virtualShader.stage + ".");
+            }
+        }
+
+        if (!issues.isEmpty()) {
+            virtualProgram.linkStatus = false;
+            virtualProgram.infoLog = String.join("\n", issues);
+            return;
+        }
+
+        virtualProgram.linkStatus = true;
+        virtualProgram.infoLog = "";
+    }
+
+    public int getProgramParameter(CommandContext ctx, int program, int pname) {
+        VirtualProgram virtualProgram = requireVirtualProgram(program);
+        if (pname == VulkanicAPI.GL_LINK_STATUS) {
+            return virtualProgram.linkStatus ? VulkanicAPI.GL_TRUE : VulkanicAPI.GL_FALSE;
+        }
+        if (pname == VulkanicAPI.GL_ACTIVE_UNIFORMS) {
+            return 0;
+        }
+        if (pname == VulkanicAPI.GL_ACTIVE_UNIFORM_BLOCKS) {
+            return 0;
+        }
+        return 0;
+    }
+
+    public String getProgramInfoLog(CommandContext ctx, int program) {
+        return requireVirtualProgram(program).infoLog;
+    }
+
+    public void deleteShader(CommandContext ctx, int shader) {
+        virtualShaders.remove(shader);
+        for (VirtualProgram virtualProgram : virtualPrograms.values()) {
+            virtualProgram.attachedShaderIds.remove(shader);
+        }
+    }
+
+    public void deleteProgram(CommandContext ctx, int program) {
+        virtualPrograms.remove(program);
+    }
+
     public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
         ensureNativeReady("createPipeline");
         throw new UnsupportedOperationException("Vulkan-native pipeline creation is not implemented yet.");
@@ -356,6 +542,71 @@ public class VulkanBackend {
 
     public boolean isFallbackMode() {
         return !isNativeVulkanReady();
+    }
+
+    private VirtualShader requireVirtualShader(int shaderId) {
+        VirtualShader virtualShader = virtualShaders.get(shaderId);
+        if (virtualShader == null) {
+            throw new IllegalArgumentException("Unknown Vulkan virtual shader handle: " + shaderId);
+        }
+        return virtualShader;
+    }
+
+    private VirtualProgram requireVirtualProgram(int programId) {
+        VirtualProgram virtualProgram = virtualPrograms.get(programId);
+        if (virtualProgram == null) {
+            throw new IllegalArgumentException("Unknown Vulkan virtual program handle: " + programId);
+        }
+        return virtualProgram;
+    }
+
+    private static String decodeShaderSource(long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        if (pointerBufferAddress == 0L || stringCount <= 0) {
+            return "";
+        }
+
+        org.lwjgl.PointerBuffer sourcePointers = MemoryUtil.memPointerBuffer(pointerBufferAddress, stringCount);
+        java.nio.IntBuffer lengths = lengthsPointer != 0L
+            ? MemoryUtil.memIntBuffer(lengthsPointer, stringCount)
+            : null;
+
+        StringBuilder sourceBuilder = new StringBuilder();
+        for (int i = 0; i < stringCount; i++) {
+            long sourceAddress = sourcePointers.get(i);
+            if (sourceAddress == 0L) {
+                continue;
+            }
+
+            int sourceLength = lengths == null ? -1 : lengths.get(i);
+            if (sourceLength >= 0) {
+                java.nio.ByteBuffer sourceBuffer = MemoryUtil.memByteBuffer(sourceAddress, sourceLength);
+                byte[] sourceBytes = new byte[sourceLength];
+                sourceBuffer.get(sourceBytes);
+                sourceBuilder.append(new String(sourceBytes, java.nio.charset.StandardCharsets.UTF_8));
+            } else {
+                sourceBuilder.append(MemoryUtil.memUTF8(sourceAddress));
+            }
+        }
+
+        return sourceBuilder.toString();
+    }
+
+    private static final class VirtualShader {
+        private final VulkanicShaderStage stage;
+        private volatile String source;
+        private volatile VulkanicSpirvModule compiledModule;
+        private volatile boolean compileStatus;
+        private volatile String infoLog = "";
+
+        private VirtualShader(VulkanicShaderStage stage) {
+            this.stage = stage;
+        }
+    }
+
+    private static final class VirtualProgram {
+        private final Set<Integer> attachedShaderIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        private volatile boolean linkStatus;
+        private volatile String infoLog = "";
     }
 
     private static final class NativeSpine {

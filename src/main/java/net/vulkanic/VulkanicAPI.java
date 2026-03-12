@@ -926,16 +926,23 @@ public class VulkanicAPI {
         getBackend().clearBuffers(ctx, mask);
     }
 
+    /**
+     * Clears buffers using backend-neutral clear-buffer bits.
+     */
+    public static void clearBuffers(CommandContext ctx, VulkanicClearBuffer... buffers) {
+        getBackend().clearBuffers(ctx, buffers);
+    }
+
     public static void clearColorBuffer(CommandContext ctx) {
-        clearBuffers(ctx, GL_COLOR_BUFFER_BIT);
+        clearBuffers(ctx, VulkanicClearBuffer.COLOR);
     }
 
     public static void clearDepthBuffer(CommandContext ctx) {
-        clearBuffers(ctx, GL_DEPTH_BUFFER_BIT);
+        clearBuffers(ctx, VulkanicClearBuffer.DEPTH);
     }
 
     public static void clearColorAndDepthBuffers(CommandContext ctx) {
-        clearBuffers(ctx, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        clearBuffers(ctx, VulkanicClearBuffer.COLOR, VulkanicClearBuffer.DEPTH);
     }
 
     /**
@@ -948,16 +955,23 @@ public class VulkanicAPI {
         }
     }
 
+    /**
+     * Clears buffers using backend-neutral clear-buffer bits and drains the error queue on macOS.
+     */
+    public static void clearBuffersWithMacosWorkaround(CommandContext ctx, VulkanicClearBuffer... buffers) {
+        clearBuffersWithMacosWorkaround(ctx, VulkanicClearBuffer.toLegacyGlMask(buffers));
+    }
+
     public static void clearColorBufferWithMacosWorkaround(CommandContext ctx) {
-        clearBuffersWithMacosWorkaround(ctx, GL_COLOR_BUFFER_BIT);
+        clearBuffersWithMacosWorkaround(ctx, VulkanicClearBuffer.COLOR);
     }
 
     public static void clearDepthBufferWithMacosWorkaround(CommandContext ctx) {
-        clearBuffersWithMacosWorkaround(ctx, GL_DEPTH_BUFFER_BIT);
+        clearBuffersWithMacosWorkaround(ctx, VulkanicClearBuffer.DEPTH);
     }
 
     public static void clearColorAndDepthBuffersWithMacosWorkaround(CommandContext ctx) {
-        clearBuffersWithMacosWorkaround(ctx, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        clearBuffersWithMacosWorkaround(ctx, VulkanicClearBuffer.COLOR, VulkanicClearBuffer.DEPTH);
     }
     
     /**
@@ -1320,7 +1334,7 @@ public class VulkanicAPI {
     }
 
     public static void bindBufferBase(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer) {
-        getBackend().bindBufferBase(ctx, target.toLegacyGlTarget(), index, buffer);
+        getBackend().bindBufferBase(ctx, target, index, buffer);
     }
     
     /**
@@ -1898,6 +1912,17 @@ public class VulkanicAPI {
      * @param opcode The logical operation
      */
     public static void setLogicOp(CommandContext ctx, int opcode) {
+        VulkanicLogicOp.fromLegacyGlConstant(opcode)
+            .ifPresentOrElse(
+                typedOp -> setLogicOp(ctx, typedOp),
+                () -> getBackend().setLogicOp(ctx, opcode)
+            );
+    }
+
+    /**
+     * Sets the logical operation using backend-neutral logic-op semantics.
+     */
+    public static void setLogicOp(CommandContext ctx, VulkanicLogicOp opcode) {
         getBackend().setLogicOp(ctx, opcode);
     }
     
@@ -2345,6 +2370,38 @@ public class VulkanicAPI {
     public static int createShader(CommandContext ctx, VulkanicShaderStage shaderStage) {
         return getBackend().createShader(ctx, shaderStage);
     }
+
+    /**
+     * Compiles GLSL source to a SPIR-V module through the active backend.
+     */
+    public static VulkanicSpirvModule compileSpirvModule(
+        CommandContext ctx,
+        VulkanicShaderStage shaderStage,
+        CharSequence glslSource,
+        String sourceName,
+        String entryPoint
+    ) {
+        return getBackend().compileSpirvModule(ctx, shaderStage, glslSource, sourceName, entryPoint);
+    }
+
+    /**
+     * Compiles GLSL source to a SPIR-V module using entry point {@code main}.
+     */
+    public static VulkanicSpirvModule compileSpirvModule(
+        CommandContext ctx,
+        VulkanicShaderStage shaderStage,
+        CharSequence glslSource,
+        String sourceName
+    ) {
+        return getBackend().compileSpirvModule(ctx, shaderStage, glslSource, sourceName);
+    }
+
+    /**
+     * Returns compiled SPIR-V for a shader handle when the backend tracks it.
+     */
+    public static java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
+        return getBackend().getCompiledSpirvModule(ctx, shader);
+    }
     
     public static void compileShader(CommandContext ctx, int shader) {
         getBackend().compileShader(ctx, shader);
@@ -2448,6 +2505,13 @@ public class VulkanicAPI {
         return getBackend().getUniformLocation(ctx, program, name);
     }
 
+    /**
+     * Resolves a uniform binding slot using a backend-neutral uniform-location wrapper.
+     */
+    public static VulkanicUniformLocation resolveUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        return getBackend().resolveUniformLocation(ctx, program, name);
+    }
+
     public static int getUniformLocationWithLegacySamplerFallback(CommandContext ctx, int program, CharSequence name) {
         int location = getUniformLocation(ctx, program, name);
         if (location != -1) {
@@ -2471,48 +2535,95 @@ public class VulkanicAPI {
 
         return location;
     }
+
+    /**
+     * Resolves a uniform binding slot with legacy sampler-name fallback behavior.
+     */
+    public static VulkanicUniformLocation resolveUniformLocationWithLegacySamplerFallback(CommandContext ctx, int program, CharSequence name) {
+        return VulkanicUniformLocation.of(getUniformLocationWithLegacySamplerFallback(ctx, program, name));
+    }
     
     public static int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
         return getBackend().getAttributeLocation(ctx, program, name);
     }
     
     public static void setUniform1i(CommandContext ctx, int location, int value) {
+        setUniform1i(ctx, VulkanicUniformLocation.of(location), value);
+    }
+
+    public static void setUniform1i(CommandContext ctx, VulkanicUniformLocation location, int value) {
         getBackend().setUniform1i(ctx, location, value);
     }
     
     public static void setUniform1f(CommandContext ctx, int location, float value) {
+        setUniform1f(ctx, VulkanicUniformLocation.of(location), value);
+    }
+
+    public static void setUniform1f(CommandContext ctx, VulkanicUniformLocation location, float value) {
         getBackend().setUniform1f(ctx, location, value);
     }
     
     public static void setUniform2f(CommandContext ctx, int location, float v0, float v1) {
+        setUniform2f(ctx, VulkanicUniformLocation.of(location), v0, v1);
+    }
+
+    public static void setUniform2f(CommandContext ctx, VulkanicUniformLocation location, float v0, float v1) {
         getBackend().setUniform2f(ctx, location, v0, v1);
     }
     
     public static void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
+        setUniform3i(ctx, VulkanicUniformLocation.of(location), v0, v1, v2);
+    }
+
+    public static void setUniform3i(CommandContext ctx, VulkanicUniformLocation location, int v0, int v1, int v2) {
         getBackend().setUniform3i(ctx, location, v0, v1, v2);
     }
     
     public static void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
+        setUniform4f(ctx, VulkanicUniformLocation.of(location), v0, v1, v2, v3);
+    }
+
+    public static void setUniform4f(CommandContext ctx, VulkanicUniformLocation location, float v0, float v1, float v2, float v3) {
         getBackend().setUniform4f(ctx, location, v0, v1, v2, v3);
     }
     
     public static void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3) {
+        setUniform4i(ctx, VulkanicUniformLocation.of(location), v0, v1, v2, v3);
+    }
+
+    public static void setUniform4i(CommandContext ctx, VulkanicUniformLocation location, int v0, int v1, int v2, int v3) {
         getBackend().setUniform4i(ctx, location, v0, v1, v2, v3);
     }
     
     public static void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        setUniformMatrix3fv(ctx, VulkanicUniformLocation.of(location), transpose, matrix);
+    }
+
+    public static void setUniformMatrix3fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, java.nio.FloatBuffer matrix) {
         getBackend().setUniformMatrix3fv(ctx, location, transpose, matrix);
     }
     
     public static void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        setUniformMatrix3fv(ctx, VulkanicUniformLocation.of(location), transpose, matrix);
+    }
+
+    public static void setUniformMatrix3fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, float[] matrix) {
         getBackend().setUniformMatrix3fv(ctx, location, transpose, matrix);
     }
     
     public static void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        setUniformMatrix4fv(ctx, VulkanicUniformLocation.of(location), transpose, matrix);
+    }
+
+    public static void setUniformMatrix4fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, java.nio.FloatBuffer matrix) {
         getBackend().setUniformMatrix4fv(ctx, location, transpose, matrix);
     }
     
     public static void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        setUniformMatrix4fv(ctx, VulkanicUniformLocation.of(location), transpose, matrix);
+    }
+
+    public static void setUniformMatrix4fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, float[] matrix) {
         getBackend().setUniformMatrix4fv(ctx, location, transpose, matrix);
     }
     
@@ -3449,6 +3560,17 @@ public class VulkanicAPI {
      * @param ctx Command context
      */
     public static void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
+        VulkanicBufferTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> bindUniformBufferRange(ctx, typedTarget, index, buffer, offset, size),
+                () -> getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size)
+            );
+    }
+
+    /**
+     * Binds a range of a buffer to a uniform buffer binding point using backend-neutral target semantics.
+     */
+    public static void bindUniformBufferRange(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer, long offset, long size) {
         getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size);
     }
 
@@ -3456,7 +3578,7 @@ public class VulkanicAPI {
      * Binds a range of a buffer to a uniform buffer binding point.
      */
     public static void bindUniformBufferRange(CommandContext ctx, int index, int buffer, long offset, long size) {
-        getBackend().bindUniformBufferRange(ctx, GL_UNIFORM_BUFFER, index, buffer, offset, size);
+        getBackend().bindUniformBufferRange(ctx, VulkanicBufferTarget.UNIFORM, index, buffer, offset, size);
     }
     
     /**
@@ -3464,6 +3586,17 @@ public class VulkanicAPI {
      * @param ctx Command context
      */
     public static void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer) {
+        VulkanicTextureTarget.fromLegacyGlTarget(target)
+            .ifPresentOrElse(
+                typedTarget -> texBuffer(ctx, typedTarget, internalFormat, buffer),
+                () -> getBackend().texBuffer(ctx, target, internalFormat, buffer)
+            );
+    }
+
+    /**
+     * Attaches a buffer object to a texture buffer using backend-neutral texture-target semantics.
+     */
+    public static void texBuffer(CommandContext ctx, VulkanicTextureTarget target, int internalFormat, int buffer) {
         getBackend().texBuffer(ctx, target, internalFormat, buffer);
     }
 
@@ -3471,7 +3604,7 @@ public class VulkanicAPI {
      * Attaches a buffer object to a texture buffer target.
      */
     public static void bindTextureBufferData(CommandContext ctx, int internalFormat, int buffer) {
-        getBackend().texBuffer(ctx, GL_TEXTURE_BUFFER, internalFormat, buffer);
+        getBackend().texBuffer(ctx, VulkanicTextureTarget.TEXTURE_BUFFER, internalFormat, buffer);
     }
     
     

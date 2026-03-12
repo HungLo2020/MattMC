@@ -9,6 +9,7 @@ import net.vulkanic.VulkanicBlendEquation;
 import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicCapability;
+import net.vulkanic.VulkanicClearBuffer;
 import net.vulkanic.VulkanicCullFaceMode;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicIntegerQuery;
@@ -3058,7 +3059,7 @@ public class OpenGLBackend implements GraphicsBackend {
         }
 
         // 5. Optionally clear color
-        int clearMask = 0;
+        boolean shouldClearColor = false;
         if (clearColor.isPresent()) {
             int argb = clearColor.getAsInt();
             float a = ((argb >> 24) & 0xFF) / 255.0f;
@@ -3066,17 +3067,22 @@ public class OpenGLBackend implements GraphicsBackend {
             float g = ((argb >>  8) & 0xFF) / 255.0f;
             float b = ( argb        & 0xFF) / 255.0f;
             net.vulkanic.VulkanicAPI.setClearColor(ctx, r, g, b, a);
-            clearMask |= net.vulkanic.VulkanicAPI.GL_COLOR_BUFFER_BIT;
+            shouldClearColor = true;
         }
 
         // 6. Optionally clear depth
+        boolean shouldClearDepth = false;
         if (depthTarget != null && clearDepth.isPresent()) {
             net.vulkanic.VulkanicAPI.setClearDepth(ctx, clearDepth.getAsDouble());
-            clearMask |= net.vulkanic.VulkanicAPI.GL_DEPTH_BUFFER_BIT;
+            shouldClearDepth = true;
         }
 
-        if (clearMask != 0) {
-            net.vulkanic.VulkanicAPI.clearBuffers(ctx, clearMask);
+        if (shouldClearColor && shouldClearDepth) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.COLOR, VulkanicClearBuffer.DEPTH);
+        } else if (shouldClearColor) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.COLOR);
+        } else if (shouldClearDepth) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.DEPTH);
         }
 
         // 7. Set the viewport to the color attachment's dimensions
