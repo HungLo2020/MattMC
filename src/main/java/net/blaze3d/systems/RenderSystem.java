@@ -46,9 +46,18 @@ public class RenderSystem {
 		if (!skipFirstPoll) {
 			net.vulkanic.VulkanicAPI.pollEvents();
 		}
+
+		boolean vulkanBackendSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
+		if (vulkanBackendSelected) {
+			net.vulkanic.VulkanicAPI.beginFrame();
+		}
 		
 		Tesselator.getInstance().clear();
-		GLFW.glfwSwapBuffers(window.handle());
+		if (vulkanBackendSelected) {
+			net.vulkanic.VulkanicAPI.endFrame();
+		} else {
+			GLFW.glfwSwapBuffers(window.handle());
+		}
 		if (tracyFrameCapture != null) {
 			tracyFrameCapture.endFrame();
 		}

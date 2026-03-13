@@ -56,6 +56,7 @@ import org.lwjgl.vulkan.VkMemoryBarrier;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
+import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 import org.lwjgl.vulkan.VkRenderPassBeginInfo;
@@ -67,6 +68,30 @@ import org.lwjgl.vulkan.VkSubmitInfo;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
+import net.blaze3d.platform.DepthTestFunction;
+import net.blaze3d.platform.DestFactor;
+import net.blaze3d.platform.LogicOp;
+import net.blaze3d.platform.PolygonMode;
+import net.blaze3d.platform.SourceFactor;
+import net.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormatElement;
+import org.lwjgl.vulkan.VkDescriptorSetLayoutBinding;
+import org.lwjgl.vulkan.VkDescriptorSetLayoutCreateInfo;
+import org.lwjgl.vulkan.VkGraphicsPipelineCreateInfo;
+import org.lwjgl.vulkan.VkPipelineColorBlendAttachmentState;
+import org.lwjgl.vulkan.VkPipelineColorBlendStateCreateInfo;
+import org.lwjgl.vulkan.VkPipelineDepthStencilStateCreateInfo;
+import org.lwjgl.vulkan.VkPipelineDynamicStateCreateInfo;
+import org.lwjgl.vulkan.VkPipelineInputAssemblyStateCreateInfo;
+import org.lwjgl.vulkan.VkPipelineLayoutCreateInfo;
+import org.lwjgl.vulkan.VkPipelineMultisampleStateCreateInfo;
+import org.lwjgl.vulkan.VkPipelineRasterizationStateCreateInfo;
+import org.lwjgl.vulkan.VkPipelineShaderStageCreateInfo;
+import org.lwjgl.vulkan.VkPipelineVertexInputStateCreateInfo;
+import org.lwjgl.vulkan.VkPipelineViewportStateCreateInfo;
+import org.lwjgl.vulkan.VkPushConstantRange;
+import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
+import org.lwjgl.vulkan.VkVertexInputBindingDescription;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1418,9 +1443,104 @@ public class VulkanBackend {
         }
     }
 
+    /**
+     * Vulkan-native handle for a compiled graphics pipeline.
+     *
+     * <p>Wraps a {@code VkPipeline}, its {@code VkPipelineLayout}, and an associated
+     * {@code VkDescriptorSetLayout}.  All three are destroyed deterministically when
+     * {@link #close()} is called.</p>
+     */
+    private static final class VulkanPipelineHandle implements PipelineHandle {
+        private final long vkPipelineHandle;
+        private final long vkPipelineLayoutHandle;
+        private final long vkDescriptorSetLayoutHandle;
+        private final NativeSpine spine;
+        private volatile boolean closed;
+
+        private VulkanPipelineHandle(
+            long vkPipelineHandle,
+            long vkPipelineLayoutHandle,
+            long vkDescriptorSetLayoutHandle,
+            NativeSpine spine
+        ) {
+            this.vkPipelineHandle = vkPipelineHandle;
+            this.vkPipelineLayoutHandle = vkPipelineLayoutHandle;
+            this.vkDescriptorSetLayoutHandle = vkDescriptorSetLayoutHandle;
+            this.spine = Objects.requireNonNull(spine, "spine must not be null");
+        }
+
+        /** Returns the native {@code VkPipeline} handle for command-buffer binding. */
+        long getVkPipelineHandle() {
+            return vkPipelineHandle;
+        }
+
+        @Override
+        public boolean isValid() {
+            return !closed && vkPipelineHandle != VK10.VK_NULL_HANDLE;
+        }
+
+        @Override
+        public void close() {
+            if (closed) return;
+            closed = true;
+            spine.destroyVulkanPipeline(vkPipelineHandle, vkPipelineLayoutHandle, vkDescriptorSetLayoutHandle);
+        }
+
+        @Override
+        public String toString() {
+            return "VulkanPipelineHandle{valid=" + isValid() + ", pipeline=0x"
+                + Long.toHexString(vkPipelineHandle) + "}";
+        }
+    }
+
     public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
         ensureNativeReady("createPipeline");
-        throw new UnsupportedOperationException("Vulkan-native pipeline creation is not implemented yet.");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        // Vulkan pipeline creation requires precompiled SPIR-V shader modules.
+        List<VulkanicSpirvModule> spirvModules = descriptor.getSpirvModules();
+        if (spirvModules.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Vulkan pipeline creation requires precompiled SPIR-V shader modules attached to the "
+                + "PipelineDescriptor. Use PipelineDescriptor.fromPortableStateAndSpirvModules(...) "
+                + "or PipelineDescriptor.fromRenderPipelineAndSpirvModules(...) to provide SPIR-V "
+                + "bytecode for both vertex and fragment stages.");
+        }
+
+        VulkanicSpirvModule vertModule = null;
+        VulkanicSpirvModule fragModule = null;
+        for (VulkanicSpirvModule module : spirvModules) {
+            if (module.stage() == VulkanicShaderStage.VERTEX) {
+                vertModule = module;
+            } else if (module.stage() == VulkanicShaderStage.FRAGMENT) {
+                fragModule = module;
+            }
+        }
+        if (vertModule == null) {
+            throw new IllegalArgumentException(
+                "Vulkan pipeline creation requires a VERTEX stage SPIR-V module in the descriptor.");
+        }
+        if (fragModule == null) {
+            throw new IllegalArgumentException(
+                "Vulkan pipeline creation requires a FRAGMENT stage SPIR-V module in the descriptor.");
+        }
+
+        // Create transient shader modules, create the pipeline, then immediately destroy the modules
+        // (valid per Vulkan spec: VkPipeline owns its compiled shader code after creation).
+        long vertModuleHandle = spine.createShaderModule(vertModule);
+        long fragModuleHandle = spine.createShaderModule(fragModule);
+        try {
+            return spine.createVulkanPipeline(descriptor, vertModuleHandle, fragModuleHandle);
+        } finally {
+            spine.destroyShaderModule(vertModuleHandle);
+            spine.destroyShaderModule(fragModuleHandle);
+        }
     }
 
     private static final class BoundPipelineResources {
@@ -1767,9 +1887,15 @@ public class VulkanBackend {
         @Override
         public void setPipeline(PipelineHandle pipeline) {
             ensureOpen("setPipeline");
-            throw new UnsupportedOperationException(
-                "Vulkan render-pass pipeline binding is not implemented yet. "
-                    + "Graphics Pipeline Creation remains tracked separately.");
+            if (!(pipeline instanceof VulkanPipelineHandle vulkanPipeline)) {
+                throw new IllegalArgumentException(
+                    "Vulkan render pass requires a VulkanPipelineHandle, got: "
+                        + (pipeline == null ? "null" : pipeline.getClass().getName()));
+            }
+            if (!vulkanPipeline.isValid()) {
+                throw new IllegalStateException("Cannot bind a closed or invalid VulkanPipelineHandle");
+            }
+            spine.bindPipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
         }
 
         @Override
@@ -1851,6 +1977,24 @@ public class VulkanBackend {
         spine.submitPrimaryCommandBuffer(commandBufferHandle);
         boundPipelineResourcesByCommandBuffer.remove(commandBufferHandle);
         currentCommandContext = null;
+    }
+
+    public int beginFrame() {
+        ensureNativeReady("beginFrame");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.beginFrame();
+    }
+
+    public void endFrame() {
+        ensureNativeReady("endFrame");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.endFrame();
     }
 
     public void drawArrays(CommandContext ctx, int mode, int first, int count) {
@@ -2092,6 +2236,13 @@ public class VulkanBackend {
         private final Set<Long> managedShaderModules = ConcurrentHashMap.newKeySet();
         private final Set<Long> transientRenderPassHandles = ConcurrentHashMap.newKeySet();
         private final Set<Long> transientFramebufferHandles = ConcurrentHashMap.newKeySet();
+    /** Tracks {@code VkPipeline} handles owned by live {@link VulkanPipelineHandle} objects. */
+    private final Set<Long> managedVkPipelineHandles = ConcurrentHashMap.newKeySet();
+    /** Tracks {@code VkPipelineLayout} handles owned by live {@link VulkanPipelineHandle} objects. */
+    private final Set<Long> managedVkPipelineLayoutHandles = ConcurrentHashMap.newKeySet();
+    /** Tracks {@code VkDescriptorSetLayout} handles owned by live {@link VulkanPipelineHandle} objects. */
+    private final Set<Long> managedVkDescriptorSetLayoutHandles = ConcurrentHashMap.newKeySet();
+
 
         /** Maps {@code VkImage} handle → {@code VkDeviceMemory} handle for all live managed textures. */
         private final Map<Long, Long> managedImageAllocations = new ConcurrentHashMap<>();
@@ -2112,6 +2263,8 @@ public class VulkanBackend {
         private long windowHandle;
         private boolean commandBufferRecording;
         private boolean renderPassRecording;
+        private boolean frameInProgress;
+        private int acquiredSwapchainImageIndex = -1;
         private int activeTextureUnitIndex;
 
         private final PixelStoreState pixelStoreState = new PixelStoreState();
@@ -3979,6 +4132,96 @@ public class VulkanBackend {
             }
         }
 
+        private int beginFrame() {
+            if (logicalDevice == null) {
+                throw new IllegalStateException("Cannot begin frame: Vulkan logical device is unavailable.");
+            }
+            if (graphicsQueue == null) {
+                throw new IllegalStateException("Cannot begin frame: Vulkan graphics queue is unavailable.");
+            }
+            if (swapchain == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("Cannot begin frame: Vulkan swapchain is unavailable.");
+            }
+            if (frameInProgress) {
+                throw new IllegalStateException("beginFrame called while a Vulkan frame is already in progress.");
+            }
+
+            recreateSwapchainIfFramebufferSizeChanged();
+
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer pImageIndex = stack.ints(0);
+                int acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
+                    logicalDevice,
+                    swapchain,
+                    Long.MAX_VALUE,
+                    VK10.VK_NULL_HANDLE,
+                    VK10.VK_NULL_HANDLE,
+                    pImageIndex
+                );
+
+                if (acquireResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR) {
+                    recreateSwapchain();
+                    acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
+                        logicalDevice,
+                        swapchain,
+                        Long.MAX_VALUE,
+                        VK10.VK_NULL_HANDLE,
+                        VK10.VK_NULL_HANDLE,
+                        pImageIndex
+                    );
+                }
+
+                if (acquireResult != VK10.VK_SUCCESS && acquireResult != KHRSwapchain.VK_SUBOPTIMAL_KHR) {
+                    throw new IllegalStateException(
+                        "vkAcquireNextImageKHR failed with VkResult=" + acquireResult);
+                }
+
+                int imageIndex = pImageIndex.get(0);
+                if (imageIndex < 0) {
+                    throw new IllegalStateException("vkAcquireNextImageKHR returned invalid image index: " + imageIndex);
+                }
+
+                acquiredSwapchainImageIndex = imageIndex;
+                frameInProgress = true;
+                return imageIndex;
+            }
+        }
+
+        private void endFrame() {
+            if (!frameInProgress) {
+                throw new IllegalStateException("endFrame called without an active Vulkan frame.");
+            }
+            if (commandBufferRecording) {
+                throw new IllegalStateException("endFrame requires submitted command buffers; active recording command buffer detected.");
+            }
+            if (renderPassRecording) {
+                throw new IllegalStateException("endFrame cannot run while a render pass is active.");
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                java.nio.LongBuffer pSwapchains = stack.longs(swapchain);
+                java.nio.IntBuffer pImageIndices = stack.ints(acquiredSwapchainImageIndex);
+
+                VkPresentInfoKHR presentInfo = VkPresentInfoKHR.calloc(stack)
+                    .sType$Default()
+                    .pSwapchains(pSwapchains)
+                    .pImageIndices(pImageIndices);
+
+                int presentResult = KHRSwapchain.vkQueuePresentKHR(graphicsQueue, presentInfo);
+                if (presentResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR
+                    || presentResult == KHRSwapchain.VK_SUBOPTIMAL_KHR) {
+                    recreateSwapchain();
+                } else {
+                    checkVk("vkQueuePresentKHR", presentResult);
+                }
+
+                checkVk("vkQueueWaitIdle", VK10.vkQueueWaitIdle(graphicsQueue));
+            } finally {
+                acquiredSwapchainImageIndex = -1;
+                frameInProgress = false;
+            }
+        }
+
         private long beginPrimaryCommandBuffer() {
             if (primaryCommandBuffer == null) {
                 throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
@@ -4327,6 +4570,560 @@ public class VulkanBackend {
             }
         }
 
+        // =====================================================================
+        // Pipeline creation
+        // =====================================================================
+
+        /**
+         * Creates a complete Vulkan graphics pipeline from a {@link PipelineDescriptor}
+         * and pre-created transient shader module handles.
+         *
+         * <p>The returned {@link VulkanPipelineHandle} owns the {@code VkPipeline},
+         * {@code VkPipelineLayout}, and {@code VkDescriptorSetLayout}.  The caller is
+         * responsible for closing the handle to release those resources.</p>
+         *
+         * <p>The pipeline is compiled against a placeholder render pass whose formats are
+         * derived from the swapchain surface.  The actual render pass used at draw time
+         * must be compatible (same attachment formats and sample counts).</p>
+         */
+        private VulkanPipelineHandle createVulkanPipeline(
+            PipelineDescriptor descriptor,
+            long vertShaderModuleHandle,
+            long fragShaderModuleHandle
+        ) {
+            Objects.requireNonNull(descriptor, "descriptor must not be null");
+            if (logicalDevice == null) {
+                throw new IllegalStateException("Cannot create pipeline: Vulkan logical device is unavailable.");
+            }
+
+            PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
+
+            try (MemoryStack stack = stackPush()) {
+
+                // --- 1. VkDescriptorSetLayout ---
+                java.util.List<PipelineDescriptor.ResourceBinding> bindings =
+                    descriptor.getResourceLayout().bindings();
+
+                long descriptorSetLayoutHandle;
+                if (bindings.isEmpty()) {
+                    VkDescriptorSetLayoutCreateInfo emptyDslInfo = VkDescriptorSetLayoutCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .pBindings(null);
+                    java.nio.LongBuffer pDsl0 = stack.mallocLong(1);
+                    checkVk("vkCreateDescriptorSetLayout (empty)",
+                        VK10.vkCreateDescriptorSetLayout(logicalDevice, emptyDslInfo, null, pDsl0));
+                    descriptorSetLayoutHandle = pDsl0.get(0);
+                } else {
+                    VkDescriptorSetLayoutBinding.Buffer dslBindings =
+                        VkDescriptorSetLayoutBinding.calloc(bindings.size(), stack);
+                    for (int i = 0; i < bindings.size(); i++) {
+                        PipelineDescriptor.ResourceBinding b = bindings.get(i);
+                        dslBindings.get(i)
+                            .binding(b.binding())
+                            .descriptorType(toVkDescriptorType(b.type()))
+                            .descriptorCount(1)
+                            .stageFlags(VK10.VK_SHADER_STAGE_VERTEX_BIT
+                                | VK10.VK_SHADER_STAGE_FRAGMENT_BIT);
+                    }
+                    VkDescriptorSetLayoutCreateInfo dslInfo = VkDescriptorSetLayoutCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .pBindings(dslBindings);
+                    java.nio.LongBuffer pDsl = stack.mallocLong(1);
+                    checkVk("vkCreateDescriptorSetLayout",
+                        VK10.vkCreateDescriptorSetLayout(logicalDevice, dslInfo, null, pDsl));
+                    descriptorSetLayoutHandle = pDsl.get(0);
+                }
+                managedVkDescriptorSetLayoutHandles.add(descriptorSetLayoutHandle);
+
+                // --- 2. VkPipelineLayout ---
+                java.nio.LongBuffer dslBuf = stack.longs(descriptorSetLayoutHandle);
+
+                java.util.List<PipelineDescriptor.PushConstantRange> pushRanges =
+                    descriptor.getPushConstantRanges();
+                VkPushConstantRange.Buffer vkPushRanges = null;
+                if (!pushRanges.isEmpty()) {
+                    vkPushRanges = VkPushConstantRange.calloc(pushRanges.size(), stack);
+                    for (int i = 0; i < pushRanges.size(); i++) {
+                        PipelineDescriptor.PushConstantRange r = pushRanges.get(i);
+                        vkPushRanges.get(i)
+                            .stageFlags(toVkShaderStageFlags(r.stages()))
+                            .offset(r.offset())
+                            .size(r.size());
+                    }
+                }
+
+                VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkPipelineLayoutCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .pSetLayouts(dslBuf)
+                    .pPushConstantRanges(vkPushRanges);
+                java.nio.LongBuffer pPipelineLayout = stack.mallocLong(1);
+                checkVk("vkCreatePipelineLayout",
+                    VK10.vkCreatePipelineLayout(logicalDevice, pipelineLayoutInfo, null, pPipelineLayout));
+                long pipelineLayoutHandle = pPipelineLayout.get(0);
+                managedVkPipelineLayoutHandles.add(pipelineLayoutHandle);
+
+                // --- 3. Shader stages ---
+                java.nio.ByteBuffer mainEntry = stack.UTF8("main");
+                VkPipelineShaderStageCreateInfo.Buffer shaderStages =
+                    VkPipelineShaderStageCreateInfo.calloc(2, stack);
+                shaderStages.get(0)
+                    .sType$Default()
+                    .stage(VK10.VK_SHADER_STAGE_VERTEX_BIT)
+                    .module(vertShaderModuleHandle)
+                    .pName(mainEntry);
+                shaderStages.get(1)
+                    .sType$Default()
+                    .stage(VK10.VK_SHADER_STAGE_FRAGMENT_BIT)
+                    .module(fragShaderModuleHandle)
+                    .pName(mainEntry);
+
+                // --- 4. Vertex input state ---
+                VertexFormat vertexFormat = portableState.vertexFormat();
+                java.util.List<VertexFormatElement> vfElements = vertexFormat.getElements();
+
+                VkVertexInputBindingDescription.Buffer vBindings =
+                    VkVertexInputBindingDescription.calloc(1, stack);
+                vBindings.get(0)
+                    .binding(0)
+                    .stride(vertexFormat.getVertexSize())
+                    .inputRate(VK10.VK_VERTEX_INPUT_RATE_VERTEX);
+
+                VkVertexInputAttributeDescription.Buffer vAttribs =
+                    VkVertexInputAttributeDescription.calloc(vfElements.size(), stack);
+                for (int i = 0; i < vfElements.size(); i++) {
+                    VertexFormatElement elem = vfElements.get(i);
+                    vAttribs.get(i)
+                        .location(elem.id())
+                        .binding(0)
+                        .format(toVkVertexElementFormat(elem.type(), elem.count()))
+                        .offset(vertexFormat.getOffset(elem));
+                }
+
+                VkPipelineVertexInputStateCreateInfo vertexInputInfo =
+                    VkPipelineVertexInputStateCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .pVertexBindingDescriptions(vBindings)
+                        .pVertexAttributeDescriptions(vAttribs);
+
+                // --- 5. Input assembly ---
+                VkPipelineInputAssemblyStateCreateInfo inputAssembly =
+                    VkPipelineInputAssemblyStateCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .topology(toVkPrimitiveTopology(portableState.vertexFormatMode()))
+                        .primitiveRestartEnable(false);
+
+                // --- 6. Viewport state (dynamic) ---
+                VkPipelineViewportStateCreateInfo viewportState =
+                    VkPipelineViewportStateCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .viewportCount(1)
+                        .scissorCount(1);
+
+                // --- 7. Rasterization ---
+                boolean hasBias = portableState.depthBiasConstant() != 0.0f
+                    || portableState.depthBiasScaleFactor() != 0.0f;
+                VkPipelineRasterizationStateCreateInfo rasterizer =
+                    VkPipelineRasterizationStateCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .depthClampEnable(false)
+                        .rasterizerDiscardEnable(false)
+                        .polygonMode(toVkPolygonMode(portableState.polygonMode()))
+                        .lineWidth(1.0f)
+                        .cullMode(portableState.cull()
+                            ? VK10.VK_CULL_MODE_BACK_BIT
+                            : VK10.VK_CULL_MODE_NONE)
+                        .frontFace(VK10.VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                        .depthBiasEnable(hasBias)
+                        .depthBiasConstantFactor(portableState.depthBiasConstant())
+                        .depthBiasSlopeFactor(portableState.depthBiasScaleFactor())
+                        .depthBiasClamp(0.0f);
+
+                // --- 8. Multisample ---
+                VkPipelineMultisampleStateCreateInfo multisampling =
+                    VkPipelineMultisampleStateCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .sampleShadingEnable(false)
+                        .rasterizationSamples(VK10.VK_SAMPLE_COUNT_1_BIT);
+
+                // --- 9. Depth/stencil ---
+                boolean depthTestEnabled =
+                    portableState.depthTestFunction() != DepthTestFunction.NO_DEPTH_TEST;
+                VkPipelineDepthStencilStateCreateInfo depthStencil =
+                    VkPipelineDepthStencilStateCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .depthTestEnable(depthTestEnabled)
+                        .depthWriteEnable(portableState.writeDepth())
+                        .depthCompareOp(toVkDepthCompareOp(portableState.depthTestFunction()))
+                        .depthBoundsTestEnable(false)
+                        .stencilTestEnable(false);
+
+                // --- 10. Color blend ---
+                int colorWriteMask = 0;
+                if (portableState.writeColor()) {
+                    colorWriteMask |= VK10.VK_COLOR_COMPONENT_R_BIT
+                        | VK10.VK_COLOR_COMPONENT_G_BIT
+                        | VK10.VK_COLOR_COMPONENT_B_BIT;
+                }
+                if (portableState.writeAlpha()) {
+                    colorWriteMask |= VK10.VK_COLOR_COMPONENT_A_BIT;
+                }
+
+                java.util.Optional<PipelineDescriptor.BlendState> blendState =
+                    portableState.blendState();
+                VkPipelineColorBlendAttachmentState.Buffer colorBlendAttachment =
+                    VkPipelineColorBlendAttachmentState.calloc(1, stack);
+                colorBlendAttachment.get(0)
+                    .colorWriteMask(colorWriteMask)
+                    .blendEnable(blendState.isPresent());
+                if (blendState.isPresent()) {
+                    PipelineDescriptor.BlendState blend = blendState.get();
+                    colorBlendAttachment.get(0)
+                        .srcColorBlendFactor(toVkBlendFactor(blend.sourceColor()))
+                        .dstColorBlendFactor(toVkBlendFactor(blend.destColor()))
+                        .colorBlendOp(VK10.VK_BLEND_OP_ADD)
+                        .srcAlphaBlendFactor(toVkBlendFactor(blend.sourceAlpha()))
+                        .dstAlphaBlendFactor(toVkBlendFactor(blend.destAlpha()))
+                        .alphaBlendOp(VK10.VK_BLEND_OP_ADD);
+                }
+
+                boolean logicOpEnabled = portableState.colorLogic() != LogicOp.NONE;
+                VkPipelineColorBlendStateCreateInfo colorBlending =
+                    VkPipelineColorBlendStateCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .logicOpEnable(logicOpEnabled)
+                        .logicOp(toVkLogicOp(portableState.colorLogic()))
+                        .pAttachments(colorBlendAttachment)
+                        .blendConstants(stack.floats(0f, 0f, 0f, 0f));
+
+                // --- 11. Dynamic state ---
+                java.nio.IntBuffer dynamicStates = stack.ints(
+                    VK10.VK_DYNAMIC_STATE_VIEWPORT,
+                    VK10.VK_DYNAMIC_STATE_SCISSOR);
+                VkPipelineDynamicStateCreateInfo dynamicState =
+                    VkPipelineDynamicStateCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .pDynamicStates(dynamicStates);
+
+                // --- 12. Compatible placeholder render pass ---
+                // The pipeline render pass only needs to be *compatible* (same formats/samples)
+                // with the render pass used at draw time.  We build one against the swapchain
+                // color format + D32_SFLOAT depth format so it matches the transient render
+                // passes created by beginRenderPass() for standard Minecraft draw calls.
+                long placeholderRenderPass = createPipelineCompatibleRenderPass(stack,
+                    depthTestEnabled || portableState.writeDepth());
+
+                // --- 13. VkGraphicsPipelineCreateInfo ---
+                VkGraphicsPipelineCreateInfo.Buffer pipelineInfo =
+                    VkGraphicsPipelineCreateInfo.calloc(1, stack);
+                pipelineInfo.get(0)
+                    .sType$Default()
+                    .pStages(shaderStages)
+                    .pVertexInputState(vertexInputInfo)
+                    .pInputAssemblyState(inputAssembly)
+                    .pViewportState(viewportState)
+                    .pRasterizationState(rasterizer)
+                    .pMultisampleState(multisampling)
+                    .pDepthStencilState(depthStencil)
+                    .pColorBlendState(colorBlending)
+                    .pDynamicState(dynamicState)
+                    .layout(pipelineLayoutHandle)
+                    .renderPass(placeholderRenderPass)
+                    .subpass(0)
+                    .basePipelineHandle(VK10.VK_NULL_HANDLE)
+                    .basePipelineIndex(-1);
+
+                java.nio.LongBuffer pPipeline = stack.mallocLong(1);
+                checkVk("vkCreateGraphicsPipelines",
+                    VK10.vkCreateGraphicsPipelines(
+                        logicalDevice, VK10.VK_NULL_HANDLE, pipelineInfo, null, pPipeline));
+                long pipelineHandle = pPipeline.get(0);
+                managedVkPipelineHandles.add(pipelineHandle);
+
+                // Destroy the transient placeholder render pass immediately; it was only needed
+                // during pipeline compilation and is not required at draw time.
+                VK10.vkDestroyRenderPass(logicalDevice, placeholderRenderPass, null);
+
+                return new VulkanPipelineHandle(
+                    pipelineHandle, pipelineLayoutHandle, descriptorSetLayoutHandle,
+                    this);
+            }
+        }
+
+        /**
+         * Destroys a {@code VkPipeline}, its {@code VkPipelineLayout}, and its
+         * {@code VkDescriptorSetLayout} when a {@link VulkanPipelineHandle} is closed.
+         */
+        private void destroyVulkanPipeline(
+            long pipelineHandle,
+            long pipelineLayoutHandle,
+            long descriptorSetLayoutHandle
+        ) {
+            if (logicalDevice == null) return;
+            if (pipelineHandle != VK10.VK_NULL_HANDLE) {
+                managedVkPipelineHandles.remove(pipelineHandle);
+                VK10.vkDestroyPipeline(logicalDevice, pipelineHandle, null);
+            }
+            if (pipelineLayoutHandle != VK10.VK_NULL_HANDLE) {
+                managedVkPipelineLayoutHandles.remove(pipelineLayoutHandle);
+                VK10.vkDestroyPipelineLayout(logicalDevice, pipelineLayoutHandle, null);
+            }
+            if (descriptorSetLayoutHandle != VK10.VK_NULL_HANDLE) {
+                managedVkDescriptorSetLayoutHandles.remove(descriptorSetLayoutHandle);
+                VK10.vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayoutHandle, null);
+            }
+        }
+
+        /**
+         * Records a {@code vkCmdBindPipeline} command for {@code VK_PIPELINE_BIND_POINT_GRAPHICS}.
+         */
+        private void bindPipeline(long commandBufferHandle, long pipelineHandle) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "bindPipeline");
+            if (!renderPassRecording) {
+                throw new IllegalStateException("bindPipeline requires an active render pass");
+            }
+            VK10.vkCmdBindPipeline(
+                primaryCommandBuffer,
+                VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipelineHandle);
+        }
+
+        /**
+         * Creates a transient render-pass object suitable for pipeline compilation.
+         *
+         * <p>This render pass is immediately destroyed after pipeline creation; it only
+         * needs to be <em>compatible</em> with the transient render passes created by
+         * {@link #beginRenderPass} at draw time (same formats, same sample count).</p>
+         *
+         * @param includeDepth whether to include a D32_SFLOAT depth/stencil attachment
+         */
+        private long createPipelineCompatibleRenderPass(MemoryStack stack, boolean includeDepth) {
+            int colorFormat = swapchainImageFormat != VK10.VK_FORMAT_UNDEFINED
+                ? swapchainImageFormat
+                : VK10.VK_FORMAT_B8G8R8A8_UNORM;   // safe fallback
+            int attachmentCount = includeDepth ? 2 : 1;
+
+            VkAttachmentDescription.Buffer attachments =
+                VkAttachmentDescription.calloc(attachmentCount, stack);
+            attachments.get(0)
+                .format(colorFormat)
+                .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
+                .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                .initialLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                .finalLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            VkAttachmentReference.Buffer colorRef = VkAttachmentReference.calloc(1, stack);
+            colorRef.get(0)
+                .attachment(0)
+                .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            VkAttachmentReference depthRef = null;
+            if (includeDepth) {
+                attachments.get(1)
+                    .format(VK10.VK_FORMAT_D32_SFLOAT)
+                    .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                    .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                    .storeOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                    .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                    .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                    .initialLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+                    .finalLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                depthRef = VkAttachmentReference.calloc(stack)
+                    .attachment(1)
+                    .layout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            }
+
+            VkSubpassDescription.Buffer subpass = VkSubpassDescription.calloc(1, stack);
+            subpass.get(0)
+                .pipelineBindPoint(VK10.VK_PIPELINE_BIND_POINT_GRAPHICS)
+                .colorAttachmentCount(1)
+                .pColorAttachments(colorRef)
+                .pDepthStencilAttachment(depthRef);
+
+            VkRenderPassCreateInfo rpInfo = VkRenderPassCreateInfo.calloc(stack)
+                .sType$Default()
+                .pAttachments(attachments)
+                .pSubpasses(subpass);
+
+            java.nio.LongBuffer pRp = stack.mallocLong(1);
+            checkVk("vkCreateRenderPass (pipeline-compatible)",
+                VK10.vkCreateRenderPass(logicalDevice, rpInfo, null, pRp));
+            return pRp.get(0);
+        }
+
+        // =====================================================================
+        // Pipeline state mapping helpers
+        // =====================================================================
+
+        private static int toVkDescriptorType(PipelineDescriptor.ResourceType type) {
+            return switch (type) {
+                case SAMPLER -> VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                case UNIFORM_BUFFER -> VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                case TEXEL_BUFFER -> VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+            };
+        }
+
+        private static int toVkShaderStageFlags(java.util.Set<VulkanicShaderStage> stages) {
+            int flags = 0;
+            for (VulkanicShaderStage stage : stages) {
+                flags |= switch (stage) {
+                    case VERTEX -> VK10.VK_SHADER_STAGE_VERTEX_BIT;
+                    case FRAGMENT -> VK10.VK_SHADER_STAGE_FRAGMENT_BIT;
+                    case GEOMETRY -> VK10.VK_SHADER_STAGE_GEOMETRY_BIT;
+                    case COMPUTE -> VK10.VK_SHADER_STAGE_COMPUTE_BIT;
+                    case TESSELLATION_CONTROL -> VK10.VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+                    case TESSELLATION_EVALUATION -> VK10.VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+                };
+            }
+            return flags;
+        }
+
+        /**
+         * Maps {@link VertexFormatElement.Type} + component count to a {@code VkFormat}.
+         *
+         * <p>UBYTE components are mapped to UNORM (normalized [0..1]) since they are typically
+         * used for color data.  SHORT components used for UV coordinates are mapped to SSCALED
+         * (denormalized signed integer scaled to float) since Minecraft's UV coordinates span
+         * full short ranges and are not pre-normalized to [0..1].</p>
+         */
+        private static int toVkVertexElementFormat(VertexFormatElement.Type type, int count) {
+            return switch (type) {
+                case FLOAT -> switch (count) {
+                    case 1 -> VK10.VK_FORMAT_R32_SFLOAT;
+                    case 2 -> VK10.VK_FORMAT_R32G32_SFLOAT;
+                    case 3 -> VK10.VK_FORMAT_R32G32B32_SFLOAT;
+                    case 4 -> VK10.VK_FORMAT_R32G32B32A32_SFLOAT;
+                    default -> throw new IllegalArgumentException(
+                        "Unsupported FLOAT vertex component count: " + count);
+                };
+                case UBYTE -> switch (count) {
+                    case 1 -> VK10.VK_FORMAT_R8_UNORM;
+                    case 2 -> VK10.VK_FORMAT_R8G8_UNORM;
+                    case 3 -> VK10.VK_FORMAT_R8G8B8_UNORM;
+                    case 4 -> VK10.VK_FORMAT_R8G8B8A8_UNORM;
+                    default -> throw new IllegalArgumentException(
+                        "Unsupported UBYTE vertex component count: " + count);
+                };
+                case BYTE -> switch (count) {
+                    case 1 -> VK10.VK_FORMAT_R8_SNORM;
+                    case 2 -> VK10.VK_FORMAT_R8G8_SNORM;
+                    case 3 -> VK10.VK_FORMAT_R8G8B8_SNORM;
+                    case 4 -> VK10.VK_FORMAT_R8G8B8A8_SNORM;
+                    default -> throw new IllegalArgumentException(
+                        "Unsupported BYTE vertex component count: " + count);
+                };
+                case SHORT -> switch (count) {
+                    case 1 -> VK10.VK_FORMAT_R16_SSCALED;
+                    case 2 -> VK10.VK_FORMAT_R16G16_SSCALED;
+                    case 3 -> VK10.VK_FORMAT_R16G16B16_SSCALED;
+                    case 4 -> VK10.VK_FORMAT_R16G16B16A16_SSCALED;
+                    default -> throw new IllegalArgumentException(
+                        "Unsupported SHORT vertex component count: " + count);
+                };
+                case USHORT -> switch (count) {
+                    case 1 -> VK10.VK_FORMAT_R16_USCALED;
+                    case 2 -> VK10.VK_FORMAT_R16G16_USCALED;
+                    case 3 -> VK10.VK_FORMAT_R16G16B16_USCALED;
+                    case 4 -> VK10.VK_FORMAT_R16G16B16A16_USCALED;
+                    default -> throw new IllegalArgumentException(
+                        "Unsupported USHORT vertex component count: " + count);
+                };
+                case INT -> switch (count) {
+                    case 1 -> VK10.VK_FORMAT_R32_SINT;
+                    case 2 -> VK10.VK_FORMAT_R32G32_SINT;
+                    case 3 -> VK10.VK_FORMAT_R32G32B32_SINT;
+                    case 4 -> VK10.VK_FORMAT_R32G32B32A32_SINT;
+                    default -> throw new IllegalArgumentException(
+                        "Unsupported INT vertex component count: " + count);
+                };
+                case UINT -> switch (count) {
+                    case 1 -> VK10.VK_FORMAT_R32_UINT;
+                    case 2 -> VK10.VK_FORMAT_R32G32_UINT;
+                    case 3 -> VK10.VK_FORMAT_R32G32B32_UINT;
+                    case 4 -> VK10.VK_FORMAT_R32G32B32A32_UINT;
+                    default -> throw new IllegalArgumentException(
+                        "Unsupported UINT vertex component count: " + count);
+                };
+            };
+        }
+
+        private static int toVkPrimitiveTopology(VertexFormat.Mode mode) {
+            return switch (mode) {
+                case LINES, DEBUG_LINES -> VK10.VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+                case LINE_STRIP, DEBUG_LINE_STRIP -> VK10.VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+                case TRIANGLES -> VK10.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+                case TRIANGLE_STRIP -> VK10.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+                case TRIANGLE_FAN -> VK10.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+                // QUADS are emulated via indexed TRIANGLE_LIST in Minecraft's rendering pipeline.
+                case QUADS -> VK10.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            };
+        }
+
+        private static int toVkPolygonMode(PolygonMode mode) {
+            return switch (mode) {
+                case FILL -> VK10.VK_POLYGON_MODE_FILL;
+                case WIREFRAME -> VK10.VK_POLYGON_MODE_LINE;
+            };
+        }
+
+        private static int toVkDepthCompareOp(DepthTestFunction func) {
+            return switch (func) {
+                case NO_DEPTH_TEST -> VK10.VK_COMPARE_OP_ALWAYS;
+                case EQUAL_DEPTH_TEST -> VK10.VK_COMPARE_OP_EQUAL;
+                case LEQUAL_DEPTH_TEST -> VK10.VK_COMPARE_OP_LESS_OR_EQUAL;
+                case LESS_DEPTH_TEST -> VK10.VK_COMPARE_OP_LESS;
+                case GREATER_DEPTH_TEST -> VK10.VK_COMPARE_OP_GREATER;
+            };
+        }
+
+        private static int toVkBlendFactor(SourceFactor factor) {
+            return switch (factor) {
+                case ZERO -> VK10.VK_BLEND_FACTOR_ZERO;
+                case ONE -> VK10.VK_BLEND_FACTOR_ONE;
+                case SRC_COLOR -> VK10.VK_BLEND_FACTOR_SRC_COLOR;
+                case ONE_MINUS_SRC_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+                case DST_COLOR -> VK10.VK_BLEND_FACTOR_DST_COLOR;
+                case ONE_MINUS_DST_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+                case SRC_ALPHA -> VK10.VK_BLEND_FACTOR_SRC_ALPHA;
+                case ONE_MINUS_SRC_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+                case DST_ALPHA -> VK10.VK_BLEND_FACTOR_DST_ALPHA;
+                case ONE_MINUS_DST_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+                case CONSTANT_COLOR -> VK10.VK_BLEND_FACTOR_CONSTANT_COLOR;
+                case ONE_MINUS_CONSTANT_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+                case CONSTANT_ALPHA -> VK10.VK_BLEND_FACTOR_CONSTANT_ALPHA;
+                case ONE_MINUS_CONSTANT_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
+                case SRC_ALPHA_SATURATE -> VK10.VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+            };
+        }
+
+        private static int toVkBlendFactor(DestFactor factor) {
+            return switch (factor) {
+                case ZERO -> VK10.VK_BLEND_FACTOR_ZERO;
+                case ONE -> VK10.VK_BLEND_FACTOR_ONE;
+                case SRC_COLOR -> VK10.VK_BLEND_FACTOR_SRC_COLOR;
+                case ONE_MINUS_SRC_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+                case DST_COLOR -> VK10.VK_BLEND_FACTOR_DST_COLOR;
+                case ONE_MINUS_DST_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+                case SRC_ALPHA -> VK10.VK_BLEND_FACTOR_SRC_ALPHA;
+                case ONE_MINUS_SRC_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+                case DST_ALPHA -> VK10.VK_BLEND_FACTOR_DST_ALPHA;
+                case ONE_MINUS_DST_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+                case CONSTANT_COLOR -> VK10.VK_BLEND_FACTOR_CONSTANT_COLOR;
+                case ONE_MINUS_CONSTANT_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+                case CONSTANT_ALPHA -> VK10.VK_BLEND_FACTOR_CONSTANT_ALPHA;
+                case ONE_MINUS_CONSTANT_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
+            };
+        }
+
+        private static int toVkLogicOp(LogicOp op) {
+            return switch (op) {
+                case NONE -> VK10.VK_LOGIC_OP_NO_OP;   // logicOpEnable=false when NONE; safe default
+                case OR_REVERSE -> VK10.VK_LOGIC_OP_OR_REVERSE;
+            };
+        }
+
         private long createShaderModule(VulkanicSpirvModule spirvModule) {
             Objects.requireNonNull(spirvModule, "spirvModule must not be null");
 
@@ -4461,6 +5258,32 @@ public class VulkanBackend {
                     });
                 }
 
+                // Destroy pipelines before their layouts and descriptor set layouts.
+                if (!managedVkPipelineHandles.isEmpty()) {
+                    new ArrayList<>(managedVkPipelineHandles).forEach(pipelineHandle -> {
+                        managedVkPipelineHandles.remove(pipelineHandle);
+                        if (pipelineHandle != VK10.VK_NULL_HANDLE) {
+                            VK10.vkDestroyPipeline(logicalDevice, pipelineHandle, null);
+                        }
+                    });
+                }
+                if (!managedVkPipelineLayoutHandles.isEmpty()) {
+                    new ArrayList<>(managedVkPipelineLayoutHandles).forEach(layoutHandle -> {
+                        managedVkPipelineLayoutHandles.remove(layoutHandle);
+                        if (layoutHandle != VK10.VK_NULL_HANDLE) {
+                            VK10.vkDestroyPipelineLayout(logicalDevice, layoutHandle, null);
+                        }
+                    });
+                }
+                if (!managedVkDescriptorSetLayoutHandles.isEmpty()) {
+                    new ArrayList<>(managedVkDescriptorSetLayoutHandles).forEach(dslHandle -> {
+                        managedVkDescriptorSetLayoutHandles.remove(dslHandle);
+                        if (dslHandle != VK10.VK_NULL_HANDLE) {
+                            VK10.vkDestroyDescriptorSetLayout(logicalDevice, dslHandle, null);
+                        }
+                    });
+                }
+
                 if (!managedShaderModules.isEmpty()) {
                     new ArrayList<>(managedShaderModules).forEach(shaderModuleHandle -> destroyShaderModule(shaderModuleHandle));
                 }
@@ -4482,6 +5305,8 @@ public class VulkanBackend {
                 graphicsQueue = null;
                 primaryCommandBuffer = null;
                 commandBufferRecording = false;
+                frameInProgress = false;
+                acquiredSwapchainImageIndex = -1;
             }
 
             if (instance != null) {
@@ -4503,3 +5328,4 @@ public class VulkanBackend {
         }
     }
 }
+

@@ -3506,6 +3506,35 @@ public interface GraphicsBackend {
                                PipelineResourceBindings bindings);
 
     // =========================================================================
+    // Phase 3e: Frame Lifecycle + Presentation
+    // =========================================================================
+
+    /**
+     * Begins a new frame lifecycle scope.
+     *
+     * <p>In OpenGL: no-op, returns {@code -1}.
+     * In Vulkan: acquires the next swapchain image (typically via
+     * {@code vkAcquireNextImageKHR}) and returns its image index.
+     *
+     * @return acquired swapchain image index for Vulkan, or {@code -1} for backends
+     *         without explicit frame acquisition
+     */
+    default int beginFrame() {
+        return -1;
+    }
+
+    /**
+     * Ends the current frame lifecycle scope.
+     *
+     * <p>In OpenGL: no-op.
+     * In Vulkan: presents the acquired swapchain image (typically via
+     * {@code vkQueuePresentKHR}).
+     */
+    default void endFrame() {
+        // no-op for backends without explicit present lifecycle
+    }
+
+    // =========================================================================
     // Phase 3d: Command Buffer Lifecycle
     // =========================================================================
 

@@ -1,17 +1,17 @@
 # Vulkan Backend Readiness
 
-## Coverage Baseline (as of 2026-03-12)
+## Coverage Baseline (as of 2026-03-13)
 
 | Backend | Implements `GraphicsBackend` | Coverage |
 |---------|------------------------------|----------|
-| Vulkan  | 80 / 261 methods             | **30.7%** |
+| Vulkan  | 82 / 263 methods             | **31.2%** |
 | OpenGL  | 256 declared + interface defaults | **100%** (compiler-verified) |
 
 "Implements" means the backend has a declared method of that name.
 It does **not** mean the method works correctly end-to-end.
 
 > 100% coverage = every production `VulkanicAPI.*` callsite delegates to
-> a working implementation in both backends.  We are at **30.7%** for Vulkan.
+> a working implementation in both backends.  We are at **31.2%** for Vulkan.
 
 ### How to measure progress
 
@@ -81,7 +81,7 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
   - `VulkanBackend.NativeSpine` creates `VkDevice` + graphics queue on bring-up.
   - `VulkanExecutionContextInfo` snapshot type exists for diagnostic reporting.
   - `VulkanicAPI.getVulkanExecutionContextInfo()` / `describeVulkanExecutionContextInfo()` are dead code — zero production callsites.
-- **Notes:** Abstraction layer exists. No production code calls it. Does not contribute to the 69.3% of missing methods.
+- **Notes:** Abstraction layer exists. No production code calls it. Does not contribute to the 68.8% of missing methods.
 
 ### Swapchain / Surface Handling
 
@@ -177,17 +177,21 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
   - Compiled SPIR-V shaders now materialize native `VkShaderModule` handles via `vkCreateShaderModule` when native Vulkan runtime is available.
   - Native shader modules are now lifecycle-managed and destroyed deterministically (`deleteShader` path + backend/device teardown).
   - Native bring-up now materializes already-compiled virtual shader modules so shader compilation and Vulkan runtime initialization order are decoupled.
-- **Notes:** Shader compilation/module lifecycle is now Vulkan-native and pipeline-ready. Full graphics-pipeline assembly/binding remains tracked under Graphics Pipeline Creation.
+- **Notes:** Shader compilation/module lifecycle is now Vulkan-native and consumed by graphics-pipeline creation. Frame lifecycle/presentation integration remains tracked in their dedicated capabilities.
 
 ### Graphics Pipeline Creation
 
 - **Capability Name:** Graphics Pipeline Creation
 - **Description:** Backend must compile/bind a Vulkan graphics pipeline from descriptor state + shaders.
-- **Status:** BLOCKED
+- **Status:** COMPLETE
 - **Evidence:**
   - `GraphicsBackend.createPipeline(PipelineDescriptor)` required.
-  - `VulkanBackend.createPipeline(...)` throws `UnsupportedOperationException("Vulkan-native pipeline creation is not implemented yet.")`.
-- **Notes:** No Vulkan pipeline object can be created.
+  - `VulkanBackend.createPipeline(...)` now validates descriptor/SPIR-V inputs and delegates to native `NativeSpine.createVulkanPipeline(...)`.
+  - `VulkanBackend.NativeSpine.createVulkanPipeline(...)` now creates `VkDescriptorSetLayout`, `VkPipelineLayout`, and `VkPipeline` via `vkCreateGraphicsPipelines`.
+  - `VulkanBackedRenderPass.setPipeline(...)` now validates `VulkanPipelineHandle` and records `vkCmdBindPipeline(...)`.
+  - Pipeline resources are lifecycle-managed in `NativeSpine` (`managedVkPipelineHandles`, `managedVkPipelineLayoutHandles`, `managedVkDescriptorSetLayoutHandles`) and destroyed deterministically on handle close/backend teardown.
+  - Regression tests: `VulkanPipelineCreationLifecycleTest` covers OpenGL path non-regression, Vulkan fail-hard behavior when runtime is unavailable, runtime-ready pipeline creation path, and source-level native wiring assertions.
+- **Notes:** Vulkan can now compile and bind native graphics pipeline objects through the backend-neutral API. Presentation/acquire lifecycle remains tracked separately.
 
 ### Render Target / Framebuffer Abstraction
 
@@ -213,7 +217,7 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
   - `VulkanBackend.NativeSpine.beginRenderPass(...)` now creates transient `VkRenderPass` + `VkFramebuffer`, maps load/store ops, and records `vkCmdBeginRenderPass(...)`.
   - Scoped render pass close now records `vkCmdEndRenderPass(...)` and enforces idempotent close semantics.
   - Transient render-pass/framebuffer resources are tracked and destroyed deterministically after command submission and during backend teardown.
-- **Notes:** Attachment lifecycle and begin/end semantics are now Vulkan-native. Graphics pipeline binding and descriptor-driven resource binding remain tracked separately in their dedicated capabilities.
+- **Notes:** Attachment lifecycle and begin/end semantics are now Vulkan-native and now support native graphics-pipeline binding through `VulkanBackedRenderPass.setPipeline(...)`.
 
 ### Descriptor / Resource Binding
 
@@ -226,7 +230,7 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
   - Vulkan backend now provides full descriptor lifecycle methods: `createDescriptorPool`, `allocateDescriptorSet`, `updateDescriptorSet`, `bindDescriptorSet`, `resetDescriptorPool`, and `bindPipelineResources`.
   - New Vulkan logical descriptor handles (`VulkanDescriptorPoolHandle`, `VulkanDescriptorSetHandle`) enforce allocation capacity, validity, reset/close invalidation, and descriptor-layout matching.
   - `VulkanBackend.bindPipelineResources(...)` now validates bindings against `PipelineDescriptor.ResourceLayout`, validates Vulkan command-context usage, validates Vulkan uniform-buffer slices, and records per-command-buffer bound resource state.
-- **Notes:** Descriptor/resource lifecycle and binding validation are now operational in the Vulkan backend abstraction. Native graphics-pipeline object creation/binding remains tracked under Graphics Pipeline Creation.
+- **Notes:** Descriptor/resource lifecycle and binding validation are operational in the Vulkan backend abstraction and now pair with native graphics-pipeline creation/binding.
 
 ### Draw Calls (indexed and non-indexed)
 
@@ -258,11 +262,14 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Frame Lifecycle (begin frame / end frame)
 - **Description:** Backend must define frame-level sequencing suitable for swapchain image acquisition, recording, submit, and completion.
-- **Status:** MISSING
+- **Status:** COMPLETE
 - **Evidence:**
-  - `GraphicsBackend` / `VulkanicAPI` provide command-buffer lifecycle only (`beginCommandBuffer`, `submitCommandBuffer`).
-  - No `beginFrame` / `endFrame` abstraction exists.
-- **Notes:** Required frame orchestration for Vulkan presentation flow is absent.
+  - `GraphicsBackend.beginFrame()` / `GraphicsBackend.endFrame()` now define backend-neutral frame-level lifecycle hooks.
+  - `VulkanicAPI.beginFrame()` / `VulkanicAPI.endFrame()` now expose frame lifecycle orchestration through the active backend.
+  - `VulkanBackend.beginFrame()` now enforces Vulkan fail-hard readiness and delegates to native acquire logic.
+  - `VulkanBackend.endFrame()` now enforces Vulkan fail-hard readiness and delegates to native present logic.
+  - `RenderSystem.flipFrame(...)` now conditionally routes Vulkan-selected execution through `VulkanicAPI.beginFrame()` + `VulkanicAPI.endFrame()`.
+- **Notes:** Frame-level sequencing abstraction now exists and is wired into the production frame-flip path for Vulkan-selected routing.
 
 ### Resize / Recreate Framebuffers
 
@@ -282,11 +289,14 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Presentation
 - **Description:** Backend must acquire swapchain images and present rendered images to the window surface.
-- **Status:** MISSING
+- **Status:** COMPLETE
 - **Evidence:**
-  - `VulkanBackend` creates swapchain, but there is no `vkAcquireNextImageKHR` or `vkQueuePresentKHR` path.
-  - No presentation method is defined in `GraphicsBackend`/`VulkanicAPI`.
-- **Notes:** Even with command submission, rendered output cannot reach the screen.
+  - `VulkanBackend.NativeSpine.beginFrame()` now acquires swapchain images via `vkAcquireNextImageKHR`.
+  - `VulkanBackend.NativeSpine.endFrame()` now presents acquired images via `vkQueuePresentKHR`.
+  - Acquire/present path handles `VK_ERROR_OUT_OF_DATE_KHR` / `VK_SUBOPTIMAL_KHR` by recreating the swapchain.
+  - `RenderSystem.flipFrame(...)` now uses Vulkan frame lifecycle routing in Vulkan-selected mode and preserves `GLFW.glfwSwapBuffers(...)` for OpenGL.
+  - Regression tests in `VulkanFramePresentationLifecycleTest` cover OpenGL no-op behavior, Vulkan fail-hard/readiness behavior, and source-level wiring assertions.
+- **Notes:** Swapchain acquire/present lifecycle is now implemented and wired through production frame presentation routing.
 
 ### GraphicsBackend Contract Coverage (Vulkan Path)
 
@@ -301,20 +311,17 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 ## Blocking Issues
 
-1. **Vulkan backend covers only 30.7% of the `GraphicsBackend` interface.**
-  - **Origin:** `VulkanicAPI.createFailFastVulkanProxy(...)` + 80 of 261 interface methods implemented in `VulkanBackend`.
+1. **Vulkan backend covers only 31.2% of the `GraphicsBackend` interface.**
+  - **Origin:** `VulkanicAPI.createFailFastVulkanProxy(...)` + 82 of 263 interface methods implemented in `VulkanBackend`.
   - **Why it blocks:** Any production render call that hits the 181 unimplemented methods immediately throws. Normal render flow is impossible.
    - **Measure:** `./gradlew test --tests net.vulkanic.VulkanBackendCoverageTest` — raises floor as implementations land.
 
-2. **Graphics pipeline creation/binding is still unimplemented on Vulkan path.**
-  - **Origin:** `VulkanBackend.createPipeline(...)` still throws `UnsupportedOperationException`, and render-pass `setPipeline(...)` remains blocked pending native pipeline objects.
-  - **Why it blocks:** A basic scene still cannot bind real Vulkan graphics pipeline state, so draw submission remains blocked despite render-pass/framebuffer lifecycle support.
+2. ~~**Graphics pipeline creation/binding is still unimplemented on Vulkan path.**~~ **RESOLVED.**
+  - `VulkanBackend.createPipeline(...)` now compiles native Vulkan pipeline objects (`VkDescriptorSetLayout` + `VkPipelineLayout` + `VkPipeline`) and `VulkanBackedRenderPass.setPipeline(...)` records `vkCmdBindPipeline(...)`. See Graphics Pipeline Creation section above.
 
 3. ~~**Vulkan texture upload path is still missing.**~~ **RESOLVED.** `uploadTexture2D`, sub-image upload, and all supporting texture lifecycle methods are now implemented in `VulkanBackend` via a staging-buffer → `vkCmdCopyBufferToImage` path. See Texture Upload section above.
 
-4. **Presentation lifecycle is missing (acquire/present).**
-   - **Origin:** No `vkAcquireNextImageKHR` / `vkQueuePresentKHR` in `VulkanBackend`; no `beginFrame`/`endFrame` abstraction.
-   - **Why it blocks:** Rendered frames cannot reach the screen.
+4. ~~**Presentation lifecycle is missing (acquire/present).**~~ **RESOLVED.** Vulkan frame lifecycle now includes `beginFrame`/`endFrame` abstraction plus native `vkAcquireNextImageKHR` and `vkQueuePresentKHR` paths, wired into `RenderSystem.flipFrame(...)` for Vulkan-selected routing.
 
 5. **Some scaffolded diagnostics APIs still have zero production callsites.**
   - **Origin:** `initializeNativeVulkanRuntime`, `getVulkanExecutionContextInfo`, and `getVulkanSwapchainSurfaceInfo` are still called only from tests.

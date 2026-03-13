@@ -5491,6 +5491,30 @@ public class VulkanicAPI {
     }
 
     // =========================================================================
+    // Phase 3e: Frame Lifecycle + Presentation
+    // =========================================================================
+
+    /**
+     * Begins a backend frame lifecycle scope.
+     *
+     * <p>In OpenGL this is a no-op and returns {@code -1}.
+     * In Vulkan this acquires the next swapchain image and returns its index.
+     */
+    public static int beginFrame() {
+        return getBackend().beginFrame();
+    }
+
+    /**
+     * Ends a backend frame lifecycle scope.
+     *
+     * <p>In OpenGL this is a no-op.
+     * In Vulkan this presents the currently acquired swapchain image.
+     */
+    public static void endFrame() {
+        getBackend().endFrame();
+    }
+
+    // =========================================================================
     // Phase 3d: Command Buffer Lifecycle
     // =========================================================================
 
