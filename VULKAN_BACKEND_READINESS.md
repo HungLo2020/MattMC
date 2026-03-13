@@ -1,17 +1,17 @@
 # Vulkan Backend Readiness
 
-## Coverage Baseline (as of 2026-03-13)
+## Coverage Baseline (as of 2026-03-12)
 
 | Backend | Implements `GraphicsBackend` | Coverage |
 |---------|------------------------------|----------|
-| Vulkan  | 65 / 261 methods             | **24.9%** |
-| OpenGL  | 256 / 261 methods            | **98.1%** |
+| Vulkan  | 80 / 261 methods             | **30.7%** |
+| OpenGL  | 256 declared + interface defaults | **100%** (compiler-verified) |
 
 "Implements" means the backend has a declared method of that name.
 It does **not** mean the method works correctly end-to-end.
 
 > 100% coverage = every production `VulkanicAPI.*` callsite delegates to
-> a working implementation in both backends.  We are at **24.9%** for Vulkan.
+> a working implementation in both backends.  We are at **30.7%** for Vulkan.
 
 ### How to measure progress
 
@@ -81,7 +81,7 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
   - `VulkanBackend.NativeSpine` creates `VkDevice` + graphics queue on bring-up.
   - `VulkanExecutionContextInfo` snapshot type exists for diagnostic reporting.
   - `VulkanicAPI.getVulkanExecutionContextInfo()` / `describeVulkanExecutionContextInfo()` are dead code — zero production callsites.
-- **Notes:** Abstraction layer exists. No production code calls it. Does not contribute to the 86.2% of missing methods.
+- **Notes:** Abstraction layer exists. No production code calls it. Does not contribute to the 69.3% of missing methods.
 
 ### Swapchain / Surface Handling
 
@@ -91,8 +91,9 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 - **Evidence:**
   - `VulkanBackend.NativeSpine.createSurface()` / `createSwapchain()` exist and run on bring-up.
   - `VulkanSwapchainSurfaceInfo` snapshot + recreate methods exist.
-  - `VulkanicAPI.recreateVulkanSwapchain()` / `recreateVulkanSwapchainIfNeeded()` are dead code — zero production callsites in `GameRenderer` or `RenderSystem`.
-- **Notes:** Swapchain exists internally. The resize/recreate hooks are not wired into any window-resize or render-loop path.
+  - `VulkanicAPI.recreateVulkanSwapchainIfNeededOnFramebufferResize(...)` now provides a resize-event-safe Vulkan callsite that avoids implicit backend initialization.
+  - `Window.onFramebufferResize(...)` now calls `handleVulkanSwapchainFramebufferResize(...)`, which delegates to Vulkan swapchain conditional recreation when Vulkan backend routing is active.
+- **Notes:** Swapchain exists internally and resize-triggered recreation is now wired from the window callback path. Presentation/acquire flow remains tracked under Presentation and Frame Lifecycle.
 
 ### Command Encoder or Command Buffer Abstraction
 
@@ -267,13 +268,15 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Resize / Recreate Framebuffers
 - **Description:** Backend must recreate swapchain-dependent targets on window resize/out-of-date surface.
-- **Status:** SCAFFOLDING (API exists, not wired to window resize events)
+- **Status:** COMPLETE
 - **Evidence:**
   - `VulkanBackend.NativeSpine.recreateSwapchainIfFramebufferSizeChanged()` exists and checks GLFW framebuffer size vs stored swapchain extent.
   - `VulkanBackend.beginCommandBuffer()` auto-checks for mismatch and triggers recreation.
-  - `VulkanicAPI.recreateVulkanSwapchain()` / `recreateVulkanSwapchainIfNeeded()` exist as API surface.
-  - No callsite in `Window`, `Minecraft`, `GameRenderer`, or `RenderSystem` calls these methods on resize events.
-- **Notes:** The resize-recreate logic exists internally in the command-buffer path. Engine-level window callback → swapchain recreation is not wired.
+  - `Window.onFramebufferResize(...)` now invokes `Window.handleVulkanSwapchainFramebufferResize(...)` before `eventHandler.resizeDisplay()`.
+  - `Window.handleVulkanSwapchainFramebufferResize(...)` delegates to `VulkanicAPI.recreateVulkanSwapchainIfNeededOnFramebufferResize(...)`.
+  - `VulkanicAPI.recreateVulkanSwapchainIfNeededOnFramebufferResize(...)` no-ops for uninitialized/OpenGL backends and conditionally recreates swapchain state for Vulkan-selected routing.
+  - Regression tests: `WindowVulkanSwapchainResizeTest` covers uninitialized no-init behavior, OpenGL no-op behavior, Vulkan fail-hard/readiness behavior, and minimized-dimension guard paths.
+- **Notes:** Resize callback wiring is now implemented end-to-end. Existing command-buffer mismatch checks remain in place as a secondary safety path.
 
 ### Presentation
 
@@ -313,9 +316,9 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
    - **Origin:** No `vkAcquireNextImageKHR` / `vkQueuePresentKHR` in `VulkanBackend`; no `beginFrame`/`endFrame` abstraction.
    - **Why it blocks:** Rendered frames cannot reach the screen.
 
-5. **Scaffolded APIs have zero production callsites.**
-   - **Origin:** `initializeNativeVulkanRuntime`, `getVulkanExecutionContextInfo`, `getVulkanSwapchainSurfaceInfo`, `recreateVulkanSwapchain*` are called only from tests.
-   - **Why it matters:** These have been counted as "COMPLETE" in the past but contribute nothing to actual render flow. Engine integration code has not been written.
+5. **Some scaffolded diagnostics APIs still have zero production callsites.**
+  - **Origin:** `initializeNativeVulkanRuntime`, `getVulkanExecutionContextInfo`, and `getVulkanSwapchainSurfaceInfo` are still called only from tests.
+  - **Why it matters:** These APIs provide useful diagnostics but still do not contribute to active render flow integration. (Resize-triggered `recreateVulkanSwapchainIfNeeded*` is now wired from `Window.onFramebufferResize(...)`.)
 
 ## First Vulkan Backend Exit Criteria
 

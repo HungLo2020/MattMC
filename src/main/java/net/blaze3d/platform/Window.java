@@ -270,6 +270,7 @@ public final class Window implements AutoCloseable {
 				this.framebufferHeight = j;
 				if (this.getWidth() != k || this.getHeight() != m) {
 					try {
+						handleVulkanSwapchainFramebufferResize(i, j);
 						this.eventHandler.resizeDisplay();
 					} catch (Exception var10) {
 						CrashReport crashReport = CrashReport.forThrowable(var10, "Window resize");
@@ -283,6 +284,10 @@ public final class Window implements AutoCloseable {
 				this.minimized = true;
 			}
 		}
+	}
+
+	static boolean handleVulkanSwapchainFramebufferResize(int framebufferWidth, int framebufferHeight) {
+		return net.vulkanic.VulkanicAPI.recreateVulkanSwapchainIfNeededOnFramebufferResize(framebufferWidth, framebufferHeight);
 	}
 
 	private void refreshFramebufferSize() {

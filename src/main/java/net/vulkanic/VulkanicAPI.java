@@ -821,6 +821,31 @@ public class VulkanicAPI {
     }
 
     /**
+     * Handles a framebuffer resize event by conditionally recreating the Vulkan
+     * swapchain when Vulkan backend routing is already active.
+     *
+     * <p>This method intentionally does <b>not</b> auto-initialize the backend:
+     * when Vulkanic is not initialized yet, this is treated as a no-op to avoid
+     * accidentally locking startup into the default OpenGL backend.</p>
+     *
+     * @param framebufferWidth new framebuffer width in pixels
+     * @param framebufferHeight new framebuffer height in pixels
+     * @return true if Vulkan swapchain recreation occurred, false otherwise
+     */
+    public static boolean recreateVulkanSwapchainIfNeededOnFramebufferResize(int framebufferWidth, int framebufferHeight) {
+        if (framebufferWidth <= 0 || framebufferHeight <= 0) {
+            return false;
+        }
+
+        GraphicsBackend activeBackend = backend;
+        if (activeBackend == null || activeBackend.getBackendType() != GraphicsBackendType.VULKAN) {
+            return false;
+        }
+
+        return activeBackend.recreateVulkanSwapchainIfNeeded();
+    }
+
+    /**
      * Attempts explicit native Vulkan runtime initialization for the active
      * backend and returns structured diagnostics about the outcome.
      */
