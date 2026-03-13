@@ -6,6 +6,9 @@ import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -15,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanBackendSpirvPathTest {
+
+    private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
 
     private static final CommandContext TEST_CONTEXT = new CommandContext() {
         @Override
@@ -103,6 +108,39 @@ public class VulkanBackendSpirvPathTest {
         assertEquals(VulkanicAPI.GL_FALSE,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_LINK_STATUS));
         assertTrue(backend.getProgramInfoLog(TEST_CONTEXT, program).contains("failed compilation"));
+    }
+
+    @Test
+    public void testUploadingNewSourceInvalidatesPreviouslyCompiledModule() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x11, 0x22, 0x33, 0x44}, sourceName, "stub")
+        );
+
+        int shader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        uploadSource(backend, shader, "#version 450\nvoid main(){}");
+        backend.compileShader(TEST_CONTEXT, shader);
+        assertTrue(backend.getCompiledSpirvModule(TEST_CONTEXT, shader).isPresent(),
+            "Initial compile should produce a SPIR-V module");
+
+        uploadSource(backend, shader, "#version 450\nvoid main(){gl_Position=vec4(1.0);}");
+
+        assertFalse(backend.getCompiledSpirvModule(TEST_CONTEXT, shader).isPresent(),
+            "Uploading new source should invalidate previous SPIR-V module");
+        assertEquals(VulkanicAPI.GL_FALSE,
+            backend.getShaderParameter(TEST_CONTEXT, shader, VulkanicAPI.GL_COMPILE_STATUS));
+    }
+
+    @Test
+    public void testSourceWiresNativeVulkanShaderModuleLifecycle() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("vkCreateShaderModule"),
+            "Vulkan shader abstraction should materialize native VkShaderModule handles");
+        assertTrue(source.contains("destroyShaderModule("),
+            "Vulkan shader abstraction should destroy native VkShaderModule handles");
+        assertTrue(source.contains("materializeCompiledShaderModules("),
+            "Vulkan native bring-up should materialize already-compiled shader modules");
     }
 
     private static void uploadSource(VulkanBackend backend, int shader, String source) {

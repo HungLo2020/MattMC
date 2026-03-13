@@ -5,8 +5,13 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
+import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.VulkanReadinessReport;
+import net.vulkanic.VulkanicBufferSlice;
 import net.vulkanic.VulkanicBuffer;
+import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicRenderPass;
+import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureFormat;
 import net.vulkanic.VulkanicTextureView;
@@ -26,9 +31,14 @@ import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkAttachmentDescription;
+import org.lwjgl.vulkan.VkAttachmentReference;
 import org.lwjgl.vulkan.VkApplicationInfo;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
+import org.lwjgl.vulkan.VkBufferImageCopy;
+import org.lwjgl.vulkan.VkClearValue;
 import org.lwjgl.vulkan.VkImageCreateInfo;
+import org.lwjgl.vulkan.VkImageMemoryBarrier;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
@@ -38,14 +48,21 @@ import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
 import org.lwjgl.vulkan.VkExtent2D;
+import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
 import org.lwjgl.vulkan.VkMemoryAllocateInfo;
+import org.lwjgl.vulkan.VkMemoryBarrier;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
+import org.lwjgl.vulkan.VkRenderPassBeginInfo;
+import org.lwjgl.vulkan.VkRenderPassCreateInfo;
+import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
+import org.lwjgl.vulkan.VkSubpassDependency;
+import org.lwjgl.vulkan.VkSubpassDescription;
 import org.lwjgl.vulkan.VkSubmitInfo;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
@@ -68,6 +85,9 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 
 public class VulkanBackend {
 
+    private static final int GL_LUMINANCE = 0x1909;
+    private static final int GL_LUMINANCE_ALPHA = 0x190A;
+
     private final Object nativeInitLock = new Object();
     private volatile NativeSpine nativeSpine;
     private volatile boolean nativeBringUpAttempted;
@@ -81,6 +101,7 @@ public class VulkanBackend {
     private final AtomicInteger nextVirtualProgramId = new AtomicInteger(1);
     private final Map<Integer, VirtualShader> virtualShaders = new ConcurrentHashMap<>();
     private final Map<Integer, VirtualProgram> virtualPrograms = new ConcurrentHashMap<>();
+    private final Map<Long, BoundPipelineResources> boundPipelineResourcesByCommandBuffer = new ConcurrentHashMap<>();
 
     public VulkanBackend() {
         this(new GlslangSpirvCompiler());
@@ -384,15 +405,77 @@ public class VulkanBackend {
             }
 
             nativeBringUpAttempted = true;
+            NativeSpine createdSpine = null;
             try {
-                nativeSpine = NativeSpine.create();
+                createdSpine = NativeSpine.create();
+                materializeCompiledShaderModules(createdSpine);
+
+                nativeSpine = createdSpine;
                 nativeBringUpFailure = null;
             } catch (Throwable throwable) {
+                if (createdSpine != null) {
+                    try {
+                        createdSpine.close();
+                    } catch (Throwable ignored) {
+                    }
+                }
                 nativeBringUpFailure = compactThrowable(throwable);
                 nativeSpine = null;
             } finally {
                 cachedReadinessReport = null;
             }
+        }
+    }
+
+    private void materializeCompiledShaderModules(NativeSpine spine) {
+        for (Map.Entry<Integer, VirtualShader> entry : virtualShaders.entrySet()) {
+            VirtualShader virtualShader = entry.getValue();
+            if (!virtualShader.compileStatus || virtualShader.compiledModule == null) {
+                continue;
+            }
+
+            try {
+                materializeNativeShaderModuleIfNeeded(entry.getKey(), virtualShader, spine);
+            } catch (RuntimeException exception) {
+                throw new IllegalStateException(
+                    "Failed to materialize Vulkan shader module for virtual shader " + entry.getKey(),
+                    exception
+                );
+            }
+        }
+    }
+
+    private long materializeNativeShaderModuleIfNeeded(int shaderId, VirtualShader virtualShader, NativeSpine spine) {
+        synchronized (virtualShader) {
+            if (virtualShader.nativeShaderModuleHandle != VK10.VK_NULL_HANDLE) {
+                return virtualShader.nativeShaderModuleHandle;
+            }
+
+            VulkanicSpirvModule compiledModule = virtualShader.compiledModule;
+            if (compiledModule == null) {
+                throw new IllegalStateException("Virtual shader " + shaderId + " has no compiled SPIR-V module");
+            }
+
+            long shaderModuleHandle = spine.createShaderModule(compiledModule);
+            virtualShader.nativeShaderModuleHandle = shaderModuleHandle;
+            return shaderModuleHandle;
+        }
+    }
+
+    private void releaseVirtualShaderNativeModule(VirtualShader virtualShader) {
+        long shaderModuleHandle;
+        synchronized (virtualShader) {
+            shaderModuleHandle = virtualShader.nativeShaderModuleHandle;
+            virtualShader.nativeShaderModuleHandle = VK10.VK_NULL_HANDLE;
+        }
+
+        if (shaderModuleHandle == VK10.VK_NULL_HANDLE) {
+            return;
+        }
+
+        NativeSpine spine = nativeSpine;
+        if (spine != null) {
+            spine.destroyShaderModule(shaderModuleHandle);
         }
     }
 
@@ -445,6 +528,7 @@ public class VulkanBackend {
 
     public void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
         VirtualShader virtualShader = requireVirtualShader(shader);
+        releaseVirtualShaderNativeModule(virtualShader);
         virtualShader.source = source == null ? "" : source.toString();
         virtualShader.compiledModule = null;
         virtualShader.compileStatus = false;
@@ -457,6 +541,8 @@ public class VulkanBackend {
 
     public void compileShader(CommandContext ctx, int shader) {
         VirtualShader virtualShader = requireVirtualShader(shader);
+        releaseVirtualShaderNativeModule(virtualShader);
+
         if (virtualShader.source == null || virtualShader.source.isBlank()) {
             virtualShader.compileStatus = false;
             virtualShader.compiledModule = null;
@@ -475,7 +561,13 @@ public class VulkanBackend {
             virtualShader.compiledModule = compiledModule;
             virtualShader.compileStatus = true;
             virtualShader.infoLog = "";
+
+            NativeSpine spine = nativeSpine;
+            if (spine != null) {
+                materializeNativeShaderModuleIfNeeded(shader, virtualShader, spine);
+            }
         } catch (RuntimeException exception) {
+            releaseVirtualShaderNativeModule(virtualShader);
             virtualShader.compileStatus = false;
             virtualShader.compiledModule = null;
             virtualShader.infoLog = exception.getMessage() == null
@@ -523,6 +615,7 @@ public class VulkanBackend {
             return;
         }
 
+        NativeSpine spine = nativeSpine;
         List<String> issues = new ArrayList<>();
         Set<VulkanicShaderStage> seenStages = new HashSet<>();
         for (int shaderId : virtualProgram.attachedShaderIds) {
@@ -538,6 +631,15 @@ public class VulkanBackend {
 
             if (!seenStages.add(virtualShader.stage)) {
                 issues.add("Multiple shaders attached for stage " + virtualShader.stage + ".");
+            }
+
+            if (spine != null) {
+                try {
+                    materializeNativeShaderModuleIfNeeded(shaderId, virtualShader, spine);
+                } catch (RuntimeException exception) {
+                    issues.add("Attached shader " + shaderId + " failed Vulkan shader-module materialization: "
+                        + (exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage()));
+                }
             }
         }
 
@@ -570,7 +672,10 @@ public class VulkanBackend {
     }
 
     public void deleteShader(CommandContext ctx, int shader) {
-        virtualShaders.remove(shader);
+        VirtualShader removedShader = virtualShaders.remove(shader);
+        if (removedShader != null) {
+            releaseVirtualShaderNativeModule(removedShader);
+        }
         for (VirtualProgram virtualProgram : virtualPrograms.values()) {
             virtualProgram.attachedShaderIds.remove(shader);
         }
@@ -963,49 +1068,493 @@ public class VulkanBackend {
         return spine.createManagedTextureView(vulkanTexture, baseMipLevel, mipLevelCount);
     }
 
+    public void setActiveTextureUnit(CommandContext ctx, int unit) {
+        requireVulkanCommandBufferHandle("setActiveTextureUnit", ctx);
+        ensureNativeReady("setActiveTextureUnit");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.setActiveTextureUnit(unit);
+    }
+
+    public void bindTexture2D(CommandContext ctx, int textureId) {
+        bindTexture(ctx, VulkanicAPI.GL_TEXTURE_2D, textureId);
+    }
+
+    public void bindTexture(CommandContext ctx, int target, int textureId) {
+        requireVulkanCommandBufferHandle("bindTexture", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_2D && target != VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D targets, got: " + target);
+        }
+        if (textureId < 0) {
+            throw new IllegalArgumentException("textureId must be >= 0, got: " + textureId);
+        }
+
+        ensureNativeReady("bindTexture");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.bindLegacyTexture(target, textureId);
+    }
+
+    public void bindTexture(CommandContext ctx, net.vulkanic.VulkanicTextureTarget target, int textureId) {
+        if (target == null) {
+            throw new IllegalArgumentException("target must not be null");
+        }
+        bindTexture(ctx, target.toLegacyGlTarget(), textureId);
+    }
+
+    public void bindTextureUnit(CommandContext ctx, int unit, int texture) {
+        requireVulkanCommandBufferHandle("bindTextureUnit", ctx);
+        if (unit < 0) {
+            throw new IllegalArgumentException("unit must be >= 0, got: " + unit);
+        }
+        if (texture < 0) {
+            throw new IllegalArgumentException("texture must be >= 0, got: " + texture);
+        }
+
+        ensureNativeReady("bindTextureUnit");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.bindLegacyTextureUnit(unit, texture);
+    }
+
+    public int createTexture2D(CommandContext ctx) {
+        return createTextures(ctx, VulkanicAPI.GL_TEXTURE_2D);
+    }
+
+    public int createTextures(CommandContext ctx, int target) {
+        requireVulkanCommandBufferHandle("createTextures", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_2D) {
+            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D createTextures target, got: " + target);
+        }
+
+        ensureNativeReady("createTextures");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.createLegacyTexture(target);
+    }
+
+    public void deleteTexture(CommandContext ctx, int texture) {
+        requireVulkanCommandBufferHandle("deleteTexture", ctx);
+        if (texture < 0) {
+            throw new IllegalArgumentException("texture must be >= 0, got: " + texture);
+        }
+
+        ensureNativeReady("deleteTexture");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.deleteLegacyTexture(texture);
+    }
+
+    public void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        texParameteri(ctx, target, pname, param);
+    }
+
+    public int getTexParameteri(CommandContext ctx, int target, int pname) {
+        requireVulkanCommandBufferHandle("getTexParameteri", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_2D && target != VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D targets, got: " + target);
+        }
+
+        ensureNativeReady("getTexParameteri");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.getLegacyTextureParameter(target, pname);
+    }
+
+    public void texParameterf(CommandContext ctx, int target, int pname, float param) {
+        texParameteri(ctx, target, pname, Math.round(param));
+    }
+
+    public void texParameteri(CommandContext ctx, int target, int pname, int param) {
+        requireVulkanCommandBufferHandle("texParameteri", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_2D && target != VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D targets, got: " + target);
+        }
+
+        ensureNativeReady("texParameteri");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.setLegacyTextureParameter(target, pname, param);
+    }
+
+    public void texParameteri(CommandContext ctx,
+                              net.vulkanic.VulkanicTextureTarget target,
+                              net.vulkanic.VulkanicTextureParameterName pname,
+                              int param) {
+        if (target == null) {
+            throw new IllegalArgumentException("target must not be null");
+        }
+        if (pname == null) {
+            throw new IllegalArgumentException("pname must not be null");
+        }
+        texParameteri(ctx, target.toLegacyGlTarget(), pname.toLegacyGlPName(), param);
+    }
+
+    public void setPixelStore(CommandContext ctx, int pname, int value) {
+        requireVulkanCommandBufferHandle("setPixelStore", ctx);
+        ensureNativeReady("setPixelStore");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.setPixelStore(pname, value);
+    }
+
+    public int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
+        requireVulkanCommandBufferHandle("getTextureLevelParameter", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_2D && target != VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D targets, got: " + target);
+        }
+        if (level < 0) {
+            throw new IllegalArgumentException("level must be >= 0, got: " + level);
+        }
+
+        ensureNativeReady("getTextureLevelParameter");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.getTextureLevelParameter(target, level, pname);
+    }
+
+    public void uploadTexture2D(CommandContext ctx,
+                                int target,
+                                int level,
+                                int internalFormat,
+                                int width,
+                                int height,
+                                int border,
+                                int format,
+                                int type,
+                                java.nio.ByteBuffer pixels) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture2D", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_2D && target != VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D upload targets, got: " + target);
+        }
+        if (level < 0) {
+            throw new IllegalArgumentException("level must be >= 0, got: " + level);
+        }
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("uploadTexture2D requires width/height > 0, got " + width + "x" + height);
+        }
+        if (border != 0) {
+            throw new IllegalArgumentException("uploadTexture2D requires border == 0, got: " + border);
+        }
+
+        LegacyTextureFormatInfo.resolve(internalFormat, format, type);
+
+        ensureNativeReady("uploadTexture2D");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.uploadLegacyTexture2D(commandBufferHandle,
+            target,
+            level,
+            internalFormat,
+            width,
+            height,
+            format,
+            type,
+            pixels == null ? null : pixels.duplicate());
+    }
+
+    public void uploadTexture2DSubImage(CommandContext ctx,
+                                        int target,
+                                        int level,
+                                        int xOffset,
+                                        int yOffset,
+                                        int width,
+                                        int height,
+                                        int format,
+                                        int type,
+                                        long pixels) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture2DSubImage", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_2D && target != VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D upload targets, got: " + target);
+        }
+        if (level < 0 || xOffset < 0 || yOffset < 0 || width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Invalid uploadTexture2DSubImage region/level arguments");
+        }
+        if (pixels == 0L) {
+            throw new IllegalArgumentException("pixels pointer must not be null");
+        }
+
+        ensureNativeReady("uploadTexture2DSubImage");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.uploadLegacyTexture2DSubImage(commandBufferHandle,
+            target,
+            level,
+            xOffset,
+            yOffset,
+            width,
+            height,
+            format,
+            type,
+            pixels);
+    }
+
+    public void uploadTexture2DSubImage(CommandContext ctx,
+                                        int target,
+                                        int level,
+                                        int xOffset,
+                                        int yOffset,
+                                        int width,
+                                        int height,
+                                        int format,
+                                        int type,
+                                        java.nio.ByteBuffer pixels) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("uploadTexture2DSubImage", ctx);
+        if (target != VulkanicAPI.GL_TEXTURE_2D && target != VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D upload targets, got: " + target);
+        }
+        if (level < 0 || xOffset < 0 || yOffset < 0 || width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Invalid uploadTexture2DSubImage region/level arguments");
+        }
+        if (pixels == null) {
+            throw new IllegalArgumentException("pixels must not be null");
+        }
+
+        ensureNativeReady("uploadTexture2DSubImage");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.uploadLegacyTexture2DSubImage(commandBufferHandle,
+            target,
+            level,
+            xOffset,
+            yOffset,
+            width,
+            height,
+            format,
+            type,
+            pixels.duplicate());
+    }
+
+    private static final class LegacyTextureFormatInfo {
+        private final int vkFormat;
+        private final int pixelBytes;
+        private final int aspectMask;
+
+        private LegacyTextureFormatInfo(int vkFormat, int pixelBytes, int aspectMask) {
+            this.vkFormat = vkFormat;
+            this.pixelBytes = pixelBytes;
+            this.aspectMask = aspectMask;
+        }
+
+        private static LegacyTextureFormatInfo resolve(int internalFormat, int format, int type) {
+            if (internalFormat == VulkanicAPI.GL_DEPTH_COMPONENT
+                || internalFormat == VulkanicAPI.GL_DEPTH_COMPONENT16
+                || internalFormat == VulkanicAPI.GL_DEPTH_COMPONENT24
+                || internalFormat == VulkanicAPI.GL_DEPTH_COMPONENT32
+                || internalFormat == VulkanicAPI.GL_DEPTH_COMPONENT32F
+                || format == VulkanicAPI.GL_DEPTH_COMPONENT) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_D32_SFLOAT, 4, VK10.VK_IMAGE_ASPECT_DEPTH_BIT);
+            }
+
+            if ((internalFormat == VulkanicAPI.GL_R8I || format == VulkanicAPI.GL_RED_INTEGER)
+                && type == VulkanicAPI.GL_BYTE) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R8_SINT, 1, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if (internalFormat == VulkanicAPI.GL_R16F
+                || (format == VulkanicAPI.GL_RED && type == VulkanicAPI.GL_HALF_FLOAT)) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R16_SFLOAT, 2, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if (internalFormat == VulkanicAPI.GL_RGBA16F
+                || (format == VulkanicAPI.GL_RGBA && type == VulkanicAPI.GL_HALF_FLOAT)) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R16G16B16A16_SFLOAT, 8, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if ((internalFormat == VulkanicAPI.GL_RGBA16 || internalFormat == VulkanicAPI.GL_RGBA)
+                && (type == VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4
+                || type == VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4_REV)) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R4G4B4A4_UNORM_PACK16, 2, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if ((format == VulkanicAPI.GL_RGBA || internalFormat == VulkanicAPI.GL_RGBA8 || internalFormat == VulkanicAPI.GL_RGBA16)
+                && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R8G8B8A8_UNORM, 4, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if (format == VulkanicAPI.GL_RED && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R8_UNORM, 1, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if (format == GL_LUMINANCE && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R8_UNORM, 1, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if (format == GL_LUMINANCE_ALPHA && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R8G8_UNORM, 2, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if (format == VulkanicAPI.GL_RGB && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R8G8B8_UNORM, 3, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            throw new IllegalArgumentException(
+                "Unsupported legacy texture upload format combination: internalFormat=" + internalFormat
+                    + ", format=" + format + ", type=" + type);
+        }
+    }
+
     public PipelineHandle createPipeline(PipelineDescriptor descriptor) {
         ensureNativeReady("createPipeline");
         throw new UnsupportedOperationException("Vulkan-native pipeline creation is not implemented yet.");
     }
 
+    private static final class BoundPipelineResources {
+        private final PipelineHandle pipeline;
+        private final PipelineDescriptor descriptor;
+        private final PipelineResourceBindings bindings;
+
+        private BoundPipelineResources(
+            PipelineHandle pipeline,
+            PipelineDescriptor descriptor,
+            PipelineResourceBindings bindings
+        ) {
+            this.pipeline = pipeline;
+            this.descriptor = descriptor;
+            this.bindings = bindings;
+        }
+    }
+
     public net.vulkanic.DescriptorPoolHandle createDescriptorPool(
             net.vulkanic.DescriptorPoolDescriptor descriptor) {
-        ensureNativeReady("createDescriptorPool");
-        throw new UnsupportedOperationException("Vulkan-native descriptor pool lifecycle is not implemented yet.");
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+        return new VulkanDescriptorPoolHandle(descriptor.maxSets());
     }
 
     public net.vulkanic.DescriptorSetHandle allocateDescriptorSet(
             net.vulkanic.DescriptorPoolHandle pool,
             PipelineDescriptor descriptor) {
-        ensureNativeReady("allocateDescriptorSet");
-        throw new UnsupportedOperationException("Vulkan-native descriptor set allocation is not implemented yet.");
+        if (!(pool instanceof VulkanDescriptorPoolHandle vulkanPool)) {
+            throw new IllegalArgumentException(
+                "Vulkan backend requires VulkanDescriptorPoolHandle, got: "
+                    + (pool == null ? "null" : pool.getClass().getName()));
+        }
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        return vulkanPool.allocate(descriptor.getStableCacheKey(), descriptor.getResourceLayout());
     }
 
     public void updateDescriptorSet(net.vulkanic.DescriptorSetHandle descriptorSet,
             net.vulkanic.PipelineResourceBindings bindings) {
-        ensureNativeReady("updateDescriptorSet");
-        throw new UnsupportedOperationException("Vulkan-native descriptor set updates are not implemented yet.");
+        if (!(descriptorSet instanceof VulkanDescriptorSetHandle vulkanDescriptorSet)) {
+            throw new IllegalArgumentException(
+                "Vulkan backend requires VulkanDescriptorSetHandle, got: "
+                    + (descriptorSet == null ? "null" : descriptorSet.getClass().getName()));
+        }
+
+        vulkanDescriptorSet.updateBindings(bindings);
     }
 
     public void bindDescriptorSet(CommandContext ctx,
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
             net.vulkanic.DescriptorSetHandle descriptorSet) {
-        ensureNativeReady("bindDescriptorSet");
-        throw new UnsupportedOperationException("Vulkan-native descriptor set binding is not implemented yet.");
+        if (!(descriptorSet instanceof VulkanDescriptorSetHandle vulkanDescriptorSet)) {
+            throw new IllegalArgumentException(
+                "Vulkan backend requires VulkanDescriptorSetHandle, got: "
+                    + (descriptorSet == null ? "null" : descriptorSet.getClass().getName()));
+        }
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        String expectedLayoutKey = descriptor.getStableCacheKey();
+        if (!expectedLayoutKey.equals(vulkanDescriptorSet.layoutKey())) {
+            throw new IllegalArgumentException(
+                "Descriptor set layout key mismatch. Expected " + expectedLayoutKey
+                    + " but got " + vulkanDescriptorSet.layoutKey());
+        }
+
+        bindPipelineResources(ctx, pipeline, descriptor, vulkanDescriptorSet.requireBindings());
     }
 
     public void resetDescriptorPool(net.vulkanic.DescriptorPoolHandle pool) {
-        ensureNativeReady("resetDescriptorPool");
-        throw new UnsupportedOperationException("Vulkan-native descriptor pool reset is not implemented yet.");
+        if (!(pool instanceof VulkanDescriptorPoolHandle vulkanPool)) {
+            throw new IllegalArgumentException(
+                "Vulkan backend requires VulkanDescriptorPoolHandle, got: "
+                    + (pool == null ? "null" : pool.getClass().getName()));
+        }
+
+        vulkanPool.reset();
     }
 
     public void bindPipelineResources(CommandContext ctx,
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
             net.vulkanic.PipelineResourceBindings bindings) {
-        ensureNativeReady("bindPipelineResources");
-        throw new UnsupportedOperationException("Vulkan-native descriptor set updates are not implemented yet.");
+        long commandBufferHandle = requireVulkanCommandBufferHandle("bindPipelineResources", ctx);
+
+        if (pipeline != null && !pipeline.isValid()) {
+            throw new IllegalArgumentException("Cannot bind resources for an invalid pipeline handle");
+        }
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+        if (bindings == null) {
+            throw new IllegalArgumentException("bindings must not be null");
+        }
+
+        PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+        bindings.validateAgainst(layout);
+
+        for (PipelineDescriptor.ResourceBinding resourceBinding : layout.bindings()) {
+            if (resourceBinding.type() != PipelineDescriptor.ResourceType.UNIFORM_BUFFER) {
+                continue;
+            }
+
+            VulkanicBufferSlice slice = bindings.getUniformBufferBinding(resourceBinding.name())
+                .orElseThrow(() -> new IllegalStateException(
+                    "Missing uniform-buffer binding for '" + resourceBinding.name() + "' after validation"));
+
+            if (!(slice.buffer() instanceof VulkanBuffer vulkanBuffer)) {
+                throw new IllegalArgumentException(
+                    "Uniform-buffer binding '" + resourceBinding.name()
+                        + "' must use VulkanBuffer in Vulkan backend");
+            }
+            if (vulkanBuffer.isClosed()) {
+                throw new IllegalStateException(
+                    "Uniform-buffer binding '" + resourceBinding.name() + "' uses a closed VulkanBuffer");
+            }
+            if (slice.offset() < 0 || slice.length() <= 0
+                || ((long) slice.offset() + slice.length()) > vulkanBuffer.size()) {
+                throw new IllegalArgumentException(
+                    "Uniform-buffer binding '" + resourceBinding.name()
+                        + "' slice [offset=" + slice.offset() + ", length=" + slice.length()
+                        + "] is outside buffer size " + vulkanBuffer.size());
+            }
+        }
+
+        boundPipelineResourcesByCommandBuffer.put(
+            commandBufferHandle,
+            new BoundPipelineResources(pipeline, descriptor, bindings));
     }
 
     public void applyResourceBarriers(CommandContext ctx,
@@ -1112,6 +1661,167 @@ public class VulkanBackend {
         }
     }
 
+    private static final class ResolvedRenderTargets {
+        private final VulkanTextureView colorView;
+        private final VulkanTexture colorTexture;
+        private final VulkanTextureView depthView;
+        private final VulkanTexture depthTexture;
+        private final int width;
+        private final int height;
+
+        private ResolvedRenderTargets(
+            VulkanTextureView colorView,
+            VulkanTexture colorTexture,
+            VulkanTextureView depthView,
+            VulkanTexture depthTexture,
+            int width,
+            int height
+        ) {
+            this.colorView = colorView;
+            this.colorTexture = colorTexture;
+            this.depthView = depthView;
+            this.depthTexture = depthTexture;
+            this.width = width;
+            this.height = height;
+        }
+
+        private boolean hasDepthTarget() {
+            return depthView != null;
+        }
+    }
+
+    private static ResolvedRenderTargets resolveRenderTargets(VulkanicRenderPassDescriptor descriptor) {
+        VulkanTextureView colorView = requireVulkanTextureView(descriptor.colorAttachment().target(), "colorAttachment.target");
+        VulkanTexture colorTexture = requireVulkanTexture(colorView.texture(), "colorAttachment.texture");
+        if (!colorTexture.getVulkanicFormat().hasColorAspect()) {
+            throw new IllegalArgumentException("Color attachment must use a color-capable texture format");
+        }
+        if ((colorTexture.usage() & VulkanicTexture.USAGE_RENDER_ATTACHMENT) == 0) {
+            throw new IllegalArgumentException("Color attachment texture must include USAGE_RENDER_ATTACHMENT");
+        }
+
+        int width = colorView.getWidth(0);
+        int height = colorView.getHeight(0);
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Render pass attachments must have non-zero dimensions");
+        }
+
+        VulkanicRenderPassDescriptor.DepthAttachment depthAttachment = descriptor.depthAttachment();
+        if (depthAttachment == null) {
+            return new ResolvedRenderTargets(colorView, colorTexture, null, null, width, height);
+        }
+
+        VulkanTextureView depthView = requireVulkanTextureView(depthAttachment.target(), "depthAttachment.target");
+        VulkanTexture depthTexture = requireVulkanTexture(depthView.texture(), "depthAttachment.texture");
+        if (!depthTexture.getVulkanicFormat().hasDepthAspect()) {
+            throw new IllegalArgumentException("Depth attachment must use a depth-capable texture format");
+        }
+        if ((depthTexture.usage() & VulkanicTexture.USAGE_RENDER_ATTACHMENT) == 0) {
+            throw new IllegalArgumentException("Depth attachment texture must include USAGE_RENDER_ATTACHMENT");
+        }
+        if (depthView.getWidth(0) != width || depthView.getHeight(0) != height) {
+            throw new IllegalArgumentException("Depth attachment dimensions must match color attachment dimensions");
+        }
+
+        return new ResolvedRenderTargets(colorView, colorTexture, depthView, depthTexture, width, height);
+    }
+
+    private static VulkanTextureView requireVulkanTextureView(VulkanicTextureView view, String fieldName) {
+        if (!(view instanceof VulkanTextureView vulkanView)) {
+            throw new IllegalArgumentException("Vulkan render pass requires VulkanTextureView for " + fieldName
+                + ", got: " + (view == null ? "null" : view.getClass().getName()));
+        }
+        if (vulkanView.isClosed()) {
+            throw new IllegalStateException("Cannot use closed VulkanTextureView for " + fieldName);
+        }
+        return vulkanView;
+    }
+
+    private static VulkanTexture requireVulkanTexture(VulkanicTexture texture, String fieldName) {
+        if (!(texture instanceof VulkanTexture vulkanTexture)) {
+            throw new IllegalArgumentException("Vulkan render pass requires VulkanTexture for " + fieldName
+                + ", got: " + (texture == null ? "null" : texture.getClass().getName()));
+        }
+        if (vulkanTexture.isClosed()) {
+            throw new IllegalStateException("Cannot use closed VulkanTexture for " + fieldName);
+        }
+        return vulkanTexture;
+    }
+
+    private static final class VulkanBackedRenderPass implements VulkanicRenderPass {
+        private final NativeSpine spine;
+        private final long commandBufferHandle;
+        private volatile boolean closed;
+
+        private VulkanBackedRenderPass(NativeSpine spine, long commandBufferHandle) {
+            this.spine = Objects.requireNonNull(spine, "spine must not be null");
+            this.commandBufferHandle = commandBufferHandle;
+        }
+
+        private void ensureOpen(String operation) {
+            if (closed) {
+                throw new IllegalStateException(operation + " called after render pass was closed");
+            }
+        }
+
+        @Override
+        public void setPipeline(PipelineHandle pipeline) {
+            ensureOpen("setPipeline");
+            throw new UnsupportedOperationException(
+                "Vulkan render-pass pipeline binding is not implemented yet. "
+                    + "Graphics Pipeline Creation remains tracked separately.");
+        }
+
+        @Override
+        public void setVertexBuffer(int slot, VulkanicBuffer buffer) {
+            ensureOpen("setVertexBuffer");
+            if (!(buffer instanceof VulkanBuffer vulkanBuffer)) {
+                throw new IllegalArgumentException(
+                    "Vulkan render pass requires VulkanBuffer for vertex buffer, got: "
+                        + (buffer == null ? "null" : buffer.getClass().getName()));
+            }
+            if (vulkanBuffer.isClosed()) {
+                throw new IllegalStateException("Cannot bind closed VulkanBuffer as vertex buffer");
+            }
+            spine.bindVertexBuffer(commandBufferHandle, slot, vulkanBuffer.getVkBufferHandle());
+        }
+
+        @Override
+        public void setIndexBuffer(VulkanicBuffer buffer, VulkanicIndexType indexType) {
+            ensureOpen("setIndexBuffer");
+            if (!(buffer instanceof VulkanBuffer vulkanBuffer)) {
+                throw new IllegalArgumentException(
+                    "Vulkan render pass requires VulkanBuffer for index buffer, got: "
+                        + (buffer == null ? "null" : buffer.getClass().getName()));
+            }
+            if (vulkanBuffer.isClosed()) {
+                throw new IllegalStateException("Cannot bind closed VulkanBuffer as index buffer");
+            }
+            spine.bindIndexBuffer(commandBufferHandle, vulkanBuffer.getVkBufferHandle(), indexType);
+        }
+
+        @Override
+        public void drawIndexed(int firstIndex, int indexCount, int baseVertex, int instanceCount) {
+            ensureOpen("drawIndexed");
+            spine.drawIndexed(commandBufferHandle, firstIndex, indexCount, baseVertex, instanceCount);
+        }
+
+        @Override
+        public void draw(int firstVertex, int vertexCount) {
+            ensureOpen("draw");
+            spine.draw(commandBufferHandle, firstVertex, vertexCount);
+        }
+
+        @Override
+        public void close() {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            spine.endRenderPass(commandBufferHandle);
+        }
+    }
+
     public CommandContext beginCommandBuffer() {
         ensureNativeReady("beginCommandBuffer");
         NativeSpine spine = nativeSpine;
@@ -1122,6 +1832,7 @@ public class VulkanBackend {
         spine.recreateSwapchainIfFramebufferSizeChanged();
 
         long commandBufferHandle = spine.beginPrimaryCommandBuffer();
+        boundPipelineResourcesByCommandBuffer.remove(commandBufferHandle);
         CommandContext context = new VulkanCommandContext(commandBufferHandle, "Vulkan-PrimaryCommandBuffer");
         currentCommandContext = context;
         return context;
@@ -1138,14 +1849,129 @@ public class VulkanBackend {
         }
 
         spine.submitPrimaryCommandBuffer(commandBufferHandle);
+        boundPipelineResourcesByCommandBuffer.remove(commandBufferHandle);
         currentCommandContext = null;
+    }
+
+    public void drawArrays(CommandContext ctx, int mode, int first, int count) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("drawArrays", ctx);
+        if (first < 0 || count < 0) {
+            throw new IllegalArgumentException("drawArrays requires first/count >= 0, got first=" + first + ", count=" + count);
+        }
+        if (count == 0) {
+            return;
+        }
+
+        ensureNativeReady("drawArrays");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.drawLegacyArrays(commandBufferHandle, mode, first, count, 1);
+    }
+
+    public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("drawElements", ctx);
+        VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
+            .orElseThrow(() -> new IllegalArgumentException("Unsupported drawElements index type constant: " + type));
+
+        if (count < 0 || indices < 0L) {
+            throw new IllegalArgumentException("drawElements requires count >= 0 and indices >= 0, got count="
+                + count + ", indices=" + indices);
+        }
+        if ((indices % indexType.bytesPerIndex()) != 0L) {
+            throw new IllegalArgumentException("Index offset must align to index type size. offset="
+                + indices + ", bytesPerIndex=" + indexType.bytesPerIndex());
+        }
+        if (count == 0) {
+            return;
+        }
+
+        ensureNativeReady("drawElements");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.drawLegacyElements(commandBufferHandle, mode, count, indexType, indices, 1, 0);
+    }
+
+    public void drawIndexedInstancedBaseVertex(CommandContext ctx,
+                                                int mode,
+                                                int count,
+                                                int type,
+                                                long indices,
+                                                int instanceCount,
+                                                int baseVertex) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("drawIndexedInstancedBaseVertex", ctx);
+        VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Unsupported drawIndexedInstancedBaseVertex index type constant: " + type));
+
+        if (count < 0 || indices < 0L || instanceCount < 1) {
+            throw new IllegalArgumentException(
+                "drawIndexedInstancedBaseVertex requires count >= 0, indices >= 0, instanceCount >= 1");
+        }
+        if ((indices % indexType.bytesPerIndex()) != 0L) {
+            throw new IllegalArgumentException("Index offset must align to index type size. offset="
+                + indices + ", bytesPerIndex=" + indexType.bytesPerIndex());
+        }
+        if (count == 0) {
+            return;
+        }
+
+        ensureNativeReady("drawIndexedInstancedBaseVertex");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.drawLegacyElements(commandBufferHandle, mode, count, indexType, indices, instanceCount, baseVertex);
+    }
+
+    public void drawIndexedBaseVertex(CommandContext ctx,
+                                      int mode,
+                                      int count,
+                                      int type,
+                                      long indices,
+                                      int baseVertex) {
+        drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, 1, baseVertex);
+    }
+
+    public void drawIndexedInstanced(CommandContext ctx,
+                                     int mode,
+                                     int count,
+                                     int type,
+                                     long indices,
+                                     int instanceCount) {
+        drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, instanceCount, 0);
+    }
+
+    public void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("drawArraysInstanced", ctx);
+        if (first < 0 || count < 0 || instanceCount < 1) {
+            throw new IllegalArgumentException(
+                "drawArraysInstanced requires first/count >= 0 and instanceCount >= 1");
+        }
+        if (count == 0) {
+            return;
+        }
+
+        ensureNativeReady("drawArraysInstanced");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.drawLegacyArrays(commandBufferHandle, mode, first, count, instanceCount);
     }
 
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
             java.util.function.Supplier<String> label,
             net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor) {
-        ensureNativeReady("beginRenderPass");
-        throw new UnsupportedOperationException("Vulkan-native render pass lifecycle is not implemented yet.");
+        return beginRenderPass(ctx,
+            VulkanicRenderPassDescriptor.color(label, colorTarget, clearColor));
     }
 
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
@@ -1153,14 +1979,25 @@ public class VulkanBackend {
             net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor,
             @org.jetbrains.annotations.Nullable net.vulkanic.VulkanicTextureView depthTarget,
             java.util.OptionalDouble clearDepth) {
-        ensureNativeReady("beginRenderPass");
-        throw new UnsupportedOperationException("Vulkan-native render pass lifecycle is not implemented yet.");
+        return beginRenderPass(ctx,
+            VulkanicRenderPassDescriptor.colorAndDepth(
+                label, colorTarget, clearColor, depthTarget, clearDepth));
     }
 
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
             net.vulkanic.VulkanicRenderPassDescriptor descriptor) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("beginRenderPass", ctx);
+        VulkanicRenderPassDescriptor safeDescriptor = Objects.requireNonNull(descriptor, "descriptor must not be null");
+        ResolvedRenderTargets resolvedTargets = resolveRenderTargets(safeDescriptor);
+
         ensureNativeReady("beginRenderPass");
-        throw new UnsupportedOperationException("Vulkan-native render pass lifecycle is not implemented yet.");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.beginRenderPass(commandBufferHandle, safeDescriptor, resolvedTargets);
+        return new VulkanBackedRenderPass(spine, commandBufferHandle);
     }
 
     public boolean isFallbackMode() {
@@ -1218,6 +2055,7 @@ public class VulkanBackend {
         private final VulkanicShaderStage stage;
         private volatile String source;
         private volatile VulkanicSpirvModule compiledModule;
+        private volatile long nativeShaderModuleHandle = VK10.VK_NULL_HANDLE;
         private volatile boolean compileStatus;
         private volatile String infoLog = "";
 
@@ -1247,6 +2085,13 @@ public class VulkanBackend {
         private final Map<Integer, LegacyBufferObject> legacyBuffers = new ConcurrentHashMap<>();
         private final Map<Integer, Integer> legacyBufferBindings = new ConcurrentHashMap<>();
         private final Map<Integer, VulkanicBuffer.MappedView> legacyBufferMappedViews = new ConcurrentHashMap<>();
+        private final AtomicInteger nextLegacyTextureId = new AtomicInteger(1);
+        private final Map<Integer, LegacyTextureObject> legacyTextures = new ConcurrentHashMap<>();
+        private final Map<Integer, Integer> legacyTexture2DBindingsByUnit = new ConcurrentHashMap<>();
+        private final Map<Integer, TextureLevelInfo> proxyTexture2DLevels = new ConcurrentHashMap<>();
+        private final Set<Long> managedShaderModules = ConcurrentHashMap.newKeySet();
+        private final Set<Long> transientRenderPassHandles = ConcurrentHashMap.newKeySet();
+        private final Set<Long> transientFramebufferHandles = ConcurrentHashMap.newKeySet();
 
         /** Maps {@code VkImage} handle → {@code VkDeviceMemory} handle for all live managed textures. */
         private final Map<Long, Long> managedImageAllocations = new ConcurrentHashMap<>();
@@ -1266,6 +2111,10 @@ public class VulkanBackend {
         private int graphicsQueueFamilyIndex;
         private long windowHandle;
         private boolean commandBufferRecording;
+        private boolean renderPassRecording;
+        private int activeTextureUnitIndex;
+
+        private final PixelStoreState pixelStoreState = new PixelStoreState();
 
         private static final int GL_MAP_READ_BIT = 0x0001;
 
@@ -1278,6 +2127,50 @@ public class VulkanBackend {
             private LegacyBufferObject(int id) {
                 this.id = id;
                 this.lastTarget = VulkanicAPI.GL_ARRAY_BUFFER;
+            }
+        }
+
+        private static final class TextureLevelInfo {
+            private final int width;
+            private final int height;
+            private final int internalFormat;
+
+            private TextureLevelInfo(int width, int height, int internalFormat) {
+                this.width = width;
+                this.height = height;
+                this.internalFormat = internalFormat;
+            }
+        }
+
+        private static final class PixelStoreState {
+            private int unpackRowLength;
+            private int unpackSkipRows;
+            private int unpackSkipPixels;
+            private int unpackAlignment = 4;
+        }
+
+        private static final class LegacyTextureObject {
+            private final int id;
+            private final int target;
+            private final Map<Integer, Integer> integerParameters = new ConcurrentHashMap<>();
+            private final Map<Integer, TextureLevelInfo> levels = new ConcurrentHashMap<>();
+
+            private volatile long imageHandle;
+            private volatile long memoryHandle;
+            private volatile long defaultViewHandle;
+            private volatile int vkFormat = VK10.VK_FORMAT_UNDEFINED;
+            private volatile int aspectMask = VK10.VK_IMAGE_ASPECT_COLOR_BIT;
+            private volatile int pixelBytes;
+            private volatile int currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+            private volatile int mipLevels = 1;
+            private volatile int width;
+            private volatile int height;
+            private volatile int sourceFormat;
+            private volatile int sourceType;
+
+            private LegacyTextureObject(int id, int target) {
+                this.id = id;
+                this.target = target;
             }
         }
 
@@ -1474,6 +2367,672 @@ public class VulkanBackend {
             LegacyBufferObject legacy = legacyBuffers.computeIfAbsent(bufferId, id -> new LegacyBufferObject(id));
             legacy.lastTarget = target;
             legacyBufferBindings.put(target, bufferId);
+        }
+
+        private int createLegacyTexture(int target) {
+            int id = nextLegacyTextureId.getAndIncrement();
+            legacyTextures.put(id, new LegacyTextureObject(id, target));
+            return id;
+        }
+
+        private void deleteLegacyTexture(int textureId) {
+            if (textureId == 0) {
+                return;
+            }
+
+            LegacyTextureObject texture = legacyTextures.remove(textureId);
+            if (texture != null) {
+                destroyLegacyTextureStorage(texture);
+            }
+
+            for (Map.Entry<Integer, Integer> entry : new ArrayList<>(legacyTexture2DBindingsByUnit.entrySet())) {
+                if (entry.getValue() == textureId) {
+                    legacyTexture2DBindingsByUnit.remove(entry.getKey());
+                }
+            }
+        }
+
+        private void bindLegacyTexture(int target, int textureId) {
+            if (target == VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+                return;
+            }
+
+            if (textureId == 0) {
+                legacyTexture2DBindingsByUnit.remove(activeTextureUnitIndex);
+                return;
+            }
+
+            legacyTextures.computeIfAbsent(textureId, id -> new LegacyTextureObject(id, target));
+            legacyTexture2DBindingsByUnit.put(activeTextureUnitIndex, textureId);
+        }
+
+        private void bindLegacyTextureUnit(int unit, int textureId) {
+            if (textureId == 0) {
+                legacyTexture2DBindingsByUnit.remove(unit);
+                return;
+            }
+
+            legacyTextures.computeIfAbsent(textureId, id -> new LegacyTextureObject(id, VulkanicAPI.GL_TEXTURE_2D));
+            legacyTexture2DBindingsByUnit.put(unit, textureId);
+        }
+
+        private void setActiveTextureUnit(int unit) {
+            int normalized = unit >= VulkanicAPI.GL_TEXTURE0
+                ? unit - VulkanicAPI.GL_TEXTURE0
+                : unit;
+            if (normalized < 0) {
+                throw new IllegalArgumentException("Texture unit must be >= 0, got: " + unit);
+            }
+            activeTextureUnitIndex = normalized;
+        }
+
+        private void setLegacyTextureParameter(int target, int pname, int param) {
+            if (target == VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+                return;
+            }
+            LegacyTextureObject texture = requireBoundLegacyTexture2D(target, "texParameteri");
+            texture.integerParameters.put(pname, param);
+        }
+
+        private int getLegacyTextureParameter(int target, int pname) {
+            if (target == VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+                return 0;
+            }
+            LegacyTextureObject texture = requireBoundLegacyTexture2D(target, "getTexParameteri");
+            return texture.integerParameters.getOrDefault(pname, 0);
+        }
+
+        private void setPixelStore(int pname, int value) {
+            if (value < 0) {
+                throw new IllegalArgumentException("Pixel-store value must be >= 0, got: " + value);
+            }
+
+            switch (pname) {
+                case VulkanicAPI.GL_UNPACK_ROW_LENGTH -> pixelStoreState.unpackRowLength = value;
+                case VulkanicAPI.GL_UNPACK_SKIP_ROWS -> pixelStoreState.unpackSkipRows = value;
+                case VulkanicAPI.GL_UNPACK_SKIP_PIXELS -> pixelStoreState.unpackSkipPixels = value;
+                case VulkanicAPI.GL_UNPACK_ALIGNMENT -> {
+                    if (value != 1 && value != 2 && value != 4 && value != 8) {
+                        throw new IllegalArgumentException(
+                            "GL_UNPACK_ALIGNMENT must be one of {1,2,4,8}, got: " + value);
+                    }
+                    pixelStoreState.unpackAlignment = value;
+                }
+                default -> {
+                }
+            }
+        }
+
+        private int getTextureLevelParameter(int target, int level, int pname) {
+            TextureLevelInfo info;
+            if (target == VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+                info = proxyTexture2DLevels.get(level);
+            } else {
+                LegacyTextureObject texture = requireBoundLegacyTexture2D(target, "getTextureLevelParameter");
+                info = texture.levels.get(level);
+            }
+
+            if (info == null) {
+                return 0;
+            }
+
+            return switch (pname) {
+                case VulkanicAPI.GL_TEXTURE_WIDTH -> info.width;
+                case VulkanicAPI.GL_TEXTURE_HEIGHT -> info.height;
+                case VulkanicAPI.GL_TEXTURE_INTERNAL_FORMAT -> info.internalFormat;
+                default -> 0;
+            };
+        }
+
+        private LegacyTextureObject requireBoundLegacyTexture2D(int target, String operation) {
+            if (target != VulkanicAPI.GL_TEXTURE_2D) {
+                throw new IllegalArgumentException(
+                    operation + " currently supports only GL_TEXTURE_2D target, got: " + target);
+            }
+
+            Integer textureId = legacyTexture2DBindingsByUnit.get(activeTextureUnitIndex);
+            if (textureId == null || textureId == 0) {
+                throw new IllegalStateException(
+                    "No legacy Vulkan texture is bound to GL_TEXTURE_2D on active texture unit " + activeTextureUnitIndex);
+            }
+
+            LegacyTextureObject texture = legacyTextures.get(textureId);
+            if (texture == null) {
+                throw new IllegalStateException("Bound legacy Vulkan texture handle is unknown: " + textureId);
+            }
+            return texture;
+        }
+
+        private static int align(int value, int alignment) {
+            if (alignment <= 1) {
+                return value;
+            }
+            int mask = alignment - 1;
+            return (value + mask) & ~mask;
+        }
+
+        private java.nio.ByteBuffer normalizePixelData(java.nio.ByteBuffer pixels,
+                                                       LegacyTextureFormatInfo formatInfo,
+                                                       int width,
+                                                       int height) {
+            if (pixels == null) {
+                throw new IllegalArgumentException("pixels must not be null");
+            }
+            if (width <= 0 || height <= 0) {
+                throw new IllegalArgumentException("width/height must be > 0");
+            }
+
+            int rowLength = pixelStoreState.unpackRowLength > 0
+                ? pixelStoreState.unpackRowLength
+                : width;
+            int rowBytes = rowLength * formatInfo.pixelBytes;
+            int stride = align(rowBytes, pixelStoreState.unpackAlignment);
+            int startOffset = pixelStoreState.unpackSkipRows * stride
+                + pixelStoreState.unpackSkipPixels * formatInfo.pixelBytes;
+
+            long requiredLong = (long) startOffset
+                + (long) (height - 1) * stride
+                + (long) width * formatInfo.pixelBytes;
+            if (requiredLong > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Pixel upload source size exceeds int range: " + requiredLong);
+            }
+            int required = (int) requiredLong;
+            if (pixels.remaining() < required) {
+                throw new IllegalArgumentException(
+                    "Pixel upload buffer too small. Required=" + required + ", remaining=" + pixels.remaining());
+            }
+
+            int tightlyPackedRowBytes = width * formatInfo.pixelBytes;
+            if (stride == tightlyPackedRowBytes) {
+                java.nio.ByteBuffer source = pixels.duplicate();
+                source.position(source.position() + startOffset);
+                source.limit(source.position() + tightlyPackedRowBytes * height);
+                return source.slice();
+            }
+
+            java.nio.ByteBuffer packed = java.nio.ByteBuffer.allocateDirect(tightlyPackedRowBytes * height)
+                .order(ByteOrder.nativeOrder());
+
+            java.nio.ByteBuffer source = pixels.duplicate();
+            int sourceBase = source.position() + startOffset;
+            for (int row = 0; row < height; row++) {
+                int rowStart = sourceBase + row * stride;
+                java.nio.ByteBuffer rowSlice = source.duplicate();
+                rowSlice.position(rowStart);
+                rowSlice.limit(rowStart + tightlyPackedRowBytes);
+                packed.put(rowSlice);
+            }
+
+            packed.flip();
+            return packed;
+        }
+
+        private void uploadLegacyTexture2D(long commandBufferHandle,
+                                           int target,
+                                           int level,
+                                           int internalFormat,
+                                           int width,
+                                           int height,
+                                           int format,
+                                           int type,
+                                           java.nio.ByteBuffer pixels) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "uploadTexture2D");
+            if (renderPassRecording) {
+                throw new IllegalStateException("uploadTexture2D requires command recording outside an active render pass");
+            }
+
+            LegacyTextureFormatInfo formatInfo = LegacyTextureFormatInfo.resolve(internalFormat, format, type);
+
+            if (target == VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+                proxyTexture2DLevels.put(level, new TextureLevelInfo(width, height, internalFormat));
+                return;
+            }
+
+            LegacyTextureObject texture = requireBoundLegacyTexture2D(target, "uploadTexture2D");
+            proxyTexture2DLevels.remove(level);
+
+            int inferredBaseWidth = level == 0 ? width : Math.max(1, width << level);
+            int inferredBaseHeight = level == 0 ? height : Math.max(1, height << level);
+            int requiredMipLevels = Math.max(1, level + 1);
+
+            boolean needsRecreate = texture.imageHandle == VK10.VK_NULL_HANDLE
+                || texture.vkFormat != formatInfo.vkFormat
+                || texture.width != inferredBaseWidth
+                || texture.height != inferredBaseHeight
+                || texture.mipLevels < requiredMipLevels;
+
+            if (needsRecreate) {
+                recreateLegacyTextureStorage(texture, formatInfo, inferredBaseWidth, inferredBaseHeight, requiredMipLevels);
+            }
+
+            texture.sourceFormat = format;
+            texture.sourceType = type;
+            texture.levels.put(level, new TextureLevelInfo(width, height, internalFormat));
+
+            if (pixels == null) {
+                int finalLayout = texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
+                    ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                transitionImageLayout(texture, texture.currentLayout, finalLayout, level, 1);
+                texture.currentLayout = finalLayout;
+                return;
+            }
+
+            java.nio.ByteBuffer packedPixels = normalizePixelData(pixels, formatInfo, width, height);
+            uploadToLegacyTextureRegion(texture, level, 0, 0, width, height, packedPixels);
+        }
+
+        private void uploadLegacyTexture2DSubImage(long commandBufferHandle,
+                                                   int target,
+                                                   int level,
+                                                   int xOffset,
+                                                   int yOffset,
+                                                   int width,
+                                                   int height,
+                                                   int format,
+                                                   int type,
+                                                   long pixelsPointer) {
+            LegacyTextureObject texture = uploadLegacyTexture2DSubImageCommon(
+                commandBufferHandle,
+                target,
+                level,
+                xOffset,
+                yOffset,
+                width,
+                height,
+                format,
+                type
+            );
+
+            LegacyTextureFormatInfo formatInfo = LegacyTextureFormatInfo.resolve(
+                texture.levels.get(level).internalFormat,
+                format,
+                type
+            );
+            int rowLength = pixelStoreState.unpackRowLength > 0 ? pixelStoreState.unpackRowLength : width;
+            int stride = align(rowLength * formatInfo.pixelBytes, pixelStoreState.unpackAlignment);
+            int startOffset = pixelStoreState.unpackSkipRows * stride
+                + pixelStoreState.unpackSkipPixels * formatInfo.pixelBytes;
+            int required = startOffset + (height - 1) * stride + width * formatInfo.pixelBytes;
+
+            java.nio.ByteBuffer source = MemoryUtil.memByteBuffer(pixelsPointer, required);
+            java.nio.ByteBuffer packedPixels = normalizePixelData(source, formatInfo, width, height);
+            uploadToLegacyTextureRegion(texture, level, xOffset, yOffset, width, height, packedPixels);
+        }
+
+        private void uploadLegacyTexture2DSubImage(long commandBufferHandle,
+                                                   int target,
+                                                   int level,
+                                                   int xOffset,
+                                                   int yOffset,
+                                                   int width,
+                                                   int height,
+                                                   int format,
+                                                   int type,
+                                                   java.nio.ByteBuffer pixels) {
+            LegacyTextureObject texture = uploadLegacyTexture2DSubImageCommon(
+                commandBufferHandle,
+                target,
+                level,
+                xOffset,
+                yOffset,
+                width,
+                height,
+                format,
+                type
+            );
+
+            LegacyTextureFormatInfo formatInfo = LegacyTextureFormatInfo.resolve(
+                texture.levels.get(level).internalFormat,
+                format,
+                type
+            );
+            java.nio.ByteBuffer packedPixels = normalizePixelData(pixels, formatInfo, width, height);
+            uploadToLegacyTextureRegion(texture, level, xOffset, yOffset, width, height, packedPixels);
+        }
+
+        private LegacyTextureObject uploadLegacyTexture2DSubImageCommon(long commandBufferHandle,
+                                                                         int target,
+                                                                         int level,
+                                                                         int xOffset,
+                                                                         int yOffset,
+                                                                         int width,
+                                                                         int height,
+                                                                         int format,
+                                                                         int type) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "uploadTexture2DSubImage");
+            if (renderPassRecording) {
+                throw new IllegalStateException("uploadTexture2DSubImage requires command recording outside an active render pass");
+            }
+
+            if (target == VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+                throw new IllegalArgumentException("uploadTexture2DSubImage does not support GL_PROXY_TEXTURE_2D target");
+            }
+
+            LegacyTextureObject texture = requireBoundLegacyTexture2D(target, "uploadTexture2DSubImage");
+            if (texture.imageHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("uploadTexture2DSubImage requires existing texture storage (call uploadTexture2D first)");
+            }
+
+            TextureLevelInfo levelInfo = texture.levels.get(level);
+            if (levelInfo == null) {
+                throw new IllegalArgumentException("No texture storage defined for mip level " + level);
+            }
+
+            LegacyTextureFormatInfo expected = LegacyTextureFormatInfo.resolve(levelInfo.internalFormat, format, type);
+            if (expected.vkFormat != texture.vkFormat) {
+                throw new IllegalArgumentException("uploadTexture2DSubImage format/type does not match existing texture format");
+            }
+
+            if (xOffset + width > levelInfo.width || yOffset + height > levelInfo.height) {
+                throw new IllegalArgumentException("Sub-image upload exceeds texture bounds at mip level " + level);
+            }
+
+            return texture;
+        }
+
+        private static final class StagingBuffer {
+            private final long bufferHandle;
+            private final long memoryHandle;
+
+            private StagingBuffer(long bufferHandle, long memoryHandle) {
+                this.bufferHandle = bufferHandle;
+                this.memoryHandle = memoryHandle;
+            }
+        }
+
+        private void recreateLegacyTextureStorage(LegacyTextureObject texture,
+                                                  LegacyTextureFormatInfo formatInfo,
+                                                  int width,
+                                                  int height,
+                                                  int mipLevels) {
+            destroyLegacyTextureStorage(texture);
+
+            long imageHandle = VK10.VK_NULL_HANDLE;
+            long memoryHandle = VK10.VK_NULL_HANDLE;
+            long defaultViewHandle = VK10.VK_NULL_HANDLE;
+
+            try (MemoryStack stack = stackPush()) {
+                VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .imageType(VK10.VK_IMAGE_TYPE_2D)
+                    .format(formatInfo.vkFormat)
+                    .mipLevels(mipLevels)
+                    .arrayLayers(1)
+                    .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                    .tiling(VK10.VK_IMAGE_TILING_OPTIMAL)
+                    .usage(VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
+                        | VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+                        | VK10.VK_IMAGE_USAGE_SAMPLED_BIT)
+                    .sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE)
+                    .initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
+                imageCreateInfo.extent()
+                    .width(width)
+                    .height(height)
+                    .depth(1);
+
+                java.nio.LongBuffer pImage = stack.mallocLong(1);
+                checkVk("vkCreateImage(legacy texture)", VK10.vkCreateImage(logicalDevice, imageCreateInfo, null, pImage));
+                imageHandle = pImage.get(0);
+
+                VkMemoryRequirements memoryRequirements = VkMemoryRequirements.malloc(stack);
+                VK10.vkGetImageMemoryRequirements(logicalDevice, imageHandle, memoryRequirements);
+
+                int memoryTypeIndex = findMemoryTypeIndex(
+                    memoryRequirements.memoryTypeBits(),
+                    VK10.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+                );
+                if (memoryTypeIndex < 0) {
+                    throw new IllegalStateException("No device-local memory type available for legacy Vulkan texture allocation");
+                }
+
+                VkMemoryAllocateInfo memoryAllocateInfo = VkMemoryAllocateInfo.calloc(stack)
+                    .sType$Default()
+                    .allocationSize(memoryRequirements.size())
+                    .memoryTypeIndex(memoryTypeIndex);
+
+                java.nio.LongBuffer pMemory = stack.mallocLong(1);
+                checkVk("vkAllocateMemory(legacy texture)", VK10.vkAllocateMemory(logicalDevice, memoryAllocateInfo, null, pMemory));
+                memoryHandle = pMemory.get(0);
+
+                checkVk("vkBindImageMemory(legacy texture)",
+                    VK10.vkBindImageMemory(logicalDevice, imageHandle, memoryHandle, 0));
+
+                defaultViewHandle = createVkImageView(
+                    stack,
+                    imageHandle,
+                    formatInfo.vkFormat,
+                    formatInfo.aspectMask,
+                    0,
+                    mipLevels,
+                    1
+                );
+
+                texture.imageHandle = imageHandle;
+                texture.memoryHandle = memoryHandle;
+                texture.defaultViewHandle = defaultViewHandle;
+                texture.vkFormat = formatInfo.vkFormat;
+                texture.aspectMask = formatInfo.aspectMask;
+                texture.pixelBytes = formatInfo.pixelBytes;
+                texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+                texture.mipLevels = mipLevels;
+                texture.width = width;
+                texture.height = height;
+                texture.levels.clear();
+            } catch (RuntimeException exception) {
+                if (logicalDevice != null) {
+                    if (defaultViewHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyImageView(logicalDevice, defaultViewHandle, null);
+                    }
+                    if (imageHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyImage(logicalDevice, imageHandle, null);
+                    }
+                    if (memoryHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkFreeMemory(logicalDevice, memoryHandle, null);
+                    }
+                }
+                throw exception;
+            }
+        }
+
+        private void destroyLegacyTextureStorage(LegacyTextureObject texture) {
+            if (logicalDevice != null) {
+                if (texture.defaultViewHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyImageView(logicalDevice, texture.defaultViewHandle, null);
+                }
+                if (texture.imageHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyImage(logicalDevice, texture.imageHandle, null);
+                }
+                if (texture.memoryHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkFreeMemory(logicalDevice, texture.memoryHandle, null);
+                }
+            }
+
+            texture.imageHandle = VK10.VK_NULL_HANDLE;
+            texture.memoryHandle = VK10.VK_NULL_HANDLE;
+            texture.defaultViewHandle = VK10.VK_NULL_HANDLE;
+            texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+            texture.levels.clear();
+        }
+
+        private StagingBuffer createStagingBuffer(java.nio.ByteBuffer data) {
+            long bufferHandle = VK10.VK_NULL_HANDLE;
+            long memoryHandle = VK10.VK_NULL_HANDLE;
+
+            int size = data.remaining();
+            if (size <= 0) {
+                throw new IllegalArgumentException("Staging upload requires non-empty pixel data");
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                VkBufferCreateInfo bufferCreateInfo = VkBufferCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .size(size)
+                    .usage(VK10.VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+                    .sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE);
+
+                java.nio.LongBuffer pBuffer = stack.mallocLong(1);
+                checkVk("vkCreateBuffer(staging)", VK10.vkCreateBuffer(logicalDevice, bufferCreateInfo, null, pBuffer));
+                bufferHandle = pBuffer.get(0);
+
+                VkMemoryRequirements memoryRequirements = VkMemoryRequirements.malloc(stack);
+                VK10.vkGetBufferMemoryRequirements(logicalDevice, bufferHandle, memoryRequirements);
+
+                int memoryTypeIndex = findMemoryTypeIndex(
+                    memoryRequirements.memoryTypeBits(),
+                    VK10.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK10.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                );
+                if (memoryTypeIndex < 0) {
+                    throw new IllegalStateException("No host-visible/coherent memory type for staging upload buffer");
+                }
+
+                VkMemoryAllocateInfo memoryAllocateInfo = VkMemoryAllocateInfo.calloc(stack)
+                    .sType$Default()
+                    .allocationSize(memoryRequirements.size())
+                    .memoryTypeIndex(memoryTypeIndex);
+
+                java.nio.LongBuffer pMemory = stack.mallocLong(1);
+                checkVk("vkAllocateMemory(staging)", VK10.vkAllocateMemory(logicalDevice, memoryAllocateInfo, null, pMemory));
+                memoryHandle = pMemory.get(0);
+
+                checkVk("vkBindBufferMemory(staging)",
+                    VK10.vkBindBufferMemory(logicalDevice, bufferHandle, memoryHandle, 0));
+
+                org.lwjgl.PointerBuffer mappedPointer = stack.mallocPointer(1);
+                checkVk("vkMapMemory(staging)",
+                    VK10.vkMapMemory(logicalDevice, memoryHandle, 0, size, 0, mappedPointer));
+
+                java.nio.ByteBuffer mapped = MemoryUtil.memByteBuffer(mappedPointer.get(0), size);
+                mapped.put(data.duplicate());
+                VK10.vkUnmapMemory(logicalDevice, memoryHandle);
+
+                return new StagingBuffer(bufferHandle, memoryHandle);
+            } catch (RuntimeException exception) {
+                if (logicalDevice != null) {
+                    if (bufferHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyBuffer(logicalDevice, bufferHandle, null);
+                    }
+                    if (memoryHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkFreeMemory(logicalDevice, memoryHandle, null);
+                    }
+                }
+                throw exception;
+            }
+        }
+
+        private void destroyStagingBuffer(StagingBuffer stagingBuffer) {
+            if (logicalDevice == null || stagingBuffer == null) {
+                return;
+            }
+            if (stagingBuffer.bufferHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyBuffer(logicalDevice, stagingBuffer.bufferHandle, null);
+            }
+            if (stagingBuffer.memoryHandle != VK10.VK_NULL_HANDLE) {
+                VK10.vkFreeMemory(logicalDevice, stagingBuffer.memoryHandle, null);
+            }
+        }
+
+        private void transitionImageLayout(LegacyTextureObject texture,
+                                           int oldLayout,
+                                           int newLayout,
+                                           int baseMipLevel,
+                                           int levelCount) {
+            try (MemoryStack stack = stackPush()) {
+                VkImageMemoryBarrier.Buffer barrier = VkImageMemoryBarrier.calloc(1, stack);
+                barrier.get(0)
+                    .sType$Default()
+                    .oldLayout(oldLayout)
+                    .newLayout(newLayout)
+                    .srcQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
+                    .dstQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
+                    .image(texture.imageHandle);
+                barrier.get(0).subresourceRange()
+                    .aspectMask(texture.aspectMask)
+                    .baseMipLevel(baseMipLevel)
+                    .levelCount(levelCount)
+                    .baseArrayLayer(0)
+                    .layerCount(1);
+
+                int srcStage;
+                int dstStage;
+                int srcAccessMask;
+                int dstAccessMask;
+
+                if (oldLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
+                    srcStage = VK10.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+                    srcAccessMask = 0;
+                } else if (oldLayout == VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                    srcStage = VK10.VK_PIPELINE_STAGE_TRANSFER_BIT;
+                    srcAccessMask = VK10.VK_ACCESS_TRANSFER_WRITE_BIT;
+                } else {
+                    srcStage = VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                    srcAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
+                }
+
+                if (newLayout == VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                    dstStage = VK10.VK_PIPELINE_STAGE_TRANSFER_BIT;
+                    dstAccessMask = VK10.VK_ACCESS_TRANSFER_WRITE_BIT;
+                } else {
+                    dstStage = VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                    dstAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
+                }
+
+                barrier.get(0).srcAccessMask(srcAccessMask).dstAccessMask(dstAccessMask);
+
+                VK10.vkCmdPipelineBarrier(
+                    primaryCommandBuffer,
+                    srcStage,
+                    dstStage,
+                    0,
+                    null,
+                    null,
+                    barrier
+                );
+            }
+        }
+
+        private void uploadToLegacyTextureRegion(LegacyTextureObject texture,
+                                                 int level,
+                                                 int xOffset,
+                                                 int yOffset,
+                                                 int width,
+                                                 int height,
+                                                 java.nio.ByteBuffer pixels) {
+            StagingBuffer stagingBuffer = createStagingBuffer(pixels);
+            try {
+                transitionImageLayout(texture, texture.currentLayout, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, level, 1);
+
+                try (MemoryStack stack = stackPush()) {
+                    VkBufferImageCopy.Buffer regions = VkBufferImageCopy.calloc(1, stack);
+                    regions.get(0)
+                        .bufferOffset(0L)
+                        .bufferRowLength(0)
+                        .bufferImageHeight(0);
+                    regions.get(0).imageSubresource()
+                        .aspectMask(texture.aspectMask)
+                        .mipLevel(level)
+                        .baseArrayLayer(0)
+                        .layerCount(1);
+                    regions.get(0).imageOffset().set(xOffset, yOffset, 0);
+                    regions.get(0).imageExtent().set(width, height, 1);
+
+                    VK10.vkCmdCopyBufferToImage(
+                        primaryCommandBuffer,
+                        stagingBuffer.bufferHandle,
+                        texture.imageHandle,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        regions
+                    );
+                }
+
+                int finalLayout = texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
+                    ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                transitionImageLayout(texture, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout, level, 1);
+                texture.currentLayout = finalLayout;
+            } finally {
+                destroyStagingBuffer(stagingBuffer);
+            }
         }
 
         private void bufferDataByTarget(int target, java.nio.ByteBuffer data, int usageHint) {
@@ -1777,6 +3336,47 @@ public class VulkanBackend {
         private void flushMappedBufferRangeByTarget(int target, long offset, long length) {
             LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
             flushMappedNamedBufferRange(legacy.id, offset, length);
+        }
+
+        private VulkanBuffer requireLegacyDrawBuffer(int target, String operation) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            return requireAllocatedLegacyBuffer(legacy, operation);
+        }
+
+        private void drawLegacyArrays(long commandBufferHandle,
+                                      int mode,
+                                      int first,
+                                      int count,
+                                      int instanceCount) {
+            VulkanBuffer vertexBuffer = requireLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER, "drawArrays");
+            bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
+            drawInstanced(commandBufferHandle, first, count, instanceCount);
+        }
+
+        private void drawLegacyElements(long commandBufferHandle,
+                                        int mode,
+                                        int count,
+                                        VulkanicIndexType indexType,
+                                        long indices,
+                                        int instanceCount,
+                                        int baseVertex) {
+            VulkanBuffer vertexBuffer = requireLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER, "drawElements(vertex)");
+            VulkanBuffer indexBuffer = requireLegacyDrawBuffer(VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, "drawElements(index)");
+
+            int bytesPerIndex = indexType.bytesPerIndex();
+            if ((indices % bytesPerIndex) != 0L) {
+                throw new IllegalArgumentException(
+                    "Index offset must align to index type size. offset=" + indices + ", bytesPerIndex=" + bytesPerIndex);
+            }
+
+            long firstIndexLong = indices / bytesPerIndex;
+            if (firstIndexLong > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Computed firstIndex exceeds int range: " + firstIndexLong);
+            }
+
+            bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
+            bindIndexBuffer(commandBufferHandle, indexBuffer.getVkBufferHandle(), indexType);
+            drawIndexed(commandBufferHandle, (int) firstIndexLong, count, baseVertex, instanceCount);
         }
 
         private VulkanicBuffer createManagedBuffer(String label,
@@ -2397,24 +3997,15 @@ public class VulkanBackend {
 
                 checkVk("vkBeginCommandBuffer", VK10.vkBeginCommandBuffer(primaryCommandBuffer, beginInfo));
                 commandBufferRecording = true;
+                renderPassRecording = false;
                 return primaryCommandBuffer.address();
             }
         }
 
         private void submitPrimaryCommandBuffer(long commandBufferHandle) {
-            if (primaryCommandBuffer == null) {
-                throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
-            }
-
-            if (commandBufferHandle != primaryCommandBuffer.address()) {
-                throw new IllegalArgumentException(
-                    "submitCommandBuffer received unknown VkCommandBuffer handle. Expected 0x"
-                        + Long.toHexString(primaryCommandBuffer.address())
-                        + " but got 0x" + Long.toHexString(commandBufferHandle));
-            }
-
-            if (!commandBufferRecording) {
-                throw new IllegalStateException("Primary command buffer is not in recording state.");
+            ensureRecordingCommandBuffer(commandBufferHandle, "submitCommandBuffer");
+            if (renderPassRecording) {
+                throw new IllegalStateException("Cannot submit command buffer while a render pass is still active.");
             }
 
             try (MemoryStack stack = stackPush()) {
@@ -2429,29 +4020,17 @@ public class VulkanBackend {
                 checkVk("vkQueueSubmit",
                     VK10.vkQueueSubmit(graphicsQueue, submitInfos, VK10.VK_NULL_HANDLE));
                 checkVk("vkQueueWaitIdle", VK10.vkQueueWaitIdle(graphicsQueue));
+                destroyTransientRenderPassResources();
                 commandBufferRecording = false;
             }
         }
 
         private void applyResourceBarriers(long commandBufferHandle, VulkanicResourceBarriers barriers) {
-            if (primaryCommandBuffer == null) {
-                throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
-            }
-
-            if (commandBufferHandle != primaryCommandBuffer.address()) {
-                throw new IllegalArgumentException(
-                    "applyResourceBarriers received unknown VkCommandBuffer handle. Expected 0x"
-                        + Long.toHexString(primaryCommandBuffer.address())
-                        + " but got 0x" + Long.toHexString(commandBufferHandle));
-            }
-
-            if (!commandBufferRecording) {
-                throw new IllegalStateException("applyResourceBarriers requires an active recording command buffer.");
-            }
+            ensureRecordingCommandBuffer(commandBufferHandle, "applyResourceBarriers");
 
             BarrierMasks masks = toVkBarrierMasks(barriers);
             try (MemoryStack stack = stackPush()) {
-                org.lwjgl.vulkan.VkMemoryBarrier.Buffer memoryBarriers = org.lwjgl.vulkan.VkMemoryBarrier.calloc(1, stack);
+                VkMemoryBarrier.Buffer memoryBarriers = VkMemoryBarrier.calloc(1, stack);
                 memoryBarriers.get(0)
                     .sType$Default()
                     .srcAccessMask(masks.srcAccessMask())
@@ -2466,6 +4045,324 @@ public class VulkanBackend {
                     null,
                     null
                 );
+            }
+        }
+
+        private void ensureRecordingCommandBuffer(long commandBufferHandle, String operation) {
+            if (primaryCommandBuffer == null) {
+                throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
+            }
+            if (commandBufferHandle != primaryCommandBuffer.address()) {
+                throw new IllegalArgumentException(
+                    operation + " received unknown VkCommandBuffer handle. Expected 0x"
+                        + Long.toHexString(primaryCommandBuffer.address())
+                        + " but got 0x" + Long.toHexString(commandBufferHandle));
+            }
+            if (!commandBufferRecording) {
+                throw new IllegalStateException(operation + " requires an active recording command buffer.");
+            }
+        }
+
+        private void beginRenderPass(long commandBufferHandle,
+                                     VulkanicRenderPassDescriptor descriptor,
+                                     ResolvedRenderTargets targets) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "beginRenderPass");
+            if (renderPassRecording) {
+                throw new IllegalStateException("Nested Vulkan render passes are not supported yet.");
+            }
+
+            VulkanTextureView colorView = targets.colorView;
+            VulkanTexture colorTexture = targets.colorTexture;
+            VulkanTextureView depthView = targets.depthView;
+            VulkanTexture depthTexture = targets.depthTexture;
+            int width = targets.width;
+            int height = targets.height;
+            VulkanicRenderPassDescriptor.DepthAttachment depthAttachment = descriptor.depthAttachment();
+
+            long renderPassHandle = VK10.VK_NULL_HANDLE;
+            long framebufferHandle = VK10.VK_NULL_HANDLE;
+            try (MemoryStack stack = stackPush()) {
+                int attachmentCount = targets.hasDepthTarget() ? 2 : 1;
+                VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.calloc(attachmentCount, stack);
+
+                attachments.get(0)
+                    .format(toVkFormat(colorTexture.getVulkanicFormat()))
+                    .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                    .loadOp(toVkLoadOp(descriptor.colorAttachment().loadOp()))
+                    .storeOp(toVkStoreOp(descriptor.colorAttachment().storeOp()))
+                    .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                    .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                    .initialLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                    .finalLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+                VkAttachmentReference.Buffer colorReference = VkAttachmentReference.calloc(1, stack);
+                colorReference.get(0)
+                    .attachment(0)
+                    .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+                VkAttachmentReference depthReference = null;
+                if (targets.hasDepthTarget()) {
+                    attachments.get(1)
+                        .format(toVkFormat(depthTexture.getVulkanicFormat()))
+                        .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                        .loadOp(toVkLoadOp(depthAttachment.loadOp()))
+                        .storeOp(toVkStoreOp(depthAttachment.storeOp()))
+                        .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                        .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                        .initialLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+                        .finalLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+                    depthReference = VkAttachmentReference.calloc(stack)
+                        .attachment(1)
+                        .layout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                }
+
+                VkSubpassDescription.Buffer subpasses = VkSubpassDescription.calloc(1, stack);
+                subpasses.get(0)
+                    .pipelineBindPoint(VK10.VK_PIPELINE_BIND_POINT_GRAPHICS)
+                    .colorAttachmentCount(1)
+                    .pColorAttachments(colorReference)
+                    .pDepthStencilAttachment(depthReference);
+
+                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(1, stack);
+                dependencies.get(0)
+                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                    .dstSubpass(0)
+                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT)
+                    .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT)
+                    .srcAccessMask(0)
+                    .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+
+                VkRenderPassCreateInfo renderPassCreateInfo = VkRenderPassCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .pAttachments(attachments)
+                    .pSubpasses(subpasses)
+                    .pDependencies(dependencies);
+
+                java.nio.LongBuffer pRenderPass = stack.mallocLong(1);
+                checkVk("vkCreateRenderPass",
+                    VK10.vkCreateRenderPass(logicalDevice, renderPassCreateInfo, null, pRenderPass));
+                renderPassHandle = pRenderPass.get(0);
+
+                java.nio.LongBuffer pAttachments = stack.mallocLong(attachmentCount);
+                pAttachments.put(0, colorView.getVkImageViewHandle());
+                if (targets.hasDepthTarget()) {
+                    pAttachments.put(1, depthView.getVkImageViewHandle());
+                }
+
+                VkFramebufferCreateInfo framebufferCreateInfo = VkFramebufferCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .renderPass(renderPassHandle)
+                    .pAttachments(pAttachments)
+                    .width(width)
+                    .height(height)
+                    .layers(1);
+
+                java.nio.LongBuffer pFramebuffer = stack.mallocLong(1);
+                checkVk("vkCreateFramebuffer",
+                    VK10.vkCreateFramebuffer(logicalDevice, framebufferCreateInfo, null, pFramebuffer));
+                framebufferHandle = pFramebuffer.get(0);
+
+                VkClearValue.Buffer clearValues = VkClearValue.calloc(attachmentCount, stack);
+                if (descriptor.colorAttachment().loadOp() == VulkanicRenderPassDescriptor.LoadOp.CLEAR) {
+                    int argb = descriptor.colorAttachment().clearColor().orElse(0);
+                    float a = ((argb >> 24) & 0xFF) / 255.0f;
+                    float r = ((argb >> 16) & 0xFF) / 255.0f;
+                    float g = ((argb >> 8) & 0xFF) / 255.0f;
+                    float b = (argb & 0xFF) / 255.0f;
+                    clearValues.get(0).color()
+                        .float32(0, r)
+                        .float32(1, g)
+                        .float32(2, b)
+                        .float32(3, a);
+                }
+
+                if (targets.hasDepthTarget() && depthAttachment.loadOp() == VulkanicRenderPassDescriptor.LoadOp.CLEAR) {
+                    float clearDepth = (float) depthAttachment.clearDepth().orElse(1.0);
+                    clearValues.get(1).depthStencil().depth(clearDepth).stencil(0);
+                }
+
+                VkRenderPassBeginInfo beginInfo = VkRenderPassBeginInfo.calloc(stack)
+                    .sType$Default()
+                    .renderPass(renderPassHandle)
+                    .framebuffer(framebufferHandle)
+                    .pClearValues(clearValues);
+                beginInfo.renderArea()
+                    .offset(it -> it.x(0).y(0))
+                    .extent(it -> it.width(width).height(height));
+
+                VK10.vkCmdBeginRenderPass(primaryCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
+
+                renderPassRecording = true;
+                transientRenderPassHandles.add(renderPassHandle);
+                transientFramebufferHandles.add(framebufferHandle);
+            } catch (RuntimeException exception) {
+                if (framebufferHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
+                }
+                if (renderPassHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
+                }
+                throw exception;
+            }
+        }
+
+        private void endRenderPass(long commandBufferHandle) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "endRenderPass");
+            if (!renderPassRecording) {
+                throw new IllegalStateException("No active Vulkan render pass to end");
+            }
+
+            VK10.vkCmdEndRenderPass(primaryCommandBuffer);
+            renderPassRecording = false;
+        }
+
+        private void bindVertexBuffer(long commandBufferHandle, int slot, long bufferHandle) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "bindVertexBuffer");
+            if (!renderPassRecording) {
+                throw new IllegalStateException("bindVertexBuffer requires an active render pass");
+            }
+            if (slot < 0) {
+                throw new IllegalArgumentException("slot must be >= 0, got: " + slot);
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                java.nio.LongBuffer buffers = stack.longs(bufferHandle);
+                java.nio.LongBuffer offsets = stack.longs(0L);
+                VK10.vkCmdBindVertexBuffers(primaryCommandBuffer, slot, buffers, offsets);
+            }
+        }
+
+        private void bindIndexBuffer(long commandBufferHandle, long bufferHandle, VulkanicIndexType indexType) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "bindIndexBuffer");
+            if (!renderPassRecording) {
+                throw new IllegalStateException("bindIndexBuffer requires an active render pass");
+            }
+            Objects.requireNonNull(indexType, "indexType must not be null");
+
+            int vkIndexType;
+            switch (indexType) {
+                case SHORT -> vkIndexType = VK10.VK_INDEX_TYPE_UINT16;
+                case INT -> vkIndexType = VK10.VK_INDEX_TYPE_UINT32;
+                case BYTE -> throw new UnsupportedOperationException(
+                    "Vulkan index type BYTE requires VK_EXT_index_type_uint8 and is not supported yet.");
+                default -> throw new IllegalArgumentException("Unsupported VulkanicIndexType: " + indexType);
+            }
+
+            VK10.vkCmdBindIndexBuffer(primaryCommandBuffer, bufferHandle, 0L, vkIndexType);
+        }
+
+        private void drawIndexed(long commandBufferHandle, int firstIndex, int indexCount, int baseVertex, int instanceCount) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "drawIndexed");
+            if (!renderPassRecording) {
+                throw new IllegalStateException("drawIndexed requires an active render pass");
+            }
+            if (firstIndex < 0 || indexCount < 0 || instanceCount < 1) {
+                throw new IllegalArgumentException("Invalid indexed draw arguments");
+            }
+
+            VK10.vkCmdDrawIndexed(primaryCommandBuffer, indexCount, instanceCount, firstIndex, baseVertex, 0);
+        }
+
+        private void draw(long commandBufferHandle, int firstVertex, int vertexCount) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "draw");
+            if (!renderPassRecording) {
+                throw new IllegalStateException("draw requires an active render pass");
+            }
+            if (firstVertex < 0 || vertexCount < 0) {
+                throw new IllegalArgumentException("Invalid draw arguments");
+            }
+
+            VK10.vkCmdDraw(primaryCommandBuffer, vertexCount, 1, firstVertex, 0);
+        }
+
+        private void drawInstanced(long commandBufferHandle, int firstVertex, int vertexCount, int instanceCount) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "drawInstanced");
+            if (!renderPassRecording) {
+                throw new IllegalStateException("drawInstanced requires an active render pass");
+            }
+            if (firstVertex < 0 || vertexCount < 0 || instanceCount < 1) {
+                throw new IllegalArgumentException("Invalid instanced draw arguments");
+            }
+
+            VK10.vkCmdDraw(primaryCommandBuffer, vertexCount, instanceCount, firstVertex, 0);
+        }
+
+        private static int toVkLoadOp(VulkanicRenderPassDescriptor.LoadOp loadOp) {
+            Objects.requireNonNull(loadOp, "loadOp must not be null");
+            return switch (loadOp) {
+                case LOAD -> VK10.VK_ATTACHMENT_LOAD_OP_LOAD;
+                case CLEAR -> VK10.VK_ATTACHMENT_LOAD_OP_CLEAR;
+                case DONT_CARE -> VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            };
+        }
+
+        private static int toVkStoreOp(VulkanicRenderPassDescriptor.StoreOp storeOp) {
+            Objects.requireNonNull(storeOp, "storeOp must not be null");
+            return switch (storeOp) {
+                case STORE -> VK10.VK_ATTACHMENT_STORE_OP_STORE;
+                case DONT_CARE -> VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            };
+        }
+
+        private void destroyTransientRenderPassResources() {
+            if (!transientFramebufferHandles.isEmpty()) {
+                new ArrayList<>(transientFramebufferHandles).forEach(framebufferHandle -> {
+                    transientFramebufferHandles.remove(framebufferHandle);
+                    if (logicalDevice != null && framebufferHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
+                    }
+                });
+            }
+            if (!transientRenderPassHandles.isEmpty()) {
+                new ArrayList<>(transientRenderPassHandles).forEach(renderPassHandle -> {
+                    transientRenderPassHandles.remove(renderPassHandle);
+                    if (logicalDevice != null && renderPassHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
+                    }
+                });
+            }
+        }
+
+        private long createShaderModule(VulkanicSpirvModule spirvModule) {
+            Objects.requireNonNull(spirvModule, "spirvModule must not be null");
+
+            byte[] spirvBytes = spirvModule.spirvBytes();
+            if (spirvBytes.length == 0 || (spirvBytes.length % Integer.BYTES) != 0) {
+                throw new IllegalArgumentException(
+                    "SPIR-V module byte size must be > 0 and aligned to 4 bytes, got: " + spirvBytes.length);
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                java.nio.ByteBuffer code = stack.malloc(spirvBytes.length);
+                code.put(spirvBytes);
+                code.flip();
+
+                VkShaderModuleCreateInfo createInfo = VkShaderModuleCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .pCode(code);
+
+                java.nio.LongBuffer pShaderModule = stack.mallocLong(1);
+                checkVk("vkCreateShaderModule",
+                    VK10.vkCreateShaderModule(logicalDevice, createInfo, null, pShaderModule));
+
+                long shaderModuleHandle = pShaderModule.get(0);
+                managedShaderModules.add(shaderModuleHandle);
+                return shaderModuleHandle;
+            }
+        }
+
+        private void destroyShaderModule(long shaderModuleHandle) {
+            if (shaderModuleHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+
+            managedShaderModules.remove(shaderModuleHandle);
+            if (logicalDevice != null) {
+                VK10.vkDestroyShaderModule(logicalDevice, shaderModuleHandle, null);
             }
         }
 
@@ -2545,6 +4442,13 @@ public class VulkanBackend {
                     managedBufferAllocations.clear();
                 }
 
+                if (!legacyTextures.isEmpty()) {
+                    new ArrayList<>(legacyTextures.values()).forEach(this::destroyLegacyTextureStorage);
+                    legacyTextures.clear();
+                }
+                legacyTexture2DBindingsByUnit.clear();
+                proxyTexture2DLevels.clear();
+
                 if (!managedExtraImageViews.isEmpty()) {
                     new ArrayList<>(managedExtraImageViews).forEach(viewHandle -> destroyManagedImageView(viewHandle));
                 }
@@ -2556,6 +4460,12 @@ public class VulkanBackend {
                             defView != null ? defView : VK10.VK_NULL_HANDLE);
                     });
                 }
+
+                if (!managedShaderModules.isEmpty()) {
+                    new ArrayList<>(managedShaderModules).forEach(shaderModuleHandle -> destroyShaderModule(shaderModuleHandle));
+                }
+
+                destroyTransientRenderPassResources();
 
                 if (swapchain != VK10.VK_NULL_HANDLE) {
                     KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, swapchain, null);

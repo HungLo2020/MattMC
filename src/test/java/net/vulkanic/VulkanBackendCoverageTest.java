@@ -45,7 +45,7 @@ class VulkanBackendCoverageTest {
      * Raise this number every time new Vulkan implementations are added.
      * NEVER lower it.
      */
-    private static final double MIN_VULKAN_COVERAGE_PCT = 21.8;
+    private static final double MIN_VULKAN_COVERAGE_PCT = 29.8;
 
     // ── helpers ────────────────────────────────────────────────────────────
 

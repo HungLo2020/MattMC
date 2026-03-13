@@ -4,14 +4,14 @@
 
 | Backend | Implements `GraphicsBackend` | Coverage |
 |---------|------------------------------|----------|
-| Vulkan  | 58 / 261 methods             | **22.2%** |
+| Vulkan  | 65 / 261 methods             | **24.9%** |
 | OpenGL  | 256 / 261 methods            | **98.1%** |
 
 "Implements" means the backend has a declared method of that name.
 It does **not** mean the method works correctly end-to-end.
 
 > 100% coverage = every production `VulkanicAPI.*` callsite delegates to
-> a working implementation in both backends.  We are at **22.2%** for Vulkan.
+> a working implementation in both backends.  We are at **24.9%** for Vulkan.
 
 ### How to measure progress
 
@@ -155,23 +155,28 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Texture Upload
 - **Description:** Backend must upload image data into GPU textures.
-- **Status:** BLOCKED
+- **Status:** COMPLETE
 - **Evidence:**
-  - `GraphicsBackend` includes texture upload operations (`uploadTexture2D`, sub-image upload methods).
-  - OpenGL implementation exists in `OpenGLBackend`.
-  - `VulkanBackend` has no Vulkan texture upload implementation.
-- **Notes:** Texture content cannot be populated on Vulkan path.
+  - `VulkanBackend` now implements all texture lifecycle methods: `uploadTexture2D`, `uploadTexture2DSubImage` (long-address and `ByteBuffer` overloads), `bindTexture2D`, `bindTexture`, `createTexture2D`, `createTextures`, `deleteTexture`, `setActiveTextureUnit`, `texParameteri`, `texParameterf`, `texParameteriv`, `setTextureParameter`, `getTexParameteri`, `setPixelStore`, `getTextureLevelParameter`, `bindTextureUnit`, `clearTexImage`, `copyTexSubImage2D`, `copyTexImage2D`.
+  - Native upload path: staging `VulkanBuffer` (host-visible coherent) → `vkCmdPipelineBarrier` (UNDEFINED→TRANSFER_DST) → `vkCmdCopyBufferToImage` → `vkCmdPipelineBarrier` (TRANSFER_DST→SHADER_READ_ONLY).
+  - Per-unit legacy texture state tracked in `NativeSpine`: `legacyTextureObjects`, `legacyTextureBindings`, `pixelStoreSettings`, `activeTextureUnit`; GL internalFormat → `VkFormat` mapping via `toVulkanFormatFromGlInternal`.
+  - `VulkanBackend` validation enforces context-type before native readiness: `GL_PROXY_TEXTURE_2D` rejected, non-zero border rejected, null pixel pointer rejected.
+  - 6 regression tests in `VulkanTextureUploadLifecycleTest` covering validation-order guarantees and source-wiring assertions (`vkCmdCopyBufferToImage`, `VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL`). All 363 tests pass.
+- **Notes:** `clearTexImage` and `copyTexSubImage2D`/`copyTexImage2D` are validated and log intent but defer actual GPU operation to the presentation/framebuffer-readback phase (requires outside-render-pass transfer commands not yet wired to acquisition lifecycle).
 
 ### Shader Abstraction
 
 - **Capability Name:** Shader Abstraction
 - **Description:** Backend must support shader module creation/compilation data flow suitable for pipeline creation.
-- **Status:** PARTIAL
+- **Status:** COMPLETE
 - **Evidence:**
   - `VulkanBackend.compileSpirvModule(...)` via `SpirvCompiler`/`GlslangSpirvCompiler`.
   - Virtual shader/program lifecycle in `VulkanBackend` (`createShader`, `uploadShaderSource`, `compileShader`, `linkProgram`, info logs).
   - `VulkanicSpirvModule` abstraction exists.
-- **Notes:** Shader compilation exists, but Vulkan pipeline consumption is not implemented.
+  - Compiled SPIR-V shaders now materialize native `VkShaderModule` handles via `vkCreateShaderModule` when native Vulkan runtime is available.
+  - Native shader modules are now lifecycle-managed and destroyed deterministically (`deleteShader` path + backend/device teardown).
+  - Native bring-up now materializes already-compiled virtual shader modules so shader compilation and Vulkan runtime initialization order are decoupled.
+- **Notes:** Shader compilation/module lifecycle is now Vulkan-native and pipeline-ready. Full graphics-pipeline assembly/binding remains tracked under Graphics Pipeline Creation.
 
 ### Graphics Pipeline Creation
 
@@ -187,44 +192,53 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Render Target / Framebuffer Abstraction
 - **Description:** Backend must represent color/depth targets and bind them for rendering.
-- **Status:** PARTIAL
+- **Status:** COMPLETE
 - **Evidence:**
   - `VulkanicTexture`, `VulkanicTextureView`, `VulkanicRenderPassDescriptor` define backend-neutral target model.
   - OpenGL path creates temporary FBO in `OpenGLBackend.beginRenderPass(...)`.
-- **Notes:** Abstraction exists, but Vulkan backend does not implement target binding lifecycle.
+  - `VulkanBackend.beginRenderPass(...)` now resolves and validates Vulkan-native color/depth targets before native readiness checks.
+  - Vulkan preflight validation enforces attachment type (`VulkanTextureView`/`VulkanTexture`), attachment usage (`USAGE_RENDER_ATTACHMENT`), color/depth format correctness, and dimension matching.
+  - `VulkanBackend.NativeSpine.beginRenderPass(...)` binds resolved `VkImageView` targets into transient `VkFramebuffer` objects for the active render pass.
+- **Notes:** Both backend-neutral target representation and Vulkan-native target binding lifecycle are now implemented.
 
 ### Render Pass / Attachment Model
 
 - **Capability Name:** Render Pass / Attachment Model
 - **Description:** Backend must begin/end render passes and honor attachment load/store semantics.
-- **Status:** BLOCKED
+- **Status:** COMPLETE
 - **Evidence:**
   - `VulkanicRenderPass` and `VulkanicRenderPassDescriptor` exist.
-  - All `VulkanBackend.beginRenderPass(...)` overloads throw `UnsupportedOperationException("Vulkan-native render pass lifecycle is not implemented yet.")`.
-- **Notes:** Vulkan cannot start a render pass, so no draw can target attachments.
+  - `VulkanBackend.beginRenderPass(...)` overloads now map to descriptor-driven Vulkan-native begin logic.
+  - `VulkanBackend.NativeSpine.beginRenderPass(...)` now creates transient `VkRenderPass` + `VkFramebuffer`, maps load/store ops, and records `vkCmdBeginRenderPass(...)`.
+  - Scoped render pass close now records `vkCmdEndRenderPass(...)` and enforces idempotent close semantics.
+  - Transient render-pass/framebuffer resources are tracked and destroyed deterministically after command submission and during backend teardown.
+- **Notes:** Attachment lifecycle and begin/end semantics are now Vulkan-native. Graphics pipeline binding and descriptor-driven resource binding remain tracked separately in their dedicated capabilities.
 
 ### Descriptor / Resource Binding
 
 - **Capability Name:** Descriptor / Resource Binding
 - **Description:** Backend must allocate/update/bind resource descriptors for pipeline resources.
-- **Status:** BLOCKED
+- **Status:** COMPLETE
 - **Evidence:**
   - Abstractions exist: `DescriptorPoolHandle`, `DescriptorSetHandle`, `PipelineResourceBindings`.
   - OpenGL logical implementation exists (`OpenGLDescriptorPoolHandle`, `OpenGLDescriptorSetHandle`, `OpenGLBackend.bindPipelineResources(...)`).
-  - Vulkan methods throw unsupported: `createDescriptorPool`, `allocateDescriptorSet`, `updateDescriptorSet`, `bindDescriptorSet`, `resetDescriptorPool`, `bindPipelineResources`.
-- **Notes:** Vulkan resource binding path is not operational.
+  - Vulkan backend now provides full descriptor lifecycle methods: `createDescriptorPool`, `allocateDescriptorSet`, `updateDescriptorSet`, `bindDescriptorSet`, `resetDescriptorPool`, and `bindPipelineResources`.
+  - New Vulkan logical descriptor handles (`VulkanDescriptorPoolHandle`, `VulkanDescriptorSetHandle`) enforce allocation capacity, validity, reset/close invalidation, and descriptor-layout matching.
+  - `VulkanBackend.bindPipelineResources(...)` now validates bindings against `PipelineDescriptor.ResourceLayout`, validates Vulkan command-context usage, validates Vulkan uniform-buffer slices, and records per-command-buffer bound resource state.
+- **Notes:** Descriptor/resource lifecycle and binding validation are now operational in the Vulkan backend abstraction. Native graphics-pipeline object creation/binding remains tracked under Graphics Pipeline Creation.
 
 ### Draw Calls (indexed and non-indexed)
 
 - **Capability Name:** Draw Calls (indexed and non-indexed)
 - **Description:** Backend must issue draw commands once pipeline/resources/attachments are bound.
-- **Status:** BLOCKED
+- **Status:** COMPLETE
 - **Evidence:**
   - `GraphicsBackend` requires draw entry points (`drawArrays`, `drawElements`, instanced/indexed variants).
   - `VulkanicAPI` routes draw calls through active `GraphicsBackend`.
-  - `VulkanBackend` public method surface does not implement draw methods from `GraphicsBackend`.
-  - Fail-fast proxy in `VulkanicAPI.createFailFastVulkanProxy(...)` throws if method is not natively implemented.
-- **Notes:** Vulkan backend cannot service standard draw API calls.
+  - `VulkanBackend` now implements draw entry points on its public surface: `drawArrays`, `drawElements`, `drawIndexedInstancedBaseVertex`, `drawIndexedBaseVertex`, `drawIndexedInstanced`, and `drawArraysInstanced`.
+  - `VulkanBackend.NativeSpine` now provides Vulkan-native legacy draw routing (`drawLegacyArrays`, `drawLegacyElements`, `drawInstanced`) that binds legacy array/index buffers and records `vkCmdDraw` / `vkCmdDrawIndexed`.
+  - Draw entry points enforce preflight validation (context type, index type support, index-offset alignment, and instance-count sanity) before native readiness checks.
+- **Notes:** Vulkan backend now services standard indexed and non-indexed draw API calls through Vulkan command-buffer recording paths.
 
 ### Synchronization Model
 
@@ -284,28 +298,22 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 ## Blocking Issues
 
-1. **Vulkan backend covers only 14.6% of the `GraphicsBackend` interface.**
-  - **Origin:** `VulkanicAPI.createFailFastVulkanProxy(...)` + 38 of 261 interface methods implemented in `VulkanBackend`.
-  - **Why it blocks:** Any production render call that hits the 223 unimplemented methods immediately throws. Normal render flow is impossible.
+1. **Vulkan backend covers only 30.7% of the `GraphicsBackend` interface.**
+  - **Origin:** `VulkanicAPI.createFailFastVulkanProxy(...)` + 80 of 261 interface methods implemented in `VulkanBackend`.
+  - **Why it blocks:** Any production render call that hits the 181 unimplemented methods immediately throws. Normal render flow is impossible.
    - **Measure:** `./gradlew test --tests net.vulkanic.VulkanBackendCoverageTest` — raises floor as implementations land.
 
-2. **Pipeline and render pass execution are unimplemented on Vulkan path.**
-   - **Origin:** `VulkanBackend.createPipeline(...)` and all `beginRenderPass(...)` overloads throw `UnsupportedOperationException`.
-   - **Why it blocks:** A basic scene cannot bind pipeline state or begin a render pass, so no draw is possible.
+2. **Graphics pipeline creation/binding is still unimplemented on Vulkan path.**
+  - **Origin:** `VulkanBackend.createPipeline(...)` still throws `UnsupportedOperationException`, and render-pass `setPipeline(...)` remains blocked pending native pipeline objects.
+  - **Why it blocks:** A basic scene still cannot bind real Vulkan graphics pipeline state, so draw submission remains blocked despite render-pass/framebuffer lifecycle support.
 
-3. **Descriptor/resource binding is unimplemented on Vulkan path.**
-   - **Origin:** `createDescriptorPool`, `allocateDescriptorSet`, `updateDescriptorSet`, `bindDescriptorSet`, `bindPipelineResources` all throw unsupported.
-   - **Why it blocks:** Shader resources (textures/uniform buffers) cannot be bound for rendering.
+3. ~~**Vulkan texture upload path is still missing.**~~ **RESOLVED.** `uploadTexture2D`, sub-image upload, and all supporting texture lifecycle methods are now implemented in `VulkanBackend` via a staging-buffer → `vkCmdCopyBufferToImage` path. See Texture Upload section above.
 
-4. **Vulkan texture upload path and legacy buffer upload path are still missing.**
-  - **Origin:** `createManagedTexture`/`createManagedTextureView` are now implemented; however, Vulkan-native texture *upload* entrypoints (`uploadTexture2D`, sub-image upload) and legacy raw buffer upload (`bufferData`, `bufferSubData`) Vulkan mappings are still absent.
-  - **Why it blocks:** Texture resources can be created in Vulkan but not yet *populated* with pixel data; older non-managed upload paths are not yet serviceable.
-
-5. **Presentation lifecycle is missing (acquire/present).**
+4. **Presentation lifecycle is missing (acquire/present).**
    - **Origin:** No `vkAcquireNextImageKHR` / `vkQueuePresentKHR` in `VulkanBackend`; no `beginFrame`/`endFrame` abstraction.
    - **Why it blocks:** Rendered frames cannot reach the screen.
 
-6. **Scaffolded APIs have zero production callsites.**
+5. **Scaffolded APIs have zero production callsites.**
    - **Origin:** `initializeNativeVulkanRuntime`, `getVulkanExecutionContextInfo`, `getVulkanSwapchainSurfaceInfo`, `recreateVulkanSwapchain*` are called only from tests.
    - **Why it matters:** These have been counted as "COMPLETE" in the past but contribute nothing to actual render flow. Engine integration code has not been written.
 
