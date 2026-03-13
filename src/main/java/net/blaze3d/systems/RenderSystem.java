@@ -87,6 +87,7 @@ public class RenderSystem {
 
 	public static void initRenderer(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		net.vulkanic.VulkanicAPI.setDevice(new GlDevice(l, i, bl, biFunction, bl2));
+		net.vulkanic.VulkanicAPI.initializeNativeVulkanRuntimeOnRendererStartupIfSelected();
 		net.vulkanic.VulkanicAPI.initializeDynamicUniforms();
 		
 		// Sodium: Post-context initialization (from RenderSystemMixin)

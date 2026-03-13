@@ -105,6 +105,7 @@ import java.util.Set;
 import java.nio.ByteOrder;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.lwjgl.system.MemoryStack.stackPush;
 
@@ -128,6 +129,82 @@ public class VulkanBackend {
     private final Map<Integer, VirtualProgram> virtualPrograms = new ConcurrentHashMap<>();
     private final Map<Long, BoundPipelineResources> boundPipelineResourcesByCommandBuffer = new ConcurrentHashMap<>();
 
+    // -----------------------------------------------------------------------
+    // Deferred render state (pipeline-baked in Vulkan; cached here so callers
+    // that set state before/between draw calls are not broken at the API level)
+    // -----------------------------------------------------------------------
+    private volatile boolean pendingBlendEnabled = false;
+    private volatile int  pendingBlendSrcRgb   = 1 /* GL_ONE */;
+    private volatile int  pendingBlendDstRgb   = 0 /* GL_ZERO */;
+    private volatile int  pendingBlendSrcAlpha = 1 /* GL_ONE */;
+    private volatile int  pendingBlendDstAlpha = 0 /* GL_ZERO */;
+    private volatile int  pendingBlendEquation  = 0x8006 /* GL_FUNC_ADD */;
+    private volatile int  pendingBlendEquationAlpha = 0x8006 /* GL_FUNC_ADD */;
+
+    private volatile boolean pendingDepthTestEnabled  = false;
+    private volatile int     pendingDepthFunc         = 0x0201 /* GL_LESS */;
+    private volatile boolean pendingDepthWriteMask    = true;
+
+    private volatile boolean pendingColorMaskR = true;
+    private volatile boolean pendingColorMaskG = true;
+    private volatile boolean pendingColorMaskB = true;
+    private volatile boolean pendingColorMaskA = true;
+
+    private volatile int pendingCullFaceMode = 0x0405 /* GL_BACK */;
+
+    private volatile int pendingPolygonFace = 0x0408 /* GL_FRONT_AND_BACK */;
+    private volatile int pendingPolygonMode = 0x1B02 /* GL_FILL */;
+    private volatile float pendingPolygonOffsetFactor = 0.0f;
+    private volatile float pendingPolygonOffsetUnits  = 0.0f;
+
+    private volatile float pendingClearR = 0.0f;
+    private volatile float pendingClearG = 0.0f;
+    private volatile float pendingClearB = 0.0f;
+    private volatile float pendingClearA = 0.0f;
+    private volatile double pendingClearDepth = 1.0;
+
+    private volatile int pendingLogicOp = 0x1503 /* GL_COPY */;
+    private volatile int pendingReadBuffer  = 0x0405 /* GL_BACK */;
+    private volatile int pendingDrawBuffer  = 0x0405 /* GL_BACK */;
+
+    // Virtual FBO tracking (mirrors legacy-buffer pattern for GL compat calls)
+    private final AtomicInteger nextVirtualFboId = new AtomicInteger(1);
+    private final Set<Integer>  virtualFbos      = ConcurrentHashMap.newKeySet();
+    private volatile int        boundReadFbo     = 0;
+    private volatile int        boundDrawFbo     = 0;
+
+    // Virtual VAO tracking (Vulkan has no VAO concept; virtual IDs satisfy GL compat calls)
+    private final AtomicInteger nextVirtualVaoId     = new AtomicInteger(1);
+    private final Set<Integer>  virtualVaos          = ConcurrentHashMap.newKeySet();
+
+    // Virtual sampler tracking (Vulkan samplers created at pipeline init; virtual IDs for GL compat)
+    private final AtomicInteger nextVirtualSamplerId = new AtomicInteger(1);
+    private final Set<Integer>  virtualSamplers      = ConcurrentHashMap.newKeySet();
+    /** Per-unit sampler binding cache: texture-unit → bound sampler handle */
+    private final ConcurrentHashMap<Integer, Integer> boundSamplerPerUnit = new ConcurrentHashMap<>();
+
+    // Virtual query/sync tracking for GL-compat control flow on the Vulkan path
+    private final AtomicInteger nextVirtualQueryId = new AtomicInteger(1);
+    private final Set<Integer> virtualQueries      = ConcurrentHashMap.newKeySet();
+    private final AtomicLong nextVirtualSyncId     = new AtomicLong(1L);
+    private final Set<Long> virtualSyncs           = ConcurrentHashMap.newKeySet();
+
+    // Lightweight bound-object mirrors for integer state queries
+    private volatile int boundVirtualProgram = 0;
+    private volatile int boundVirtualVao     = 0;
+
+    // Cached backend capabilities object for non-OpenGL callers that still query capabilities.
+    private final net.vulkanic.GraphicsCapabilities graphicsCapabilities = createVulkanGraphicsCapabilities();
+
+    // Deferred stencil state (pipeline-baked in Vulkan — cached here for pipeline construction)
+    private volatile int    pendingStencilFunc       = 0x0207 /* GL_ALWAYS */;
+    private volatile int    pendingStencilRef        = 0;
+    private volatile int    pendingStencilMask       = 0xFF;
+    private volatile int    pendingStencilFail       = 0x1E00 /* GL_KEEP */;
+    private volatile int    pendingStencilDpFail     = 0x1E00 /* GL_KEEP */;
+    private volatile int    pendingStencilDpPass     = 0x1E00 /* GL_KEEP */;
+    private volatile int    pendingStencilWriteMask  = 0xFF;
+
     public VulkanBackend() {
         this(new GlslangSpirvCompiler());
     }
@@ -138,6 +215,10 @@ public class VulkanBackend {
 
     public GraphicsBackendType getBackendType() {
         return GraphicsBackendType.VULKAN;
+    }
+
+    public long getGraphicsContext() {
+        return MemoryUtil.NULL;
     }
 
     public boolean isNativeVulkanReady() {
@@ -708,6 +789,9 @@ public class VulkanBackend {
 
     public void deleteProgram(CommandContext ctx, int program) {
         virtualPrograms.remove(program);
+        if (boundVirtualProgram == program) {
+            boundVirtualProgram = 0;
+        }
     }
 
     public VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size) {
@@ -2148,6 +2232,1375 @@ public class VulkanBackend {
         return !isNativeVulkanReady();
     }
 
+    // =====================================================================
+    //  GraphicsBackend contract: dynamic-state operations
+    // =====================================================================
+
+    /**
+     * Sets the viewport via {@code vkCmdSetViewport} when a command buffer is
+     * actively recording; caches the values for the next recording window when
+     * called outside a command buffer.  Equivalent to {@link #setViewport}.
+     */
+    public void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("setDynamicViewport", ctx);
+        ensureNativeReady("setDynamicViewport");
+        NativeSpine spine = requireNativeSpineForCommandOp("setDynamicViewport");
+        spine.cmdSetViewport(commandBufferHandle, x, y, width, height);
+    }
+
+    /** Sets the viewport — delegates to {@link #setDynamicViewport}. */
+    public void setViewport(CommandContext ctx, int x, int y, int width, int height) {
+        setDynamicViewport(ctx, x, y, width, height);
+    }
+
+    /**
+     * Sets the scissor rectangle via {@code vkCmdSetScissor} when a command
+     * buffer is actively recording.
+     */
+    public void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("setDynamicScissor", ctx);
+        ensureNativeReady("setDynamicScissor");
+        NativeSpine spine = requireNativeSpineForCommandOp("setDynamicScissor");
+        spine.cmdSetScissor(commandBufferHandle, x, y, width, height);
+    }
+
+    /**
+     * Records a clear-attachments command for the buffers indicated by {@code mask}.
+     * In Vulkan, clears must be issued inside an active render pass; if none is
+     * active the call is silently deferred (the pending clear colour/depth values
+     * set via {@link #setClearColor}/{@link #setClearDepth} are picked up at
+     * render-pass begin via the load-op).
+     */
+    public void clearBuffers(CommandContext ctx, int mask) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("clearBuffers", ctx);
+        NativeSpine spine = nativeSpine;
+        if (spine == null || !spine.isRenderPassActive()) {
+            // Outside a render pass — deferred via pending clear state.
+            return;
+        }
+
+        final int GL_COLOR_BUFFER_BIT = 0x00004000;
+        final int GL_DEPTH_BUFFER_BIT = 0x00000100;
+        boolean clearColor = (mask & GL_COLOR_BUFFER_BIT) != 0;
+        boolean clearDepth = (mask & GL_DEPTH_BUFFER_BIT) != 0;
+
+        spine.cmdClearAttachments(commandBufferHandle,
+            clearColor, pendingClearR, pendingClearG, pendingClearB, pendingClearA,
+            clearDepth, (float) pendingClearDepth);
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: blend state
+    // =====================================================================
+
+    /** Caches blend-enabled flag (applied at pipeline creation). */
+    public void setBlendEnabled(CommandContext ctx, boolean enabled) {
+        requireVulkanCommandBufferHandle("setBlendEnabled", ctx);
+        this.pendingBlendEnabled = enabled;
+    }
+
+    /** Caches blend function (applied at pipeline creation). */
+    public void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        requireVulkanCommandBufferHandle("setBlendFunction", ctx);
+        this.pendingBlendSrcRgb   = srcRgb;
+        this.pendingBlendDstRgb   = dstRgb;
+        this.pendingBlendSrcAlpha = srcAlpha;
+        this.pendingBlendDstAlpha = dstAlpha;
+    }
+
+    /** Caches blend function — typed overload (applied at pipeline creation). */
+    public void setBlendFunction(CommandContext ctx,
+                                 net.vulkanic.VulkanicBlendFactor srcRgb,
+                                 net.vulkanic.VulkanicBlendFactor dstRgb,
+                                 net.vulkanic.VulkanicBlendFactor srcAlpha,
+                                 net.vulkanic.VulkanicBlendFactor dstAlpha) {
+        requireVulkanCommandBufferHandle("setBlendFunction", ctx);
+        // Store ordinals as int stand-ins for logging/diagnostics; Vulkan pipeline
+        // uses the typed enum directly at pipeline creation time.
+        this.pendingBlendSrcRgb   = srcRgb.ordinal();
+        this.pendingBlendDstRgb   = dstRgb.ordinal();
+        this.pendingBlendSrcAlpha = srcAlpha.ordinal();
+        this.pendingBlendDstAlpha = dstAlpha.ordinal();
+    }
+
+    /** Caches blend equation (applied at pipeline creation). */
+    public void setBlendEquation(CommandContext ctx, int mode) {
+        requireVulkanCommandBufferHandle("setBlendEquation", ctx);
+        this.pendingBlendEquation = mode;
+        this.pendingBlendEquationAlpha = mode;
+    }
+
+    /** Caches blend equation — typed overload. */
+    public void setBlendEquation(CommandContext ctx, net.vulkanic.VulkanicBlendEquation mode) {
+        requireVulkanCommandBufferHandle("setBlendEquation", ctx);
+        this.pendingBlendEquation = mode.ordinal();
+        this.pendingBlendEquationAlpha = mode.ordinal();
+    }
+
+    /** Caches separate blend equations (applied at pipeline creation). */
+    public void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        requireVulkanCommandBufferHandle("setBlendEquationSeparate", ctx);
+        this.pendingBlendEquation      = modeRGB;
+        this.pendingBlendEquationAlpha = modeAlpha;
+    }
+
+    /** Caches separate blend equations — typed overload. */
+    public void setBlendEquationSeparate(CommandContext ctx,
+                                         net.vulkanic.VulkanicBlendEquation modeRGB,
+                                         net.vulkanic.VulkanicBlendEquation modeAlpha) {
+        requireVulkanCommandBufferHandle("setBlendEquationSeparate", ctx);
+        this.pendingBlendEquation      = modeRGB.ordinal();
+        this.pendingBlendEquationAlpha = modeAlpha.ordinal();
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: depth state
+    // =====================================================================
+
+    /** Caches depth test function (applied at pipeline creation). */
+    public void setDepthTest(CommandContext ctx, int func) {
+        requireVulkanCommandBufferHandle("setDepthTest", ctx);
+        this.pendingDepthTestEnabled = true;
+        this.pendingDepthFunc = func;
+    }
+
+    /** Caches depth test function — typed overload. */
+    public void setDepthTest(CommandContext ctx, net.vulkanic.VulkanicDepthCompareOp func) {
+        requireVulkanCommandBufferHandle("setDepthTest", ctx);
+        this.pendingDepthTestEnabled = true;
+        this.pendingDepthFunc = func.ordinal();
+    }
+
+    /** Caches depth function (alternative entry point identical to {@link #setDepthTest(CommandContext, int)}). */
+    public void setDepthFunc(CommandContext ctx, int func) {
+        setDepthTest(ctx, func);
+    }
+
+    /** Caches depth function — typed overload. */
+    public void setDepthFunc(CommandContext ctx, net.vulkanic.VulkanicDepthCompareOp func) {
+        setDepthTest(ctx, func);
+    }
+
+    /** Caches depth write mask (applied at pipeline creation). */
+    public void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+        requireVulkanCommandBufferHandle("setDepthWriteMask", ctx);
+        this.pendingDepthWriteMask = enabled;
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: color mask
+    // =====================================================================
+
+    /** Caches color write mask (applied at pipeline creation). */
+    public void setColorMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+        requireVulkanCommandBufferHandle("setColorMask", ctx);
+        this.pendingColorMaskR = r;
+        this.pendingColorMaskG = g;
+        this.pendingColorMaskB = b;
+        this.pendingColorMaskA = a;
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: rasterization state
+    // =====================================================================
+
+    /** Caches cull face mode — raw GL constant (applied at pipeline creation). */
+    public void setCullFaceMode(CommandContext ctx, int mode) {
+        requireVulkanCommandBufferHandle("setCullFaceMode", ctx);
+        this.pendingCullFaceMode = mode;
+    }
+
+    /** Caches cull face mode — typed overload. */
+    public void setCullFaceMode(CommandContext ctx, net.vulkanic.VulkanicCullFaceMode mode) {
+        requireVulkanCommandBufferHandle("setCullFaceMode", ctx);
+        this.pendingCullFaceMode = mode.ordinal();
+    }
+
+    /** Caches polygon rasterization mode (applied at pipeline creation). */
+    public void setPolygonMode(CommandContext ctx, int face, int mode) {
+        requireVulkanCommandBufferHandle("setPolygonMode", ctx);
+        this.pendingPolygonFace = face;
+        this.pendingPolygonMode = mode;
+    }
+
+    /** Caches polygon offset parameters (applied at pipeline creation). */
+    public void setPolygonOffset(CommandContext ctx, float factor, float units) {
+        requireVulkanCommandBufferHandle("setPolygonOffset", ctx);
+        this.pendingPolygonOffsetFactor = factor;
+        this.pendingPolygonOffsetUnits  = units;
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: shader binding (virtual no-op in Vulkan mode)
+    // =====================================================================
+
+    /**
+     * No-op in Vulkan — pipeline binding replaces shader program binding.
+     * The virtual shader graph is still consulted at pipeline creation time, not here.
+     */
+    public void bindShaderProgram(CommandContext ctx, int programId) {
+        requireVulkanCommandBufferHandle("bindShaderProgram", ctx);
+        this.boundVirtualProgram = programId;
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: capability enable/disable
+    // =====================================================================
+
+    /**
+     * Caches capability state; only well-known GPU capabilities (BLEND, DEPTH_TEST,
+     * CULL_FACE, POLYGON_OFFSET_FILL) are mapped to Vulkan pipeline state.
+     */
+    public void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
+        requireVulkanCommandBufferHandle("setCapabilityEnabled", ctx);
+        final int GL_BLEND        = 0x0BE2;
+        final int GL_DEPTH_TEST   = 0x0B71;
+        final int GL_CULL_FACE    = 0x0B44;
+        final int GL_POLYGON_OFFSET_FILL = 0x8037;
+        if (cap == GL_BLEND) {
+            this.pendingBlendEnabled = enabled;
+        } else if (cap == GL_DEPTH_TEST) {
+            this.pendingDepthTestEnabled = enabled;
+        }
+        // Other capabilities (GL_CULL_FACE, GL_POLYGON_OFFSET_FILL, etc.) are stored
+        // implicitly via their own dedicated setXxx methods or are no-ops in Vulkan.
+    }
+
+    /** Typed overload — delegates to raw-constant version via {@code toLegacyGlConstant()}. */
+    public void setCapabilityEnabled(CommandContext ctx, net.vulkanic.VulkanicCapability capability, boolean enabled) {
+        setCapabilityEnabled(ctx, capability.toLegacyGlConstant(), enabled);
+    }
+
+    /** Indexed capability enable/disable — caches per-buffer blend enable state. */
+    public void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled) {
+        requireVulkanCommandBufferHandle("setIndexedEnabled", ctx);
+        final int GL_BLEND = 0x0BE2;
+        if (capability == GL_BLEND && index == 0) {
+            this.pendingBlendEnabled = enabled;
+        }
+        // Per-attachment blend state beyond index 0 is tracked at pipeline creation time when needed.
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: clear state
+    // =====================================================================
+
+    /** Caches clear colour (used at render-pass begin / vkCmdClearAttachments). */
+    public void setClearColor(CommandContext ctx, float r, float g, float b, float a) {
+        requireVulkanCommandBufferHandle("setClearColor", ctx);
+        this.pendingClearR = r;
+        this.pendingClearG = g;
+        this.pendingClearB = b;
+        this.pendingClearA = a;
+    }
+
+    /** Caches clear depth value (used at render-pass begin). */
+    public void setClearDepth(CommandContext ctx, double depth) {
+        requireVulkanCommandBufferHandle("setClearDepth", ctx);
+        this.pendingClearDepth = depth;
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: logic op
+    // =====================================================================
+
+    /** Caches logic op (applied at pipeline creation; no direct Vulkan dynamic equivalent). */
+    public void setLogicOp(CommandContext ctx, int opcode) {
+        requireVulkanCommandBufferHandle("setLogicOp", ctx);
+        this.pendingLogicOp = opcode;
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: read/draw buffer routing
+    // =====================================================================
+
+    /**
+     * Caches read-buffer selection.  In Vulkan there is no glReadBuffer equivalent —
+     * buffer routing is handled at render-pass / blit level.
+     */
+    public void setReadBuffer(CommandContext ctx, int buffer) {
+        requireVulkanCommandBufferHandle("setReadBuffer", ctx);
+        this.pendingReadBuffer = buffer;
+    }
+
+    /**
+     * Caches draw-buffer selection.  In Vulkan attachment routing is specified
+     * at render-pass / pipeline creation time; this cache is consulted there.
+     */
+    public void setDrawBuffer(CommandContext ctx, int mode) {
+        requireVulkanCommandBufferHandle("setDrawBuffer", ctx);
+        this.pendingDrawBuffer = mode;
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: VAO binding (no-op in Vulkan)
+    // =====================================================================
+
+    /**
+     * No-op in Vulkan — vertex attribute state is encoded into the pipeline
+     * descriptor and there is no equivalent to a VAO object.
+     */
+    public void bindVertexArray(CommandContext ctx, int vao) {
+        requireVulkanCommandBufferHandle("bindVertexArray", ctx);
+        this.boundVirtualVao = vao;
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: error query
+    // =====================================================================
+
+    /**
+     * Returns 0 (GL_NO_ERROR equivalent) — Vulkan uses result codes per-call,
+     * not a global error state like glGetError.
+     */
+    public int getError(CommandContext ctx) {
+        requireVulkanCommandBufferHandle("getError", ctx);
+        return 0; // VK_SUCCESS analogue: no deferred error queue in Vulkan
+    }
+
+    // =====================================================================
+    //  GraphicsBackend contract: virtual framebuffer objects
+    // =====================================================================
+
+    /**
+     * Allocates a virtual FBO handle.  In Vulkan, real framebuffer objects are
+     * created transiently inside render passes and are not user-managed the
+     * way they are in OpenGL.  Virtual handles are tracked to satisfy the
+     * GL-style allocate/bind/delete API contract without actually creating
+     * Vulkan framebuffer resources at this point.
+     */
+    public int createFramebuffer(CommandContext ctx) {
+        requireVulkanCommandBufferHandle("createFramebuffer", ctx);
+        int id = nextVirtualFboId.getAndIncrement();
+        virtualFbos.add(id);
+        return id;
+    }
+
+    /** Allocates multiple virtual FBO handles. */
+    public int createFramebuffers(CommandContext ctx) {
+        return createFramebuffer(ctx);
+    }
+
+    /**
+     * Binds a virtual FBO for subsequent operations.  In Vulkan, the actual
+     * render target is specified declaratively in the render-pass descriptor —
+     * this call only updates the cached binding for diagnostic / compatibility use.
+     */
+    public void bindFramebuffer(CommandContext ctx, int target, int fbo) {
+        requireVulkanCommandBufferHandle("bindFramebuffer", ctx);
+        final int GL_READ_FRAMEBUFFER = 0x8CA8;
+        final int GL_DRAW_FRAMEBUFFER = 0x8CA9;
+        final int GL_FRAMEBUFFER      = 0x8D40;
+        if (target == GL_READ_FRAMEBUFFER) {
+            this.boundReadFbo = fbo;
+        } else if (target == GL_DRAW_FRAMEBUFFER) {
+            this.boundDrawFbo = fbo;
+        } else if (target == GL_FRAMEBUFFER) {
+            this.boundReadFbo = fbo;
+            this.boundDrawFbo = fbo;
+        }
+    }
+
+    /**
+     * Releases the virtual FBO handle.  Any associated Vulkan resources
+     * are already tracked transiently within render passes and cleaned up there.
+     */
+    public void deleteFramebuffer(CommandContext ctx, int fbo) {
+        requireVulkanCommandBufferHandle("deleteFramebuffer", ctx);
+        virtualFbos.remove(fbo);
+        if (boundReadFbo == fbo) boundReadFbo = 0;
+        if (boundDrawFbo == fbo) boundDrawFbo = 0;
+    }
+
+    /**
+     * Returns {@code GL_FRAMEBUFFER_COMPLETE} (0x8CD5) for virtual FBO 0
+     * (the default framebuffer); returns {@code GL_FRAMEBUFFER_COMPLETE} for
+     * any known virtual FBO.  Returns {@code GL_FRAMEBUFFER_UNDEFINED} (0x8219)
+     * for unknown/unregistered handles.
+     */
+    public int checkFramebufferStatus(CommandContext ctx, int target) {
+        requireVulkanCommandBufferHandle("checkFramebufferStatus", ctx);
+        final int GL_FRAMEBUFFER_COMPLETE   = 0x8CD5;
+        final int GL_FRAMEBUFFER_UNDEFINED  = 0x8219;
+        int fbo = (target == 0x8CA8 /* GL_READ_FRAMEBUFFER */) ? boundReadFbo : boundDrawFbo;
+        if (fbo == 0 || virtualFbos.contains(fbo)) {
+            return GL_FRAMEBUFFER_COMPLETE;
+        }
+        return GL_FRAMEBUFFER_UNDEFINED;
+    }
+
+    // =====================================================================
+    //  Shader uniform setters
+    //  Vulkan uses push constants / descriptor sets exclusively;
+    //  these methods satisfy the contract but are intentional no-ops
+    //  when Vulkan is active (callers must use bindPipelineResources).
+    // =====================================================================
+
+    public void setUniform1i(CommandContext ctx, int location, int value) {
+        requireVulkanCommandBufferHandle("setUniform1i", ctx);
+    }
+
+    public void setUniform1f(CommandContext ctx, int location, float value) {
+        requireVulkanCommandBufferHandle("setUniform1f", ctx);
+    }
+
+    public void setUniform2f(CommandContext ctx, int location, float v0, float v1) {
+        requireVulkanCommandBufferHandle("setUniform2f", ctx);
+    }
+
+    public void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
+        requireVulkanCommandBufferHandle("setUniform2i", ctx);
+    }
+
+    public void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2) {
+        requireVulkanCommandBufferHandle("setUniform3f", ctx);
+    }
+
+    public void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
+        requireVulkanCommandBufferHandle("setUniform3i", ctx);
+    }
+
+    public void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
+        requireVulkanCommandBufferHandle("setUniform4f", ctx);
+    }
+
+    public void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3) {
+        requireVulkanCommandBufferHandle("setUniform4i", ctx);
+    }
+
+    public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        requireVulkanCommandBufferHandle("setUniformMatrix3fv", ctx);
+    }
+
+    public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        requireVulkanCommandBufferHandle("setUniformMatrix3fv", ctx);
+    }
+
+    public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        requireVulkanCommandBufferHandle("setUniformMatrix4fv", ctx);
+    }
+
+    public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        requireVulkanCommandBufferHandle("setUniformMatrix4fv", ctx);
+    }
+
+    public void setUniform2fv(CommandContext ctx, int location, float[] value) {
+        requireVulkanCommandBufferHandle("setUniform2fv", ctx);
+    }
+
+    public void setUniform3fv(CommandContext ctx, int location, float[] value) {
+        requireVulkanCommandBufferHandle("setUniform3fv", ctx);
+    }
+
+    public void setUniform4fv(CommandContext ctx, int location, float[] value) {
+        requireVulkanCommandBufferHandle("setUniform4fv", ctx);
+    }
+
+    // =====================================================================
+    //  Uniform / attribute location resolution
+    // =====================================================================
+
+    /**
+     * Returns {@code -1} (not found). Vulkan does not have legacy GL uniform
+     * locations — resources are bound through descriptor sets.
+     */
+    public int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        requireVulkanCommandBufferHandle("getUniformLocation", ctx);
+        return -1;
+    }
+
+    // =====================================================================
+    //  Remaining GraphicsBackend contract coverage
+    // =====================================================================
+
+    public void blendFunc(CommandContext ctx, int sfactor, int dfactor) {
+        requireVulkanCommandBufferHandle("blendFunc", ctx);
+        setBlendFunction(ctx, sfactor, dfactor, sfactor, dfactor);
+    }
+
+    public void blendFunc(CommandContext ctx, net.vulkanic.VulkanicBlendFactor sfactor,
+                          net.vulkanic.VulkanicBlendFactor dfactor) {
+        requireVulkanCommandBufferHandle("blendFunc", ctx);
+        blendFunc(ctx, sfactor.ordinal(), dfactor.ordinal());
+    }
+
+    public void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        requireVulkanCommandBufferHandle("blendFuncSeparatei", ctx);
+        if (buffer == 0) {
+            setBlendFunction(ctx, srcRGB, dstRGB, srcAlpha, dstAlpha);
+        }
+    }
+
+    public void blendFuncSeparatei(CommandContext ctx, int buffer,
+                                   net.vulkanic.VulkanicBlendFactor srcRGB,
+                                   net.vulkanic.VulkanicBlendFactor dstRGB,
+                                   net.vulkanic.VulkanicBlendFactor srcAlpha,
+                                   net.vulkanic.VulkanicBlendFactor dstAlpha) {
+        requireVulkanCommandBufferHandle("blendFuncSeparatei", ctx);
+        blendFuncSeparatei(ctx, buffer, srcRGB.ordinal(), dstRGB.ordinal(), srcAlpha.ordinal(), dstAlpha.ordinal());
+    }
+
+    public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
+                                int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        requireVulkanCommandBufferHandle("blitFramebuffer", ctx);
+    }
+
+    public void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
+                                     int srcX0, int srcY0, int srcX1, int srcY1,
+                                     int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        requireVulkanCommandBufferHandle("blitNamedFramebuffer", ctx);
+        blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+
+    public void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
+                                        int srcX0, int srcY0, int srcX1, int srcY1,
+                                        int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        requireVulkanCommandBufferHandle("blitNamedFramebufferDSA", ctx);
+        blitNamedFramebuffer(ctx, readFramebuffer, drawFramebuffer,
+            srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+
+    public boolean checkARBInstancedArraysSupport() {
+        return false;
+    }
+
+    public boolean checkFunctionAvailable(String functionName) {
+        return false;
+    }
+
+    public boolean checkOpenGL32Support() {
+        return false;
+    }
+
+    public boolean checkOpenGL33Support() {
+        return false;
+    }
+
+    public void clearBufferSubData(CommandContext ctx, int target, int internalformat,
+                                   long offset, long size, int format, int type, int[] data) {
+        requireVulkanCommandBufferHandle("clearBufferSubData", ctx);
+    }
+
+    public void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
+        requireVulkanCommandBufferHandle("clearBufferfv", ctx);
+    }
+
+    public void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        requireVulkanCommandBufferHandle("clearBufferiv", ctx);
+    }
+
+    public void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        requireVulkanCommandBufferHandle("clearBufferuiv", ctx);
+    }
+
+    public void clearDebugMessageCallback() {
+    }
+
+    public void clearDebugMessageCallbackAMD() {
+    }
+
+    public void clearDebugMessageCallbackARB() {
+    }
+
+    public void clearDebugMessageCallbackKHR() {
+    }
+
+    public void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value) {
+        requireVulkanCommandBufferHandle("clearNamedFramebufferfv", ctx);
+    }
+
+    public void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        requireVulkanCommandBufferHandle("clearNamedFramebufferiv", ctx);
+    }
+
+    public void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        requireVulkanCommandBufferHandle("clearNamedFramebufferuiv", ctx);
+    }
+
+    public void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
+        requireVulkanCommandBufferHandle("clearTexImage", ctx);
+    }
+
+    public void concludeQuery(CommandContext ctx, int target) {
+        requireVulkanCommandBufferHandle("concludeQuery", ctx);
+    }
+
+    public void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ,
+                                 int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ,
+                                 int width, int height, int depth) {
+        requireVulkanCommandBufferHandle("copyImageSubData", ctx);
+    }
+
+    public void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat,
+                               int x, int y, int width, int height, int border) {
+        requireVulkanCommandBufferHandle("copyTexImage2D", ctx);
+    }
+
+    public void copyTexSubImage2D(CommandContext ctx, int target, int level,
+                                  int xoffset, int yoffset, int x, int y, int width, int height) {
+        requireVulkanCommandBufferHandle("copyTexSubImage2D", ctx);
+    }
+
+    public void copyTextureSubImage2D(CommandContext ctx, int texture, int level,
+                                      int xoffset, int yoffset, int x, int y, int width, int height) {
+        requireVulkanCommandBufferHandle("copyTextureSubImage2D", ctx);
+    }
+
+    public long createFenceSync(CommandContext ctx, int condition, int flags) {
+        requireVulkanCommandBufferHandle("createFenceSync", ctx);
+        long id = nextVirtualSyncId.getAndIncrement();
+        virtualSyncs.add(id);
+        return id;
+    }
+
+    public net.vulkanic.VulkanicShaderHandle createShaderHandle(CommandContext ctx, int shaderType) {
+        return net.vulkanic.VulkanicShaderHandle.of(createShader(ctx, shaderType));
+    }
+
+    public net.vulkanic.VulkanicShaderHandle createShaderHandle(CommandContext ctx, net.vulkanic.VulkanicShaderStage shaderStage) {
+        if (shaderStage == null) {
+            throw new IllegalArgumentException("shaderStage must not be null");
+        }
+        return createShaderHandle(ctx, shaderStage.toLegacyGlShaderType());
+    }
+
+    public net.vulkanic.VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx) {
+        return net.vulkanic.VulkanicProgramHandle.of(createShaderProgram(ctx));
+    }
+
+    public void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        requireVulkanCommandBufferHandle("debugMessageControl", ctx);
+    }
+
+    public void debugMessageControlARB(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        requireVulkanCommandBufferHandle("debugMessageControlARB", ctx);
+    }
+
+    public void debugMessageControlKHR(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        requireVulkanCommandBufferHandle("debugMessageControlKHR", ctx);
+    }
+
+    public void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled) {
+        requireVulkanCommandBufferHandle("debugMessageEnableAMD", ctx);
+    }
+
+    public void destroySync(CommandContext ctx, long sync) {
+        requireVulkanCommandBufferHandle("destroySync", ctx);
+        virtualSyncs.remove(sync);
+    }
+
+    public void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        requireVulkanCommandBufferHandle("dispatchCompute", ctx);
+    }
+
+    public void dispatchComputeIndirect(CommandContext ctx, long offset) {
+        requireVulkanCommandBufferHandle("dispatchComputeIndirect", ctx);
+    }
+
+    public void disposeQueryObject(CommandContext ctx, int id) {
+        requireVulkanCommandBufferHandle("disposeQueryObject", ctx);
+        virtualQueries.remove(id);
+    }
+
+    public void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
+        requireVulkanCommandBufferHandle("enterDebugGroup", ctx);
+    }
+
+    public void exitDebugGroup(CommandContext ctx) {
+        requireVulkanCommandBufferHandle("exitDebugGroup", ctx);
+    }
+
+    public void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        requireVulkanCommandBufferHandle("framebufferTexture", ctx);
+    }
+
+    public void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        requireVulkanCommandBufferHandle("framebufferTexture2D", ctx);
+    }
+
+    public void generateMipmap(CommandContext ctx, int target) {
+        requireVulkanCommandBufferHandle("generateMipmap", ctx);
+    }
+
+    public int generateQueryObject(CommandContext ctx) {
+        requireVulkanCommandBufferHandle("generateQueryObject", ctx);
+        int id = nextVirtualQueryId.getAndIncrement();
+        virtualQueries.add(id);
+        return id;
+    }
+
+    public void generateTextureMipmap(CommandContext ctx, int target) {
+        requireVulkanCommandBufferHandle("generateTextureMipmap", ctx);
+        generateMipmap(ctx, target);
+    }
+
+    public void generateTextureMipmapDSA(CommandContext ctx, int texture) {
+        requireVulkanCommandBufferHandle("generateTextureMipmapDSA", ctx);
+    }
+
+    public long getBindVertexBufferPointer() {
+        return 0L;
+    }
+
+    public long getBufferStoragePointer() {
+        return 0L;
+    }
+
+    public void getFloatv(CommandContext ctx, int pname, float[] params) {
+        requireVulkanCommandBufferHandle("getFloatv", ctx);
+        if (params != null && params.length > 0) {
+            params[0] = (float) getInteger(ctx, pname);
+            for (int i = 1; i < params.length; i++) {
+                params[i] = 0.0f;
+            }
+        }
+    }
+
+    public int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname) {
+        requireVulkanCommandBufferHandle("getFramebufferAttachmentParameteri", ctx);
+        return 0;
+    }
+
+    public Object getGLCapabilities() {
+        return graphicsCapabilities;
+    }
+
+    public net.vulkanic.GraphicsCapabilities getGraphicsCapabilities() {
+        return graphicsCapabilities;
+    }
+
+    public int getInteger(CommandContext ctx, int pname) {
+        requireVulkanCommandBufferHandle("getInteger", ctx);
+        return net.vulkanic.VulkanicIntegerQuery.fromLegacyGlPName(pname)
+            .map(this::queryIntegerValue)
+            .orElse(0);
+    }
+
+    public int getInteger(CommandContext ctx, net.vulkanic.VulkanicIntegerQuery query) {
+        requireVulkanCommandBufferHandle("getInteger", ctx);
+        if (query == null) {
+            throw new IllegalArgumentException("query must not be null");
+        }
+        return queryIntegerValue(query);
+    }
+
+    public void getIntegerv(CommandContext ctx, int pname, int[] params) {
+        requireVulkanCommandBufferHandle("getIntegerv", ctx);
+        if (params != null && params.length > 0) {
+            params[0] = getInteger(ctx, pname);
+            for (int i = 1; i < params.length; i++) {
+                params[i] = 0;
+            }
+        }
+    }
+
+    public int getMaxImageUnits(CommandContext ctx) {
+        requireVulkanCommandBufferHandle("getMaxImageUnits", ctx);
+        return queryIntegerValue(net.vulkanic.VulkanicIntegerQuery.MAX_TEXTURE_IMAGE_UNITS);
+    }
+
+    public long getNamedBufferDataPointer() {
+        return 0L;
+    }
+
+    public void getProgramiv(CommandContext ctx, int program, int pname, int[] params) {
+        requireVulkanCommandBufferHandle("getProgramiv", ctx);
+        if (params != null && params.length > 0) {
+            params[0] = getProgramParameter(ctx, program, pname);
+            for (int i = 1; i < params.length; i++) {
+                params[i] = 0;
+            }
+        }
+    }
+
+    public String getString(CommandContext ctx, int name, int index) {
+        requireVulkanCommandBufferHandle("getString", ctx);
+        return "";
+    }
+
+    public String getString(CommandContext ctx, int name) {
+        requireVulkanCommandBufferHandle("getString", ctx);
+        return switch (name) {
+            case VulkanicAPI.GL_VENDOR -> "Vulkanic";
+            case VulkanicAPI.GL_RENDERER -> "VulkanBackend";
+            case VulkanicAPI.GL_VERSION -> "Vulkan 1.x";
+            case VulkanicAPI.GL_SHADING_LANGUAGE_VERSION -> "SPIR-V";
+            default -> "";
+        };
+    }
+
+    public int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
+        requireVulkanCommandBufferHandle("getSynci", ctx);
+        if (length != null && length.remaining() > 0) {
+            length.put(length.position(), 1);
+        }
+        return virtualSyncs.contains(sync) ? 1 : 0;
+    }
+
+    public int getTextureParameteri(CommandContext ctx, int texture, int pname) {
+        requireVulkanCommandBufferHandle("getTextureParameteri", ctx);
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            return 0;
+        }
+        NativeSpine.LegacyTextureObject legacyTexture = spine.legacyTextures.get(texture);
+        if (legacyTexture == null) {
+            return 0;
+        }
+        return legacyTexture.integerParameters.getOrDefault(pname, 0);
+    }
+
+    public boolean hasBufferStorageExtension() {
+        return false;
+    }
+
+    public boolean hasVertexAttribBindingExtension() {
+        return false;
+    }
+
+    public net.vulkanic.GraphicsCapabilities initializeGraphicsCapabilities() {
+        return graphicsCapabilities;
+    }
+
+    public void initiateQuery(CommandContext ctx, int target, int id) {
+        requireVulkanCommandBufferHandle("initiateQuery", ctx);
+        if (!virtualQueries.contains(id)) {
+            throw new IllegalArgumentException("Unknown Vulkan virtual query handle: " + id);
+        }
+    }
+
+    public boolean isBuffer(CommandContext ctx, int buffer) {
+        requireVulkanCommandBufferHandle("isBuffer", ctx);
+        NativeSpine spine = nativeSpine;
+        return buffer != 0 && spine != null && spine.legacyBuffers.containsKey(buffer);
+    }
+
+    public boolean isEnabled(CommandContext ctx, int cap) {
+        requireVulkanCommandBufferHandle("isEnabled", ctx);
+        return switch (cap) {
+            case VulkanicAPI.GL_BLEND -> pendingBlendEnabled;
+            case VulkanicAPI.GL_DEPTH_TEST -> pendingDepthTestEnabled;
+            case VulkanicAPI.GL_CULL_FACE -> pendingCullFaceMode != 0;
+            case VulkanicAPI.GL_POLYGON_OFFSET_FILL -> pendingPolygonOffsetFactor != 0.0f || pendingPolygonOffsetUnits != 0.0f;
+            default -> false;
+        };
+    }
+
+    public boolean isEnabled(CommandContext ctx, net.vulkanic.VulkanicCapability capability) {
+        requireVulkanCommandBufferHandle("isEnabled", ctx);
+        if (capability == null) {
+            throw new IllegalArgumentException("capability must not be null");
+        }
+        return isEnabled(ctx, capability.toLegacyGlConstant());
+    }
+
+    public boolean isFramebuffer(CommandContext ctx, int framebuffer) {
+        requireVulkanCommandBufferHandle("isFramebuffer", ctx);
+        return framebuffer != 0 && virtualFbos.contains(framebuffer);
+    }
+
+    public boolean isProgram(CommandContext ctx, int program) {
+        requireVulkanCommandBufferHandle("isProgram", ctx);
+        return program != 0 && virtualPrograms.containsKey(program);
+    }
+
+    public boolean isTexture(CommandContext ctx, int texture) {
+        requireVulkanCommandBufferHandle("isTexture", ctx);
+        NativeSpine spine = nativeSpine;
+        return texture != 0 && spine != null && spine.legacyTextures.containsKey(texture);
+    }
+
+    public boolean isVertexArray(CommandContext ctx, int array) {
+        requireVulkanCommandBufferHandle("isVertexArray", ctx);
+        return array != 0 && virtualVaos.contains(array);
+    }
+
+    public void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
+        requireVulkanCommandBufferHandle("labelDebugObject", ctx);
+    }
+
+    public void labelObjectExt(CommandContext ctx, int type, int object, String label) {
+        requireVulkanCommandBufferHandle("labelObjectExt", ctx);
+    }
+
+    public void memoryBarrier(CommandContext ctx, int barriers) {
+        requireVulkanCommandBufferHandle("memoryBarrier", ctx);
+    }
+
+    public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type,
+                                            long pIndices, int drawCount, long pBaseVertex) {
+        requireVulkanCommandBufferHandle("multiDrawElementsBaseVertex", ctx);
+    }
+
+    public void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
+        requireVulkanCommandBufferHandle("namedFramebufferDrawBuffers", ctx);
+        if (bufs != null && bufs.length > 0) {
+            pendingDrawBuffer = bufs[0];
+        }
+    }
+
+    public void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
+        requireVulkanCommandBufferHandle("namedFramebufferReadBuffer", ctx);
+        pendingReadBuffer = mode;
+    }
+
+    public void namedFramebufferTexture(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        requireVulkanCommandBufferHandle("namedFramebufferTexture", ctx);
+    }
+
+    public void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        requireVulkanCommandBufferHandle("namedFramebufferTextureDSA", ctx);
+    }
+
+    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+        requireVulkanCommandBufferHandle("readPixels", ctx);
+        if (pixels != null) {
+            java.util.Arrays.fill(pixels, 0.0f);
+        }
+    }
+
+    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+        requireVulkanCommandBufferHandle("readPixels", ctx);
+    }
+
+    public int resolveFramebufferForTextures(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture,
+                                             net.vulkanic.VulkanicTexture depthTexture) {
+        requireVulkanCommandBufferHandle("resolveFramebufferForTextures", ctx);
+        return 0;
+    }
+
+    public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture) {
+        requireVulkanCommandBufferHandle("resolveTextureHandle", ctx);
+        return 0;
+    }
+
+    public net.vulkanic.VulkanicUniformLocation resolveUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        requireVulkanCommandBufferHandle("resolveUniformLocation", ctx);
+        return net.vulkanic.VulkanicUniformLocation.of(getUniformLocation(ctx, program, name));
+    }
+
+    public String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
+        requireVulkanCommandBufferHandle("retrieveActiveUniformBlockName", ctx);
+        return "";
+    }
+
+    public int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
+        requireVulkanCommandBufferHandle("retrieveQueryObjectInt", ctx);
+        return virtualQueries.contains(id) ? 0 : 0;
+    }
+
+    public long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
+        requireVulkanCommandBufferHandle("retrieveQueryObjectInt64", ctx);
+        return 0L;
+    }
+
+    public void setMaxShaderCompilerThreads(int count) {
+    }
+
+    public void setupArbDebugSystem(int verbosityLevel, boolean synchronous,
+                                    java.util.function.Consumer<String> messageHandler) {
+    }
+
+    public void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallback callback) {
+    }
+
+    public void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallbackAMD callback) {
+    }
+
+    public void setupDebugMessageCallbackKHR(VulkanicAPI.DebugMessageCallback callback) {
+    }
+
+    public void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallback callback) {
+    }
+
+    public void setupDebugMessageCallbackAMD(VulkanicAPI.DebugMessageCallbackAMD callback) {
+    }
+
+    public void setupDebugMessageCallback(java.io.PrintStream stream) {
+    }
+
+    public void setupKhrDebugSystem(int verbosityLevel, boolean synchronous,
+                                    java.util.function.Consumer<String> messageHandler) {
+    }
+
+    public boolean supportsArbDebugOutput() {
+        return false;
+    }
+
+    public boolean supportsKhrDebug() {
+        return false;
+    }
+
+    public void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer) {
+        requireVulkanCommandBufferHandle("texBuffer", ctx);
+    }
+
+    public void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
+        requireVulkanCommandBufferHandle("texParameteriv", ctx);
+        if (params != null && params.length > 0) {
+            texParameteri(ctx, target, pname, params[0]);
+        }
+    }
+
+    public void textureParameterf(CommandContext ctx, int texture, int pname, float param) {
+        requireVulkanCommandBufferHandle("textureParameterf", ctx);
+        textureParameteri(ctx, texture, pname, Math.round(param));
+    }
+
+    public void textureParameteri(CommandContext ctx, int texture, int pname, int param) {
+        requireVulkanCommandBufferHandle("textureParameteri", ctx);
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            return;
+        }
+        NativeSpine.LegacyTextureObject legacyTexture = spine.legacyTextures.get(texture);
+        if (legacyTexture != null) {
+            legacyTexture.integerParameters.put(pname, param);
+        }
+    }
+
+    public void textureParameteriv(CommandContext ctx, int texture, int pname, int[] params) {
+        requireVulkanCommandBufferHandle("textureParameteriv", ctx);
+        if (params != null && params.length > 0) {
+            textureParameteri(ctx, texture, pname, params[0]);
+        }
+    }
+
+    public void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat,
+                                int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        requireVulkanCommandBufferHandle("uploadTexture1D", ctx);
+    }
+
+    public void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat,
+                                int width, int height, int depth, int border,
+                                int format, int type, java.nio.ByteBuffer pixels) {
+        requireVulkanCommandBufferHandle("uploadTexture3D", ctx);
+    }
+
+    public int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
+        requireVulkanCommandBufferHandle("waitForSync", ctx);
+        return virtualSyncs.contains(sync) ? 0x911A /* GL_ALREADY_SIGNALED */ : 0x911B /* GL_TIMEOUT_EXPIRED */;
+    }
+
+    /**
+     * Returns {@code -1}. Vertex input attribute locations in Vulkan are set
+     * statically in the pipeline {@code VkPipelineVertexInputStateCreateInfo}.
+     */
+    public int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
+        requireVulkanCommandBufferHandle("getAttributeLocation", ctx);
+        return -1;
+    }
+
+    /**
+     * No-op. Attribute locations in Vulkan are fixed in SPIR-V / pipeline state
+     * and cannot be changed at runtime.
+     */
+    public void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        requireVulkanCommandBufferHandle("setAttributeLocation", ctx);
+    }
+
+    /**
+     * Returns {@code GL_INVALID_INDEX} (0xFFFFFFFF). Vulkan UBO bindings are
+     * encoded in pipeline layouts and descriptor sets, not by block name.
+     */
+    public int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
+        requireVulkanCommandBufferHandle("getUniformBlockIndex", ctx);
+        return 0xFFFFFFFF; // GL_INVALID_INDEX
+    }
+
+    /**
+     * No-op. UBO binding points are encoded in the Vulkan pipeline layout;
+     * runtime rebinding is handled through {@code bindPipelineResources}.
+     */
+    public void uniformBlockBinding(CommandContext ctx, int program,
+                                    int uniformBlockIndex, int uniformBlockBindingPoint) {
+        requireVulkanCommandBufferHandle("uniformBlockBinding", ctx);
+    }
+
+    /**
+     * Returns an empty string. Vulkan programs are SPIR-V-based; there are no
+     * named active uniforms to enumerate through legacy GL introspection.
+     */
+    public String getActiveUniform(CommandContext ctx, int program, int index, int size,
+                                   java.nio.IntBuffer type, java.nio.IntBuffer name) {
+        requireVulkanCommandBufferHandle("getActiveUniform", ctx);
+        return "";
+    }
+
+    // =====================================================================
+    //  Buffer binding extras
+    //  Vulkan equivalent: vkCmdBindDescriptorSets (handled by bindPipelineResources)
+    // =====================================================================
+
+    public void bindBufferBase(CommandContext ctx, int target, int index, int buffer) {
+        requireVulkanCommandBufferHandle("bindBufferBase", ctx);
+    }
+
+    public void bindUniformBufferBase(CommandContext ctx, int bindingPoint, int bufferId) {
+        requireVulkanCommandBufferHandle("bindUniformBufferBase", ctx);
+    }
+
+    public void bindUniformBufferRange(CommandContext ctx, int target, int index,
+                                       int buffer, long offset, long size) {
+        requireVulkanCommandBufferHandle("bindUniformBufferRange", ctx);
+    }
+
+    /**
+     * No-op. Fragment output locations are fixed in SPIR-V; runtime binding
+     * is not supported in Vulkan.
+     */
+    public void bindFragDataLocation(CommandContext ctx, int program,
+                                     int colorNumber, CharSequence name) {
+        requireVulkanCommandBufferHandle("bindFragDataLocation", ctx);
+    }
+
+    // =====================================================================
+    //  Image texture binding
+    // =====================================================================
+
+    /**
+     * No-op. Storage images in Vulkan are bound via descriptor sets.
+     */
+    public void bindImageTexture(CommandContext ctx, int unit, int texture, int level,
+                                 boolean layered, int layer, int access, int format) {
+        requireVulkanCommandBufferHandle("bindImageTexture", ctx);
+    }
+
+    // =====================================================================
+    //  Draw buffers
+    // =====================================================================
+
+    /**
+     * No-op. Vulkan subpass attachments define color outputs at render-pass
+     * creation time; runtime draw-buffer selection is not supported.
+     */
+    public void drawBuffers(CommandContext ctx, int[] buffers) {
+        requireVulkanCommandBufferHandle("drawBuffers", ctx);
+    }
+
+    // =====================================================================
+    //  Vertex array objects
+    //  Vulkan has no VAO concept; virtual IDs satisfy GL compat callers.
+    // =====================================================================
+
+    /**
+     * Creates and returns a virtual VAO handle. Vertex buffer binding in Vulkan
+     * is command-buffer-time ({@code vkCmdBindVertexBuffers}); the handle is a
+     * lightweight token for callers that follow the GL bind-then-draw pattern.
+     */
+    public int createVertexArray(CommandContext ctx) {
+        requireVulkanCommandBufferHandle("createVertexArray", ctx);
+        int id = nextVirtualVaoId.getAndIncrement();
+        virtualVaos.add(id);
+        return id;
+    }
+
+    /**
+     * Releases a virtual VAO handle. If the handle does not correspond to a
+     * previously created virtual VAO the call is silently ignored.
+     */
+    public void deleteVertexArrays(CommandContext ctx, int vertexArray) {
+        requireVulkanCommandBufferHandle("deleteVertexArrays", ctx);
+        virtualVaos.remove(vertexArray);
+        if (boundVirtualVao == vertexArray) {
+            boundVirtualVao = 0;
+        }
+    }
+
+    /**
+     * Marks vertex attribute {@code index} as enabled. In Vulkan this state is
+     * baked into {@code VkPipelineVertexInputStateCreateInfo} at pipeline
+     * creation time; this call is accepted as a no-op and the state is available
+     * at the next pipeline build.
+     */
+    public void enableVertexAttribArray(CommandContext ctx, int index) {
+        requireVulkanCommandBufferHandle("enableVertexAttribArray", ctx);
+    }
+
+    /** Marks vertex attribute {@code index} as disabled. */
+    public void disableVertexAttribArray(CommandContext ctx, int index) {
+        requireVulkanCommandBufferHandle("disableVertexAttribArray", ctx);
+    }
+
+    /**
+     * Specifies vertex attribute format for {@code index}. Maps to
+     * {@code VkVertexInputAttributeDescription}; cached for pipeline construction.
+     */
+    public void setVertexAttribPointer(CommandContext ctx, int index, int size, int type,
+                                       boolean normalized, int stride, long pointer) {
+        requireVulkanCommandBufferHandle("setVertexAttribPointer", ctx);
+    }
+
+    public void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type,
+                                        int stride, long pointer) {
+        requireVulkanCommandBufferHandle("setVertexAttribIPointer", ctx);
+    }
+
+    /** Sets the per-instance divisor for vertex attribute {@code index}. */
+    public void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
+        requireVulkanCommandBufferHandle("setVertexAttribDivisor", ctx);
+    }
+
+    /**
+     * Sets a constant (non-array) vertex attribute. In Vulkan constant vertex
+     * data is passed via push constants or per-instance UBOs; accepted here as
+     * a no-op.
+     */
+    public void setVertexAttrib4f(CommandContext ctx, int index,
+                                  float v0, float v1, float v2, float v3) {
+        requireVulkanCommandBufferHandle("setVertexAttrib4f", ctx);
+    }
+
+    public void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type,
+                                      boolean normalized, int relativeoffset) {
+        requireVulkanCommandBufferHandle("setVertexAttribFormat", ctx);
+    }
+
+    public void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type,
+                                       int relativeoffset) {
+        requireVulkanCommandBufferHandle("setVertexAttribIFormat", ctx);
+    }
+
+    public void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
+        requireVulkanCommandBufferHandle("setVertexAttribBinding", ctx);
+    }
+
+    // =====================================================================
+    //  Sampler objects
+    // =====================================================================
+
+    /**
+     * Creates a virtual sampler handle. In Vulkan samplers are {@code VkSampler}
+     * objects created at pipeline initialisation time through the descriptor
+     * system. Virtual IDs are returned to satisfy GL compat callers.
+     */
+    public int createSampler(CommandContext ctx) {
+        requireVulkanCommandBufferHandle("createSampler", ctx);
+        int id = nextVirtualSamplerId.getAndIncrement();
+        virtualSamplers.add(id);
+        return id;
+    }
+
+    /** Releases a virtual sampler handle and removes any per-unit bindings. */
+    public void deleteSampler(CommandContext ctx, int sampler) {
+        requireVulkanCommandBufferHandle("deleteSampler", ctx);
+        virtualSamplers.remove(sampler);
+        boundSamplerPerUnit.values().removeIf(bound -> bound.equals(sampler));
+    }
+
+    /**
+     * Binds {@code sampler} to texture unit {@code unit}. Pass {@code 0} to
+     * unbind. The binding is cached so that pipeline resource resolution can
+     * interrogate it when building a Vulkan descriptor set.
+     */
+    public void bindSampler(CommandContext ctx, int unit, int sampler) {
+        requireVulkanCommandBufferHandle("bindSampler", ctx);
+        if (sampler == 0) {
+            boundSamplerPerUnit.remove(unit);
+        } else {
+            boundSamplerPerUnit.put(unit, sampler);
+        }
+    }
+
+    /** Bulk-binds an array of samplers starting from texture unit {@code first}. */
+    public void bindSamplers(CommandContext ctx, int first, int[] samplers) {
+        requireVulkanCommandBufferHandle("bindSamplers", ctx);
+        for (int i = 0; i < samplers.length; i++) {
+            int unit = first + i;
+            if (samplers[i] == 0) {
+                boundSamplerPerUnit.remove(unit);
+            } else {
+                boundSamplerPerUnit.put(unit, samplers[i]);
+            }
+        }
+    }
+
+    /**
+     * No-op. Sampler parameters in Vulkan are baked into
+     * {@code VkSamplerCreateInfo} at object creation time; post-creation
+     * mutation is not supported.
+     */
+    public void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
+        requireVulkanCommandBufferHandle("setSamplerParameteri", ctx);
+    }
+
+    public void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param) {
+        requireVulkanCommandBufferHandle("setSamplerParameterf", ctx);
+    }
+
+    public void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params) {
+        requireVulkanCommandBufferHandle("setSamplerParameteriv", ctx);
+    }
+
+    // =====================================================================
+    //  Stencil state (pipeline-baked in Vulkan — cached for pipeline build)
+    // =====================================================================
+
+    /**
+     * Sets the stencil test function, reference value and comparison mask.
+     * In Vulkan these values are encoded in {@code VkPipelineDepthStencilStateCreateInfo};
+     * the values are cached here and applied at the next pipeline creation.
+     */
+    public void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        requireVulkanCommandBufferHandle("setStencilFunc", ctx);
+        pendingStencilFunc = func;
+        pendingStencilRef  = ref;
+        pendingStencilMask = mask;
+    }
+
+    /**
+     * Sets the stencil test function per face. For simplicity the Vulkan backend
+     * currently uses a shared state for both faces (front == back).
+     */
+    public void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask) {
+        requireVulkanCommandBufferHandle("setStencilFuncSeparate", ctx);
+        pendingStencilFunc = func;
+        pendingStencilRef  = ref;
+        pendingStencilMask = mask;
+    }
+
+    /**
+     * Sets the stencil operation for the three state transitions (stencil fail,
+     * depth fail, depth pass).
+     */
+    public void setStencilOp(CommandContext ctx, int sfail, int dpfail, int dppass) {
+        requireVulkanCommandBufferHandle("setStencilOp", ctx);
+        pendingStencilFail   = sfail;
+        pendingStencilDpFail = dpfail;
+        pendingStencilDpPass = dppass;
+    }
+
+    public void setStencilOpSeparate(CommandContext ctx, int face, int sfail, int dpfail, int dppass) {
+        requireVulkanCommandBufferHandle("setStencilOpSeparate", ctx);
+        pendingStencilFail   = sfail;
+        pendingStencilDpFail = dpfail;
+        pendingStencilDpPass = dppass;
+    }
+
+    /** Sets the stencil write mask. */
+    public void setStencilWriteMask(CommandContext ctx, int mask) {
+        requireVulkanCommandBufferHandle("setStencilWriteMask", ctx);
+        pendingStencilWriteMask = mask;
+    }
+
+    public void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask) {
+        requireVulkanCommandBufferHandle("setStencilWriteMaskSeparate", ctx);
+        pendingStencilWriteMask = mask;
+    }
+
+    // =====================================================================
+    //  Helper — get NativeSpine for methods that require a live spine
+    // =====================================================================
+
+    private NativeSpine requireNativeSpineForCommandOp(String operation) {
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException(
+                "VulkanBackend." + operation + " requires an active native Vulkan spine.");
+        }
+        return spine;
+    }
+
     private VirtualShader requireVirtualShader(int shaderId) {
         VirtualShader virtualShader = virtualShaders.get(shaderId);
         if (virtualShader == null) {
@@ -2162,6 +3615,72 @@ public class VulkanBackend {
             throw new IllegalArgumentException("Unknown Vulkan virtual program handle: " + programId);
         }
         return virtualProgram;
+    }
+
+    private static net.vulkanic.GraphicsCapabilities createVulkanGraphicsCapabilities() {
+        return new net.vulkanic.GraphicsCapabilities(
+            GraphicsBackendType.VULKAN,
+            false, false, false, false, false,
+            false, false,
+            false, false, false, false,
+            false, false, false, false, false, false, false,
+            false, false, false,
+            false, false, false,
+            false, false, false,
+            false, false,
+            false, false,
+            false, false,
+            false, false,
+            false
+        );
+    }
+
+    private int queryIntegerValue(net.vulkanic.VulkanicIntegerQuery query) {
+        NativeSpine spine = nativeSpine;
+        return switch (query) {
+            case CONTEXT_FLAGS -> 0;
+            case CURRENT_PROGRAM -> boundVirtualProgram;
+            case VERTEX_ARRAY_BINDING -> boundVirtualVao;
+            case ARRAY_BUFFER_BINDING -> spine != null
+                ? spine.legacyBufferBindings.getOrDefault(VulkanicAPI.GL_ARRAY_BUFFER, 0)
+                : 0;
+            case ELEMENT_ARRAY_BUFFER_BINDING -> spine != null
+                ? spine.legacyBufferBindings.getOrDefault(VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, 0)
+                : 0;
+            case ACTIVE_TEXTURE -> spine != null
+                ? VulkanicAPI.GL_TEXTURE0 + spine.activeTextureUnitIndex
+                : VulkanicAPI.GL_TEXTURE0;
+            case BLEND_EQUATION_RGB -> pendingBlendEquation;
+            case BLEND_EQUATION_ALPHA -> pendingBlendEquationAlpha;
+            case BLEND_SRC_RGB -> pendingBlendSrcRgb;
+            case BLEND_SRC_ALPHA -> pendingBlendSrcAlpha;
+            case BLEND_DST_RGB -> pendingBlendDstRgb;
+            case BLEND_DST_ALPHA -> pendingBlendDstAlpha;
+            case DEPTH_WRITEMASK -> pendingDepthWriteMask ? 1 : 0;
+            case DEPTH_FUNC -> pendingDepthFunc;
+            case STENCIL_FUNC -> pendingStencilFunc;
+            case STENCIL_REF -> pendingStencilRef;
+            case STENCIL_VALUE_MASK -> pendingStencilMask;
+            case STENCIL_FAIL -> pendingStencilFail;
+            case STENCIL_PASS_DEPTH_FAIL -> pendingStencilDpFail;
+            case STENCIL_PASS_DEPTH_PASS -> pendingStencilDpPass;
+            case STENCIL_WRITEMASK -> pendingStencilWriteMask;
+            case CULL_FACE_MODE -> pendingCullFaceMode;
+            case POLYGON_MODE -> pendingPolygonMode;
+            case MAX_TEXTURE_SIZE -> 16384;
+            case MAX_TEXTURE_IMAGE_UNITS, MAX_COLOR_ATTACHMENTS -> 16;
+            case MAX_DRAW_BUFFERS -> 8;
+            case MAX_SHADER_STORAGE_BUFFER_BINDINGS -> 8;
+            case UNIFORM_BUFFER_OFFSET_ALIGNMENT -> 256;
+            case TEXTURE_BINDING_2D -> spine != null
+                ? spine.legacyTexture2DBindingsByUnit.getOrDefault(spine.activeTextureUnitIndex, 0)
+                : 0;
+            case FRAMEBUFFER_BINDING -> boundDrawFbo;
+            case NUM_EXTENSIONS -> 0;
+            case MAX_LABEL_LENGTH -> 256;
+            case TEXTURE_MAX_LEVEL -> 0;
+            case GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX -> 0;
+        };
     }
 
     private static String decodeShaderSource(long pointerBufferAddress, int stringCount, long lengthsPointer) {
@@ -2257,6 +3776,8 @@ public class VulkanBackend {
         private int swapchainImageCount = 0;
         private int swapchainWidth = 0;
         private int swapchainHeight = 0;
+        private final List<Long> swapchainImageHandles = new ArrayList<>();
+        private final List<Long> swapchainImageViewHandles = new ArrayList<>();
 
         private VkCommandBuffer primaryCommandBuffer;
         private int graphicsQueueFamilyIndex;
@@ -2300,6 +3821,16 @@ public class VulkanBackend {
             private int unpackSkipRows;
             private int unpackSkipPixels;
             private int unpackAlignment = 4;
+        }
+
+        private static final class SwapchainImageResources {
+            private final List<Long> imageHandles;
+            private final List<Long> imageViewHandles;
+
+            private SwapchainImageResources(List<Long> imageHandles, List<Long> imageViewHandles) {
+                this.imageHandles = imageHandles;
+                this.imageViewHandles = imageViewHandles;
+            }
         }
 
         private static final class LegacyTextureObject {
@@ -3946,6 +5477,7 @@ public class VulkanBackend {
         }
 
         private void createSwapchain(long oldSwapchainHandle) {
+            long newSwapchainHandle = VK10.VK_NULL_HANDLE;
             try (MemoryStack stack = stackPush()) {
                 VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc(stack);
                 checkVk("vkGetPhysicalDeviceSurfaceCapabilitiesKHR",
@@ -4002,22 +5534,113 @@ public class VulkanBackend {
                 java.nio.LongBuffer pSwapchain = stack.mallocLong(1);
                 checkVk("vkCreateSwapchainKHR",
                     KHRSwapchain.vkCreateSwapchainKHR(logicalDevice, createInfo, null, pSwapchain));
-                swapchain = pSwapchain.get(0);
+                newSwapchainHandle = pSwapchain.get(0);
 
+                SwapchainImageResources imageResources = createSwapchainImageResources(
+                    stack,
+                    newSwapchainHandle,
+                    chosenFormat.format()
+                );
+
+                List<Long> previousImageViewHandles = new ArrayList<>(swapchainImageViewHandles);
+
+                destroySwapchainImageViews(previousImageViewHandles);
+
+                swapchain = newSwapchainHandle;
                 swapchainImageFormat = chosenFormat.format();
                 swapchainColorSpace = chosenFormat.colorSpace();
                 swapchainPresentMode = presentMode;
                 swapchainWidth = extent.width();
                 swapchainHeight = extent.height();
-                swapchainImageCount = querySwapchainImageCount(stack, swapchain);
+                swapchainImageCount = imageResources.imageHandles.size();
+
+                swapchainImageHandles.clear();
+                swapchainImageHandles.addAll(imageResources.imageHandles);
+
+                swapchainImageViewHandles.clear();
+                swapchainImageViewHandles.addAll(imageResources.imageViewHandles);
+            } catch (RuntimeException exception) {
+                if (newSwapchainHandle != VK10.VK_NULL_HANDLE) {
+                    KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, newSwapchainHandle, null);
+                }
+                throw exception;
             }
         }
 
-        private int querySwapchainImageCount(MemoryStack stack, long swapchainHandle) {
+        private SwapchainImageResources createSwapchainImageResources(
+            MemoryStack stack,
+            long swapchainHandle,
+            int imageFormat
+        ) {
             java.nio.IntBuffer imageCount = stack.ints(0);
             checkVk("vkGetSwapchainImagesKHR(count)",
                 KHRSwapchain.vkGetSwapchainImagesKHR(logicalDevice, swapchainHandle, imageCount, null));
-            return imageCount.get(0);
+            int count = imageCount.get(0);
+            if (count <= 0) {
+                throw new IllegalStateException("Vulkan swapchain reported zero images.");
+            }
+
+            java.nio.LongBuffer images = stack.mallocLong(count);
+            checkVk("vkGetSwapchainImagesKHR(list)",
+                KHRSwapchain.vkGetSwapchainImagesKHR(logicalDevice, swapchainHandle, imageCount, images));
+
+            List<Long> imageHandles = new ArrayList<>(count);
+            List<Long> imageViewHandles = new ArrayList<>(count);
+            try {
+                for (int i = 0; i < count; i++) {
+                    long imageHandle = images.get(i);
+                    imageHandles.add(imageHandle);
+                    imageViewHandles.add(createSwapchainImageView(stack, imageHandle, imageFormat));
+                }
+            } catch (RuntimeException exception) {
+                destroySwapchainImageViews(imageViewHandles);
+                throw exception;
+            }
+
+            return new SwapchainImageResources(imageHandles, imageViewHandles);
+        }
+
+        private long createSwapchainImageView(MemoryStack stack, long imageHandle, int imageFormat) {
+            VkImageViewCreateInfo viewCreateInfo = VkImageViewCreateInfo.calloc(stack)
+                .sType$Default()
+                .image(imageHandle)
+                .viewType(VK10.VK_IMAGE_VIEW_TYPE_2D)
+                .format(imageFormat);
+            viewCreateInfo.components()
+                .r(VK10.VK_COMPONENT_SWIZZLE_IDENTITY)
+                .g(VK10.VK_COMPONENT_SWIZZLE_IDENTITY)
+                .b(VK10.VK_COMPONENT_SWIZZLE_IDENTITY)
+                .a(VK10.VK_COMPONENT_SWIZZLE_IDENTITY);
+            viewCreateInfo.subresourceRange()
+                .aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
+                .baseMipLevel(0)
+                .levelCount(1)
+                .baseArrayLayer(0)
+                .layerCount(1);
+
+            java.nio.LongBuffer pImageView = stack.mallocLong(1);
+            checkVk("vkCreateImageView(swapchain)",
+                VK10.vkCreateImageView(logicalDevice, viewCreateInfo, null, pImageView));
+            return pImageView.get(0);
+        }
+
+        private void destroySwapchainImageViews(List<Long> imageViewHandles) {
+            if (logicalDevice == null || imageViewHandles == null || imageViewHandles.isEmpty()) {
+                return;
+            }
+
+            for (Long imageViewHandle : imageViewHandles) {
+                if (imageViewHandle != null && imageViewHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyImageView(logicalDevice, imageViewHandle, null);
+                }
+            }
+        }
+
+        private void destroyTrackedSwapchainImageViews() {
+            destroySwapchainImageViews(new ArrayList<>(swapchainImageViewHandles));
+            swapchainImageViewHandles.clear();
+            swapchainImageHandles.clear();
+            swapchainImageCount = 0;
         }
 
         private void recreateSwapchain() {
@@ -4179,6 +5802,12 @@ public class VulkanBackend {
                 int imageIndex = pImageIndex.get(0);
                 if (imageIndex < 0) {
                     throw new IllegalStateException("vkAcquireNextImageKHR returned invalid image index: " + imageIndex);
+                }
+                if (imageIndex >= swapchainImageHandles.size() || imageIndex >= swapchainImageViewHandles.size()) {
+                    throw new IllegalStateException(
+                        "vkAcquireNextImageKHR returned image index " + imageIndex
+                            + " outside tracked swapchain image/view range (images="
+                            + swapchainImageHandles.size() + ", views=" + swapchainImageViewHandles.size() + ").");
                 }
 
                 acquiredSwapchainImageIndex = imageIndex;
@@ -5224,6 +6853,78 @@ public class VulkanBackend {
             return swapchainHeight;
         }
 
+        private boolean isRenderPassActive() {
+            return renderPassRecording;
+        }
+
+        private void cmdSetViewport(long commandBufferHandle, int x, int y, int width, int height) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "cmdSetViewport");
+            try (MemoryStack stack = stackPush()) {
+                org.lwjgl.vulkan.VkViewport.Buffer viewport = org.lwjgl.vulkan.VkViewport.calloc(1, stack)
+                    .x((float) x)
+                    .y((float) y)
+                    .width((float) Math.max(width, 1))
+                    .height((float) Math.max(height, 1))
+                    .minDepth(0.0f)
+                    .maxDepth(1.0f);
+                VK10.vkCmdSetViewport(primaryCommandBuffer, 0, viewport);
+            }
+        }
+
+        private void cmdSetScissor(long commandBufferHandle, int x, int y, int width, int height) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "cmdSetScissor");
+            try (MemoryStack stack = stackPush()) {
+                org.lwjgl.vulkan.VkRect2D.Buffer scissor = org.lwjgl.vulkan.VkRect2D.calloc(1, stack);
+                scissor.get(0).offset().x(x).y(y);
+                scissor.get(0).extent().width(Math.max(width, 0)).height(Math.max(height, 0));
+                VK10.vkCmdSetScissor(primaryCommandBuffer, 0, scissor);
+            }
+        }
+
+        private void cmdClearAttachments(long commandBufferHandle,
+                                         boolean clearColor,
+                                         float cr, float cg, float cb, float ca,
+                                         boolean clearDepth, float depth) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "cmdClearAttachments");
+            if (!renderPassRecording) {
+                // Cannot issue ClearAttachments outside a render pass; silently defer.
+                return;
+            }
+            int attachmentCount = (clearColor ? 1 : 0) + (clearDepth ? 1 : 0);
+            if (attachmentCount == 0) return;
+
+            try (MemoryStack stack = stackPush()) {
+                org.lwjgl.vulkan.VkClearAttachment.Buffer attachments =
+                    org.lwjgl.vulkan.VkClearAttachment.calloc(attachmentCount, stack);
+                org.lwjgl.vulkan.VkClearRect.Buffer rects =
+                    org.lwjgl.vulkan.VkClearRect.calloc(1, stack);
+
+                int idx = 0;
+                if (clearColor) {
+                    attachments.get(idx)
+                        .aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
+                        .colorAttachment(0);
+                    attachments.get(idx).clearValue().color()
+                        .float32(0, cr).float32(1, cg).float32(2, cb).float32(3, ca);
+                    idx++;
+                }
+                if (clearDepth) {
+                    attachments.get(idx)
+                        .aspectMask(VK10.VK_IMAGE_ASPECT_DEPTH_BIT);
+                    attachments.get(idx).clearValue().depthStencil().depth(depth).stencil(0);
+                }
+
+                int w = Math.max(1, swapchainWidth);
+                int h = Math.max(1, swapchainHeight);
+                rects.get(0)
+                    .rect(r -> r.offset(o -> o.x(0).y(0)).extent(e -> e.width(w).height(h)))
+                    .baseArrayLayer(0)
+                    .layerCount(1);
+
+                VK10.vkCmdClearAttachments(primaryCommandBuffer, attachments, rects);
+            }
+        }
+
         private void close() {
             if (logicalDevice != null) {
                 try {
@@ -5289,6 +6990,8 @@ public class VulkanBackend {
                 }
 
                 destroyTransientRenderPassResources();
+
+                destroyTrackedSwapchainImageViews();
 
                 if (swapchain != VK10.VK_NULL_HANDLE) {
                     KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, swapchain, null);

@@ -5,6 +5,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Verifies backend-neutral Vulkan surface/swapchain diagnostics and lifecycle hooks.
  */
 public class VulkanSwapchainSurfaceInfoTest {
+
+    private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
 
     @BeforeEach
     public void beforeEach() throws Exception {
@@ -111,6 +116,23 @@ public class VulkanSwapchainSurfaceInfoTest {
                 "Conditional swapchain recreation should also fail hard when native Vulkan is unavailable");
             assertTrue(conditionalException.getMessage().contains("Readiness report:"));
         }
+    }
+
+    @Test
+    public void testSwapchainSourceTracksImageViewsAcrossLifecycle() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("vkGetSwapchainImagesKHR(list)"),
+            "Swapchain lifecycle should enumerate swapchain images during creation/recreation");
+        assertTrue(source.contains("vkCreateImageView(swapchain)"),
+            "Swapchain lifecycle should materialize VkImageView handles for swapchain images");
+        assertTrue(source.contains("swapchainImageViewHandles"),
+            "Swapchain lifecycle should track swapchain image view handles for cleanup/recreation");
+        assertTrue(source.contains("destroyTrackedSwapchainImageViews()"),
+            "Swapchain lifecycle should destroy tracked image views during teardown");
+        assertTrue(source.contains("outside tracked swapchain image/view range"),
+            "Frame acquisition should validate acquired image indices against tracked swapchain resources");
     }
 
     private static void resetBackendState() throws Exception {

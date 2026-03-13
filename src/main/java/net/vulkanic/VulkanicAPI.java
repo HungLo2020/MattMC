@@ -861,6 +861,45 @@ public class VulkanicAPI {
         return initializeNativeVulkanRuntime().toMultilineString();
     }
 
+    /**
+     * Performs fail-hard native Vulkan runtime initialization during renderer
+     * startup only when Vulkan backend routing is already selected.
+     *
+     * <p>This method intentionally avoids implicit backend initialization. If
+     * backend routing has not been selected yet, it is treated as a no-op.
+     * OpenGL routing is also a no-op.</p>
+     *
+     * <p>When Vulkan routing is selected but native bring-up fails, this throws
+     * an {@link IllegalStateException} containing initialization diagnostics.</p>
+     */
+    public static void initializeNativeVulkanRuntimeOnRendererStartupIfSelected() {
+        GraphicsBackend activeBackend = backend;
+        if (activeBackend == null || activeBackend.getBackendType() != GraphicsBackendType.VULKAN) {
+            return;
+        }
+
+        VulkanNativeInitializationInfo info = activeBackend.initializeNativeVulkanRuntime();
+        if (!info.isNativeVulkanReady()) {
+            throw new IllegalStateException(
+                "Vulkan backend is selected but native Vulkan runtime initialization failed during renderer startup.\n"
+                    + info.toMultilineString());
+        }
+
+        VulkanExecutionContextInfo executionContextInfo = activeBackend.getVulkanExecutionContextInfo();
+        if (!executionContextInfo.isAvailable()) {
+            throw new IllegalStateException(
+                "Vulkan backend is selected but execution context is unavailable during renderer startup.\n"
+                    + executionContextInfo.toMultilineString());
+        }
+
+        VulkanSwapchainSurfaceInfo swapchainSurfaceInfo = activeBackend.getVulkanSwapchainSurfaceInfo();
+        if (!swapchainSurfaceInfo.isAvailable()) {
+            throw new IllegalStateException(
+                "Vulkan backend is selected but swapchain/surface is unavailable during renderer startup.\n"
+                    + swapchainSurfaceInfo.toMultilineString());
+        }
+    }
+
     private static GraphicsBackend createFailFastVulkanProxy(VulkanBackend vulkanBackend) {
         java.util.Map<Method, java.util.Optional<Method>> methodCache = new ConcurrentHashMap<>();
 
