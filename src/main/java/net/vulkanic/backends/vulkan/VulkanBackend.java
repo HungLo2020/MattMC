@@ -16,6 +16,8 @@ import net.vulkanic.VulkanicSpirvModule;
 import net.vulkanic.VulkanExecutionContextInfo;
 import net.vulkanic.VulkanNativeInitializationInfo;
 import net.vulkanic.VulkanSwapchainSurfaceInfo;
+import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicResourceBarriers;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
@@ -58,6 +60,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.nio.ByteOrder;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -289,9 +292,10 @@ public class VulkanBackend {
         if (lwjglBindingsPresent) {
             try {
                 org.lwjgl.PointerBuffer requiredExtensions = GLFWVulkan.glfwGetRequiredInstanceExtensions();
-                glfwRequiredExtensionsPresent = requiredExtensions != null && requiredExtensions.remaining() > 0;
+                int requiredExtensionCount = requiredExtensions == null ? 0 : requiredExtensions.remaining();
+                glfwRequiredExtensionsPresent = requiredExtensionCount > 0;
                 glfwExtensionsStatus = glfwRequiredExtensionsPresent
-                    ? "available (count=" + requiredExtensions.remaining() + ")"
+                    ? "available (count=" + requiredExtensionCount + ")"
                     : "unavailable (glfwGetRequiredInstanceExtensions returned null/empty)";
             } catch (Throwable throwable) {
                 glfwExtensionsStatus = "probe failed (" + compactThrowable(throwable) + ")";
@@ -635,6 +639,268 @@ public class VulkanBackend {
         return spine.mapManagedBuffer(vulkanBuffer, read, write);
     }
 
+    public int createBuffer(CommandContext ctx) {
+        ensureNativeReady("createBuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.createLegacyBuffer();
+    }
+
+    public void createBuffers(CommandContext ctx, int[] buffers) {
+        if (buffers == null) {
+            throw new IllegalArgumentException("buffers must not be null");
+        }
+        ensureNativeReady("createBuffers");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.createLegacyBuffers(buffers);
+    }
+
+    public void deleteBuffer(CommandContext ctx, int buffer) {
+        ensureNativeReady("deleteBuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.deleteLegacyBuffer(buffer);
+    }
+
+    public void bindBuffer(CommandContext ctx, int target, int buffer) {
+        ensureNativeReady("bindBuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.bindLegacyBuffer(target, buffer);
+    }
+
+    public void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
+        if (target == null) {
+            throw new IllegalArgumentException("target must not be null");
+        }
+        bindBuffer(ctx, target.toLegacyGlTarget(), buffer);
+    }
+
+    public void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage) {
+        if (data == null) {
+            throw new IllegalArgumentException("data must not be null");
+        }
+        ensureNativeReady("bufferData");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.bufferDataByTarget(target, data.duplicate(), usage);
+    }
+
+    public void bufferData(CommandContext ctx, int target, long size, int usage) {
+        if (size < 0L || size > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("size must be in [0, " + Integer.MAX_VALUE + "], got: " + size);
+        }
+        ensureNativeReady("bufferData");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.bufferDataByTarget(target, (int) size, usage);
+    }
+
+    public void bufferData(CommandContext ctx, int target, float[] data, int usage) {
+        if (data == null) {
+            throw new IllegalArgumentException("data must not be null");
+        }
+        java.nio.ByteBuffer byteBuffer = java.nio.ByteBuffer.allocateDirect(data.length * Float.BYTES)
+            .order(ByteOrder.nativeOrder());
+        byteBuffer.asFloatBuffer().put(data);
+        bufferData(ctx, target, byteBuffer, usage);
+    }
+
+    public void bufferData(CommandContext ctx, int target, int[] data, int usage) {
+        if (data == null) {
+            throw new IllegalArgumentException("data must not be null");
+        }
+        java.nio.ByteBuffer byteBuffer = java.nio.ByteBuffer.allocateDirect(data.length * Integer.BYTES)
+            .order(ByteOrder.nativeOrder());
+        byteBuffer.asIntBuffer().put(data);
+        bufferData(ctx, target, byteBuffer, usage);
+    }
+
+    public void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
+        if (data == null) {
+            throw new IllegalArgumentException("data must not be null");
+        }
+        ensureNativeReady("bufferSubData");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.bufferSubDataByTarget(target, offset, data.duplicate());
+    }
+
+    public void bufferStorage(CommandContext ctx, int target, long size, int flags) {
+        if (size < 0L || size > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("size must be in [0, " + Integer.MAX_VALUE + "], got: " + size);
+        }
+        ensureNativeReady("bufferStorage");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.bufferStorageByTarget(target, (int) size, flags);
+    }
+
+    public void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
+        if (data == null) {
+            throw new IllegalArgumentException("data must not be null");
+        }
+        ensureNativeReady("bufferStorage");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.bufferStorageByTarget(target, data.duplicate(), flags);
+    }
+
+    public void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        ensureNativeReady("copyBufferSubData");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.copyBufferSubDataByTarget(readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+
+    public java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
+        ensureNativeReady("mapBuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.mapBufferByTarget(target, offset, length, access);
+    }
+
+    public void unmapBuffer(CommandContext ctx, int target) {
+        ensureNativeReady("unmapBuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.unmapBufferByTarget(target);
+    }
+
+    public void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
+        ensureNativeReady("flushMappedBufferRange");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.flushMappedBufferRangeByTarget(target, offset, length);
+    }
+
+    public int createBufferDSA(CommandContext ctx) {
+        return createBuffer(ctx);
+    }
+
+    public void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        if (size < 0L || size > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("size must be in [0, " + Integer.MAX_VALUE + "], got: " + size);
+        }
+        ensureNativeReady("namedBufferDataDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.namedBufferData((int) buffer, (int) size, usage);
+    }
+
+    public void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        if (data == null) {
+            throw new IllegalArgumentException("data must not be null");
+        }
+        ensureNativeReady("namedBufferDataDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.namedBufferData((int) buffer, data.duplicate(), usage);
+    }
+
+    public void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        if (data == null) {
+            throw new IllegalArgumentException("data must not be null");
+        }
+        ensureNativeReady("namedBufferSubDataDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.namedBufferSubData(buffer, offset, data.duplicate());
+    }
+
+    public void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
+        if (size < 0L || size > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("size must be in [0, " + Integer.MAX_VALUE + "], got: " + size);
+        }
+        ensureNativeReady("namedBufferStorageDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.namedBufferStorage(buffer, (int) size, flags);
+    }
+
+    public void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        if (data == null) {
+            throw new IllegalArgumentException("data must not be null");
+        }
+        ensureNativeReady("namedBufferStorageDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.namedBufferStorage(buffer, data.duplicate(), flags);
+    }
+
+    public java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
+        ensureNativeReady("mapNamedBufferRangeDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.mapNamedBufferRange(buffer, offset, length, access);
+    }
+
+    public void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
+        ensureNativeReady("unmapNamedBufferDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.unmapNamedBuffer(buffer);
+    }
+
+    public void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
+        ensureNativeReady("flushMappedNamedBufferRangeDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.flushMappedNamedBufferRange(buffer, offset, length);
+    }
+
+    public void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        ensureNativeReady("copyNamedBufferSubDataDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        spine.copyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size);
+    }
+
     public VulkanicTexture createManagedTexture(String label, int usage, VulkanicTextureFormat format,
                                                  int width, int height, int depthOrLayers, int mipLevels) {
         // Argument validation runs before ensureNativeReady so callers always get
@@ -743,9 +1009,107 @@ public class VulkanBackend {
     }
 
     public void applyResourceBarriers(CommandContext ctx,
-            net.vulkanic.VulkanicResourceBarriers barriers) {
+            VulkanicResourceBarriers barriers) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("applyResourceBarriers", ctx);
+
+        VulkanicResourceBarriers safeBarriers = Objects.requireNonNull(barriers, "barriers must not be null");
+
         ensureNativeReady("applyResourceBarriers");
-        throw new UnsupportedOperationException("Vulkan-native resource barrier mapping is not implemented yet.");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.applyResourceBarriers(commandBufferHandle, safeBarriers);
+    }
+
+    private static long requireVulkanCommandBufferHandle(String operation, CommandContext ctx) {
+        if (!(ctx instanceof VulkanCommandContext)) {
+            throw new IllegalArgumentException(
+                operation + " requires VulkanCommandContext when Vulkan backend is selected; got: "
+                    + (ctx == null ? "null" : ctx.getClass().getName()));
+        }
+        return ctx.getHandle();
+    }
+
+    private static BarrierMasks toVkBarrierMasks(VulkanicResourceBarriers barriers) {
+        int srcStageMask = 0;
+        int dstStageMask = 0;
+        int srcAccessMask = 0;
+        int dstAccessMask = 0;
+
+        int shaderStages = VK10.VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
+            | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+            | VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+        for (VulkanicResourceBarriers.Barrier barrier : barriers.barriers()) {
+            switch (barrier) {
+                case SHADER_IMAGE_ACCESS -> {
+                    srcStageMask |= shaderStages;
+                    dstStageMask |= shaderStages;
+                    srcAccessMask |= VK10.VK_ACCESS_SHADER_WRITE_BIT;
+                    dstAccessMask |= VK10.VK_ACCESS_SHADER_READ_BIT | VK10.VK_ACCESS_SHADER_WRITE_BIT;
+                }
+                case TEXTURE_FETCH -> {
+                    srcStageMask |= shaderStages;
+                    dstStageMask |= shaderStages;
+                    srcAccessMask |= VK10.VK_ACCESS_SHADER_WRITE_BIT;
+                    dstAccessMask |= VK10.VK_ACCESS_SHADER_READ_BIT;
+                }
+                case SHADER_STORAGE -> {
+                    srcStageMask |= shaderStages;
+                    dstStageMask |= shaderStages;
+                    srcAccessMask |= VK10.VK_ACCESS_SHADER_WRITE_BIT;
+                    dstAccessMask |= VK10.VK_ACCESS_SHADER_READ_BIT | VK10.VK_ACCESS_SHADER_WRITE_BIT;
+                }
+                default -> throw new IllegalArgumentException("Unhandled VulkanicResourceBarriers.Barrier: " + barrier);
+            }
+        }
+
+        if (srcStageMask == 0) {
+            srcStageMask = VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        }
+        if (dstStageMask == 0) {
+            dstStageMask = VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        }
+        if (srcAccessMask == 0) {
+            srcAccessMask = VK10.VK_ACCESS_MEMORY_WRITE_BIT;
+        }
+        if (dstAccessMask == 0) {
+            dstAccessMask = VK10.VK_ACCESS_MEMORY_READ_BIT;
+        }
+
+        return new BarrierMasks(srcStageMask, dstStageMask, srcAccessMask, dstAccessMask);
+    }
+
+    private static final class BarrierMasks {
+        private final int srcStageMask;
+        private final int dstStageMask;
+        private final int srcAccessMask;
+        private final int dstAccessMask;
+
+        private BarrierMasks(int srcStageMask, int dstStageMask, int srcAccessMask, int dstAccessMask) {
+            this.srcStageMask = srcStageMask;
+            this.dstStageMask = dstStageMask;
+            this.srcAccessMask = srcAccessMask;
+            this.dstAccessMask = dstAccessMask;
+        }
+
+        private int srcStageMask() {
+            return srcStageMask;
+        }
+
+        private int dstStageMask() {
+            return dstStageMask;
+        }
+
+        private int srcAccessMask() {
+            return srcAccessMask;
+        }
+
+        private int dstAccessMask() {
+            return dstAccessMask;
+        }
     }
 
     public CommandContext beginCommandBuffer() {
@@ -764,20 +1128,16 @@ public class VulkanBackend {
     }
 
     public void submitCommandBuffer(CommandContext ctx) {
-        ensureNativeReady("submitCommandBuffer");
+        long commandBufferHandle = requireVulkanCommandBufferHandle("submitCommandBuffer", ctx);
 
-        if (!(ctx instanceof VulkanCommandContext)) {
-            throw new IllegalArgumentException(
-                "submitCommandBuffer requires VulkanCommandContext when Vulkan backend is selected; got: "
-                    + (ctx == null ? "null" : ctx.getClass().getName()));
-        }
+        ensureNativeReady("submitCommandBuffer");
 
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        spine.submitPrimaryCommandBuffer(ctx.getHandle());
+        spine.submitPrimaryCommandBuffer(commandBufferHandle);
         currentCommandContext = null;
     }
 
@@ -883,6 +1243,10 @@ public class VulkanBackend {
         private long commandPool;
 
         private final Map<Long, Long> managedBufferAllocations = new ConcurrentHashMap<>();
+        private final AtomicInteger nextLegacyBufferId = new AtomicInteger(1);
+        private final Map<Integer, LegacyBufferObject> legacyBuffers = new ConcurrentHashMap<>();
+        private final Map<Integer, Integer> legacyBufferBindings = new ConcurrentHashMap<>();
+        private final Map<Integer, VulkanicBuffer.MappedView> legacyBufferMappedViews = new ConcurrentHashMap<>();
 
         /** Maps {@code VkImage} handle → {@code VkDeviceMemory} handle for all live managed textures. */
         private final Map<Long, Long> managedImageAllocations = new ConcurrentHashMap<>();
@@ -902,6 +1266,20 @@ public class VulkanBackend {
         private int graphicsQueueFamilyIndex;
         private long windowHandle;
         private boolean commandBufferRecording;
+
+        private static final int GL_MAP_READ_BIT = 0x0001;
+
+        private static final class LegacyBufferObject {
+            private final int id;
+            private volatile VulkanBuffer buffer;
+            private volatile int logicalSizeBytes;
+            private volatile int lastTarget;
+
+            private LegacyBufferObject(int id) {
+                this.id = id;
+                this.lastTarget = VulkanicAPI.GL_ARRAY_BUFFER;
+            }
+        }
 
         private static NativeSpine create() {
             NativeSpine spine = new NativeSpine();
@@ -1054,6 +1432,351 @@ public class VulkanBackend {
                 VK10.vkGetDeviceQueue(logicalDevice, graphicsQueueFamilyIndex, 0, pQueue);
                 graphicsQueue = new VkQueue(pQueue.get(0), logicalDevice);
             }
+        }
+
+        private int createLegacyBuffer() {
+            int id = nextLegacyBufferId.getAndIncrement();
+            legacyBuffers.put(id, new LegacyBufferObject(id));
+            return id;
+        }
+
+        private void createLegacyBuffers(int[] buffers) {
+            for (int i = 0; i < buffers.length; i++) {
+                buffers[i] = createLegacyBuffer();
+            }
+        }
+
+        private void deleteLegacyBuffer(int bufferId) {
+            if (bufferId == 0) {
+                return;
+            }
+
+            unmapNamedBuffer(bufferId);
+
+            LegacyBufferObject legacy = legacyBuffers.remove(bufferId);
+            if (legacy != null) {
+                closeLegacyBufferStorage(legacy);
+            }
+
+            for (Map.Entry<Integer, Integer> entry : new ArrayList<>(legacyBufferBindings.entrySet())) {
+                if (entry.getValue() == bufferId) {
+                    legacyBufferBindings.remove(entry.getKey());
+                }
+            }
+        }
+
+        private void bindLegacyBuffer(int target, int bufferId) {
+            if (bufferId == 0) {
+                legacyBufferBindings.remove(target);
+                return;
+            }
+
+            LegacyBufferObject legacy = legacyBuffers.computeIfAbsent(bufferId, id -> new LegacyBufferObject(id));
+            legacy.lastTarget = target;
+            legacyBufferBindings.put(target, bufferId);
+        }
+
+        private void bufferDataByTarget(int target, java.nio.ByteBuffer data, int usageHint) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            namedBufferData(legacy.id, data, usageHint);
+        }
+
+        private void bufferDataByTarget(int target, int size, int usageHint) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            namedBufferData(legacy.id, size, usageHint);
+        }
+
+        private void bufferStorageByTarget(int target, java.nio.ByteBuffer data, int flags) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            namedBufferStorage(legacy.id, data, flags);
+        }
+
+        private void bufferStorageByTarget(int target, int size, int flags) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            namedBufferStorage(legacy.id, size, flags);
+        }
+
+        private void namedBufferData(int bufferId, java.nio.ByteBuffer data, int usageHint) {
+            if (data == null) {
+                throw new IllegalArgumentException("data must not be null");
+            }
+
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            int size = data.remaining();
+            configureLegacyBufferStorage(legacy, legacy.lastTarget, size, usageHint,
+                size == 0 ? null : data.duplicate());
+        }
+
+        private void namedBufferData(int bufferId, int size, int usageHint) {
+            if (size < 0) {
+                throw new IllegalArgumentException("size must be >= 0, got: " + size);
+            }
+
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            configureLegacyBufferStorage(legacy, legacy.lastTarget, size, usageHint, null);
+        }
+
+        private void namedBufferStorage(int bufferId, java.nio.ByteBuffer data, int flags) {
+            if (data == null) {
+                throw new IllegalArgumentException("data must not be null");
+            }
+
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            int size = data.remaining();
+            configureLegacyBufferStorage(legacy, legacy.lastTarget, size, flags,
+                size == 0 ? null : data.duplicate());
+        }
+
+        private void namedBufferStorage(int bufferId, int size, int flags) {
+            if (size < 0) {
+                throw new IllegalArgumentException("size must be >= 0, got: " + size);
+            }
+
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            configureLegacyBufferStorage(legacy, legacy.lastTarget, size, flags, null);
+        }
+
+        private void configureLegacyBufferStorage(LegacyBufferObject legacy,
+                                                  int target,
+                                                  int size,
+                                                  int usageHint,
+                                                  java.nio.ByteBuffer initialData) {
+            unmapNamedBuffer(legacy.id);
+            closeLegacyBufferStorage(legacy);
+
+            legacy.logicalSizeBytes = size;
+            legacy.lastTarget = target;
+
+            if (size == 0) {
+                legacy.buffer = null;
+                return;
+            }
+
+            int usage = toLegacyBufferUsage(target);
+            legacy.buffer = (VulkanBuffer) createManagedBuffer(
+                "LegacyBuffer-" + legacy.id,
+                usage,
+                size,
+                initialData == null ? null : initialData.duplicate()
+            );
+        }
+
+        private void closeLegacyBufferStorage(LegacyBufferObject legacy) {
+            VulkanBuffer buffer = legacy.buffer;
+            legacy.buffer = null;
+            if (buffer != null) {
+                buffer.close();
+            }
+        }
+
+        private int toLegacyBufferUsage(int target) {
+            int usage = VulkanicBuffer.USAGE_MAP_READ
+                | VulkanicBuffer.USAGE_MAP_WRITE
+                | VulkanicBuffer.USAGE_COPY_SRC
+                | VulkanicBuffer.USAGE_COPY_DST;
+
+            if (target == VulkanicAPI.GL_ARRAY_BUFFER) {
+                usage |= VulkanicBuffer.USAGE_VERTEX;
+            } else if (target == VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER) {
+                usage |= VulkanicBuffer.USAGE_INDEX;
+            } else if (target == VulkanicAPI.GL_UNIFORM_BUFFER) {
+                usage |= VulkanicBuffer.USAGE_UNIFORM;
+            }
+
+            return usage;
+        }
+
+        private LegacyBufferObject requireLegacyBuffer(int bufferId) {
+            LegacyBufferObject legacy = legacyBuffers.get(bufferId);
+            if (legacy == null) {
+                throw new IllegalArgumentException("Unknown Vulkan legacy buffer handle: " + bufferId);
+            }
+            return legacy;
+        }
+
+        private LegacyBufferObject requireBoundLegacyBuffer(int target) {
+            Integer bufferId = legacyBufferBindings.get(target);
+            if (bufferId == null || bufferId == 0) {
+                throw new IllegalStateException("No Vulkan legacy buffer bound for target " + target);
+            }
+            return requireLegacyBuffer(bufferId);
+        }
+
+        private VulkanBuffer requireAllocatedLegacyBuffer(LegacyBufferObject legacy, String operation) {
+            VulkanBuffer buffer = legacy.buffer;
+            if (buffer == null || legacy.logicalSizeBytes <= 0) {
+                throw new IllegalStateException(operation + " requires allocated legacy buffer storage for handle " + legacy.id);
+            }
+            return buffer;
+        }
+
+        private void namedBufferSubData(int bufferId, long offset, java.nio.ByteBuffer data) {
+            if (data == null) {
+                throw new IllegalArgumentException("data must not be null");
+            }
+
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            if (offset < 0L) {
+                throw new IllegalArgumentException("offset must be >= 0, got: " + offset);
+            }
+
+            int length = data.remaining();
+            if (length == 0) {
+                return;
+            }
+            if (offset + length > legacy.logicalSizeBytes) {
+                throw new IllegalArgumentException("SubData range exceeds legacy buffer size (offset="
+                    + offset + ", length=" + length + ", size=" + legacy.logicalSizeBytes + ")");
+            }
+            if (legacyBufferMappedViews.containsKey(bufferId)) {
+                throw new IllegalStateException("Legacy buffer is currently mapped: " + bufferId);
+            }
+
+            VulkanBuffer buffer = requireAllocatedLegacyBuffer(legacy, "namedBufferSubDataDSA");
+            try (VulkanicBuffer.MappedView mapped = mapManagedBuffer(buffer, false, true)) {
+                java.nio.ByteBuffer mappedData = mapped.data();
+                java.nio.ByteBuffer source = data.duplicate();
+                mappedData.position((int) offset);
+                mappedData.put(source);
+                mappedData.position(0);
+            }
+        }
+
+        private void bufferSubDataByTarget(int target, long offset, java.nio.ByteBuffer data) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            namedBufferSubData(legacy.id, offset, data);
+        }
+
+        private void copyNamedBufferSubData(int readBufferId,
+                                            int writeBufferId,
+                                            long readOffset,
+                                            long writeOffset,
+                                            long size) {
+            if (readOffset < 0L || writeOffset < 0L || size < 0L || size > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Invalid copy range: readOffset=" + readOffset
+                    + ", writeOffset=" + writeOffset + ", size=" + size);
+            }
+            if (size == 0L) {
+                return;
+            }
+
+            LegacyBufferObject readLegacy = requireLegacyBuffer(readBufferId);
+            LegacyBufferObject writeLegacy = requireLegacyBuffer(writeBufferId);
+
+            if (readOffset + size > readLegacy.logicalSizeBytes) {
+                throw new IllegalArgumentException("Read range exceeds source buffer size");
+            }
+            if (writeOffset + size > writeLegacy.logicalSizeBytes) {
+                throw new IllegalArgumentException("Write range exceeds destination buffer size");
+            }
+            if (legacyBufferMappedViews.containsKey(readBufferId) || legacyBufferMappedViews.containsKey(writeBufferId)) {
+                throw new IllegalStateException("Cannot copy while legacy source/destination buffer is mapped");
+            }
+
+            VulkanBuffer readBuffer = requireAllocatedLegacyBuffer(readLegacy, "copyNamedBufferSubDataDSA(read)");
+            VulkanBuffer writeBuffer = requireAllocatedLegacyBuffer(writeLegacy, "copyNamedBufferSubDataDSA(write)");
+
+            int copySize = (int) size;
+            int readPos = (int) readOffset;
+            int writePos = (int) writeOffset;
+
+            if (readBufferId == writeBufferId) {
+                try (VulkanicBuffer.MappedView mapped = mapManagedBuffer(readBuffer, true, true)) {
+                    java.nio.ByteBuffer mappedData = mapped.data();
+                    byte[] temp = new byte[copySize];
+                    java.nio.ByteBuffer src = mappedData.duplicate();
+                    src.position(readPos).limit(readPos + copySize);
+                    src.get(temp);
+                    java.nio.ByteBuffer dst = mappedData.duplicate();
+                    dst.position(writePos);
+                    dst.put(temp);
+                }
+                return;
+            }
+
+            try (VulkanicBuffer.MappedView srcView = mapManagedBuffer(readBuffer, true, false);
+                 VulkanicBuffer.MappedView dstView = mapManagedBuffer(writeBuffer, false, true)) {
+                java.nio.ByteBuffer src = srcView.data().duplicate();
+                java.nio.ByteBuffer dst = dstView.data().duplicate();
+                src.position(readPos).limit(readPos + copySize);
+                dst.position(writePos);
+                dst.put(src);
+            }
+        }
+
+        private void copyBufferSubDataByTarget(int readTarget,
+                                               int writeTarget,
+                                               long readOffset,
+                                               long writeOffset,
+                                               long size) {
+            LegacyBufferObject readLegacy = requireBoundLegacyBuffer(readTarget);
+            LegacyBufferObject writeLegacy = requireBoundLegacyBuffer(writeTarget);
+            copyNamedBufferSubData(readLegacy.id, writeLegacy.id, readOffset, writeOffset, size);
+        }
+
+        private java.nio.ByteBuffer mapNamedBufferRange(int bufferId, long offset, long length, int access) {
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+
+            if (offset < 0L || length < 0L || length > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Invalid map range offset=" + offset + ", length=" + length);
+            }
+            if (offset + length > legacy.logicalSizeBytes) {
+                throw new IllegalArgumentException("Map range exceeds legacy buffer size");
+            }
+            if (length == 0L) {
+                return java.nio.ByteBuffer.allocate(0);
+            }
+            if (legacyBufferMappedViews.containsKey(bufferId)) {
+                throw new IllegalStateException("Legacy buffer is already mapped: " + bufferId);
+            }
+
+            boolean write = (access & VulkanicAPI.GL_MAP_WRITE_BIT) != 0;
+            boolean read = (access & GL_MAP_READ_BIT) != 0 || !write;
+
+            VulkanBuffer buffer = requireAllocatedLegacyBuffer(legacy, "mapNamedBufferRangeDSA");
+            VulkanicBuffer.MappedView view = mapManagedBuffer(buffer, read, write);
+            legacyBufferMappedViews.put(bufferId, view);
+
+            java.nio.ByteBuffer mapped = view.data().duplicate();
+            mapped.position((int) offset);
+            mapped.limit((int) (offset + length));
+            return mapped.slice();
+        }
+
+        private java.nio.ByteBuffer mapBufferByTarget(int target, long offset, long length, int access) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            return mapNamedBufferRange(legacy.id, offset, length, access);
+        }
+
+        private void unmapNamedBuffer(int bufferId) {
+            VulkanicBuffer.MappedView mappedView = legacyBufferMappedViews.remove(bufferId);
+            if (mappedView != null) {
+                mappedView.close();
+            }
+        }
+
+        private void unmapBufferByTarget(int target) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            unmapNamedBuffer(legacy.id);
+        }
+
+        private void flushMappedNamedBufferRange(int bufferId, long offset, long length) {
+            if (offset < 0L || length < 0L) {
+                throw new IllegalArgumentException("offset/length must be >= 0");
+            }
+
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            if (offset + length > legacy.logicalSizeBytes) {
+                throw new IllegalArgumentException("Flush range exceeds legacy buffer size");
+            }
+            if (!legacyBufferMappedViews.containsKey(bufferId)) {
+                throw new IllegalStateException("Cannot flush unmapped legacy buffer: " + bufferId);
+            }
+        }
+
+        private void flushMappedBufferRangeByTarget(int target, long offset, long length) {
+            LegacyBufferObject legacy = requireBoundLegacyBuffer(target);
+            flushMappedNamedBufferRange(legacy.id, offset, length);
         }
 
         private VulkanicBuffer createManagedBuffer(String label,
@@ -1710,6 +2433,42 @@ public class VulkanBackend {
             }
         }
 
+        private void applyResourceBarriers(long commandBufferHandle, VulkanicResourceBarriers barriers) {
+            if (primaryCommandBuffer == null) {
+                throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
+            }
+
+            if (commandBufferHandle != primaryCommandBuffer.address()) {
+                throw new IllegalArgumentException(
+                    "applyResourceBarriers received unknown VkCommandBuffer handle. Expected 0x"
+                        + Long.toHexString(primaryCommandBuffer.address())
+                        + " but got 0x" + Long.toHexString(commandBufferHandle));
+            }
+
+            if (!commandBufferRecording) {
+                throw new IllegalStateException("applyResourceBarriers requires an active recording command buffer.");
+            }
+
+            BarrierMasks masks = toVkBarrierMasks(barriers);
+            try (MemoryStack stack = stackPush()) {
+                org.lwjgl.vulkan.VkMemoryBarrier.Buffer memoryBarriers = org.lwjgl.vulkan.VkMemoryBarrier.calloc(1, stack);
+                memoryBarriers.get(0)
+                    .sType$Default()
+                    .srcAccessMask(masks.srcAccessMask())
+                    .dstAccessMask(masks.dstAccessMask());
+
+                VK10.vkCmdPipelineBarrier(
+                    primaryCommandBuffer,
+                    masks.srcStageMask(),
+                    masks.dstStageMask(),
+                    0,
+                    memoryBarriers,
+                    null,
+                    null
+                );
+            }
+        }
+
         private long primaryCommandBufferHandle() {
             if (primaryCommandBuffer == null) {
                 return 0L;
@@ -1787,7 +2546,7 @@ public class VulkanBackend {
                 }
 
                 if (!managedExtraImageViews.isEmpty()) {
-                    new ArrayList<>(managedExtraImageViews).forEach(this::destroyManagedImageView);
+                    new ArrayList<>(managedExtraImageViews).forEach(viewHandle -> destroyManagedImageView(viewHandle));
                 }
 
                 if (!managedImageAllocations.isEmpty()) {

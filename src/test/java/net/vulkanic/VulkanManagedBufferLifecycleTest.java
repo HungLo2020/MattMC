@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +97,58 @@ public class VulkanManagedBufferLifecycleTest {
             "Vulkan-selected backend should fail hard on mapManagedBuffer when native runtime is unavailable"
         );
         assertTrue(mappingFailure.getMessage().contains("Readiness report:"));
+    }
+
+    @Test
+    public void testVulkanLegacyUploadPathwaysFailHardWithReadinessDiagnostics() {
+        VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
+
+        IllegalStateException bufferDataFailure = assertThrows(
+            IllegalStateException.class,
+            () -> VulkanicAPI.bufferData(
+                null,
+                VulkanicAPI.GL_ARRAY_BUFFER,
+                ByteBuffer.allocateDirect(16),
+                VulkanicAPI.GL_DYNAMIC_DRAW
+            ),
+            "Vulkan legacy bufferData pathway must fail hard when native runtime is unavailable"
+        );
+
+        IllegalStateException bufferSubDataFailure = assertThrows(
+            IllegalStateException.class,
+            () -> VulkanicAPI.bufferSubData(
+                null,
+                VulkanicAPI.GL_ARRAY_BUFFER,
+                0,
+                ByteBuffer.allocateDirect(8)
+            ),
+            "Vulkan legacy bufferSubData pathway must fail hard when native runtime is unavailable"
+        );
+
+        IllegalStateException copyFailure = assertThrows(
+            IllegalStateException.class,
+            () -> VulkanicAPI.copyNamedBufferSubDataDSA(null, 1, 2, 0, 0, 8),
+            "Vulkan legacy copy pathway must fail hard when native runtime is unavailable"
+        );
+
+        IllegalStateException mapFailure = assertThrows(
+            IllegalStateException.class,
+            () -> VulkanicAPI.mapBuffer(null, VulkanicAPI.GL_ARRAY_BUFFER, 0, 8, VulkanicAPI.GL_MAP_WRITE_BIT),
+            "Vulkan legacy mapBuffer pathway must fail hard when native runtime is unavailable"
+        );
+
+        assertReadinessFailure(bufferDataFailure);
+        assertReadinessFailure(bufferSubDataFailure);
+        assertReadinessFailure(copyFailure);
+        assertReadinessFailure(mapFailure);
+    }
+
+    private static void assertReadinessFailure(IllegalStateException failure) {
+        String message = failure.getMessage();
+        assertNotNull(message);
+        assertTrue(message.contains("Readiness report:"), "Failure should include readiness diagnostics");
+        assertFalse(message.contains("OpenGL fallback is intentionally blocked"),
+            "Newly implemented Vulkan pathways should route to Vulkan readiness checks, not proxy fallback errors");
     }
 
     private static void resetBackendState() throws Exception {

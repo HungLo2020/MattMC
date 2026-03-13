@@ -1,17 +1,17 @@
 # Vulkan Backend Readiness
 
-## Coverage Baseline (as of 2026-03-12)
+## Coverage Baseline (as of 2026-03-13)
 
 | Backend | Implements `GraphicsBackend` | Coverage |
 |---------|------------------------------|----------|
-| Vulkan  | 38 / 261 methods             | **14.6%** |
+| Vulkan  | 58 / 261 methods             | **22.2%** |
 | OpenGL  | 256 / 261 methods            | **98.1%** |
 
 "Implements" means the backend has a declared method of that name.
 It does **not** mean the method works correctly end-to-end.
 
 > 100% coverage = every production `VulkanicAPI.*` callsite delegates to
-> a working implementation in both backends.  We are at **14.6%** for Vulkan.
+> a working implementation in both backends.  We are at **22.2%** for Vulkan.
 
 ### How to measure progress
 
@@ -98,12 +98,14 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Command Encoder or Command Buffer Abstraction
 - **Description:** Backend must support explicit command recording and submission.
-- **Status:** PARTIAL
+- **Status:** COMPLETE
 - **Evidence:**
   - `GraphicsBackend.beginCommandBuffer()` / `submitCommandBuffer(...)`.
   - `VulkanBackend.beginCommandBuffer()` begins primary command buffer.
   - `VulkanBackend.submitCommandBuffer(...)` ends and submits recorded commands.
-- **Notes:** Single primary command buffer path exists; rendering commands that should be recorded are largely unimplemented on Vulkan path.
+  - `VulkanBackend.applyResourceBarriers(...)` now records Vulkan-native barrier commands onto the active command buffer.
+  - `VulkanBackend.NativeSpine` enforces command-buffer recording state and handle validation for submission + barrier recording.
+- **Notes:** Current implementation uses a single primary command buffer and conservative queue submission (`vkQueueWaitIdle`). Higher-level draw/pipeline/render-pass capabilities remain tracked in their dedicated sections.
 
 ### GPU Buffer Creation (vertex/index/uniform)
 
@@ -122,14 +124,15 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Buffer Upload / Staging Support
 - **Description:** Backend must upload CPU data to GPU buffers (directly or via staging).
-- **Status:** PARTIAL
+- **Status:** COMPLETE
 - **Evidence:**
   - `GraphicsBackend` defines buffer upload/mapping operations (`bufferData`, `bufferSubData`, `mapManagedBuffer`, etc.).
   - OpenGL has implementations in `OpenGLBackend`.
   - `VulkanBackend.createManagedBuffer(..., initialData)` uploads initial bytes through mapped host-visible memory.
   - `VulkanBackend.mapManagedBuffer(...)` now supports explicit CPU mapping for managed Vulkan buffers.
-  - Legacy raw upload entrypoints (`bufferData`, `bufferSubData`, copy-buffer pathways) still have no Vulkan-native implementation.
-- **Notes:** Managed-buffer upload exists; full legacy upload/staging parity is still incomplete.
+  - `VulkanBackend` now implements legacy raw upload + copy + mapping entrypoints: `createBuffer`, `createBuffers`, `deleteBuffer`, `bindBuffer`, `bufferData` (all overloads), `bufferSubData`, `bufferStorage` (all overloads), `copyBufferSubData`, `mapBuffer`, `unmapBuffer`, `flushMappedBufferRange`, and DSA equivalents (`namedBufferDataDSA`, `namedBufferSubDataDSA`, `namedBufferStorageDSA`, `mapNamedBufferRangeDSA`, `unmapNamedBufferDSA`, `flushMappedNamedBufferRangeDSA`, `copyNamedBufferSubDataDSA`).
+  - Vulkan legacy buffer upload operations are backed by native managed buffer allocations and explicit mapped-view lifecycle in `VulkanBackend.NativeSpine`.
+- **Notes:** Upload support is now available both via managed-buffer APIs and legacy raw/DSA upload APIs; implementation currently uses host-visible mapped memory pathways (direct upload) rather than an explicit transient staging-queue abstraction.
 
 ### Texture/Image Creation
 
@@ -227,13 +230,14 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Synchronization Model
 - **Description:** Backend must expose resource visibility and queue/frame synchronization sufficient for correct rendering.
-- **Status:** BLOCKED
+- **Status:** COMPLETE
 - **Evidence:**
   - `VulkanicResourceBarriers` abstraction exists.
   - `GraphicsBackend.applyResourceBarriers(...)` exists.
-  - `VulkanBackend.applyResourceBarriers(...)` throws unsupported.
+  - `VulkanBackend.applyResourceBarriers(...)` now validates Vulkan command-context usage and dispatches to native spine barrier handling.
+  - `VulkanBackend.NativeSpine.applyResourceBarriers(...)` now translates `VulkanicResourceBarriers` domains into Vulkan stage/access masks and records `vkCmdPipelineBarrier(...)` memory barriers on the active command buffer.
   - Submission path currently uses `vkQueueWaitIdle` after submit (`VulkanBackend.NativeSpine.submitPrimaryCommandBuffer(...)`).
-- **Notes:** No Vulkan barrier mapping or frame-level sync primitives are implemented.
+- **Notes:** Resource-visibility barrier mapping is now Vulkan-native. Queue/frame lifecycle orchestration beyond the current conservative `vkQueueWaitIdle` submission model remains tracked under Frame Lifecycle.
 
 ### Frame Lifecycle (begin frame / end frame)
 
