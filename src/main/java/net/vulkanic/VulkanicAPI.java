@@ -1427,6 +1427,23 @@ public class VulkanicAPI {
     }
 
     /**
+     * Binds a render target described by a color/depth texture pair.
+     */
+    public static void bindRenderTarget(CommandContext ctx, @Nullable GpuTexture colorTexture, @Nullable GpuTexture depthTexture) {
+        if (!(colorTexture instanceof VulkanicTexture colorTarget)) {
+            bindDefaultFramebuffer(ctx);
+            return;
+        }
+
+        VulkanicTexture depthTarget = depthTexture instanceof VulkanicTexture texture ? texture : null;
+        getBackend().bindRenderTarget(ctx, colorTarget, depthTarget);
+
+        int framebuffer = getBackend().resolveFramebufferForTextures(ctx, colorTarget, depthTarget);
+        readFramebufferBinding = framebuffer;
+        drawFramebufferBinding = framebuffer;
+    }
+
+    /**
      * Binds the read framebuffer target.
      */
     public static void bindReadFramebuffer(CommandContext ctx, int fbo) {

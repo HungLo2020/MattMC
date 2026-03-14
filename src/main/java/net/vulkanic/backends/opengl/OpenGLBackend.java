@@ -292,6 +292,12 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL30.glBindFramebuffer(target, fbo);
     }
+
+    @Override
+    public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
+        int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);
+        bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+    }
     
     @Override
     public void bindBuffer(CommandContext ctx, int target, int buffer) {

@@ -10,6 +10,7 @@ import com.seibel.distanthorizons.core.util.math.Vec3f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import net.vulkanic.CommandContext;
 
 /**
  * Contains everything related to
@@ -40,6 +41,8 @@ public interface IMinecraftRenderWrapper extends IBindable
 	
 	boolean mcRendersToFrameBuffer();
 	boolean runningLegacyOpenGL();
+	boolean hasTargetRenderTarget();
+	boolean bindTargetRenderTarget(CommandContext ctx);
 	
 	/** @return -1 if no valid framebuffer is available yet */
 	int getTargetFramebuffer(); // Note: Iris is now hooking onto this for DH + Iris compat, try not to change (unless we wanna deal with some annoyances)

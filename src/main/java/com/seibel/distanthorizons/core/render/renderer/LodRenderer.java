@@ -70,6 +70,7 @@ public class LodRenderer
 	private int activeFramebufferId = -1;
 	private int activeColorTextureId = -1;
 	private int activeDepthTextureId = -1;
+	private IDhApiFramebuffer activeFramebuffer;
 	private int textureWidth;
 	private int textureHeight;
 	
@@ -370,6 +371,7 @@ public class LodRenderer
 		{
 			framebuffer = framebufferOverride;
 		}
+		this.activeFramebuffer = framebuffer;
 		this.activeFramebufferId = framebuffer.getId();
 		framebuffer.bind();
 		
@@ -712,6 +714,19 @@ public class LodRenderer
 	
 	/** @return -1 if no frame buffer has been bound yet */
 	public int getActiveFramebufferId() { return this.activeFramebufferId; }
+
+	public boolean hasActiveRenderTarget() { return this.activeFramebuffer != null && this.activeFramebufferId != -1; }
+
+	public boolean bindActiveRenderTarget()
+	{
+		if (!this.hasActiveRenderTarget())
+		{
+			return false;
+		}
+
+		this.activeFramebuffer.bind();
+		return true;
+	}
 	
 	/** @return -1 if no texture has been bound yet */
 	public int getActiveColorTextureId() { return this.activeColorTextureId; }

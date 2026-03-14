@@ -2,7 +2,6 @@ package net.irisshaders.iris;
 
 import com.google.common.base.Throwables;
 import net.blaze3d.opengl.GlDebug;
-import net.blaze3d.opengl.GlDevice;
 import net.blaze3d.platform.InputConstants;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.DefaultVertexFormat;
@@ -417,7 +416,7 @@ public class Iris {
 			success = GLDebug.setupDebugMessageCallback();
 		} else {
 			GLDebug.reloadDebugState();
-			GlDebug.enableDebugCallback(Minecraft.getInstance().options.glDebugVerbosity, false, new HashSet<>(((GlDevice) RenderSystem.getDevice()).getEnabledExtensions()));
+			GlDebug.enableDebugCallback(Minecraft.getInstance().options.glDebugVerbosity, false, new HashSet<>(RenderSystem.getDevice().getEnabledExtensions()));
 			success = 1;
 		}
 

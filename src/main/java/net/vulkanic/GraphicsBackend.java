@@ -516,6 +516,21 @@ public interface GraphicsBackend {
      * @param fbo The framebuffer object ID
      */
     void bindFramebuffer(CommandContext ctx, int target, int fbo);
+
+    /**
+     * Binds a render target described by its color/depth textures.
+     *
+     * <p>In OpenGL this typically resolves a cached FBO for the texture pair and binds it.
+     * In backends without user-visible FBO identity this should bind whatever backend-owned
+     * render-target state best represents those attachments.</p>
+     *
+     * @param ctx Command context for recording this command
+     * @param colorTexture Color target texture (required)
+     * @param depthTexture Optional depth target texture (nullable)
+     */
+    default void bindRenderTarget(CommandContext ctx, VulkanicTexture colorTexture, VulkanicTexture depthTexture) {
+        bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, resolveFramebufferForTextures(ctx, colorTexture, depthTexture));
+    }
     
     /**
      * Sets the read buffer for a named framebuffer using Direct State Access.

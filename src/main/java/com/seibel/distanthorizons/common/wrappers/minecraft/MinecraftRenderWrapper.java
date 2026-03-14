@@ -35,6 +35,7 @@ import org.joml.Vector4f;
 
 import net.minecraft.world.level.material.FogType;
 
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 
@@ -175,24 +176,49 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	{
 		return false;
 	}
+
+	@Override
+	public boolean hasTargetRenderTarget()
+	{
+		return this.resolveTargetFramebufferId(this.getRenderTarget()) != -1;
+	}
+
+	@Override
+	public boolean bindTargetRenderTarget(CommandContext ctx)
+	{
+		RenderTarget renderTarget = this.getRenderTarget();
+		int framebufferId = this.resolveTargetFramebufferId(renderTarget);
+		if (framebufferId == -1 || renderTarget == null)
+		{
+			return false;
+		}
+
+		this.finalLevelFrameBufferId = framebufferId;
+		VulkanicAPI.bindRenderTarget(ctx, renderTarget.getColorTexture(), renderTarget.getDepthTexture());
+		return true;
+	}
 	
 	@Override
 	public int getTargetFramebuffer()
 	{
 		RenderTarget renderTarget = this.getRenderTarget();
-		if (renderTarget == null)
-		{
-			this.finalLevelFrameBufferId = -1;
-			return -1;
-		}
-
-		int framebufferId = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
-		this.finalLevelFrameBufferId = framebufferId == 0 ? -1 : framebufferId;
+		this.finalLevelFrameBufferId = this.resolveTargetFramebufferId(renderTarget);
 		return this.finalLevelFrameBufferId;
 	}
 	
 	@Override
 	public void clearTargetFrameBuffer() { this.finalLevelFrameBufferId = -1; }
+
+	private int resolveTargetFramebufferId(RenderTarget renderTarget)
+	{
+		if (renderTarget == null)
+		{
+			return -1;
+		}
+
+		int framebufferId = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
+		return framebufferId == 0 ? -1 : framebufferId;
+	}
 	
 	@Override
 	public int getDepthTextureId()

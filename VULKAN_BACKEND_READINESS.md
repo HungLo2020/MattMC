@@ -324,6 +324,44 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 - **Tests:** `VulkanRenderStateContractTest`, `VulkanFullContractCoverageTest`, and updated `VulkanFailFastRoutingTest`; full suite now **423/423 passing**.
 - **Notes:** The fail-fast Vulkan proxy still guards native-readiness-sensitive operations, but there are now **zero** `GraphicsBackend` contract gaps on the Vulkan path.
 
+### Backend-Neutral Device / Encoder Callsite Seams
+
+- **Capability Name:** Backend-Neutral Device / Encoder Callsite Seams
+- **Description:** High-traffic production callsites must avoid concrete `GlDevice` / `GlCommandEncoder` dependencies and instead use backend-neutral `GpuDevice` / `CommandEncoder` interfaces.
+- **Status:** COMPLETE
+- **Evidence:**
+  - `CommandEncoder` now exposes backend-neutral pipeline-state hooks: `applyPipelineState(RenderPipeline)` and `invalidateCachedProgramBinding()`.
+  - `GlCommandEncoder` now implements those hooks directly through the interface seam; the previous public `lastProgram` field is no longer exposed for external mutation.
+  - `ShaderChunkRenderer` now acquires a `CommandEncoder` from `RenderSystem.getDevice()` and no longer casts to `GlCommandEncoder` for pipeline-state application or cached-program invalidation.
+  - `Iris.setDebug(...)` now queries enabled extensions through `RenderSystem.getDevice().getEnabledExtensions()` and no longer casts to `GlDevice`.
+- **Tests:** `ApiNeutralityCallsiteTest` now guards the new encoder seam and ensures those high-traffic callsites remain free of concrete backend casts.
+- **Notes:** This removes concrete OpenGL type leakage from hot rendering paths and strengthens the path toward a future Vulkan-native `GpuDevice` / `CommandEncoder` implementation.
+
+### Backend-Owned Render Target Binding Seams
+
+- **Capability Name:** Backend-Owned Render Target Binding Seams
+- **Description:** Production callsites should bind output targets by owned color/depth textures, not by resolving and binding backend-specific framebuffer identities themselves.
+- **Status:** COMPLETE
+- **Evidence:**
+  - `GraphicsBackend` now exposes `bindRenderTarget(CommandContext, VulkanicTexture, VulkanicTexture)` as a backend-owned render-target binding seam.
+  - `VulkanicAPI.bindRenderTarget(...)` now routes `GpuTexture` color/depth pairs through the active backend and falls back to the default framebuffer only when no color target exists.
+  - `RenderTarget.iris$bindFramebuffer()` now binds through `VulkanicAPI.bindRenderTarget(...)` and no longer resolves backend framebuffer ids directly.
+  - `OpenGLBackend` and `VulkanBackend` both implement the seam so attachment-pair binding stays inside backend code.
+- **Tests:** `Phase3DrawPathTest` now guards the seam and ensures `RenderTarget` no longer resolves framebuffer ids directly from production callsites.
+- **Notes:** This shrinks one more GL-shaped surface area by keeping framebuffer identity private to the backend while preserving current compatibility behavior.
+
+### Distant Horizons Owner-Bound Render Target Seams
+
+- **Capability Name:** Distant Horizons Owner-Bound Render Target Seams
+- **Description:** Distant Horizons hot render paths should bind Minecraft and LodRenderer outputs through owner seams instead of pulling and rebinding raw framebuffer ids.
+- **Status:** COMPLETE
+- **Evidence:**
+  - `IMinecraftRenderWrapper` / `MinecraftRenderWrapper` now expose `hasTargetRenderTarget()` and `bindTargetRenderTarget(CommandContext)` so DH renderers bind Minecraft's current output target through the wrapper owner.
+  - `LodRenderer` now retains the active `IDhApiFramebuffer` and exposes `hasActiveRenderTarget()` / `bindActiveRenderTarget()` so downstream shaders no longer need the raw active framebuffer id just to rebind DH output.
+  - `TestRenderer`, `DhApplyShader`, `FogApplyShader`, `SSAOApplyShader`, `VanillaFadeRenderer`, `DhFadeRenderer`, and `FadeApplyShader` now bind through those owner seams instead of resolving draw targets from `getTargetFramebuffer()` / `getActiveFramebufferId()` in their hot paths.
+- **Tests:** `Phase3DrawPathTest` now guards the new DH owner-bound seams and verifies those render paths avoid raw framebuffer-id binding in the migrated callsites.
+- **Notes:** This preserves legacy compatibility APIs for Iris/DH integration while moving active production rendering closer to texture-backed, backend-owned render-target intent.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

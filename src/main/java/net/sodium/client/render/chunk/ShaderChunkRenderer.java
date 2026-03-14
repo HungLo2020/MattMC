@@ -1,19 +1,17 @@
 package net.sodium.client.render.chunk;
 
 import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sodium.client.gl.attribute.GlVertexFormat;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.RenderDevice;
-import net.sodium.client.render.chunk.shader.*;
 import net.sodium.client.gl.shader.*;
-import net.sodium.client.render.chunk.shader.*;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.sodium.client.render.chunk.shader.*;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
-import net.sodium.client.gl.shader.*;
 import net.sodium.client.util.FogParameters;
-import net.blaze3d.opengl.GlCommandEncoder;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
@@ -98,9 +96,10 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         
         // Iris: From MixinShaderChunkRenderer - framebuffer binding is delayed/redirected
         // The framebuffer binding is handled below in the compileProgram redirect
-        
-        ((GlCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).applyPipelineState(pass.getPipeline());
-        ((GlCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).lastProgram = null; // Direct field access - lastProgram is now public
+
+        CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+        commandEncoder.applyPipelineState(pass.getPipeline());
+        commandEncoder.invalidateCachedProgramBinding();
 
         ChunkShaderOptions options = new ChunkShaderOptions(ChunkFogMode.SMOOTH, pass, this.vertexType);
 

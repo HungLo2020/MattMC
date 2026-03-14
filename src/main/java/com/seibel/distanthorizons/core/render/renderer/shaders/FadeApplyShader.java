@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
+import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.VanillaFadeRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import net.vulkanic.CommandContext;
@@ -23,10 +24,12 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	public int fadeTexture = -1;
 	
 	public int readFramebuffer = -1;
-	public int drawFramebuffer = -1;
+	public boolean drawToMinecraftTarget = false;
+	public boolean drawToLodTarget = false;
 
 	private int activeReadFramebuffer = -1;
-	private int activeDrawFramebuffer = -1;
+	private boolean activeDrawToMinecraftTarget = false;
+	private boolean activeDrawToLodTarget = false;
 	
 	// uniforms
 	public int uFadeColorTextureUniform = -1;
@@ -61,10 +64,11 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		this.activeReadFramebuffer = this.readFramebuffer;
-		this.activeDrawFramebuffer = this.drawFramebuffer;
+		this.activeDrawToMinecraftTarget = this.drawToMinecraftTarget;
+		this.activeDrawToLodTarget = this.drawToLodTarget;
 		return this.fadeTexture != -1
 			&& this.activeReadFramebuffer != -1
-			&& this.activeDrawFramebuffer != -1;
+			&& (this.activeDrawToMinecraftTarget || this.activeDrawToLodTarget);
 	}
 
 	@Override
@@ -95,11 +99,32 @@ public class FadeApplyShader extends AbstractShaderRenderer
 		
 		// apply the rendered Fade to Minecraft's framebuffer
 		VulkanicAPI.bindReadFramebuffer(ctx, this.activeReadFramebuffer);
-		VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);
+		if (this.activeDrawToMinecraftTarget)
+		{
+			if (!MC_RENDER.bindTargetRenderTarget(ctx))
+			{
+				VulkanicAPI.bindReadFramebuffer(ctx, 0);
+				return;
+			}
+		}
+		else if (this.activeDrawToLodTarget)
+		{
+			if (!LodRenderer.INSTANCE.bindActiveRenderTarget())
+			{
+				VulkanicAPI.bindReadFramebuffer(ctx, 0);
+				return;
+			}
+		}
+		else
+		{
+			VulkanicAPI.bindReadFramebuffer(ctx, 0);
+			return;
+		}
 		
 		ScreenQuad.INSTANCE.render();
 		
 		VulkanicAPI.setDepthTestEnabled(ctx, true);
+		VulkanicAPI.bindReadFramebuffer(ctx, 0);
 		
 	}
 	

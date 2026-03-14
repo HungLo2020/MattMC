@@ -21,6 +21,39 @@ public class ApiNeutralityCallsiteTest {
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
 
     @Test
+    public void testHighTrafficRendererCallsitesAvoidConcreteBackendCastLeaks() throws IOException {
+        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/CommandEncoder.java"));
+        String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
+        String irisSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
+
+        assertTrue(commandEncoderSource.contains("void applyPipelineState(RenderPipeline renderPipeline);"),
+            "CommandEncoder should expose a backend-neutral pipeline-state seam");
+        assertTrue(commandEncoderSource.contains("void invalidateCachedProgramBinding();"),
+            "CommandEncoder should expose a backend-neutral cached-program invalidation seam");
+        assertTrue(glCommandEncoderSource.contains("public void applyPipelineState(RenderPipeline renderPipeline)"),
+            "GlCommandEncoder should implement backend-neutral pipeline-state application through the interface seam");
+        assertTrue(glCommandEncoderSource.contains("public void invalidateCachedProgramBinding()"),
+            "GlCommandEncoder should implement backend-neutral cached-program invalidation through the interface seam");
+        assertFalse(glCommandEncoderSource.contains("public GlProgram lastProgram"),
+            "GlCommandEncoder should not expose lastProgram as a public concrete-backend field");
+
+        assertTrue(sodiumRendererSource.contains("CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();"),
+            "ShaderChunkRenderer should acquire a backend-neutral CommandEncoder");
+        assertTrue(sodiumRendererSource.contains("commandEncoder.applyPipelineState(pass.getPipeline());"),
+            "ShaderChunkRenderer should apply pipeline state through CommandEncoder");
+        assertTrue(sodiumRendererSource.contains("commandEncoder.invalidateCachedProgramBinding();"),
+            "ShaderChunkRenderer should invalidate cached program binding through CommandEncoder");
+        assertFalse(sodiumRendererSource.contains("GlCommandEncoder"),
+            "ShaderChunkRenderer should avoid concrete GlCommandEncoder dependency");
+
+        assertTrue(irisSource.contains("RenderSystem.getDevice().getEnabledExtensions()"),
+            "Iris should use backend-neutral GpuDevice extension querying");
+        assertFalse(irisSource.contains("((GlDevice) RenderSystem.getDevice())"),
+            "Iris should avoid concrete GlDevice casts when querying enabled extensions");
+    }
+
+    @Test
     public void testPrimitiveAndPolygonLegacyMappingsRemainAvailable() {
         assertTrue(VulkanicPrimitiveMode.fromLegacyGlConstant(VulkanicAPI.GL_TRIANGLES).isPresent(),
             "Primitive mode mapping should recognize GL_TRIANGLES");

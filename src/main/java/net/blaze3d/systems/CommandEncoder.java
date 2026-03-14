@@ -3,6 +3,7 @@ package net.blaze3d.systems;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.GpuFence;
+import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.NativeImage;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
@@ -49,6 +50,10 @@ public interface CommandEncoder {
 	void copyTextureToBuffer(GpuTexture gpuTexture, GpuBuffer gpuBuffer, int i, Runnable runnable, int j, int k, int l, int m, int n);
 
 	void copyTextureToTexture(GpuTexture gpuTexture, GpuTexture gpuTexture2, int i, int j, int k, int l, int m, int n, int o);
+
+	void applyPipelineState(RenderPipeline renderPipeline);
+
+	void invalidateCachedProgramBinding();
 
 	void presentTexture(GpuTextureView gpuTextureView);
 

@@ -665,8 +665,10 @@ public class Phase3DrawPathTest {
         String renderTargetSource = Files.readString(renderTargetFile);
         assertFalse(renderTargetSource.contains("IrisRenderSystem.bindFramebuffer("),
             "RenderTarget iris$bindFramebuffer path should not bind through IrisRenderSystem helper wrappers");
-        assertTrue(renderTargetSource.contains("VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext()"),
-            "RenderTarget iris$bindFramebuffer path should bind through VulkanicAPI helper");
+        assertFalse(renderTargetSource.contains("VulkanicAPI.resolveFramebufferForTextures(this.colorTexture, this.depthTexture)"),
+            "RenderTarget iris$bindFramebuffer path should not resolve backend framebuffer ids directly");
+        assertTrue(renderTargetSource.contains("VulkanicAPI.bindRenderTarget(VulkanicAPI.getCommandContext(), this.colorTexture, this.depthTexture);"),
+            "RenderTarget iris$bindFramebuffer path should bind through VulkanicAPI render-target helper");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = readSourceIfExists(dhWrapperFile);
@@ -980,6 +982,39 @@ public class Phase3DrawPathTest {
             "RenderableBoxGroup should create instance buffers through VulkanicAPI helper");
         assertTrue(renderableBoxGroupSource.contains("VulkanicAPI.deleteBuffer("),
             "RenderableBoxGroup should delete instance buffers through VulkanicAPI helper");
+    }
+
+    @Test
+    public void testRenderTargetBindingOwnedByBackendSeam() throws IOException {
+        Path backendInterfaceFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
+        String backendInterfaceSource = Files.readString(backendInterfaceFile);
+        assertTrue(backendInterfaceSource.contains("default void bindRenderTarget(CommandContext ctx, VulkanicTexture colorTexture, VulkanicTexture depthTexture)"),
+            "GraphicsBackend should expose backend-owned render-target binding seam");
+        assertTrue(backendInterfaceSource.contains("bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, resolveFramebufferForTextures(ctx, colorTexture, depthTexture));"),
+            "GraphicsBackend default render-target seam should bridge through backend-owned framebuffer resolution");
+
+        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        assertTrue(vulkanicApiSource.contains("public static void bindRenderTarget(CommandContext ctx, @Nullable GpuTexture colorTexture, @Nullable GpuTexture depthTexture)"),
+            "VulkanicAPI should expose render-target binding helper for color/depth texture pairs");
+        assertTrue(vulkanicApiSource.contains("getBackend().bindRenderTarget(ctx, colorTarget, depthTarget);"),
+            "VulkanicAPI render-target binding helper should delegate ownership to GraphicsBackend");
+        assertTrue(vulkanicApiSource.contains("bindDefaultFramebuffer(ctx);"),
+            "VulkanicAPI render-target binding helper should fall back to default framebuffer when no color target exists");
+
+        Path openGlBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
+        String openGlBackendSource = Files.readString(openGlBackendFile);
+        assertTrue(openGlBackendSource.contains("public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture)"),
+            "OpenGLBackend should implement render-target binding seam");
+        assertTrue(openGlBackendSource.contains("int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);"),
+            "OpenGLBackend render-target binding should resolve framebuffer internally");
+
+        Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String vulkanBackendSource = Files.readString(vulkanBackendFile);
+        assertTrue(vulkanBackendSource.contains("public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture)"),
+            "VulkanBackend should implement render-target binding seam");
+        assertTrue(vulkanBackendSource.contains("int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);"),
+            "VulkanBackend render-target binding should keep attachment-pair routing inside backend code");
     }
 
     @Test
@@ -3829,8 +3864,15 @@ public class Phase3DrawPathTest {
             "MinecraftRenderWrapper.getTargetFramebuffer should not hardcode default FBO 0");
         assertTrue(wrapperSource.contains("VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture())"),
             "MinecraftRenderWrapper.getTargetFramebuffer should resolve framebuffer via VulkanicAPI texture-pair seam");
-        assertTrue(wrapperSource.contains("this.finalLevelFrameBufferId = framebufferId == 0 ? -1 : framebufferId;"),
-            "MinecraftRenderWrapper.getTargetFramebuffer should map unresolved framebuffers to -1 per IMinecraftRenderWrapper contract");
+        assertTrue(wrapperSource.contains("public boolean hasTargetRenderTarget()"),
+            "MinecraftRenderWrapper should expose a target render-target availability seam for DH renderers");
+        assertTrue(wrapperSource.contains("public boolean bindTargetRenderTarget(CommandContext ctx)"),
+            "MinecraftRenderWrapper should expose a target render-target binding seam for DH renderers");
+        assertTrue(wrapperSource.contains("VulkanicAPI.bindRenderTarget(ctx, renderTarget.getColorTexture(), renderTarget.getDepthTexture());"),
+            "MinecraftRenderWrapper should bind target render targets through VulkanicAPI render-target helper");
+        assertTrue(wrapperSource.contains("this.finalLevelFrameBufferId = this.resolveTargetFramebufferId(renderTarget);")
+                && wrapperSource.contains("return framebufferId == 0 ? -1 : framebufferId;"),
+            "MinecraftRenderWrapper should map unresolved framebuffers to -1 through a shared render-target helper");
         assertFalse(wrapperSource.contains("return 0;"),
             "MinecraftRenderWrapper should not expose 0 as an unresolved texture/framebuffer sentinel in DH-facing seams");
         assertFalse(wrapperSource.contains("this.getRenderTarget().getDepthTexture()"),
@@ -3863,8 +3905,10 @@ public class Phase3DrawPathTest {
     public void testDistantHorizonsRenderPathsGuardUnresolvedFramebufferIds() throws IOException {
         Path testRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/TestRenderer.java");
         String testRendererSource = Files.readString(testRendererFile);
-        assertTrue(testRendererSource.contains("if (targetFramebuffer == -1)"),
-            "TestRenderer should skip rendering when target framebuffer is unresolved (-1)");
+        assertTrue(testRendererSource.contains("if (!MC_RENDER.bindTargetRenderTarget(ctx))"),
+            "TestRenderer should bind Minecraft's target render target through the wrapper seam");
+        assertFalse(testRendererSource.contains("MC_RENDER.getTargetFramebuffer()"),
+            "TestRenderer should avoid resolving raw target framebuffer ids in the render hot path");
 
         Path dhApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/DhApplyShader.java");
         String dhApplySource = Files.readString(dhApplyFile);
@@ -3873,29 +3917,37 @@ public class Phase3DrawPathTest {
         assertTrue(dhApplySource.contains("this.activeDhColorTextureId == -1 || this.activeDhDepthTextureId == -1")
                 && dhApplySource.contains("this.activeRenderToFrameBuffer = MC_RENDER.mcRendersToFrameBuffer();"),
             "DhApplyShader precheck should gate rendering on resolved DH textures and selected render path");
-        assertTrue(dhApplySource.contains("return this.activeTargetColorTextureId != -1")
-                && dhApplySource.contains("&& this.activeDhFrameBufferId != -1")
-                && dhApplySource.contains("&& this.activeMcFrameBufferId != -1;"),
-            "DhApplyShader precheck should validate texture-render-path framebuffer/texture ids before bind/uniform work");
+        assertTrue(dhApplySource.contains("return MC_RENDER.hasTargetRenderTarget();")
+                && dhApplySource.contains("return this.activeTargetColorTextureId != -1")
+                && dhApplySource.contains("&& LodRenderer.INSTANCE.hasActiveRenderTarget()")
+                && dhApplySource.contains("&& MC_RENDER.hasTargetRenderTarget();"),
+            "DhApplyShader precheck should validate render-target availability through owner seams before bind/uniform work");
         assertTrue(dhApplySource.contains("DhTextureState.bindTexture2D(this.activeDhColorTextureId)")
                 && dhApplySource.contains("DhTextureState.bindTexture2D(this.activeDhDepthTextureId)"),
             "DhApplyShader should bind cached validated DH color/depth texture ids resolved during precheck");
+        assertTrue(dhApplySource.contains("if (!MC_RENDER.bindTargetRenderTarget(ctx))")
+                && dhApplySource.contains("if (!LodRenderer.INSTANCE.bindActiveRenderTarget())"),
+            "DhApplyShader should bind MC and DH outputs through owner seams instead of raw framebuffer ids");
 
         Path fadeApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FadeApplyShader.java");
         String fadeApplySource = Files.readString(fadeApplyFile);
         assertTrue(fadeApplySource.contains("public int fadeTexture = -1;"),
             "FadeApplyShader should initialize fadeTexture to unresolved sentinel -1");
-        assertTrue(fadeApplySource.contains("public int readFramebuffer = -1;") && fadeApplySource.contains("public int drawFramebuffer = -1;"),
-            "FadeApplyShader should initialize read/draw framebuffer ids to unresolved sentinel -1");
+        assertTrue(fadeApplySource.contains("public int readFramebuffer = -1;")
+                && fadeApplySource.contains("public boolean drawToMinecraftTarget = false;")
+                && fadeApplySource.contains("public boolean drawToLodTarget = false;"),
+            "FadeApplyShader should track the draw target via owner seams instead of cached framebuffer ids");
         assertTrue(fadeApplySource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
             "FadeApplyShader should use shared pre-bind precheck hook for unresolved resources");
         assertTrue(fadeApplySource.contains("this.fadeTexture != -1")
                 && fadeApplySource.contains("this.activeReadFramebuffer != -1")
-                && fadeApplySource.contains("this.activeDrawFramebuffer != -1"),
-            "FadeApplyShader precheck should require resolved fade/read/draw resources before bind/uniform work");
+                && fadeApplySource.contains("(this.activeDrawToMinecraftTarget || this.activeDrawToLodTarget)"),
+            "FadeApplyShader precheck should require a resolved source framebuffer and an owner-routed draw target");
         assertTrue(fadeApplySource.contains("VulkanicAPI.bindReadFramebuffer(ctx, this.activeReadFramebuffer);")
-                && fadeApplySource.contains("VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);"),
-            "FadeApplyShader should bind cached validated framebuffer ids resolved during precheck");
+                && fadeApplySource.contains("if (this.activeDrawToMinecraftTarget)")
+                && fadeApplySource.contains("if (!MC_RENDER.bindTargetRenderTarget(ctx))")
+                && fadeApplySource.contains("if (!LodRenderer.INSTANCE.bindActiveRenderTarget())"),
+            "FadeApplyShader should bind through MC/DH owner seams instead of cached draw framebuffer ids");
 
         Path fogApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogApplyShader.java");
         String fogApplySource = Files.readString(fogApplyFile);
@@ -3906,11 +3958,11 @@ public class Phase3DrawPathTest {
         assertTrue(fogApplySource.contains("this.fogTexture != -1")
                 && fogApplySource.contains("this.activeDepthTextureId != -1")
                 && fogApplySource.contains("FogShader.INSTANCE.frameBuffer != -1")
-                && fogApplySource.contains("this.activeDrawFramebuffer != -1"),
+                && fogApplySource.contains("LodRenderer.INSTANCE.hasActiveRenderTarget()"),
             "FogApplyShader precheck should require resolved fog/depth/framebuffer resources before bind/uniform work");
         assertTrue(fogApplySource.contains("DhTextureState.bindTexture2D(this.activeDepthTextureId)")
-                && fogApplySource.contains("VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);"),
-            "FogApplyShader should use cached validated depth/framebuffer ids resolved during precheck");
+                && fogApplySource.contains("if (!LodRenderer.INSTANCE.bindActiveRenderTarget())"),
+            "FogApplyShader should bind the DH draw target through LodRenderer's owner seam");
 
         Path ssaoApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOApplyShader.java");
         String ssaoApplySource = Files.readString(ssaoApplyFile);
@@ -3921,11 +3973,11 @@ public class Phase3DrawPathTest {
         assertTrue(ssaoApplySource.contains("this.ssaoTexture != -1")
                 && ssaoApplySource.contains("this.activeDepthTextureId != -1")
                 && ssaoApplySource.contains("SSAOShader.INSTANCE.frameBuffer != -1")
-                && ssaoApplySource.contains("this.activeDrawFramebuffer != -1"),
+                && ssaoApplySource.contains("LodRenderer.INSTANCE.hasActiveRenderTarget()"),
             "SSAOApplyShader precheck should require resolved SSAO/depth/framebuffer resources before bind/uniform work");
         assertTrue(ssaoApplySource.contains("DhTextureState.bindTexture2D(this.activeDepthTextureId)")
-                && ssaoApplySource.contains("VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);"),
-            "SSAOApplyShader should use cached validated depth/framebuffer ids resolved during precheck");
+                && ssaoApplySource.contains("if (!LodRenderer.INSTANCE.bindActiveRenderTarget())"),
+            "SSAOApplyShader should bind the DH draw target through LodRenderer's owner seam");
 
         Path dhFadeShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/DhFadeShader.java");
         String dhFadeShaderSource = Files.readString(dhFadeShaderFile);

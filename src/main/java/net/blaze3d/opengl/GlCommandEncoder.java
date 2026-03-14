@@ -49,7 +49,7 @@ public class GlCommandEncoder implements CommandEncoder {
 	private RenderPipeline lastPipeline;
 	private boolean inRenderPass;
 	@Nullable
-	public GlProgram lastProgram; // Made public for Sodium shader rendering integration
+	private GlProgram lastProgram;
 	
 	// Iris: From MixinGlCommandEncoder - Shadow rendering state and program tracking
 	private int iris$tempFBO;
@@ -1176,7 +1176,8 @@ public class GlCommandEncoder implements CommandEncoder {
 		return true;
 	}
 
-	public void applyPipelineState(RenderPipeline renderPipeline) { // Made public for Sodium shader rendering integration
+	@Override
+	public void applyPipelineState(RenderPipeline renderPipeline) {
 		if (this.lastPipeline != renderPipeline) {
 			CommandContext ctx = commandContext();
 			this.lastPipeline = renderPipeline;
@@ -1225,6 +1226,11 @@ public class GlCommandEncoder implements CommandEncoder {
 					VulkanicAPI.setLogicOp(ctx, VulkanicLogicOp.OR_REVERSE);
 			}
 		}
+	}
+
+	@Override
+	public void invalidateCachedProgramBinding() {
+		this.lastProgram = null;
 	}
 
 	public void finishRenderPass() {

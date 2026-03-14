@@ -29,7 +29,6 @@ public class FogApplyShader extends AbstractShaderRenderer
 	public int depthTextureUniform;
 
 	private int activeDepthTextureId = -1;
-	private int activeDrawFramebuffer = -1;
 	
 	
 	
@@ -62,11 +61,10 @@ public class FogApplyShader extends AbstractShaderRenderer
 	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		this.activeDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
-		this.activeDrawFramebuffer = LodRenderer.INSTANCE.getActiveFramebufferId();
 		return this.fogTexture != -1
 			&& this.activeDepthTextureId != -1
 			&& FogShader.INSTANCE.frameBuffer != -1
-			&& this.activeDrawFramebuffer != -1;
+			&& LodRenderer.INSTANCE.hasActiveRenderTarget();
 	}
 
 	@Override
@@ -109,7 +107,11 @@ public class FogApplyShader extends AbstractShaderRenderer
 		
 		// apply the rendered Fog to DH's framebuffer
 		VulkanicAPI.bindReadFramebuffer(ctx, FogShader.INSTANCE.frameBuffer);
-		VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);
+		if (!LodRenderer.INSTANCE.bindActiveRenderTarget())
+		{
+			VulkanicAPI.bindReadFramebuffer(ctx, 0);
+			return;
+		}
 		
 		ScreenQuad.INSTANCE.render();
 		

@@ -179,7 +179,8 @@ public class VanillaFadeRenderer
 				
 				FadeApplyShader.INSTANCE.fadeTexture = this.fadeTexture;
 				FadeApplyShader.INSTANCE.readFramebuffer = DhFadeShader.INSTANCE.frameBuffer;
-				FadeApplyShader.INSTANCE.drawFramebuffer = MC_RENDER.getTargetFramebuffer();
+				FadeApplyShader.INSTANCE.drawToMinecraftTarget = true;
+				FadeApplyShader.INSTANCE.drawToLodTarget = false;
 				FadeApplyShader.INSTANCE.render(partialTicks);
 			}
 			

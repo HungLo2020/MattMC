@@ -2634,6 +2634,12 @@ public class VulkanBackend {
         }
     }
 
+    public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
+        requireVulkanCommandBufferHandle("bindRenderTarget", ctx);
+        int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);
+        bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+    }
+
     /**
      * Releases the virtual FBO handle.  Any associated Vulkan resources
      * are already tracked transiently within render passes and cleaned up there.

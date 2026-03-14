@@ -35,7 +35,6 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	public int gFarUniform;
 
 	private int activeDepthTextureId = -1;
-	private int activeDrawFramebuffer = -1;
 	
 	
 	
@@ -71,11 +70,10 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		this.activeDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
-		this.activeDrawFramebuffer = LodRenderer.INSTANCE.getActiveFramebufferId();
 		return this.ssaoTexture != -1
 			&& this.activeDepthTextureId != -1
 			&& SSAOShader.INSTANCE.frameBuffer != -1
-			&& this.activeDrawFramebuffer != -1;
+			&& LodRenderer.INSTANCE.hasActiveRenderTarget();
 	}
 
 	@Override
@@ -137,7 +135,11 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		
 		// apply the rendered SSAO to the LODs 
 		VulkanicAPI.bindReadFramebuffer(ctx, SSAOShader.INSTANCE.frameBuffer);
-		VulkanicAPI.bindDrawFramebuffer(ctx, this.activeDrawFramebuffer);
+		if (!LodRenderer.INSTANCE.bindActiveRenderTarget())
+		{
+			VulkanicAPI.bindReadFramebuffer(ctx, 0);
+			return;
+		}
 		
 		
 		ScreenQuad.INSTANCE.render();
