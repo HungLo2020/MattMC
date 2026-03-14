@@ -87,24 +87,32 @@ public final class Window implements AutoCloseable {
 		this.windowedWidth = this.width = Math.max(displayData.width(), 1);
 		this.windowedHeight = this.height = Math.max(displayData.height(), 1);
 		GLFW.glfwDefaultWindowHints();
-		
-		// Iris: Enable OpenGL debug context if debug options are enabled
-		if (net.irisshaders.iris.Iris.getIrisConfig().areDebugOptionsEnabled()) {
-			GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_DEBUG_CONTEXT, GLFW.GLFW_TRUE);
-			GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_NO_ERROR, GLFW.GLFW_FALSE);
-			net.irisshaders.iris.Iris.logger.info("OpenGL debug context activated.");
+		boolean useNoApiClientWindow = shouldRequestNoApiWindowClientForVulkanBackend();
+		if (useNoApiClientWindow) {
+			GLFW.glfwWindowHint(GLFW.GLFW_CLIENT_API, GLFW.GLFW_NO_API);
+		} else {
+			// Iris: Enable OpenGL debug context if debug options are enabled
+			if (net.irisshaders.iris.Iris.getIrisConfig().areDebugOptionsEnabled()) {
+				GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_DEBUG_CONTEXT, GLFW.GLFW_TRUE);
+				GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_NO_ERROR, GLFW.GLFW_FALSE);
+				net.irisshaders.iris.Iris.logger.info("OpenGL debug context activated.");
+			}
+
+			GLFW.glfwWindowHint(139265, 196609);
+			GLFW.glfwWindowHint(139275, 221185);
+			GLFW.glfwWindowHint(139266, 3);
+			GLFW.glfwWindowHint(139267, 3);
+			GLFW.glfwWindowHint(139272, 204801);
+			GLFW.glfwWindowHint(139270, 1);
 		}
-		
-		GLFW.glfwWindowHint(139265, 196609);
-		GLFW.glfwWindowHint(139275, 221185);
-		GLFW.glfwWindowHint(139266, 3);
-		GLFW.glfwWindowHint(139267, 3);
-		GLFW.glfwWindowHint(139272, 204801);
-		GLFW.glfwWindowHint(139270, 1);
 		
 		// Call registered hooks for window hint configuration
 		for (net.minecraft.hooks.WindowHooks hook : net.minecraft.hooks.HookRegistry.getWindowHooks()) {
 			hook.onBeforeWindowCreate();
+		}
+
+		if (useNoApiClientWindow) {
+			GLFW.glfwWindowHint(GLFW.GLFW_CLIENT_API, GLFW.GLFW_NO_API);
 		}
 		
 		// Sodium: Apply NVIDIA workarounds (from WindowMixin)
@@ -114,6 +122,7 @@ public final class Window implements AutoCloseable {
 		} finally {
 			net.sodium.client.compatibility.workarounds.nvidia.NvidiaWorkarounds.undoEnvironmentChanges();
 		}
+		net.vulkanic.VulkanicAPI.registerGlfwWindowHandleForVulkanSurface(this.handle);
 		
 		if (monitor != null) {
 			VideoMode videoMode = monitor.getPreferredVidMode(this.fullscreen ? this.preferredFullscreenVideoMode : Optional.empty());
@@ -244,6 +253,9 @@ public final class Window implements AutoCloseable {
 	public void updateVsync(boolean bl) {
 		RenderSystem.assertOnRenderThread();
 		this.vsync = bl;
+		if (shouldRequestNoApiWindowClientForVulkanBackend()) {
+			return;
+		}
 		GLFW.glfwSwapInterval(bl ? 1 : 0);
 	}
 
@@ -251,6 +263,7 @@ public final class Window implements AutoCloseable {
 		RenderSystem.assertOnRenderThread();
 		Callbacks.glfwFreeCallbacks(this.handle);
 		this.defaultErrorCallback.close();
+		net.vulkanic.VulkanicAPI.clearRegisteredGlfwWindowHandleForVulkanSurface(this.handle);
 		GLFW.glfwDestroyWindow(this.handle);
 		GLFW.glfwTerminate();
 	}
@@ -288,6 +301,10 @@ public final class Window implements AutoCloseable {
 
 	static boolean handleVulkanSwapchainFramebufferResize(int framebufferWidth, int framebufferHeight) {
 		return net.vulkanic.VulkanicAPI.recreateVulkanSwapchainIfNeededOnFramebufferResize(framebufferWidth, framebufferHeight);
+	}
+
+	static boolean shouldRequestNoApiWindowClientForVulkanBackend() {
+		return net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected();
 	}
 
 	private void refreshFramebufferSize() {

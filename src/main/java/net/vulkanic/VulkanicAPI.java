@@ -27,6 +27,8 @@ import org.lwjgl.glfw.GLFWErrorCallbackI;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 import java.util.Objects;
@@ -48,6 +50,7 @@ public class VulkanicAPI {
     private static Thread renderThread;
     @Nullable
     private static GpuDevice device;
+    private static volatile long registeredGlfwWindowHandleForVulkanSurface;
     private static final ThreadLocal<java.util.ArrayDeque<CommandContext>> CONTEXT_STACK = ThreadLocal.withInitial(java.util.ArrayDeque::new);
     private static ProjectionType projectionType = ProjectionType.PERSPECTIVE;
     private static ProjectionType savedProjectionType = ProjectionType.PERSPECTIVE;
@@ -735,6 +738,17 @@ public class VulkanicAPI {
     }
 
     /**
+     * Returns true only when backend routing has already been initialized and
+     * the selected backend is Vulkan.
+     *
+     * <p>Unlike {@link #isVulkanBackendSelected()}, this method does not
+     * auto-initialize backend routing.</p>
+     */
+    public static synchronized boolean isVulkanBackendInitializedAndSelected() {
+        return backend != null && backend.getBackendType() == GraphicsBackendType.VULKAN;
+    }
+
+    /**
      * Returns true only when native Vulkan internals are active and ready.
      */
     public static boolean isNativeVulkanBackendReady() {
@@ -920,6 +934,9 @@ public class VulkanicAPI {
                 });
 
                 if (backendMethod.isEmpty()) {
+                    if (method.isDefault()) {
+                        return invokeDefaultInterfaceMethod(proxy, method, args);
+                    }
                     throw new IllegalStateException(
                         "Vulkan backend selected but method '" + method.getName() + "' is not implemented natively; "
                             + "OpenGL fallback is intentionally blocked.");
@@ -932,6 +949,18 @@ public class VulkanicAPI {
                 }
             }
         );
+    }
+
+    private static Object invokeDefaultInterfaceMethod(Object proxy, Method method, Object[] args) throws Throwable {
+        Class<?> declaringClass = method.getDeclaringClass();
+        MethodHandles.Lookup privateLookup = MethodHandles.privateLookupIn(declaringClass, MethodHandles.lookup());
+        MethodType methodType = MethodType.methodType(method.getReturnType(), method.getParameterTypes());
+        Object[] safeArgs = args == null ? new Object[0] : args;
+
+        return privateLookup
+            .findSpecial(declaringClass, method.getName(), methodType, declaringClass)
+            .bindTo(proxy)
+            .invokeWithArguments(safeArgs);
     }
     
     /**
@@ -3054,6 +3083,22 @@ public class VulkanicAPI {
     public static void setDevice(GpuDevice gpuDevice) {
         assertOnRenderThread();
         device = gpuDevice;
+    }
+
+    public static void registerGlfwWindowHandleForVulkanSurface(long windowHandle) {
+        if (windowHandle != MemoryUtil.NULL) {
+            registeredGlfwWindowHandleForVulkanSurface = windowHandle;
+        }
+    }
+
+    public static long getRegisteredGlfwWindowHandleForVulkanSurface() {
+        return registeredGlfwWindowHandleForVulkanSurface;
+    }
+
+    public static void clearRegisteredGlfwWindowHandleForVulkanSurface(long windowHandle) {
+        if (windowHandle != MemoryUtil.NULL && registeredGlfwWindowHandleForVulkanSurface == windowHandle) {
+            registeredGlfwWindowHandleForVulkanSurface = MemoryUtil.NULL;
+        }
     }
 
     public static GpuDevice getDevice() {

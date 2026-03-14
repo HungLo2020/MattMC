@@ -1305,6 +1305,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			LOGGER.error("Shutdown failure!", var5);
 			throw var5;
 		} finally {
+			RenderSystem.cleanupAuxiliaryOpenGlContextWindow();
 			this.virtualScreen.close();
 			this.window.close();
 		}

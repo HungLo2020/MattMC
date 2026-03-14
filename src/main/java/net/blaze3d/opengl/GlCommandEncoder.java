@@ -185,7 +185,7 @@ public class GlCommandEncoder implements CommandEncoder {
 	 * does not delete the underlying texture (the caller remains the owner).
 	 */
 	private net.vulkanic.VulkanicTextureView toVulkanicTextureView(GlTextureView view) {
-		return new net.vulkanic.backends.opengl.OpenGLTextureView(
+		return VulkanicAPI.createManagedTextureView(
 			view.texture(), view.baseMipLevel(), view.mipLevels()
 		);
 	}

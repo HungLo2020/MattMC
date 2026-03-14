@@ -2828,13 +2828,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public net.vulkanic.VulkanicTextureView createManagedTextureView(net.vulkanic.VulkanicTexture texture,
             int baseMipLevel, int mipLevelCount) {
-        if (!(texture instanceof OpenGLTexture openGLTexture)) {
-            throw new IllegalArgumentException("Expected OpenGLTexture, got: " + texture.getClass());
+        if (!(texture instanceof OpenGLTexture) && !(texture instanceof net.blaze3d.opengl.GlTexture)) {
+            throw new IllegalArgumentException("Expected OpenGLTexture or GlTexture, got: " + texture.getClass());
         }
         if (texture.isClosed()) {
             throw new IllegalArgumentException("Cannot create a view of a closed texture");
         }
-        return new OpenGLTextureView(openGLTexture, baseMipLevel, mipLevelCount);
+        return new OpenGLTextureView(texture, baseMipLevel, mipLevelCount);
     }
 
     private static int[] toGlInternalFormat(net.vulkanic.VulkanicTextureFormat format) {

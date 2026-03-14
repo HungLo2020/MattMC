@@ -1,7 +1,6 @@
 package net.blaze3d.systems;
 
 import net.blaze3d.TracyFrameCapture;
-import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140SizeCalculator;
 import net.blaze3d.opengl.GlDevice;
 import net.blaze3d.platform.Window;
@@ -28,6 +27,52 @@ public class RenderSystem {
 	public static final int PROJECTION_MATRIX_UBO_SIZE = new Std140SizeCalculator().putMat4f().get();
 	// Sodium: Track WGL context for security checks (from RenderSystemMixin)
 	private static long wglPrevContext = MemoryUtil.NULL;
+	private static long auxiliaryOpenGlContextWindow = MemoryUtil.NULL;
+
+	private static long resolveGlDeviceWindowHandleForRendererInitialization(long mainWindowHandle) {
+		if (!net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+			return mainWindowHandle;
+		}
+
+		if (auxiliaryOpenGlContextWindow != MemoryUtil.NULL) {
+			return auxiliaryOpenGlContextWindow;
+		}
+
+		GLFW.glfwDefaultWindowHints();
+		GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
+		GLFW.glfwWindowHint(GLFW.GLFW_CLIENT_API, GLFW.GLFW_OPENGL_API);
+		GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
+		GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
+		GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
+		GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE);
+
+		auxiliaryOpenGlContextWindow = GLFW.glfwCreateWindow(1, 1, "MattMC Aux OpenGL Context", 0L, 0L);
+		if (auxiliaryOpenGlContextWindow == MemoryUtil.NULL) {
+			throw new IllegalStateException("Failed to create auxiliary OpenGL context window for Vulkan startup compatibility path");
+		}
+
+		LOGGER.info("Created auxiliary hidden OpenGL context window for Vulkan startup compatibility path");
+		return auxiliaryOpenGlContextWindow;
+	}
+
+	public static void cleanupAuxiliaryOpenGlContextWindow() {
+		if (auxiliaryOpenGlContextWindow == MemoryUtil.NULL) {
+			return;
+		}
+
+		try {
+			if (GLFW.glfwGetCurrentContext() == auxiliaryOpenGlContextWindow) {
+				GLFW.glfwMakeContextCurrent(0L);
+			}
+			GLFW.glfwDestroyWindow(auxiliaryOpenGlContextWindow);
+			LOGGER.info("Destroyed auxiliary hidden OpenGL context window for Vulkan startup compatibility path");
+		} catch (Throwable throwable) {
+			LOGGER.warn("Failed to destroy auxiliary hidden OpenGL context window cleanly", throwable);
+		} finally {
+			auxiliaryOpenGlContextWindow = MemoryUtil.NULL;
+			wglPrevContext = MemoryUtil.NULL;
+		}
+	}
 
 	public static void assertOnRenderThread() {
 		net.vulkanic.VulkanicAPI.assertOnRenderThread();
@@ -86,8 +131,9 @@ public class RenderSystem {
 	}
 
 	public static void initRenderer(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
-		net.vulkanic.VulkanicAPI.setDevice(new GlDevice(l, i, bl, biFunction, bl2));
 		net.vulkanic.VulkanicAPI.initializeNativeVulkanRuntimeOnRendererStartupIfSelected();
+		long glDeviceWindowHandle = resolveGlDeviceWindowHandleForRendererInitialization(l);
+		net.vulkanic.VulkanicAPI.setDevice(new GlDevice(glDeviceWindowHandle, i, bl, biFunction, bl2));
 		net.vulkanic.VulkanicAPI.initializeDynamicUniforms();
 		
 		// Sodium: Post-context initialization (from RenderSystemMixin)

@@ -33,7 +33,7 @@ def useBundledDeps = bundledDepsDir.exists() && bundledDepsDir.isDirectory()
 
 if (useBundledDeps) {
     println "✓ Using bundled dependencies from libraries/deps/"
-    println "  Run './libraries/download-dependencies.sh' to update bundled dependencies"
+    println "  Run './Install.sh' to provision local runtime tooling (SPIR-V compiler)"
 }
 
 repositories {
@@ -50,7 +50,7 @@ repositories {
     // Only add specialized remote repositories if bundled dependencies are NOT available
     if (!useBundledDeps) {
         println "⚠ Bundled dependencies not found. Using remote repositories."
-        println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
+        println "  Run './Install.sh' to provision local runtime tooling (SPIR-V compiler)."
         
         // Fabric Maven repository (for Fabric Loader dependencies)
         maven {
@@ -428,6 +428,37 @@ if (isMacOS) {
 // Add macOS-specific JVM arguments for LWJGL/GLFW
 if (isMacOS) {
     clientJvmArgs += '-XstartOnFirstThread'
+}
+
+def resolveBundledSpirvCompilerPath() {
+    def osName = System.getProperty('os.name').toLowerCase()
+    def candidates = []
+
+    if (osName.contains('windows') || osName.contains('win')) {
+        candidates += 'libraries/deps/glslangValidator.exe'
+    } else {
+        candidates += 'libraries/deps/glslangValidator'
+    }
+
+    candidates += 'libraries/deps/bin/glslangValidator'
+    candidates += 'libraries/deps/bin/glslangValidator.exe'
+
+    for (def candidatePath : candidates) {
+        def candidate = file(candidatePath)
+        if (candidate.exists() && candidate.isFile()) {
+            return candidate.absolutePath
+        }
+    }
+
+    return null
+}
+
+def bundledSpirvCompilerPath = resolveBundledSpirvCompilerPath()
+if (bundledSpirvCompilerPath != null) {
+    clientJvmArgs += "-Dvulkanic.spirv.compiler=${bundledSpirvCompilerPath}"
+    println "✓ Using bundled SPIR-V compiler: ${bundledSpirvCompilerPath}"
+} else {
+    println "⚠ SPIR-V compiler not bundled. Run './Install.sh' to add glslangValidator in libraries/deps/."
 }
 
 // Helper method to configure JavaExec tasks to use bundled JDK (if available) or toolchain
@@ -814,6 +845,17 @@ tasks.register('clientDist') {
                 into "${distDir}/run/jdk-${targetJavaVersion}"
             }
             println "✅ JDK copied to distribution"
+        }
+
+        // Copy bundled SPIR-V compiler if available
+        def bundledCompiler = file(resolveBundledSpirvCompilerPath() ?: '')
+        if (bundledCompiler.exists() && bundledCompiler.isFile()) {
+            copy {
+                from bundledCompiler
+                into "${distDir}/libraries/deps"
+            }
+            file("${distDir}/libraries/deps/${bundledCompiler.name}").setExecutable(true)
+            println "✅ Bundled SPIR-V compiler copied to ${distDir}/libraries/deps/${bundledCompiler.name}"
         }
         
         // Assets are now loaded directly from the JAR - no filesystem copy needed!

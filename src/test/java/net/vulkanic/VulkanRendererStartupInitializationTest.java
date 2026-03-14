@@ -91,15 +91,61 @@ public class VulkanRendererStartupInitializationTest {
             .resolve("src/main/java/net/blaze3d/systems/RenderSystem.java"));
         String vulkanicApiSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/VulkanicAPI.java"));
+        String vulkanBackendSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
         assertTrue(renderSystemSource.contains("initializeNativeVulkanRuntimeOnRendererStartupIfSelected"),
             "RenderSystem.initRenderer should invoke Vulkan startup initialization hook");
+        assertTrue(
+            renderSystemSource.indexOf("initializeNativeVulkanRuntimeOnRendererStartupIfSelected")
+                < renderSystemSource.indexOf("VulkanicAPI.setDevice(new GlDevice"),
+            "RenderSystem.initRenderer should initialize Vulkan runtime before constructing GlDevice"
+        );
         assertTrue(vulkanicApiSource.contains("public static void initializeNativeVulkanRuntimeOnRendererStartupIfSelected()"),
             "VulkanicAPI should expose startup Vulkan initialization hook");
         assertTrue(vulkanicApiSource.contains("getVulkanExecutionContextInfo"),
             "Startup Vulkan initialization hook should validate Vulkan execution-context availability");
         assertTrue(vulkanicApiSource.contains("getVulkanSwapchainSurfaceInfo"),
             "Startup Vulkan initialization hook should validate Vulkan swapchain/surface availability");
+        assertTrue(vulkanicApiSource.contains("registerGlfwWindowHandleForVulkanSurface"),
+            "VulkanicAPI should expose GLFW window registration for Vulkan NO_API surface creation");
+        assertTrue(vulkanBackendSource.contains("getRegisteredGlfwWindowHandleForVulkanSurface"),
+            "VulkanBackend should fallback to registered GLFW window handle when no current context exists");
+        assertTrue(vulkanicApiSource.contains("method.isDefault()"),
+            "Fail-fast Vulkan proxy should recognize default interface methods");
+        assertTrue(vulkanicApiSource.contains("invokeDefaultInterfaceMethod"),
+            "Fail-fast Vulkan proxy should invoke default interface methods instead of failing");
+        assertTrue(vulkanBackendSource.contains("beginPrimaryCommandBuffer();"),
+            "VulkanBackend should auto-begin command recording for immediate-mode compatibility operations");
+        assertTrue(vulkanBackendSource.contains("submitPrimaryCommandBuffer(primaryCommandBuffer.address());"),
+            "VulkanBackend frame lifecycle should auto-submit pending primary command buffers when needed");
+    }
+
+    @Test
+    public void testNoApiWindowStartupSourceWiringAvoidsMainWindowContextBinding() throws Exception {
+        String renderSystemSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/blaze3d/systems/RenderSystem.java"));
+        String windowSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/blaze3d/platform/Window.java"));
+        String minecraftSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/minecraft/client/Minecraft.java"));
+
+        assertTrue(renderSystemSource.contains("resolveGlDeviceWindowHandleForRendererInitialization"),
+            "RenderSystem should resolve a Vulkan-safe GL bootstrap context window handle");
+        assertTrue(renderSystemSource.contains("isVulkanBackendInitializedAndSelected"),
+            "RenderSystem Vulkan-safe GL bootstrap should only activate when Vulkan backend routing is selected");
+        assertTrue(renderSystemSource.contains("Created auxiliary hidden OpenGL context window for Vulkan startup compatibility path"),
+            "RenderSystem should document auxiliary OpenGL context bootstrap when Vulkan NO_API windows are used");
+        assertTrue(renderSystemSource.contains("cleanupAuxiliaryOpenGlContextWindow"),
+            "RenderSystem should expose auxiliary OpenGL context cleanup for tidy shutdown");
+        assertTrue(minecraftSource.contains("RenderSystem.cleanupAuxiliaryOpenGlContextWindow();"),
+            "Minecraft.close should invoke auxiliary OpenGL context cleanup before window termination");
+        assertTrue(windowSource.contains("if (shouldRequestNoApiWindowClientForVulkanBackend())"),
+            "Window.updateVsync should no-op when Vulkan NO_API window mode is selected");
+        assertTrue(windowSource.contains("registerGlfwWindowHandleForVulkanSurface"),
+            "Window should register GLFW handle for Vulkan NO_API surface initialization");
+        assertTrue(windowSource.contains("clearRegisteredGlfwWindowHandleForVulkanSurface"),
+            "Window shutdown should clear registered GLFW handle for tidy lifecycle management");
     }
 
     private static Object getBackendFieldValue() throws Exception {

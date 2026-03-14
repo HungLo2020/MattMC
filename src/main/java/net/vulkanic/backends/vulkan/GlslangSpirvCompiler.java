@@ -41,6 +41,8 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             command.add("-V");
             command.add("-S");
             command.add(stageSuffix);
+            command.add("--auto-map-bindings");
+            command.add("--auto-map-locations");
             command.add("-e");
             command.add(entryPoint);
             command.add("-o");
