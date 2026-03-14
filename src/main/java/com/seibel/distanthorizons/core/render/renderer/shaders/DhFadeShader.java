@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
@@ -18,8 +19,8 @@ public class DhFadeShader extends AbstractShaderRenderer
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
 	
-	public int frameBuffer = -1;
-	private int activeFrameBuffer = -1;
+	public DhFramebuffer frameBuffer;
+	private DhFramebuffer activeFrameBuffer;
 	private int activeDepthTextureId = -1;
 	private int activeColorTextureId = -1;
 	private int activeMcColorTextureId = -1;
@@ -119,12 +120,12 @@ public class DhFadeShader extends AbstractShaderRenderer
 		if (depthTextureId == -1
 			|| colorTextureId == -1
 			|| mcColorTextureId == -1
-			|| this.frameBuffer == -1)
+			|| this.frameBuffer == null)
 		{
 			this.activeDepthTextureId = -1;
 			this.activeColorTextureId = -1;
 			this.activeMcColorTextureId = -1;
-			this.activeFrameBuffer = -1;
+			this.activeFrameBuffer = null;
 			return false;
 		}
 
@@ -138,7 +139,7 @@ public class DhFadeShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
-		VulkanicAPI.bindFramebuffer(ctx, this.activeFrameBuffer);
+		this.activeFrameBuffer.bind(ctx);
 		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		VulkanicAPI.setBlendEnabled(ctx, false);

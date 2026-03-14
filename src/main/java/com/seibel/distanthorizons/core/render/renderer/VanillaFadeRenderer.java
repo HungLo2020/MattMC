@@ -4,6 +4,7 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.GLState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.renderer.shaders.DhFadeShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FadeApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.VanillaFadeShader;
@@ -41,7 +42,7 @@ public class VanillaFadeRenderer
 	
 	private int width = -1;
 	private int height = -1;
-	private int fadeFramebuffer = -1;
+	private DhFramebuffer fadeFramebuffer;
 	
 	private int fadeTexture = -1;
 	
@@ -64,14 +65,13 @@ public class VanillaFadeRenderer
 	
 	private void createFramebuffer(CommandContext ctx, int width, int height, int mcColorTextureId)
 	{
-		if (this.fadeFramebuffer != -1)
+		if (this.fadeFramebuffer != null)
 		{
-			VulkanicAPI.deleteFramebuffer(ctx, this.fadeFramebuffer);
-			this.fadeFramebuffer = -1;
+			this.fadeFramebuffer.destroy(ctx);
+			this.fadeFramebuffer = null;
 		}
 		
-		this.fadeFramebuffer = VulkanicAPI.createFramebuffer(ctx);
-		VulkanicAPI.bindFramebuffer(ctx, this.fadeFramebuffer);
+		this.fadeFramebuffer = new DhFramebuffer();
 		
 		
 		// Applying the fade texture is only needed if MC is drawing to their own frame buffer,
@@ -89,11 +89,11 @@ public class VanillaFadeRenderer
 			VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
-			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, this.fadeTexture, 0);
+			this.fadeFramebuffer.addColorAttachment(ctx, 0, this.fadeTexture);
 		}
 		else
 		{
-			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, mcColorTextureId, 0);
+			this.fadeFramebuffer.addColorAttachment(ctx, 0, mcColorTextureId);
 		}
 	}
 	
@@ -155,7 +155,7 @@ public class VanillaFadeRenderer
 				this.createFramebuffer(ctx, width, height, mcColorTextureId);
 			}
 
-			if (this.fadeFramebuffer == -1)
+			if (this.fadeFramebuffer == null)
 			{
 				return;
 			}

@@ -72,7 +72,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		this.activeDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
 		return this.ssaoTexture != -1
 			&& this.activeDepthTextureId != -1
-			&& SSAOShader.INSTANCE.frameBuffer != -1
+			&& SSAOShader.INSTANCE.frameBuffer != null
 			&& LodRenderer.INSTANCE.hasActiveRenderTarget();
 	}
 
@@ -134,7 +134,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		
 		// apply the rendered SSAO to the LODs 
-		VulkanicAPI.bindReadFramebuffer(ctx, SSAOShader.INSTANCE.frameBuffer);
+		SSAOShader.INSTANCE.frameBuffer.bindAsReadBuffer(ctx);
 		if (!LodRenderer.INSTANCE.bindActiveRenderTarget())
 		{
 			VulkanicAPI.bindReadFramebuffer(ctx, 0);

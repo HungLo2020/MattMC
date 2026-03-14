@@ -3,6 +3,7 @@ package com.seibel.distanthorizons.core.render.renderer;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.GLState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FogApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FogShader;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
@@ -32,7 +33,7 @@ public class FogRenderer
 	
 	private int width = -1;
 	private int height = -1;
-	private int fogFramebuffer = -1;
+	private DhFramebuffer fogFramebuffer;
 	
 	private int fogTexture = -1;
 	
@@ -55,10 +56,10 @@ public class FogRenderer
 	
 	private void createFramebuffer(CommandContext ctx, int width, int height)
 	{
-		if (this.fogFramebuffer != -1)
+		if (this.fogFramebuffer != null)
 		{
-			VulkanicAPI.deleteFramebuffer(ctx, this.fogFramebuffer);
-			this.fogFramebuffer = -1;
+			this.fogFramebuffer.destroy(ctx);
+			this.fogFramebuffer = null;
 		}
 		
 		if (this.fogTexture != -1)
@@ -67,8 +68,7 @@ public class FogRenderer
 			this.fogTexture = -1;
 		}
 		
-		this.fogFramebuffer = VulkanicAPI.createFramebuffer(ctx);
-		VulkanicAPI.bindFramebuffer(ctx, this.fogFramebuffer);
+		this.fogFramebuffer = new DhFramebuffer();
 		
 		this.fogTexture = VulkanicAPI.createTexture2D(ctx);
 		{
@@ -76,7 +76,7 @@ public class FogRenderer
 			VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
-			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, this.fogTexture, 0);
+			this.fogFramebuffer.addColorAttachment(ctx, 0, this.fogTexture);
 			
 			// disable mip-mapping since DH is just going to draw straight to the screen
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, 0);
@@ -115,7 +115,7 @@ public class FogRenderer
 			this.createFramebuffer(ctx, width, height);
 		}
 
-		if (this.fogFramebuffer == -1 || this.fogTexture == -1)
+		if (this.fogFramebuffer == null || this.fogTexture == -1)
 		{
 			return;
 		}

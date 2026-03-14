@@ -267,13 +267,7 @@ public abstract class DirectStateAccess {
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
 			CommandContext ctx = commandContext();
-			int u = VulkanicAPI.getReadFramebufferBinding();
-			int v = VulkanicAPI.getDrawFramebufferBinding();
-			VulkanicAPI.bindReadFramebuffer(ctx, i);
-			VulkanicAPI.bindDrawFramebuffer(ctx, j);
-			VulkanicAPI.blitFramebuffer(ctx, k, l, m, n, o, p, q, r, s, t);
-			VulkanicAPI.bindReadFramebuffer(ctx, u);
-			VulkanicAPI.bindDrawFramebuffer(ctx, v);
+			VulkanicAPI.blitNamedFramebuffer(ctx, i, j, k, l, m, n, o, p, q, r, s, t);
 		}
 	}
 }

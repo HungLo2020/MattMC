@@ -1,6 +1,7 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.VanillaFadeRenderer;
@@ -23,11 +24,11 @@ public class FadeApplyShader extends AbstractShaderRenderer
 	
 	public int fadeTexture = -1;
 	
-	public int readFramebuffer = -1;
+	public DhFramebuffer readFramebuffer;
 	public boolean drawToMinecraftTarget = false;
 	public boolean drawToLodTarget = false;
 
-	private int activeReadFramebuffer = -1;
+	private DhFramebuffer activeReadFramebuffer;
 	private boolean activeDrawToMinecraftTarget = false;
 	private boolean activeDrawToLodTarget = false;
 	
@@ -67,7 +68,7 @@ public class FadeApplyShader extends AbstractShaderRenderer
 		this.activeDrawToMinecraftTarget = this.drawToMinecraftTarget;
 		this.activeDrawToLodTarget = this.drawToLodTarget;
 		return this.fadeTexture != -1
-			&& this.activeReadFramebuffer != -1
+			&& this.activeReadFramebuffer != null
 			&& (this.activeDrawToMinecraftTarget || this.activeDrawToLodTarget);
 	}
 
@@ -98,7 +99,7 @@ public class FadeApplyShader extends AbstractShaderRenderer
 		
 		
 		// apply the rendered Fade to Minecraft's framebuffer
-		VulkanicAPI.bindReadFramebuffer(ctx, this.activeReadFramebuffer);
+		this.activeReadFramebuffer.bindAsReadBuffer(ctx);
 		if (this.activeDrawToMinecraftTarget)
 		{
 			if (!MC_RENDER.bindTargetRenderTarget(ctx))

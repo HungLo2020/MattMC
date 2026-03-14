@@ -3,6 +3,7 @@ package com.seibel.distanthorizons.core.render.renderer;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.GLState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.renderer.shaders.SSAOApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.SSAOShader;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
@@ -32,7 +33,7 @@ public class SSAORenderer
 	
 	private int width = -1;
 	private int height = -1;
-	private int ssaoFramebuffer = -1;
+	private DhFramebuffer ssaoFramebuffer;
 	
 	private int ssaoTexture = -1;
 	
@@ -55,10 +56,10 @@ public class SSAORenderer
 	
 	private void createFramebuffer(CommandContext ctx, int width, int height)
 	{
-		if (this.ssaoFramebuffer != -1)
+		if (this.ssaoFramebuffer != null)
 		{
-			VulkanicAPI.deleteFramebuffer(ctx, this.ssaoFramebuffer);
-			this.ssaoFramebuffer = -1;
+			this.ssaoFramebuffer.destroy(ctx);
+			this.ssaoFramebuffer = null;
 		}
 		
 		if (this.ssaoTexture != -1)
@@ -67,8 +68,7 @@ public class SSAORenderer
 			this.ssaoTexture = -1;
 		}
 		
-		this.ssaoFramebuffer = VulkanicAPI.createFramebuffer(ctx);
-		VulkanicAPI.bindFramebuffer(ctx, this.ssaoFramebuffer);
+		this.ssaoFramebuffer = new DhFramebuffer();
 		
 		this.ssaoTexture = VulkanicAPI.createTexture2D(ctx);
 		{
@@ -82,7 +82,7 @@ public class SSAORenderer
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, 0);
 		}
 		
-		VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, this.ssaoTexture, 0);
+		this.ssaoFramebuffer.addColorAttachment(ctx, 0, this.ssaoTexture);
 	}
 	
 	
@@ -115,7 +115,7 @@ public class SSAORenderer
 			this.createFramebuffer(ctx, width, height);
 		}
 
-		if (this.ssaoFramebuffer == -1 || this.ssaoTexture == -1)
+		if (this.ssaoFramebuffer == null || this.ssaoTexture == -1)
 		{
 			return;
 		}

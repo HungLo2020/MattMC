@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.SSAORenderer;
@@ -23,8 +24,8 @@ public class SSAOShader extends AbstractShaderRenderer
 	public static SSAOShader INSTANCE = new SSAOShader();
 	
 	
-	public int frameBuffer = -1;
-	private int activeFrameBuffer = -1;
+	public DhFramebuffer frameBuffer;
+	private DhFramebuffer activeFrameBuffer;
 	private int activeDepthTextureId = -1;
 	
 	private Mat4f projection;
@@ -120,9 +121,9 @@ public class SSAOShader extends AbstractShaderRenderer
 	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
-		if (this.frameBuffer == -1 || depthTextureId == -1)
+		if (this.frameBuffer == null || depthTextureId == -1)
 		{
-			this.activeFrameBuffer = -1;
+			this.activeFrameBuffer = null;
 			this.activeDepthTextureId = -1;
 			return false;
 		}
@@ -135,7 +136,7 @@ public class SSAOShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender(CommandContext ctx)
 	{
-		VulkanicAPI.bindFramebuffer(ctx, this.activeFrameBuffer);
+		this.activeFrameBuffer.bind(ctx);
 		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		VulkanicAPI.setBlendEnabled(ctx, false);

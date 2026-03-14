@@ -4,6 +4,7 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.renderer.shaders.DhFadeShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FadeApplyShader;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
@@ -38,7 +39,7 @@ public class DhFadeRenderer
 	
 	private int width = -1;
 	private int height = -1;
-	private int fadeFramebuffer = -1;
+	private DhFramebuffer fadeFramebuffer;
 	
 	private int fadeTexture = -1;
 	
@@ -61,14 +62,13 @@ public class DhFadeRenderer
 	
 	private void createFramebuffer(CommandContext ctx, int width, int height)
 	{
-		if (this.fadeFramebuffer != -1)
+		if (this.fadeFramebuffer != null)
 		{
-			VulkanicAPI.deleteFramebuffer(ctx, this.fadeFramebuffer);
-			this.fadeFramebuffer = -1;
+			this.fadeFramebuffer.destroy(ctx);
+			this.fadeFramebuffer = null;
 		}
 		
-		this.fadeFramebuffer = VulkanicAPI.createFramebuffer(ctx);
-		VulkanicAPI.bindFramebuffer(ctx, this.fadeFramebuffer);
+		this.fadeFramebuffer = new DhFramebuffer();
 		
 		
 		if (this.fadeTexture != -1)
@@ -89,7 +89,7 @@ public class DhFadeRenderer
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, 0);
 		}
 		
-		VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, this.fadeTexture, 0);
+		this.fadeFramebuffer.addColorAttachment(ctx, 0, this.fadeTexture);
 		
 	}
 	
@@ -125,7 +125,7 @@ public class DhFadeRenderer
 				this.createFramebuffer(ctx, width, height);
 			}
 
-			if (this.fadeFramebuffer == -1 || this.fadeTexture == -1)
+			if (this.fadeFramebuffer == null || this.fadeTexture == -1)
 			{
 				return;
 			}

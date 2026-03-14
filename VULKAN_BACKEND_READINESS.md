@@ -362,6 +362,30 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 - **Tests:** `Phase3DrawPathTest` now guards the new DH owner-bound seams and verifies those render paths avoid raw framebuffer-id binding in the migrated callsites.
 - **Notes:** This preserves legacy compatibility APIs for Iris/DH integration while moving active production rendering closer to texture-backed, backend-owned render-target intent.
 
+### Distant Horizons Managed Offscreen Framebuffer Owners
+
+- **Capability Name:** Distant Horizons Managed Offscreen Framebuffer Owners
+- **Description:** Distant Horizons transient offscreen passes should carry framebuffer ownership through `DhFramebuffer` objects instead of reducing those targets to raw framebuffer ids during creation, binding, and apply stages.
+- **Status:** COMPLETE
+- **Evidence:**
+  - `FogRenderer`, `SSAORenderer`, `DhFadeRenderer`, and `VanillaFadeRenderer` now create and track offscreen targets as `DhFramebuffer` owners, attaching textures through `DhFramebuffer.addColorAttachment(...)` instead of ad hoc global framebuffer mutation.
+  - `FogShader`, `SSAOShader`, `DhFadeShader`, and `VanillaFadeShader` now bind their output targets through `DhFramebuffer.bind(...)` rather than cached raw framebuffer ids.
+  - `FogApplyShader`, `SSAOApplyShader`, and `FadeApplyShader` now bind read targets through framebuffer owners (`bindAsReadBuffer`) instead of raw `bindReadFramebuffer` ids for the migrated Distant Horizons offscreen passes.
+- **Tests:** `Phase3DrawPathTest` now guards the owner-based offscreen framebuffer flow across the DH renderers and apply shaders.
+- **Notes:** This removes another GL-shaped identity leak from hot render paths by treating offscreen framebuffers as owned resources rather than public integer handles.
+
+### Named Framebuffer Blit Routing Seams
+
+- **Capability Name:** Named Framebuffer Blit Routing Seams
+- **Description:** Production fallback blit paths should delegate source/destination framebuffer routing through Vulkanic's named-blit seam instead of manually binding read/draw targets around every copy.
+- **Status:** COMPLETE
+- **Evidence:**
+  - `DirectStateAccess` fallback blit path now uses `VulkanicAPI.blitNamedFramebuffer(...)` instead of caching and restoring read/draw framebuffer bindings manually.
+  - `IrisRenderSystem` unsupported-DSA blit path now also uses `VulkanicAPI.blitNamedFramebuffer(...)`, keeping read/draw target routing inside Vulkanic/backends.
+  - The existing OpenGL and Vulkan backend `blitNamedFramebuffer(...)` implementations now serve both DSA-capable and fallback production paths.
+- **Tests:** `Phase3DrawPathTest` now guards the migration and ensures those fallback blit paths do not manually bind read/draw framebuffer targets before blitting.
+- **Notes:** This shrinks another framebuffer-identity surface area by making blit intent a backend-owned operation even when the caller only has source/destination framebuffer handles.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

@@ -1304,9 +1304,7 @@ public class IrisRenderSystem {
 
 		@Override
 		public void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
-			VulkanicAPI.bindReadFramebuffer(VulkanicAPI.getCommandContext(), source);
-			VulkanicAPI.bindDrawFramebuffer(VulkanicAPI.getCommandContext(), dest);
-			VulkanicAPI.blitFramebuffer(VulkanicAPI.getCommandContext(), offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
+			VulkanicAPI.blitNamedFramebuffer(VulkanicAPI.getCommandContext(), source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 		}
 
 		@Override
