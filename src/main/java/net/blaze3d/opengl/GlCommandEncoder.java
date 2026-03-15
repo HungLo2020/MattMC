@@ -774,27 +774,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for presentation");
 		} else {
 			CommandContext ctx = commandContext();
-			VulkanicAPI.setScissorTestEnabled(ctx, false);
-			VulkanicAPI.setDynamicViewport(ctx, 0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
-			net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
-			net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
-			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, VulkanicCoreAPI.textureId(gpuTextureView), 0, 0, 0);
-			this.device
-				.directStateAccess()
-				.blitFrameBuffers(
-					this.drawFbo,
-					0,
-					0,
-					0,
-					gpuTextureView.getWidth(0),
-					gpuTextureView.getHeight(0),
-					0,
-					0,
-					gpuTextureView.getWidth(0),
-					gpuTextureView.getHeight(0),
-					VulkanicAPI.GL_COLOR_BUFFER_BIT,
-					VulkanicAPI.GL_NEAREST
-				);
+			VulkanicCoreAPI.presentTextureToScreen(ctx, gpuTextureView);
 		}
 	}
 

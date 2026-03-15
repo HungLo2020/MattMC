@@ -196,6 +196,16 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
+    public void testPresentTextureToScreenRoutesThroughBackendSeam() {
+        VulkanicAPI.presentTextureToScreen(TEST_CONTEXT, null);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("presentTextureToScreen", invocation.method.getName());
+        assertEquals(net.blaze3d.textures.GpuTextureView.class, invocation.method.getParameterTypes()[1]);
+    }
+
+    @Test
     public void testCoreAndLegacyGetIntegerUseTypedAndFallbackPaths() {
         int typedResult = VulkanicCoreAPI.getInteger(TEST_CONTEXT, VulkanicIntegerQuery.MAX_TEXTURE_SIZE);
         RecordedInvocation typedInvocation = invocationHandler.lastInvocation;

@@ -528,6 +528,8 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder texture blit path should not branch over hardcoded depth/color blit masks 256/16384");
         assertFalse(source.contains("gpuTextureView.getHeight(0), 16384, 9728"),
             "GlCommandEncoder presentTexture path should not use hardcoded color-mask/filter literals 16384/9728");
+        assertFalse(source.contains("bindFrameBufferTextures(this.drawFbo, VulkanicCoreAPI.textureId(gpuTextureView), 0, 0, 0)"),
+            "GlCommandEncoder presentTexture should avoid direct drawFbo texture attachment plumbing and route through backend-owned present seam");
 
         assertTrue(source.contains("VulkanicAPI.bindCubemapTexture("),
             "GlCommandEncoder should bind cubemaps via VulkanicAPI.bindCubemapTexture");
@@ -541,6 +543,8 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder texture blit path should route depth/color masks through VulkanicAPI constants");
         assertTrue(source.contains("VulkanicAPI.GL_NEAREST"),
             "GlCommandEncoder blit paths should route nearest-filter intent through VulkanicAPI constant");
+        assertTrue(source.contains("VulkanicCoreAPI.presentTextureToScreen(ctx, gpuTextureView);"),
+            "GlCommandEncoder presentTexture should route final presentation through VulkanicCoreAPI.presentTextureToScreen backend seam");
     }
 
     @Test

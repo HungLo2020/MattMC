@@ -3,6 +3,7 @@ package net.vulkanic.backends.opengl;
 import net.blaze3d.opengl.GlDevice;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.textures.GpuTextureView;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsBackendType;
@@ -42,6 +43,7 @@ public class OpenGLBackend implements GraphicsBackend {
     private static final int TEXTURE_UNIT_COUNT = 128;
     private final int[] texture2DBindings = new int[TEXTURE_UNIT_COUNT];
     private int activeTextureUnitIndex = 0;
+    private volatile int presentScratchReadFbo;
 
     /**
      * Reference to the GlDevice, set after device initialization.
@@ -949,6 +951,87 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+
+    @Override
+    public void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (textureView == null) {
+            throw new IllegalArgumentException("textureView must not be null");
+        }
+
+        int textureHandle = resolveTextureHandle(ctx, textureView.texture());
+        if (textureHandle == 0) {
+            throw new IllegalStateException("OpenGL present requires a valid texture handle");
+        }
+
+        int width = textureView.getWidth(0);
+        int height = textureView.getHeight(0);
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("OpenGL present requires a non-zero texture extent");
+        }
+
+        int readFbo = ensurePresentScratchReadFramebuffer();
+        int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int previousDrawFramebuffer = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+
+        try {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFbo);
+            GL32.glFramebufferTexture(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, textureHandle, textureView.baseMipLevel());
+
+            int framebufferStatus = GL30.glCheckFramebufferStatus(GL30.GL_READ_FRAMEBUFFER);
+            if (framebufferStatus != GL30.GL_FRAMEBUFFER_COMPLETE) {
+                throw new IllegalStateException(
+                    "OpenGL present read framebuffer is incomplete (status=0x" + Integer.toHexString(framebufferStatus) + ")"
+                );
+            }
+
+            GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0);
+
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
+
+            GL30.glBlitFramebuffer(
+                0,
+                0,
+                width,
+                height,
+                0,
+                0,
+                width,
+                height,
+                GL11.GL_COLOR_BUFFER_BIT,
+                GL11.GL_NEAREST
+            );
+        } finally {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+            GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+        }
+    }
+
+    private int ensurePresentScratchReadFramebuffer() {
+        int readFbo = presentScratchReadFbo;
+        if (readFbo != 0 && GL30.glIsFramebuffer(readFbo)) {
+            return readFbo;
+        }
+
+        readFbo = GL30.glGenFramebuffers();
+        if (readFbo == 0) {
+            throw new IllegalStateException("Failed to allocate OpenGL framebuffer for presentTextureToScreen");
+        }
+
+        int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        try {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFbo);
+        } finally {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        }
+
+        presentScratchReadFbo = readFbo;
+        return readFbo;
     }
     
     

@@ -3,6 +3,7 @@ package net.vulkanic.backends.vulkan;
 import net.blaze3d.GpuOutOfMemoryException;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.textures.GpuTextureView;
 import net.logging.LogUtils;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackendType;
@@ -41,6 +42,7 @@ import org.lwjgl.vulkan.VkApplicationInfo;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkBufferImageCopy;
 import org.lwjgl.vulkan.VkClearValue;
+import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
@@ -2225,6 +2227,41 @@ public class VulkanBackend {
         spine.endFrame();
     }
 
+    public void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("presentTextureToScreen", ctx);
+        if (textureView == null) {
+            throw new IllegalArgumentException("textureView must not be null");
+        }
+        if (!textureView.texture().getFormat().hasColorAspect()) {
+            throw new IllegalStateException("Cannot present a non-color texture");
+        }
+        if ((textureView.texture().usage() & 8) == 0) {
+            throw new IllegalStateException("Presented texture must include USAGE_RENDER_ATTACHMENT");
+        }
+        if (textureView.texture().getDepthOrLayers() > 1) {
+            throw new UnsupportedOperationException("Textures with multiple depths/layers are not supported for Vulkan presentation");
+        }
+
+        ensureNativeReady("presentTextureToScreen");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        int legacyTextureHandle = resolveTextureHandle(ctx, textureView.texture());
+        if (legacyTextureHandle == 0) {
+            throw new IllegalStateException("Unable to resolve backend texture handle for presentation target");
+        }
+
+        spine.queuePresentTextureRequest(
+            commandBufferHandle,
+            legacyTextureHandle,
+            textureView.baseMipLevel(),
+            textureView.getWidth(0),
+            textureView.getHeight(0)
+        );
+    }
+
     public void drawArrays(CommandContext ctx, int mode, int first, int count) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("drawArrays", ctx);
         if (first < 0 || count < 0) {
@@ -4046,6 +4083,7 @@ public class VulkanBackend {
         private boolean renderPassRecording;
         private boolean frameInProgress;
         private int acquiredSwapchainImageIndex = -1;
+        private volatile PendingPresentTextureRequest pendingPresentTextureRequest;
         private int activeTextureUnitIndex;
 
         private final PixelStoreState pixelStoreState = new PixelStoreState();
@@ -4115,6 +4153,20 @@ public class VulkanBackend {
             private LegacyTextureObject(int id, int target) {
                 this.id = id;
                 this.target = target;
+            }
+        }
+
+        private static final class PendingPresentTextureRequest {
+            private final int legacyTextureHandle;
+            private final int mipLevel;
+            private final int width;
+            private final int height;
+
+            private PendingPresentTextureRequest(int legacyTextureHandle, int mipLevel, int width, int height) {
+                this.legacyTextureHandle = legacyTextureHandle;
+                this.mipLevel = mipLevel;
+                this.width = width;
+                this.height = height;
             }
         }
 
@@ -4900,6 +4952,22 @@ public class VulkanBackend {
                                            int newLayout,
                                            int baseMipLevel,
                                            int levelCount) {
+            transitionImageLayout(
+                texture.imageHandle,
+                texture.aspectMask,
+                oldLayout,
+                newLayout,
+                baseMipLevel,
+                levelCount
+            );
+        }
+
+        private void transitionImageLayout(long imageHandle,
+                                            int aspectMask,
+                                            int oldLayout,
+                                            int newLayout,
+                                            int baseMipLevel,
+                                            int levelCount) {
             try (MemoryStack stack = stackPush()) {
                 VkImageMemoryBarrier.Buffer barrier = VkImageMemoryBarrier.calloc(1, stack);
                 barrier.get(0)
@@ -4908,50 +4976,61 @@ public class VulkanBackend {
                     .newLayout(newLayout)
                     .srcQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
                     .dstQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED)
-                    .image(texture.imageHandle);
+                    .image(imageHandle);
                 barrier.get(0).subresourceRange()
-                    .aspectMask(texture.aspectMask)
+                    .aspectMask(aspectMask)
                     .baseMipLevel(baseMipLevel)
                     .levelCount(levelCount)
                     .baseArrayLayer(0)
                     .layerCount(1);
 
-                int srcStage;
-                int dstStage;
-                int srcAccessMask;
-                int dstAccessMask;
-
-                if (oldLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
-                    srcStage = VK10.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-                    srcAccessMask = 0;
-                } else if (oldLayout == VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-                    srcStage = VK10.VK_PIPELINE_STAGE_TRANSFER_BIT;
-                    srcAccessMask = VK10.VK_ACCESS_TRANSFER_WRITE_BIT;
-                } else {
-                    srcStage = VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-                    srcAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
-                }
-
-                if (newLayout == VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-                    dstStage = VK10.VK_PIPELINE_STAGE_TRANSFER_BIT;
-                    dstAccessMask = VK10.VK_ACCESS_TRANSFER_WRITE_BIT;
-                } else {
-                    dstStage = VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-                    dstAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
-                }
-
-                barrier.get(0).srcAccessMask(srcAccessMask).dstAccessMask(dstAccessMask);
+                barrier.get(0)
+                    .srcAccessMask(accessMaskForLayout(oldLayout))
+                    .dstAccessMask(accessMaskForLayout(newLayout));
 
                 VK10.vkCmdPipelineBarrier(
                     primaryCommandBuffer,
-                    srcStage,
-                    dstStage,
+                    stageMaskForLayout(oldLayout),
+                    stageMaskForLayout(newLayout),
                     0,
                     null,
                     null,
                     barrier
                 );
             }
+        }
+
+        private static int accessMaskForLayout(int layout) {
+            return switch (layout) {
+                case VK10.VK_IMAGE_LAYOUT_UNDEFINED -> 0;
+                case VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL -> VK10.VK_ACCESS_TRANSFER_READ_BIT;
+                case VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL -> VK10.VK_ACCESS_TRANSFER_WRITE_BIT;
+                case VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ->
+                    VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ->
+                    VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL -> VK10.VK_ACCESS_SHADER_READ_BIT;
+                case VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL -> VK10.VK_ACCESS_SHADER_READ_BIT;
+                case VK10.VK_IMAGE_LAYOUT_GENERAL -> VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT;
+                case KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> 0;
+                default -> VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT;
+            };
+        }
+
+        private static int stageMaskForLayout(int layout) {
+            return switch (layout) {
+                case VK10.VK_IMAGE_LAYOUT_UNDEFINED -> VK10.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+                case VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL -> VK10.VK_PIPELINE_STAGE_TRANSFER_BIT;
+                case VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                case VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                    VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ->
+                    VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                case VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ->
+                    VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+                case KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+                default -> VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            };
         }
 
         private void uploadToLegacyTextureRegion(LegacyTextureObject texture,
@@ -5114,6 +5193,14 @@ public class VulkanBackend {
                 throw new IllegalArgumentException("Unknown Vulkan legacy buffer handle: " + bufferId);
             }
             return legacy;
+        }
+
+        private LegacyTextureObject requireLegacyTexture(int textureId) {
+            LegacyTextureObject texture = legacyTextures.get(textureId);
+            if (texture == null) {
+                throw new IllegalArgumentException("Unknown Vulkan legacy texture handle: " + textureId);
+            }
+            return texture;
         }
 
         private LegacyBufferObject requireBoundLegacyBuffer(int target) {
@@ -6148,14 +6235,14 @@ public class VulkanBackend {
             if (!frameInProgress) {
                 throw new IllegalStateException("endFrame called without an active Vulkan frame.");
             }
-            if (commandBufferRecording) {
-                if (renderPassRecording) {
-                    throw new IllegalStateException("endFrame cannot run while a render pass is active.");
-                }
-                submitPrimaryCommandBuffer(primaryCommandBuffer.address());
-            }
             if (renderPassRecording) {
                 throw new IllegalStateException("endFrame cannot run while a render pass is active.");
+            }
+
+            composePendingPresentTexture(primaryCommandBuffer.address());
+
+            if (commandBufferRecording) {
+                submitPrimaryCommandBuffer(primaryCommandBuffer.address());
             }
 
             try (MemoryStack stack = stackPush()) {
@@ -6177,9 +6264,147 @@ public class VulkanBackend {
 
                 checkVk("vkQueueWaitIdle", VK10.vkQueueWaitIdle(graphicsQueue));
             } finally {
+                pendingPresentTextureRequest = null;
                 acquiredSwapchainImageIndex = -1;
                 frameInProgress = false;
             }
+        }
+
+        private void queuePresentTextureRequest(long commandBufferHandle,
+                                                int legacyTextureHandle,
+                                                int mipLevel,
+                                                int width,
+                                                int height) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "queuePresentTextureRequest");
+            LegacyTextureObject legacyTexture = requireLegacyTexture(legacyTextureHandle);
+            if (legacyTexture.imageHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("Texture " + legacyTextureHandle + " has no Vulkan image storage for presentation.");
+            }
+            if (mipLevel < 0 || mipLevel >= legacyTexture.mipLevels) {
+                throw new IllegalArgumentException(
+                    "Requested present mip level " + mipLevel + " is outside texture mip range [0, "
+                        + legacyTexture.mipLevels + ")"
+                );
+            }
+
+            pendingPresentTextureRequest = new PendingPresentTextureRequest(
+                legacyTextureHandle,
+                mipLevel,
+                Math.max(1, width),
+                Math.max(1, height)
+            );
+        }
+
+        private void composePendingPresentTexture(long commandBufferHandle) {
+            PendingPresentTextureRequest request = pendingPresentTextureRequest;
+            if (request == null) {
+                return;
+            }
+
+            if (!frameInProgress || acquiredSwapchainImageIndex < 0) {
+                throw new IllegalStateException("Cannot compose present texture without an acquired swapchain image.");
+            }
+            if (acquiredSwapchainImageIndex >= swapchainImageHandles.size()) {
+                throw new IllegalStateException(
+                    "Acquired swapchain image index " + acquiredSwapchainImageIndex
+                        + " is outside swapchain image range " + swapchainImageHandles.size()
+                );
+            }
+
+            LegacyTextureObject sourceTexture = requireLegacyTexture(request.legacyTextureHandle);
+            if (sourceTexture.imageHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException(
+                    "Queued present texture " + request.legacyTextureHandle + " has no Vulkan image storage."
+                );
+            }
+
+            long swapchainImageHandle = swapchainImageHandles.get(acquiredSwapchainImageIndex);
+            if (swapchainImageHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("Acquired swapchain image handle is null");
+            }
+
+            int dstWidth = Math.max(1, swapchainWidth);
+            int dstHeight = Math.max(1, swapchainHeight);
+            int srcWidth = Math.max(1, request.width);
+            int srcHeight = Math.max(1, request.height);
+            int copyWidth = Math.min(srcWidth, dstWidth);
+            int copyHeight = Math.min(srcHeight, dstHeight);
+            if (copyWidth <= 0 || copyHeight <= 0) {
+                pendingPresentTextureRequest = null;
+                return;
+            }
+
+            ensureRecordingCommandBuffer(commandBufferHandle, "composePendingPresentTexture");
+
+            int originalSourceLayout = sourceTexture.currentLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                : sourceTexture.currentLayout;
+
+            transitionImageLayout(
+                sourceTexture.imageHandle,
+                sourceTexture.aspectMask,
+                originalSourceLayout,
+                VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                request.mipLevel,
+                1
+            );
+            transitionImageLayout(
+                swapchainImageHandle,
+                VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+                KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                0,
+                1
+            );
+
+            try (MemoryStack stack = stackPush()) {
+                VkImageBlit.Buffer region = VkImageBlit.calloc(1, stack);
+                region.get(0).srcSubresource()
+                    .aspectMask(sourceTexture.aspectMask)
+                    .mipLevel(request.mipLevel)
+                    .baseArrayLayer(0)
+                    .layerCount(1);
+                region.get(0).srcOffsets(0).set(0, 0, 0);
+                region.get(0).srcOffsets(1).set(srcWidth, srcHeight, 1);
+
+                region.get(0).dstSubresource()
+                    .aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
+                    .mipLevel(0)
+                    .baseArrayLayer(0)
+                    .layerCount(1);
+                region.get(0).dstOffsets(0).set(0, 0, 0);
+                region.get(0).dstOffsets(1).set(copyWidth, copyHeight, 1);
+
+                VK10.vkCmdBlitImage(
+                    primaryCommandBuffer,
+                    sourceTexture.imageHandle,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    swapchainImageHandle,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    region,
+                    VK10.VK_FILTER_NEAREST
+                );
+            }
+
+            transitionImageLayout(
+                sourceTexture.imageHandle,
+                sourceTexture.aspectMask,
+                VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                originalSourceLayout,
+                request.mipLevel,
+                1
+            );
+            transitionImageLayout(
+                swapchainImageHandle,
+                VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+                VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                0,
+                1
+            );
+
+            sourceTexture.currentLayout = originalSourceLayout;
+            pendingPresentTextureRequest = null;
         }
 
         private long beginPrimaryCommandBuffer() {
@@ -7360,6 +7585,7 @@ public class VulkanBackend {
                 commandBufferRecording = false;
                 frameInProgress = false;
                 acquiredSwapchainImageIndex = -1;
+                pendingPresentTextureRequest = null;
             }
 
             if (instance != null) {

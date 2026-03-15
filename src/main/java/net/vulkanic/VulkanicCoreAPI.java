@@ -89,6 +89,10 @@ public final class VulkanicCoreAPI {
         return textureId(textureView.texture());
     }
 
+    public static void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        VulkanicAPI.presentTextureToScreen(ctx, textureView);
+    }
+
     public static void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled) {
         VulkanicAPI.setCapabilityEnabled(ctx, capability, enabled);
     }

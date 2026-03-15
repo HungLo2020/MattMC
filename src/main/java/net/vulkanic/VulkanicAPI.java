@@ -5732,6 +5732,13 @@ public class VulkanicAPI {
         getBackend().endFrame();
     }
 
+    /**
+     * Presents a color render target view to the active backend's screen/swapchain.
+     */
+    public static void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        getBackend().presentTextureToScreen(ctx, textureView);
+    }
+
     // =========================================================================
     // Phase 3d: Command Buffer Lifecycle
     // =========================================================================

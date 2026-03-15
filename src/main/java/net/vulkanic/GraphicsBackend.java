@@ -1,5 +1,7 @@
 package net.vulkanic;
 
+import net.blaze3d.textures.GpuTextureView;
+
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.OptionalDouble;
@@ -3673,6 +3675,19 @@ public interface GraphicsBackend {
      */
     default void endFrame() {
         // no-op for backends without explicit present lifecycle
+    }
+
+    /**
+     * Presents a color render target view to the backend-owned screen/swapchain.
+     *
+     * <p>OpenGL backends should blit/copy the view to the default framebuffer.
+     * Vulkan backends should stage this as the source image for swapchain
+     * composition during frame presentation.</p>
+     */
+    default void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not implement presentTextureToScreen."
+        );
     }
 
     // =========================================================================

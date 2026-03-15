@@ -469,6 +469,35 @@ Vulkan-selected startup still exposed compatibility `GlDevice` metadata as the s
 - Vulkan runtime rendering ownership is still incomplete in broader architecture; compatibility `GlDevice` remains in service for substantial resource and draw plumbing.
 - Additional high-traffic callsites may still read concrete `RenderSystem.getDevice()` metadata and should be migrated through the same seam.
 
+## Session 2026-03-15: Backend-Owned Final Present Seam (Finding #1)
+
+### Problem Targeted
+`GlCommandEncoder.presentTexture(...)` was still using a GL-shaped direct-FBO blit path (`bindFrameBufferTextures` + `blitFrameBuffers`) in shared/game callsites. On Vulkan-selected runtime this created a semantic gap between frame lifecycle acquire/present and actual final image composition into swapchain images.
+
+### Structural Changes
+- **`GraphicsBackend`:** Added backend-owned `presentTextureToScreen(CommandContext, GpuTextureView)` seam.
+- **`VulkanicAPI` + `VulkanicCoreAPI`:** Added wrapper methods so production callsites can route final presentation by backend intent.
+- **`GlCommandEncoder.presentTexture(...)`:** Replaced direct draw-FBO blit implementation with `VulkanicCoreAPI.presentTextureToScreen(...)`.
+- **`OpenGLBackend`:** Implemented `presentTextureToScreen` using named-framebuffer texture attachment + blit to default framebuffer.
+- **`VulkanBackend`:** Implemented `presentTextureToScreen` as a backend-owned queued present request; native `endFrame()` now composes the queued source texture into the acquired swapchain image via `vkCmdBlitImage` before `vkQueuePresentKHR`.
+- **`VulkanBackend.NativeSpine`:** Added pending present request tracking and generalized image-layout transition helpers for transfer/present barriers.
+
+### Evidence
+- Source guardrails added/updated:
+  - `Phase3DrawPathTest` now asserts `GlCommandEncoder.presentTexture` routes through `VulkanicCoreAPI.presentTextureToScreen(...)` and no longer performs direct draw-FBO attachment for this path.
+  - `VulkanFramePresentationLifecycleTest` now asserts Vulkan source wiring includes queued present composition (`composePendingPresentTexture`) and `vkCmdBlitImage` in the frame presentation path.
+  - `VulkanicTypedApiRoutingTest` now verifies `VulkanicAPI.presentTextureToScreen(...)` routes through backend seam dispatch.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Final present callsite no longer encodes concrete GL FBO-blit mechanics in shared `GlCommandEncoder` path.
+- **2 — Backend Implementation:** Vulkan path moved from no-op display blit behavior to concrete swapchain composition command recording in `endFrame`.
+- **4 — Parity Improvement:** Both backends now implement the same backend-owned present seam (`presentTextureToScreen`) with backend-native behavior.
+- **5 — Debuggability Improvement:** Presentation failures now fail in backend-owned seam/compose code with targeted errors (missing texture handle/storage/mip/layout assumptions).
+
+### Still Unproven
+- Runtime validation on real Vulkan hardware with Iris/shaderpacks active is still required to prove full image correctness and layout assumptions under all passes.
+- Current Vulkan present composition uses queue-idle synchronization and single-request overwrite semantics; it is functional but not yet optimized for throughput.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**
