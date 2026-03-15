@@ -89,6 +89,54 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
+    public void testUploadTexture2DRoutingUsesTypedMethodForKnownTuple() {
+        VulkanicAPI.uploadTexture2D(
+            TEST_CONTEXT,
+            VulkanicAPI.GL_TEXTURE_2D,
+            0,
+            VulkanicAPI.GL_R32F,
+            1,
+            1,
+            0,
+            VulkanicAPI.GL_RED,
+            VulkanicAPI.GL_FLOAT,
+            null
+        );
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("uploadTexture2D", invocation.method.getName());
+        assertEquals(VulkanicTextureTarget.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(VulkanicTextureUploadFormat.class, invocation.method.getParameterTypes()[3]);
+        assertEquals(VulkanicTextureTarget.TEXTURE_2D, invocation.args[1]);
+        assertEquals(VulkanicTextureUploadFormat.RED32_SFLOAT, invocation.args[3]);
+    }
+
+    @Test
+    public void testUploadTexture2DRoutingFallsBackForUnknownTuple() {
+        int unknownInternalFormat = 0x7FFF_2010;
+        VulkanicAPI.uploadTexture2D(
+            TEST_CONTEXT,
+            VulkanicAPI.GL_TEXTURE_2D,
+            0,
+            unknownInternalFormat,
+            1,
+            1,
+            0,
+            VulkanicAPI.GL_RED,
+            VulkanicAPI.GL_FLOAT,
+            null
+        );
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("uploadTexture2D", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(int.class, invocation.method.getParameterTypes()[3]);
+        assertEquals(unknownInternalFormat, invocation.args[3]);
+    }
+
+    @Test
     public void testCoreAndLegacyGetIntegerUseTypedAndFallbackPaths() {
         int typedResult = VulkanicCoreAPI.getInteger(TEST_CONTEXT, VulkanicIntegerQuery.MAX_TEXTURE_SIZE);
         RecordedInvocation typedInvocation = invocationHandler.lastInvocation;

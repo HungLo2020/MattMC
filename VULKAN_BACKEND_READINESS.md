@@ -389,6 +389,50 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 - **Tests:** `Phase3DrawPathTest` now guards the migration and ensures those fallback blit paths do not manually bind read/draw framebuffer targets before blitting.
 - **Notes:** This shrinks another framebuffer-identity surface area by making blit intent a backend-owned operation even when the caller only has source/destination framebuffer handles.
 
+
+## Session 2026-03-15: Typed Texture Upload — R32F Center-Depth Path
+
+### Problem Targeted
+`GL_R32F / GL_RED / GL_FLOAT` upload tuple was missing from `VulkanBackend.LegacyTextureFormatInfo.resolve()`, causing an `IllegalArgumentException("Unsupported legacy texture upload format combination")` crash whenever Iris loaded a shaderpack that exercises the center-depth smooth-depth path (`CenterDepthSampler`). The callsite also used raw `InternalTextureFormat.R32F` + `PixelType.FLOAT` GL integer expansion — opaque to any backend routing logic.
+
+### Structural Changes
+- **`VulkanicTextureUploadFormat` (new enum):** Backend-neutral upload tuple type (10 named formats) with `fromLegacyGlTuple(int, int, int)` auto-mapper.
+- **`GraphicsBackend`:** Two typed `default` overloads for `uploadTexture2D` accepting `VulkanicTextureUploadFormat`.
+- **`VulkanicAPI`:** Smart auto-upgrade in the legacy `uploadTexture2D` dispatch — when both target and format are recognized, promotes to typed call; falls back to raw for unknown tuples. Two new typed overloads added.
+- **`VulkanicCoreAPI`:** Two typed `uploadTexture2D` wrappers.
+- **`OpenGLBackend`:** Explicit typed override — unpacks format to GL integers, delegates to `GL11.glTexImage2D`.
+- **`VulkanBackend`:** Explicit typed override + **`R32F → VK_FORMAT_R32_SFLOAT` added** in `LegacyTextureFormatInfo.resolve()`.
+- **`IrisRenderSystem`:** Two typed `texImage2D` overloads accepting `VulkanicTextureUploadFormat`.
+- **`CenterDepthSampler`:** `setupColorTexture()` migrated — no longer uses `InternalTextureFormat` / `PixelType`; calls `IrisRenderSystem.texImage2D(texture, 0, VulkanicTextureUploadFormat.RED32_SFLOAT, 1, 1, 0, null)`.
+
+### Evidence
+- `VulkanTextureUploadFormatContractTest` (new, 3 tests): tuple mapper recognizes center-depth tuple; Vulkan resolver accepts R32F (asserts `vkFormat == VK_FORMAT_R32_SFLOAT`, `pixelBytes == 4`, `aspectMask == VK_IMAGE_ASPECT_COLOR_BIT`); resolver still fail-fasts for unknown tuples.
+- `VulkanicTypedApiRoutingTest` (2 new tests): known GL-R32F tuple routes to typed method; unknown tuple falls back to raw int overload.
+- `ApiNeutralityCallsiteTest` (2 new assertions): `GraphicsBackend` typed upload seam exists; `CenterDepthSampler` references `VulkanicTextureUploadFormat.RED32_SFLOAT` and not `PixelType.FLOAT.getGlFormat()`.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Typed upload seam added; center-depth callsite off raw GL tuple.
+- **2 — Backend Implementation:** Concrete Vulkan R32F path; fail-fast hole removed for this tuple.
+- **4 — Parity Improvement:** Upload intent expressed as backend-neutral format, not GL mechanism.
+- **5 — Debuggability Improvement:** Narrower failure mode for unsupported tuples; known center-depth routes deterministically.
+
+### Still Unproven
+- Full runtime validation with Iris + shaderpack active on a real Vulkan device.
+- Other upload tuples used by other shader passes may still be unmapped in `LegacyTextureFormatInfo.resolve()`.
+
+### Bug Fix — Over-Broad `fromLegacyGlTuple` Routing (Post-session fix)
+**Symptom:** Water surface rendered white/transparent in OpenGL mode with Iris shader packs enabled.
+
+**Root cause:** `VulkanicTextureUploadFormat.fromLegacyGlTuple` used OR conditions that matched on just the pixel `format` OR just the `internalFormat`, independent of each other. This allowed higher-precision formats (e.g., `GL_RGBA16`, `GL_RGBA`, `GL_RGB16`) to match lower-precision enum entries (`RGBA8_UNORM`, `RGB8_UNORM`), silently changing the `internalFormat` passed to `glTexImage2D`. Iris render targets that default to `InternalTextureFormat.RGBA` (`GL_RGBA = 0x1908`) were incorrectly upgraded to `GL_RGBA8 (0x8058)` and render targets using `GL_RGBA16` were downgraded to `GL_RGBA8`, corrupting colortex buffer precision used by composite shaders for water rendering.
+
+**Fix:** Replaced the entire conditional block in `fromLegacyGlTuple` with exact per-field matching (`internalFormat AND format AND type` must all match). Each enum entry now only recognizes its own canonical exact tuple. Unknown or non-canonical tuples fall through to the raw GL path, preserving the caller's original values unchanged.
+
+**Regression guard:** `VulkanTextureUploadFormatContractTest` now contains 4 tests:
+- `testTupleMapperDoesNotRouteUnsizedRgbaToRgba8Unorm` — `GL_RGBA` (unsized) does not map to `RGBA8_UNORM`
+- `testTupleMapperDoesNotDowngradeRgba16ToRgba8` — `GL_RGBA16` does not silently lose precision
+- `testTupleMapperDoesNotDowngradeRgb16ToRgb8` — `GL_RGB16` does not silently lose precision
+- `testTupleMapperStillRecognizesCanonicalRgba8UnormTuple` — exact `GL_RGBA8` tuple still routes correctly
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

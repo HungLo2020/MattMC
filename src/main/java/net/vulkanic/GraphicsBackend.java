@@ -1246,6 +1246,56 @@ public interface GraphicsBackend {
      */
     void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
                          int border, int format, int type, java.nio.ByteBuffer pixels);
+
+    /**
+     * Uploads pixel data to a 2D texture using backend-neutral upload-format semantics.
+     */
+    default void uploadTexture2D(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        if (target == null) {
+            throw new IllegalArgumentException("target must not be null");
+        }
+        if (uploadFormat == null) {
+            throw new IllegalArgumentException("uploadFormat must not be null");
+        }
+
+        uploadTexture2D(
+            ctx,
+            target.toLegacyGlTarget(),
+            level,
+            uploadFormat.legacyInternalFormat(),
+            width,
+            height,
+            border,
+            uploadFormat.legacyFormat(),
+            uploadFormat.legacyType(),
+            pixels
+        );
+    }
+
+    /**
+     * Uploads pixel data to the currently bound GL_TEXTURE_2D target using
+     * backend-neutral upload-format semantics.
+     */
+    default void uploadTexture2D(
+        CommandContext ctx,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        uploadTexture2D(ctx, VulkanicTextureTarget.TEXTURE_2D, level, uploadFormat, width, height, border, pixels);
+    }
     
     /**
      * Uploads pixel data to a subregion of a 2D texture.

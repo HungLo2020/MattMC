@@ -2431,7 +2431,44 @@ public class VulkanicAPI {
     
     public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
                                         int border, int format, int type, java.nio.ByteBuffer pixels) {
+        java.util.Optional<VulkanicTextureUploadFormat> knownFormat = VulkanicTextureUploadFormat.fromLegacyGlTuple(internalFormat, format, type);
+        java.util.Optional<VulkanicTextureTarget> knownTarget = VulkanicTextureTarget.fromLegacyGlTarget(target);
+
+        if (knownFormat.isPresent() && knownTarget.isPresent()) {
+            getBackend().uploadTexture2D(ctx, knownTarget.get(), level, knownFormat.get(), width, height, border, pixels);
+            return;
+        }
+
         getBackend().uploadTexture2D(ctx, target, level, internalFormat, width, height, border, format, type, pixels);
+    }
+
+    public static void uploadTexture2D(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        getBackend().uploadTexture2D(ctx, target, level, uploadFormat, width, height, border, pixels);
+    }
+
+    /**
+     * Uploads a 2D texture image to the currently bound 2D texture target using
+     * backend-neutral upload-format semantics.
+     */
+    public static void uploadTexture2D(
+        CommandContext ctx,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        getBackend().uploadTexture2D(ctx, level, uploadFormat, width, height, border, pixels);
     }
 
     /**

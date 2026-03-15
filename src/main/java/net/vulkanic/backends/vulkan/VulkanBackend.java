@@ -17,6 +17,7 @@ import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureFormat;
+import net.vulkanic.VulkanicTextureUploadFormat;
 import net.vulkanic.VulkanicTextureView;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicShaderStage;
@@ -1474,6 +1475,37 @@ public class VulkanBackend {
             pixels == null ? null : pixels.duplicate());
     }
 
+    public void uploadTexture2D(
+        CommandContext ctx,
+        net.vulkanic.VulkanicTextureTarget target,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        if (target == null) {
+            throw new IllegalArgumentException("target must not be null");
+        }
+        if (uploadFormat == null) {
+            throw new IllegalArgumentException("uploadFormat must not be null");
+        }
+
+        uploadTexture2D(
+            ctx,
+            target.toLegacyGlTarget(),
+            level,
+            uploadFormat.legacyInternalFormat(),
+            width,
+            height,
+            border,
+            uploadFormat.legacyFormat(),
+            uploadFormat.legacyType(),
+            pixels
+        );
+    }
+
     public void uploadTexture2DSubImage(CommandContext ctx,
                                         int target,
                                         int level,
@@ -1579,6 +1611,12 @@ public class VulkanBackend {
             if (internalFormat == VulkanicAPI.GL_R16F
                 || (format == VulkanicAPI.GL_RED && type == VulkanicAPI.GL_HALF_FLOAT)) {
                 return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R16_SFLOAT, 2, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
+            if (internalFormat == VulkanicAPI.GL_R32F
+                && format == VulkanicAPI.GL_RED
+                && type == VulkanicAPI.GL_FLOAT) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R32_SFLOAT, 4, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
             }
 
             if (internalFormat == VulkanicAPI.GL_RGBA16F

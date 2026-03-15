@@ -26,6 +26,7 @@ import net.vulkanic.VulkanicResourceBarriers;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
 import net.vulkanic.VulkanicTextureTarget;
+import net.vulkanic.VulkanicTextureUploadFormat;
 import net.vulkanic.VulkanicTextureSwizzleComponent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -147,6 +148,33 @@ public class IrisRenderSystem {
 
 	public static void texImage2D(int texture, VulkanicTextureTarget target, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		texImage2D(texture, target.toLegacyGlTarget(), level, internalformat, width, height, border, format, type, pixels);
+	}
+
+	public static void texImage2D(
+		int texture,
+		VulkanicTextureTarget target,
+		int level,
+		VulkanicTextureUploadFormat uploadFormat,
+		int width,
+		int height,
+		int border,
+		@Nullable ByteBuffer pixels
+	) {
+		RenderSystem.assertOnRenderThread();
+		IrisRenderSystem.bindTextureForSetup(target.toLegacyGlTarget(), texture);
+		VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, uploadFormat, width, height, border, pixels);
+	}
+
+	public static void texImage2D(
+		int texture,
+		int level,
+		VulkanicTextureUploadFormat uploadFormat,
+		int width,
+		int height,
+		int border,
+		@Nullable ByteBuffer pixels
+	) {
+		texImage2D(texture, VulkanicTextureTarget.TEXTURE_2D, level, uploadFormat, width, height, border, pixels);
 	}
 
 	public static void texImage2D(int texture, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {

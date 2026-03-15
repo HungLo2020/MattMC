@@ -14,14 +14,13 @@ import net.irisshaders.iris.gl.program.ProgramBuilder;
 import net.irisshaders.iris.gl.program.ProgramSamplers;
 import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
-import net.irisshaders.iris.gl.texture.InternalTextureFormat;
-import net.irisshaders.iris.gl.texture.PixelType;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pipeline.CompositeRenderer;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureUploadFormat;
 import org.apache.commons.io.IOUtils;
 import org.joml.Matrix4f;
 
@@ -52,9 +51,8 @@ public class CenterDepthSampler {
 		this.altTexture = IrisRenderSystem.createTextureId();
 		this.framebuffer = new GlFramebuffer();
 
-		InternalTextureFormat format = InternalTextureFormat.R32F;
-		setupColorTexture(texture, format);
-		setupColorTexture(altTexture, format);
+		setupColorTexture(texture);
+		setupColorTexture(altTexture);
 		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 
 		this.framebuffer.addColorAttachment(0, texture);
@@ -117,8 +115,8 @@ public class CenterDepthSampler {
 
 	}
 
-	public void setupColorTexture(int texture, InternalTextureFormat format) {
-		IrisRenderSystem.texImage2D(texture, 0, format.getGlFormat(), 1, 1, 0, format.getPixelFormat().getGlFormat(), PixelType.FLOAT.getGlFormat(), null);
+	public void setupColorTexture(int texture) {
+		IrisRenderSystem.texImage2D(texture, 0, VulkanicTextureUploadFormat.RED32_SFLOAT, 1, 1, 0, null);
 
 		IrisRenderSystem.setTextureLinearFiltering(texture);
 		IrisRenderSystem.setTextureWrapMode2D(texture, true);

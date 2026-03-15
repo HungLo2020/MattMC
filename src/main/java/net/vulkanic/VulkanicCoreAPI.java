@@ -20,6 +20,31 @@ public final class VulkanicCoreAPI {
         VulkanicAPI.bindTexture(ctx, target, textureId);
     }
 
+    public static void uploadTexture2D(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        VulkanicAPI.uploadTexture2D(ctx, target, level, uploadFormat, width, height, border, pixels);
+    }
+
+    public static void uploadTexture2D(
+        CommandContext ctx,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        VulkanicAPI.uploadTexture2D(ctx, level, uploadFormat, width, height, border, pixels);
+    }
+
     public static void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
         VulkanicAPI.bindBuffer(ctx, target, buffer);
     }

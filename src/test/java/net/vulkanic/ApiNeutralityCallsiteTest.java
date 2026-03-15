@@ -563,6 +563,27 @@ public class ApiNeutralityCallsiteTest {
             "GraphicsBackend should expose typed uniform-buffer range binding overloads at the backend boundary: " + relative);
         assertTrue(source.contains("default void texBuffer(CommandContext ctx, VulkanicTextureTarget target"),
             "GraphicsBackend should expose typed tex-buffer target overloads at the backend boundary: " + relative);
+        assertTrue(source.contains("default void uploadTexture2D(")
+                && source.contains("VulkanicTextureUploadFormat uploadFormat"),
+            "GraphicsBackend should expose typed texture-upload format overloads at the backend boundary: " + relative);
+    }
+
+    @Test
+    public void testCenterDepthSamplerUsesTypedTextureUploadFormatSeam() throws IOException {
+        String centerDepthRelative = "net/irisshaders/iris/pathways/CenterDepthSampler.java";
+        String centerDepthSource = Files.readString(SRC_MAIN_JAVA.resolve(centerDepthRelative));
+
+        assertTrue(centerDepthSource.contains("VulkanicTextureUploadFormat.RED32_SFLOAT"),
+            "CenterDepthSampler should express center-depth texture upload intent through typed Vulkanic upload formats: " + centerDepthRelative);
+        assertFalse(centerDepthSource.contains("PixelType.FLOAT.getGlFormat()"),
+            "CenterDepthSampler should avoid raw GL pixel-type constants for center-depth texture setup: " + centerDepthRelative);
+
+        String irisRenderSystemRelative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
+        String irisRenderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve(irisRenderSystemRelative));
+        assertTrue(irisRenderSystemSource.contains("VulkanicTextureUploadFormat uploadFormat"),
+            "IrisRenderSystem should expose typed texture-upload overloads for backend-neutral callsites: " + irisRenderSystemRelative);
+        assertTrue(irisRenderSystemSource.contains("VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, uploadFormat"),
+            "IrisRenderSystem typed texture-upload overloads should route through VulkanicAPI typed seams: " + irisRenderSystemRelative);
     }
 
     @Test
