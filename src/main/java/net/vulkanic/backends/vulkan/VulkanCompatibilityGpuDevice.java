@@ -36,12 +36,12 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuTexture createTexture(@Nullable Supplier<String> supplier, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
-		return this.compatibilityDevice.createTexture(supplier, i, textureFormat, j, k, l, m);
+		return this.backend.createTexture(supplier, i, textureFormat, j, k, l, m);
 	}
 
 	@Override
 	public GpuTexture createTexture(@Nullable String string, int i, TextureFormat textureFormat, int j, int k, int l, int m) {
-		return this.compatibilityDevice.createTexture(string, i, textureFormat, j, k, l, m);
+		return this.backend.createTexture(string, i, textureFormat, j, k, l, m);
 	}
 
 	@Override
@@ -56,12 +56,12 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int i, int j) {
-		return this.compatibilityDevice.createBuffer(supplier, i, j);
+		return this.backend.createBuffer(supplier, i, j);
 	}
 
 	@Override
 	public GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int i, ByteBuffer byteBuffer) {
-		return this.compatibilityDevice.createBuffer(supplier, i, byteBuffer);
+		return this.backend.createBuffer(supplier, i, byteBuffer);
 	}
 
 	@Override

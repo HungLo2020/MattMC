@@ -43,10 +43,22 @@ public class ApiNeutralityCallsiteTest {
 
         assertTrue(graphicsBackendSource.contains("default CommandEncoder createCommandEncoder()"),
             "GraphicsBackend should expose backend-owned command-encoder acquisition seam");
+        assertTrue(graphicsBackendSource.contains("default GpuTexture createTexture("),
+            "GraphicsBackend should expose backend-owned texture creation seams");
+        assertTrue(graphicsBackendSource.contains("default GpuBuffer createBuffer("),
+            "GraphicsBackend should expose backend-owned buffer creation seams");
         assertTrue(vulkanicApiSource.contains("public static CommandEncoder createCommandEncoder()"),
             "VulkanicAPI should expose backend-owned command-encoder wrapper");
         assertTrue(vulkanicApiSource.contains("return getBackend().createCommandEncoder();"),
             "VulkanicAPI command-encoder wrapper should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("public static GpuTexture createTexture("),
+            "VulkanicAPI should expose backend-owned texture creation wrappers");
+        assertTrue(vulkanicApiSource.contains("public static GpuBuffer createBuffer("),
+            "VulkanicAPI should expose backend-owned buffer creation wrappers");
+        assertTrue(vulkanicApiSource.contains("return getBackend().createTexture("),
+            "VulkanicAPI texture wrappers should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("return getBackend().createBuffer("),
+            "VulkanicAPI buffer wrappers should route through backend seam");
 
         assertTrue(commandEncoderSource.contains("void applyPipelineState(RenderPipeline renderPipeline);"),
             "CommandEncoder should expose a backend-neutral pipeline-state seam");
@@ -110,6 +122,14 @@ public class ApiNeutralityCallsiteTest {
             "VulkanCompatibilityGpuDevice should route command-encoder creation through backend seam");
         assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.createCommandEncoder();"),
             "VulkanCompatibilityGpuDevice should avoid direct compatibility-device command-encoder delegation");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.createTexture("),
+            "VulkanCompatibilityGpuDevice should route texture creation through backend seam");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.createBuffer("),
+            "VulkanCompatibilityGpuDevice should route buffer creation through backend seam");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.createTexture("),
+            "VulkanCompatibilityGpuDevice should avoid direct compatibility-device texture creation delegation");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.createBuffer("),
+            "VulkanCompatibilityGpuDevice should avoid direct compatibility-device buffer creation delegation");
         assertTrue(renderTargetSource.contains("VulkanicAPI.createCommandEncoder()"),
             "RenderTarget should acquire command encoders via backend-owned VulkanicAPI seam");
         assertFalse(renderTargetSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),

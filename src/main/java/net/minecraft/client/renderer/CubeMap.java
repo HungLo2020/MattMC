@@ -102,7 +102,7 @@ public class CubeMap implements AutoCloseable {
 			bufferBuilder.addVertex(1.0F, 1.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var3 = VulkanicAPI.getDevice().createBuffer(() -> "Cube map vertex buffer", 32, meshData.vertexBuffer());
+				var3 = VulkanicAPI.createBuffer(() -> "Cube map vertex buffer", 32, meshData.vertexBuffer());
 			}
 		}
 

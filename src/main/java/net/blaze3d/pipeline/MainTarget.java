@@ -83,7 +83,7 @@ public class MainTarget extends RenderTarget {
 	@Nullable
 	private GpuTexture allocateColorAttachment(MainTarget.Dimension dimension) {
 		try {
-			return net.vulkanic.VulkanicAPI.getDevice().createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, dimension.width, dimension.height, 1, 1);
+			return net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, dimension.width, dimension.height, 1, 1);
 		} catch (GpuOutOfMemoryException var3) {
 			return null;
 		}
@@ -92,7 +92,7 @@ public class MainTarget extends RenderTarget {
 	@Nullable
 	private GpuTexture allocateDepthAttachment(MainTarget.Dimension dimension) {
 		try {
-			return net.vulkanic.VulkanicAPI.getDevice().createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, dimension.width, dimension.height, 1, 1);
+			return net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, dimension.width, dimension.height, 1, 1);
 		} catch (GpuOutOfMemoryException var3) {
 			return null;
 		}

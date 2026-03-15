@@ -4,9 +4,12 @@ import net.blaze3d.opengl.GlDevice;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.TextureFormat;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsBackendType;
@@ -156,6 +159,66 @@ public class OpenGLBackend implements GraphicsBackend {
         }
 
         return device.createCommandEncoder();
+    }
+
+    @Override
+    public GpuTexture createTexture(
+        @Nullable java.util.function.Supplier<String> supplier,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTexture(supplier, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+    }
+
+    @Override
+    public GpuTexture createTexture(
+        @Nullable String label,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTexture(label, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+    }
+
+    @Override
+    public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createBuffer(supplier, usage, size);
+    }
+
+    @Override
+    public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, java.nio.ByteBuffer data) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createBuffer(supplier, usage, data);
     }
 
     @Override

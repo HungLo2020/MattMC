@@ -1,6 +1,9 @@
 package net.vulkanic;
 
 import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
@@ -181,6 +184,58 @@ public interface GraphicsBackend {
     default CommandEncoder createCommandEncoder() {
         throw new UnsupportedOperationException(
             "Backend " + getBackendType() + " does not provide command encoder creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned GPU texture with supplier-based debug labeling.
+     */
+    default GpuTexture createTexture(
+        @Nullable Supplier<String> supplier,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide texture creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned GPU texture with string debug labeling.
+     */
+    default GpuTexture createTexture(
+        @Nullable String label,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide texture creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned GPU buffer with size allocation.
+     */
+    default GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int usage, int size) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide buffer creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned GPU buffer initialized from byte data.
+     */
+    default GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int usage, ByteBuffer data) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide buffer creation."
         );
     }
     

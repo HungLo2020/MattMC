@@ -1,13 +1,16 @@
 package net.vulkanic.backends.vulkan;
 
 import net.blaze3d.GpuOutOfMemoryException;
+import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.preprocessor.GlslPreprocessor;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.TextureFormat;
 import net.logging.LogUtils;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackendType;
@@ -436,6 +439,62 @@ public class VulkanBackend {
         }
 
         return device.createCommandEncoder();
+    }
+
+    public GpuTexture createTexture(
+        @Nullable java.util.function.Supplier<String> supplier,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before requesting textures.");
+        }
+        return device.createTexture(supplier, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+    }
+
+    public GpuTexture createTexture(
+        @Nullable String label,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before requesting textures.");
+        }
+        return device.createTexture(label, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+    }
+
+    public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before requesting buffers.");
+        }
+        return device.createBuffer(supplier, usage, size);
+    }
+
+    public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, java.nio.ByteBuffer data) {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before requesting buffers.");
+        }
+        return device.createBuffer(supplier, usage, data);
     }
 
     public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {

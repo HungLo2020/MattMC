@@ -13,6 +13,7 @@ import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.ScissorState;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.TextureFormat;
 import net.blaze3d.vertex.VertexFormat;
 import net.minecraft.Util;
 import net.minecraft.client.renderer.DynamicUniforms;
@@ -3217,6 +3218,50 @@ public class VulkanicAPI {
      */
     public static CommandEncoder createCommandEncoder() {
         return getBackend().createCommandEncoder();
+    }
+
+    /**
+     * Creates a backend-owned GPU texture with supplier-based debug label.
+     */
+    public static GpuTexture createTexture(
+        @Nullable java.util.function.Supplier<String> supplier,
+        int usage,
+        TextureFormat format,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        return getBackend().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels);
+    }
+
+    /**
+     * Creates a backend-owned GPU texture with string debug label.
+     */
+    public static GpuTexture createTexture(
+        @Nullable String label,
+        int usage,
+        TextureFormat format,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        return getBackend().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
+    }
+
+    /**
+     * Creates a backend-owned GPU buffer with size allocation.
+     */
+    public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
+        return getBackend().createBuffer(supplier, usage, size);
+    }
+
+    /**
+     * Creates a backend-owned GPU buffer initialized from byte data.
+     */
+    public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, ByteBuffer data) {
+        return getBackend().createBuffer(supplier, usage, data);
     }
 
     public static String getApiDescription() {

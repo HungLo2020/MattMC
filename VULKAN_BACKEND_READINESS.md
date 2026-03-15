@@ -674,8 +674,55 @@ Shared/game callsites still acquired command encoders through `VulkanicAPI.getDe
 
 ### Still Unproven
 - Vulkan backend command-encoder seam still returns compatibility `GlCommandEncoder`; fully native Vulkan command-encoder ownership is not yet in place.
-- `createTexture` and `createBuffer` in `VulkanCompatibilityGpuDevice` remain direct compatibility-device delegation hotspots.
+- `createTexture` and `createBuffer` hotspot delegation was addressed in a subsequent session (see "Backend-Owned Texture/Buffer Creation Seams"); native Vulkan resource ownership for those paths remains future work.
 - Some external/mod callsites still acquire encoders through non-VulkanicAPI seams (for example, `RenderSystem.getDevice().createCommandEncoder()`).
+
+## Session 2026-03-15: Backend-Owned Texture/Buffer Creation Seams (Compatibility Delegation Reduction)
+
+### Problem Targeted
+Shared and modded high-traffic callsites were still creating textures/buffers via `VulkanicAPI.getDevice().createTexture(...)` and `VulkanicAPI.getDevice().createBuffer(...)`. In Vulkan-selected runtime, `VulkanCompatibilityGpuDevice` also delegated those calls directly to `compatibilityDevice`, keeping resource creation ownership shaped around concrete device access instead of backend-owned seams.
+
+### Structural Changes
+- Added backend-owned resource-creation seams to `GraphicsBackend`:
+  - `createTexture(Supplier<String>, ...)`
+  - `createTexture(String, ...)`
+  - `createBuffer(Supplier<String>, int, int)`
+  - `createBuffer(Supplier<String>, int, ByteBuffer)`
+- Added matching `VulkanicAPI` wrappers for all texture/buffer creation seam overloads.
+- Implemented seam behavior in both backends:
+  - **OpenGLBackend:** delegates texture/buffer creation to registered `GlDevice`, with fail-fast null-guard when device is not registered.
+  - **VulkanBackend:** delegates texture/buffer creation through backend-owned compatibility device reference, with startup-state fail-fast guards.
+- Reduced compatibility delegation leakage in `VulkanCompatibilityGpuDevice`:
+  - `createTexture(...)` and `createBuffer(...)` now route through `this.backend.createTexture(...)` / `this.backend.createBuffer(...)`.
+  - Direct `this.compatibilityDevice.createTexture(...)` and `this.compatibilityDevice.createBuffer(...)` delegations were removed.
+- Migrated production callsites from concrete device creation to backend-owned seam:
+  - Replaced `VulkanicAPI.getDevice().createTexture(...)` and `VulkanicAPI.getDevice().createBuffer(...)` with `VulkanicAPI.createTexture(...)` / `VulkanicAPI.createBuffer(...)` across Blaze3D, Minecraft renderer/UI, and VoxelMap files.
+
+### Evidence
+- Source migration verification:
+  - `grep -RIn --include='*.java' -E 'VulkanicAPI\.getDevice\(\)\.create(Texture|Buffer)\(' src/main/java src/test/java`
+  - Result: no remaining direct `getDevice().createTexture/createBuffer` callsites.
+- Typed seam routing guardrail:
+  - `VulkanicTypedApiRoutingTest` now includes `testCreateTextureRoutesThroughBackendSeam` and `testCreateBufferRoutesThroughBackendSeam`.
+- Neutrality/callsite guardrails:
+  - `ApiNeutralityCallsiteTest` now asserts `GraphicsBackend`/`VulkanicAPI` texture-buffer seams exist and `VulkanCompatibilityGpuDevice` routes through backend seams.
+  - `Phase3DrawPathTest` migrated package-cluster seam checks now accept `VulkanicAPI.createTexture(...)` / `VulkanicAPI.createBuffer(...)` as valid backend-owned callsite seams.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.VulkanicTypedApiRoutingTest --tests net.vulkanic.ApiNeutralityCallsiteTest --tests net.vulkanic.Phase3DrawPathTest.testBlaze3dPackageUsesVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testVoxelMapPackageUsesVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testMinecraftAndGuiUseVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testRendererClusterUsesVulkanicAPIGetDevice`
+  - Result: **84 passed, 0 failed**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: **BUILD SUCCESSFUL**.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Shared callsites now express texture/buffer creation through backend-owned `VulkanicAPI.createTexture/createBuffer` seams.
+- **2 — Backend Implementation:** Both OpenGL and Vulkan backends implement concrete seam behavior for texture/buffer creation.
+- **4 — Parity Improvement:** Same resource-creation seam contract now drives both backends from shared callsites.
+- **5 — Debuggability Improvement:** Early/invalid resource-creation state now fails at backend seam boundaries with explicit backend-scoped errors.
+
+### Still Unproven
+- Vulkan backend texture/buffer seams still route through compatibility `GlDevice` ownership under the hood; fully native Vulkan resource ownership for these creation paths is not yet complete.
+- Additional external/mod callsites can still create resources through other device-access seams (for example, direct `RenderSystem.getDevice()` usage) and remain migration candidates.
 
 ## Blocking Issues
 

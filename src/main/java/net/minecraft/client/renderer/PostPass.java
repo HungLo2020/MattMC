@@ -63,7 +63,7 @@ public class PostPass implements AutoCloseable {
 					}
 
 					this.customUniforms
-						.put((String)entry.getKey(), net.vulkanic.VulkanicAPI.getDevice().createBuffer(() -> this.name + " / " + (String)entry.getKey(), 128, std140Builder.get()));
+						.put((String)entry.getKey(), net.vulkanic.VulkanicAPI.createBuffer(() -> this.name + " / " + (String)entry.getKey(), 128, std140Builder.get()));
 				}
 			}
 		}

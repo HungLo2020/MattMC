@@ -119,7 +119,7 @@ public class DebugScreenOverlay {
 			bufferBuilder.addVertex(0.0F, 0.0F, 1.0F).setColor(-8421377).setNormal(0.0F, 0.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				this.crosshairBuffer = VulkanicAPI.getDevice().createBuffer(() -> "Crosshair vertex buffer", 32, meshData.vertexBuffer());
+				this.crosshairBuffer = VulkanicAPI.createBuffer(() -> "Crosshair vertex buffer", 32, meshData.vertexBuffer());
 			}
 		}
 	}

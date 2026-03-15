@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.systems.CommandEncoder;
+import net.blaze3d.textures.TextureFormat;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -222,6 +223,35 @@ public class VulkanicTypedApiRoutingTest {
         RecordedInvocation invocation = invocationHandler.lastInvocation;
         assertNotNull(invocation);
         assertEquals("createCommandEncoder", invocation.method.getName());
+    }
+
+    @Test
+    public void testCreateTextureRoutesThroughBackendSeam() {
+        VulkanicAPI.createTexture(
+            () -> "routing-test-texture",
+            15,
+            TextureFormat.RGBA8,
+            8,
+            8,
+            1,
+            1
+        );
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("createTexture", invocation.method.getName());
+        assertEquals(java.util.function.Supplier.class, invocation.method.getParameterTypes()[0]);
+    }
+
+    @Test
+    public void testCreateBufferRoutesThroughBackendSeam() {
+        VulkanicAPI.createBuffer(() -> "routing-test-buffer", 9, 64);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("createBuffer", invocation.method.getName());
+        assertEquals(java.util.function.Supplier.class, invocation.method.getParameterTypes()[0]);
+        assertEquals(int.class, invocation.method.getParameterTypes()[2]);
     }
 
     @Test

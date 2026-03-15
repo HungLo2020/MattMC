@@ -86,14 +86,14 @@ public class SkyRenderer implements AutoCloseable {
 			this.buildSkyDisc(bufferBuilder, 16.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				this.topSkyBuffer = VulkanicAPI.getDevice().createBuffer(() -> "Top sky vertex buffer", 32, meshData.vertexBuffer());
+				this.topSkyBuffer = VulkanicAPI.createBuffer(() -> "Top sky vertex buffer", 32, meshData.vertexBuffer());
 			}
 
 			bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.TRIANGLE_FAN, DefaultVertexFormat.POSITION);
 			this.buildSkyDisc(bufferBuilder, -16.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				this.bottomSkyBuffer = VulkanicAPI.getDevice().createBuffer(() -> "Bottom sky vertex buffer", 32, meshData.vertexBuffer());
+				this.bottomSkyBuffer = VulkanicAPI.createBuffer(() -> "Bottom sky vertex buffer", 32, meshData.vertexBuffer());
 			}
 		}
 	}
@@ -131,7 +131,7 @@ public class SkyRenderer implements AutoCloseable {
 			}
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var16 = VulkanicAPI.getDevice().createBuffer(() -> "Sunrise/Sunset fan", 32, meshData.vertexBuffer());
+				var16 = VulkanicAPI.createBuffer(() -> "Sunrise/Sunset fan", 32, meshData.vertexBuffer());
 			}
 		}
 
@@ -149,7 +149,7 @@ public class SkyRenderer implements AutoCloseable {
 			bufferBuilder.addVertex(matrix4f, -1.0F, 0.0F, 1.0F).setUv(0.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var5 = VulkanicAPI.getDevice().createBuffer(() -> "Sun quad", 40, meshData.vertexBuffer());
+				var5 = VulkanicAPI.createBuffer(() -> "Sun quad", 40, meshData.vertexBuffer());
 			}
 		}
 
@@ -179,7 +179,7 @@ public class SkyRenderer implements AutoCloseable {
 			}
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var18 = VulkanicAPI.getDevice().createBuffer(() -> "Moon phases", 32, meshData.vertexBuffer());
+				var18 = VulkanicAPI.createBuffer(() -> "Moon phases", 32, meshData.vertexBuffer());
 			}
 		}
 
@@ -213,7 +213,7 @@ public class SkyRenderer implements AutoCloseable {
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
 				this.starIndexCount = meshData.drawState().indexCount();
-				var19 = VulkanicAPI.getDevice().createBuffer(() -> "Stars vertex buffer", 40, meshData.vertexBuffer());
+				var19 = VulkanicAPI.createBuffer(() -> "Stars vertex buffer", 40, meshData.vertexBuffer());
 			}
 		}
 
@@ -260,7 +260,7 @@ public class SkyRenderer implements AutoCloseable {
 			}
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var10 = VulkanicAPI.getDevice().createBuffer(() -> "End sky vertex buffer", 40, meshData.vertexBuffer());
+				var10 = VulkanicAPI.createBuffer(() -> "End sky vertex buffer", 40, meshData.vertexBuffer());
 			}
 		}
 
@@ -278,7 +278,7 @@ public class SkyRenderer implements AutoCloseable {
 			bufferBuilder.addVertex(matrix4f, -1.0F, 0.0F, 1.0F).setUv(0.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				var5 = VulkanicAPI.getDevice().createBuffer(() -> "End flash quad", 32, meshData.vertexBuffer());
+				var5 = VulkanicAPI.createBuffer(() -> "End flash quad", 32, meshData.vertexBuffer());
 			}
 		}
 
