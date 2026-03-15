@@ -1,11 +1,17 @@
 package net.vulkanic;
 
 import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.shaders.ShaderType;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 /**
@@ -146,6 +152,25 @@ public interface GraphicsBackend {
      * Cleans up backend-owned renderer bootstrap resources.
      */
     default void cleanupRendererBootstrapResources() {
+    }
+
+    /**
+     * Precompiles a render pipeline using backend-owned compilation and caching.
+     *
+     * <p>This seam lets shared/game code pre-warm shader/pipeline state without
+     * routing through a concrete {@code GpuDevice} implementation.</p>
+     */
+    default CompiledRenderPipeline precompileRenderPipeline(
+        RenderPipeline renderPipeline,
+        @Nullable BiFunction<ResourceLocation, ShaderType, String> sourceProvider
+    ) {
+        return () -> false;
+    }
+
+    /**
+     * Clears backend-owned precompiled pipeline caches.
+     */
+    default void clearPrecompiledPipelineCache() {
     }
     
     /**

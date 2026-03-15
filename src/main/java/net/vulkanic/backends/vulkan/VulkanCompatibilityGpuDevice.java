@@ -126,11 +126,12 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public CompiledRenderPipeline precompilePipeline(RenderPipeline renderPipeline, @Nullable BiFunction<ResourceLocation, ShaderType, String> biFunction) {
-		return this.compatibilityDevice.precompilePipeline(renderPipeline, biFunction);
+		return this.backend.precompileRenderPipeline(renderPipeline, biFunction);
 	}
 
 	@Override
 	public void clearPipelineCache() {
+		this.backend.clearPrecompiledPipelineCache();
 		this.compatibilityDevice.clearPipelineCache();
 	}
 

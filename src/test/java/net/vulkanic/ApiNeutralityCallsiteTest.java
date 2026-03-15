@@ -28,8 +28,10 @@ public class ApiNeutralityCallsiteTest {
         String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
         String irisSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
         String renderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java"));
+        String vulkanCompatibilityGpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanCompatibilityGpuDevice.java"));
         String gpuWarnlistManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GpuWarnlistManager.java"));
         String gameRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java"));
+        String shaderManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ShaderManager.java"));
         String debugEntrySystemSpecsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"));
         String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"));
 
@@ -73,8 +75,24 @@ public class ApiNeutralityCallsiteTest {
             "GpuWarnlistManager should avoid backend-name string comparisons for OpenGL warnlist decisions");
         assertTrue(gameRendererSource.contains("getDeviceInfo()"),
             "GameRenderer should use backend-neutral device info for hardware logging");
+        assertTrue(gameRendererSource.contains("VulkanicAPI.precompileRenderPipeline("),
+            "GameRenderer should precompile UI pipelines through VulkanicAPI backend-owned seam");
+        assertFalse(gameRendererSource.contains("precompilePipeline(RenderPipelines.GUI"),
+            "GameRenderer should avoid direct GpuDevice.precompilePipeline usage in shared startup callsites");
         assertFalse(gameRendererSource.contains("Supports OpenGL"),
             "GameRenderer should avoid hard-coded OpenGL capability wording in shared hardware logging");
+        assertTrue(shaderManagerSource.contains("VulkanicAPI.precompileRenderPipeline("),
+            "ShaderManager should precompile required pipelines through VulkanicAPI backend-owned seam");
+        assertTrue(shaderManagerSource.contains("VulkanicAPI.clearBackendPipelineCache()"),
+            "ShaderManager should clear backend-owned pipeline caches through VulkanicAPI seam");
+        assertFalse(shaderManagerSource.contains("gpuDevice.precompilePipeline("),
+            "ShaderManager should avoid direct GpuDevice.precompilePipeline usage in shared reload path");
+        assertFalse(shaderManagerSource.contains("gpuDevice.clearPipelineCache("),
+            "ShaderManager should avoid direct GpuDevice.clearPipelineCache usage in shared reload path");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.precompileRenderPipeline(renderPipeline, biFunction);"),
+            "VulkanCompatibilityGpuDevice should route precompilePipeline through backend seam");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("compatibilityDevice.precompilePipeline("),
+            "VulkanCompatibilityGpuDevice should avoid direct compatibility-device precompile delegation");
         assertTrue(debugEntrySystemSpecsSource.contains("getDeviceInfo()"),
             "DebugEntrySystemSpecs should use backend-neutral device info for display strings");
         assertFalse(debugEntrySystemSpecsSource.contains("gpuDevice.getVersion()"),

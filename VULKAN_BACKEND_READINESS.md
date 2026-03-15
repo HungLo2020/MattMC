@@ -582,6 +582,58 @@ Core renderer callsites (`RenderStateShard`, `LightTexture`, `OverlayTexture`) s
 - Several Iris/Sodium/custom-shader paths outside the migrated core renderer callsites still use texture-ID based bindings and should be migrated in future sessions.
 - Vulkan-native descriptor-first sampler routing for all shaderpack texture-unit paths remains in-progress; legacy texture-unit emulation remains active for compatibility paths.
 
+## Session 2026-03-15: Backend-Owned Pipeline Precompile Seam (Compatibility Delegation Reduction)
+
+### Problem Targeted
+Vulkan-selected startup still validated required render pipelines through `GpuDevice.precompilePipeline(...)` on `VulkanCompatibilityGpuDevice`, which delegated directly to compatibility `GlDevice.precompilePipeline(...)`. This left a high-impact startup shader/pipeline validation stage OpenGL-owned even when Vulkan backend routing was selected.
+
+### Structural Changes
+- Added backend-owned precompile seams to `GraphicsBackend`:
+  - `precompileRenderPipeline(RenderPipeline, BiFunction<ResourceLocation, ShaderType, String>)`
+  - `clearPrecompiledPipelineCache()`
+- Added matching `VulkanicAPI` wrappers:
+  - `precompileRenderPipeline(...)`
+  - `clearBackendPipelineCache()`
+- Implemented seam behavior in both backends:
+  - **OpenGLBackend:** delegates to `GlDevice.precompilePipeline(...)` / `GlDevice.clearPipelineCache()`.
+  - **VulkanBackend:** added native precompile/cache path that:
+    - injects shader defines with `GlslPreprocessor.injectDefines(...)`,
+    - compiles vertex/fragment GLSL to SPIR-V via `SpirvCompiler`,
+    - creates a native Vulkan pipeline handle using `PipelineDescriptor.fromRenderPipelineAndSpirvModules(...)` + `createPipeline(...)`,
+    - caches precompile results and closes cached handles on clear.
+- Reduced compatibility delegation in `VulkanCompatibilityGpuDevice`:
+  - `precompilePipeline(...)` now routes through `backend.precompileRenderPipeline(...)` instead of `compatibilityDevice.precompilePipeline(...)`.
+  - `clearPipelineCache()` now clears backend precompiled cache first, then compatibility cache.
+- Migrated high-traffic shared callsites to backend seam:
+  - `GameRenderer.preloadUiShader(...)` now uses `VulkanicAPI.precompileRenderPipeline(...)`.
+  - `ShaderManager.apply(...)` now uses `VulkanicAPI.precompileRenderPipeline(...)` and `VulkanicAPI.clearBackendPipelineCache()`.
+
+### Evidence
+- Typed routing guardrail updated:
+  - `VulkanicTypedApiRoutingTest.testPipelinePrecompileAndCacheClearRouteThroughBackendSeams()` verifies the new Vulkanic API wrappers dispatch through backend seams.
+- Callsite neutrality guardrail updated:
+  - `ApiNeutralityCallsiteTest` now asserts:
+    - `GameRenderer` and `ShaderManager` use `VulkanicAPI.precompileRenderPipeline(...)`,
+    - `ShaderManager` uses `VulkanicAPI.clearBackendPipelineCache()`,
+    - `VulkanCompatibilityGpuDevice` no longer delegates precompile directly to compatibility `GlDevice`.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.VulkanicTypedApiRoutingTest --tests net.vulkanic.ApiNeutralityCallsiteTest --tests net.vulkanic.Phase3DrawPathTest`
+  - Result: **176 passed, 0 failed**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: **BUILD SUCCESSFUL**.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Startup precompile callsites now express backend intent through `VulkanicAPI` seam instead of concrete device method coupling.
+- **2 — Backend Implementation:** Vulkan backend now has concrete native precompile behavior (define injection, SPIR-V compile, native pipeline creation) instead of relying on compatibility `GlDevice` precompile.
+- **3 — Runtime Bootstrap Progress:** Vulkan-selected startup now validates required pipelines via backend-owned Vulkan path, moving failure points to native compile/pipeline diagnostics.
+- **4 — Parity Improvement:** OpenGL and Vulkan now satisfy the same backend-owned precompile/cache contract.
+- **5 — Debuggability Improvement:** Precompile failures are now localized to backend-owned seam and Vulkan native compile/pipeline creation path.
+
+### Still Unproven
+- `createCommandEncoder`, `createTexture`, and `createBuffer` on `VulkanCompatibilityGpuDevice` still delegate to compatibility `GlDevice`; full Vulkan-selected renderer ownership remains incomplete.
+- Current Vulkan precompile cache is validation-oriented and not yet guaranteed to be the sole runtime pipeline source for all draw paths.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

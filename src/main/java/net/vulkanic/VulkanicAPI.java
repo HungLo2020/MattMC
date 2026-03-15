@@ -3,6 +3,8 @@ package net.vulkanic;
 import net.blaze3d.ProjectionType;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.GLX;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.GpuDevice;
@@ -5622,6 +5624,27 @@ public class VulkanicAPI {
     // =========================================================================
     // Phase 3c: Pipeline Objects
     // =========================================================================
+
+    /**
+     * Precompiles a render pipeline through the active backend.
+     *
+     * <p>This keeps startup callsites backend-neutral and avoids coupling to a
+     * concrete {@code GpuDevice} implementation when validating shader/pipeline
+     * readiness.</p>
+     */
+    public static CompiledRenderPipeline precompileRenderPipeline(
+        RenderPipeline pipeline,
+        @Nullable BiFunction<ResourceLocation, ShaderType, String> sourceProvider
+    ) {
+        return getBackend().precompileRenderPipeline(pipeline, sourceProvider);
+    }
+
+    /**
+     * Clears backend-owned precompiled pipeline caches.
+     */
+    public static void clearBackendPipelineCache() {
+        getBackend().clearPrecompiledPipelineCache();
+    }
 
     /**
      * Creates (or retrieves a cached) compiled render pipeline.

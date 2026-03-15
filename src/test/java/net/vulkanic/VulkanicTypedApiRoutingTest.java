@@ -3,6 +3,7 @@ package net.vulkanic;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import net.blaze3d.pipeline.CompiledRenderPipeline;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -11,6 +12,7 @@ import java.lang.reflect.Proxy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanicTypedApiRoutingTest {
 
@@ -193,6 +195,22 @@ public class VulkanicTypedApiRoutingTest {
         assertNotNull(featureInvocation);
         assertEquals("getBackendOptionalFeatureNames", featureInvocation.method.getName());
         assertEquals(java.util.List.of("native-vulkan-runtime"), optionalFeatures);
+    }
+
+    @Test
+    public void testPipelinePrecompileAndCacheClearRouteThroughBackendSeams() {
+        CompiledRenderPipeline compiled = VulkanicAPI.precompileRenderPipeline(null, null);
+        assertNotNull(compiled);
+        assertTrue(compiled.isValid());
+
+        RecordedInvocation precompileInvocation = invocationHandler.lastInvocation;
+        assertNotNull(precompileInvocation);
+        assertEquals("precompileRenderPipeline", precompileInvocation.method.getName());
+
+        VulkanicAPI.clearBackendPipelineCache();
+        RecordedInvocation clearInvocation = invocationHandler.lastInvocation;
+        assertNotNull(clearInvocation);
+        assertEquals("clearPrecompiledPipelineCache", clearInvocation.method.getName());
     }
 
     @Test
@@ -875,6 +893,10 @@ public class VulkanicTypedApiRoutingTest {
 
             if (method.getName().equals("getBackendOptionalFeatureNames")) {
                 return java.util.List.of("native-vulkan-runtime");
+            }
+
+            if (method.getName().equals("precompileRenderPipeline")) {
+                return (CompiledRenderPipeline) () -> true;
             }
 
             return defaultValue(method.getReturnType());

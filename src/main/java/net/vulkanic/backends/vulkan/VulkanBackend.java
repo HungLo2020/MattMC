@@ -1,6 +1,9 @@
 package net.vulkanic.backends.vulkan;
 
 import net.blaze3d.GpuOutOfMemoryException;
+import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.preprocessor.GlslPreprocessor;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.textures.GpuTextureView;
@@ -28,6 +31,7 @@ import net.vulkanic.VulkanNativeInitializationInfo;
 import net.vulkanic.VulkanSwapchainSurfaceInfo;
 import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicResourceBarriers;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
@@ -135,6 +139,7 @@ public class VulkanBackend {
     private volatile long auxiliaryOpenGlContextWindow = MemoryUtil.NULL;
 
     private final SpirvCompiler spirvCompiler;
+    private final Map<RenderPipeline, PrecompiledPipelineState> precompiledPipelineCache = new ConcurrentHashMap<>();
     private final AtomicInteger nextVirtualShaderId = new AtomicInteger(1);
     private final AtomicInteger nextVirtualProgramId = new AtomicInteger(1);
     private final Map<Integer, VirtualShader> virtualShaders = new ConcurrentHashMap<>();
@@ -223,6 +228,117 @@ public class VulkanBackend {
 
     VulkanBackend(SpirvCompiler spirvCompiler) {
         this.spirvCompiler = Objects.requireNonNull(spirvCompiler, "spirvCompiler must not be null");
+    }
+
+    private static final class PrecompiledPipelineState implements CompiledRenderPipeline {
+        private final PipelineHandle pipelineHandle;
+        private final boolean valid;
+
+        private PrecompiledPipelineState(PipelineHandle pipelineHandle, boolean valid) {
+            this.pipelineHandle = pipelineHandle;
+            this.valid = valid;
+        }
+
+        static PrecompiledPipelineState successful(PipelineHandle pipelineHandle) {
+            return new PrecompiledPipelineState(pipelineHandle, true);
+        }
+
+        static PrecompiledPipelineState failed() {
+            return new PrecompiledPipelineState(null, false);
+        }
+
+        @Override
+        public boolean isValid() {
+            return valid && pipelineHandle != null && pipelineHandle.isValid();
+        }
+
+        void closeIfNeeded() {
+            if (pipelineHandle != null) {
+                pipelineHandle.close();
+            }
+        }
+    }
+
+    public CompiledRenderPipeline precompileRenderPipeline(
+        RenderPipeline renderPipeline,
+        @Nullable BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> sourceProvider
+    ) {
+        if (renderPipeline == null) {
+            throw new IllegalArgumentException("renderPipeline must not be null");
+        }
+
+        // Keep behavior explicit: callers that skip source plumbing get a deterministic invalid result.
+        if (sourceProvider == null) {
+            LOGGER.error("Cannot precompile Vulkan pipeline {} without shader source provider", renderPipeline.getLocation());
+            return PrecompiledPipelineState.failed();
+        }
+
+        return precompiledPipelineCache.computeIfAbsent(
+            renderPipeline,
+            pipeline -> compilePrecompiledPipeline(pipeline, sourceProvider)
+        );
+    }
+
+    public void clearPrecompiledPipelineCache() {
+        for (PrecompiledPipelineState state : new ArrayList<>(precompiledPipelineCache.values())) {
+            state.closeIfNeeded();
+        }
+        precompiledPipelineCache.clear();
+    }
+
+    private PrecompiledPipelineState compilePrecompiledPipeline(
+        RenderPipeline renderPipeline,
+        BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> sourceProvider
+    ) {
+        try {
+            String vertexSource = sourceProvider.apply(renderPipeline.getVertexShader(), ShaderType.VERTEX);
+            String fragmentSource = sourceProvider.apply(renderPipeline.getFragmentShader(), ShaderType.FRAGMENT);
+
+            if (vertexSource == null || fragmentSource == null) {
+                LOGGER.error(
+                    "Cannot precompile Vulkan pipeline {} because shader source is missing (vertex={}, fragment={})",
+                    renderPipeline.getLocation(),
+                    renderPipeline.getVertexShader(),
+                    renderPipeline.getFragmentShader()
+                );
+                return PrecompiledPipelineState.failed();
+            }
+
+            String vertexWithDefines = GlslPreprocessor.injectDefines(vertexSource, renderPipeline.getShaderDefines());
+            String fragmentWithDefines = GlslPreprocessor.injectDefines(fragmentSource, renderPipeline.getShaderDefines());
+
+            VulkanicSpirvModule vertexModule = spirvCompiler.compile(
+                VulkanicShaderStage.VERTEX,
+                vertexWithDefines,
+                renderPipeline.getVertexShader().toString(),
+                "main"
+            );
+            VulkanicSpirvModule fragmentModule = spirvCompiler.compile(
+                VulkanicShaderStage.FRAGMENT,
+                fragmentWithDefines,
+                renderPipeline.getFragmentShader().toString(),
+                "main"
+            );
+
+            PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
+                renderPipeline,
+                List.of(vertexModule, fragmentModule)
+            );
+            PipelineHandle pipelineHandle = createPipeline(descriptor);
+
+            if (pipelineHandle == null || !pipelineHandle.isValid()) {
+                if (pipelineHandle != null) {
+                    pipelineHandle.close();
+                }
+                LOGGER.error("Vulkan precompile produced invalid pipeline handle for {}", renderPipeline.getLocation());
+                return PrecompiledPipelineState.failed();
+            }
+
+            return PrecompiledPipelineState.successful(pipelineHandle);
+        } catch (RuntimeException exception) {
+            LOGGER.error("Failed to precompile Vulkan pipeline {}", renderPipeline.getLocation(), exception);
+            return PrecompiledPipelineState.failed();
+        }
     }
 
     public GraphicsBackendType getBackendType() {

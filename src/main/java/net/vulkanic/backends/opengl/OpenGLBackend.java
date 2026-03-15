@@ -1,6 +1,8 @@
 package net.vulkanic.backends.opengl;
 
 import net.blaze3d.opengl.GlDevice;
+import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.textures.GpuTextureView;
@@ -30,6 +32,7 @@ import net.vulkanic.VulkanNativeInitializationInfo;
 import net.vulkanic.VulkanSwapchainSurfaceInfo;
 import net.minecraft.Util;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.*;
 
 import java.util.function.BiFunction;
@@ -164,6 +167,33 @@ public class OpenGLBackend implements GraphicsBackend {
         net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
         net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
         net.irisshaders.iris.Iris.onRenderSystemInit();
+    }
+
+    @Override
+    public CompiledRenderPipeline precompileRenderPipeline(
+        RenderPipeline renderPipeline,
+        @Nullable BiFunction<ResourceLocation, ShaderType, String> sourceProvider
+    ) {
+        if (renderPipeline == null) {
+            throw new IllegalArgumentException("renderPipeline must not be null");
+        }
+
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+
+        return device.precompilePipeline(renderPipeline, sourceProvider);
+    }
+
+    @Override
+    public void clearPrecompiledPipelineCache() {
+        GlDevice device = this.glDevice;
+        if (device != null) {
+            device.clearPipelineCache();
+        }
     }
     
     /**

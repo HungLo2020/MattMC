@@ -316,7 +316,6 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	}
 
 	public void preloadUiShader(ResourceProvider resourceProvider) {
-		GpuDevice gpuDevice = VulkanicAPI.getDevice();
 		BiFunction<ResourceLocation, ShaderType, String> biFunction = (resourceLocation, shaderType) -> {
 			ResourceLocation resourceLocation2 = shaderType.idConverter().idToFile(resourceLocation);
 
@@ -348,10 +347,10 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				return null;
 			}
 		};
-		gpuDevice.precompilePipeline(RenderPipelines.GUI, biFunction);
-		gpuDevice.precompilePipeline(RenderPipelines.GUI_TEXTURED, biFunction);
+		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI, biFunction);
+		VulkanicAPI.precompileRenderPipeline(RenderPipelines.GUI_TEXTURED, biFunction);
 		if (TracyClient.isAvailable()) {
-			gpuDevice.precompilePipeline(RenderPipelines.TRACY_BLIT, biFunction);
+			VulkanicAPI.precompileRenderPipeline(RenderPipelines.TRACY_BLIT, biFunction);
 		}
 	}
 
