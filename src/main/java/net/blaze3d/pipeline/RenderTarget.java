@@ -1,6 +1,5 @@
 package net.blaze3d.pipeline;
 
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.AddressMode;
@@ -86,20 +85,19 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 
 	public void createBuffers(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
-		int k = gpuDevice.getMaxTextureSize();
+		int k = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
 		if (i > 0 && i <= k && j > 0 && j <= k) {
 			this.width = i;
 			this.height = j;
 			if (this.useDepth) {
-				this.depthTexture = gpuDevice.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, i, j, 1, 1);
-				this.depthTextureView = gpuDevice.createTextureView(this.depthTexture);
+				this.depthTexture = net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, i, j, 1, 1);
+				this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
 				this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);
 				this.depthTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 			}
 
-			this.colorTexture = gpuDevice.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, i, j, 1, 1);
-			this.colorTextureView = gpuDevice.createTextureView(this.colorTexture);
+			this.colorTexture = net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, i, j, 1, 1);
+			this.colorTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.colorTexture);
 			this.colorTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 			this.setFilterMode(FilterMode.NEAREST, true);
 		} else {

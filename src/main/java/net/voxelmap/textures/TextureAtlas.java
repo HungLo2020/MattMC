@@ -79,7 +79,7 @@ public class TextureAtlas extends AbstractTexture {
         this.mapRegisteredSprites.clear();
         this.mapUploadedSprites.clear();
         this.initMissingImage();
-        int glMaxTextureSize = net.vulkanic.VulkanicAPI.getDevice().getMaxTextureSize();
+        int glMaxTextureSize = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
         this.stitcher = new Stitcher(glMaxTextureSize, glMaxTextureSize, 0);
     }
 

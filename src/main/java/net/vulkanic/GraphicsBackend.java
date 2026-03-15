@@ -8,6 +8,7 @@ import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.CommandEncoder;
+import net.blaze3d.systems.GpuDevice;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -2871,6 +2872,36 @@ public interface GraphicsBackend {
      */
     default java.util.List<String> getBackendOptionalFeatureNames() {
         return java.util.List.of();
+    }
+
+    /**
+     * Returns backend-owned max texture size capability.
+     */
+    default int getBackendMaxTextureSize() {
+        return getInteger(getCurrentCommandContext(), VulkanicAPI.GL_MAX_TEXTURE_SIZE);
+    }
+
+    /**
+     * Returns backend-owned uniform-buffer offset alignment capability.
+     */
+    default int getBackendUniformOffsetAlignment() {
+        return getInteger(getCurrentCommandContext(), VulkanicAPI.GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT);
+    }
+
+    /**
+     * Returns backend-owned device info snapshot for diagnostics and warnlist checks.
+     */
+    default GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
+        String backendName = getBackendType() == GraphicsBackendType.OPENGL ? "OpenGL" : "Vulkan";
+        return new GpuDevice.GpuDeviceInfo(
+            backendName,
+            backendName,
+            getBackendVendorName(),
+            getBackendRendererName(),
+            getBackendVersionName(),
+            getBackendType() == GraphicsBackendType.OPENGL,
+            getBackendOptionalFeatureNames()
+        );
     }
 
     /**

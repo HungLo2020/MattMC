@@ -28,18 +28,24 @@ public class ApiNeutralityCallsiteTest {
         String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
         String gpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/GpuDevice.java"));
         String renderTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/RenderTarget.java"));
+        String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
+        String lightingSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/platform/Lighting.java"));
         String tracyFrameCaptureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/TracyFrameCapture.java"));
         String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
         String irisSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
         String renderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java"));
         String vulkanCompatibilityGpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanCompatibilityGpuDevice.java"));
+        String dynamicUniformStorageSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/DynamicUniformStorage.java"));
         String gpuWarnlistManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GpuWarnlistManager.java"));
         String gameRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java"));
         String levelRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java"));
+        String minecraftTextureAtlasSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/TextureAtlas.java"));
         String shaderManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ShaderManager.java"));
         String debugEntrySystemSpecsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"));
+        String guiRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"));
         String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"));
         String screenshotSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Screenshot.java"));
+        String voxelMapTextureAtlasSource = Files.readString(SRC_MAIN_JAVA.resolve("net/voxelmap/textures/TextureAtlas.java"));
 
         assertTrue(graphicsBackendSource.contains("default CommandEncoder createCommandEncoder()"),
             "GraphicsBackend should expose backend-owned command-encoder acquisition seam");
@@ -65,6 +71,24 @@ public class ApiNeutralityCallsiteTest {
             "VulkanicAPI should expose backend-owned texture-view creation wrappers");
         assertTrue(vulkanicApiSource.contains("return getBackend().createTextureView("),
             "VulkanicAPI texture-view wrappers should route through backend seam");
+        assertTrue(graphicsBackendSource.contains("default int getBackendMaxTextureSize()"),
+            "GraphicsBackend should expose backend-owned max texture size seam");
+        assertTrue(graphicsBackendSource.contains("default int getBackendUniformOffsetAlignment()"),
+            "GraphicsBackend should expose backend-owned uniform offset alignment seam");
+        assertTrue(graphicsBackendSource.contains("default GpuDevice.GpuDeviceInfo getBackendDeviceInfo()"),
+            "GraphicsBackend should expose backend-owned device info seam");
+        assertTrue(vulkanicApiSource.contains("public static int getBackendMaxTextureSize()"),
+            "VulkanicAPI should expose backend-owned max texture size wrapper");
+        assertTrue(vulkanicApiSource.contains("public static int getBackendUniformOffsetAlignment()"),
+            "VulkanicAPI should expose backend-owned uniform offset alignment wrapper");
+        assertTrue(vulkanicApiSource.contains("public static GpuDevice.GpuDeviceInfo getBackendDeviceInfo()"),
+            "VulkanicAPI should expose backend-owned device info wrapper");
+        assertTrue(vulkanicApiSource.contains("return getBackend().getBackendMaxTextureSize();"),
+            "VulkanicAPI max texture size wrapper should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("return getBackend().getBackendUniformOffsetAlignment();"),
+            "VulkanicAPI uniform offset alignment wrapper should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("return getBackend().getBackendDeviceInfo();"),
+            "VulkanicAPI device info wrapper should route through backend seam");
 
         assertTrue(commandEncoderSource.contains("void applyPipelineState(RenderPipeline renderPipeline);"),
             "CommandEncoder should expose a backend-neutral pipeline-state seam");
@@ -98,14 +122,16 @@ public class ApiNeutralityCallsiteTest {
             "GpuDevice should expose backend-neutral optional feature reporting");
         assertTrue(gpuDeviceSource.contains("default boolean shouldApplyOpenGlWarnlist()"),
             "GpuDevice should expose explicit OpenGL warnlist applicability instead of requiring string comparisons");
-        assertTrue(gpuWarnlistManagerSource.contains("gpuDevice.getDeviceInfo()"),
-            "GpuWarnlistManager should query backend-neutral device info through GpuDevice");
+        assertTrue(gpuWarnlistManagerSource.contains("VulkanicAPI.getBackendDeviceInfo()"),
+            "GpuWarnlistManager should query backend-owned device info seam");
         assertTrue(gpuWarnlistManagerSource.contains("deviceInfo.appliesOpenGlWarnlist()"),
             "GpuWarnlistManager should use explicit warnlist applicability seam");
         assertFalse(gpuWarnlistManagerSource.contains("getBackendName().equals(\"OpenGL\")"),
             "GpuWarnlistManager should avoid backend-name string comparisons for OpenGL warnlist decisions");
-        assertTrue(gameRendererSource.contains("getDeviceInfo()"),
-            "GameRenderer should use backend-neutral device info for hardware logging");
+        assertTrue(gameRendererSource.contains("VulkanicAPI.getBackendDeviceInfo()"),
+            "GameRenderer should use backend-owned device info seam for hardware logging");
+        assertFalse(gameRendererSource.contains("VulkanicAPI.getDevice().getDeviceInfo()"),
+            "GameRenderer should avoid direct getDevice().getDeviceInfo() logging callsites");
         assertTrue(gameRendererSource.contains("VulkanicAPI.precompileRenderPipeline("),
             "GameRenderer should precompile UI pipelines through VulkanicAPI backend-owned seam");
         assertFalse(gameRendererSource.contains("precompilePipeline(RenderPipelines.GUI"),
@@ -140,10 +166,48 @@ public class ApiNeutralityCallsiteTest {
             "VulkanCompatibilityGpuDevice should route texture-view creation through backend seam");
         assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.createTextureView("),
             "VulkanCompatibilityGpuDevice should avoid direct compatibility-device texture-view creation delegation");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.getBackendMaxTextureSize();"),
+            "VulkanCompatibilityGpuDevice should route max texture size queries through backend seam");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.getBackendUniformOffsetAlignment();"),
+            "VulkanCompatibilityGpuDevice should route uniform offset alignment queries through backend seam");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.getBackendDeviceInfo();"),
+            "VulkanCompatibilityGpuDevice should route device info through backend seam");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.getMaxTextureSize();"),
+            "VulkanCompatibilityGpuDevice should avoid direct compatibility-device max texture size queries");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.getUniformOffsetAlignment();"),
+            "VulkanCompatibilityGpuDevice should avoid direct compatibility-device uniform alignment queries");
         assertTrue(renderTargetSource.contains("VulkanicAPI.createCommandEncoder()"),
             "RenderTarget should acquire command encoders via backend-owned VulkanicAPI seam");
         assertFalse(renderTargetSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
             "RenderTarget should avoid direct getDevice().createCommandEncoder() calls");
+        assertTrue(renderTargetSource.contains("VulkanicAPI.getBackendMaxTextureSize()"),
+            "RenderTarget should query max texture size through backend-owned VulkanicAPI seam");
+        assertFalse(renderTargetSource.contains("gpuDevice.getMaxTextureSize()"),
+            "RenderTarget should avoid direct device max texture size queries");
+        assertTrue(mainTargetSource.contains("VulkanicAPI.getBackendMaxTextureSize()"),
+            "MainTarget should query max texture size through backend-owned VulkanicAPI seam");
+        assertFalse(mainTargetSource.contains("VulkanicAPI.getDevice().getMaxTextureSize()"),
+            "MainTarget should avoid direct getDevice().getMaxTextureSize() queries");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.getBackendMaxTextureSize()"),
+            "GuiRenderer should query max texture size through backend-owned VulkanicAPI seam");
+        assertFalse(guiRendererSource.contains("VulkanicAPI.getDevice().getMaxTextureSize()"),
+            "GuiRenderer should avoid direct getDevice().getMaxTextureSize() queries");
+        assertTrue(minecraftTextureAtlasSource.contains("VulkanicAPI.getBackendMaxTextureSize()"),
+            "Minecraft TextureAtlas should query max texture size through backend-owned VulkanicAPI seam");
+        assertFalse(minecraftTextureAtlasSource.contains("VulkanicAPI.getDevice().getMaxTextureSize()"),
+            "Minecraft TextureAtlas should avoid direct getDevice().getMaxTextureSize() queries");
+        assertTrue(voxelMapTextureAtlasSource.contains("VulkanicAPI.getBackendMaxTextureSize()"),
+            "VoxelMap TextureAtlas should query max texture size through backend-owned VulkanicAPI seam");
+        assertFalse(voxelMapTextureAtlasSource.contains("VulkanicAPI.getDevice().getMaxTextureSize()"),
+            "VoxelMap TextureAtlas should avoid direct getDevice().getMaxTextureSize() queries");
+        assertTrue(dynamicUniformStorageSource.contains("VulkanicAPI.getBackendUniformOffsetAlignment()"),
+            "DynamicUniformStorage should use backend-owned uniform offset alignment seam");
+        assertTrue(lightingSource.contains("VulkanicAPI.getBackendUniformOffsetAlignment()"),
+            "Lighting should use backend-owned uniform offset alignment seam");
+        assertFalse(dynamicUniformStorageSource.contains("gpuDevice.getUniformOffsetAlignment()"),
+            "DynamicUniformStorage should avoid direct device uniform alignment queries");
+        assertFalse(lightingSource.contains("gpuDevice.getUniformOffsetAlignment()"),
+            "Lighting should avoid direct device uniform alignment queries");
         assertTrue(tracyFrameCaptureSource.contains("VulkanicAPI.createCommandEncoder()"),
             "TracyFrameCapture should acquire command encoders via backend-owned VulkanicAPI seam");
         assertFalse(tracyFrameCaptureSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
@@ -156,8 +220,10 @@ public class ApiNeutralityCallsiteTest {
             "Screenshot should acquire command encoders via backend-owned VulkanicAPI seam");
         assertFalse(screenshotSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
             "Screenshot should avoid direct getDevice().createCommandEncoder() calls");
-        assertTrue(debugEntrySystemSpecsSource.contains("getDeviceInfo()"),
-            "DebugEntrySystemSpecs should use backend-neutral device info for display strings");
+        assertTrue(debugEntrySystemSpecsSource.contains("VulkanicAPI.getBackendDeviceInfo()"),
+            "DebugEntrySystemSpecs should use backend-owned device info seam for display strings");
+        assertFalse(debugEntrySystemSpecsSource.contains("VulkanicAPI.getDevice().getDeviceInfo()"),
+            "DebugEntrySystemSpecs should avoid direct getDevice().getDeviceInfo() queries");
         assertFalse(debugEntrySystemSpecsSource.contains("gpuDevice.getVersion()"),
             "DebugEntrySystemSpecs should avoid raw version string composition when backend-neutral device info helpers exist");
         assertTrue(minecraftSource.contains("getBackendOptionalFeatureNames()"),

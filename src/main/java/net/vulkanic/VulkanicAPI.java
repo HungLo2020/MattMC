@@ -3630,6 +3630,27 @@ public class VulkanicAPI {
     }
 
     /**
+     * Returns backend-owned max texture size capability.
+     */
+    public static int getBackendMaxTextureSize() {
+        return getBackend().getBackendMaxTextureSize();
+    }
+
+    /**
+     * Returns backend-owned uniform-buffer offset alignment capability.
+     */
+    public static int getBackendUniformOffsetAlignment() {
+        return getBackend().getBackendUniformOffsetAlignment();
+    }
+
+    /**
+     * Returns backend-owned device info snapshot for diagnostics and warnlist checks.
+     */
+    public static GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
+        return getBackend().getBackendDeviceInfo();
+    }
+
+    /**
      * Returns the backend-native texture handle for transitional integrations.
      *
      * <p>Resolution is delegated to the active backend so callsites stay backend-neutral

@@ -3,7 +3,6 @@ package net.blaze3d.platform;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
-import net.blaze3d.systems.GpuDevice;
 import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -26,9 +25,8 @@ public class Lighting implements AutoCloseable {
 	private final int paddedSize;
 
 	public Lighting() {
-		GpuDevice gpuDevice = VulkanicAPI.getDevice();
-		this.paddedSize = Mth.roundToward(UBO_SIZE, gpuDevice.getUniformOffsetAlignment());
-		this.buffer = gpuDevice.createBuffer(() -> "Lighting UBO", 136, this.paddedSize * Lighting.Entry.values().length);
+		this.paddedSize = Mth.roundToward(UBO_SIZE, VulkanicAPI.getBackendUniformOffsetAlignment());
+		this.buffer = VulkanicAPI.createBuffer(() -> "Lighting UBO", 136, this.paddedSize * Lighting.Entry.values().length);
 		Matrix4f matrix4f = new Matrix4f().rotationY((float) (-Math.PI / 8)).rotateX((float) (Math.PI * 3.0 / 4.0));
 		this.updateBuffer(
 			Lighting.Entry.ITEMS_FLAT, matrix4f.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()), matrix4f.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())

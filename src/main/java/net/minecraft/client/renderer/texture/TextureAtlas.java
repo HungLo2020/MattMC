@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.TextureUtil;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.TextureFormat;
 import net.logging.LogUtils;
@@ -52,15 +51,14 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 	public TextureAtlas(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
-		this.maxSupportedTextureSize = net.vulkanic.VulkanicAPI.getDevice().getMaxTextureSize();
+		this.maxSupportedTextureSize = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
 	}
 
 	private void createTexture(int i, int j, int k) {
 		LOGGER.info("Created: {}x{}x{} {}-atlas", i, j, k, this.location);
-		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.close();
-		this.texture = gpuDevice.createTexture(this.location::toString, 7, TextureFormat.RGBA8, i, j, 1, k + 1);
-		this.textureView = gpuDevice.createTextureView(this.texture);
+		this.texture = net.vulkanic.VulkanicAPI.createTexture(this.location::toString, 7, TextureFormat.RGBA8, i, j, 1, k + 1);
+		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		this.width = i;
 		this.height = j;
 		this.mipLevel = k;

@@ -82,7 +82,7 @@ public class GuiRenderer implements AutoCloseable {
 	public static final int GUI_3D_Z_NEAR = -1000;
 	public static final int DEFAULT_ITEM_SIZE = 16;
 	private static final int MINIMUM_ITEM_ATLAS_SIZE = 512;
-	private static final int MAXIMUM_ITEM_ATLAS_SIZE = VulkanicAPI.getDevice().getMaxTextureSize();
+	private static final int MAXIMUM_ITEM_ATLAS_SIZE = VulkanicAPI.getBackendMaxTextureSize();
 	public static final int CLEAR_COLOR = 0;
 	private static final Comparator<ScreenRectangle> SCISSOR_COMPARATOR = Comparator.nullsFirst(
 		Comparator.comparing(ScreenRectangle::top).thenComparing(ScreenRectangle::bottom).thenComparing(ScreenRectangle::left).thenComparing(ScreenRectangle::right)

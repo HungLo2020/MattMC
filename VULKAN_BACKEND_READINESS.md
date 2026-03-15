@@ -775,6 +775,56 @@ Multiple shared/modded production callsites still created texture views via `Vul
 - Vulkan texture-view seams still route through compatibility `GlDevice` under Vulkan-selected startup; fully native Vulkan texture-view ownership remains future work.
 - Other direct `VulkanicAPI.getDevice()` usage classes (identity/capabilities/lifecycle utilities) still exist and are candidates for continued seam migration.
 
+## Session 2026-03-15: Backend-Owned Capability and Device-Info Query Seams
+
+### Problem Targeted
+Shared/game callsites still queried renderer capabilities and diagnostics through concrete device access (`VulkanicAPI.getDevice().getMaxTextureSize()`, `gpuDevice.getUniformOffsetAlignment()`, `VulkanicAPI.getDevice().getDeviceInfo()`). In Vulkan-selected routing this retained OpenGL-shaped query plumbing and left `VulkanCompatibilityGpuDevice` max-size/alignment/info paths tied directly to compatibility-device methods.
+
+### Structural Changes
+- Added backend-owned capability/info seams to `GraphicsBackend`:
+  - `getBackendMaxTextureSize()`
+  - `getBackendUniformOffsetAlignment()`
+  - `getBackendDeviceInfo()`
+- Added matching `VulkanicAPI` wrappers for all three seams.
+- Implemented seam behavior in both backends:
+  - **OpenGLBackend:** max texture size/alignment route to registered `GlDevice`; backend device-info seam now returns `GlDevice` info when available and falls back to backend identity seams.
+  - **VulkanBackend:** max texture size/alignment route through backend-owned compatibility device with fail-fast startup guards; backend device-info seam now builds Vulkan-owned info from backend identity/feature seams.
+- Reduced compatibility delegation leakage in `VulkanCompatibilityGpuDevice`:
+  - `getMaxTextureSize()`, `getUniformOffsetAlignment()`, and `getDeviceInfo()` now route through backend-owned seams instead of direct compatibility-device calls.
+- Migrated production callsites to backend-owned seams:
+  - Max texture size queries migrated in `RenderTarget`, `MainTarget`, Minecraft `TextureAtlas`, VoxelMap `TextureAtlas`, and `GuiRenderer`.
+  - Uniform offset alignment queries migrated in `DynamicUniformStorage` and `Lighting`.
+  - Device-info diagnostics/warnlist queries migrated in `GameRenderer`, `GpuWarnlistManager`, and `DebugEntrySystemSpecs`.
+  - Additional cleanup: `DynamicUniformStorage` command-encoder mapping path now uses `VulkanicAPI.createCommandEncoder()` seam in both mapped-write callsites.
+
+### Evidence
+- Source migration verification:
+  - Pattern sweep for targeted direct usage (`getDevice().getMaxTextureSize`, `getDevice().getDeviceInfo`, `gpuDevice.getUniformOffsetAlignment`, and legacy `getDevice().createCommandEncoder` in migrated files) reports no production matches.
+- Typed seam routing guardrails:
+  - `VulkanicTypedApiRoutingTest` now includes `testBackendCapabilitySeamsRouteThroughBackend`.
+- Neutrality/callsite guardrails:
+  - `ApiNeutralityCallsiteTest` now asserts:
+    - seam presence in `GraphicsBackend` and `VulkanicAPI`,
+    - `VulkanCompatibilityGpuDevice` routes max-size/alignment/device-info via backend seams,
+    - migrated production callsites use backend-owned capability/info wrappers and avoid direct device query patterns.
+  - `Phase3DrawPathTest` package-cluster seam checks now accept backend-owned capability/info seam usage (`getBackendMaxTextureSize`, `getBackendUniformOffsetAlignment`, `getBackendDeviceInfo`) alongside prior seams.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.VulkanicTypedApiRoutingTest --tests net.vulkanic.ApiNeutralityCallsiteTest --tests net.vulkanic.Phase3DrawPathTest.testBlaze3dPackageUsesVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testVoxelMapPackageUsesVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testMinecraftAndGuiUseVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testRendererClusterUsesVulkanicAPIGetDevice`
+  - Result: **87 passed, 0 failed**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: **BUILD SUCCESSFUL**.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Capability/info queries now flow through backend-owned VulkanicAPI seams instead of concrete `GpuDevice` query patterns in migrated shared/game callsites.
+- **2 — Backend Implementation:** Vulkan backend now implements explicit capability/info seam methods with fail-fast guards; compatibility wrapper query delegation reduced.
+- **4 — Parity Improvement:** OpenGL and Vulkan now satisfy the same backend-owned capability/info query contract from production callsites.
+- **5 — Debuggability Improvement:** Diagnostic and warnlist callsites now fail/query at explicit seam boundaries; guardrails localize regressions to backend seam usage.
+
+### Still Unproven
+- Vulkan capability queries for max texture size/alignment still route through compatibility `GlDevice`; full native Vulkan capability ownership for these values remains future work.
+- Other direct `VulkanicAPI.getDevice()` usages remain in rendering/data paths that still require staged migration.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

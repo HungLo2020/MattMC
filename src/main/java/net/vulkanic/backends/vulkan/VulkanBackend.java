@@ -3440,6 +3440,38 @@ public class VulkanBackend {
         );
     }
 
+    public int getBackendMaxTextureSize() {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before querying max texture size.");
+        }
+        return device.getMaxTextureSize();
+    }
+
+    public int getBackendUniformOffsetAlignment() {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before querying uniform alignment.");
+        }
+        return device.getUniformOffsetAlignment();
+    }
+
+    public net.blaze3d.systems.GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
+        return new net.blaze3d.systems.GpuDevice.GpuDeviceInfo(
+            "Vulkan",
+            "Vulkan",
+            getBackendVendorName(),
+            getBackendRendererName(),
+            getBackendVersionName(),
+            false,
+            getBackendOptionalFeatureNames()
+        );
+    }
+
     private static String mapPciVendorName(int vendorId) {
         return switch (vendorId) {
             case 0x10DE -> "NVIDIA";

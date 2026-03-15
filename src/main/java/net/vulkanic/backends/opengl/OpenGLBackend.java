@@ -1920,6 +1920,46 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
+    public int getBackendMaxTextureSize() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.getMaxTextureSize();
+    }
+
+    @Override
+    public int getBackendUniformOffsetAlignment() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.getUniformOffsetAlignment();
+    }
+
+    @Override
+    public GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
+        GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getDeviceInfo();
+        }
+
+        return new GpuDevice.GpuDeviceInfo(
+            "OpenGL",
+            "OpenGL",
+            getBackendVendorName(),
+            getBackendRendererName(),
+            getBackendVersionName(),
+            true,
+            getBackendOptionalFeatureNames()
+        );
+    }
+
+    @Override
     public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");

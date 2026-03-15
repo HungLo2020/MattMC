@@ -103,25 +103,17 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuDeviceInfo getDeviceInfo() {
-		return new GpuDeviceInfo(
-			"Vulkan",
-			"Vulkan",
-			this.backend.getBackendVendorName(),
-			this.backend.getBackendRendererName(),
-			this.backend.getBackendVersionName(),
-			false,
-			getOptionalFeatureNames()
-		);
+		return this.backend.getBackendDeviceInfo();
 	}
 
 	@Override
 	public int getMaxTextureSize() {
-		return this.compatibilityDevice.getMaxTextureSize();
+		return this.backend.getBackendMaxTextureSize();
 	}
 
 	@Override
 	public int getUniformOffsetAlignment() {
-		return this.compatibilityDevice.getUniformOffsetAlignment();
+		return this.backend.getBackendUniformOffsetAlignment();
 	}
 
 	@Override

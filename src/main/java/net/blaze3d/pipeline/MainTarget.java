@@ -110,7 +110,7 @@ public class MainTarget extends RenderTarget {
 
 		static List<MainTarget.Dimension> listWithFallback(int i, int j) {
 			RenderSystem.assertOnRenderThread();
-			int k = net.vulkanic.VulkanicAPI.getDevice().getMaxTextureSize();
+			int k = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
 			return i > 0 && i <= k && j > 0 && j <= k
 				? ImmutableList.of(new MainTarget.Dimension(i, j), MainTarget.DEFAULT_DIMENSIONS)
 				: ImmutableList.of(MainTarget.DEFAULT_DIMENSIONS);

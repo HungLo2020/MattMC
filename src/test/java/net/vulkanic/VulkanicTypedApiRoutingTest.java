@@ -200,6 +200,26 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
+    public void testBackendCapabilitySeamsRouteThroughBackend() {
+        assertEquals(16384, VulkanicAPI.getBackendMaxTextureSize());
+        RecordedInvocation maxTextureInvocation = invocationHandler.lastInvocation;
+        assertNotNull(maxTextureInvocation);
+        assertEquals("getBackendMaxTextureSize", maxTextureInvocation.method.getName());
+
+        assertEquals(256, VulkanicAPI.getBackendUniformOffsetAlignment());
+        RecordedInvocation uniformOffsetInvocation = invocationHandler.lastInvocation;
+        assertNotNull(uniformOffsetInvocation);
+        assertEquals("getBackendUniformOffsetAlignment", uniformOffsetInvocation.method.getName());
+
+        net.blaze3d.systems.GpuDevice.GpuDeviceInfo info = VulkanicAPI.getBackendDeviceInfo();
+        RecordedInvocation deviceInfoInvocation = invocationHandler.lastInvocation;
+        assertNotNull(deviceInfoInvocation);
+        assertEquals("getBackendDeviceInfo", deviceInfoInvocation.method.getName());
+        assertEquals("Vulkan", info.backendName());
+        assertEquals("GeForce RTX", info.renderer());
+    }
+
+    @Test
     public void testPipelinePrecompileAndCacheClearRouteThroughBackendSeams() {
         CompiledRenderPipeline compiled = VulkanicAPI.precompileRenderPipeline(null, null);
         assertNotNull(compiled);
@@ -956,6 +976,26 @@ public class VulkanicTypedApiRoutingTest {
 
             if (method.getName().equals("getBackendOptionalFeatureNames")) {
                 return java.util.List.of("native-vulkan-runtime");
+            }
+
+            if (method.getName().equals("getBackendMaxTextureSize")) {
+                return 16384;
+            }
+
+            if (method.getName().equals("getBackendUniformOffsetAlignment")) {
+                return 256;
+            }
+
+            if (method.getName().equals("getBackendDeviceInfo")) {
+                return new net.blaze3d.systems.GpuDevice.GpuDeviceInfo(
+                    "Vulkan",
+                    "Vulkan",
+                    "NVIDIA",
+                    "GeForce RTX",
+                    "Vulkan 1.3",
+                    false,
+                    java.util.List.of("native-vulkan-runtime")
+                );
             }
 
             if (method.getName().equals("precompileRenderPipeline")) {
