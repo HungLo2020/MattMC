@@ -49,6 +49,9 @@ public class OpenGLBackend implements GraphicsBackend {
      * that require access to the device's shader cache and DirectStateAccess.
      */
     private volatile net.blaze3d.opengl.GlDevice glDevice;
+    private volatile String backendVendorName = "unknown";
+    private volatile String backendRendererName = "unknown";
+    private volatile String backendVersionName = "unknown";
 
     /**
      * Registers the GlDevice with this backend.
@@ -58,6 +61,11 @@ public class OpenGLBackend implements GraphicsBackend {
      */
     public void setGlDevice(net.blaze3d.opengl.GlDevice device) {
         this.glDevice = device;
+        if (device != null) {
+            this.backendVendorName = normalizeDeviceIdentity(device.getVendor());
+            this.backendRendererName = normalizeDeviceIdentity(device.getRenderer());
+            this.backendVersionName = normalizeDeviceIdentity(device.getVersion());
+        }
     }
 
     /**
@@ -139,6 +147,11 @@ public class OpenGLBackend implements GraphicsBackend {
         logger.info("OpenGL Vendor: {}", context.vendor());
         logger.info("OpenGL Renderer: {}", context.renderer());
         logger.info("OpenGL Version: {}", context.version());
+
+        // Cache stable identity strings while a valid context is known to exist.
+        this.backendVendorName = normalizeDeviceIdentity(context.vendor());
+        this.backendRendererName = normalizeDeviceIdentity(context.renderer());
+        this.backendVersionName = normalizeDeviceIdentity(context.version());
 
         net.sodium.client.platform.NativeWindowHandle handle = () -> org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window(mainWindowHandle);
         net.sodium.client.compatibility.checks.PostLaunchChecks.onContextInitialized(handle, context);
@@ -1638,6 +1651,61 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public GraphicsCapabilities getGraphicsCapabilities() {
         return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
+    }
+
+    @Override
+    public String getBackendVendorName() {
+        String cached = this.backendVendorName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_VENDOR);
+        return normalizeDeviceIdentity(value);
+    }
+
+    @Override
+    public String getBackendRendererName() {
+        String cached = this.backendRendererName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_RENDERER);
+        return normalizeDeviceIdentity(value);
+    }
+
+    @Override
+    public String getBackendVersionName() {
+        String cached = this.backendVersionName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_VERSION);
+        return normalizeDeviceIdentity(value);
+    }
+
+    private static String normalizeDeviceIdentity(String value) {
+        return value == null || value.isBlank() ? "unknown" : value;
+    }
+
+    @Override
+    public java.util.List<String> getBackendEnabledExtensions() {
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getEnabledExtensions();
+        }
+        return java.util.List.of();
+    }
+
+    @Override
+    public java.util.List<String> getBackendOptionalFeatureNames() {
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getOptionalFeatureNames();
+        }
+        return java.util.List.of();
     }
 
     @Override

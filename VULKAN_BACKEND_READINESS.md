@@ -433,6 +433,42 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 - `testTupleMapperDoesNotDowngradeRgb16ToRgb8` — `GL_RGB16` does not silently lose precision
 - `testTupleMapperStillRecognizesCanonicalRgba8UnormTuple` — exact `GL_RGBA8` tuple still routes correctly
 
+## Session 2026-03-15: Backend-Owned Device Identity and Feature Seams
+
+### Problem Targeted
+Vulkan-selected startup still exposed compatibility `GlDevice` metadata as the source of truth for vendor/renderer/version/extensions/features. High-traffic callsites (Iris shader macro vendor/renderer selection, Iris debug callback extension reporting, and Minecraft startup/system-report feature logging) consumed those `RenderSystem.getDevice()` values directly. That coupling makes Vulkan mode identity partially OpenGL-shaped and keeps backend selection semantics fragile.
+
+### Structural Changes
+- **`GraphicsBackend`:** Added backend-owned identity and feature seams:
+  - `getBackendVendorName()`
+  - `getBackendRendererName()`
+  - `getBackendVersionName()`
+  - `getBackendEnabledExtensions()`
+  - `getBackendOptionalFeatureNames()`
+- **`VulkanicAPI`:** Added public wrappers for all new backend-owned seams with null-safe defaults and defensive list copy behavior.
+- **`OpenGLBackend`:** Implemented seam methods using GL string queries for identity and active `GlDevice` values for extension/optional-feature lists.
+- **`VulkanBackend`:** Implemented seam methods and captured native physical-device metadata during device selection (`vendorID`, `apiVersion`, `deviceName`) via `vkGetPhysicalDeviceProperties`.
+- **`VulkanCompatibilityGpuDevice`:** Metadata and feature methods now delegate to backend-owned seam methods instead of exposing compatibility-device-local identity values.
+- **Callsite migrations:**
+  - `StandardMacros` vendor/renderer classification now uses `VulkanicAPI.getBackendVendorName()` and `VulkanicAPI.getBackendRendererName()`.
+  - `Iris.setDebug(...)` extension snapshot for debug callback now uses `VulkanicAPI.getBackendEnabledExtensions()`.
+  - `Minecraft` startup log and system report optional-feature list now use `VulkanicAPI.getBackendOptionalFeatureNames()`.
+
+### Evidence
+- `VulkanicTypedApiRoutingTest` now verifies the new Vulkanic API seam routes to backend methods for all identity/feature getters and preserves expected return values.
+- `ApiNeutralityCallsiteTest` now guards migrated callsites and asserts those shader/debug/diagnostic code paths reference backend-owned seam methods instead of concrete device metadata lookups.
+- Full test suite validation: `./gradlew test` reports **442 passed, 0 failed**.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Backend-owned identity/feature contract added and consumed through `VulkanicAPI`.
+- **2 — Backend Implementation:** Both OpenGL and Vulkan backends now implement the contract; Vulkan path uses native physical-device properties.
+- **4 — Parity Improvement:** Cross-backend callsites now consume backend intent (identity/features) instead of concrete device shape.
+- **5 — Debuggability Improvement:** Vendor/renderer/version/feature reporting now follows selected backend ownership, reducing misleading metadata in diagnostics.
+
+### Still Unproven
+- Vulkan runtime rendering ownership is still incomplete in broader architecture; compatibility `GlDevice` remains in service for substantial resource and draw plumbing.
+- Additional high-traffic callsites may still read concrete `RenderSystem.getDevice()` metadata and should be migrated through the same seam.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

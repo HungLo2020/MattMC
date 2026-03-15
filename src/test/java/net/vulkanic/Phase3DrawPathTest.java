@@ -4908,10 +4908,13 @@ public class Phase3DrawPathTest {
 
         Path blockModelWrapperFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/item/BlockModelWrapper.java");
         String blockModelWrapperSource = Files.readString(blockModelWrapperFile);
-        assertTrue(blockModelWrapperSource.contains("itemDisplayContext == ItemDisplayContext.GUI"),
-            "BlockModelWrapper should apply GUI-only render-type remapping for inventory/hotbar item rendering");
-        assertTrue(blockModelWrapperSource.contains("renderType = Sheets.cutoutBlockSheet();"),
-            "BlockModelWrapper GUI remap should force cutout item sheet for GUI-only item rendering");
+        assertFalse(blockModelWrapperSource.contains("renderType = Sheets.cutoutBlockSheet();"),
+            "BlockModelWrapper should not force GUI item rendering onto the cutout sheet; translucent items need their original render type");
+
+        Path irisPipelinesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisPipelines.java");
+        String irisPipelinesSource = Files.readString(irisPipelinesFile);
+        assertTrue(irisPipelinesSource.contains("assignToMain(RenderPipelines.ITEM_ENTITY_TRANSLUCENT_CULL, p -> getTranslucent(p));"),
+            "IrisPipelines should keep ITEM_ENTITY_TRANSLUCENT_CULL on translucent shader selection so GUI translucent items preserve alpha blending");
 
         Path itemShaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh");
         String itemShaderSource = Files.readString(itemShaderFile);

@@ -2431,15 +2431,21 @@ public class VulkanicAPI {
     
     public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
                                         int border, int format, int type, java.nio.ByteBuffer pixels) {
-        java.util.Optional<VulkanicTextureUploadFormat> knownFormat = VulkanicTextureUploadFormat.fromLegacyGlTuple(internalFormat, format, type);
-        java.util.Optional<VulkanicTextureTarget> knownTarget = VulkanicTextureTarget.fromLegacyGlTarget(target);
+        GraphicsBackend activeBackend = getBackend();
 
-        if (knownFormat.isPresent() && knownTarget.isPresent()) {
-            getBackend().uploadTexture2D(ctx, knownTarget.get(), level, knownFormat.get(), width, height, border, pixels);
-            return;
+        // Preserve exact legacy GL tuples on OpenGL to avoid any accidental
+        // reinterpretation of caller-provided texture upload semantics.
+        if (activeBackend.getBackendType() == GraphicsBackendType.VULKAN) {
+            java.util.Optional<VulkanicTextureUploadFormat> knownFormat = VulkanicTextureUploadFormat.fromLegacyGlTuple(internalFormat, format, type);
+            java.util.Optional<VulkanicTextureTarget> knownTarget = VulkanicTextureTarget.fromLegacyGlTarget(target);
+
+            if (knownFormat.isPresent() && knownTarget.isPresent()) {
+                activeBackend.uploadTexture2D(ctx, knownTarget.get(), level, knownFormat.get(), width, height, border, pixels);
+                return;
+            }
         }
 
-        getBackend().uploadTexture2D(ctx, target, level, internalFormat, width, height, border, format, type, pixels);
+        activeBackend.uploadTexture2D(ctx, target, level, internalFormat, width, height, border, format, type, pixels);
     }
 
     public static void uploadTexture2D(
@@ -3511,6 +3517,46 @@ public class VulkanicAPI {
     
     public static GraphicsCapabilities getGraphicsCapabilities() {
         return getBackend().getGraphicsCapabilities();
+    }
+
+    /**
+     * Returns the backend-owned GPU vendor name for shader macro and diagnostics.
+     */
+    public static String getBackendVendorName() {
+        String value = getBackend().getBackendVendorName();
+        return value == null || value.isBlank() ? "unknown" : value;
+    }
+
+    /**
+     * Returns the backend-owned GPU renderer name for shader macro and diagnostics.
+     */
+    public static String getBackendRendererName() {
+        String value = getBackend().getBackendRendererName();
+        return value == null || value.isBlank() ? "unknown" : value;
+    }
+
+    /**
+     * Returns the backend-owned version descriptor for diagnostics.
+     */
+    public static String getBackendVersionName() {
+        String value = getBackend().getBackendVersionName();
+        return value == null || value.isBlank() ? "unknown" : value;
+    }
+
+    /**
+     * Returns backend-owned extension identifiers when the backend exposes them.
+     */
+    public static java.util.List<String> getBackendEnabledExtensions() {
+        java.util.List<String> values = getBackend().getBackendEnabledExtensions();
+        return values == null ? java.util.List.of() : java.util.List.copyOf(values);
+    }
+
+    /**
+     * Returns backend-owned optional feature names for diagnostics/reporting.
+     */
+    public static java.util.List<String> getBackendOptionalFeatureNames() {
+        java.util.List<String> values = getBackend().getBackendOptionalFeatureNames();
+        return values == null ? java.util.List.of() : java.util.List.copyOf(values);
     }
 
     /**

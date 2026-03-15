@@ -60,6 +60,7 @@ import org.lwjgl.vulkan.VkMemoryBarrier;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
+import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
@@ -3118,6 +3119,65 @@ public class VulkanBackend {
         return graphicsCapabilities;
     }
 
+    public String getBackendVendorName() {
+        NativeSpine spine = nativeSpine;
+        if (spine != null && spine.physicalDeviceVendorId != 0) {
+            return mapPciVendorName(spine.physicalDeviceVendorId);
+        }
+        return "Vulkanic";
+    }
+
+    public String getBackendRendererName() {
+        NativeSpine spine = nativeSpine;
+        if (spine != null && spine.physicalDeviceName != null && !spine.physicalDeviceName.isBlank()) {
+            return spine.physicalDeviceName;
+        }
+        return "VulkanBackend";
+    }
+
+    public String getBackendVersionName() {
+        NativeSpine spine = nativeSpine;
+        if (spine != null) {
+            int api = spine.physicalDeviceApiVersion;
+            int major = VK10.VK_API_VERSION_MAJOR(api);
+            int minor = VK10.VK_API_VERSION_MINOR(api);
+            int patch = VK10.VK_API_VERSION_PATCH(api);
+            return "Vulkan " + major + "." + minor + "." + patch;
+        }
+        return "Vulkan";
+    }
+
+    public java.util.List<String> getBackendEnabledExtensions() {
+        // Vulkan path does not expose OpenGL extension strings.
+        return java.util.List.of();
+    }
+
+    public java.util.List<String> getBackendOptionalFeatureNames() {
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            return java.util.List.of("vulkan-bootstrap-compatibility");
+        }
+        return java.util.List.of(
+            "native-vulkan-runtime",
+            "vulkan-swapchain",
+            "vulkan-command-buffer",
+            "vulkan-render-pass"
+        );
+    }
+
+    private static String mapPciVendorName(int vendorId) {
+        return switch (vendorId) {
+            case 0x10DE -> "NVIDIA";
+            case 0x1002, 0x1022 -> "AMD";
+            case 0x8086 -> "Intel";
+            case 0x13B5 -> "ARM";
+            case 0x5143 -> "Qualcomm";
+            case 0x1010 -> "Imagination";
+            case 0x106B -> "Apple";
+            default -> "Vulkanic";
+        };
+    }
+
     public int getInteger(CommandContext ctx, int pname) {
         requireVulkanCommandBufferHandle("getInteger", ctx);
         return net.vulkanic.VulkanicIntegerQuery.fromLegacyGlPName(pname)
@@ -3978,6 +4038,9 @@ public class VulkanBackend {
 
         private VkCommandBuffer primaryCommandBuffer;
         private int graphicsQueueFamilyIndex;
+        private int physicalDeviceVendorId;
+        private int physicalDeviceApiVersion = VK10.VK_API_VERSION_1_0;
+        private String physicalDeviceName = "Vulkan GPU";
         private long windowHandle;
         private boolean commandBufferRecording;
         private boolean renderPassRecording;
@@ -4141,12 +4204,26 @@ public class VulkanBackend {
                     if (queueFamily.isPresent()) {
                         physicalDevice = candidate;
                         graphicsQueueFamilyIndex = queueFamily.getAsInt();
+                        capturePhysicalDeviceProperties(candidate);
                         return;
                     }
                 }
 
                 throw new IllegalStateException(
                     "No physical device with combined graphics+present queue support for GLFW surface was found.");
+            }
+        }
+
+        private void capturePhysicalDeviceProperties(VkPhysicalDevice device) {
+            try (MemoryStack stack = stackPush()) {
+                VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.malloc(stack);
+                VK10.vkGetPhysicalDeviceProperties(device, properties);
+                physicalDeviceVendorId = properties.vendorID();
+                physicalDeviceApiVersion = properties.apiVersion();
+                String name = properties.deviceNameString();
+                if (name != null && !name.isBlank()) {
+                    physicalDeviceName = name;
+                }
             }
         }
 

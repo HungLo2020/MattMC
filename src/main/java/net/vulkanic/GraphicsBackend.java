@@ -2728,6 +2728,41 @@ public interface GraphicsBackend {
     GraphicsCapabilities getGraphicsCapabilities();
 
     /**
+     * Returns the backend-owned GPU vendor name used for shader macro and diagnostics.
+     */
+    default String getBackendVendorName() {
+        return getString(getCurrentCommandContext(), VulkanicAPI.GL_VENDOR);
+    }
+
+    /**
+     * Returns the backend-owned GPU renderer name used for shader macro and diagnostics.
+     */
+    default String getBackendRendererName() {
+        return getString(getCurrentCommandContext(), VulkanicAPI.GL_RENDERER);
+    }
+
+    /**
+     * Returns the backend-owned GPU/driver version descriptor used for diagnostics.
+     */
+    default String getBackendVersionName() {
+        return getString(getCurrentCommandContext(), VulkanicAPI.GL_VERSION);
+    }
+
+    /**
+     * Returns backend-owned extension identifiers when the backend exposes them.
+     */
+    default java.util.List<String> getBackendEnabledExtensions() {
+        return java.util.List.of();
+    }
+
+    /**
+     * Returns backend-owned optional feature names for diagnostics/reporting.
+     */
+    default java.util.List<String> getBackendOptionalFeatureNames() {
+        return java.util.List.of();
+    }
+
+    /**
      * Resolves a backend-native texture handle for transitional integrations.
      *
      * <p>In OpenGL this corresponds to the GL texture object name.

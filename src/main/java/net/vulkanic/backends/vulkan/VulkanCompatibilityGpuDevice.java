@@ -83,7 +83,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public String getVendor() {
-		return "Vulkanic";
+		return this.backend.getBackendVendorName();
 	}
 
 	@Override
@@ -93,12 +93,12 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public String getVersion() {
-		return this.backend.isNativeVulkanReady() ? "native-ready" : "bootstrap-compatibility";
+		return this.backend.getBackendVersionName();
 	}
 
 	@Override
 	public String getRenderer() {
-		return this.compatibilityDevice.getRenderer();
+		return this.backend.getBackendRendererName();
 	}
 
 	@Override
@@ -106,9 +106,9 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 		return new GpuDeviceInfo(
 			"Vulkan",
 			"Vulkan",
-			this.compatibilityDevice.getVendor(),
-			this.compatibilityDevice.getRenderer(),
-			this.backend.isNativeVulkanReady() ? "native-runtime" : "compatibility-bootstrap",
+			this.backend.getBackendVendorName(),
+			this.backend.getBackendRendererName(),
+			this.backend.getBackendVersionName(),
 			false,
 			getOptionalFeatureNames()
 		);
@@ -136,12 +136,12 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public List<String> getEnabledExtensions() {
-		return List.of();
+		return this.backend.getBackendEnabledExtensions();
 	}
 
 	@Override
 	public List<String> getOptionalFeatureNames() {
-		return List.of();
+		return this.backend.getBackendOptionalFeatureNames();
 	}
 
 	@Override

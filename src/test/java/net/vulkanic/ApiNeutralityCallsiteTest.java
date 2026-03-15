@@ -53,8 +53,8 @@ public class ApiNeutralityCallsiteTest {
         assertFalse(sodiumRendererSource.contains("GlCommandEncoder"),
             "ShaderChunkRenderer should avoid concrete GlCommandEncoder dependency");
 
-        assertTrue(irisSource.contains("RenderSystem.getDevice().getEnabledExtensions()"),
-            "Iris should use backend-neutral GpuDevice extension querying");
+        assertTrue(irisSource.contains("VulkanicAPI.getBackendEnabledExtensions()"),
+            "Iris should use backend-owned extension querying seam");
         assertFalse(irisSource.contains("((GlDevice) RenderSystem.getDevice())"),
             "Iris should avoid concrete GlDevice casts when querying enabled extensions");
         assertTrue(gpuDeviceSource.contains("record GpuDeviceInfo("),
@@ -79,8 +79,8 @@ public class ApiNeutralityCallsiteTest {
             "DebugEntrySystemSpecs should use backend-neutral device info for display strings");
         assertFalse(debugEntrySystemSpecsSource.contains("gpuDevice.getVersion()"),
             "DebugEntrySystemSpecs should avoid raw version string composition when backend-neutral device info helpers exist");
-        assertTrue(minecraftSource.contains("getOptionalFeatureNames()"),
-            "Minecraft should log backend-neutral optional rendering features instead of raw extensions");
+        assertTrue(minecraftSource.contains("getBackendOptionalFeatureNames()"),
+            "Minecraft should log backend-owned optional rendering features instead of device-wrapper extension metadata");
         assertFalse(minecraftSource.contains("Using optional rendering extensions:"),
             "Minecraft should avoid OpenGL extension wording in shared startup logging");
         assertTrue(renderSystemSource.contains("VulkanicAPI.createRendererDevice("),
@@ -584,6 +584,49 @@ public class ApiNeutralityCallsiteTest {
             "IrisRenderSystem should expose typed texture-upload overloads for backend-neutral callsites: " + irisRenderSystemRelative);
         assertTrue(irisRenderSystemSource.contains("VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, uploadFormat"),
             "IrisRenderSystem typed texture-upload overloads should route through VulkanicAPI typed seams: " + irisRenderSystemRelative);
+    }
+
+    @Test
+    public void testBackendOwnedDeviceIdentitySeamsAreUsedByShaderAndDebugCallsites() throws IOException {
+        String standardMacrosRelative = "net/irisshaders/iris/gl/shader/StandardMacros.java";
+        String standardMacrosSource = Files.readString(SRC_MAIN_JAVA.resolve(standardMacrosRelative));
+        assertTrue(standardMacrosSource.contains("VulkanicAPI.getBackendVendorName()"),
+            "StandardMacros should use backend-owned vendor identity seam instead of RenderSystem device metadata: " + standardMacrosRelative);
+        assertTrue(standardMacrosSource.contains("VulkanicAPI.getBackendRendererName()"),
+            "StandardMacros should use backend-owned renderer identity seam instead of RenderSystem device metadata: " + standardMacrosRelative);
+        assertFalse(standardMacrosSource.contains("RenderSystem.getDevice().getVendor()"),
+            "StandardMacros should avoid direct RenderSystem.getDevice().getVendor() callsites: " + standardMacrosRelative);
+        assertFalse(standardMacrosSource.contains("RenderSystem.getDevice().getRenderer()"),
+            "StandardMacros should avoid direct RenderSystem.getDevice().getRenderer() callsites: " + standardMacrosRelative);
+
+        String irisRelative = "net/irisshaders/iris/Iris.java";
+        String irisSource = Files.readString(SRC_MAIN_JAVA.resolve(irisRelative));
+        assertTrue(irisSource.contains("VulkanicAPI.getBackendEnabledExtensions()"),
+            "Iris debug callback setup should use backend-owned extension seam: " + irisRelative);
+        assertFalse(irisSource.contains("RenderSystem.getDevice().getEnabledExtensions()"),
+            "Iris debug callback setup should avoid direct RenderSystem device extension access: " + irisRelative);
+
+        String minecraftRelative = "net/minecraft/client/Minecraft.java";
+        String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve(minecraftRelative));
+        assertTrue(minecraftSource.contains("VulkanicAPI.getBackendOptionalFeatureNames()"),
+            "Minecraft startup/system-report diagnostics should use backend-owned optional-feature seam: " + minecraftRelative);
+        assertFalse(minecraftSource.contains("VulkanicAPI.getDevice().getOptionalFeatureNames()"),
+            "Minecraft startup/system-report diagnostics should avoid device-wrapper optional-feature calls: " + minecraftRelative);
+
+        String compatDeviceRelative = "net/vulkanic/backends/vulkan/VulkanCompatibilityGpuDevice.java";
+        String compatDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve(compatDeviceRelative));
+        assertTrue(compatDeviceSource.contains("this.backend.getBackendVendorName()"),
+            "Vulkan compatibility device should source vendor metadata from backend-owned seam: " + compatDeviceRelative);
+        assertTrue(compatDeviceSource.contains("this.backend.getBackendRendererName()"),
+            "Vulkan compatibility device should source renderer metadata from backend-owned seam: " + compatDeviceRelative);
+        assertTrue(compatDeviceSource.contains("this.backend.getBackendEnabledExtensions()"),
+            "Vulkan compatibility device should source extension diagnostics from backend-owned seam: " + compatDeviceRelative);
+        assertTrue(compatDeviceSource.contains("this.backend.getBackendOptionalFeatureNames()"),
+            "Vulkan compatibility device should source optional feature diagnostics from backend-owned seam: " + compatDeviceRelative);
+        assertFalse(compatDeviceSource.contains("this.compatibilityDevice.getVendor()"),
+            "Vulkan compatibility device should avoid leaking compatibility-device vendor metadata: " + compatDeviceRelative);
+        assertFalse(compatDeviceSource.contains("this.compatibilityDevice.getRenderer()"),
+            "Vulkan compatibility device should avoid leaking compatibility-device renderer metadata: " + compatDeviceRelative);
     }
 
     @Test

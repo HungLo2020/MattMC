@@ -37,6 +37,7 @@ public class VulkanicTypedApiRoutingTest {
     public void setUp() throws Exception {
         resetBackendState();
         invocationHandler.configureProgramReflection(java.util.List.of(), java.util.List.of());
+        invocationHandler.setBackendType(GraphicsBackendType.VULKAN);
 
         GraphicsBackend proxyBackend = (GraphicsBackend) Proxy.newProxyInstance(
             GraphicsBackend.class.getClassLoader(),
@@ -134,6 +135,64 @@ public class VulkanicTypedApiRoutingTest {
         assertEquals(int.class, invocation.method.getParameterTypes()[1]);
         assertEquals(int.class, invocation.method.getParameterTypes()[3]);
         assertEquals(unknownInternalFormat, invocation.args[3]);
+    }
+
+    @Test
+    public void testUploadTexture2DRoutingPreservesRawTupleOnOpenGLBackend() {
+        invocationHandler.setBackendType(GraphicsBackendType.OPENGL);
+
+        VulkanicAPI.uploadTexture2D(
+            TEST_CONTEXT,
+            VulkanicAPI.GL_TEXTURE_2D,
+            0,
+            VulkanicAPI.GL_R32F,
+            1,
+            1,
+            0,
+            VulkanicAPI.GL_RED,
+            VulkanicAPI.GL_FLOAT,
+            null
+        );
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("uploadTexture2D", invocation.method.getName());
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(int.class, invocation.method.getParameterTypes()[3]);
+        assertEquals(VulkanicAPI.GL_R32F, invocation.args[3]);
+    }
+
+    @Test
+    public void testBackendIdentitySeamsRouteThroughBackend() {
+        assertEquals("NVIDIA", VulkanicAPI.getBackendVendorName());
+        RecordedInvocation vendorInvocation = invocationHandler.lastInvocation;
+        assertNotNull(vendorInvocation);
+        assertEquals("getBackendVendorName", vendorInvocation.method.getName());
+
+        assertEquals("GeForce RTX", VulkanicAPI.getBackendRendererName());
+        RecordedInvocation rendererInvocation = invocationHandler.lastInvocation;
+        assertNotNull(rendererInvocation);
+        assertEquals("getBackendRendererName", rendererInvocation.method.getName());
+
+        assertEquals("Vulkan 1.3", VulkanicAPI.getBackendVersionName());
+        RecordedInvocation versionInvocation = invocationHandler.lastInvocation;
+        assertNotNull(versionInvocation);
+        assertEquals("getBackendVersionName", versionInvocation.method.getName());
+    }
+
+    @Test
+    public void testBackendFeatureSeamsRouteThroughBackend() {
+        java.util.List<String> extensions = VulkanicAPI.getBackendEnabledExtensions();
+        RecordedInvocation extensionInvocation = invocationHandler.lastInvocation;
+        assertNotNull(extensionInvocation);
+        assertEquals("getBackendEnabledExtensions", extensionInvocation.method.getName());
+        assertEquals(java.util.List.of("GL_KHR_debug"), extensions);
+
+        java.util.List<String> optionalFeatures = VulkanicAPI.getBackendOptionalFeatureNames();
+        RecordedInvocation featureInvocation = invocationHandler.lastInvocation;
+        assertNotNull(featureInvocation);
+        assertEquals("getBackendOptionalFeatureNames", featureInvocation.method.getName());
+        assertEquals(java.util.List.of("native-vulkan-runtime"), optionalFeatures);
     }
 
     @Test
@@ -734,6 +793,11 @@ public class VulkanicTypedApiRoutingTest {
         private RecordedInvocation lastInvocation;
         private java.util.List<String> reflectedUniformBlocks = java.util.List.of();
         private java.util.List<ReflectedUniform> reflectedUniforms = java.util.List.of();
+        private GraphicsBackendType backendType = GraphicsBackendType.VULKAN;
+
+        private void setBackendType(GraphicsBackendType backendType) {
+            this.backendType = backendType;
+        }
 
         private void configureProgramReflection(
             java.util.List<String> uniformBlocks,
@@ -777,6 +841,30 @@ public class VulkanicTypedApiRoutingTest {
                     return 111;
                 }
                 return 222;
+            }
+
+            if (method.getName().equals("getBackendType")) {
+                return backendType;
+            }
+
+            if (method.getName().equals("getBackendVendorName")) {
+                return "NVIDIA";
+            }
+
+            if (method.getName().equals("getBackendRendererName")) {
+                return "GeForce RTX";
+            }
+
+            if (method.getName().equals("getBackendVersionName")) {
+                return "Vulkan 1.3";
+            }
+
+            if (method.getName().equals("getBackendEnabledExtensions")) {
+                return java.util.List.of("GL_KHR_debug");
+            }
+
+            if (method.getName().equals("getBackendOptionalFeatureNames")) {
+                return java.util.List.of("native-vulkan-runtime");
             }
 
             return defaultValue(method.getReturnType());

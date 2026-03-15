@@ -502,7 +502,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			(resourceLocation, shaderType) -> this.getShaderManager().getShader(resourceLocation, shaderType),
 			gameConfig.game.renderDebugLabels
 		);
-		List<String> optionalFeatureNames = VulkanicAPI.getDevice().getOptionalFeatureNames();
+		List<String> optionalFeatureNames = VulkanicAPI.getBackendOptionalFeatureNames();
 		if (optionalFeatureNames.isEmpty()) {
 			LOGGER.info("No optional rendering features reported by the active backend device");
 		} else {
@@ -2489,7 +2489,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		systemReport.setDetail("Backend API", VulkanicAPI::getApiDescription);
 		systemReport.setDetail("Window size", () -> minecraft != null ? minecraft.window.getWidth() + "x" + minecraft.window.getHeight() : "<not initialized>");
 		systemReport.setDetail("GFLW Platform", Window::getPlatform);
-		systemReport.setDetail("Render Features", () -> String.join(", ", VulkanicAPI.getDevice().getOptionalFeatureNames()));
+		systemReport.setDetail("Render Features", () -> String.join(", ", VulkanicAPI.getBackendOptionalFeatureNames()));
 		systemReport.setDetail("GL debug messages", () -> {
 			GpuDevice gpuDevice = VulkanicAPI.tryGetDevice();
 			if (gpuDevice == null) {
