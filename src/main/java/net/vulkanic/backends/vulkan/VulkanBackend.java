@@ -497,6 +497,26 @@ public class VulkanBackend {
         return device.createBuffer(supplier, usage, data);
     }
 
+    public GpuTextureView createTextureView(GpuTexture texture) {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before requesting texture views.");
+        }
+        return device.createTextureView(texture);
+    }
+
+    public GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before requesting texture views.");
+        }
+        return device.createTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
     public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
         LOGGER.info("Vulkan renderer startup now uses backend-owned device creation instead of shared GlDevice construction");
         LOGGER.info("Vulkan readiness: {}", getReadinessReport().summaryLine());

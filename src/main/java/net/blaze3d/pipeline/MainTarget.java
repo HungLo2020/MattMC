@@ -65,8 +65,8 @@ public class MainTarget extends RenderTarget {
 			this.colorTexture = this.allocateColorAttachment(dimension);
 			this.depthTexture = this.allocateDepthAttachment(dimension);
 			if (this.colorTexture != null && this.depthTexture != null) {
-				this.colorTextureView = net.vulkanic.VulkanicAPI.getDevice().createTextureView(this.colorTexture);
-				this.depthTextureView = net.vulkanic.VulkanicAPI.getDevice().createTextureView(this.depthTexture);
+				this.colorTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.colorTexture);
+				this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
 				return dimension;
 			}
 		}

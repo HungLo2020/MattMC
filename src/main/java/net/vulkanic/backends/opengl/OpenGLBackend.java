@@ -222,6 +222,28 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
+    public GpuTextureView createTextureView(GpuTexture texture) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTextureView(texture);
+    }
+
+    @Override
+    public GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
+    @Override
     public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
         net.sodium.client.compatibility.environment.GlContextInfo context = net.sodium.client.compatibility.environment.GlContextInfo.create();
         org.slf4j.Logger logger = net.logging.LogUtils.getLogger();

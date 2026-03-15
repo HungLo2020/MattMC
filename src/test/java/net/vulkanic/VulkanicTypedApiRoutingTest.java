@@ -255,6 +255,28 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
+    public void testCreateTextureViewRoutesThroughBackendSeam() {
+        VulkanicAPI.createTextureView(null);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("createTextureView", invocation.method.getName());
+        assertEquals(net.blaze3d.textures.GpuTexture.class, invocation.method.getParameterTypes()[0]);
+    }
+
+    @Test
+    public void testCreateTextureViewWithMipRangeRoutesThroughBackendSeam() {
+        VulkanicAPI.createTextureView(null, 0, 1);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("createTextureView", invocation.method.getName());
+        assertEquals(net.blaze3d.textures.GpuTexture.class, invocation.method.getParameterTypes()[0]);
+        assertEquals(int.class, invocation.method.getParameterTypes()[1]);
+        assertEquals(int.class, invocation.method.getParameterTypes()[2]);
+    }
+
+    @Test
     public void testPresentTextureToScreenRoutesThroughBackendSeam() {
         VulkanicAPI.presentTextureToScreen(TEST_CONTEXT, null);
 

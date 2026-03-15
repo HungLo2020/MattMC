@@ -46,12 +46,12 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public GpuTextureView createTextureView(GpuTexture gpuTexture) {
-		return this.compatibilityDevice.createTextureView(gpuTexture);
+		return this.backend.createTextureView(gpuTexture);
 	}
 
 	@Override
 	public GpuTextureView createTextureView(GpuTexture gpuTexture, int i, int j) {
-		return this.compatibilityDevice.createTextureView(gpuTexture, i, j);
+		return this.backend.createTextureView(gpuTexture, i, j);
 	}
 
 	@Override

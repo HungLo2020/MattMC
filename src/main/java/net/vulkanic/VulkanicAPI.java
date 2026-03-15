@@ -3264,6 +3264,20 @@ public class VulkanicAPI {
         return getBackend().createBuffer(supplier, usage, data);
     }
 
+    /**
+     * Creates a backend-owned texture view for a full texture range.
+     */
+    public static GpuTextureView createTextureView(GpuTexture texture) {
+        return getBackend().createTextureView(texture);
+    }
+
+    /**
+     * Creates a backend-owned texture view for an explicit mip range.
+     */
+    public static GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+        return getBackend().createTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
     public static String getApiDescription() {
         GpuDevice gpuDevice = tryGetDevice();
         return gpuDevice == null ? "Unknown" : gpuDevice.getImplementationInformation();

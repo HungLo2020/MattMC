@@ -724,6 +724,57 @@ Shared and modded high-traffic callsites were still creating textures/buffers vi
 - Vulkan backend texture/buffer seams still route through compatibility `GlDevice` ownership under the hood; fully native Vulkan resource ownership for these creation paths is not yet complete.
 - Additional external/mod callsites can still create resources through other device-access seams (for example, direct `RenderSystem.getDevice()` usage) and remain migration candidates.
 
+## Session 2026-03-15: Backend-Owned Texture-View Creation Seams (Compatibility Delegation Reduction)
+
+### Problem Targeted
+Multiple shared/modded production callsites still created texture views via `VulkanicAPI.getDevice().createTextureView(...)`, and `VulkanCompatibilityGpuDevice.createTextureView(...)` still delegated directly to `compatibilityDevice`. This left a remaining high-traffic resource-creation path shaped around concrete device access rather than backend-owned seams.
+
+### Structural Changes
+- Added backend-owned texture-view seams to `GraphicsBackend`:
+  - `createTextureView(GpuTexture)`
+  - `createTextureView(GpuTexture, int baseMipLevel, int mipLevelCount)`
+- Added matching `VulkanicAPI` wrappers:
+  - `createTextureView(GpuTexture)`
+  - `createTextureView(GpuTexture, int, int)`
+- Implemented seam behavior in both backends:
+  - **OpenGLBackend:** delegates to registered `GlDevice.createTextureView(...)` overloads with fail-fast device-registration guards.
+  - **VulkanBackend:** delegates to backend-owned compatibility device texture-view creation with startup-state fail-fast guards.
+- Reduced compatibility delegation leakage in `VulkanCompatibilityGpuDevice`:
+  - `createTextureView(...)` overloads now route through `this.backend.createTextureView(...)`.
+  - Direct `this.compatibilityDevice.createTextureView(...)` delegation was removed.
+- Migrated production callsites from concrete device access to backend seam:
+  - Replaced `VulkanicAPI.getDevice().createTextureView(...)` with `VulkanicAPI.createTextureView(...)` in Blaze3D and VoxelMap callsites (`MainTarget`, `Map`, `AllocatedTexture`, `TextureAtlas`, `EntityMapImageManager`).
+
+### Evidence
+- Source migration verification:
+  - `grep -RIn --include='*.java' 'VulkanicAPI.getDevice().createTextureView(' src/main/java src/test/java`
+  - Result: no remaining direct `getDevice().createTextureView` callsites.
+- Typed seam routing guardrails:
+  - `VulkanicTypedApiRoutingTest` now includes:
+    - `testCreateTextureViewRoutesThroughBackendSeam`
+    - `testCreateTextureViewWithMipRangeRoutesThroughBackendSeam`
+- Neutrality/callsite guardrails:
+  - `ApiNeutralityCallsiteTest` now asserts:
+    - `GraphicsBackend` and `VulkanicAPI` expose texture-view seams.
+    - `VulkanCompatibilityGpuDevice` routes texture-view creation through backend seam and not direct compatibility device delegation.
+  - `Phase3DrawPathTest` package-cluster seam checks now accept `VulkanicAPI.createTextureView(...)` as valid backend-owned seam usage.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.VulkanicTypedApiRoutingTest --tests net.vulkanic.ApiNeutralityCallsiteTest --tests net.vulkanic.Phase3DrawPathTest.testBlaze3dPackageUsesVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testVoxelMapPackageUsesVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testMinecraftAndGuiUseVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testRendererClusterUsesVulkanicAPIGetDevice`
+  - Result: **86 passed, 0 failed**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: **BUILD SUCCESSFUL**.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Shared callsites now express texture-view creation through backend-owned `VulkanicAPI.createTextureView(...)` seams instead of concrete device access.
+- **2 — Backend Implementation:** Both backends now implement explicit texture-view seam methods.
+- **4 — Parity Improvement:** Same texture-view seam contract now drives both OpenGL and Vulkan-selected routing.
+- **5 — Debuggability Improvement:** Missing/early texture-view creation now fails at backend seam boundaries with explicit backend-scoped error paths.
+
+### Still Unproven
+- Vulkan texture-view seams still route through compatibility `GlDevice` under Vulkan-selected startup; fully native Vulkan texture-view ownership remains future work.
+- Other direct `VulkanicAPI.getDevice()` usage classes (identity/capabilities/lifecycle utilities) still exist and are candidates for continued seam migration.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

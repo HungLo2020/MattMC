@@ -103,8 +103,8 @@ public class EntityMapImageManager {
         Minecraft.getInstance().getTextureManager().register(resourceFboTexture, new AllocatedTexture(fboTexture));
 
         // this.fboTexture = fboTexture.getTexture();
-        fboTextureView = net.vulkanic.VulkanicAPI.getDevice().createTextureView(this.fboTexture);
-        fboDepthTextureView = net.vulkanic.VulkanicAPI.getDevice().createTextureView(this.fboDepthTexture);
+        fboTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboTexture);
+        fboDepthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboDepthTexture);
 
         projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Entity Map Image Proj", 256.0F, -256.0F, -256.0F, 256.0F, 1000.0F, 21000.0F);
 

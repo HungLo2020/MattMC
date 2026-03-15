@@ -238,6 +238,24 @@ public interface GraphicsBackend {
             "Backend " + getBackendType() + " does not provide buffer creation."
         );
     }
+
+    /**
+     * Creates a backend-owned texture view for a full texture range.
+     */
+    default GpuTextureView createTextureView(GpuTexture texture) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide texture-view creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned texture view for an explicit mip range.
+     */
+    default GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide texture-view creation."
+        );
+    }
     
     /**
      * Sets the dynamic viewport state for rendering.

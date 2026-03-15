@@ -7,6 +7,6 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 public class AllocatedTexture extends AbstractTexture {
     public AllocatedTexture(GpuTexture texture) {
         this.texture = texture;
-        this.textureView = net.vulkanic.VulkanicAPI.getDevice().createTextureView(texture);
+        this.textureView = net.vulkanic.VulkanicAPI.createTextureView(texture);
     }
 }

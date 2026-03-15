@@ -4639,8 +4639,9 @@ public class Phase3DrawPathTest {
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
-            assertTrue(usesDeviceSeam || usesCommandEncoderSeam || usesTextureSeam || usesBufferSeam,
-                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer after device-access migration");
+            boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
+            assertTrue(usesDeviceSeam || usesCommandEncoderSeam || usesTextureSeam || usesBufferSeam || usesTextureViewSeam,
+                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer/createTextureView after device-access migration");
         }
     }
 
@@ -4663,8 +4664,9 @@ public class Phase3DrawPathTest {
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
-            assertTrue(usesDeviceSeam || usesCommandEncoderSeam || usesTextureSeam || usesBufferSeam,
-                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer after device-access migration");
+            boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
+            assertTrue(usesDeviceSeam || usesCommandEncoderSeam || usesTextureSeam || usesBufferSeam || usesTextureViewSeam,
+                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer/createTextureView after device-access migration");
         }
     }
 
@@ -4691,8 +4693,9 @@ public class Phase3DrawPathTest {
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
-            assertTrue(usesDeviceSeam || usesCommandEncoderSeam || usesTextureSeam || usesBufferSeam,
-                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer after device-access migration");
+            boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
+            assertTrue(usesDeviceSeam || usesCommandEncoderSeam || usesTextureSeam || usesBufferSeam || usesTextureViewSeam,
+                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer/createTextureView after device-access migration");
         }
     }
 
@@ -4721,8 +4724,9 @@ public class Phase3DrawPathTest {
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
-            assertTrue(usesDeviceSeam || usesCommandEncoderSeam || usesTextureSeam || usesBufferSeam,
-                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer after renderer-cluster migration");
+            boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
+            assertTrue(usesDeviceSeam || usesCommandEncoderSeam || usesTextureSeam || usesBufferSeam || usesTextureViewSeam,
+                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer/createTextureView after renderer-cluster migration");
         }
     }
 
