@@ -544,6 +544,44 @@ Vulkan-selected startup still exposed compatibility `GlDevice` metadata as the s
   - `./gradlew test --tests net.vulkanic.Phase3DrawPathTest --tests net.vulkanic.Phase3ResourceTypesTest --tests net.vulkanic.VulkanDescriptorLifecycleTest`
   - Result: **146 passed, 0 failed**.
 
+## Session 2026-03-15: Texture-View Texture-Unit Binding Seam in Shared Renderer Callsites
+
+### Problem Targeted
+Core renderer callsites (`RenderStateShard`, `LightTexture`, `OverlayTexture`) still bound sampler units by extracting raw backend texture IDs (`VulkanicCoreAPI.textureId(...)`) before calling Iris/OpenGL-style bind helpers. That leaked GL-shaped handle mechanics into shared/game code and made texture-unit binding less backend-agnostic.
+
+### Structural Changes
+- Added a backend-neutral texture-view texture-unit seam:
+  - `GraphicsBackend` now exposes `bindTextureUnit(CommandContext, int, GpuTextureView)` default behavior (validate view, resolve backend handle, bind unit).
+  - `VulkanicAPI` now exposes `bindTextureUnit(CommandContext, int, GpuTextureView)` and synchronizes Iris texture-unit cache state after backend binding.
+  - `VulkanicCoreAPI` now exposes matching wrapper method for frontend callsites.
+- Migrated shared/game callsites to the seam:
+  - `RenderStateShard` now binds texture units via `VulkanicAPI.bindTextureUnit(..., textureView)` for both multi-texture and single-texture states.
+  - `LightTexture.turnOnLightLayer()` now binds via `VulkanicAPI.bindTextureUnit(..., this.textureView)`.
+  - `OverlayTexture.setupOverlayColor()` now binds via `VulkanicAPI.bindTextureUnit(..., textureView)`.
+- Result: these callsites no longer extract raw texture IDs from texture views for texture-unit binding.
+
+### Evidence
+- Guardrail source test updates in `Phase3DrawPathTest` now assert:
+  - renderer callsites above use `VulkanicAPI.bindTextureUnit(..., textureView)`,
+  - raw texture-ID extraction (`VulkanicCoreAPI.textureId(textureView)`) is absent in those bindings,
+  - Vulkanic seam exists in both `GraphicsBackend` and `VulkanicAPI`.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.Phase3DrawPathTest --tests net.vulkanic.Phase3ResourceTypesTest --tests net.vulkanic.VulkanDescriptorLifecycleTest`
+  - Result: **146 passed, 0 failed**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: **BUILD SUCCESSFUL** (no recurrence of prior `iris_DynamicTransforms` missing-UBO crash signature).
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Shared renderer callsites now express texture-unit intent with texture views, not raw GL-shaped texture IDs.
+- **2 — Backend Implementation:** Both backends now service the new seam through backend-owned handle resolution + existing texture-unit bind implementations (OpenGL immediate DSA bind, Vulkan legacy texture-unit emulation path).
+- **4 — Parity Improvement:** Same callsite contract now drives both backends (`bindTextureUnit(..., GpuTextureView)`), reducing OpenGL-mechanism leakage.
+- **5 — Debuggability Improvement:** Missing/unresolvable texture-handle scenarios now fail at an explicit seam with targeted validation messages.
+
+### Still Unproven
+- Several Iris/Sodium/custom-shader paths outside the migrated core renderer callsites still use texture-ID based bindings and should be migrated in future sessions.
+- Vulkan-native descriptor-first sampler routing for all shaderpack texture-unit paths remains in-progress; legacy texture-unit emulation remains active for compatibility paths.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

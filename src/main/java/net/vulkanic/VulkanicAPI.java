@@ -5003,6 +5003,19 @@ public class VulkanicAPI {
     public static void bindTextureUnit(CommandContext ctx, int unit, int texture) {
         getBackend().bindTextureUnit(ctx, unit, texture);
     }
+
+
+    /**
+     * Binds a texture view to a specified texture unit through backend-owned handle resolution.
+     * See {@link GraphicsBackend#bindTextureUnit(CommandContext, int, GpuTextureView)}
+     */
+    public static void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView) {
+        getBackend().bindTextureUnit(ctx, unit, textureView);
+
+        // Iris tracks texture-unit state in a cache used by shader/pipeline integration.
+        int textureHandle = getBackend().resolveTextureHandle(ctx, textureView.texture());
+        net.irisshaders.iris.gl.IrisRenderSystem.setTextureBinding(unit, textureHandle);
+    }
     
     
     /**

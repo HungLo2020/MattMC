@@ -2,13 +2,11 @@ package net.minecraft.client.renderer;
 
 import com.google.common.collect.ImmutableList;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.systems.RenderSystem;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.function.Supplier;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -203,7 +201,7 @@ public abstract class RenderStateShard {
 					AbstractTexture abstractTexture = textureManager.getTexture(entry.id);
 					abstractTexture.setUseMipmaps(entry.mipmap);
 					var textureView = abstractTexture.getTextureView();
-						IrisRenderSystem.bindTextureToUnit(i, net.vulkanic.VulkanicCoreAPI.textureId(textureView));
+					VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), i, textureView);
 					TextureTracker.INSTANCE.onSetShaderTexture(i, textureView);
 				}
 			}, () -> {});
@@ -285,7 +283,7 @@ public abstract class RenderStateShard {
 				AbstractTexture abstractTexture = textureManager.getTexture(resourceLocation);
 				abstractTexture.setUseMipmaps(bl);
 				var textureView = abstractTexture.getTextureView();
-				IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(textureView));
+				VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 0, textureView);
 				TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 			}, () -> {});
 			this.texture = Optional.of(resourceLocation);

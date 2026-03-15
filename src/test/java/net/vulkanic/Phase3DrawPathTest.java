@@ -3285,16 +3285,14 @@ public class Phase3DrawPathTest {
             "RenderStateShard multi-texture setup should not bind shader textures through RenderSystem.setShaderTexture");
         assertFalse(renderStateShardSource.contains("RenderSystem.setShaderTexture(0, abstractTexture.getTextureView())"),
             "RenderStateShard single-texture setup should not bind shader texture 0 through RenderSystem.setShaderTexture");
-        assertFalse(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D"),
-            "RenderStateShard texture setup should not pass explicit GL_TEXTURE_2D when binding texture units");
-        assertTrue(containsAny(renderStateShardSource,
-            "IrisRenderSystem.bindTextureToUnit(i, VulkanicAPI.getTextureHandle(textureView.texture()))",
-            "IrisRenderSystem.bindTextureToUnit(i, net.vulkanic.VulkanicCoreAPI.textureId(textureView))"),
-            "RenderStateShard multi-texture setup should bind texture units through IrisRenderSystem default-2D helper");
-        assertTrue(containsAny(renderStateShardSource,
-            "IrisRenderSystem.bindTextureToUnit(0, VulkanicAPI.getTextureHandle(textureView.texture()))",
-            "IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(textureView))"),
-            "RenderStateShard single-texture setup should bind texture unit 0 through IrisRenderSystem default-2D helper");
+        assertFalse(renderStateShardSource.contains("IrisRenderSystem.bindTextureToUnit("),
+            "RenderStateShard texture setup should bind through VulkanicAPI texture-view seam instead of Iris texture-id helper calls");
+        assertFalse(renderStateShardSource.contains("VulkanicCoreAPI.textureId(textureView)"),
+            "RenderStateShard texture setup should not extract raw texture ids from texture views");
+        assertTrue(renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), i, textureView)"),
+            "RenderStateShard multi-texture setup should bind through VulkanicAPI texture-view seam");
+        assertTrue(renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 0, textureView)"),
+            "RenderStateShard single-texture setup should bind through VulkanicAPI texture-view seam");
         assertTrue(renderStateShardSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(i, textureView)"),
             "RenderStateShard multi-texture setup should notify TextureTracker for each texture unit binding");
 
@@ -3329,14 +3327,12 @@ public class Phase3DrawPathTest {
             "LightTexture should not disable light layer via RenderSystem.setShaderTexture bridge");
         assertFalse(lightTextureSource.contains("RenderSystem.setShaderTexture(2, this.textureView)"),
             "LightTexture should not enable light layer via RenderSystem.setShaderTexture bridge");
-        assertFalse(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D"),
-            "LightTexture should not pass explicit GL_TEXTURE_2D when binding the light layer");
         assertTrue(lightTextureSource.contains("IrisRenderSystem.bindTextureToUnit(2, 0)"),
             "LightTexture should disable light layer via IrisRenderSystem default-2D helper");
-        assertTrue(containsAny(lightTextureSource,
-            "IrisRenderSystem.bindTextureToUnit(2, VulkanicAPI.getTextureHandle(this.texture))",
-            "IrisRenderSystem.bindTextureToUnit(2, net.vulkanic.VulkanicCoreAPI.textureId(this.texture))"),
-            "LightTexture should enable light layer via IrisRenderSystem default-2D helper");
+        assertFalse(lightTextureSource.contains("VulkanicCoreAPI.textureId(this.texture)"),
+            "LightTexture should not extract raw texture ids for light-layer binding");
+        assertTrue(lightTextureSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 2, this.textureView)"),
+            "LightTexture should enable light layer through VulkanicAPI texture-view seam");
 
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
         String renderSystemSource = Files.readString(renderSystemFile);
@@ -3592,18 +3588,23 @@ public class Phase3DrawPathTest {
             "OverlayTexture should not route overlay setup through RenderSystem.setupOverlayColor");
         assertFalse(overlayTextureSource.contains("RenderSystem.teardownOverlayColor("),
             "OverlayTexture should not route overlay teardown through RenderSystem.teardownOverlayColor");
-        assertFalse(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D"),
-            "OverlayTexture should not pass explicit GL_TEXTURE_2D when binding overlay texture");
-        assertTrue(containsAny(overlayTextureSource,
-            "IrisRenderSystem.bindTextureToUnit(1, VulkanicAPI.getTextureHandle(textureView.texture()))",
-            "IrisRenderSystem.bindTextureToUnit(1, net.vulkanic.VulkanicCoreAPI.textureId(textureView))"),
-            "OverlayTexture should bind overlay texture directly through IrisRenderSystem default-2D helper");
+        assertFalse(overlayTextureSource.contains("VulkanicCoreAPI.textureId(textureView)"),
+            "OverlayTexture should not extract raw texture ids for overlay binding");
+        assertTrue(overlayTextureSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 1, textureView)"),
+            "OverlayTexture should bind overlay texture through VulkanicAPI texture-view seam");
         assertTrue(overlayTextureSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(1, textureView)"),
             "OverlayTexture should publish Sampler1 texture view updates to TextureTracker");
         assertTrue(overlayTextureSource.contains("IrisRenderSystem.bindTextureToUnit(1, 0)"),
             "OverlayTexture should clear overlay texture binding directly through IrisRenderSystem default-2D helper");
         assertTrue(overlayTextureSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(1, null)"),
             "OverlayTexture should clear Sampler1 texture view updates from TextureTracker when unbinding");
+
+        Path graphicsBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
+        String graphicsBackendSource = Files.readString(graphicsBackendFile);
+        assertTrue(graphicsBackendSource.contains("default void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView)"),
+            "GraphicsBackend should expose texture-view texture-unit binding seam for backend-neutral callsites");
+        assertTrue(vulkanicApiSource.contains("public static void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView)"),
+            "VulkanicAPI should expose texture-view texture-unit binding seam for shared/game rendering callsites");
     }
 
     @Test

@@ -6,7 +6,6 @@ import net.blaze3d.buffers.Std140SizeCalculator;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
@@ -86,7 +85,7 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOnLightLayer() {
-		IrisRenderSystem.bindTextureToUnit(2, net.vulkanic.VulkanicCoreAPI.textureId(this.texture));
+		VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 2, this.textureView);
 		TextureTracker.INSTANCE.onSetShaderTexture(2, this.textureView);
 	}
 

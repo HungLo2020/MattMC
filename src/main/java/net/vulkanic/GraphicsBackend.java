@@ -2999,6 +2999,29 @@ public interface GraphicsBackend {
      * @param texture The texture object to bind
      */
     void bindTextureUnit(CommandContext ctx, int unit, int texture);
+
+    /**
+     * Binds a backend-managed texture view to a specified texture unit.
+     *
+     * <p>This is the preferred frontend seam for shared/game callsites that
+     * should avoid extracting raw backend texture handles directly.</p>
+     */
+    default void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView) {
+        if (textureView == null) {
+            throw new IllegalArgumentException("textureView must not be null");
+        }
+        if (textureView.isClosed()) {
+            throw new IllegalStateException("Cannot bind closed texture view");
+        }
+
+        int textureHandle = resolveTextureHandle(ctx, textureView.texture());
+        if (textureHandle <= 0) {
+            throw new IllegalStateException(
+                "Unable to resolve backend texture handle for view texture: " + textureView.texture().getLabel());
+        }
+
+        bindTextureUnit(ctx, unit, textureHandle);
+    }
     
     /**
      * Creates a new buffer object using Direct State Access.
