@@ -131,9 +131,8 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	public void blitAndBlendToTexture(GpuTextureView gpuTextureView) {
 		RenderSystem.assertOnRenderThread();
 
-		try (RenderPass renderPass = net.vulkanic.VulkanicAPI.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "Blit render target", gpuTextureView, OptionalInt.empty())) {
+		try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(
+				() -> "Blit render target", gpuTextureView, OptionalInt.empty())) {
 			renderPass.setPipeline(RenderPipelines.ENTITY_OUTLINE_BLIT);
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.bindSampler("InSampler", this.colorTextureView);

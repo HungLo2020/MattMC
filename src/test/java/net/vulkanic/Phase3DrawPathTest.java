@@ -4637,6 +4637,7 @@ public class Phase3DrawPathTest {
                 file + " should not call RenderSystem.getDevice after device-access migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -4646,13 +4647,14 @@ public class Phase3DrawPathTest {
             assertTrue(
                 usesDeviceSeam
                     || usesCommandEncoderSeam
+                    || usesRenderPassSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
                     || usesBackendMaxTextureSizeSeam
                     || usesBackendUniformAlignmentSeam
                     || usesBackendDeviceInfoSeam,
-                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer/createTextureView/getBackendMaxTextureSize/getBackendUniformOffsetAlignment/getBackendDeviceInfo after device-access migration"
+                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createRenderPass/createTexture/createBuffer/createTextureView/getBackendMaxTextureSize/getBackendUniformOffsetAlignment/getBackendDeviceInfo after device-access migration"
             );
         }
     }
@@ -4674,6 +4676,7 @@ public class Phase3DrawPathTest {
                 file + " should not call RenderSystem.getDevice after device-access migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -4683,13 +4686,14 @@ public class Phase3DrawPathTest {
             assertTrue(
                 usesDeviceSeam
                     || usesCommandEncoderSeam
+                    || usesRenderPassSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
                     || usesBackendMaxTextureSizeSeam
                     || usesBackendUniformAlignmentSeam
                     || usesBackendDeviceInfoSeam,
-                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer/createTextureView/getBackendMaxTextureSize/getBackendUniformOffsetAlignment/getBackendDeviceInfo after device-access migration"
+                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createRenderPass/createTexture/createBuffer/createTextureView/getBackendMaxTextureSize/getBackendUniformOffsetAlignment/getBackendDeviceInfo after device-access migration"
             );
         }
     }
@@ -4715,6 +4719,7 @@ public class Phase3DrawPathTest {
                 file + " should not call RenderSystem.getDevice after device-access migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -4724,13 +4729,14 @@ public class Phase3DrawPathTest {
             assertTrue(
                 usesDeviceSeam
                     || usesCommandEncoderSeam
+                    || usesRenderPassSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
                     || usesBackendMaxTextureSizeSeam
                     || usesBackendUniformAlignmentSeam
                     || usesBackendDeviceInfoSeam,
-                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer/createTextureView/getBackendMaxTextureSize/getBackendUniformOffsetAlignment/getBackendDeviceInfo after device-access migration"
+                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createRenderPass/createTexture/createBuffer/createTextureView/getBackendMaxTextureSize/getBackendUniformOffsetAlignment/getBackendDeviceInfo after device-access migration"
             );
         }
     }
@@ -4758,6 +4764,7 @@ public class Phase3DrawPathTest {
                 file + " should not call RenderSystem.getDevice after renderer-cluster migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -4767,13 +4774,14 @@ public class Phase3DrawPathTest {
             assertTrue(
                 usesDeviceSeam
                     || usesCommandEncoderSeam
+                    || usesRenderPassSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
                     || usesBackendMaxTextureSizeSeam
                     || usesBackendUniformAlignmentSeam
                     || usesBackendDeviceInfoSeam,
-                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createTexture/createBuffer/createTextureView/getBackendMaxTextureSize/getBackendUniformOffsetAlignment/getBackendDeviceInfo after renderer-cluster migration"
+                file + " should call VulkanicAPI.getDevice/createCommandEncoder/createRenderPass/createTexture/createBuffer/createTextureView/getBackendMaxTextureSize/getBackendUniformOffsetAlignment/getBackendDeviceInfo after renderer-cluster migration"
             );
         }
     }

@@ -162,6 +162,26 @@ public class OpenGLBackend implements GraphicsBackend {
     }
 
     @Override
+    public net.blaze3d.systems.RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        java.util.OptionalInt clearColor
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);
+    }
+
+    @Override
+    public net.blaze3d.systems.RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        java.util.OptionalInt clearColor,
+        @Nullable GpuTextureView depthTextureView,
+        java.util.OptionalDouble clearDepth
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    @Override
     public GpuTexture createTexture(
         @Nullable java.util.function.Supplier<String> supplier,
         int usage,

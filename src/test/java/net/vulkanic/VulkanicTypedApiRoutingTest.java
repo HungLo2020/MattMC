@@ -11,6 +11,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -243,6 +245,23 @@ public class VulkanicTypedApiRoutingTest {
         RecordedInvocation invocation = invocationHandler.lastInvocation;
         assertNotNull(invocation);
         assertEquals("createCommandEncoder", invocation.method.getName());
+    }
+
+    @Test
+    public void testCreateRenderPassRoutesThroughBackendSeam() {
+        VulkanicAPI.createRenderPass(() -> "routing-test-pass", null, OptionalInt.empty());
+
+        RecordedInvocation colorOnlyInvocation = invocationHandler.lastInvocation;
+        assertNotNull(colorOnlyInvocation);
+        assertEquals("createRenderPass", colorOnlyInvocation.method.getName());
+        assertEquals(3, colorOnlyInvocation.method.getParameterCount());
+
+        VulkanicAPI.createRenderPass(() -> "routing-test-pass-depth", null, OptionalInt.empty(), null, OptionalDouble.empty());
+
+        RecordedInvocation colorDepthInvocation = invocationHandler.lastInvocation;
+        assertNotNull(colorDepthInvocation);
+        assertEquals("createRenderPass", colorDepthInvocation.method.getName());
+        assertEquals(5, colorDepthInvocation.method.getParameterCount());
     }
 
     @Test

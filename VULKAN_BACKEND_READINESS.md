@@ -825,6 +825,63 @@ Shared/game callsites still queried renderer capabilities and diagnostics throug
 - Vulkan capability queries for max texture size/alignment still route through compatibility `GlDevice`; full native Vulkan capability ownership for these values remains future work.
 - Other direct `VulkanicAPI.getDevice()` usages remain in rendering/data paths that still require staged migration.
 
+## Session 2026-03-15: Backend-Owned Render-Pass Seam and Draw-Path Callsite Migration
+
+### Problem Targeted
+High-traffic draw paths still created render passes through concrete device chains (`VulkanicAPI.getDevice().createCommandEncoder().createRenderPass(...)`). This kept shared/game render callsites coupled to `GpuDevice` acquisition and prevented render-pass setup from being expressed as a backend-owned seam. The same cluster still included direct `getDevice().createBuffer(...)` allocation in chunk-mesh and world-border paths.
+
+### Structural Changes
+- Added backend-owned render-pass seam methods to `GraphicsBackend`:
+  - `createRenderPass(Supplier<String>, GpuTextureView, OptionalInt)`
+  - `createRenderPass(Supplier<String>, GpuTextureView, OptionalInt, @Nullable GpuTextureView, OptionalDouble)`
+- Added matching `VulkanicAPI` wrappers for both render-pass seam overloads.
+- Implemented seam methods in both backends:
+  - **OpenGLBackend:** routes through backend-owned command encoder seam.
+  - **VulkanBackend:** routes through backend-owned command encoder seam with existing startup fail-fast behavior.
+- Migrated high-traffic production callsites from concrete device chains to backend-owned render-pass wrappers:
+  - `SkyRenderer` (all sky/celestial passes)
+  - `ChunkSectionsToRender`
+  - `WorldBorderRenderer`
+  - `CloudRenderer`
+  - `CubeMap`
+  - `RenderType` immediate draw path
+  - `DebugScreenOverlay` 3D crosshair
+  - `RenderTarget` blit pass
+  - `GuiRenderer` draw-range pass
+- Migrated adjacent buffer/texture allocation hotspots off direct `getDevice()`:
+  - `CompiledSectionMesh` buffer allocations now use `VulkanicAPI.createBuffer(...)`.
+  - `WorldBorderRenderer` vertex buffer now uses `VulkanicAPI.createBuffer(...)`.
+  - `GuiRenderer` atlas textures/views now use `VulkanicAPI.createTexture(...)` / `createTextureView(...)`.
+
+### Evidence
+- Source migration verification:
+  - Targeted sweep confirms no `VulkanicAPI.getDevice()` usage remains in migrated renderer files (`SkyRenderer`, `ChunkSectionsToRender`, `WorldBorderRenderer`, `CloudRenderer`, `CubeMap`, `RenderType`, `DebugScreenOverlay`, `RenderTarget`, `GuiRenderer`, `CompiledSectionMesh`).
+- Typed seam routing guardrails:
+  - `VulkanicTypedApiRoutingTest` now includes `testCreateRenderPassRoutesThroughBackendSeam` (both overloads).
+- Neutrality/callsite guardrails:
+  - `ApiNeutralityCallsiteTest` now asserts:
+    - seam presence in `GraphicsBackend` and `VulkanicAPI`,
+    - render-path callsites use `VulkanicAPI.createRenderPass(...)`,
+    - migrated files avoid direct `VulkanicAPI.getDevice()` usage for these operations,
+    - `CompiledSectionMesh` and related allocations route through backend-owned buffer/texture seams.
+  - `Phase3DrawPathTest` seam-acceptance checks now include `VulkanicAPI.createRenderPass(...)` as a valid migrated seam.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.VulkanicTypedApiRoutingTest --tests net.vulkanic.ApiNeutralityCallsiteTest --tests net.vulkanic.Phase3DrawPathTest.testBlaze3dPackageUsesVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testVoxelMapPackageUsesVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testMinecraftAndGuiUseVulkanicAPIGetDevice --tests net.vulkanic.Phase3DrawPathTest.testRendererClusterUsesVulkanicAPIGetDevice`
+  - Result: **88 passed, 0 failed**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: **BUILD SUCCESSFUL**.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Draw-path render-pass creation now uses backend-owned VulkanicAPI seams instead of concrete `GpuDevice` acquisition chains in migrated high-traffic callsites.
+- **2 — Backend Implementation:** Both backends now explicitly implement render-pass seam methods, reducing shared-callsite dependence on direct device object choreography.
+- **4 — Parity Improvement:** OpenGL and Vulkan now satisfy the same render-pass creation contract through shared callsites; callsites express render-pass intent, not `GpuDevice` mechanism.
+- **5 — Debuggability Improvement:** Guardrails now fail at seam-boundary regressions (`createRenderPass`/`createBuffer`) rather than late concrete-device callsite drift.
+
+### Still Unproven
+- Vulkan render-pass seam methods currently delegate through compatibility command-encoder/device plumbing; fully native Vulkan render-pass ownership for these shared callsites remains future work.
+- Remaining `VulkanicAPI.getDevice()` usages still exist in other texture/font/projection/lifecycle clusters and need staged migration.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

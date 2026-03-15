@@ -43,8 +43,9 @@ public class WorldBorderRenderer {
 	private double lastBorderMaxX;
 	private double lastBorderMinZ;
 	private double lastBorderMaxZ;
-	private final GpuBuffer worldBorderBuffer = VulkanicAPI.getDevice()
-		.createBuffer(() -> "World border vertex buffer", 40, 16 * DefaultVertexFormat.POSITION_TEX.getVertexSize());
+	private final GpuBuffer worldBorderBuffer = VulkanicAPI.createBuffer(
+		() -> "World border vertex buffer", 40, 16 * DefaultVertexFormat.POSITION_TEX.getVertexSize()
+	);
 	private final VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 
 	private void rebuildWorldBorderBuffer(WorldBorderRenderState worldBorderRenderState, double d, double e, double f, float g, float h, float i) {
@@ -158,9 +159,8 @@ public class WorldBorderRenderer {
 					0.0F
 				);
 
-			try (RenderPass renderPass = VulkanicAPI.getDevice()
-					.createCommandEncoder()
-					.createRenderPass(() -> "World border", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(
+					() -> "World border", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(renderPipeline);
 				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);

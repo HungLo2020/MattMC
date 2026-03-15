@@ -3221,6 +3221,30 @@ public class VulkanicAPI {
     }
 
     /**
+     * Creates a backend-owned render pass targeting a color attachment.
+     */
+    public static RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        java.util.OptionalInt clearColor
+    ) {
+        return getBackend().createRenderPass(supplier, colorTextureView, clearColor);
+    }
+
+    /**
+     * Creates a backend-owned render pass targeting color and optional depth attachments.
+     */
+    public static RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        java.util.OptionalInt clearColor,
+        @Nullable GpuTextureView depthTextureView,
+        java.util.OptionalDouble clearDepth
+    ) {
+        return getBackend().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    /**
      * Creates a backend-owned GPU texture with supplier-based debug label.
      */
     public static GpuTexture createTexture(

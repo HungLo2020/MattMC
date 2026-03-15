@@ -10,7 +10,6 @@ import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.platform.Lighting;
 import net.blaze3d.platform.Window;
 import net.blaze3d.systems.CommandEncoder;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
@@ -255,9 +254,7 @@ public class GuiRenderer implements AutoCloseable {
 		int i,
 		int j
 	) {
-		try (RenderPass renderPass = VulkanicAPI.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(
 					supplier,
 					renderTarget.getColorTextureView(),
 					OptionalInt.empty(),
@@ -460,13 +457,12 @@ public class GuiRenderer implements AutoCloseable {
 	}
 
 	private void createAtlasTextures(int i) {
-		GpuDevice gpuDevice = VulkanicAPI.getDevice();
-		this.itemsAtlas = gpuDevice.createTexture("UI items atlas", 12, TextureFormat.RGBA8, i, i, 1, 1);
+		this.itemsAtlas = VulkanicAPI.createTexture("UI items atlas", 12, TextureFormat.RGBA8, i, i, 1, 1);
 		this.itemsAtlas.setTextureFilter(FilterMode.NEAREST, false);
-		this.itemsAtlasView = gpuDevice.createTextureView(this.itemsAtlas);
-		this.itemsAtlasDepth = gpuDevice.createTexture("UI items atlas depth", 8, TextureFormat.DEPTH32, i, i, 1, 1);
-		this.itemsAtlasDepthView = gpuDevice.createTextureView(this.itemsAtlasDepth);
-		gpuDevice.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0);
+		this.itemsAtlasView = VulkanicAPI.createTextureView(this.itemsAtlas);
+		this.itemsAtlasDepth = VulkanicAPI.createTexture("UI items atlas depth", 8, TextureFormat.DEPTH32, i, i, 1, 1);
+		this.itemsAtlasDepthView = VulkanicAPI.createTextureView(this.itemsAtlasDepth);
+		VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0);
 	}
 
 	private int calculateAtlasSizeInPixels(int i) {

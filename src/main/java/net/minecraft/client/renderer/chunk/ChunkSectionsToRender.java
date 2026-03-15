@@ -62,9 +62,7 @@ public record ChunkSectionsToRender(
 		boolean bl = SharedConstants.DEBUG_HOTKEYS && minecraft.wireframe;
 		RenderTarget renderTarget = chunkSectionLayerGroup.outputTarget();
 
-		try (RenderPass renderPass = VulkanicAPI.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(
 					() -> "Section layers for " + chunkSectionLayerGroup.label(),
 					renderTarget.getColorTextureView(),
 					OptionalInt.empty(),

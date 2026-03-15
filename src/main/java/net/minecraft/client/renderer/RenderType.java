@@ -969,9 +969,8 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 					? (VulkanicAPI.getOutputDepthTextureOverride() != null ? VulkanicAPI.getOutputDepthTextureOverride() : renderTarget.getDepthTextureView())
 					: null;
 
-				try (RenderPass renderPass = VulkanicAPI.getDevice()
-						.createCommandEncoder()
-						.createRenderPass(() -> "Immediate draw for " + this.getName(), gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+				try (RenderPass renderPass = VulkanicAPI.createRenderPass(
+						() -> "Immediate draw for " + this.getName(), gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 					renderPass.setPipeline(this.renderPipeline);
 					ScissorState scissorState = VulkanicAPI.getScissorStateForRenderTypeDraws();
 					if (scissorState.enabled()) {

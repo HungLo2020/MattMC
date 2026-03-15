@@ -9,6 +9,7 @@ import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderPass;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -186,6 +187,30 @@ public interface GraphicsBackend {
         throw new UnsupportedOperationException(
             "Backend " + getBackendType() + " does not provide command encoder creation."
         );
+    }
+
+    /**
+     * Creates a backend-owned render pass targeting a color attachment.
+     */
+    default RenderPass createRenderPass(
+        Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        OptionalInt clearColor
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);
+    }
+
+    /**
+     * Creates a backend-owned render pass targeting color and optional depth attachments.
+     */
+    default RenderPass createRenderPass(
+        Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        OptionalInt clearColor,
+        @Nullable GpuTextureView depthTextureView,
+        OptionalDouble clearDepth
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
     }
 
     /**

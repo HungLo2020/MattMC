@@ -226,9 +226,7 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 					gpuTextureView2 = renderTarget.getDepthTextureView();
 				}
 
-				try (RenderPass renderPass = VulkanicAPI.getDevice()
-						.createCommandEncoder()
-						.createRenderPass(() -> "Clouds", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+				try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Clouds", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 					renderPass.setPipeline(renderPipeline);
 					net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 					renderPass.setUniform("DynamicTransforms", gpuBufferSlice);

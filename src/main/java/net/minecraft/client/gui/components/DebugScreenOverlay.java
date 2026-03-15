@@ -477,9 +477,7 @@ public class DebugScreenOverlay {
 				new DynamicUniforms.Transform(new Matrix4f(matrix4fStack), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 2.0F)
 			);
 
-		try (RenderPass renderPass = VulkanicAPI.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "3d crosshair", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "3d crosshair", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setVertexBuffer(0, this.crosshairBuffer);

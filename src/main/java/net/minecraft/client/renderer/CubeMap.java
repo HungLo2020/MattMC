@@ -59,9 +59,7 @@ public class CubeMap implements AutoCloseable {
 			.writeTransform(new Matrix4f(matrix4fStack), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		matrix4fStack.popMatrix();
 
-		try (RenderPass renderPass = VulkanicAPI.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setVertexBuffer(0, this.vertexBuffer);

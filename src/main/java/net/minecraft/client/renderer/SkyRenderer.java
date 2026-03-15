@@ -294,9 +294,7 @@ public class SkyRenderer implements AutoCloseable {
 		GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 		GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 
-		try (RenderPass renderPass = VulkanicAPI.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "Sky disc", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Sky disc", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(RenderPipelines.SKY);
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
@@ -346,9 +344,7 @@ public class SkyRenderer implements AutoCloseable {
 		GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 		GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 
-		try (RenderPass renderPass = VulkanicAPI.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "Sky dark", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Sky dark", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(RenderPipelines.SKY);
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
@@ -394,9 +390,7 @@ public class SkyRenderer implements AutoCloseable {
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 			GpuBuffer gpuBuffer = this.quadIndices.getBuffer(6);
 
-			try (RenderPass renderPass = VulkanicAPI.getDevice()
-					.createCommandEncoder()
-					.createRenderPass(() -> "Sky sun", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Sky sun", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
 				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
@@ -432,9 +426,7 @@ public class SkyRenderer implements AutoCloseable {
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 			GpuBuffer gpuBuffer = this.quadIndices.getBuffer(6);
 
-			try (RenderPass renderPass = VulkanicAPI.getDevice()
-					.createCommandEncoder()
-					.createRenderPass(() -> "Sky moon", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Sky moon", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
 				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
@@ -462,9 +454,7 @@ public class SkyRenderer implements AutoCloseable {
 		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 			.writeTransform(matrix4fStack, new Vector4f(f, f, f, f), new Vector3f(), new Matrix4f(), 0.0F);
 
-		try (RenderPass renderPass = VulkanicAPI.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "Stars", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Stars", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
@@ -498,9 +488,7 @@ public class SkyRenderer implements AutoCloseable {
 			GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 
-			try (RenderPass renderPass = VulkanicAPI.getDevice()
-					.createCommandEncoder()
-					.createRenderPass(() -> "Sunrise sunset", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Sunrise sunset", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.SUNRISE_SUNSET);
 				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
@@ -522,9 +510,7 @@ public class SkyRenderer implements AutoCloseable {
 			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(VulkanicAPI.getModelViewMatrix(), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 
-			try (RenderPass renderPass = VulkanicAPI.getDevice()
-					.createCommandEncoder()
-					.createRenderPass(() -> "End sky", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "End sky", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.END_SKY);
 				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
@@ -551,9 +537,7 @@ public class SkyRenderer implements AutoCloseable {
 			GpuTextureView gpuTextureView2 = Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
 			GpuBuffer gpuBuffer = this.quadIndices.getBuffer(6);
 
-			try (RenderPass renderPass = VulkanicAPI.getDevice()
-					.createCommandEncoder()
-					.createRenderPass(() -> "End flash", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "End flash", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 				renderPass.setPipeline(RenderPipelines.CELESTIAL);
 				net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("DynamicTransforms", gpuBufferSlice);

@@ -31,6 +31,13 @@ public class ApiNeutralityCallsiteTest {
         String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
         String lightingSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/platform/Lighting.java"));
         String tracyFrameCaptureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/TracyFrameCapture.java"));
+        String chunkSectionsToRenderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/ChunkSectionsToRender.java"));
+        String compiledSectionMeshSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/CompiledSectionMesh.java"));
+        String worldBorderRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/WorldBorderRenderer.java"));
+        String skyRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/SkyRenderer.java"));
+        String cloudRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CloudRenderer.java"));
+        String cubeMapSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"));
+        String renderTypeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java"));
         String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
         String irisSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
         String renderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java"));
@@ -42,6 +49,7 @@ public class ApiNeutralityCallsiteTest {
         String minecraftTextureAtlasSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/TextureAtlas.java"));
         String shaderManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ShaderManager.java"));
         String debugEntrySystemSpecsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"));
+        String debugScreenOverlaySource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/DebugScreenOverlay.java"));
         String guiRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"));
         String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"));
         String screenshotSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Screenshot.java"));
@@ -57,6 +65,12 @@ public class ApiNeutralityCallsiteTest {
             "VulkanicAPI should expose backend-owned command-encoder wrapper");
         assertTrue(vulkanicApiSource.contains("return getBackend().createCommandEncoder();"),
             "VulkanicAPI command-encoder wrapper should route through backend seam");
+        assertTrue(graphicsBackendSource.contains("default RenderPass createRenderPass("),
+            "GraphicsBackend should expose backend-owned render-pass creation seams");
+        assertTrue(vulkanicApiSource.contains("public static RenderPass createRenderPass("),
+            "VulkanicAPI should expose backend-owned render-pass wrappers");
+        assertTrue(vulkanicApiSource.contains("return getBackend().createRenderPass("),
+            "VulkanicAPI render-pass wrappers should route through backend seam");
         assertTrue(vulkanicApiSource.contains("public static GpuTexture createTexture("),
             "VulkanicAPI should expose backend-owned texture creation wrappers");
         assertTrue(vulkanicApiSource.contains("public static GpuBuffer createBuffer("),
@@ -180,10 +194,56 @@ public class ApiNeutralityCallsiteTest {
             "RenderTarget should acquire command encoders via backend-owned VulkanicAPI seam");
         assertFalse(renderTargetSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
             "RenderTarget should avoid direct getDevice().createCommandEncoder() calls");
+        assertTrue(renderTargetSource.contains("VulkanicAPI.createRenderPass("),
+            "RenderTarget should create render passes through backend-owned VulkanicAPI seam");
+        assertFalse(renderTargetSource.contains("VulkanicAPI.getDevice()"),
+            "RenderTarget should avoid direct getDevice() usage in render-pass setup");
         assertTrue(renderTargetSource.contains("VulkanicAPI.getBackendMaxTextureSize()"),
             "RenderTarget should query max texture size through backend-owned VulkanicAPI seam");
         assertFalse(renderTargetSource.contains("gpuDevice.getMaxTextureSize()"),
             "RenderTarget should avoid direct device max texture size queries");
+        assertTrue(chunkSectionsToRenderSource.contains("VulkanicAPI.createRenderPass("),
+            "ChunkSectionsToRender should create render passes through backend-owned VulkanicAPI seam");
+        assertFalse(chunkSectionsToRenderSource.contains("VulkanicAPI.getDevice()"),
+            "ChunkSectionsToRender should avoid direct getDevice() usage for render-pass creation");
+        assertTrue(worldBorderRendererSource.contains("VulkanicAPI.createRenderPass("),
+            "WorldBorderRenderer should create render passes through backend-owned VulkanicAPI seam");
+        assertTrue(worldBorderRendererSource.contains("VulkanicAPI.createBuffer("),
+            "WorldBorderRenderer should allocate buffers through backend-owned VulkanicAPI seam");
+        assertFalse(worldBorderRendererSource.contains("VulkanicAPI.getDevice()"),
+            "WorldBorderRenderer should avoid direct getDevice() usage in draw path");
+        assertTrue(skyRendererSource.contains("VulkanicAPI.createRenderPass("),
+            "SkyRenderer should create render passes through backend-owned VulkanicAPI seam");
+        assertFalse(skyRendererSource.contains("VulkanicAPI.getDevice()"),
+            "SkyRenderer should avoid direct getDevice() usage in sky draw passes");
+        assertTrue(cloudRendererSource.contains("VulkanicAPI.createRenderPass("),
+            "CloudRenderer should create render passes through backend-owned VulkanicAPI seam");
+        assertFalse(cloudRendererSource.contains("VulkanicAPI.getDevice()"),
+            "CloudRenderer should avoid direct getDevice() usage in cloud draw path");
+        assertTrue(cubeMapSource.contains("VulkanicAPI.createRenderPass("),
+            "CubeMap should create render passes through backend-owned VulkanicAPI seam");
+        assertFalse(cubeMapSource.contains("VulkanicAPI.getDevice()"),
+            "CubeMap should avoid direct getDevice() usage in panorama pass");
+        assertTrue(renderTypeSource.contains("VulkanicAPI.createRenderPass("),
+            "RenderType should create immediate-mode render passes through backend-owned VulkanicAPI seam");
+        assertFalse(renderTypeSource.contains("VulkanicAPI.getDevice()"),
+            "RenderType should avoid direct getDevice() usage in immediate draw path");
+        assertTrue(debugScreenOverlaySource.contains("VulkanicAPI.createRenderPass("),
+            "DebugScreenOverlay should create render passes through backend-owned VulkanicAPI seam");
+        assertFalse(debugScreenOverlaySource.contains("VulkanicAPI.getDevice()"),
+            "DebugScreenOverlay should avoid direct getDevice() usage in 3d crosshair draw path");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.createRenderPass("),
+            "GuiRenderer should create render passes through backend-owned VulkanicAPI seam");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.createTexture(\"UI items atlas\""),
+            "GuiRenderer should allocate item atlas textures through backend-owned VulkanicAPI seam");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.createTextureView(this.itemsAtlas)"),
+            "GuiRenderer should allocate item atlas texture views through backend-owned VulkanicAPI seam");
+        assertFalse(guiRendererSource.contains("GpuDevice gpuDevice = VulkanicAPI.getDevice();"),
+            "GuiRenderer should avoid local direct getDevice() variables for atlas setup");
+        assertTrue(compiledSectionMeshSource.contains("VulkanicAPI.createBuffer("),
+            "CompiledSectionMesh should allocate section buffers through backend-owned VulkanicAPI seam");
+        assertFalse(compiledSectionMeshSource.contains("VulkanicAPI.getDevice()"),
+            "CompiledSectionMesh should avoid direct getDevice() usage in mesh upload path");
         assertTrue(mainTargetSource.contains("VulkanicAPI.getBackendMaxTextureSize()"),
             "MainTarget should query max texture size through backend-owned VulkanicAPI seam");
         assertFalse(mainTargetSource.contains("VulkanicAPI.getDevice().getMaxTextureSize()"),
