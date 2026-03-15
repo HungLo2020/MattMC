@@ -27,6 +27,8 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
 import net.vulkanic.CommandContext;
+import net.vulkanic.PipelineDescriptor;
+import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicDepthCompareOp;
@@ -184,9 +186,82 @@ public class GlCommandEncoder implements CommandEncoder {
 	 * descriptor with no new GPU allocations, and {@link net.vulkanic.backends.opengl.OpenGLTextureView#close()}
 	 * does not delete the underlying texture (the caller remains the owner).
 	 */
+	net.vulkanic.VulkanicTextureView createSamplerResourceView(GlTextureView view) {
+		return toVulkanicTextureView(view);
+	}
+
 	private net.vulkanic.VulkanicTextureView toVulkanicTextureView(GlTextureView view) {
 		return VulkanicAPI.createManagedTextureView(
 			view.texture(), view.baseMipLevel(), view.mipLevels()
+		);
+	}
+
+	private record PipelineResourceBindingSubmission(
+		PipelineDescriptor descriptor,
+		PipelineResourceBindings bindings,
+		boolean completeCoverage
+	) {
+	}
+
+	@Nullable
+	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass) {
+		GlRenderPipeline glRenderPipeline = glRenderPass.pipeline;
+		PipelineDescriptor.ResourceLayout layout = glRenderPipeline.descriptor().getResourceLayout();
+		PipelineResourceBindings.Builder builder = PipelineResourceBindings.builder();
+		java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>();
+
+		for (PipelineDescriptor.ResourceBinding resourceBinding : layout.bindings()) {
+			switch (resourceBinding.type()) {
+				case SAMPLER -> {
+					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
+					if (uniform instanceof Uniform.Sampler(int location, int samplerIndex)) {
+						net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
+						if (textureView != null) {
+							builder.bindSampler(resourceBinding.name(), textureView, samplerIndex);
+							boundResources.add(resourceBinding);
+						}
+					}
+				}
+				case UNIFORM_BUFFER -> {
+					GpuBufferSlice slice = glRenderPass.uniforms.get(resourceBinding.name());
+					if (slice != null) {
+						if (!(slice.buffer() instanceof GlBuffer glBuffer)) {
+							throw new IllegalStateException(
+								"Uniform buffer binding must use GlBuffer in GlCommandEncoder, got: "
+									+ slice.buffer().getClass().getName());
+						}
+						builder.bindUniformBuffer(
+							resourceBinding.name(),
+							new net.vulkanic.VulkanicBufferSlice(
+								new net.vulkanic.backends.opengl.OpenGLBuffer(glBuffer.handle, glBuffer.usage(), glBuffer.size()),
+								slice.offset(),
+								slice.length()
+							)
+						);
+						boundResources.add(resourceBinding);
+					}
+				}
+				case TEXEL_BUFFER -> {
+					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
+					if (uniform instanceof Uniform.Utb(int location, int samplerIndex, TextureFormat format, int texture)) {
+						builder.bindTexelBuffer(resourceBinding.name(), samplerIndex);
+						boundResources.add(resourceBinding);
+					}
+				}
+			}
+		}
+
+		if (boundResources.isEmpty()) {
+			return null;
+		}
+
+		PipelineDescriptor filteredDescriptor = glRenderPipeline.descriptor()
+			.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
+
+		return new PipelineResourceBindingSubmission(
+			filteredDescriptor,
+			builder.build(),
+			boundResources.size() == layout.bindings().size()
 		);
 	}
 
@@ -1079,23 +1154,38 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.lastProgram = glProgram;
 		}
 
+		boolean immediateSeamHasCompleteCoverage = false;
+		if (ctx.isImmediate()) {
+			PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass);
+			if (submission != null) {
+				VulkanicAPI.bindPipelineResources(
+					ctx,
+					new net.vulkanic.backends.opengl.OpenGLPipelineHandle(glRenderPass.pipeline),
+					submission.descriptor(),
+					submission.bindings()
+				);
+				immediateSeamHasCompleteCoverage = submission.completeCoverage();
+			}
+		}
+
 		for (Entry<String, Uniform> entry2 : glProgram.getUniforms().entrySet()) {
 			String string2 = (String)entry2.getKey();
 			boolean bl2 = glRenderPass.dirtyUniforms.contains(string2);
 			switch ((Uniform)entry2.getValue()) {
 				case Uniform.Ubo(int var61):
 					int var39 = var61;
-					if (bl2) {
+					if ((!ctx.isImmediate() || !immediateSeamHasCompleteCoverage) && bl2) {
 						GpuBufferSlice gpuBufferSlice2 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-								VulkanicAPI.bindUniformBufferRange(ctx, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
+						if (gpuBufferSlice2 != null) {
+							VulkanicAPI.bindUniformBufferRange(ctx, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
+						}
 					}
 					break;
 				case Uniform.Utb(int var41, int var42, TextureFormat var43, int var59):
 					int var44 = var59;
-					if (bl || bl2) {
-							VulkanicAPI.setUniform1i(ctx, var41, var42);
+					if ((!ctx.isImmediate() || !immediateSeamHasCompleteCoverage) && (bl || bl2)) {
+						VulkanicAPI.setUniform1i(ctx, var41, var42);
 					}
-
 						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var42);
 						VulkanicAPI.bindTextureBuffer(ctx, var44);
 					if (bl2) {
@@ -1104,31 +1194,33 @@ public class GlCommandEncoder implements CommandEncoder {
 					}
 					break;
 				case Uniform.Sampler(int glTextureView2, int var51):
-					int var46 = var51;
-					GlTextureView glTextureView2x = (GlTextureView)glRenderPass.samplers.get(string2);
-					if (glTextureView2x == null) {
-						break;
-					}
+					if (!ctx.isImmediate() || !immediateSeamHasCompleteCoverage) {
+						int var46 = var51;
+						GlTextureView glTextureView2x = (GlTextureView)glRenderPass.samplers.get(string2);
+						if (glTextureView2x == null) {
+							break;
+						}
 
-					if (bl || bl2) {
+						if (bl || bl2) {
 							VulkanicAPI.setUniform1i(ctx, glTextureView2, var46);
-					}
+						}
 
 						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var46);
-					GpuTexture texture = glTextureView2x.texture();
+						GpuTexture texture = glTextureView2x.texture();
 						int textureHandle = VulkanicCoreAPI.textureId(texture);
-					VulkanicTextureTarget textureTarget;
-					if ((texture.usage() & 16) != 0) {
+						VulkanicTextureTarget textureTarget;
+						if ((texture.usage() & 16) != 0) {
 							textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
 							VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
-					} else {
+						} else {
 							textureTarget = VulkanicTextureTarget.TEXTURE_2D;
-						VulkanicAPI.bindTexture2D(ctx, textureHandle);
-					}
+							VulkanicAPI.bindTexture2D(ctx, textureHandle);
+						}
 
 						VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.BASE_LEVEL, glTextureView2x.baseMipLevel());
 						VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, glTextureView2x.baseMipLevel() + glTextureView2x.mipLevels() - 1);
-					texture.flushModeChanges(textureTarget);
+						texture.flushModeChanges(textureTarget);
+					}
 					break;
 				default:
 					throw new MatchException(null, null);

@@ -630,6 +630,32 @@ public class Phase3ResourceTypesTest {
     }
 
     @Test
+    public void testPipelineResourceBindingsSamplerCanCarryTextureView() {
+        OpenGLTexture texture = OpenGLTexture.nonOwning(
+            33,
+            VulkanicTexture.USAGE_TEXTURE_BINDING,
+            VulkanicTextureFormat.RGBA8,
+            16,
+            16,
+            1,
+            1,
+            "sampler-view-test"
+        );
+        OpenGLTextureView textureView = new OpenGLTextureView(texture, 0, 1);
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", textureView, 2)
+            .build();
+
+        PipelineResourceBindings.SamplerBinding samplerBinding = bindings.getSamplerBinding("Sampler0")
+            .orElseThrow(() -> new IllegalStateException("Sampler binding missing"));
+
+        assertEquals(2, samplerBinding.textureUnit());
+        assertSame(textureView, samplerBinding.textureView(),
+            "Sampler binding should retain the backend-neutral texture view so backends can own the actual texture bind");
+    }
+
+    @Test
     public void testPipelineResourceBindingsMissingResourceFailsValidation() {
         PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
 

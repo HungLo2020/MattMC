@@ -498,6 +498,52 @@ Vulkan-selected startup still exposed compatibility `GlDevice` metadata as the s
 - Runtime validation on real Vulkan hardware with Iris/shaderpacks active is still required to prove full image correctness and layout assumptions under all passes.
 - Current Vulkan present composition uses queue-idle synchronization and single-request overwrite semantics; it is functional but not yet optimized for throughput.
 
+## Session 2026-03-15: Pipeline-Resource Binding in Shared Draw Setup (Finding #1 Follow-up)
+
+### Problem Targeted
+`GlCommandEncoder.trySetup(...)` still performed GL-shaped per-uniform resource binding for samplers and UBOs (uniform location/block binding + direct texture target binds) in shared draw code. This kept resource ownership outside backend seams even after the descriptor/pipeline-resource model existed.
+
+### Structural Changes
+- `GlRenderPipeline` now carries a `PipelineDescriptor` so compiled pipelines retain backend-neutral reflected resource-layout metadata.
+- `GlDevice` now creates compiled pipelines through `createCompiledRenderPipeline(...)` and attaches reflected layout metadata via `VulkanicAPI.withReflectedResourceLayout(...)`.
+- `PipelineResourceBindings` sampler bindings now optionally carry a `VulkanicTextureView`, plus builder overloads for `bindSampler(name, textureView, unit, ...)`.
+- `GlRenderPass` now tracks sampler resource views (`VulkanicTextureView`) per sampler name and closes them when the pass closes.
+- `GlCommandEncoder.trySetup(...)` now:
+  - builds `PipelineResourceBindings` from live pass state,
+  - routes immediate-context sampler/UBO binding through `VulkanicAPI.bindPipelineResources(...)`,
+  - keeps non-immediate compatibility fallback for now to avoid Vulkan-path regressions while buffer/texture backing migration is still incomplete.
+- `OpenGLBackend.bindPipelineResources(...)` now consumes sampler `textureView` bindings and performs texture bind + mip-range setup in backend-owned code.
+- `VulkanBackend.bindPipelineResources(...)` now validates sampler and texel-buffer binding presence in addition to existing UBO validation.
+
+### Evidence
+- Guardrail source test added: `Phase3DrawPathTest.testDrawPathRoutesSamplerAndUboBindingThroughPipelineResourceSeam`.
+- Resource contract test added: `Phase3ResourceTypesTest.testPipelineResourceBindingsSamplerCanCarryTextureView`.
+- Vulkan validation test added: `VulkanDescriptorLifecycleTest.testBindPipelineResourcesRejectsSamplerWithoutTextureView`.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.Phase3ResourceTypesTest --tests net.vulkanic.VulkanDescriptorLifecycleTest --tests net.vulkanic.Phase3DrawPathTest --tests net.vulkanic.Phase3DescriptorLifecycleTest`
+  - Result: **152 passed, 0 failed**.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Shared draw setup now routes immediate-context sampler/UBO resource binding through backend-owned pipeline-resource seam.
+- **2 — Backend Implementation:** OpenGL backend now fully implements sampler resource-view binding in `bindPipelineResources`; Vulkan backend binding validation now includes sampler/texel checks.
+- **4 — Parity Improvement:** Both backends now consume the same richer `PipelineResourceBindings` contract (including texture-view intent), reducing GL mechanism leakage in shared draw setup.
+- **5 — Debuggability Improvement:** Missing/invalid sampler resource bindings now fail at explicit seam validation with targeted errors instead of implicit state drift.
+
+### Still Unproven
+- Non-immediate (Vulkan-selected compatibility) path still uses a guarded fallback inside `GlCommandEncoder.trySetup(...)`; full removal requires migrating shared draw resources to native Vulkan-backed buffer/texture bindings.
+- End-to-end Vulkan runtime correctness remains blocked by broader GL-shaped resource/program ownership outside this seam.
+
+### Regression Fix (OpenGL + Iris)
+- Runtime regression observed after the initial seam migration: `IllegalStateException: Missing uniform buffer binding for iris_DynamicTransforms` in `GlCommandEncoder.buildPipelineResourceBindings(...)`.
+- Fix applied in `GlCommandEncoder.trySetup(...)` / `buildPipelineResourceBindings(...)`:
+  - immediate-path seam binding now supports **partial resource coverage** (bind only resources present in the live pass),
+  - seam invocation now runs **after** shader program activation (`useProgram`) to avoid no-active-program uniform updates,
+  - compatibility fallback remains active when immediate seam coverage is incomplete.
+- Guardrail source test updated to assert the new incomplete-coverage fallback signal (`immediateSeamHasCompleteCoverage`).
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.Phase3DrawPathTest --tests net.vulkanic.Phase3ResourceTypesTest --tests net.vulkanic.VulkanDescriptorLifecycleTest`
+  - Result: **146 passed, 0 failed**.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

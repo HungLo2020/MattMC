@@ -1863,29 +1863,58 @@ public class VulkanBackend {
         bindings.validateAgainst(layout);
 
         for (PipelineDescriptor.ResourceBinding resourceBinding : layout.bindings()) {
-            if (resourceBinding.type() != PipelineDescriptor.ResourceType.UNIFORM_BUFFER) {
-                continue;
-            }
+            switch (resourceBinding.type()) {
+                case SAMPLER -> {
+                    net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
+                        bindings.getSamplerBinding(resourceBinding.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing sampler binding for '" + resourceBinding.name() + "' after validation"));
 
-            VulkanicBufferSlice slice = bindings.getUniformBufferBinding(resourceBinding.name())
-                .orElseThrow(() -> new IllegalStateException(
-                    "Missing uniform-buffer binding for '" + resourceBinding.name() + "' after validation"));
+                    net.vulkanic.VulkanicTextureView textureView = samplerBinding.textureView();
+                    if (textureView == null) {
+                        throw new IllegalArgumentException(
+                            "Sampler binding '" + resourceBinding.name() + "' must provide a VulkanicTextureView in Vulkan backend");
+                    }
+                    if (textureView.isClosed()) {
+                        throw new IllegalStateException(
+                            "Sampler binding '" + resourceBinding.name() + "' uses a closed texture view");
+                    }
 
-            if (!(slice.buffer() instanceof VulkanBuffer vulkanBuffer)) {
-                throw new IllegalArgumentException(
-                    "Uniform-buffer binding '" + resourceBinding.name()
-                        + "' must use VulkanBuffer in Vulkan backend");
-            }
-            if (vulkanBuffer.isClosed()) {
-                throw new IllegalStateException(
-                    "Uniform-buffer binding '" + resourceBinding.name() + "' uses a closed VulkanBuffer");
-            }
-            if (slice.offset() < 0 || slice.length() <= 0
-                || ((long) slice.offset() + slice.length()) > vulkanBuffer.size()) {
-                throw new IllegalArgumentException(
-                    "Uniform-buffer binding '" + resourceBinding.name()
-                        + "' slice [offset=" + slice.offset() + ", length=" + slice.length()
-                        + "] is outside buffer size " + vulkanBuffer.size());
+                    net.vulkanic.VulkanicTexture texture = textureView.texture();
+                    if (texture.isClosed()) {
+                        throw new IllegalStateException(
+                            "Sampler binding '" + resourceBinding.name() + "' uses a closed texture");
+                    }
+                    if ((texture.usage() & net.vulkanic.VulkanicTexture.USAGE_TEXTURE_BINDING) == 0) {
+                        throw new IllegalArgumentException(
+                            "Sampler binding '" + resourceBinding.name() + "' texture must include USAGE_TEXTURE_BINDING");
+                    }
+                }
+                case UNIFORM_BUFFER -> {
+                    VulkanicBufferSlice slice = bindings.getUniformBufferBinding(resourceBinding.name())
+                        .orElseThrow(() -> new IllegalStateException(
+                            "Missing uniform-buffer binding for '" + resourceBinding.name() + "' after validation"));
+
+                    if (!(slice.buffer() instanceof VulkanBuffer vulkanBuffer)) {
+                        throw new IllegalArgumentException(
+                            "Uniform-buffer binding '" + resourceBinding.name()
+                                + "' must use VulkanBuffer in Vulkan backend");
+                    }
+                    if (vulkanBuffer.isClosed()) {
+                        throw new IllegalStateException(
+                            "Uniform-buffer binding '" + resourceBinding.name() + "' uses a closed VulkanBuffer");
+                    }
+                    if (slice.offset() < 0 || slice.length() <= 0
+                        || ((long) slice.offset() + slice.length()) > vulkanBuffer.size()) {
+                        throw new IllegalArgumentException(
+                            "Uniform-buffer binding '" + resourceBinding.name()
+                                + "' slice [offset=" + slice.offset() + ", length=" + slice.length()
+                                + "] is outside buffer size " + vulkanBuffer.size());
+                    }
+                }
+                case TEXEL_BUFFER -> bindings.getTexelBufferBinding(resourceBinding.name())
+                    .orElseThrow(() -> new IllegalStateException(
+                        "Missing texel-buffer binding for '" + resourceBinding.name() + "' after validation"));
             }
         }
 

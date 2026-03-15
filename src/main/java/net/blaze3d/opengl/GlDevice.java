@@ -29,6 +29,7 @@ import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
+import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureTarget;
 import org.apache.commons.lang3.StringUtils;
@@ -410,7 +411,7 @@ public class GlDevice implements GpuDevice {
 				GlProgram program = overrideIrisProgram(irisPipeline, renderPipeline);
 
 				if (program != null) {
-					return new GlRenderPipeline(renderPipeline, program);
+					return this.createCompiledRenderPipeline(renderPipeline, program);
 				} else if (missingShaders.add(renderPipeline)) {
 					if (renderPipeline.getLocation().getNamespace().equals("minecraft")) {
 						LOGGER.error("Missing program " + renderPipeline.getLocation() + " in Iris override list. This is likely an Iris bug!!!", new Throwable());
@@ -424,6 +425,14 @@ public class GlDevice implements GpuDevice {
 		// Default vanilla behavior
 		return (GlRenderPipeline)this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
+	}
+
+	private GlRenderPipeline createCompiledRenderPipeline(RenderPipeline renderPipeline, GlProgram program) {
+		PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(renderPipeline);
+		if (program != GlProgram.INVALID_PROGRAM) {
+			descriptor = VulkanicAPI.withReflectedResourceLayout(commandContext(), descriptor, program.getProgramId());
+		}
+		return new GlRenderPipeline(renderPipeline, program, descriptor);
 	}
 
 	// Iris: Override Iris program (merged from MixinShaderManager_Overrides)
@@ -481,22 +490,22 @@ public class GlDevice implements GpuDevice {
 		);
 		if (glShaderModule == GlShaderModule.INVALID_SHADER) {
 			LOGGER.error("Couldn't compile pipeline {}: vertex shader {} was invalid", renderPipeline.getLocation(), renderPipeline.getVertexShader());
-			return new GlRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
+			return this.createCompiledRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
 		} else if (glShaderModule2 == GlShaderModule.INVALID_SHADER) {
 			LOGGER.error("Couldn't compile pipeline {}: fragment shader {} was invalid", renderPipeline.getLocation(), renderPipeline.getFragmentShader());
-			return new GlRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
+			return this.createCompiledRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
 		} else {
 			GlProgram glProgram;
 			try {
 				glProgram = GlProgram.link(glShaderModule, glShaderModule2, renderPipeline.getVertexFormat(), renderPipeline.getLocation().toString());
 			} catch (ShaderManager.CompilationException var7) {
 				LOGGER.error("Couldn't compile program for pipeline {}: {}", renderPipeline.getLocation(), var7);
-				return new GlRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
+				return this.createCompiledRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
 			}
 
 			glProgram.setupUniforms(renderPipeline.getUniforms(), renderPipeline.getSamplers());
 			this.debugLabels.applyLabel(glProgram);
-			return new GlRenderPipeline(renderPipeline, glProgram);
+			return this.createCompiledRenderPipeline(renderPipeline, glProgram);
 		}
 	}
 

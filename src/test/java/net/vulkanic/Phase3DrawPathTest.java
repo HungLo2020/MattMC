@@ -253,6 +253,32 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testDrawPathRoutesSamplerAndUboBindingThroughPipelineResourceSeam() throws IOException {
+        String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String glDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java"));
+        String openGLBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java"));
+
+        int trySetupStart = glCommandEncoderSource.indexOf("private boolean trySetup(");
+        int trySetupEnd = glCommandEncoderSource.indexOf("@Override\n\tpublic void applyPipelineState", trySetupStart);
+        assertTrue(trySetupStart >= 0 && trySetupEnd > trySetupStart,
+            "GlCommandEncoder should still expose trySetup for draw-path inspection");
+        String trySetupSource = glCommandEncoderSource.substring(trySetupStart, trySetupEnd);
+
+        assertTrue(glDeviceSource.contains("withReflectedResourceLayout("),
+            "GlDevice should cache reflected resource-layout metadata with compiled pipelines");
+        assertTrue(trySetupSource.contains("buildPipelineResourceBindings(glRenderPass)"),
+            "GlCommandEncoder trySetup should derive backend-neutral pipeline resource bindings from the live render pass");
+        assertTrue(trySetupSource.contains("VulkanicAPI.bindPipelineResources("),
+            "GlCommandEncoder trySetup should route sampler and UBO binding through VulkanicAPI.bindPipelineResources");
+        assertTrue(trySetupSource.contains("if (ctx.isImmediate())"),
+            "GlCommandEncoder trySetup should use pipeline-resource binding seam on immediate (OpenGL) contexts");
+        assertTrue(trySetupSource.contains("immediateSeamHasCompleteCoverage"),
+            "GlCommandEncoder trySetup should keep an explicit compatibility fallback path when immediate seam coverage is incomplete during migration");
+        assertTrue(openGLBackendSource.contains("samplerBinding.textureView()"),
+            "OpenGLBackend should consume sampler texture views from the pipeline resource seam");
+    }
+
+    @Test
     public void testBackendReadinessSeamExistsForPrepOnlyVulkanPath() throws IOException {
         Path backendInterfaceFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
         String backendInterfaceSource = Files.readString(backendInterfaceFile);

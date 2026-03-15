@@ -81,6 +81,7 @@ public class VulkanDescriptorLifecycleTest {
     public void testBindPipelineResourcesRejectsNonVulkanContextBeforeFurtherChecks() {
         VulkanBackend backend = new VulkanBackend();
         PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        VulkanicTextureView samplerView = createSamplerTextureView();
 
         VulkanBuffer uniformBuffer = new VulkanBuffer(
             0x31L,
@@ -92,7 +93,7 @@ public class VulkanDescriptorLifecycleTest {
         );
 
         PipelineResourceBindings bindings = PipelineResourceBindings.builder()
-            .bindSampler("Sampler0", 0)
+            .bindSampler("Sampler0", samplerView, 0)
             .bindUniformBuffer("Globals", new VulkanicBufferSlice(uniformBuffer, 0, 256))
             .bindTexelBuffer("CloudFaces", 3)
             .build();
@@ -112,9 +113,10 @@ public class VulkanDescriptorLifecycleTest {
     public void testBindPipelineResourcesRejectsNonVulkanUniformBufferBinding() {
         VulkanBackend backend = new VulkanBackend();
         PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        VulkanicTextureView samplerView = createSamplerTextureView();
 
         PipelineResourceBindings bindings = PipelineResourceBindings.builder()
-            .bindSampler("Sampler0", 0)
+            .bindSampler("Sampler0", samplerView, 0)
             .bindUniformBuffer("Globals", new VulkanicBufferSlice(
                 new OpenGLBuffer(77, VulkanicBuffer.USAGE_UNIFORM, 256),
                 0,
@@ -130,6 +132,37 @@ public class VulkanDescriptorLifecycleTest {
                 bindings));
 
         assertTrue(mismatch.getMessage().contains("must use VulkanBuffer"));
+    }
+
+    @Test
+    public void testBindPipelineResourcesRejectsSamplerWithoutTextureView() {
+        VulkanBackend backend = new VulkanBackend();
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        VulkanBuffer uniformBuffer = new VulkanBuffer(
+            0x41L,
+            0x42L,
+            VulkanicBuffer.USAGE_UNIFORM,
+            256,
+            "sampler-view-check-ubo",
+            () -> {}
+        );
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", 0)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(uniformBuffer, 0, 256))
+            .bindTexelBuffer("CloudFaces", 3)
+            .build();
+
+        IllegalArgumentException mismatch = assertThrows(IllegalArgumentException.class,
+            () -> backend.bindPipelineResources(
+                new VulkanCommandContext(1L, "sampler-view-test"),
+                new StubPipelineHandle(true),
+                descriptor,
+                bindings));
+
+        assertTrue(mismatch.getMessage().contains("must provide a VulkanicTextureView"));
+        uniformBuffer.close();
     }
 
     @Test
@@ -228,5 +261,27 @@ public class VulkanDescriptorLifecycleTest {
         public void close() {
             valid = false;
         }
+    }
+
+    private static VulkanicTextureView createSamplerTextureView() {
+        VulkanicTexture texture = new VulkanicTexture() {
+            @Override public int getWidth(int mipLevel) { return 16; }
+            @Override public int getHeight(int mipLevel) { return 16; }
+            @Override public int getMipLevels() { return 1; }
+            @Override public int getDepthOrLayers() { return 1; }
+            @Override public VulkanicTextureFormat getVulkanicFormat() { return VulkanicTextureFormat.RGBA8; }
+            @Override public int usage() { return VulkanicTexture.USAGE_TEXTURE_BINDING; }
+            @Override public String getLabel() { return "sampler-view-texture"; }
+            @Override public boolean isClosed() { return false; }
+            @Override public void close() {}
+        };
+
+        return new VulkanicTextureView() {
+            @Override public VulkanicTexture texture() { return texture; }
+            @Override public int getBaseMipLevel() { return 0; }
+            @Override public int getMipLevelCount() { return 1; }
+            @Override public boolean isClosed() { return false; }
+            @Override public void close() {}
+        };
     }
 }

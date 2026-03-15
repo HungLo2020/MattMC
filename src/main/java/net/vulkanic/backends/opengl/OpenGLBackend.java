@@ -3230,6 +3230,43 @@ public class OpenGLBackend implements GraphicsBackend {
                         setUniform1i(ctx, location, samplerBinding.textureUnit());
                     }
 
+                    net.vulkanic.VulkanicTextureView textureView = samplerBinding.textureView();
+                    if (textureView != null) {
+                        if (!(textureView instanceof OpenGLTextureView openGLTextureView)) {
+                            throw new IllegalArgumentException(
+                                "Sampler binding '" + resource.name() + "' must use OpenGLTextureView in OpenGL backend");
+                        }
+                        if (openGLTextureView.isClosed()) {
+                            throw new IllegalStateException(
+                                "Sampler binding '" + resource.name() + "' uses a closed OpenGLTextureView");
+                        }
+
+                        VulkanicAPI.setActiveTextureUnitIndex(ctx, samplerBinding.textureUnit());
+                        int textureHandle = openGLTextureView.glHandle();
+                        net.vulkanic.VulkanicTexture texture = openGLTextureView.texture();
+                        net.vulkanic.VulkanicTextureTarget textureTarget =
+                            (texture.usage() & net.vulkanic.VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE) != 0
+                                ? net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP
+                                : net.vulkanic.VulkanicTextureTarget.TEXTURE_2D;
+
+                        if (textureTarget == net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP) {
+                            bindTexture(ctx, net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP, textureHandle);
+                        } else {
+                            bindTexture2D(ctx, textureHandle);
+                        }
+
+                        setTextureParameter(ctx, textureTarget,
+                            net.vulkanic.VulkanicTextureParameterName.BASE_LEVEL,
+                            openGLTextureView.getBaseMipLevel());
+                        setTextureParameter(ctx, textureTarget,
+                            net.vulkanic.VulkanicTextureParameterName.MAX_LEVEL,
+                            openGLTextureView.getBaseMipLevel() + openGLTextureView.getMipLevelCount() - 1);
+
+                        if (texture instanceof net.blaze3d.textures.GpuTexture gpuTexture) {
+                            gpuTexture.flushModeChanges(textureTarget);
+                        }
+                    }
+
                     if (samplerBinding.samplerObject() != null) {
                         bindSampler(ctx, samplerBinding.textureUnit(), samplerBinding.samplerObject());
                     }

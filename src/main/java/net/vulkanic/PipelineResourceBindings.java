@@ -115,7 +115,7 @@ public final class PipelineResourceBindings {
         }
     }
 
-    public record SamplerBinding(int textureUnit, @Nullable Integer samplerObject) {
+    public record SamplerBinding(int textureUnit, @Nullable Integer samplerObject, @Nullable VulkanicTextureView textureView) {
         public SamplerBinding {
             if (textureUnit < 0) {
                 throw new IllegalArgumentException("textureUnit must be >= 0");
@@ -124,6 +124,18 @@ public final class PipelineResourceBindings {
                 throw new IllegalArgumentException("samplerObject must be >= 0 when provided");
             }
         }
+
+        public SamplerBinding(int textureUnit, @Nullable Integer samplerObject) {
+            this(textureUnit, samplerObject, null);
+        }
+
+        public SamplerBinding(int textureUnit, VulkanicTextureView textureView) {
+            this(textureUnit, null, textureView);
+        }
+
+		public SamplerBinding withTextureView(@Nullable VulkanicTextureView textureView) {
+			return new SamplerBinding(textureUnit, samplerObject, textureView);
+		}
     }
 
     public record TexelBufferBinding(int textureUnit) {
@@ -147,6 +159,20 @@ public final class PipelineResourceBindings {
             String normalizedName = normalizeName(name);
             ensureNameUnused(normalizedName);
             samplerBindings.put(normalizedName, new SamplerBinding(textureUnit, samplerObject));
+            return this;
+        }
+
+        public Builder bindSampler(String name, VulkanicTextureView textureView, int textureUnit) {
+            return bindSampler(name, textureView, textureUnit, null);
+        }
+
+        public Builder bindSampler(String name, VulkanicTextureView textureView, int textureUnit, @Nullable Integer samplerObject) {
+            String normalizedName = normalizeName(name);
+            ensureNameUnused(normalizedName);
+            samplerBindings.put(
+                normalizedName,
+                new SamplerBinding(textureUnit, samplerObject, Objects.requireNonNull(textureView, "textureView must not be null"))
+            );
             return this;
         }
 
