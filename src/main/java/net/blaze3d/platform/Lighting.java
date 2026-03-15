@@ -60,7 +60,7 @@ public class Lighting implements AutoCloseable {
 	private void updateBuffer(Lighting.Entry entry, Vector3f vector3f, Vector3f vector3f2) {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, UBO_SIZE).putVec3(vector3f).putVec3(vector3f2).get();
-			VulkanicAPI.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(entry.ordinal() * this.paddedSize, this.paddedSize), byteBuffer);
+			VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(entry.ordinal() * this.paddedSize, this.paddedSize), byteBuffer);
 		}
 	}
 

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.blaze3d.systems.CommandEncoder;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -211,6 +212,16 @@ public class VulkanicTypedApiRoutingTest {
         RecordedInvocation clearInvocation = invocationHandler.lastInvocation;
         assertNotNull(clearInvocation);
         assertEquals("clearPrecompiledPipelineCache", clearInvocation.method.getName());
+    }
+
+    @Test
+    public void testCreateCommandEncoderRoutesThroughBackendSeam() {
+        CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
+        assertNotNull(commandEncoder);
+
+        RecordedInvocation invocation = invocationHandler.lastInvocation;
+        assertNotNull(invocation);
+        assertEquals("createCommandEncoder", invocation.method.getName());
     }
 
     @Test
@@ -897,6 +908,14 @@ public class VulkanicTypedApiRoutingTest {
 
             if (method.getName().equals("precompileRenderPipeline")) {
                 return (CompiledRenderPipeline) () -> true;
+            }
+
+            if (method.getName().equals("createCommandEncoder")) {
+                return Proxy.newProxyInstance(
+                    CommandEncoder.class.getClassLoader(),
+                    new Class<?>[]{CommandEncoder.class},
+                    (commandProxy, commandMethod, commandArgs) -> defaultValue(commandMethod.getReturnType())
+                );
             }
 
             return defaultValue(method.getReturnType());

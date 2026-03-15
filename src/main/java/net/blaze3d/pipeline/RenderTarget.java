@@ -80,7 +80,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		} else if (renderTarget.depthTexture == null) {
 			throw new IllegalStateException("Trying to copy depth texture from a RenderTarget without a depth texture");
 		} else {
-			net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().copyTextureToTexture(renderTarget.depthTexture, this.depthTexture, 0, 0, 0, 0, 0, this.width, this.height);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().copyTextureToTexture(renderTarget.depthTexture, this.depthTexture, 0, 0, 0, 0, 0, this.width, this.height);
 		}
 	}
 
@@ -126,7 +126,7 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		if (this.colorTexture == null) {
 			throw new IllegalStateException("Can't blit to screen, color texture doesn't exist yet");
 		} else {
-			net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().presentTexture(this.colorTextureView);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().presentTexture(this.colorTextureView);
 		}
 	}
 

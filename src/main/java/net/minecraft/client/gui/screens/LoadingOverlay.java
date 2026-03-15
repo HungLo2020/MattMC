@@ -100,7 +100,7 @@ public class LoadingOverlay extends Overlay {
 			o = Mth.clamp(h, 0.0F, 1.0F);
 		} else {
 			int n = BRAND_BACKGROUND.getAsInt();
-			net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().clearColorTexture(this.minecraft.getMainRenderTarget().getColorTexture(), n);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().clearColorTexture(this.minecraft.getMainRenderTarget().getColorTexture(), n);
 			o = 1.0F;
 		}
 

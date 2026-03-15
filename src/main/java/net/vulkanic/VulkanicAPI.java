@@ -7,6 +7,7 @@ import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.GLX;
 import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.ScissorState;
@@ -3208,6 +3209,14 @@ public class VulkanicAPI {
     @Nullable
     public static GpuDevice tryGetDevice() {
         return device;
+    }
+
+    /**
+     * Creates (or retrieves) a backend-owned command encoder for shared render
+     * callsites.
+     */
+    public static CommandEncoder createCommandEncoder() {
+        return getBackend().createCommandEncoder();
     }
 
     public static String getApiDescription() {

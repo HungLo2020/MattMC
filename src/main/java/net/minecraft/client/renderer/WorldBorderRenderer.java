@@ -80,7 +80,7 @@ public class WorldBorderRenderer {
 			bufferBuilder.addVertex((float)(k - r), g, (float)(o - n)).setUv(p, i);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				VulkanicAPI.getDevice().createCommandEncoder().writeToBuffer(this.worldBorderBuffer.slice(), meshData.vertexBuffer());
+				VulkanicAPI.createCommandEncoder().writeToBuffer(this.worldBorderBuffer.slice(), meshData.vertexBuffer());
 			}
 
 			this.lastBorderMinX = j;

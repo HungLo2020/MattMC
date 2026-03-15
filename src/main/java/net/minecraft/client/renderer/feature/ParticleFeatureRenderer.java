@@ -119,7 +119,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 				this.ringBuffer = new MappableRingBuffer(() -> "Particle Vertices", 34, byteBuffer.remaining());
 			}
 
-			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().mapBuffer(this.ringBuffer.currentBuffer().slice(), false, true)) {
+			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.ringBuffer.currentBuffer().slice(), false, true)) {
 				mappedView.data().put(byteBuffer);
 			}
 		}

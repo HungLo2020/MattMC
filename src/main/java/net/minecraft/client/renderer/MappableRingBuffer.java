@@ -51,7 +51,7 @@ public class MappableRingBuffer implements AutoCloseable {
 			this.fences[this.current].close();
 		}
 
-		this.fences[this.current] = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().createFence();
+		this.fences[this.current] = net.vulkanic.VulkanicAPI.createCommandEncoder().createFence();
 		this.current = (this.current + 1) % 3;
 	}
 

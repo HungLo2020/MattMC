@@ -221,7 +221,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			hook.onFogParametersCalculated(camera, i, bl, deltaTracker, f, clientLevel, fogData, vector4f);
 		}
 
-		try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
+		try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
 			this.updateBuffer(
 				mappedView.data(),
 				0,

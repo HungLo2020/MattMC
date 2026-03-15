@@ -18,7 +18,7 @@ public record RenderTargetDescriptor(int width, int height, boolean useDepth, in
 				.createCommandEncoder()
 				.clearColorAndDepthTextures(renderTarget.getColorTexture(), this.clearColor, renderTarget.getDepthTexture(), 1.0);
 		} else {
-			net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().clearColorTexture(renderTarget.getColorTexture(), this.clearColor);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().clearColorTexture(renderTarget.getColorTexture(), this.clearColor);
 		}
 	}
 

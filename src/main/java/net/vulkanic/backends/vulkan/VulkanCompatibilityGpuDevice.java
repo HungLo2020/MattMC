@@ -31,7 +31,7 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public CommandEncoder createCommandEncoder() {
-		return this.compatibilityDevice.createCommandEncoder();
+		return this.backend.createCommandEncoder();
 	}
 
 	@Override

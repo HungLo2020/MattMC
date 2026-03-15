@@ -35,7 +35,7 @@ public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 
 			try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 				ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE).putMat4f(matrix4f).get();
-				net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
+				net.vulkanic.VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
 			}
 
 			this.width = i;

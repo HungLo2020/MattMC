@@ -236,7 +236,7 @@ public class GuiRenderer implements AutoCloseable {
 			}
 
 			if (this.draws.size() > this.firstDrawIndexAfterBlur) {
-				VulkanicAPI.getDevice().createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
+				VulkanicAPI.createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
 				minecraft.gameRenderer.processBlurEffect();
 				this.executeDrawRange(
 					() -> "GUI after blur", renderTarget, gpuBufferSlice, gpuBufferSlice2, gpuBuffer, indexType, this.firstDrawIndexAfterBlur, this.draws.size()
@@ -357,7 +357,7 @@ public class GuiRenderer implements AutoCloseable {
 									int kx = bl ? atlasPosition.x : this.itemAtlasX;
 									int l = bl ? atlasPosition.y : this.itemAtlasY;
 									if (bl) {
-										VulkanicAPI.getDevice().createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0, kx, k - l - j, j, j);
+										VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0, kx, k - l - j, j, j);
 									}
 
 									this.renderItemToAtlas(trackingItemStackRenderState, poseStack, kx, l, j);
@@ -548,7 +548,7 @@ public class GuiRenderer implements AutoCloseable {
 
 	private void recordDraws() {
 		this.ensureVertexBufferSizes();
-		CommandEncoder commandEncoder = VulkanicAPI.getDevice().createCommandEncoder();
+		CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 		Object2IntMap<VertexFormat> object2IntMap = new Object2IntOpenHashMap<>();
 
 		for (GuiRenderer.MeshToDraw meshToDraw : this.meshesToDraw) {

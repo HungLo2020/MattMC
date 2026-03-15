@@ -4635,8 +4635,10 @@ public class Phase3DrawPathTest {
             String source = Files.readString(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after device-access migration");
-            assertTrue(source.contains("VulkanicAPI.getDevice("),
-                file + " should call VulkanicAPI.getDevice after device-access migration");
+            boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
+            boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            assertTrue(usesDeviceSeam || usesCommandEncoderSeam,
+                file + " should call VulkanicAPI.getDevice or VulkanicAPI.createCommandEncoder after device-access migration");
         }
     }
 
@@ -4655,8 +4657,10 @@ public class Phase3DrawPathTest {
             String source = Files.readString(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after device-access migration");
-            assertTrue(source.contains("VulkanicAPI.getDevice("),
-                file + " should call VulkanicAPI.getDevice after device-access migration");
+            boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
+            boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            assertTrue(usesDeviceSeam || usesCommandEncoderSeam,
+                file + " should call VulkanicAPI.getDevice or VulkanicAPI.createCommandEncoder after device-access migration");
         }
     }
 
@@ -4679,8 +4683,10 @@ public class Phase3DrawPathTest {
             String source = Files.readString(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after device-access migration");
-            assertTrue(source.contains("VulkanicAPI.getDevice("),
-                file + " should call VulkanicAPI.getDevice after device-access migration");
+            boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
+            boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            assertTrue(usesDeviceSeam || usesCommandEncoderSeam,
+                file + " should call VulkanicAPI.getDevice or VulkanicAPI.createCommandEncoder after device-access migration");
         }
     }
 
@@ -4705,8 +4711,10 @@ public class Phase3DrawPathTest {
             String source = Files.readString(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after renderer-cluster migration");
-            assertTrue(source.contains("VulkanicAPI.getDevice("),
-                file + " should call VulkanicAPI.getDevice after renderer-cluster migration");
+            boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
+            boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            assertTrue(usesDeviceSeam || usesCommandEncoderSeam,
+                file + " should call VulkanicAPI.getDevice or VulkanicAPI.createCommandEncoder after renderer-cluster migration");
         }
     }
 

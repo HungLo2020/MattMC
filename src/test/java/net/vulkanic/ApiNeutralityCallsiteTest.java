@@ -22,18 +22,31 @@ public class ApiNeutralityCallsiteTest {
 
     @Test
     public void testHighTrafficRendererCallsitesAvoidConcreteBackendCastLeaks() throws IOException {
+        String graphicsBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java"));
+        String vulkanicApiSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
         String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/CommandEncoder.java"));
         String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
         String gpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/GpuDevice.java"));
+        String renderTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/RenderTarget.java"));
+        String tracyFrameCaptureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/TracyFrameCapture.java"));
         String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
         String irisSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
         String renderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java"));
         String vulkanCompatibilityGpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanCompatibilityGpuDevice.java"));
         String gpuWarnlistManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GpuWarnlistManager.java"));
         String gameRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java"));
+        String levelRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java"));
         String shaderManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ShaderManager.java"));
         String debugEntrySystemSpecsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"));
         String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"));
+        String screenshotSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Screenshot.java"));
+
+        assertTrue(graphicsBackendSource.contains("default CommandEncoder createCommandEncoder()"),
+            "GraphicsBackend should expose backend-owned command-encoder acquisition seam");
+        assertTrue(vulkanicApiSource.contains("public static CommandEncoder createCommandEncoder()"),
+            "VulkanicAPI should expose backend-owned command-encoder wrapper");
+        assertTrue(vulkanicApiSource.contains("return getBackend().createCommandEncoder();"),
+            "VulkanicAPI command-encoder wrapper should route through backend seam");
 
         assertTrue(commandEncoderSource.contains("void applyPipelineState(RenderPipeline renderPipeline);"),
             "CommandEncoder should expose a backend-neutral pipeline-state seam");
@@ -93,6 +106,26 @@ public class ApiNeutralityCallsiteTest {
             "VulkanCompatibilityGpuDevice should route precompilePipeline through backend seam");
         assertFalse(vulkanCompatibilityGpuDeviceSource.contains("compatibilityDevice.precompilePipeline("),
             "VulkanCompatibilityGpuDevice should avoid direct compatibility-device precompile delegation");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.createCommandEncoder();"),
+            "VulkanCompatibilityGpuDevice should route command-encoder creation through backend seam");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.createCommandEncoder();"),
+            "VulkanCompatibilityGpuDevice should avoid direct compatibility-device command-encoder delegation");
+        assertTrue(renderTargetSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "RenderTarget should acquire command encoders via backend-owned VulkanicAPI seam");
+        assertFalse(renderTargetSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
+            "RenderTarget should avoid direct getDevice().createCommandEncoder() calls");
+        assertTrue(tracyFrameCaptureSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "TracyFrameCapture should acquire command encoders via backend-owned VulkanicAPI seam");
+        assertFalse(tracyFrameCaptureSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
+            "TracyFrameCapture should avoid direct getDevice().createCommandEncoder() calls");
+        assertTrue(levelRendererSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "LevelRenderer should acquire command encoders via backend-owned VulkanicAPI seam");
+        assertFalse(levelRendererSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
+            "LevelRenderer should avoid direct getDevice().createCommandEncoder() calls");
+        assertTrue(screenshotSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "Screenshot should acquire command encoders via backend-owned VulkanicAPI seam");
+        assertFalse(screenshotSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
+            "Screenshot should avoid direct getDevice().createCommandEncoder() calls");
         assertTrue(debugEntrySystemSpecsSource.contains("getDeviceInfo()"),
             "DebugEntrySystemSpecs should use backend-neutral device info for display strings");
         assertFalse(debugEntrySystemSpecsSource.contains("gpuDevice.getVersion()"),

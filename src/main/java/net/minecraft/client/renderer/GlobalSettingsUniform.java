@@ -24,7 +24,7 @@ public class GlobalSettingsUniform implements AutoCloseable {
 				.putFloat(((float)(l % 24000L) + deltaTracker.getGameTimeDeltaPartialTick(false)) / 24000.0F)
 				.putInt(k)
 				.get();
-			net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
 		}
 
 		VulkanicAPI.setGlobalSettingsUniform(this.buffer);

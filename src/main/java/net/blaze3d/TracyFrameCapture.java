@@ -76,9 +76,9 @@ public class TracyFrameCapture implements AutoCloseable {
 			}
 
 			this.status = TracyFrameCapture.Status.WAITING_FOR_COPY;
-			CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder();
+			CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.createCommandEncoder();
 
-			try (RenderPass renderPass = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().createRenderPass(() -> "Tracy blit", this.frameBufferView, OptionalInt.empty())) {
+			try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createCommandEncoder().createRenderPass(() -> "Tracy blit", this.frameBufferView, OptionalInt.empty())) {
 				renderPass.setPipeline(RenderPipelines.TRACY_BLIT);
 				renderPass.bindSampler("InSampler", renderTarget.getColorTextureView());
 				renderPass.draw(0, 3);
@@ -93,7 +93,7 @@ public class TracyFrameCapture implements AutoCloseable {
 		if (this.status == TracyFrameCapture.Status.WAITING_FOR_UPLOAD) {
 			this.status = TracyFrameCapture.Status.WAITING_FOR_CAPTURE;
 
-			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().mapBuffer(this.pixelbuffer, true, false)) {
+			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.pixelbuffer, true, false)) {
 				TracyClient.frameImage(mappedView.data(), this.width, this.height, this.lastCaptureDelay, true);
 			}
 		}

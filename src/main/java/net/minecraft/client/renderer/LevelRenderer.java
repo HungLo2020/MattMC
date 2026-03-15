@@ -724,7 +724,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 			if (this.shouldShowEntityOutlines() && resourceHandle4 != null) {
 				RenderTarget renderTarget = resourceHandle4.get();
-				VulkanicAPI.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
+				VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 			}
 
 			PoseStack poseStack = new PoseStack();

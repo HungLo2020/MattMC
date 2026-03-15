@@ -685,7 +685,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 
 			this.fogRenderer.endFrame();
 			RenderTarget renderTarget = this.minecraft.getMainRenderTarget();
-			VulkanicAPI.getDevice().createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
+			VulkanicAPI.createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 			this.guiRenderState.reset();
 			profilerFiller.push("guiExtraction");
@@ -966,7 +966,7 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 				.getBuffer(this.minecraft.getWindow().getWidth(), this.minecraft.getWindow().getHeight(), this.getFov(this.mainCamera, f, false)),
 			ProjectionType.PERSPECTIVE
 		);
-		VulkanicAPI.getDevice().createCommandEncoder().clearDepthTexture(this.minecraft.getMainRenderTarget().getDepthTexture(), 1.0);
+		VulkanicAPI.createCommandEncoder().clearDepthTexture(this.minecraft.getMainRenderTarget().getDepthTexture(), 1.0);
 		this.renderItemInHand(f, bl3, matrix4f2);
 		profilerFiller.popPush("screenEffects");
 		MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();

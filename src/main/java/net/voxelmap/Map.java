@@ -1639,7 +1639,7 @@ public class Map implements Runnable, IChangeObserver {
                 stencilTexture = Minecraft.getInstance().getTextureManager().getTexture(circleStencil).getTextureView();
             }
 
-            try (RenderPass renderPass = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().createRenderPass(() -> "Voxelmap: Map to screen", fboTextureView, OptionalInt.of(0x00000000))) {
+            try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createCommandEncoder().createRenderPass(() -> "Voxelmap: Map to screen", fboTextureView, OptionalInt.of(0x00000000))) {
                 renderPass.setPipeline(renderPipeline);
                 net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
                 renderPass.setUniform("DynamicTransforms", gpuBufferSlice);

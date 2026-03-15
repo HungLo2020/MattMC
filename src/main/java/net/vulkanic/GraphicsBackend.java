@@ -4,6 +4,7 @@ import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.CommandEncoder;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -171,6 +172,16 @@ public interface GraphicsBackend {
      * Clears backend-owned precompiled pipeline caches.
      */
     default void clearPrecompiledPipelineCache() {
+    }
+
+    /**
+     * Creates (or retrieves) the backend-owned command encoder used by shared
+     * rendering callsites.
+     */
+    default CommandEncoder createCommandEncoder() {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide command encoder creation."
+        );
     }
     
     /**

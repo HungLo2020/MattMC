@@ -53,7 +53,7 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 
 	public void upload() {
 		if (this.pixels != null && this.texture != null) {
-			net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder().writeToTexture(this.texture, this.pixels);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, this.pixels);
 		} else {
 			LOGGER.warn("Trying to upload disposed texture {}", this.getTexture().getLabel());
 		}

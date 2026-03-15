@@ -82,7 +82,7 @@ public class CompiledSectionMesh implements SectionMesh {
 	}
 
 	public void uploadMeshLayer(ChunkSectionLayer chunkSectionLayer, MeshData meshData, long l) {
-		CommandEncoder commandEncoder = VulkanicAPI.getDevice().createCommandEncoder();
+		CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 		SectionBuffers sectionBuffers = this.getBuffers(chunkSectionLayer);
 		if (sectionBuffers != null) {
 			if (sectionBuffers.getVertexBuffer().size() < meshData.vertexBuffer().remaining()) {
@@ -160,7 +160,7 @@ public class CompiledSectionMesh implements SectionMesh {
 						)
 				);
 			} else {
-				CommandEncoder commandEncoder = VulkanicAPI.getDevice().createCommandEncoder();
+				CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 				if (!sectionBuffers.getIndexBuffer().isClosed()) {
 					commandEncoder.writeToBuffer(sectionBuffers.getIndexBuffer().slice(), result.byteBuffer());
 				}

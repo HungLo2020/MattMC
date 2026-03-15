@@ -89,7 +89,7 @@ public class PostPass implements AutoCloseable {
 					RenderTarget renderTarget = resourceHandle.get();
 					net.vulkanic.VulkanicAPI.backupProjectionMatrix();
 					net.vulkanic.VulkanicAPI.setProjectionMatrix(gpuBufferSlice, ProjectionType.ORTHOGRAPHIC);
-					CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.getDevice().createCommandEncoder();
+					CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.createCommandEncoder();
 					List<Pair<String, GpuTextureView>> list = this.inputs.stream().map(inputxx -> Pair.of(inputxx.samplerName(), inputxx.texture(map))).toList();
 
 					try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(this.infoUbo.currentBuffer(), false, true)) {

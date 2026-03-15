@@ -4,6 +4,7 @@ import net.blaze3d.opengl.GlDevice;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.textures.GpuTextureView;
 import net.vulkanic.CommandContext;
@@ -143,6 +144,18 @@ public class OpenGLBackend implements GraphicsBackend {
         boolean debugLabelsEnabled
     ) {
         return new GlDevice(rendererBootstrapWindowHandle, debugVerbosity, debugEnabled, defaultShaderSource, debugLabelsEnabled);
+    }
+
+    @Override
+    public CommandEncoder createCommandEncoder() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+
+        return device.createCommandEncoder();
     }
 
     @Override

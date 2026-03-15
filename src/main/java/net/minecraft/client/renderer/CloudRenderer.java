@@ -196,14 +196,14 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 				this.prevType = cloudStatus;
 				this.utb.rotate();
 
-				try (GpuBuffer.MappedView mappedView = VulkanicAPI.getDevice().createCommandEncoder().mapBuffer(this.utb.currentBuffer(), false, true)) {
+				try (GpuBuffer.MappedView mappedView = VulkanicAPI.createCommandEncoder().mapBuffer(this.utb.currentBuffer(), false, true)) {
 					this.buildMesh(relativeCameraPos, mappedView.data(), p, q, bl, k);
 					this.quadCount = mappedView.data().position() / 3;
 				}
 			}
 
 			if (this.quadCount != 0) {
-				try (GpuBuffer.MappedView mappedView = VulkanicAPI.getDevice().createCommandEncoder().mapBuffer(this.ubo.currentBuffer(), false, true)) {
+				try (GpuBuffer.MappedView mappedView = VulkanicAPI.createCommandEncoder().mapBuffer(this.ubo.currentBuffer(), false, true)) {
 					Std140Builder.intoBuffer(mappedView.data())
 						.putVec4(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), 1.0F)
 						.putVec3(-r, h, -s)

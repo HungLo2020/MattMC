@@ -5,6 +5,7 @@ import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.preprocessor.GlslPreprocessor;
 import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.textures.GpuTextureView;
 import net.logging.LogUtils;
@@ -137,6 +138,7 @@ public class VulkanBackend {
     private volatile VulkanReadinessReport cachedReadinessReport;
     private volatile CommandContext currentCommandContext;
     private volatile long auxiliaryOpenGlContextWindow = MemoryUtil.NULL;
+    private volatile net.blaze3d.opengl.GlDevice compatibilityDevice;
 
     private final SpirvCompiler spirvCompiler;
     private final Map<RenderPipeline, PrecompiledPipelineState> precompiledPipelineCache = new ConcurrentHashMap<>();
@@ -421,7 +423,19 @@ public class VulkanBackend {
             defaultShaderSource,
             debugLabelsEnabled
         );
+        this.compatibilityDevice = compatibilityDevice;
         return new VulkanCompatibilityGpuDevice(this, compatibilityDevice);
+    }
+
+    public CommandEncoder createCommandEncoder() {
+        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "Vulkan compatibility device has not been created yet. "
+                    + "Ensure renderer startup calls createRendererDevice() before requesting a command encoder.");
+        }
+
+        return device.createCommandEncoder();
     }
 
     public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {

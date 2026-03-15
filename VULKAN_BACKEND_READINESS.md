@@ -634,6 +634,49 @@ Vulkan-selected startup still validated required render pipelines through `GpuDe
 - `createCommandEncoder`, `createTexture`, and `createBuffer` on `VulkanCompatibilityGpuDevice` still delegate to compatibility `GlDevice`; full Vulkan-selected renderer ownership remains incomplete.
 - Current Vulkan precompile cache is validation-oriented and not yet guaranteed to be the sole runtime pipeline source for all draw paths.
 
+## Session 2026-03-15: Backend-Owned Command Encoder Seam (Compatibility Delegation Reduction)
+
+### Problem Targeted
+Shared/game callsites still acquired command encoders through `VulkanicAPI.getDevice().createCommandEncoder()`, and `VulkanCompatibilityGpuDevice.createCommandEncoder()` still delegated directly to compatibility `GlDevice`. In Vulkan-selected runtime, this kept a high-traffic render-control seam shaped around concrete device access instead of backend-owned intent.
+
+### Structural Changes
+- Added backend-owned command-encoder seam to `GraphicsBackend`:
+  - `createCommandEncoder()`
+- Added matching `VulkanicAPI` wrapper:
+  - `createCommandEncoder()`
+- Implemented seam behavior in both backends:
+  - **OpenGLBackend:** returns the registered `GlDevice` command encoder.
+  - **VulkanBackend:** now tracks backend-owned compatibility device instance from `createRendererDevice(...)` and exposes command encoder creation via backend seam.
+- Reduced direct compatibility delegation in `VulkanCompatibilityGpuDevice`:
+  - `createCommandEncoder()` now routes through `backend.createCommandEncoder()`.
+- Migrated shared/game callsites from concrete device access to backend seam:
+  - Replaced `VulkanicAPI.getDevice().createCommandEncoder()` with `VulkanicAPI.createCommandEncoder()` across Blaze3D, Minecraft renderer/UI, and VoxelMap callsites.
+  - Migration removed 40 direct `getDevice().createCommandEncoder()` usages from `src/main/java`.
+
+### Evidence
+- Typed routing guardrail updated:
+  - `VulkanicTypedApiRoutingTest.testCreateCommandEncoderRoutesThroughBackendSeam()` verifies `VulkanicAPI.createCommandEncoder()` dispatches through backend seam.
+- Source guardrails updated:
+  - `ApiNeutralityCallsiteTest` now asserts seam presence in `GraphicsBackend`/`VulkanicAPI`, verifies `VulkanCompatibilityGpuDevice` routes command-encoder creation via backend seam, and guards migrated callsites.
+  - `Phase3DrawPathTest` guardrails were updated to accept backend-neutral command-encoder seam usage (`VulkanicAPI.createCommandEncoder(...)`) alongside existing `VulkanicAPI.getDevice(...)` migration checks.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.VulkanicTypedApiRoutingTest --tests net.vulkanic.ApiNeutralityCallsiteTest --tests net.vulkanic.Phase3DrawPathTest`
+  - Result: **177 passed, 0 failed**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: **BUILD SUCCESSFUL**.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** High-traffic shared callsites now acquire command encoders through backend-owned `VulkanicAPI.createCommandEncoder()` seam instead of concrete device access.
+- **2 — Backend Implementation:** Both OpenGL and Vulkan backend surfaces now implement command-encoder acquisition contract; Vulkan-selected compatibility routing now flows through backend seam.
+- **4 — Parity Improvement:** Both backends now satisfy the same command-encoder acquisition contract from shared callsites.
+- **5 — Debuggability Improvement:** Missing/early command-encoder acquisition now fails at backend seam boundaries with backend-scoped error messages instead of implicit concrete-device coupling.
+
+### Still Unproven
+- Vulkan backend command-encoder seam still returns compatibility `GlCommandEncoder`; fully native Vulkan command-encoder ownership is not yet in place.
+- `createTexture` and `createBuffer` in `VulkanCompatibilityGpuDevice` remain direct compatibility-device delegation hotspots.
+- Some external/mod callsites still acquire encoders through non-VulkanicAPI seams (for example, `RenderSystem.getDevice().createCommandEncoder()`).
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**
