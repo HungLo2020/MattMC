@@ -93,24 +93,48 @@ public class VulkanRendererStartupInitializationTest {
             .resolve("src/main/java/net/vulkanic/VulkanicAPI.java"));
         String vulkanBackendSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String graphicsBackendSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/GraphicsBackend.java"));
 
         assertTrue(renderSystemSource.contains("initializeNativeVulkanRuntimeOnRendererStartupIfSelected"),
             "RenderSystem.initRenderer should invoke Vulkan startup initialization hook");
         assertTrue(
             renderSystemSource.indexOf("initializeNativeVulkanRuntimeOnRendererStartupIfSelected")
-                < renderSystemSource.indexOf("VulkanicAPI.setDevice(new GlDevice"),
-            "RenderSystem.initRenderer should initialize Vulkan runtime before constructing GlDevice"
+                < renderSystemSource.indexOf("VulkanicAPI.createRendererDevice"),
+            "RenderSystem.initRenderer should initialize Vulkan runtime before backend-owned device creation"
         );
+        assertTrue(renderSystemSource.contains("prepareRendererBootstrapWindowHandle"),
+            "RenderSystem.initRenderer should resolve renderer bootstrap window handle through VulkanicAPI");
+        assertTrue(renderSystemSource.contains("onRendererDeviceInitialized"),
+            "RenderSystem.initRenderer should invoke backend-owned post-device initialization hook");
+        assertFalse(renderSystemSource.contains("new GlDevice("),
+            "RenderSystem.initRenderer should not hard-code GlDevice construction in shared startup path");
+        assertFalse(renderSystemSource.contains("OpenGL Vendor:"),
+            "RenderSystem.initRenderer should not log OpenGL vendor details directly from the shared startup path");
+        assertFalse(renderSystemSource.contains("IrisRenderSystem.initRenderer()"),
+            "RenderSystem.initRenderer should not directly run GL-specific renderer init hooks from the shared startup path");
         assertTrue(vulkanicApiSource.contains("public static void initializeNativeVulkanRuntimeOnRendererStartupIfSelected()"),
             "VulkanicAPI should expose startup Vulkan initialization hook");
+        assertTrue(vulkanicApiSource.contains("public static GpuDevice createRendererDevice("),
+            "VulkanicAPI should expose backend-owned renderer device creation");
+        assertTrue(vulkanicApiSource.contains("public static void onRendererDeviceInitialized("),
+            "VulkanicAPI should expose backend-owned post-device initialization hook");
         assertTrue(vulkanicApiSource.contains("getVulkanExecutionContextInfo"),
             "Startup Vulkan initialization hook should validate Vulkan execution-context availability");
         assertTrue(vulkanicApiSource.contains("getVulkanSwapchainSurfaceInfo"),
             "Startup Vulkan initialization hook should validate Vulkan swapchain/surface availability");
         assertTrue(vulkanicApiSource.contains("registerGlfwWindowHandleForVulkanSurface"),
             "VulkanicAPI should expose GLFW window registration for Vulkan NO_API surface creation");
+        assertTrue(graphicsBackendSource.contains("default long prepareRendererBootstrapWindow(long mainWindowHandle)"),
+            "GraphicsBackend should expose backend-owned renderer bootstrap window preparation");
+        assertTrue(graphicsBackendSource.contains("default net.blaze3d.systems.GpuDevice createRendererDevice("),
+            "GraphicsBackend should expose backend-owned renderer device creation");
+        assertTrue(graphicsBackendSource.contains("default void onRendererDeviceInitialized(long mainWindowHandle, net.blaze3d.systems.GpuDevice gpuDevice)"),
+            "GraphicsBackend should expose backend-owned post-device initialization hook");
         assertTrue(vulkanBackendSource.contains("getRegisteredGlfwWindowHandleForVulkanSurface"),
             "VulkanBackend should fallback to registered GLFW window handle when no current context exists");
+        assertTrue(vulkanBackendSource.contains("new VulkanCompatibilityGpuDevice(this, compatibilityDevice)"),
+            "VulkanBackend should own compatibility device creation instead of shared startup code constructing GlDevice directly");
         assertTrue(vulkanicApiSource.contains("method.isDefault()"),
             "Fail-fast Vulkan proxy should recognize default interface methods");
         assertTrue(vulkanicApiSource.contains("invokeDefaultInterfaceMethod"),
@@ -129,17 +153,19 @@ public class VulkanRendererStartupInitializationTest {
             .resolve("src/main/java/net/blaze3d/platform/Window.java"));
         String minecraftSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/minecraft/client/Minecraft.java"));
+        String vulkanBackendSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
-        assertTrue(renderSystemSource.contains("resolveGlDeviceWindowHandleForRendererInitialization"),
-            "RenderSystem should resolve a Vulkan-safe GL bootstrap context window handle");
-        assertTrue(renderSystemSource.contains("isVulkanBackendInitializedAndSelected"),
-            "RenderSystem Vulkan-safe GL bootstrap should only activate when Vulkan backend routing is selected");
-        assertTrue(renderSystemSource.contains("Created auxiliary hidden OpenGL context window for Vulkan startup compatibility path"),
-            "RenderSystem should document auxiliary OpenGL context bootstrap when Vulkan NO_API windows are used");
-        assertTrue(renderSystemSource.contains("cleanupAuxiliaryOpenGlContextWindow"),
-            "RenderSystem should expose auxiliary OpenGL context cleanup for tidy shutdown");
-        assertTrue(minecraftSource.contains("RenderSystem.cleanupAuxiliaryOpenGlContextWindow();"),
-            "Minecraft.close should invoke auxiliary OpenGL context cleanup before window termination");
+        assertTrue(renderSystemSource.contains("cleanupRendererBootstrapResources"),
+            "RenderSystem should expose backend-neutral renderer bootstrap cleanup");
+        assertFalse(renderSystemSource.contains("cleanupAuxiliaryOpenGlContextWindow"),
+            "RenderSystem should not expose OpenGL-named bootstrap cleanup anymore");
+        assertTrue(minecraftSource.contains("RenderSystem.cleanupRendererBootstrapResources();"),
+            "Minecraft.close should invoke backend-neutral renderer bootstrap cleanup before window termination");
+        assertTrue(vulkanBackendSource.contains("Created Vulkan compatibility bootstrap window for backend-owned renderer startup"),
+            "VulkanBackend should own compatibility bootstrap window creation when Vulkan NO_API windows are used");
+        assertTrue(vulkanBackendSource.contains("Destroyed Vulkan compatibility bootstrap window"),
+            "VulkanBackend should own compatibility bootstrap window cleanup");
         assertTrue(windowSource.contains("if (shouldRequestNoApiWindowClientForVulkanBackend())"),
             "Window.updateVsync should no-op when Vulkan NO_API window mode is selected");
         assertTrue(windowSource.contains("registerGlfwWindowHandleForVulkanSurface"),

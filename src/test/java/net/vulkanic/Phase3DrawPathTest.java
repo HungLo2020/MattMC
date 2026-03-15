@@ -4520,8 +4520,12 @@ public class Phase3DrawPathTest {
             "RenderSystem should not expose assertOnRenderThreadOrInit after thread ownership migration");
         assertFalse(renderSystemSource.contains("public static GpuDevice tryGetDevice("),
             "RenderSystem should not expose tryGetDevice after device ownership migration");
-        assertTrue(renderSystemSource.contains("VulkanicAPI.setDevice(new GlDevice("),
+        assertTrue(renderSystemSource.contains("VulkanicAPI.setDevice("),
             "RenderSystem.initRenderer should set the device through VulkanicAPI after migration");
+        assertTrue(renderSystemSource.contains("VulkanicAPI.createRendererDevice("),
+            "RenderSystem.initRenderer should create the device through the backend-owned VulkanicAPI seam after migration");
+        assertFalse(renderSystemSource.contains("new GlDevice("),
+            "RenderSystem.initRenderer should not hard-code GlDevice construction after backend-owned device migration");
         assertTrue(renderSystemSource.contains("return net.vulkanic.VulkanicAPI.getDevice();"),
             "RenderSystem.getDevice should delegate to VulkanicAPI after migration");
 

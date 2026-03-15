@@ -1,6 +1,9 @@
 package net.vulkanic.backends.vulkan;
 
 import net.blaze3d.GpuOutOfMemoryException;
+import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.GpuDevice;
+import net.logging.LogUtils;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
@@ -106,10 +109,14 @@ import java.nio.ByteOrder;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiFunction;
 
 import static org.lwjgl.system.MemoryStack.stackPush;
+import org.slf4j.Logger;
 
 public class VulkanBackend {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final int GL_LUMINANCE = 0x1909;
     private static final int GL_LUMINANCE_ALPHA = 0x190A;
@@ -121,6 +128,7 @@ public class VulkanBackend {
 
     private volatile VulkanReadinessReport cachedReadinessReport;
     private volatile CommandContext currentCommandContext;
+    private volatile long auxiliaryOpenGlContextWindow = MemoryUtil.NULL;
 
     private final SpirvCompiler spirvCompiler;
     private final AtomicInteger nextVirtualShaderId = new AtomicInteger(1);
@@ -255,6 +263,70 @@ public class VulkanBackend {
             status,
             report.summaryLine()
         );
+    }
+
+    public long prepareRendererBootstrapWindow(long mainWindowHandle) {
+        if (auxiliaryOpenGlContextWindow != MemoryUtil.NULL) {
+            return auxiliaryOpenGlContextWindow;
+        }
+
+        GLFW.glfwDefaultWindowHints();
+        GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_CLIENT_API, GLFW.GLFW_OPENGL_API);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
+        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE);
+
+        auxiliaryOpenGlContextWindow = GLFW.glfwCreateWindow(1, 1, "MattMC Vulkan Compatibility Bootstrap", 0L, 0L);
+        if (auxiliaryOpenGlContextWindow == MemoryUtil.NULL) {
+            throw new IllegalStateException("Failed to create Vulkan compatibility bootstrap window for renderer startup");
+        }
+
+        LOGGER.info("Created Vulkan compatibility bootstrap window for backend-owned renderer startup");
+        return auxiliaryOpenGlContextWindow;
+    }
+
+    public GpuDevice createRendererDevice(
+        long rendererBootstrapWindowHandle,
+        int debugVerbosity,
+        boolean debugEnabled,
+        BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> defaultShaderSource,
+        boolean debugLabelsEnabled
+    ) {
+        net.blaze3d.opengl.GlDevice compatibilityDevice = new net.blaze3d.opengl.GlDevice(
+            rendererBootstrapWindowHandle,
+            debugVerbosity,
+            debugEnabled,
+            defaultShaderSource,
+            debugLabelsEnabled
+        );
+        return new VulkanCompatibilityGpuDevice(this, compatibilityDevice);
+    }
+
+    public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
+        LOGGER.info("Vulkan renderer startup now uses backend-owned device creation instead of shared GlDevice construction");
+        LOGGER.info("Vulkan readiness: {}", getReadinessReport().summaryLine());
+        LOGGER.info("Vulkan execution context: {}", getVulkanExecutionContextInfo().summaryLine());
+        LOGGER.info("Vulkan surface/swapchain: {}", getVulkanSwapchainSurfaceInfo().summaryLine());
+    }
+
+    public void cleanupRendererBootstrapResources() {
+        if (auxiliaryOpenGlContextWindow == MemoryUtil.NULL) {
+            return;
+        }
+
+        try {
+            if (GLFW.glfwGetCurrentContext() == auxiliaryOpenGlContextWindow) {
+                GLFW.glfwMakeContextCurrent(MemoryUtil.NULL);
+            }
+            GLFW.glfwDestroyWindow(auxiliaryOpenGlContextWindow);
+            LOGGER.info("Destroyed Vulkan compatibility bootstrap window");
+        } catch (Throwable throwable) {
+            LOGGER.warn("Failed to destroy Vulkan compatibility bootstrap window cleanly", throwable);
+        } finally {
+            auxiliaryOpenGlContextWindow = MemoryUtil.NULL;
+        }
     }
 
     public VulkanExecutionContextInfo getVulkanExecutionContextInfo() {

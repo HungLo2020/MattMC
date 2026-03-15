@@ -24,8 +24,14 @@ public class ApiNeutralityCallsiteTest {
     public void testHighTrafficRendererCallsitesAvoidConcreteBackendCastLeaks() throws IOException {
         String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/CommandEncoder.java"));
         String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String gpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/GpuDevice.java"));
         String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
         String irisSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
+        String renderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java"));
+        String gpuWarnlistManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GpuWarnlistManager.java"));
+        String gameRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java"));
+        String debugEntrySystemSpecsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"));
+        String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"));
 
         assertTrue(commandEncoderSource.contains("void applyPipelineState(RenderPipeline renderPipeline);"),
             "CommandEncoder should expose a backend-neutral pipeline-state seam");
@@ -51,6 +57,38 @@ public class ApiNeutralityCallsiteTest {
             "Iris should use backend-neutral GpuDevice extension querying");
         assertFalse(irisSource.contains("((GlDevice) RenderSystem.getDevice())"),
             "Iris should avoid concrete GlDevice casts when querying enabled extensions");
+        assertTrue(gpuDeviceSource.contains("record GpuDeviceInfo("),
+            "GpuDevice should expose a backend-neutral device-info seam");
+        assertTrue(gpuDeviceSource.contains("default GpuDeviceInfo getDeviceInfo()"),
+            "GpuDevice should expose backend-neutral device-info access");
+        assertTrue(gpuDeviceSource.contains("default List<String> getOptionalFeatureNames()"),
+            "GpuDevice should expose backend-neutral optional feature reporting");
+        assertTrue(gpuDeviceSource.contains("default boolean shouldApplyOpenGlWarnlist()"),
+            "GpuDevice should expose explicit OpenGL warnlist applicability instead of requiring string comparisons");
+        assertTrue(gpuWarnlistManagerSource.contains("gpuDevice.getDeviceInfo()"),
+            "GpuWarnlistManager should query backend-neutral device info through GpuDevice");
+        assertTrue(gpuWarnlistManagerSource.contains("deviceInfo.appliesOpenGlWarnlist()"),
+            "GpuWarnlistManager should use explicit warnlist applicability seam");
+        assertFalse(gpuWarnlistManagerSource.contains("getBackendName().equals(\"OpenGL\")"),
+            "GpuWarnlistManager should avoid backend-name string comparisons for OpenGL warnlist decisions");
+        assertTrue(gameRendererSource.contains("getDeviceInfo()"),
+            "GameRenderer should use backend-neutral device info for hardware logging");
+        assertFalse(gameRendererSource.contains("Supports OpenGL"),
+            "GameRenderer should avoid hard-coded OpenGL capability wording in shared hardware logging");
+        assertTrue(debugEntrySystemSpecsSource.contains("getDeviceInfo()"),
+            "DebugEntrySystemSpecs should use backend-neutral device info for display strings");
+        assertFalse(debugEntrySystemSpecsSource.contains("gpuDevice.getVersion()"),
+            "DebugEntrySystemSpecs should avoid raw version string composition when backend-neutral device info helpers exist");
+        assertTrue(minecraftSource.contains("getOptionalFeatureNames()"),
+            "Minecraft should log backend-neutral optional rendering features instead of raw extensions");
+        assertFalse(minecraftSource.contains("Using optional rendering extensions:"),
+            "Minecraft should avoid OpenGL extension wording in shared startup logging");
+        assertTrue(renderSystemSource.contains("VulkanicAPI.createRendererDevice("),
+            "RenderSystem should create renderer devices through the backend-neutral VulkanicAPI seam");
+        assertFalse(renderSystemSource.contains("new GlDevice("),
+            "RenderSystem should avoid hard-coded GlDevice construction in the shared startup path");
+        assertFalse(renderSystemSource.contains("OpenGL Vendor:"),
+            "RenderSystem should avoid direct OpenGL startup logging in the shared startup path");
     }
 
     @Test

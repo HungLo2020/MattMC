@@ -20,16 +20,17 @@ public class DebugEntrySystemSpecs implements DebugScreenEntry {
 	@Override
 	public void display(DebugScreenDisplayer debugScreenDisplayer, @Nullable Level level, @Nullable LevelChunk levelChunk, @Nullable LevelChunk levelChunk2) {
 		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
+		GpuDevice.GpuDeviceInfo gpuDeviceInfo = gpuDevice.getDeviceInfo();
 		debugScreenDisplayer.addToGroup(
 			GROUP,
 			List.of(
 				String.format(Locale.ROOT, "Java: %s", System.getProperty("java.version")),
 				String.format(Locale.ROOT, "CPU: %s", GLX._getCpuInfo()),
 				String.format(
-					Locale.ROOT, "Display: %dx%d (%s)", Minecraft.getInstance().getWindow().getWidth(), Minecraft.getInstance().getWindow().getHeight(), gpuDevice.getVendor()
+					Locale.ROOT, "Display: %dx%d (%s)", Minecraft.getInstance().getWindow().getWidth(), Minecraft.getInstance().getWindow().getHeight(), gpuDeviceInfo.vendor()
 				),
-				gpuDevice.getRenderer(),
-				String.format(Locale.ROOT, "%s %s", gpuDevice.getBackendName(), gpuDevice.getVersion())
+				gpuDeviceInfo.rendererDisplayString(),
+				gpuDeviceInfo.backendDisplayString()
 			)
 		);
 	}

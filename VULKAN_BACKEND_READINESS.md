@@ -68,11 +68,14 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
   - `VulkanicAPI.createFailFastVulkanProxy(...)` routes all `GraphicsBackend` calls to Vulkan-native methods only.
   - `Options.selectGraphicsBackend(...)` now routes production startup backend selection through `VulkanicAPI.initializeFromOptionsValue(...)` from `options.txt` (`graphics_backend`).
   - `RenderSystem.initRenderer(...)` now invokes `VulkanicAPI.initializeNativeVulkanRuntimeOnRendererStartupIfSelected()` after context/device setup.
+  - `RenderSystem.initRenderer(...)` no longer hard-codes `new GlDevice(...)` or OpenGL-only post-init hooks in shared startup code; device creation/bootstrap selection now route through backend-owned `GraphicsBackend.prepareRendererBootstrapWindow(...)`, `createRendererDevice(...)`, and `onRendererDeviceInitialized(...)` seams.
+  - `VulkanBackend` now owns compatibility bootstrap window creation/cleanup and exposes a backend-owned `VulkanCompatibilityGpuDevice` wrapper so Vulkan-selected startup no longer presents plain `GlDevice` ownership to shared game code.
+  - Shared diagnostics/warnlist callsites now consume backend-neutral `GpuDeviceInfo` and `getOptionalFeatureNames()` seams instead of inferring behavior from raw `"OpenGL"` string checks, `getVersion()` formatting, or OpenGL extension wording.
   - `VulkanicAPI.initializeNativeVulkanRuntimeOnRendererStartupIfSelected()` enforces fail-hard startup behavior: no-op for uninitialized/OpenGL routing, throws on Vulkan-selected bring-up failure.
   - `VulkanBackend.NativeSpine.initialize()` creates instance, surface, physical/logical device, queue, swapchain, command pool.
   - `VulkanBackend.initializeNativeVulkanRuntime()` performs bring-up attempt and returns structured diagnostics.
   - Regression coverage: `VulkanRendererStartupInitializationTest` validates uninitialized/OpenGL no-op behavior, Vulkan fail-hard/ready behavior, and startup callsite wiring.
-- **Notes:** Vulkan-native initialization is now triggered from the production renderer startup path while preserving explicit fail-hard behavior for Vulkan-selected execution.
+- **Notes:** Vulkan-native initialization is now triggered from the production renderer startup path while preserving explicit fail-hard behavior for Vulkan-selected execution. Shared startup and shared diagnostics are more backend-neutral, but the compatibility device still delegates substantial resource/pipeline work to OpenGL internals and does not prove full Vulkan-native rendering ownership yet.
 
 ### Logical Device / Context Abstraction
 

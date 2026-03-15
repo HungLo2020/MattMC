@@ -104,6 +104,47 @@ public interface GraphicsBackend {
             "Backend " + getBackendType() + " does not support native Vulkan runtime initialization."
         );
     }
+
+    /**
+     * Resolves the window handle that should back renderer bootstrap for this
+     * backend.
+     *
+     * <p>OpenGL backends typically return the main window unchanged. Vulkan
+     * backends may return an auxiliary compatibility window when legacy
+     * bootstrap services still require one.</p>
+     */
+    default long prepareRendererBootstrapWindow(long mainWindowHandle) {
+        return mainWindowHandle;
+    }
+
+    /**
+     * Creates the backend-owned {@link net.blaze3d.systems.GpuDevice} used by
+     * shared renderer startup code.
+     */
+    default net.blaze3d.systems.GpuDevice createRendererDevice(
+        long rendererBootstrapWindowHandle,
+        int debugVerbosity,
+        boolean debugEnabled,
+        java.util.function.BiFunction<net.minecraft.resources.ResourceLocation, net.blaze3d.shaders.ShaderType, String> defaultShaderSource,
+        boolean debugLabelsEnabled
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide renderer device creation."
+        );
+    }
+
+    /**
+     * Runs backend-specific renderer startup work after the device has been
+     * created and registered.
+     */
+    default void onRendererDeviceInitialized(long mainWindowHandle, net.blaze3d.systems.GpuDevice gpuDevice) {
+    }
+
+    /**
+     * Cleans up backend-owned renderer bootstrap resources.
+     */
+    default void cleanupRendererBootstrapResources() {
+    }
     
     /**
      * Sets the dynamic viewport state for rendering.

@@ -198,7 +198,8 @@ public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 		// Iris: From MixinGameRenderer - log hardware information
 		net.irisshaders.iris.Iris.logger.info("Hardware information:");
 		net.irisshaders.iris.Iris.logger.info("CPU: " + GLX._getCpuInfo());
-		net.irisshaders.iris.Iris.logger.info("GPU: " + VulkanicAPI.getDevice().getRenderer() + " (Supports OpenGL " + VulkanicAPI.getDevice().getVersion() + ")");
+		GpuDevice.GpuDeviceInfo gpuDeviceInfo = VulkanicAPI.getDevice().getDeviceInfo();
+		net.irisshaders.iris.Iris.logger.info("GPU: " + gpuDeviceInfo.rendererDisplayString() + " (" + gpuDeviceInfo.driverDisplayString() + ")");
 		net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());

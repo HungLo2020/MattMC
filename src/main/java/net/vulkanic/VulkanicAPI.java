@@ -4,6 +4,7 @@ import net.blaze3d.ProjectionType;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.platform.GLX;
+import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.ScissorState;
@@ -12,6 +13,7 @@ import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.vertex.VertexFormat;
 import net.minecraft.Util;
 import net.minecraft.client.renderer.DynamicUniforms;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.util.TimeSource.NanoTimeSource;
 import net.vulkanic.backends.opengl.OpenGLBackend;
@@ -35,6 +37,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiFunction;
 
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
@@ -911,6 +914,37 @@ public class VulkanicAPI {
             throw new IllegalStateException(
                 "Vulkan backend is selected but swapchain/surface is unavailable during renderer startup.\n"
                     + swapchainSurfaceInfo.toMultilineString());
+        }
+    }
+
+    public static long prepareRendererBootstrapWindowHandle(long mainWindowHandle) {
+        return getBackend().prepareRendererBootstrapWindow(mainWindowHandle);
+    }
+
+    public static GpuDevice createRendererDevice(
+        long rendererBootstrapWindowHandle,
+        int debugVerbosity,
+        boolean debugEnabled,
+        BiFunction<ResourceLocation, ShaderType, String> defaultShaderSource,
+        boolean debugLabelsEnabled
+    ) {
+        return getBackend().createRendererDevice(
+            rendererBootstrapWindowHandle,
+            debugVerbosity,
+            debugEnabled,
+            defaultShaderSource,
+            debugLabelsEnabled
+        );
+    }
+
+    public static void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
+        getBackend().onRendererDeviceInitialized(mainWindowHandle, gpuDevice);
+    }
+
+    public static void cleanupRendererBootstrapResources() {
+        GraphicsBackend activeBackend = backend;
+        if (activeBackend != null) {
+            activeBackend.cleanupRendererBootstrapResources();
         }
     }
 

@@ -1,5 +1,8 @@
 package net.vulkanic.backends.opengl;
 
+import net.blaze3d.opengl.GlDevice;
+import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.GpuDevice;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsBackendType;
@@ -23,7 +26,11 @@ import net.vulkanic.VulkanicTextureTarget;
 import net.vulkanic.VulkanExecutionContextInfo;
 import net.vulkanic.VulkanNativeInitializationInfo;
 import net.vulkanic.VulkanSwapchainSurfaceInfo;
+import net.minecraft.Util;
+import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.opengl.*;
+
+import java.util.function.BiFunction;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
@@ -111,6 +118,36 @@ public class OpenGLBackend implements GraphicsBackend {
             GraphicsBackendType.OPENGL,
             "OpenGL backend does not support native Vulkan runtime initialization."
         );
+    }
+
+    @Override
+    public GpuDevice createRendererDevice(
+        long rendererBootstrapWindowHandle,
+        int debugVerbosity,
+        boolean debugEnabled,
+        BiFunction<ResourceLocation, ShaderType, String> defaultShaderSource,
+        boolean debugLabelsEnabled
+    ) {
+        return new GlDevice(rendererBootstrapWindowHandle, debugVerbosity, debugEnabled, defaultShaderSource, debugLabelsEnabled);
+    }
+
+    @Override
+    public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
+        net.sodium.client.compatibility.environment.GlContextInfo context = net.sodium.client.compatibility.environment.GlContextInfo.create();
+        org.slf4j.Logger logger = net.logging.LogUtils.getLogger();
+        logger.info("OpenGL Vendor: {}", context.vendor());
+        logger.info("OpenGL Renderer: {}", context.renderer());
+        logger.info("OpenGL Version: {}", context.version());
+
+        net.sodium.client.platform.NativeWindowHandle handle = () -> org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window(mainWindowHandle);
+        net.sodium.client.compatibility.checks.PostLaunchChecks.onContextInitialized(handle, context);
+        net.sodium.client.compatibility.checks.ModuleScanner.checkModules(handle);
+
+        net.irisshaders.iris.Iris.duringRenderSystemInit();
+        net.irisshaders.iris.gl.GLDebug.reloadDebugState();
+        net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
+        net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
+        net.irisshaders.iris.Iris.onRenderSystemInit();
     }
     
     /**

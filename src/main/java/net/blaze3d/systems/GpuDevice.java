@@ -18,6 +18,47 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public interface GpuDevice {
+	record GpuDeviceInfo(
+		String backendName,
+		String graphicsApiName,
+		String vendor,
+		String renderer,
+		String driverVersion,
+		boolean appliesOpenGlWarnlist,
+		List<String> optionalFeatureNames
+	) {
+		public GpuDeviceInfo {
+			backendName = backendName == null ? "" : backendName;
+			graphicsApiName = graphicsApiName == null ? "" : graphicsApiName;
+			vendor = vendor == null ? "" : vendor;
+			renderer = renderer == null ? "" : renderer;
+			driverVersion = driverVersion == null ? "" : driverVersion;
+			optionalFeatureNames = optionalFeatureNames == null ? List.of() : List.copyOf(optionalFeatureNames);
+		}
+
+		public String rendererDisplayString() {
+			return renderer.isBlank() ? vendor : renderer;
+		}
+
+		public String driverDisplayString() {
+			if (graphicsApiName.isBlank()) {
+				return driverVersion;
+			}
+			return driverVersion.isBlank() ? graphicsApiName : graphicsApiName + " " + driverVersion;
+		}
+
+		public String backendDisplayString() {
+			String driverDisplay = driverDisplayString();
+			if (backendName.isBlank()) {
+				return driverDisplay;
+			}
+			if (driverDisplay.isBlank() || backendName.equals(graphicsApiName)) {
+				return driverDisplay.isBlank() ? backendName : driverDisplay;
+			}
+			return backendName + " (" + driverDisplay + ")";
+		}
+	}
+
 	CommandEncoder createCommandEncoder();
 
 	GpuTexture createTexture(@Nullable Supplier<String> supplier, int i, TextureFormat textureFormat, int j, int k, int l, int m);
@@ -45,6 +86,26 @@ public interface GpuDevice {
 	String getVersion();
 
 	String getRenderer();
+
+	default GpuDeviceInfo getDeviceInfo() {
+		return new GpuDeviceInfo(
+			getBackendName(),
+			getBackendName(),
+			getVendor(),
+			getRenderer(),
+			getVersion(),
+			shouldApplyOpenGlWarnlist(),
+			getOptionalFeatureNames()
+		);
+	}
+
+	default boolean shouldApplyOpenGlWarnlist() {
+		return "OpenGL".equals(getBackendName());
+	}
+
+	default List<String> getOptionalFeatureNames() {
+		return getEnabledExtensions();
+	}
 
 	int getMaxTextureSize();
 

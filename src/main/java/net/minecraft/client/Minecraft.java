@@ -502,7 +502,12 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			(resourceLocation, shaderType) -> this.getShaderManager().getShader(resourceLocation, shaderType),
 			gameConfig.game.renderDebugLabels
 		);
-		LOGGER.info("Using optional rendering extensions: {}", String.join(", ", VulkanicAPI.getDevice().getEnabledExtensions()));
+		List<String> optionalFeatureNames = VulkanicAPI.getDevice().getOptionalFeatureNames();
+		if (optionalFeatureNames.isEmpty()) {
+			LOGGER.info("No optional rendering features reported by the active backend device");
+		} else {
+			LOGGER.info("Using optional rendering features: {}", String.join(", ", optionalFeatureNames));
+		}
 		this.mainRenderTarget = new MainTarget(this.window.getWidth(), this.window.getHeight());
 		this.resourceManager = new ReloadableResourceManager(PackType.CLIENT_RESOURCES);
 		this.resourcePackRepository.reload();
@@ -1305,7 +1310,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			LOGGER.error("Shutdown failure!", var5);
 			throw var5;
 		} finally {
-			RenderSystem.cleanupAuxiliaryOpenGlContextWindow();
+			RenderSystem.cleanupRendererBootstrapResources();
 			this.virtualScreen.close();
 			this.window.close();
 		}
@@ -2484,7 +2489,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		systemReport.setDetail("Backend API", VulkanicAPI::getApiDescription);
 		systemReport.setDetail("Window size", () -> minecraft != null ? minecraft.window.getWidth() + "x" + minecraft.window.getHeight() : "<not initialized>");
 		systemReport.setDetail("GFLW Platform", Window::getPlatform);
-		systemReport.setDetail("Render Extensions", () -> String.join(", ", VulkanicAPI.getDevice().getEnabledExtensions()));
+		systemReport.setDetail("Render Features", () -> String.join(", ", VulkanicAPI.getDevice().getOptionalFeatureNames()));
 		systemReport.setDetail("GL debug messages", () -> {
 			GpuDevice gpuDevice = VulkanicAPI.tryGetDevice();
 			if (gpuDevice == null) {
