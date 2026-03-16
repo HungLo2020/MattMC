@@ -5857,6 +5857,43 @@ public class VulkanicAPI {
         getBackend().bindPipelineResources(ctx, pipeline, descriptor, bindings);
     }
 
+    /**
+     * Resolves a {@link GpuBuffer} to the backend-specific {@link VulkanicBuffer} backing it.
+     *
+     * <p>In OpenGL: returns an {@code OpenGLBuffer} wrapping the GL buffer object name.
+     * In Vulkan: looks up the backing {@code VulkanBuffer} from the legacy buffer registry.
+     *
+     * <p>This is the canonical call for shared render-encoder code that needs to produce
+     * backend-neutral {@link VulkanicBufferSlice}s for {@link #bindPipelineResources} — it
+     * removes the need for callers to branch on or cast to a specific backend type.
+     *
+     * @param gpuBuffer the GPU buffer to resolve
+     * @return the backend-native buffer representation
+     */
+    public static VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer) {
+        return getBackend().resolveVulkanicBuffer(gpuBuffer);
+    }
+
+    /**
+     * Returns the compiled {@link PipelineHandle} for the given render pipeline + descriptor,
+     * or {@code null} if the active backend has not compiled a handle for them yet.
+     *
+     * <p>In OpenGL: always returns {@code null} (handles are owned by the GL command encoder).
+     * In Vulkan: returns the cached pre-compiled {@code VulkanPipelineHandle} when available.
+     *
+     * <p>This lets code that holds a {@link net.blaze3d.pipeline.RenderPipeline} reference
+     * obtain the matching backend pipeline handle without casting into backend internals.
+     *
+     * @param renderPipeline  the render pipeline identity
+     * @param descriptor      the pipeline descriptor used at compile time
+     * @return the compiled handle, or {@code null}
+     */
+    @Nullable
+    public static PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                       PipelineDescriptor descriptor) {
+        return getBackend().resolvePipelineHandle(renderPipeline, descriptor);
+    }
+
     // =========================================================================
     // Phase 3e: Frame Lifecycle + Presentation
     // =========================================================================

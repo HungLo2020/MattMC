@@ -2173,6 +2173,30 @@ public class VulkanBackend {
         vulkanPool.reset();
     }
 
+    public net.vulkanic.VulkanicBuffer resolveVulkanicBuffer(net.blaze3d.buffers.GpuBuffer gpuBuffer) {
+        if (!(gpuBuffer instanceof net.blaze3d.opengl.GlBuffer glBuffer)) {
+            throw new IllegalArgumentException(
+                "Vulkan backend resolveVulkanicBuffer requires GlBuffer, got: "
+                    + gpuBuffer.getClass().getName());
+        }
+        ensureNativeReady("resolveVulkanicBuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        return spine.resolveLegacyVulkanBuffer(glBuffer.getHandle());
+    }
+
+    public net.vulkanic.PipelineHandle resolvePipelineHandle(
+            net.blaze3d.pipeline.RenderPipeline renderPipeline,
+            net.vulkanic.PipelineDescriptor descriptor) {
+        if (renderPipeline == null) {
+            return null;
+        }
+        PrecompiledPipelineState state = precompiledPipelineCache.get(renderPipeline);
+        return (state != null && state.isValid()) ? state.pipelineHandle : null;
+    }
+
     public void bindPipelineResources(CommandContext ctx,
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
@@ -5677,6 +5701,30 @@ public class VulkanBackend {
                 throw new IllegalArgumentException("Unknown Vulkan legacy buffer handle: " + bufferId);
             }
             return legacy;
+        }
+
+        /**
+         * Resolves a legacy buffer ID to the backing {@link VulkanBuffer}.
+         *
+         * <p>Called by {@link VulkanBackend#resolveVulkanicBuffer} to provide a
+         * backend-neutral buffer reference for descriptor binding without exposing
+         * {@code NativeSpine} internals to upper layers.
+         *
+         * @param bufferId the legacy integer buffer handle (from {@link #createLegacyBuffer})
+         * @return the backing {@code VulkanBuffer} for the given ID
+         * @throws IllegalArgumentException if the ID is unknown
+         * @throws IllegalStateException    if the buffer has not had data uploaded yet
+         */
+        private VulkanBuffer resolveLegacyVulkanBuffer(int bufferId) {
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            VulkanBuffer buffer = legacy.buffer;
+            if (buffer == null || buffer.isClosed()) {
+                throw new IllegalStateException(
+                    "Legacy buffer " + bufferId
+                        + " has no backing VulkanBuffer – upload buffer data before binding "
+                        + "it as a descriptor resource (bufferData / bufferSubData must be called first)");
+            }
+            return buffer;
         }
 
         private LegacyTextureObject requireLegacyTexture(int textureId) {

@@ -270,10 +270,14 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder trySetup should derive backend-neutral pipeline resource bindings from the live render pass");
         assertTrue(trySetupSource.contains("VulkanicAPI.bindPipelineResources("),
             "GlCommandEncoder trySetup should route sampler and UBO binding through VulkanicAPI.bindPipelineResources");
-        assertTrue(trySetupSource.contains("if (ctx.isImmediate())"),
-            "GlCommandEncoder trySetup should use pipeline-resource binding seam on immediate (OpenGL) contexts");
+        assertTrue(trySetupSource.contains("VulkanicAPI.resolvePipelineHandle("),
+            "GlCommandEncoder trySetup should resolve backend pipeline handles through VulkanicAPI seam for non-immediate contexts");
         assertTrue(trySetupSource.contains("immediateSeamHasCompleteCoverage"),
             "GlCommandEncoder trySetup should keep an explicit compatibility fallback path when immediate seam coverage is incomplete during migration");
+        assertFalse(trySetupSource.contains("(!ctx.isImmediate() || !immediateSeamHasCompleteCoverage)"),
+            "GlCommandEncoder trySetup legacy fallback should no longer force Vulkan contexts onto GL-shaped uniform/texture calls when descriptor seam coverage is complete");
+        assertTrue(glCommandEncoderSource.contains("VulkanicAPI.resolveVulkanicBuffer(slice.buffer())"),
+            "GlCommandEncoder should resolve uniform-buffer bindings through a backend-neutral VulkanicAPI buffer seam");
         assertTrue(openGLBackendSource.contains("samplerBinding.textureView()"),
             "OpenGLBackend should consume sampler texture views from the pipeline resource seam");
     }

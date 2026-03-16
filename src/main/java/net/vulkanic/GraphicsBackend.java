@@ -5,6 +5,7 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.TextureFormat;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.vulkanic.VulkanicBuffer;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.CommandEncoder;
@@ -3775,6 +3776,49 @@ public interface GraphicsBackend {
      * @return a PipelineHandle for the compiled pipeline
      */
     PipelineHandle createPipeline(PipelineDescriptor descriptor);
+
+    /**
+     * Resolves a {@link GpuBuffer} to the backend-specific {@link VulkanicBuffer} that
+     * backs it at the native (GPU) level.
+     *
+     * <p>In OpenGL: wraps the GL buffer object name in an {@code OpenGLBuffer}.
+     * In Vulkan: returns the underlying {@code VulkanBuffer} mapped from the
+     * legacy buffer ID stored in the {@code GlBuffer.handle} field.
+     *
+     * <p>This method is the canonical way for shared render-encoder code to obtain
+     * a backend-neutral buffer reference for descriptor binding — removing the need
+     * for callers to cast or branch on the active backend.
+     *
+     * @param gpuBuffer the GPU buffer to resolve
+     * @return the native backend buffer
+     * @throws IllegalArgumentException if the buffer type is not supported by this backend
+     * @throws IllegalStateException    if the backend state prevents resolution (e.g., not yet
+     *                                  uploaded for Vulkan)
+     */
+    VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer);
+
+    /**
+     * Returns the compiled {@link PipelineHandle} for the given pipeline identity and descriptor,
+     * or {@code null} if no compiled handle is available for this backend at this time.
+     *
+     * <p>In OpenGL: always returns {@code null} — pipeline handles are
+     * managed externally via {@link #createPipeline}.
+     * In Vulkan: looks up the precompile cache keyed by {@code renderPipeline} and
+     * returns the associated {@link net.vulkanic.backends.vulkan.VulkanBackend.VulkanPipelineHandle}
+     * when one has been compiled, otherwise {@code null}.
+     *
+     * <p>Callers that hold a backend-specific handle (e.g., {@code OpenGLPipelineHandle} from
+     * the GL command encoder) should still pass that handle directly; this method is intended
+     * for code that does not hold a handle and needs to resolve one at draw-setup time.
+     *
+     * @param renderPipeline the render pipeline identity
+     * @param descriptor     the pipeline descriptor used to compile the handle
+     * @return the compiled pipeline handle, or {@code null} if unavailable
+     */
+    default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                          PipelineDescriptor descriptor) {
+        return null;
+    }
 
     /**
      * Creates a descriptor-pool-style allocation domain for pipeline resource sets.

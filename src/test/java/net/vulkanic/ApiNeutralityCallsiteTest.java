@@ -81,8 +81,20 @@ public class ApiNeutralityCallsiteTest {
             "VulkanicAPI buffer wrappers should route through backend seam");
         assertTrue(graphicsBackendSource.contains("default GpuTextureView createTextureView("),
             "GraphicsBackend should expose backend-owned texture-view creation seams");
+        assertTrue(graphicsBackendSource.contains("VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer);"),
+            "GraphicsBackend should expose backend-neutral buffer resolution seam for descriptor binding");
+        assertTrue(graphicsBackendSource.contains("default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,"),
+            "GraphicsBackend should expose optional backend-neutral pipeline-handle lookup seam");
         assertTrue(vulkanicApiSource.contains("public static GpuTextureView createTextureView("),
             "VulkanicAPI should expose backend-owned texture-view creation wrappers");
+        assertTrue(vulkanicApiSource.contains("public static VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer)"),
+            "VulkanicAPI should expose backend-neutral buffer resolution wrapper");
+        assertTrue(vulkanicApiSource.contains("return getBackend().resolveVulkanicBuffer(gpuBuffer);"),
+            "VulkanicAPI buffer-resolution wrapper should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("public static PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,"),
+            "VulkanicAPI should expose backend-neutral pipeline-handle lookup wrapper");
+        assertTrue(vulkanicApiSource.contains("return getBackend().resolvePipelineHandle(renderPipeline, descriptor);"),
+            "VulkanicAPI pipeline-handle lookup wrapper should route through backend seam");
         assertTrue(vulkanicApiSource.contains("return getBackend().createTextureView("),
             "VulkanicAPI texture-view wrappers should route through backend seam");
         assertTrue(graphicsBackendSource.contains("default int getBackendMaxTextureSize()"),
@@ -112,6 +124,10 @@ public class ApiNeutralityCallsiteTest {
             "GlCommandEncoder should implement backend-neutral pipeline-state application through the interface seam");
         assertTrue(glCommandEncoderSource.contains("public void invalidateCachedProgramBinding()"),
             "GlCommandEncoder should implement backend-neutral cached-program invalidation through the interface seam");
+        assertTrue(glCommandEncoderSource.contains("VulkanicAPI.resolveVulkanicBuffer(slice.buffer())"),
+            "GlCommandEncoder should resolve descriptor uniform buffers through VulkanicAPI backend-neutral buffer seam");
+        assertFalse(glCommandEncoderSource.contains("new net.vulkanic.backends.opengl.OpenGLBuffer("),
+            "GlCommandEncoder should not construct OpenGLBuffer directly in shared draw setup logic");
         assertFalse(glCommandEncoderSource.contains("public GlProgram lastProgram"),
             "GlCommandEncoder should not expose lastProgram as a public concrete-backend field");
 

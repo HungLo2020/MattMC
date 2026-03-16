@@ -3282,6 +3282,16 @@ public class OpenGLBackend implements GraphicsBackend {
     // =========================================================================
 
     @Override
+    public net.vulkanic.VulkanicBuffer resolveVulkanicBuffer(net.blaze3d.buffers.GpuBuffer gpuBuffer) {
+        if (!(gpuBuffer instanceof net.blaze3d.opengl.GlBuffer glBuffer)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend resolveVulkanicBuffer requires GlBuffer, got: "
+                    + gpuBuffer.getClass().getName());
+        }
+        return new OpenGLBuffer(glBuffer.getHandle(), glBuffer.usage(), glBuffer.size());
+    }
+
+    @Override
     public net.vulkanic.PipelineHandle createPipeline(net.vulkanic.PipelineDescriptor descriptor) {
         if (glDevice == null) {
             throw new IllegalStateException(

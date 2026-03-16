@@ -10,8 +10,8 @@
 "Implements" means the backend has a declared method of that name.
 It does **not** mean the method works correctly end-to-end.
 
-> 100% coverage = every production `VulkanicAPI.*` callsite delegates to
-> a working implementation in both backends.  We are now at **100.0%** for Vulkan.
+> Coverage percentages in this document are declaration/proxy coverage and API-seam
+> coverage. They are not equivalent to runtime-rendering parity.
 
 ### How to measure progress
 
@@ -236,14 +236,17 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
 
 - **Capability Name:** Descriptor / Resource Binding
 - **Description:** Backend must allocate/update/bind resource descriptors for pipeline resources.
-- **Status:** COMPLETE
+- **Status:** IN PROGRESS
 - **Evidence:**
   - Abstractions exist: `DescriptorPoolHandle`, `DescriptorSetHandle`, `PipelineResourceBindings`.
   - OpenGL logical implementation exists (`OpenGLDescriptorPoolHandle`, `OpenGLDescriptorSetHandle`, `OpenGLBackend.bindPipelineResources(...)`).
   - Vulkan backend now provides full descriptor lifecycle methods: `createDescriptorPool`, `allocateDescriptorSet`, `updateDescriptorSet`, `bindDescriptorSet`, `resetDescriptorPool`, and `bindPipelineResources`.
   - New Vulkan logical descriptor handles (`VulkanDescriptorPoolHandle`, `VulkanDescriptorSetHandle`) enforce allocation capacity, validity, reset/close invalidation, and descriptor-layout matching.
-  - `VulkanBackend.bindPipelineResources(...)` now validates bindings against `PipelineDescriptor.ResourceLayout`, validates Vulkan command-context usage, validates Vulkan uniform-buffer slices, and records per-command-buffer bound resource state.
-- **Notes:** Descriptor/resource lifecycle and binding validation are operational in the Vulkan backend abstraction and now pair with native graphics-pipeline creation/binding.
+  - `VulkanBackend.bindPipelineResources(...)` validates bindings against `PipelineDescriptor.ResourceLayout`, validates Vulkan command-context usage, validates Vulkan uniform-buffer slices, and records per-command-buffer bound resource state.
+  - Shared draw setup in `GlCommandEncoder.trySetup(...)` now routes descriptor binding through `VulkanicAPI.bindPipelineResources(...)` for both immediate (OpenGL) and non-immediate (Vulkan) contexts instead of gating seam usage to immediate contexts only.
+  - Shared draw setup now resolves UBO slices through backend-owned `VulkanicAPI.resolveVulkanicBuffer(...)` (backed by `GraphicsBackend.resolveVulkanicBuffer(...)`) and resolves non-immediate pipeline handles through `VulkanicAPI.resolvePipelineHandle(...)`.
+  - Regression guardrails: `Phase3DrawPathTest`, `ApiNeutralityCallsiteTest`, and `VulkanDescriptorLifecycleTest` assert the new backend-neutral seams and anti-regression constraints.
+- **Notes:** Descriptor/resource abstraction and callsite routing are improved, but Vulkan runtime parity is not yet proven: GPU descriptor writes/binds (`vkUpdateDescriptorSets` and `vkCmdBindDescriptorSets`) remain unproven in production draw submission.
 
 ### Draw Calls (indexed and non-indexed)
 

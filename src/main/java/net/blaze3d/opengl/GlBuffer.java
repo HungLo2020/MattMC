@@ -35,6 +35,10 @@ public class GlBuffer extends GpuBuffer {
 		return this.closed;
 	}
 
+	public int getHandle() {
+		return this.handle;
+	}
+
 	@Override
 	public void close() {
 		if (!this.closed) {

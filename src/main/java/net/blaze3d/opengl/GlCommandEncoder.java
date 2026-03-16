@@ -225,15 +225,10 @@ public class GlCommandEncoder implements CommandEncoder {
 				case UNIFORM_BUFFER -> {
 					GpuBufferSlice slice = glRenderPass.uniforms.get(resourceBinding.name());
 					if (slice != null) {
-						if (!(slice.buffer() instanceof GlBuffer glBuffer)) {
-							throw new IllegalStateException(
-								"Uniform buffer binding must use GlBuffer in GlCommandEncoder, got: "
-									+ slice.buffer().getClass().getName());
-						}
 						builder.bindUniformBuffer(
 							resourceBinding.name(),
 							new net.vulkanic.VulkanicBufferSlice(
-								new net.vulkanic.backends.opengl.OpenGLBuffer(glBuffer.handle, glBuffer.usage(), glBuffer.size()),
+								VulkanicAPI.resolveVulkanicBuffer(slice.buffer()),
 								slice.offset(),
 								slice.length()
 							)
@@ -1155,17 +1150,25 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		boolean immediateSeamHasCompleteCoverage = false;
-		if (ctx.isImmediate()) {
-			PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass);
-			if (submission != null) {
-				VulkanicAPI.bindPipelineResources(
-					ctx,
-					new net.vulkanic.backends.opengl.OpenGLPipelineHandle(glRenderPass.pipeline),
-					submission.descriptor(),
-					submission.bindings()
-				);
-				immediateSeamHasCompleteCoverage = submission.completeCoverage();
+		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass);
+		if (submission != null) {
+			net.vulkanic.PipelineHandle pipelineHandle;
+			if (ctx.isImmediate()) {
+				// OpenGL path: wrap the already-available GlRenderPipeline directly.
+				pipelineHandle = new net.vulkanic.backends.opengl.OpenGLPipelineHandle(glRenderPass.pipeline);
+			} else {
+				// Vulkan path: resolve a precompiled VulkanPipelineHandle from the backend
+				// cache, or null if no precompiled handle is available yet.
+				pipelineHandle = VulkanicAPI.resolvePipelineHandle(
+						glRenderPass.pipeline.info(), glRenderPass.pipeline.descriptor());
 			}
+			VulkanicAPI.bindPipelineResources(
+				ctx,
+				pipelineHandle,
+				submission.descriptor(),
+				submission.bindings()
+			);
+			immediateSeamHasCompleteCoverage = submission.completeCoverage();
 		}
 
 		for (Entry<String, Uniform> entry2 : glProgram.getUniforms().entrySet()) {
@@ -1174,7 +1177,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			switch ((Uniform)entry2.getValue()) {
 				case Uniform.Ubo(int var61):
 					int var39 = var61;
-					if ((!ctx.isImmediate() || !immediateSeamHasCompleteCoverage) && bl2) {
+					if (!immediateSeamHasCompleteCoverage && bl2) {
 						GpuBufferSlice gpuBufferSlice2 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
 						if (gpuBufferSlice2 != null) {
 							VulkanicAPI.bindUniformBufferRange(ctx, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
@@ -1183,7 +1186,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					break;
 				case Uniform.Utb(int var41, int var42, TextureFormat var43, int var59):
 					int var44 = var59;
-					if ((!ctx.isImmediate() || !immediateSeamHasCompleteCoverage) && (bl || bl2)) {
+					if (!immediateSeamHasCompleteCoverage && (bl || bl2)) {
 						VulkanicAPI.setUniform1i(ctx, var41, var42);
 					}
 						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var42);
@@ -1194,7 +1197,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					}
 					break;
 				case Uniform.Sampler(int glTextureView2, int var51):
-					if (!ctx.isImmediate() || !immediateSeamHasCompleteCoverage) {
+					if (!immediateSeamHasCompleteCoverage) {
 						int var46 = var51;
 						GlTextureView glTextureView2x = (GlTextureView)glRenderPass.samplers.get(string2);
 						if (glTextureView2x == null) {

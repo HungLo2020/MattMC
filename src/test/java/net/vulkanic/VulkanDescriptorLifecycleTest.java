@@ -196,6 +196,10 @@ public class VulkanDescriptorLifecycleTest {
             "Vulkan descriptor lifecycle should route through VulkanDescriptorSetHandle");
         assertTrue(source.contains("bindPipelineResources("),
             "Vulkan descriptor lifecycle should expose resource-binding entrypoint");
+        assertTrue(source.contains("public net.vulkanic.VulkanicBuffer resolveVulkanicBuffer"),
+            "Vulkan backend should expose backend-neutral buffer resolution for descriptor callsites");
+        assertTrue(source.contains("resolveLegacyVulkanBuffer("),
+            "Vulkan backend should resolve legacy integer buffer handles to real VulkanBuffer storage");
 
         assertFalse(source.contains("Vulkan-native descriptor pool lifecycle is not implemented yet."),
             "Descriptor pool lifecycle should no longer be marked unsupported");
