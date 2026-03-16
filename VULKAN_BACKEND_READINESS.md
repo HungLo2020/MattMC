@@ -923,6 +923,49 @@ Production callsite migration only — 18 source files updated:
 - Remaining 5 `VulkanicAPI.getDevice()` calls are intentional infrastructure: `RenderSystem.java` (device-registration bridge, 2 calls), `VertexFormat.java` (hardware workaround detection, 1 call), `Minecraft.java` (bootstrap/teardown lifecycle, 2 calls). These are candidates for further encapsulation but are not resource-allocation callsites.
 - All resource-creation seams still route through compatibility `GlDevice` under Vulkan-selected startup; fully native Vulkan resource ownership remains future work.
 
+## Session 2026-03-15: RenderSystem Device-Access Sweep — Iris and Sodium Resource/Pass Cluster
+
+### Problem Targeted
+Even after the `VulkanicAPI.getDevice()` sweep, 19 production callsites still acquired concrete devices through `RenderSystem.getDevice()` inside high-traffic Iris and Sodium render code. That trailing cluster covered Iris depth target allocation (`RenderTargets`, `ShadowRenderTargets`), custom/noise texture upload, full-screen quad and horizon buffer allocation, final/composite/shadow/center-depth/colorspace render-pass creation, PBR atlas allocation, Sodium cloud-target clear, and Sodium chunk renderer command-encoder acquisition. Those callsites still expressed backend work as concrete device choreography instead of backend-owned VulkanicAPI seam usage.
+
+### Structural Changes
+No new backend methods were required. Existing backend-owned seams already covered the full cluster: `VulkanicAPI.createTexture(...)`, `createBuffer(...)`, `createCommandEncoder()`, and `createRenderPass(...)`.
+
+Production callsite migration only — 14 source files updated:
+- **Iris depth/target allocation (3 files):** `RenderTargets`, `ShadowRenderTargets`, `PBRAtlasTexture` now allocate textures through `VulkanicAPI.createTexture(...)` instead of `RenderSystem.getDevice().createTexture(...)`.
+- **Iris upload/encoder paths (2 files):** `NativeImageBackedCustomTexture`, `NativeImageBackedNoiseTexture` now upload via `VulkanicAPI.createCommandEncoder().writeToTexture(...)`.
+- **Iris buffer allocation (2 files):** `FullScreenQuadRenderer`, `HorizonRenderer` now allocate GPU buffers through `VulkanicAPI.createBuffer(...)`.
+- **Iris render-pass paths (5 files):** `CenterDepthSampler`, `ColorSpaceFragmentConverter`, `CompositeRenderer`, `FinalPassRenderer`, `ShadowCompositeRenderer`, and the horizon draw pass in `HorizonRenderer` now create render passes through `VulkanicAPI.createRenderPass(...)`.
+- **Sodium trailing callsites (2 files):** `SodiumGameOptionPages` now clears cloud targets through `VulkanicAPI.createCommandEncoder()`, and `ShaderChunkRenderer` now acquires its backend-neutral `CommandEncoder` through `VulkanicAPI.createCommandEncoder()`.
+- Removed now-unused `RenderSystem` imports from all migrated files where device access was their only usage.
+
+### Evidence
+- Source sweep confirming full removal of production `RenderSystem.getDevice()` callsites:
+  - `grep -RIn --include='*.java' 'RenderSystem\.getDevice\(' src/main/java`
+  - Result: **0 matches**.
+- New callsite guardrail test:
+  - `ApiNeutralityCallsiteTest.testIrisAndSodiumRenderClusterCallsitesUseVulkanicAPISeams()` asserts positive seam usage plus negative `RenderSystem.getDevice()` absence across all 14 migrated Iris/Sodium files.
+- New seam-acceptance package test:
+  - `Phase3DrawPathTest.testIrisAndSodiumRenderClustersUseVulkanicAPISeams()` treats `createTexture/createBuffer/createCommandEncoder/createRenderPass` as valid migration endpoints for the migrated cluster and blocks `RenderSystem.getDevice()` regressions.
+- Targeted validation run:
+  - `./gradlew test --tests net.vulkanic.ApiNeutralityCallsiteTest --tests net.vulkanic.Phase3DrawPathTest`
+  - Result: **139 passed, 0 failed**.
+- Full regression validation:
+  - `./gradlew test --rerun-tasks`
+  - Result: **459 passed, 0 failed, BUILD SUCCESSFUL**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: client reached integrated-world join, player login, and render pipeline recreation for `minecraft:overworld`; no startup crash/regression introduced by the migration.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** Shared Iris and Sodium rendering code no longer acquires concrete devices through `RenderSystem.getDevice()` for resource creation, clears, uploads, or render-pass setup. Those callsites now express backend intent directly through VulkanicAPI seams.
+- **4 — Parity Improvement:** Both backends now satisfy the same VulkanicAPI seam contract for the migrated Iris/Sodium paths, instead of relying on OpenGL-shaped device acquisition from shared renderer code.
+- **5 — Debuggability Improvement:** Source guardrails now make `RenderSystem.getDevice()` reintroduction in this render cluster an immediate test failure rather than a late runtime abstraction regression.
+
+### Still Unproven
+- `RenderSystem.getDevice()` still exists as a bridge method, but there are no remaining production callsites under `src/main/java` after this session. Whether that bridge should be deleted or retained for API compatibility is still a follow-up decision.
+- The migrated seams still route through compatibility `GlDevice` ownership on Vulkan-selected startup; this session removed shared-callsite coupling, not the remaining compatibility-backed backend internals.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

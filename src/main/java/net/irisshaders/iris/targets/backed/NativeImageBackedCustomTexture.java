@@ -1,7 +1,6 @@
 package net.irisshaders.iris.targets.backed;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
@@ -45,7 +44,7 @@ public class NativeImageBackedCustomTexture extends DynamicTexture implements Te
 	public void upload() {
 		NativeImage image = Objects.requireNonNull(getPixels());
 
-		RenderSystem.getDevice().createCommandEncoder().writeToTexture(this.texture, image);
+		VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, image);
 	}
 
 	@Override

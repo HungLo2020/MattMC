@@ -3,7 +3,6 @@ package net.irisshaders.iris.pathways;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.BufferBuilder;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.MeshData;
@@ -76,7 +75,7 @@ public class HorizonRenderer {
 		buildHorizon(currentRenderDistance * 16, buffer);
 		MeshData meshData = buffer.build();
 
-		this.buffer = RenderSystem.getDevice().createBuffer(() -> "Horizon", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, meshData.vertexBuffer());
+		this.buffer = VulkanicAPI.createBuffer(() -> "Horizon", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, meshData.vertexBuffer());
 		this.indexCount = meshData.drawState().indexCount();
 		meshData.close();
 		Tesselator.getInstance().clear();
@@ -175,7 +174,7 @@ public class HorizonRenderer {
 		VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer indexBuffer = indices.getBuffer(indexCount);
 		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms().writeTransform(modelView, fogColor, new Vector3f(), VulkanicAPI.getTextureMatrix(), VulkanicAPI.getShaderLineWidth());
-		try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Sky", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty(),
+		try (RenderPass pass = VulkanicAPI.createRenderPass(() -> "Sky", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty(),
 			Minecraft.getInstance().getMainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
 			VulkanicAPI.bindDefaultUniforms(pass);
 			pass.setUniform("DynamicTransforms", gpuBufferSlice);

@@ -115,12 +115,14 @@ public class ApiNeutralityCallsiteTest {
         assertFalse(glCommandEncoderSource.contains("public GlProgram lastProgram"),
             "GlCommandEncoder should not expose lastProgram as a public concrete-backend field");
 
-        assertTrue(sodiumRendererSource.contains("CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();"),
-            "ShaderChunkRenderer should acquire a backend-neutral CommandEncoder");
+        assertTrue(sodiumRendererSource.contains("CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();"),
+            "ShaderChunkRenderer should acquire a backend-owned CommandEncoder through VulkanicAPI seam");
         assertTrue(sodiumRendererSource.contains("commandEncoder.applyPipelineState(pass.getPipeline());"),
             "ShaderChunkRenderer should apply pipeline state through CommandEncoder");
         assertTrue(sodiumRendererSource.contains("commandEncoder.invalidateCachedProgramBinding();"),
             "ShaderChunkRenderer should invalidate cached program binding through CommandEncoder");
+        assertFalse(sodiumRendererSource.contains("RenderSystem.getDevice("),
+            "ShaderChunkRenderer should avoid direct RenderSystem.getDevice() acquisition after seam migration");
         assertFalse(sodiumRendererSource.contains("GlCommandEncoder"),
             "ShaderChunkRenderer should avoid concrete GlCommandEncoder dependency");
 
@@ -1303,5 +1305,89 @@ public class ApiNeutralityCallsiteTest {
             "VertexFormat should allocate immediate upload buffers through backend-owned VulkanicAPI seam");
         assertTrue(vertexFormatSource.contains("VulkanicAPI.createCommandEncoder()"),
             "VertexFormat should acquire command encoders through backend-owned VulkanicAPI seam");
+    }
+
+    @Test
+    public void testIrisAndSodiumRenderClusterCallsitesUseVulkanicAPISeams() throws IOException {
+        String renderTargetsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTargets.java"));
+        String customTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedCustomTexture.java"));
+        String noiseTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedNoiseTexture.java"));
+        String centerDepthSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/CenterDepthSampler.java"));
+        String colorSpaceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/colorspace/ColorSpaceFragmentConverter.java"));
+        String fullScreenQuadSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/FullScreenQuadRenderer.java"));
+        String horizonRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java"));
+        String shadowCompositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+        String shadowRenderTargetsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderTargets.java"));
+        String finalPassRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java"));
+        String compositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+        String pbrAtlasTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/texture/PBRAtlasTexture.java"));
+        String sodiumOptionsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gui/SodiumGameOptionPages.java"));
+        String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
+
+        assertTrue(renderTargetsSource.contains("VulkanicAPI.createTexture("),
+            "Iris RenderTargets should allocate depth textures through backend-owned VulkanicAPI seam");
+        assertFalse(renderTargetsSource.contains("RenderSystem.getDevice("),
+            "Iris RenderTargets should avoid direct RenderSystem.getDevice() texture allocation");
+
+        assertTrue(customTextureSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "NativeImageBackedCustomTexture should upload textures through backend-owned VulkanicAPI command encoder seam");
+        assertFalse(customTextureSource.contains("RenderSystem.getDevice("),
+            "NativeImageBackedCustomTexture should avoid direct RenderSystem.getDevice() upload path");
+        assertTrue(noiseTextureSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "NativeImageBackedNoiseTexture should upload textures through backend-owned VulkanicAPI command encoder seam");
+        assertFalse(noiseTextureSource.contains("RenderSystem.getDevice("),
+            "NativeImageBackedNoiseTexture should avoid direct RenderSystem.getDevice() upload path");
+
+        assertTrue(centerDepthSource.contains("VulkanicAPI.createRenderPass("),
+            "CenterDepthSampler should create its sampling pass through backend-owned VulkanicAPI render-pass seam");
+        assertFalse(centerDepthSource.contains("RenderSystem.getDevice("),
+            "CenterDepthSampler should avoid direct RenderSystem.getDevice() render-pass creation");
+        assertTrue(colorSpaceSource.contains("VulkanicAPI.createRenderPass("),
+            "ColorSpaceFragmentConverter should create its conversion pass through backend-owned VulkanicAPI render-pass seam");
+        assertFalse(colorSpaceSource.contains("RenderSystem.getDevice("),
+            "ColorSpaceFragmentConverter should avoid direct RenderSystem.getDevice() render-pass creation");
+
+        assertTrue(fullScreenQuadSource.contains("VulkanicAPI.createBuffer("),
+            "FullScreenQuadRenderer should allocate quad buffer through backend-owned VulkanicAPI seam");
+        assertFalse(fullScreenQuadSource.contains("RenderSystem.getDevice("),
+            "FullScreenQuadRenderer should avoid direct RenderSystem.getDevice() buffer allocation");
+        assertTrue(horizonRendererSource.contains("VulkanicAPI.createBuffer("),
+            "HorizonRenderer should allocate horizon buffers through backend-owned VulkanicAPI seam");
+        assertTrue(horizonRendererSource.contains("VulkanicAPI.createRenderPass("),
+            "HorizonRenderer should create sky render passes through backend-owned VulkanicAPI seam");
+        assertFalse(horizonRendererSource.contains("RenderSystem.getDevice("),
+            "HorizonRenderer should avoid direct RenderSystem.getDevice() resource and pass creation");
+
+        assertTrue(shadowCompositeSource.contains("VulkanicAPI.createRenderPass("),
+            "ShadowCompositeRenderer should create composite passes through backend-owned VulkanicAPI seam");
+        assertFalse(shadowCompositeSource.contains("RenderSystem.getDevice("),
+            "ShadowCompositeRenderer should avoid direct RenderSystem.getDevice() render-pass creation");
+        assertTrue(shadowRenderTargetsSource.contains("VulkanicAPI.createTexture("),
+            "ShadowRenderTargets should allocate depth targets through backend-owned VulkanicAPI seam");
+        assertFalse(shadowRenderTargetsSource.contains("RenderSystem.getDevice("),
+            "ShadowRenderTargets should avoid direct RenderSystem.getDevice() texture allocation");
+
+        assertTrue(finalPassRendererSource.contains("VulkanicAPI.createRenderPass("),
+            "FinalPassRenderer should create final-pass render passes through backend-owned VulkanicAPI seam");
+        assertFalse(finalPassRendererSource.contains("RenderSystem.getDevice("),
+            "FinalPassRenderer should avoid direct RenderSystem.getDevice() render-pass creation");
+        assertTrue(compositeRendererSource.contains("VulkanicAPI.createRenderPass("),
+            "CompositeRenderer should create composite passes through backend-owned VulkanicAPI seam");
+        assertFalse(compositeRendererSource.contains("RenderSystem.getDevice("),
+            "CompositeRenderer should avoid direct RenderSystem.getDevice() render-pass creation");
+
+        assertTrue(pbrAtlasTextureSource.contains("VulkanicAPI.createTexture("),
+            "PBRAtlasTexture should allocate atlas textures through backend-owned VulkanicAPI seam");
+        assertFalse(pbrAtlasTextureSource.contains("RenderSystem.getDevice("),
+            "PBRAtlasTexture should avoid direct RenderSystem.getDevice() texture allocation");
+
+        assertTrue(sodiumOptionsSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "SodiumGameOptionPages should clear cloud framebuffer through backend-owned VulkanicAPI command encoder seam");
+        assertFalse(sodiumOptionsSource.contains("RenderSystem.getDevice("),
+            "SodiumGameOptionPages should avoid direct RenderSystem.getDevice() clear path");
+        assertTrue(sodiumRendererSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "ShaderChunkRenderer should acquire a backend-owned CommandEncoder through VulkanicAPI seam");
+        assertFalse(sodiumRendererSource.contains("RenderSystem.getDevice("),
+            "ShaderChunkRenderer should avoid direct RenderSystem.getDevice() command encoder acquisition");
     }
 }

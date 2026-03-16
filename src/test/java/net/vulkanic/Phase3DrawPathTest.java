@@ -4796,6 +4796,53 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testIrisAndSodiumRenderClustersUseVulkanicAPISeams() throws IOException {
+        Path[] migratedFiles = new Path[] {
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTargets.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedCustomTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedNoiseTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/CenterDepthSampler.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/colorspace/ColorSpaceFragmentConverter.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/FullScreenQuadRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderTargets.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/texture/PBRAtlasTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/sodium/client/gui/SodiumGameOptionPages.java"),
+            SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java")
+        };
+
+        for (Path file : migratedFiles) {
+            String source = Files.readString(file);
+            assertFalse(source.contains("RenderSystem.getDevice("),
+                file + " should not call RenderSystem.getDevice after Iris/Sodium seam migration");
+            boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
+            boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
+            boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
+            boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
+            boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
+            boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
+            boolean usesBackendMaxTextureSizeSeam = source.contains("VulkanicAPI.getBackendMaxTextureSize(");
+            boolean usesBackendUniformAlignmentSeam = source.contains("VulkanicAPI.getBackendUniformOffsetAlignment(");
+            boolean usesBackendDeviceInfoSeam = source.contains("VulkanicAPI.getBackendDeviceInfo(");
+            assertTrue(
+                usesDeviceSeam
+                    || usesCommandEncoderSeam
+                    || usesRenderPassSeam
+                    || usesTextureSeam
+                    || usesBufferSeam
+                    || usesTextureViewSeam
+                    || usesBackendMaxTextureSizeSeam
+                    || usesBackendUniformAlignmentSeam
+                    || usesBackendDeviceInfoSeam,
+                file + " should call a backend-owned VulkanicAPI seam after Iris/Sodium migration"
+            );
+        }
+    }
+
+    @Test
     public void testScissorStateOwnershipMovedToVulkanicAPI() throws IOException {
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
         String renderSystemSource = Files.readString(renderSystemFile);
