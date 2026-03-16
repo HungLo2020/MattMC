@@ -13,6 +13,9 @@ import java.util.Objects;
 
 final class GlslangSpirvCompiler implements SpirvCompiler {
 
+    private static final java.util.regex.Pattern LEGACY_VERTEX_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_VertexID\\b");
+    private static final java.util.regex.Pattern LEGACY_INSTANCE_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_InstanceID\\b");
+
     @Override
     public VulkanicSpirvModule compile(VulkanicShaderStage stage, CharSequence source, String sourceName, String entryPoint) {
         Objects.requireNonNull(stage, "stage must not be null");
@@ -113,6 +116,15 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             case TESSELLATION_CONTROL -> "tesc";
             case TESSELLATION_EVALUATION -> "tese";
         };
+    }
+
+    static String normalizeForVulkan(VulkanicShaderStage stage, String shaderSource) {
+        if (stage != VulkanicShaderStage.VERTEX || shaderSource.isEmpty()) {
+            return shaderSource;
+        }
+
+        String normalized = LEGACY_VERTEX_ID_PATTERN.matcher(shaderSource).replaceAll("gl_VertexIndex");
+        return LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
     }
 
     private static void deleteTempDirectoryQuietly(Path directory) {

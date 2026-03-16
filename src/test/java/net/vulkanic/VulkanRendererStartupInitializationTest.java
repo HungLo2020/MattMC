@@ -146,6 +146,28 @@ public class VulkanRendererStartupInitializationTest {
     }
 
     @Test
+    public void testVulkanBackendOnRendererDeviceInitializedWiresIrisLifecycleHooks() throws Exception {
+        String vulkanBackendSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        // Iris init hooks must be called inside onRendererDeviceInitialized so that
+        // IrisRenderSystem.dsaState and related static fields are not null when the Iris
+        // shader pipeline is first created on the Vulkan path.
+        assertTrue(vulkanBackendSource.contains("IrisRenderSystem.initRenderer()"),
+            "VulkanBackend.onRendererDeviceInitialized should call IrisRenderSystem.initRenderer() "
+                + "so that dsaState and related Iris statics are not null on the Vulkan path");
+        assertTrue(vulkanBackendSource.contains("IrisSamplers.initRenderer()"),
+            "VulkanBackend.onRendererDeviceInitialized should call IrisSamplers.initRenderer() "
+                + "to initialize shadow sampler objects on the Vulkan path");
+        assertTrue(vulkanBackendSource.contains("Iris.duringRenderSystemInit()"),
+            "VulkanBackend.onRendererDeviceInitialized should call Iris.duringRenderSystemInit() "
+                + "to keep Iris lifecycle hook sequencing correct on the Vulkan path");
+        assertTrue(vulkanBackendSource.contains("Iris.onRenderSystemInit()"),
+            "VulkanBackend.onRendererDeviceInitialized should call Iris.onRenderSystemInit() "
+                + "to complete Iris renderer initialization on the Vulkan path");
+    }
+
+    @Test
     public void testNoApiWindowStartupSourceWiringAvoidsMainWindowContextBinding() throws Exception {
         String renderSystemSource = Files.readString(PROJECT_ROOT
             .resolve("src/main/java/net/blaze3d/systems/RenderSystem.java"));
@@ -172,6 +194,31 @@ public class VulkanRendererStartupInitializationTest {
             "Window should register GLFW handle for Vulkan NO_API surface initialization");
         assertTrue(windowSource.contains("clearRegisteredGlfwWindowHandleForVulkanSurface"),
             "Window shutdown should clear registered GLFW handle for tidy lifecycle management");
+    }
+
+    @Test
+    public void testCenterDepthVertexShaderAvoidsStandaloneUniformsForVulkan() throws Exception {
+        String centerDepthVertexSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/resources/centerDepth.vsh"));
+        String centerDepthFragmentSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/resources/centerDepth.fsh"));
+        String centerDepthSamplerSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/irisshaders/iris/pathways/CenterDepthSampler.java"));
+        String irisSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/irisshaders/iris/Iris.java"));
+
+        assertFalse(centerDepthVertexSource.contains("uniform mat4 projection"),
+            "centerDepth.vsh should avoid standalone non-opaque uniforms that fail Vulkan GLSL compilation");
+        assertTrue(centerDepthVertexSource.contains("iris_Position.xy * 2.0 - 1.0"),
+            "centerDepth.vsh should perform fixed fullscreen-NDC projection without runtime uniform plumbing");
+        assertFalse(centerDepthFragmentSource.contains("uniform float lastFrameTime"),
+            "centerDepth.fsh should avoid standalone scalar uniforms that fail Vulkan GLSL compilation");
+        assertFalse(centerDepthFragmentSource.contains("uniform float decay"),
+            "centerDepth.fsh should avoid standalone scalar uniforms that fail Vulkan GLSL compilation");
+        assertTrue(centerDepthSamplerSource.contains("if (VulkanicAPI.isVulkanBackendSelected())"),
+            "CenterDepthSampler should include a Vulkan compatibility guard to skip legacy smoothing program creation during startup");
+        assertTrue(irisSource.contains("Disabling Iris shaderpack loading on the Vulkan path"),
+            "Iris shaderpack loading should fail over explicitly on the Vulkan path instead of attempting incompatible shaderpack GLSL startup");
     }
 
     private static Object getBackendFieldValue() throws Exception {

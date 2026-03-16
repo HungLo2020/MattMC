@@ -122,6 +122,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.lwjgl.system.MemoryStack.stackPush;
 import org.slf4j.Logger;
@@ -132,6 +134,12 @@ public class VulkanBackend {
 
     private static final int GL_LUMINANCE = 0x1909;
     private static final int GL_LUMINANCE_ALPHA = 0x190A;
+    private static final Pattern GLSL_BLOCK_COMMENT_PATTERN = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
+    private static final Pattern GLSL_LINE_COMMENT_PATTERN = Pattern.compile("(?m)//.*$");
+    private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
+    private static final Pattern GLSL_STANDALONE_UNIFORM_PATTERN = Pattern.compile(
+        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+\\w+(?:\\s*\\[[^\\]]+\\])?\\s+(\\w+)(?:\\s*\\[[^\\]]+\\])?\\s*;"
+    );
 
     private final Object nativeInitLock = new Object();
     private volatile NativeSpine nativeSpine;
@@ -312,13 +320,13 @@ public class VulkanBackend {
             String vertexWithDefines = GlslPreprocessor.injectDefines(vertexSource, renderPipeline.getShaderDefines());
             String fragmentWithDefines = GlslPreprocessor.injectDefines(fragmentSource, renderPipeline.getShaderDefines());
 
-            VulkanicSpirvModule vertexModule = spirvCompiler.compile(
+            VulkanicSpirvModule vertexModule = compileSpirvModuleForBackend(
                 VulkanicShaderStage.VERTEX,
                 vertexWithDefines,
                 renderPipeline.getVertexShader().toString(),
                 "main"
             );
-            VulkanicSpirvModule fragmentModule = spirvCompiler.compile(
+            VulkanicSpirvModule fragmentModule = compileSpirvModuleForBackend(
                 VulkanicShaderStage.FRAGMENT,
                 fragmentWithDefines,
                 renderPipeline.getFragmentShader().toString(),
@@ -540,6 +548,17 @@ public class VulkanBackend {
         LOGGER.info("Vulkan readiness: {}", getReadinessReport().summaryLine());
         LOGGER.info("Vulkan execution context: {}", getVulkanExecutionContextInfo().summaryLine());
         LOGGER.info("Vulkan surface/swapchain: {}", getVulkanSwapchainSurfaceInfo().summaryLine());
+
+        // Iris subsystems must be initialized on the Vulkan path exactly as they are on the OpenGL path.
+        // IrisRenderSystem.dsaState (and several other static fields) is set here; without this call those
+        // fields remain null and any Iris shader-pipeline creation will throw a NullPointerException.
+        // The Vulkan capabilities object reports all-false for DSA/multibind/etc., so DSAUnsupported is
+        // selected — all of its methods route through VulkanicAPI and are fully backend-neutral.
+        net.irisshaders.iris.Iris.duringRenderSystemInit();
+        net.irisshaders.iris.gl.GLDebug.reloadDebugState();
+        net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
+        net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
+        net.irisshaders.iris.Iris.onRenderSystemInit();
     }
 
     public void cleanupRendererBootstrapResources() {
@@ -924,7 +943,17 @@ public class VulkanBackend {
         String sourceName,
         String entryPoint
     ) {
-        return spirvCompiler.compile(shaderStage, glslSource, sourceName, entryPoint);
+        return compileSpirvModuleForBackend(shaderStage, glslSource, sourceName, entryPoint);
+    }
+
+    private VulkanicSpirvModule compileSpirvModuleForBackend(
+        VulkanicShaderStage shaderStage,
+        CharSequence glslSource,
+        String sourceName,
+        String entryPoint
+    ) {
+        String normalizedSource = GlslangSpirvCompiler.normalizeForVulkan(shaderStage, glslSource.toString());
+        return spirvCompiler.compile(shaderStage, normalizedSource, sourceName, entryPoint);
     }
 
     public Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
@@ -1055,9 +1084,12 @@ public class VulkanBackend {
         if (!issues.isEmpty()) {
             virtualProgram.linkStatus = false;
             virtualProgram.infoLog = String.join("\n", issues);
+            virtualProgram.activeUniformNames = List.of();
+            virtualProgram.activeUniformBlocks = List.of();
             return;
         }
 
+        reflectVirtualProgramResources(virtualProgram);
         virtualProgram.linkStatus = true;
         virtualProgram.infoLog = "";
     }
@@ -1068,16 +1100,44 @@ public class VulkanBackend {
             return virtualProgram.linkStatus ? VulkanicAPI.GL_TRUE : VulkanicAPI.GL_FALSE;
         }
         if (pname == VulkanicAPI.GL_ACTIVE_UNIFORMS) {
-            return 0;
+            return virtualProgram.activeUniformNames.size();
         }
         if (pname == VulkanicAPI.GL_ACTIVE_UNIFORM_BLOCKS) {
-            return 0;
+            return virtualProgram.activeUniformBlocks.size();
         }
         return 0;
     }
 
     public String getProgramInfoLog(CommandContext ctx, int program) {
         return requireVirtualProgram(program).infoLog;
+    }
+
+    private void reflectVirtualProgramResources(VirtualProgram virtualProgram) {
+        Set<String> activeUniformNames = new java.util.LinkedHashSet<>();
+        Set<String> activeUniformBlocks = new java.util.LinkedHashSet<>();
+
+        for (int shaderId : virtualProgram.attachedShaderIds) {
+            VirtualShader virtualShader = virtualShaders.get(shaderId);
+            if (virtualShader == null || virtualShader.source == null || virtualShader.source.isBlank()) {
+                continue;
+            }
+
+            String normalizedSource = GLSL_LINE_COMMENT_PATTERN.matcher(
+                GLSL_BLOCK_COMMENT_PATTERN.matcher(virtualShader.source).replaceAll("")
+            ).replaceAll("");
+            Matcher blockMatcher = GLSL_UNIFORM_BLOCK_PATTERN.matcher(normalizedSource);
+            while (blockMatcher.find()) {
+                activeUniformBlocks.add(blockMatcher.group(1));
+            }
+
+            Matcher uniformMatcher = GLSL_STANDALONE_UNIFORM_PATTERN.matcher(normalizedSource);
+            while (uniformMatcher.find()) {
+                activeUniformNames.add(uniformMatcher.group(1));
+            }
+        }
+
+        virtualProgram.activeUniformNames = List.copyOf(activeUniformNames);
+        virtualProgram.activeUniformBlocks = List.copyOf(activeUniformBlocks);
     }
 
     public void deleteShader(CommandContext ctx, int shader) {
@@ -1496,15 +1556,29 @@ public class VulkanBackend {
     }
 
     private static boolean isSupportedLegacyTextureTarget(int target) {
-        return target == VulkanicAPI.GL_TEXTURE_2D
+        return target == VulkanicAPI.GL_TEXTURE_1D
+            || target == VulkanicAPI.GL_TEXTURE_2D
+            || target == VulkanicAPI.GL_TEXTURE_3D
+            || target == VulkanicAPI.GL_TEXTURE_RECTANGLE
             || target == VulkanicAPI.GL_PROXY_TEXTURE_2D
             || target == VulkanicAPI.GL_TEXTURE_CUBE_MAP
             || isLegacyCubemapFaceTarget(target);
     }
 
     private static boolean isSupportedLegacyTextureBindTarget(int target) {
-        return target == VulkanicAPI.GL_TEXTURE_2D
+        return target == VulkanicAPI.GL_TEXTURE_1D
+            || target == VulkanicAPI.GL_TEXTURE_2D
+            || target == VulkanicAPI.GL_TEXTURE_3D
+            || target == VulkanicAPI.GL_TEXTURE_RECTANGLE
             || target == VulkanicAPI.GL_PROXY_TEXTURE_2D
+            || target == VulkanicAPI.GL_TEXTURE_CUBE_MAP;
+    }
+
+    private static boolean isSupportedLegacyTextureCreateTarget(int target) {
+        return target == VulkanicAPI.GL_TEXTURE_1D
+            || target == VulkanicAPI.GL_TEXTURE_2D
+            || target == VulkanicAPI.GL_TEXTURE_3D
+            || target == VulkanicAPI.GL_TEXTURE_RECTANGLE
             || target == VulkanicAPI.GL_TEXTURE_CUBE_MAP;
     }
 
@@ -1515,7 +1589,11 @@ public class VulkanBackend {
     public void bindTexture(CommandContext ctx, int target, int textureId) {
         requireVulkanCommandBufferHandle("bindTexture", ctx);
         if (!isSupportedLegacyTextureBindTarget(target)) {
-            throw new IllegalArgumentException("Vulkan legacy texture path currently supports GL_TEXTURE_2D/GL_PROXY_TEXTURE_2D/GL_TEXTURE_CUBE_MAP bind targets, got: " + target);
+            throw new IllegalArgumentException(
+                "Vulkan legacy texture path currently supports GL_TEXTURE_1D/GL_TEXTURE_2D/GL_TEXTURE_3D/"
+                    + "GL_TEXTURE_RECTANGLE/GL_PROXY_TEXTURE_2D/GL_TEXTURE_CUBE_MAP bind targets, got: "
+                    + target
+            );
         }
         if (textureId < 0) {
             throw new IllegalArgumentException("textureId must be >= 0, got: " + textureId);
@@ -1559,8 +1637,12 @@ public class VulkanBackend {
 
     public int createTextures(CommandContext ctx, int target) {
         requireVulkanCommandBufferHandle("createTextures", ctx);
-        if (target != VulkanicAPI.GL_TEXTURE_2D) {
-            throw new IllegalArgumentException("Vulkan legacy texture path currently supports only GL_TEXTURE_2D createTextures target, got: " + target);
+        if (!isSupportedLegacyTextureCreateTarget(target)) {
+            throw new IllegalArgumentException(
+                "Vulkan legacy texture path currently supports GL_TEXTURE_1D/GL_TEXTURE_2D/GL_TEXTURE_3D/"
+                    + "GL_TEXTURE_RECTANGLE/GL_TEXTURE_CUBE_MAP createTextures targets, got: "
+                    + target
+            );
         }
 
         ensureNativeReady("createTextures");
@@ -1815,12 +1897,26 @@ public class VulkanBackend {
     private static final class LegacyTextureFormatInfo {
         private final int vkFormat;
         private final int pixelBytes;
+        private final int unpackPixelBytes;
         private final int aspectMask;
+        private final boolean expandRgbToRgba;
 
         private LegacyTextureFormatInfo(int vkFormat, int pixelBytes, int aspectMask) {
+            this(vkFormat, pixelBytes, pixelBytes, aspectMask, false);
+        }
+
+        private LegacyTextureFormatInfo(
+            int vkFormat,
+            int pixelBytes,
+            int unpackPixelBytes,
+            int aspectMask,
+            boolean expandRgbToRgba
+        ) {
             this.vkFormat = vkFormat;
             this.pixelBytes = pixelBytes;
+            this.unpackPixelBytes = unpackPixelBytes;
             this.aspectMask = aspectMask;
+            this.expandRgbToRgba = expandRgbToRgba;
         }
 
         private static LegacyTextureFormatInfo resolve(int internalFormat, int format, int type) {
@@ -1878,7 +1974,14 @@ public class VulkanBackend {
             }
 
             if (format == VulkanicAPI.GL_RGB && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
-                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R8G8B8_UNORM, 3, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+                // Normalize RGB8 uploads to RGBA8 to avoid fragile 24-bit legacy image allocations.
+                return new LegacyTextureFormatInfo(
+                    VK10.VK_FORMAT_R8G8B8A8_UNORM,
+                    4,
+                    3,
+                    VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+                    true
+                );
             }
 
             throw new IllegalArgumentException(
@@ -3144,12 +3247,14 @@ public class VulkanBackend {
     // =====================================================================
 
     /**
-     * Returns {@code -1} (not found). Vulkan does not have legacy GL uniform
-     * locations — resources are bound through descriptor sets.
+     * Returns a stable virtual index for linked GLSL uniforms so the legacy
+     * compatibility layer can keep sampler and texel-buffer bindings alive on
+     * the Vulkan path.
      */
     public int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
         requireVulkanCommandBufferHandle("getUniformLocation", ctx);
-        return -1;
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        return virtualProgram == null ? -1 : virtualProgram.activeUniformNames.indexOf(name.toString());
     }
 
     // =====================================================================
@@ -3763,7 +3868,11 @@ public class VulkanBackend {
 
     public String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
         requireVulkanCommandBufferHandle("retrieveActiveUniformBlockName", ctx);
-        return "";
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        if (virtualProgram == null || uniformBlockIndex < 0 || uniformBlockIndex >= virtualProgram.activeUniformBlocks.size()) {
+            return "";
+        }
+        return virtualProgram.activeUniformBlocks.get(uniformBlockIndex);
     }
 
     public int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
@@ -3882,12 +3991,13 @@ public class VulkanBackend {
     }
 
     /**
-     * Returns {@code GL_INVALID_INDEX} (0xFFFFFFFF). Vulkan UBO bindings are
-     * encoded in pipeline layouts and descriptor sets, not by block name.
+     * Returns a stable virtual block index for linked GLSL uniform blocks so the
+     * compatibility layer can preserve UBO wiring on the Vulkan path.
      */
     public int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
         requireVulkanCommandBufferHandle("getUniformBlockIndex", ctx);
-        return 0xFFFFFFFF; // GL_INVALID_INDEX
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        return virtualProgram == null ? -1 : virtualProgram.activeUniformBlocks.indexOf(uniformBlockName);
     }
 
     /**
@@ -3900,13 +4010,17 @@ public class VulkanBackend {
     }
 
     /**
-     * Returns an empty string. Vulkan programs are SPIR-V-based; there are no
-     * named active uniforms to enumerate through legacy GL introspection.
+     * Returns reflected uniform names from the linked GLSL sources so legacy
+     * compatibility code can enumerate active sampler-style uniforms on Vulkan.
      */
     public String getActiveUniform(CommandContext ctx, int program, int index, int size,
                                    java.nio.IntBuffer type, java.nio.IntBuffer name) {
         requireVulkanCommandBufferHandle("getActiveUniform", ctx);
-        return "";
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        if (virtualProgram == null || index < 0 || index >= virtualProgram.activeUniformNames.size()) {
+            return "";
+        }
+        return virtualProgram.activeUniformNames.get(index);
     }
 
     // =====================================================================
@@ -4311,6 +4425,8 @@ public class VulkanBackend {
 
     private static final class VirtualProgram {
         private final Set<Integer> attachedShaderIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        private volatile List<String> activeUniformNames = List.of();
+        private volatile List<String> activeUniformBlocks = List.of();
         private volatile boolean linkStatus;
         private volatile String infoLog = "";
     }
@@ -4786,11 +4902,15 @@ public class VulkanBackend {
         }
 
         private LegacyTextureObject requireBoundLegacyTexture2D(int target, String operation) {
-            if (target != VulkanicAPI.GL_TEXTURE_2D
+            if (target != VulkanicAPI.GL_TEXTURE_1D
+                && target != VulkanicAPI.GL_TEXTURE_2D
+                && target != VulkanicAPI.GL_TEXTURE_3D
+                && target != VulkanicAPI.GL_TEXTURE_RECTANGLE
                 && target != VulkanicAPI.GL_TEXTURE_CUBE_MAP
                 && !isLegacyCubemapFaceTarget(target)) {
                 throw new IllegalArgumentException(
-                    operation + " currently supports GL_TEXTURE_2D/GL_TEXTURE_CUBE_MAP targets, got: " + target);
+                    operation + " currently supports GL_TEXTURE_1D/GL_TEXTURE_2D/GL_TEXTURE_3D/"
+                        + "GL_TEXTURE_RECTANGLE/GL_TEXTURE_CUBE_MAP targets, got: " + target);
             }
 
             Integer textureId = legacyTexture2DBindingsByUnit.get(activeTextureUnitIndex);
@@ -4814,6 +4934,14 @@ public class VulkanBackend {
             return (value + mask) & ~mask;
         }
 
+        private static int maxMipLevelsForExtent(int width, int height) {
+            int maxDimension = Math.max(width, height);
+            if (maxDimension <= 0) {
+                return 1;
+            }
+            return 32 - Integer.numberOfLeadingZeros(maxDimension);
+        }
+
         private java.nio.ByteBuffer normalizePixelData(java.nio.ByteBuffer pixels,
                                                        LegacyTextureFormatInfo formatInfo,
                                                        int width,
@@ -4828,14 +4956,14 @@ public class VulkanBackend {
             int rowLength = pixelStoreState.unpackRowLength > 0
                 ? pixelStoreState.unpackRowLength
                 : width;
-            int rowBytes = rowLength * formatInfo.pixelBytes;
+            int rowBytes = rowLength * formatInfo.unpackPixelBytes;
             int stride = align(rowBytes, pixelStoreState.unpackAlignment);
             int startOffset = pixelStoreState.unpackSkipRows * stride
-                + pixelStoreState.unpackSkipPixels * formatInfo.pixelBytes;
+                + pixelStoreState.unpackSkipPixels * formatInfo.unpackPixelBytes;
 
             long requiredLong = (long) startOffset
                 + (long) (height - 1) * stride
-                + (long) width * formatInfo.pixelBytes;
+                + (long) width * formatInfo.unpackPixelBytes;
             if (requiredLong > Integer.MAX_VALUE) {
                 throw new IllegalArgumentException("Pixel upload source size exceeds int range: " + requiredLong);
             }
@@ -4845,25 +4973,39 @@ public class VulkanBackend {
                     "Pixel upload buffer too small. Required=" + required + ", remaining=" + pixels.remaining());
             }
 
-            int tightlyPackedRowBytes = width * formatInfo.pixelBytes;
-            if (stride == tightlyPackedRowBytes) {
+            int tightlyPackedSourceRowBytes = width * formatInfo.unpackPixelBytes;
+            int tightlyPackedDestRowBytes = width * formatInfo.pixelBytes;
+            if (!formatInfo.expandRgbToRgba && stride == tightlyPackedSourceRowBytes) {
                 java.nio.ByteBuffer source = pixels.duplicate();
                 source.position(source.position() + startOffset);
-                source.limit(source.position() + tightlyPackedRowBytes * height);
+                source.limit(source.position() + tightlyPackedSourceRowBytes * height);
                 return source.slice();
             }
 
-            java.nio.ByteBuffer packed = java.nio.ByteBuffer.allocateDirect(tightlyPackedRowBytes * height)
+            java.nio.ByteBuffer packed = java.nio.ByteBuffer.allocateDirect(tightlyPackedDestRowBytes * height)
                 .order(ByteOrder.nativeOrder());
 
             java.nio.ByteBuffer source = pixels.duplicate();
             int sourceBase = source.position() + startOffset;
-            for (int row = 0; row < height; row++) {
-                int rowStart = sourceBase + row * stride;
-                java.nio.ByteBuffer rowSlice = source.duplicate();
-                rowSlice.position(rowStart);
-                rowSlice.limit(rowStart + tightlyPackedRowBytes);
-                packed.put(rowSlice);
+            if (formatInfo.expandRgbToRgba) {
+                for (int row = 0; row < height; row++) {
+                    int rowStart = sourceBase + row * stride;
+                    for (int column = 0; column < width; column++) {
+                        int sourcePixelStart = rowStart + column * formatInfo.unpackPixelBytes;
+                        packed.put(source.get(sourcePixelStart));
+                        packed.put(source.get(sourcePixelStart + 1));
+                        packed.put(source.get(sourcePixelStart + 2));
+                        packed.put((byte) 0xFF);
+                    }
+                }
+            } else {
+                for (int row = 0; row < height; row++) {
+                    int rowStart = sourceBase + row * stride;
+                    java.nio.ByteBuffer rowSlice = source.duplicate();
+                    rowSlice.position(rowStart);
+                    rowSlice.limit(rowStart + tightlyPackedSourceRowBytes);
+                    packed.put(rowSlice);
+                }
             }
 
             packed.flip();
@@ -4896,16 +5038,33 @@ public class VulkanBackend {
 
             int inferredBaseWidth = level == 0 ? width : Math.max(1, width << level);
             int inferredBaseHeight = level == 0 ? height : Math.max(1, height << level);
-            int requiredMipLevels = Math.max(1, level + 1);
+            int maxConfiguredLevel = Math.max(0, texture.integerParameters.getOrDefault(VulkanicAPI.GL_TEXTURE_MAX_LEVEL, level));
+            int configuredMipLevels = Math.max(1, maxConfiguredLevel + 1);
+            int maxPossibleMipLevels = maxMipLevelsForExtent(inferredBaseWidth, inferredBaseHeight);
+            int requiredMipLevels = Math.max(1, Math.max(level + 1, Math.min(configuredMipLevels, maxPossibleMipLevels)));
 
+            Map<Integer, TextureLevelInfo> preservedLevels = null;
             boolean needsRecreate = texture.imageHandle == VK10.VK_NULL_HANDLE
                 || texture.vkFormat != formatInfo.vkFormat
                 || texture.width != inferredBaseWidth
                 || texture.height != inferredBaseHeight
                 || texture.mipLevels < requiredMipLevels;
 
+            boolean preserveExistingLevels = texture.imageHandle != VK10.VK_NULL_HANDLE
+                && texture.vkFormat == formatInfo.vkFormat
+                && texture.width == inferredBaseWidth
+                && texture.height == inferredBaseHeight
+                && texture.mipLevels < requiredMipLevels;
+
+            if (preserveExistingLevels) {
+                preservedLevels = new java.util.HashMap<>(texture.levels);
+            }
+
             if (needsRecreate) {
                 recreateLegacyTextureStorage(texture, formatInfo, inferredBaseWidth, inferredBaseHeight, requiredMipLevels);
+                if (preservedLevels != null && !preservedLevels.isEmpty()) {
+                    texture.levels.putAll(preservedLevels);
+                }
             }
 
             texture.sourceFormat = format;
@@ -5081,13 +5240,19 @@ public class VulkanBackend {
                 VkMemoryRequirements memoryRequirements = VkMemoryRequirements.malloc(stack);
                 VK10.vkGetImageMemoryRequirements(logicalDevice, imageHandle, memoryRequirements);
 
-                int memoryTypeIndex = findMemoryTypeIndex(
+                int preferredMemoryTypeIndex = findMemoryTypeIndex(
                     memoryRequirements.memoryTypeBits(),
                     VK10.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
                 );
-                if (memoryTypeIndex < 0) {
+                int fallbackMemoryTypeIndex = findMemoryTypeIndex(memoryRequirements.memoryTypeBits(), 0);
+
+                if (preferredMemoryTypeIndex < 0 && fallbackMemoryTypeIndex < 0) {
                     throw new IllegalStateException("No device-local memory type available for legacy Vulkan texture allocation");
                 }
+
+                int memoryTypeIndex = preferredMemoryTypeIndex >= 0
+                    ? preferredMemoryTypeIndex
+                    : fallbackMemoryTypeIndex;
 
                 VkMemoryAllocateInfo memoryAllocateInfo = VkMemoryAllocateInfo.calloc(stack)
                     .sType$Default()
@@ -5095,7 +5260,38 @@ public class VulkanBackend {
                     .memoryTypeIndex(memoryTypeIndex);
 
                 java.nio.LongBuffer pMemory = stack.mallocLong(1);
-                checkVk("vkAllocateMemory(legacy texture)", VK10.vkAllocateMemory(logicalDevice, memoryAllocateInfo, null, pMemory));
+                int allocationResult = VK10.vkAllocateMemory(logicalDevice, memoryAllocateInfo, null, pMemory);
+                if (allocationResult == VK10.VK_ERROR_OUT_OF_DEVICE_MEMORY
+                    && preferredMemoryTypeIndex >= 0
+                    && fallbackMemoryTypeIndex >= 0
+                    && fallbackMemoryTypeIndex != preferredMemoryTypeIndex) {
+                    LOGGER.warn(
+                        "Device-local legacy texture allocation failed for id={} {}x{} mipLevels={} vkFormat={} (size={} bytes); retrying with memoryTypeIndex={}",
+                        texture.id,
+                        width,
+                        height,
+                        mipLevels,
+                        formatInfo.vkFormat,
+                        memoryRequirements.size(),
+                        fallbackMemoryTypeIndex
+                    );
+                    memoryAllocateInfo.memoryTypeIndex(fallbackMemoryTypeIndex);
+                    allocationResult = VK10.vkAllocateMemory(logicalDevice, memoryAllocateInfo, null, pMemory);
+                }
+                if (allocationResult != VK10.VK_SUCCESS) {
+                    throw new IllegalStateException(
+                        "vkAllocateMemory(legacy texture) failed with VkResult=" + allocationResult
+                            + " id=" + texture.id
+                            + " width=" + width
+                            + " height=" + height
+                            + " mipLevels=" + mipLevels
+                            + " vkFormat=" + formatInfo.vkFormat
+                            + " sizeBytes=" + memoryRequirements.size()
+                            + " memoryTypeBits=0x" + Integer.toHexString(memoryRequirements.memoryTypeBits())
+                            + " preferredMemoryTypeIndex=" + preferredMemoryTypeIndex
+                            + " fallbackMemoryTypeIndex=" + fallbackMemoryTypeIndex
+                    );
+                }
                 memoryHandle = pMemory.get(0);
 
                 checkVk("vkBindImageMemory(legacy texture)",

@@ -13,15 +13,12 @@ import net.irisshaders.iris.gl.program.ProgramBuilder;
 import net.irisshaders.iris.gl.program.ProgramSamplers;
 import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pipeline.CompositeRenderer;
-import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureUploadFormat;
 import org.apache.commons.io.IOUtils;
-import org.joml.Matrix4f;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -30,7 +27,6 @@ import java.util.OptionalInt;
 import java.util.function.IntSupplier;
 
 public class CenterDepthSampler {
-	private static final double LN2 = Math.log(2);
 	private static final CustomPass EMPTY_STATE = new CustomPass() {
 		@Override
 		public void setupState() {
@@ -41,6 +37,7 @@ public class CenterDepthSampler {
 	private final GlFramebuffer framebuffer;
 	private final int texture;
 	private final int altTexture;
+	private final boolean smoothingProgramAvailable;
 	private boolean hasFirstSample;
 	private boolean everRetrieved;
 	private boolean destroyed;
@@ -55,6 +52,17 @@ public class CenterDepthSampler {
 		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 
 		this.framebuffer.addColorAttachment(0, texture);
+
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			// This pass relies on legacy standalone-uniform program plumbing that is still
+			// being migrated for Vulkan GLSL rules. Keep the center-depth textures alive
+			// but skip program creation/use on Vulkan to avoid startup crashes.
+			this.program = null;
+			this.smoothingProgramAvailable = false;
+			return;
+		}
+
+		this.smoothingProgramAvailable = true;
 		ProgramBuilder builder;
 
 		try {
@@ -68,14 +76,14 @@ public class CenterDepthSampler {
 
 		builder.addDynamicSampler(depthSupplier, "depth");
 		builder.addDynamicSampler(() -> altTexture, "altDepth");
-		builder.uniform1f(UniformUpdateFrequency.PER_FRAME, "lastFrameTime", SystemTimeUniforms.TIMER::getLastFrameTime);
-		builder.uniform1f(UniformUpdateFrequency.ONCE, "decay", () -> (1.0f / ((halfLife * 0.1) / LN2)));
-		// TODO: can we just do this for all composites?
-		builder.uniformMatrix(UniformUpdateFrequency.ONCE, "projection", () -> new Matrix4f(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, -1, -1, 0, 1));
 		this.program = builder.build();
 	}
 
 	public void sampleCenterDepth() {
+		if (!smoothingProgramAvailable) {
+			return;
+		}
+
 		if ((hasFirstSample && (!everRetrieved)) || destroyed) {
 			// If the shaderpack isn't reading center depth values, don't bother sampling it
 			// This improves performance with most shaderpacks
@@ -133,7 +141,9 @@ public class CenterDepthSampler {
 		IrisRenderSystem.deleteTextureId(texture);
 		IrisRenderSystem.deleteTextureId(altTexture);
 		framebuffer.destroy();
-		program.destroy();
+		if (program != null) {
+			program.destroy();
+		}
 		destroyed = true;
 	}
 }

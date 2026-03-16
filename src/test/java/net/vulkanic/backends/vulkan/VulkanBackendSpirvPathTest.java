@@ -62,6 +62,39 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testCompileShaderNormalizesLegacyOpenGlVertexBuiltinsForVulkan() {
+        AtomicReference<String> capturedSource = new AtomicReference<>();
+
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) -> {
+            capturedSource.set(source.toString());
+            return new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x05, 0x06}, sourceName, "stub");
+        });
+
+        int shader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        uploadSource(
+            backend,
+            shader,
+            "#version 450\nvoid main(){int a = gl_VertexID; int b = gl_InstanceID; gl_Position = vec4(float(a + b));}"
+        );
+        backend.compileShader(TEST_CONTEXT, shader);
+
+        assertTrue(capturedSource.get().contains("gl_VertexIndex"));
+        assertTrue(capturedSource.get().contains("gl_InstanceIndex"));
+        assertFalse(capturedSource.get().contains("gl_VertexID"));
+        assertFalse(capturedSource.get().contains("gl_InstanceID"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanLeavesFragmentShadersUntouched() {
+        String source = "#version 450\nvoid main(){int a = gl_VertexID; int b = gl_InstanceID;}";
+
+        assertEquals(
+            source,
+            GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
+        );
+    }
+
+    @Test
     public void testProgramLinkUsesCompiledSpirvShaders() {
         VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
             new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x0A, 0x0B}, sourceName, "stub")
@@ -84,6 +117,60 @@ public class VulkanBackendSpirvPathTest {
         assertEquals(VulkanicAPI.GL_TRUE,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_LINK_STATUS));
         assertEquals("", backend.getProgramInfoLog(TEST_CONTEXT, program));
+    }
+
+    @Test
+    public void testProgramLinkReflectsSamplerAndUniformBlockIntrospectionForVulkanCompatibility() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x0C, 0x0D}, sourceName, "stub")
+        );
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+
+        uploadSource(
+            backend,
+            vertexShader,
+            "#version 450\n"
+                + "layout(std140) uniform DynamicTransforms { mat4 ModelViewMat; };\n"
+                + "layout(std140) uniform Projection { mat4 ProjMat; };\n"
+                + "void main(){ gl_Position = ProjMat * ModelViewMat * vec4(0.0); }"
+        );
+        uploadSource(
+            backend,
+            fragmentShader,
+            "#version 450\n"
+                + "uniform sampler2D Sampler0;\n"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = texture(Sampler0, vec2(0.0)); }"
+        );
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(1L, "introspection-test");
+
+        assertEquals(1,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORMS));
+        assertEquals(2,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORM_BLOCKS));
+        assertEquals(0,
+            backend.getUniformLocation(introspectionContext, program, "Sampler0"));
+        assertEquals(0,
+            backend.getUniformBlockIndex(introspectionContext, program, "DynamicTransforms"));
+        assertEquals(1,
+            backend.getUniformBlockIndex(introspectionContext, program, "Projection"));
+        assertEquals("DynamicTransforms",
+            backend.retrieveActiveUniformBlockName(introspectionContext, program, 0));
+        assertEquals("Projection",
+            backend.retrieveActiveUniformBlockName(introspectionContext, program, 1));
+        assertEquals("Sampler0",
+            backend.getActiveUniform(introspectionContext, program, 0, 256, null, null));
     }
 
     @Test

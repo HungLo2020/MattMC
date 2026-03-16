@@ -12,7 +12,11 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import net.logging.LogUtils;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -454,7 +458,7 @@ public class GlDevice implements GpuDevice {
 	}
 
 	private GlShaderModule compileShader(GlDevice.ShaderCompilationKey shaderCompilationKey, BiFunction<ResourceLocation, ShaderType, String> biFunction) {
-		String string = (String)biFunction.apply(shaderCompilationKey.id, shaderCompilationKey.type);
+		String string = this.resolveShaderSource(shaderCompilationKey, biFunction);
 		if (string == null) {
 			LOGGER.error("Couldn't find source for {} shader ({})", shaderCompilationKey.type, shaderCompilationKey.id);
 			return GlShaderModule.INVALID_SHADER;
@@ -473,6 +477,28 @@ public class GlDevice implements GpuDevice {
 				this.debugLabels.applyLabel(glShaderModule);
 				return glShaderModule;
 			}
+		}
+	}
+
+	@Nullable
+	private String resolveShaderSource(GlDevice.ShaderCompilationKey shaderCompilationKey, BiFunction<ResourceLocation, ShaderType, String> biFunction) {
+		String string = (String)biFunction.apply(shaderCompilationKey.id, shaderCompilationKey.type);
+		return string != null ? string : loadBundledShaderSource(shaderCompilationKey.id, shaderCompilationKey.type);
+	}
+
+	@Nullable
+	static String loadBundledShaderSource(ResourceLocation resourceLocation, ShaderType shaderType) {
+		ResourceLocation resourceLocation2 = shaderType.idConverter().idToFile(resourceLocation);
+		String string = "/assets/" + resourceLocation2.getNamespace() + "/" + resourceLocation2.getPath();
+
+		try (InputStream inputStream = GlDevice.class.getResourceAsStream(string)) {
+			if (inputStream == null) {
+				return null;
+			}
+
+			return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+		} catch (IOException var5) {
+			throw new UncheckedIOException("Failed to read bundled shader source " + resourceLocation + " (" + shaderType.getName() + ")", var5);
 		}
 	}
 

@@ -227,6 +227,13 @@ public class Iris {
 			}
 		}
 
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			logger.warn("Disabling Iris shaderpack loading on the Vulkan path until shaderpack GLSL is translated through a Vulkan-compatible uniform/resource model");
+			setShadersDisabled();
+			fallback = true;
+			return;
+		}
+
 		if (!irisConfig.areShadersEnabled()) {
 			logger.info("Shaders are disabled because enableShaders is set to false in iris.properties");
 

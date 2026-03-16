@@ -51,7 +51,7 @@ public class VulkanTextureUploadLifecycleTest {
             IllegalArgumentException.class,
             () -> backend.uploadTexture2D(
                 new VulkanCommandContext(1L, "upload-cmd"),
-                VulkanicAPI.GL_TEXTURE_3D,
+                VulkanicAPI.GL_TEXTURE_BUFFER,
                 0,
                 VulkanicAPI.GL_RGBA8,
                 4,
@@ -122,6 +122,52 @@ public class VulkanTextureUploadLifecycleTest {
         );
 
         assertTrue(exception.getMessage().contains("setPixelStore requires VulkanCommandContext"));
+    }
+
+    @Test
+    public void testVulkanBackendSourcePreservesLegacyMipMetadataWhenGrowingStorage() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("Map<Integer, TextureLevelInfo> preservedLevels = null;"),
+            "Vulkan legacy texture uploads should preserve previously defined mip metadata before recreating storage");
+        assertTrue(source.contains("texture.levels.putAll(preservedLevels);"),
+            "Vulkan legacy texture uploads should restore preserved mip metadata after recreating storage");
+    }
+
+    @Test
+    public void testVulkanBackendSourceSupportsLegacyIrisTextureTargetsForBindAndCreate() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("isSupportedLegacyTextureBindTarget"),
+            "Vulkan backend should centralize legacy bind-target validation");
+        assertTrue(source.contains("target == VulkanicAPI.GL_TEXTURE_3D"),
+            "Vulkan legacy compatibility target support should include GL_TEXTURE_3D for Iris image setup");
+        assertTrue(source.contains("isSupportedLegacyTextureCreateTarget"),
+            "Vulkan backend should validate createTextures targets through a dedicated compatibility helper");
+    }
+
+    @Test
+    public void testVulkanBackendSourceSizesLegacyMipStorageUsingConfiguredMaxLevel() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("GL_TEXTURE_MAX_LEVEL"),
+            "Vulkan legacy texture uploads should consider GL_TEXTURE_MAX_LEVEL to allocate the intended mip chain up front");
+        assertTrue(source.contains("maxMipLevelsForExtent("),
+            "Vulkan legacy texture uploads should clamp configured mip levels to valid texture extent-derived limits");
+    }
+
+    @Test
+    public void testVulkanBackendSourceRetriesLegacyTextureAllocationAfterDeviceLocalOom() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(source.contains("VK_ERROR_OUT_OF_DEVICE_MEMORY"),
+            "Vulkan legacy texture allocation should detect device-local OOM explicitly");
+        assertTrue(source.contains("retrying with memoryTypeIndex="),
+            "Vulkan legacy texture allocation should retry with a compatible fallback memory type when possible");
     }
 
     @Test
