@@ -203,6 +203,26 @@ public class GlCommandEncoder implements CommandEncoder {
 	) {
 	}
 
+	private void prepareTexelBufferBindingsForVulkanDescriptors(GlRenderPass glRenderPass, CommandContext ctx) {
+		for (Entry<String, Uniform> entry : glRenderPass.pipeline.program().getUniforms().entrySet()) {
+			String name = entry.getKey();
+			Uniform uniform = entry.getValue();
+			if (uniform instanceof Uniform.Utb(int location, int samplerIndex, TextureFormat format, int textureId)) {
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(samplerIndex);
+				VulkanicAPI.bindTextureBuffer(ctx, textureId);
+
+				GpuBufferSlice slice = glRenderPass.uniforms.get(name);
+				if (slice != null) {
+					VulkanicAPI.bindTextureBufferData(
+						ctx,
+						GlConst.toGlInternalId(format),
+						((GlBuffer)slice.buffer()).handle
+					);
+				}
+			}
+		}
+	}
+
 	@Nullable
 	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass) {
 		GlRenderPipeline glRenderPipeline = glRenderPass.pipeline;
@@ -264,6 +284,35 @@ public class GlCommandEncoder implements CommandEncoder {
 			builder.build(),
 			completeCoverage
 		);
+	}
+
+	private void prepareSamplerBindingsForVulkanDescriptors(GlRenderPass glRenderPass, CommandContext ctx) {
+		for (Entry<String, Uniform> entry : glRenderPass.pipeline.program().getUniforms().entrySet()) {
+			if (!(entry.getValue() instanceof Uniform.Sampler(int location, int samplerIndex))) {
+				continue;
+			}
+
+			GlTextureView glTextureView = (GlTextureView)glRenderPass.samplers.get(entry.getKey());
+			if (glTextureView == null) {
+				continue;
+			}
+
+			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(samplerIndex);
+			GpuTexture texture = glTextureView.texture();
+			int textureHandle = VulkanicCoreAPI.textureId(texture);
+			VulkanicTextureTarget textureTarget;
+			if ((texture.usage() & 16) != 0) {
+				textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
+				VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
+			} else {
+				textureTarget = VulkanicTextureTarget.TEXTURE_2D;
+				VulkanicAPI.bindTexture2D(ctx, textureHandle);
+			}
+
+			VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.BASE_LEVEL, glTextureView.baseMipLevel());
+			VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, glTextureView.baseMipLevel() + glTextureView.mipLevels() - 1);
+			texture.flushModeChanges(textureTarget);
+		}
 	}
 
 	@Override
@@ -1156,26 +1205,21 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		boolean immediateSeamHasCompleteCoverage = false;
+		if (!ctx.isImmediate()) {
+			this.prepareTexelBufferBindingsForVulkanDescriptors(glRenderPass, ctx);
+			this.prepareSamplerBindingsForVulkanDescriptors(glRenderPass, ctx);
+		}
 		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass);
-		LOGGER.debug("buildPipelineResourceBindings returned: {}, isImmediate={}", submission != null, ctx.isImmediate());
 		if (submission != null) {
 			net.vulkanic.PipelineHandle pipelineHandle;
 			if (ctx.isImmediate()) {
-				// OpenGL path: wrap the already-available GlRenderPipeline directly.
 				pipelineHandle = new net.vulkanic.backends.opengl.OpenGLPipelineHandle(glRenderPass.pipeline);
-				LOGGER.debug("Using GL compatibility path, pipelineHandle created");
 			} else {
-				// Vulkan path: resolve a precompiled VulkanPipelineHandle from the backend
-				// cache, or null if no precompiled handle is available yet.
 				pipelineHandle = VulkanicAPI.resolvePipelineHandle(
 						glRenderPass.pipeline.info(), glRenderPass.pipeline.descriptor());
-				LOGGER.debug("Resolving Vulkan pipeline handle: {}", pipelineHandle);
 			}
 			if (pipelineHandle != null) {
-				LOGGER.debug("Pipeline handle is valid, completeCoverage={}", submission.completeCoverage());
 				if (submission.completeCoverage()) {
-					// All resource bindings are available - safe to bind descriptors
-					LOGGER.debug("Binding pipeline resources (complete coverage)");
 					VulkanicAPI.bindPipelineResources(
 						ctx,
 						pipelineHandle,
@@ -1183,15 +1227,8 @@ public class GlCommandEncoder implements CommandEncoder {
 						submission.bindings()
 					);
 					immediateSeamHasCompleteCoverage = true;
-				} else {
-					// Not all resource bindings available - use traditional GL path
-					LOGGER.debug("Skipping Vulkan descriptor binding: not all resource bindings available, falling back to direct GL uniform setting");
 				}
-			} else {
-				LOGGER.debug("Pipeline handle is null, cannot bind resources");
 			}
-		} else {
-			LOGGER.debug("buildPipelineResourceBindings returned null");
 		}
 
 		for (Entry<String, Uniform> entry2 : glProgram.getUniforms().entrySet()) {
@@ -1220,33 +1257,31 @@ public class GlCommandEncoder implements CommandEncoder {
 					}
 					break;
 				case Uniform.Sampler(int glTextureView2, int var51):
-					if (!immediateSeamHasCompleteCoverage) {
-						int var46 = var51;
-						GlTextureView glTextureView2x = (GlTextureView)glRenderPass.samplers.get(string2);
-						if (glTextureView2x == null) {
-							break;
-						}
-
-						if (bl || bl2) {
-							VulkanicAPI.setUniform1i(ctx, glTextureView2, var46);
-						}
-
-						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var46);
-						GpuTexture texture = glTextureView2x.texture();
-						int textureHandle = VulkanicCoreAPI.textureId(texture);
-						VulkanicTextureTarget textureTarget;
-						if ((texture.usage() & 16) != 0) {
-							textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
-							VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
-						} else {
-							textureTarget = VulkanicTextureTarget.TEXTURE_2D;
-							VulkanicAPI.bindTexture2D(ctx, textureHandle);
-						}
-
-						VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.BASE_LEVEL, glTextureView2x.baseMipLevel());
-						VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, glTextureView2x.baseMipLevel() + glTextureView2x.mipLevels() - 1);
-						texture.flushModeChanges(textureTarget);
+					int var46 = var51;
+					GlTextureView glTextureView2x = (GlTextureView)glRenderPass.samplers.get(string2);
+					if (glTextureView2x == null) {
+						break;
 					}
+
+					if (!immediateSeamHasCompleteCoverage && (bl || bl2)) {
+						VulkanicAPI.setUniform1i(ctx, glTextureView2, var46);
+					}
+
+					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var46);
+					GpuTexture texture = glTextureView2x.texture();
+					int textureHandle = VulkanicCoreAPI.textureId(texture);
+					VulkanicTextureTarget textureTarget;
+					if ((texture.usage() & 16) != 0) {
+						textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
+						VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
+					} else {
+						textureTarget = VulkanicTextureTarget.TEXTURE_2D;
+						VulkanicAPI.bindTexture2D(ctx, textureHandle);
+					}
+
+					VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.BASE_LEVEL, glTextureView2x.baseMipLevel());
+					VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, glTextureView2x.baseMipLevel() + glTextureView2x.mipLevels() - 1);
+					texture.flushModeChanges(textureTarget);
 					break;
 				default:
 					throw new MatchException(null, null);

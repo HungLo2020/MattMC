@@ -4633,8 +4633,107 @@ public class VulkanicAPI {
         int maxNameLength,
         java.util.Set<VulkanicShaderStage> stages
     ) {
-        return Objects.requireNonNull(descriptor, "descriptor must not be null")
-            .withResourceLayout(deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength, stages));
+        return withMergedReflectedResourceLayout(ctx, descriptor, program, maxNameLength, stages);
+    }
+
+    /**
+     * Returns a descriptor copy enriched with reflected resource layout metadata while preserving
+     * the portable pipeline resource contract derived from the originating RenderPipeline.
+     *
+     * <p>This keeps uniform-buffer and texel-buffer bindings declared by the pipeline even when
+     * linked-program reflection only reports sampler uniforms, which is critical for Vulkan
+     * descriptor layout parity with the precompiled pipeline cache.</p>
+     */
+    public static PipelineDescriptor withMergedReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        Objects.requireNonNull(descriptor, "descriptor must not be null");
+        PipelineDescriptor.ResourceLayout reflectedLayout =
+            deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength, stages);
+        PipelineDescriptor.ResourceLayout mergedLayout = mergeResourceLayouts(
+            descriptor.getResourceLayout(),
+            reflectedLayout
+        );
+        return descriptor.withResourceLayout(mergedLayout);
+    }
+
+    public static PipelineDescriptor withMergedReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        int maxNameLength
+    ) {
+        return withMergedReflectedResourceLayout(
+            ctx,
+            descriptor,
+            program,
+            maxNameLength,
+            defaultReflectedResourceStages()
+        );
+    }
+
+    public static PipelineDescriptor withMergedReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program
+    ) {
+        return withMergedReflectedResourceLayout(ctx, descriptor, program, 256);
+    }
+
+    private static PipelineDescriptor.ResourceLayout mergeResourceLayouts(
+        PipelineDescriptor.ResourceLayout baseLayout,
+        PipelineDescriptor.ResourceLayout reflectedLayout
+    ) {
+        java.util.List<PipelineDescriptor.ResourceBinding> baseBindings = baseLayout.bindings();
+        java.util.List<PipelineDescriptor.ResourceBinding> reflectedBindings = reflectedLayout.bindings();
+        if (reflectedBindings.isEmpty()) {
+            return baseLayout;
+        }
+
+        java.util.Map<String, PipelineDescriptor.ResourceBinding> reflectedByName = new java.util.LinkedHashMap<>();
+        for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedBindings) {
+            reflectedByName.put(reflectedBinding.name(), reflectedBinding);
+        }
+
+        java.util.List<PipelineDescriptor.ResourceBinding> merged = new java.util.ArrayList<>(baseBindings.size() + reflectedBindings.size());
+        java.util.Set<String> seenNames = new java.util.LinkedHashSet<>();
+        int nextBindingIndex = 0;
+
+        for (PipelineDescriptor.ResourceBinding baseBinding : baseBindings) {
+            seenNames.add(baseBinding.name());
+            nextBindingIndex = Math.max(nextBindingIndex, baseBinding.binding() + 1);
+
+            PipelineDescriptor.ResourceBinding reflectedBinding = reflectedByName.remove(baseBinding.name());
+            if (reflectedBinding != null && reflectedBinding.type() == baseBinding.type()) {
+                java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
+                mergedStages.addAll(reflectedBinding.stages());
+                merged.add(baseBinding.withStages(java.util.Set.copyOf(mergedStages)));
+            } else {
+                merged.add(baseBinding);
+            }
+        }
+
+        for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedByName.values()) {
+            if (!seenNames.add(reflectedBinding.name())) {
+                continue;
+            }
+
+            merged.add(new PipelineDescriptor.ResourceBinding(
+                reflectedBinding.set(),
+                nextBindingIndex,
+                reflectedBinding.name(),
+                reflectedBinding.type(),
+                reflectedBinding.textureFormat(),
+                reflectedBinding.stages()
+            ));
+            nextBindingIndex++;
+        }
+
+        return new PipelineDescriptor.ResourceLayout(merged);
     }
 
     /**
