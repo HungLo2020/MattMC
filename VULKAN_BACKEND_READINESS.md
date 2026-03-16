@@ -243,10 +243,12 @@ Only blockers that prevent a Vulkan backend from existing are tracked here.
   - Vulkan backend now provides full descriptor lifecycle methods: `createDescriptorPool`, `allocateDescriptorSet`, `updateDescriptorSet`, `bindDescriptorSet`, `resetDescriptorPool`, and `bindPipelineResources`.
   - New Vulkan logical descriptor handles (`VulkanDescriptorPoolHandle`, `VulkanDescriptorSetHandle`) enforce allocation capacity, validity, reset/close invalidation, and descriptor-layout matching.
   - `VulkanBackend.bindPipelineResources(...)` validates bindings against `PipelineDescriptor.ResourceLayout`, validates Vulkan command-context usage, validates Vulkan uniform-buffer slices, and records per-command-buffer bound resource state.
+  - `VulkanBackend.NativeSpine.updateAndBindDescriptorSet(...)` now allocates descriptor sets from a shared Vulkan descriptor pool and issues concrete native descriptor commands (`vkUpdateDescriptorSets` + `vkCmdBindDescriptorSets`) on the draw setup path.
+  - Vulkan texel-buffer compatibility path now has concrete `texBuffer` handling via `VkBufferView` creation (`vkCreateBufferView`) and texture-unit-to-descriptor resolution for `UNIFORM_TEXEL_BUFFER` bindings.
   - Shared draw setup in `GlCommandEncoder.trySetup(...)` now routes descriptor binding through `VulkanicAPI.bindPipelineResources(...)` for both immediate (OpenGL) and non-immediate (Vulkan) contexts instead of gating seam usage to immediate contexts only.
   - Shared draw setup now resolves UBO slices through backend-owned `VulkanicAPI.resolveVulkanicBuffer(...)` (backed by `GraphicsBackend.resolveVulkanicBuffer(...)`) and resolves non-immediate pipeline handles through `VulkanicAPI.resolvePipelineHandle(...)`.
   - Regression guardrails: `Phase3DrawPathTest`, `ApiNeutralityCallsiteTest`, and `VulkanDescriptorLifecycleTest` assert the new backend-neutral seams and anti-regression constraints.
-- **Notes:** Descriptor/resource abstraction and callsite routing are improved, but Vulkan runtime parity is not yet proven: GPU descriptor writes/binds (`vkUpdateDescriptorSets` and `vkCmdBindDescriptorSets`) remain unproven in production draw submission.
+- **Notes:** Descriptor/resource abstraction and native descriptor command paths are now implemented, but full runtime parity is still unproven at scene level (especially around pipeline-handle availability timing, swapchain/frame synchronization interactions, and broad texel-buffer format coverage).
 
 ### Draw Calls (indexed and non-indexed)
 

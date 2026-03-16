@@ -200,6 +200,16 @@ public class VulkanDescriptorLifecycleTest {
             "Vulkan backend should expose backend-neutral buffer resolution for descriptor callsites");
         assertTrue(source.contains("resolveLegacyVulkanBuffer("),
             "Vulkan backend should resolve legacy integer buffer handles to real VulkanBuffer storage");
+        assertTrue(source.contains("updateAndBindDescriptorSet("),
+            "Vulkan descriptor lifecycle should route binding requests through a native descriptor update+bind helper");
+        assertTrue(source.contains("vkUpdateDescriptorSets"),
+            "Vulkan descriptor lifecycle should now issue vkUpdateDescriptorSets on descriptor binding path");
+        assertTrue(source.contains("vkCmdBindDescriptorSets"),
+            "Vulkan descriptor lifecycle should now issue vkCmdBindDescriptorSets on descriptor binding path");
+        assertTrue(source.contains("bindLegacyTexelBufferForActiveUnit("),
+            "Vulkan texel-buffer bindings should route through native VkBufferView-backed helper");
+        assertTrue(source.contains("vkCreateBufferView(texBuffer)"),
+            "Vulkan texel-buffer path should create VkBufferView objects for descriptor writes");
 
         assertFalse(source.contains("Vulkan-native descriptor pool lifecycle is not implemented yet."),
             "Descriptor pool lifecycle should no longer be marked unsupported");

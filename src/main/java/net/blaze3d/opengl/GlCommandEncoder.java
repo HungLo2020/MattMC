@@ -1162,13 +1162,15 @@ public class GlCommandEncoder implements CommandEncoder {
 				pipelineHandle = VulkanicAPI.resolvePipelineHandle(
 						glRenderPass.pipeline.info(), glRenderPass.pipeline.descriptor());
 			}
-			VulkanicAPI.bindPipelineResources(
-				ctx,
-				pipelineHandle,
-				submission.descriptor(),
-				submission.bindings()
-			);
-			immediateSeamHasCompleteCoverage = submission.completeCoverage();
+			if (pipelineHandle != null) {
+				VulkanicAPI.bindPipelineResources(
+					ctx,
+					pipelineHandle,
+					submission.descriptor(),
+					submission.bindings()
+				);
+				immediateSeamHasCompleteCoverage = submission.completeCoverage();
+			}
 		}
 
 		for (Entry<String, Uniform> entry2 : glProgram.getUniforms().entrySet()) {
