@@ -557,8 +557,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		framePass.executes(
 			() -> {
 				RenderTarget renderTarget = this.minecraft.getMainRenderTarget();
-				VulkanicAPI.getDevice()
-					.createCommandEncoder()
+				VulkanicAPI.createCommandEncoder()
 					.clearColorAndDepthTextures(
 						renderTarget.getColorTexture(), ARGB.colorFromFloat(0.0F, vector4f.x, vector4f.y, vector4f.z), renderTarget.getDepthTexture(), 1.0
 					);

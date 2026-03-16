@@ -3,7 +3,6 @@ package net.blaze3d;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.CommandEncoder;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
@@ -33,10 +32,9 @@ public class TracyFrameCapture implements AutoCloseable {
 	public TracyFrameCapture() {
 		this.width = 320;
 		this.height = 180;
-		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
-		this.frameBuffer = gpuDevice.createTexture("Tracy Frame Capture", 10, TextureFormat.RGBA8, this.width, this.height, 1, 1);
-		this.frameBufferView = gpuDevice.createTextureView(this.frameBuffer);
-		this.pixelbuffer = gpuDevice.createBuffer(() -> "Tracy Frame Capture buffer", 9, this.width * this.height * 4);
+		this.frameBuffer = net.vulkanic.VulkanicAPI.createTexture("Tracy Frame Capture", 10, TextureFormat.RGBA8, this.width, this.height, 1, 1);
+		this.frameBufferView = net.vulkanic.VulkanicAPI.createTextureView(this.frameBuffer);
+		this.pixelbuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Tracy Frame Capture buffer", 9, this.width * this.height * 4);
 	}
 
 	private void resize(int i, int j) {
@@ -56,13 +54,12 @@ public class TracyFrameCapture implements AutoCloseable {
 		if (this.width != i || this.height != j) {
 			this.width = i;
 			this.height = j;
-			GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 			this.frameBuffer.close();
-			this.frameBuffer = gpuDevice.createTexture("Tracy Frame Capture", 10, TextureFormat.RGBA8, i, j, 1, 1);
+			this.frameBuffer = net.vulkanic.VulkanicAPI.createTexture("Tracy Frame Capture", 10, TextureFormat.RGBA8, i, j, 1, 1);
 			this.frameBufferView.close();
-			this.frameBufferView = gpuDevice.createTextureView(this.frameBuffer);
+			this.frameBufferView = net.vulkanic.VulkanicAPI.createTextureView(this.frameBuffer);
 			this.pixelbuffer.close();
-			this.pixelbuffer = gpuDevice.createBuffer(() -> "Tracy Frame Capture buffer", 9, i * j * 4);
+			this.pixelbuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Tracy Frame Capture buffer", 9, i * j * 4);
 		}
 	}
 

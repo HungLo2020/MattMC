@@ -4,7 +4,6 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
 import net.blaze3d.systems.CommandEncoder;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
@@ -55,11 +54,10 @@ public class LightTexture implements AutoCloseable {
 	public LightTexture(GameRenderer gameRenderer, Minecraft minecraft) {
 		this.renderer = gameRenderer;
 		this.minecraft = minecraft;
-		GpuDevice gpuDevice = VulkanicAPI.getDevice();
-		this.texture = gpuDevice.createTexture("Light Texture", 12, TextureFormat.RGBA8, 16, 16, 1, 1);
+		this.texture = VulkanicAPI.createTexture("Light Texture", 12, TextureFormat.RGBA8, 16, 16, 1, 1);
 		this.texture.setTextureFilter(FilterMode.LINEAR, false);
-		this.textureView = gpuDevice.createTextureView(this.texture);
-		gpuDevice.createCommandEncoder().clearColorTexture(this.texture, -1);
+		this.textureView = VulkanicAPI.createTextureView(this.texture);
+		VulkanicAPI.createCommandEncoder().clearColorTexture(this.texture, -1);
 		this.ubo = new MappableRingBuffer(() -> "Lightmap UBO", 130, LIGHTMAP_UBO_SIZE);
 	}
 

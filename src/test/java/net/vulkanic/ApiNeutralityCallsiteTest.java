@@ -1176,4 +1176,132 @@ public class ApiNeutralityCallsiteTest {
                 "Shader source helper should avoid direct UTF8 native conversion at callsites: " + relative);
         }
     }
+
+    @Test
+    public void testTextureBufferAndUploadClusterCallsitesUseVulkanicAPISeams() throws IOException {
+        // Font texture cluster
+        String fontTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/FontTexture.java"));
+        String specialGlyphsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/glyphs/SpecialGlyphs.java"));
+        String bitmapProviderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/BitmapProvider.java"));
+        String unihexProviderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/UnihexProvider.java"));
+        // Texture system cluster
+        String dynamicTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/DynamicTexture.java"));
+        String reloadableTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/ReloadableTexture.java"));
+        String cubeMapTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/CubeMapTexture.java"));
+        String spriteContentsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/SpriteContents.java"));
+        String lightTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java"));
+        String pictureInPictureRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java"));
+        // Buffer allocation cluster
+        String mappableRingBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/MappableRingBuffer.java"));
+        String perspProjBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/PerspectiveProjectionMatrixBuffer.java"));
+        String cachedPerspProjBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CachedPerspectiveProjectionMatrixBuffer.java"));
+        String cachedOrthoProjBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CachedOrthoProjectionMatrixBuffer.java"));
+        String voxelMapOrthoProjBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/voxelmap/util/VoxelMapCachedOrthoProjectionMatrixBuffer.java"));
+        String fogRendererNewSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/fog/FogRenderer.java"));
+        // Misc cluster
+        String renderTargetDescriptorSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/resource/RenderTargetDescriptor.java"));
+        String particleFeatureRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java"));
+        String vertexFormatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java"));
+
+        // Font texture cluster assertions
+        assertTrue(fontTextureSource.contains("VulkanicAPI.createTexture("),
+            "FontTexture should allocate textures through backend-owned VulkanicAPI seam");
+        assertTrue(fontTextureSource.contains("VulkanicAPI.createTextureView("),
+            "FontTexture should allocate texture views through backend-owned VulkanicAPI seam");
+        assertFalse(fontTextureSource.contains("VulkanicAPI.getDevice()"),
+            "FontTexture should avoid direct getDevice() usage");
+        assertTrue(specialGlyphsSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "SpecialGlyphs should upload glyph bitmaps via backend-owned VulkanicAPI createCommandEncoder seam");
+        assertFalse(specialGlyphsSource.contains("VulkanicAPI.getDevice()"),
+            "SpecialGlyphs should avoid direct getDevice() usage in glyph upload path");
+        assertTrue(bitmapProviderSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "BitmapProvider should upload glyph bitmaps via backend-owned VulkanicAPI createCommandEncoder seam");
+        assertFalse(bitmapProviderSource.contains("VulkanicAPI.getDevice()"),
+            "BitmapProvider should avoid direct getDevice() usage in glyph upload path");
+        assertTrue(unihexProviderSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "UnihexProvider should upload glyph bitmaps via backend-owned VulkanicAPI createCommandEncoder seam");
+        assertFalse(unihexProviderSource.contains("VulkanicAPI.getDevice()"),
+            "UnihexProvider should avoid direct getDevice() usage in glyph upload path");
+
+        // Texture system cluster assertions
+        assertTrue(dynamicTextureSource.contains("VulkanicAPI.createTexture("),
+            "DynamicTexture should allocate textures through backend-owned VulkanicAPI seam");
+        assertTrue(dynamicTextureSource.contains("VulkanicAPI.createTextureView("),
+            "DynamicTexture should allocate texture views through backend-owned VulkanicAPI seam");
+        assertFalse(dynamicTextureSource.contains("VulkanicAPI.getDevice()"),
+            "DynamicTexture should avoid direct getDevice() usage");
+        assertTrue(reloadableTextureSource.contains("VulkanicAPI.createTexture("),
+            "ReloadableTexture should allocate textures through backend-owned VulkanicAPI seam");
+        assertTrue(reloadableTextureSource.contains("VulkanicAPI.createTextureView("),
+            "ReloadableTexture should allocate texture views through backend-owned VulkanicAPI seam");
+        assertFalse(reloadableTextureSource.contains("VulkanicAPI.getDevice()"),
+            "ReloadableTexture should avoid direct getDevice() usage");
+        assertTrue(cubeMapTextureSource.contains("VulkanicAPI.createTexture("),
+            "CubeMapTexture should allocate textures through backend-owned VulkanicAPI seam");
+        assertTrue(cubeMapTextureSource.contains("VulkanicAPI.createTextureView("),
+            "CubeMapTexture should allocate texture views through backend-owned VulkanicAPI seam");
+        assertFalse(cubeMapTextureSource.contains("VulkanicAPI.getDevice()"),
+            "CubeMapTexture should avoid direct getDevice() usage");
+        assertTrue(spriteContentsSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "SpriteContents should upload sprite frames via backend-owned VulkanicAPI createCommandEncoder seam");
+        assertFalse(spriteContentsSource.contains("VulkanicAPI.getDevice()"),
+            "SpriteContents should avoid direct getDevice() usage in sprite upload path");
+        assertTrue(lightTextureSource.contains("VulkanicAPI.createTexture("),
+            "LightTexture should allocate lightmap texture through backend-owned VulkanicAPI seam");
+        assertTrue(lightTextureSource.contains("VulkanicAPI.createTextureView("),
+            "LightTexture should allocate lightmap texture view through backend-owned VulkanicAPI seam");
+        assertFalse(lightTextureSource.contains("VulkanicAPI.getDevice()"),
+            "LightTexture should avoid direct getDevice() usage");
+        assertTrue(pictureInPictureRendererSource.contains("VulkanicAPI.createTexture("),
+            "PictureInPictureRenderer should allocate UI render textures through backend-owned VulkanicAPI seam");
+        assertTrue(pictureInPictureRendererSource.contains("VulkanicAPI.createTextureView("),
+            "PictureInPictureRenderer should allocate UI texture views through backend-owned VulkanicAPI seam");
+        assertFalse(pictureInPictureRendererSource.contains("VulkanicAPI.getDevice()"),
+            "PictureInPictureRenderer should avoid direct getDevice() usage");
+
+        // Buffer allocation cluster assertions
+        assertTrue(mappableRingBufferSource.contains("VulkanicAPI.createBuffer("),
+            "MappableRingBuffer should allocate ring buffers through backend-owned VulkanicAPI seam");
+        assertFalse(mappableRingBufferSource.contains("VulkanicAPI.getDevice()"),
+            "MappableRingBuffer should avoid direct getDevice() usage");
+        assertTrue(perspProjBufferSource.contains("VulkanicAPI.createBuffer("),
+            "PerspectiveProjectionMatrixBuffer should allocate projection UBOs through backend-owned VulkanicAPI seam");
+        assertFalse(perspProjBufferSource.contains("VulkanicAPI.getDevice()"),
+            "PerspectiveProjectionMatrixBuffer should avoid direct getDevice() usage");
+        assertTrue(cachedPerspProjBufferSource.contains("VulkanicAPI.createBuffer("),
+            "CachedPerspectiveProjectionMatrixBuffer should allocate projection UBOs through backend-owned VulkanicAPI seam");
+        assertFalse(cachedPerspProjBufferSource.contains("VulkanicAPI.getDevice()"),
+            "CachedPerspectiveProjectionMatrixBuffer should avoid direct getDevice() usage");
+        assertTrue(cachedOrthoProjBufferSource.contains("VulkanicAPI.createBuffer("),
+            "CachedOrthoProjectionMatrixBuffer should allocate projection UBOs through backend-owned VulkanicAPI seam");
+        assertFalse(cachedOrthoProjBufferSource.contains("VulkanicAPI.getDevice()"),
+            "CachedOrthoProjectionMatrixBuffer should avoid direct getDevice() usage");
+        assertTrue(voxelMapOrthoProjBufferSource.contains("VulkanicAPI.createBuffer("),
+            "VoxelMapCachedOrthoProjectionMatrixBuffer should allocate projection UBOs through backend-owned VulkanicAPI seam");
+        assertFalse(voxelMapOrthoProjBufferSource.contains("VulkanicAPI.getDevice()"),
+            "VoxelMapCachedOrthoProjectionMatrixBuffer should avoid direct getDevice() usage");
+        assertTrue(fogRendererNewSource.contains("VulkanicAPI.createBuffer("),
+            "FogRenderer should allocate fog UBO through backend-owned VulkanicAPI seam");
+        assertFalse(fogRendererNewSource.contains("VulkanicAPI.getDevice()"),
+            "FogRenderer should avoid direct getDevice() usage");
+
+        // Misc cluster assertions
+        assertTrue(renderTargetDescriptorSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "RenderTargetDescriptor should clear render target textures via backend-owned VulkanicAPI createCommandEncoder seam");
+        assertFalse(renderTargetDescriptorSource.contains("VulkanicAPI.getDevice()"),
+            "RenderTargetDescriptor should avoid direct getDevice() usage for texture clearing");
+        assertTrue(particleFeatureRendererSource.contains("VulkanicAPI.createRenderPass("),
+            "ParticleFeatureRenderer should create particle render passes through backend-owned VulkanicAPI seam");
+        assertFalse(particleFeatureRendererSource.contains("VulkanicAPI.getDevice()"),
+            "ParticleFeatureRenderer should avoid direct getDevice() usage in particle render path");
+        // VertexFormat keeps getDevice() only for GraphicsWorkarounds hardware workaround detection, not resource allocation
+        assertFalse(vertexFormatSource.contains("gpuDevice.createBuffer("),
+            "VertexFormat should not use local gpuDevice variable for buffer allocation — use VulkanicAPI.createBuffer seam");
+        assertFalse(vertexFormatSource.contains("gpuDevice.createCommandEncoder()"),
+            "VertexFormat should not use local gpuDevice variable for encoder — use VulkanicAPI.createCommandEncoder seam");
+        assertTrue(vertexFormatSource.contains("VulkanicAPI.createBuffer("),
+            "VertexFormat should allocate immediate upload buffers through backend-owned VulkanicAPI seam");
+        assertTrue(vertexFormatSource.contains("VulkanicAPI.createCommandEncoder()"),
+            "VertexFormat should acquire command encoders through backend-owned VulkanicAPI seam");
+    }
 }

@@ -2,7 +2,6 @@ package net.minecraft.client.renderer.feature;
 
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
@@ -45,7 +44,6 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 		});
 		
 		if (!submitNodeCollection.getParticleGroupRenderers().isEmpty()) {
-			GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 			Minecraft minecraft = Minecraft.getInstance();
 			TextureManager textureManager = minecraft.getTextureManager();
 			RenderTarget renderTarget = minecraft.getMainRenderTarget();
@@ -62,7 +60,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 				// Iris: Override particle rendering code (merged from MixinParticleFeatureRenderer)
 				QuadParticleRenderState.PreparedBuffers preparedBuffers = particleGroupRenderer.prepare(particleBufferCache);
 				if (preparedBuffers != null) {
-					try (RenderPass renderPass = gpuDevice.createCommandEncoder().createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
+					try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
 						this.prepareRenderPass(renderPass);
 						if (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE) {
 							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, false);
@@ -73,7 +71,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 					}
 
 					if (renderTarget2 != null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
-						try (RenderPass renderPass = gpuDevice.createCommandEncoder().createRenderPass(() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty())) {
+						try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty())) {
 							this.prepareRenderPass(renderPass);
 							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
 						}

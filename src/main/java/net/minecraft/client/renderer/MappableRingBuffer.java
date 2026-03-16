@@ -2,7 +2,6 @@ package net.minecraft.client.renderer;
 
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuFence;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
@@ -17,13 +16,12 @@ public class MappableRingBuffer implements AutoCloseable {
 	private int current = 0;
 
 	public MappableRingBuffer(Supplier<String> supplier, int i, int j) {
-		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		if ((i & 1) == 0 && (i & 2) == 0) {
 			throw new IllegalArgumentException("MappableRingBuffer requires at least one of USAGE_MAP_READ or USAGE_MAP_WRITE");
 		} else {
 			for (int k = 0; k < 3; k++) {
 				int l = k;
-				this.buffers[k] = gpuDevice.createBuffer(() -> (String)supplier.get() + " #" + l, i, j);
+				this.buffers[k] = net.vulkanic.VulkanicAPI.createBuffer(() -> (String)supplier.get() + " #" + l, i, j);
 				this.fences[k] = null;
 			}
 

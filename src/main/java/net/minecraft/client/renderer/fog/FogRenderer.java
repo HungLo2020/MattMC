@@ -5,7 +5,6 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -56,13 +55,12 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	private FogParameters parameters = FogParameters.NONE;
 
 	public FogRenderer() {
-		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		this.regularBuffer = new MappableRingBuffer(() -> "Fog UBO", 130, FOG_UBO_SIZE);
 
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = memoryStack.malloc(FOG_UBO_SIZE);
 			this.updateBuffer(byteBuffer, 0, new Vector4f(0.0F), Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
-			this.emptyBuffer = gpuDevice.createBuffer(() -> "Empty fog", 128, byteBuffer.flip());
+			this.emptyBuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Empty fog", 128, byteBuffer.flip());
 		}
 
 		VulkanicAPI.setShaderFog(this.getBuffer(FogRenderer.FogMode.NONE));

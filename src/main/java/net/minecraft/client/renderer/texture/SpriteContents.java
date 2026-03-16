@@ -176,8 +176,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 
 	public void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
 		for (int m = 0; m < this.byMipLevel.length; m++) {
-			VulkanicAPI.getDevice()
-				.createCommandEncoder()
+			VulkanicAPI.createCommandEncoder()
 				.writeToTexture(gpuTexture, nativeImages[m], m, 0, i >> m, j >> m, this.width >> m, this.height >> m, k >> m, l >> m);
 		}
 	}

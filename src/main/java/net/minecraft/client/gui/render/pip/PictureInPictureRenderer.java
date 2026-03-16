@@ -1,7 +1,6 @@
 package net.minecraft.client.gui.render.pip;
 
 import net.blaze3d.ProjectionType;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
@@ -93,16 +92,15 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 			this.depthTextureView = null;
 		}
 
-		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
 		if (this.texture == null) {
-			this.texture = gpuDevice.createTexture(() -> "UI " + this.getTextureLabel() + " texture", 12, TextureFormat.RGBA8, i, j, 1, 1);
+			this.texture = net.vulkanic.VulkanicAPI.createTexture(() -> "UI " + this.getTextureLabel() + " texture", 12, TextureFormat.RGBA8, i, j, 1, 1);
 			this.texture.setTextureFilter(FilterMode.NEAREST, false);
-			this.textureView = gpuDevice.createTextureView(this.texture);
-			this.depthTexture = gpuDevice.createTexture(() -> "UI " + this.getTextureLabel() + " depth texture", 8, TextureFormat.DEPTH32, i, j, 1, 1);
-			this.depthTextureView = gpuDevice.createTextureView(this.depthTexture);
+			this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
+			this.depthTexture = net.vulkanic.VulkanicAPI.createTexture(() -> "UI " + this.getTextureLabel() + " depth texture", 8, TextureFormat.DEPTH32, i, j, 1, 1);
+			this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
 		}
 
-		gpuDevice.createCommandEncoder().clearColorAndDepthTextures(this.texture, 0, this.depthTexture, 1.0);
+		net.vulkanic.VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.texture, 0, this.depthTexture, 1.0);
 		net.vulkanic.VulkanicAPI.setProjectionMatrix(this.projectionMatrixBuffer.getBuffer(i, j), ProjectionType.ORTHOGRAPHIC);
 	}
 

@@ -107,21 +107,20 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 	}
 
 	private static GpuBuffer uploadToBuffer(@Nullable GpuBuffer gpuBuffer, ByteBuffer byteBuffer, int i, Supplier<String> supplier) {
-		GpuDevice gpuDevice = net.vulkanic.VulkanicAPI.getDevice();
-		if (GraphicsWorkarounds.get(gpuDevice).alwaysCreateFreshImmediateBuffer()) {
+		if (GraphicsWorkarounds.get(net.vulkanic.VulkanicAPI.getDevice()).alwaysCreateFreshImmediateBuffer()) {
 			if (gpuBuffer != null) {
 				gpuBuffer.close();
 			}
 
-			return gpuDevice.createBuffer(supplier, i, byteBuffer);
+			return net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
 		} else {
 			if (gpuBuffer == null) {
-				gpuBuffer = gpuDevice.createBuffer(supplier, i, byteBuffer);
+				gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
 			} else {
-				CommandEncoder commandEncoder = gpuDevice.createCommandEncoder();
+				CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.createCommandEncoder();
 				if (gpuBuffer.size() < byteBuffer.remaining()) {
 					gpuBuffer.close();
-					gpuBuffer = gpuDevice.createBuffer(supplier, i, byteBuffer);
+					gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
 				} else {
 					commandEncoder.writeToBuffer(gpuBuffer.slice(), byteBuffer);
 				}

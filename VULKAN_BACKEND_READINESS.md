@@ -882,6 +882,47 @@ High-traffic draw paths still created render passes through concrete device chai
 - Vulkan render-pass seam methods currently delegate through compatibility command-encoder/device plumbing; fully native Vulkan render-pass ownership for these shared callsites remains future work.
 - Remaining `VulkanicAPI.getDevice()` usages still exist in other texture/font/projection/lifecycle clusters and need staged migration.
 
+## Session 2026-03-15: All-Callsite Sweep — Texture, Buffer, Upload, and Render-Pass Trailing Cluster
+
+### Problem Targeted
+After the render-pass seam session, 27 `VulkanicAPI.getDevice()` callsites remained across 23 source files covering font atlas texture allocation, dynamic and reloadable textures, cube-map textures, light texture, picture-in-picture textures, Tracy frame capture, ring/projection/ortho matrix buffers (5 files), fog renderer buffer, font-glyph upload providers (SpecialGlyphs, BitmapProvider, UnihexProvider), SpriteContents upload, LevelRenderer clear, RenderTargetDescriptor clear, ParticleFeatureRenderer render passes, and VertexFormat mesh buffers. Every one of those callsites still acquired a concrete `GpuDevice` from `VulkanicAPI.getDevice()` and delegated resource creation through it, bypassing all backend-owned seams.
+
+### Structural Changes
+No new backend seams were required. All needed seams (`createTexture`, `createTextureView`, `createBuffer`, `createCommandEncoder`, `createRenderPass`) already existed from previous sessions.
+
+Production callsite migration only — 18 source files updated:
+- **Font / glyph cluster (4 files):** `FontTexture`, `SpecialGlyphs`, `BitmapProvider`, `UnihexProvider` — texture/view allocation and `writeToTexture` upload chains moved to `VulkanicAPI.createTexture/createTextureView/createCommandEncoder()`.
+- **Texture system cluster (3 files):** `DynamicTexture` (two `createTexture` overloads), `ReloadableTexture` (texture+view+upload), `CubeMapTexture` (texture+view+per-face upload loop) — all resource creation moved to `VulkanicAPI.*` seams.
+- **Renderer texture and render-pass cluster (4 files):** `LightTexture` (texture+view+clear), `PictureInPictureRenderer` (2 textures, 2 views, clearColorAndDepthTextures), `SpriteContents` (upload), `ParticleFeatureRenderer` (removed local `gpuDevice` variable, both render passes now `VulkanicAPI.createRenderPass(...)`).
+- **Buffer allocation cluster (6 files):** `MappableRingBuffer` (3× createBuffer loop), `PerspectiveProjectionMatrixBuffer`, `CachedPerspectiveProjectionMatrixBuffer`, `CachedOrthoProjectionMatrixBuffer`, `VoxelMapCachedOrthoProjectionMatrixBuffer`, `FogRenderer` (ByteBuffer overload) — all constructors now use `VulkanicAPI.createBuffer(...)`.
+- **Clear and resource misc (2 files):** `LevelRenderer` (clearColorAndDepthTextures in frame-clear lambda), `RenderTargetDescriptor` (depth-branch clear).
+- **Complex workaround (1 file):** `VertexFormat` — kept `VulkanicAPI.getDevice()` inline exclusively for `GraphicsWorkarounds.get(device)` hardware-detection check; migrated all three `createBuffer()` and one `createCommandEncoder()` calls to `VulkanicAPI.*` seams. No local `gpuDevice` variable remains.
+- Removed all now-unused `import net.vulkanic.GpuDevice` statements from the 18 migrated files.
+
+### Evidence
+- Source sweep confirming callsite reduction:
+  - `grep -RIn --include='*.java' 'VulkanicAPI\.getDevice()' src/main/java | wc -l`
+  - Result: **5 remaining** (down from 27).
+  - Remaining 5 are intentional infrastructure: `RenderSystem.java` (2, backend device-registration bridge), `VertexFormat.java` (1, hardware workaround detection only), `Minecraft.java` (2, bootstrap/teardown device lifecycle). None are resource-allocation callsites.
+- New callsite guardrail test:
+  - `ApiNeutralityCallsiteTest.testTextureBufferAndUploadClusterCallsitesUseVulkanicAPISeams()` — 30+ assertions across font cluster, texture system cluster, buffer allocation cluster, and misc cluster (positive seam usage + negative `getDevice()` absence for all 18 migrated files).
+- Expanded `Phase3DrawPathTest.testRendererClusterUsesVulkanicAPIGetDevice()` — migrated-file list extended from 12 to 21 files, adding DynamicTexture, ReloadableTexture, CubeMapTexture, MappableRingBuffer, PerspectiveProjectionMatrixBuffer, CachedPerspectiveProjectionMatrixBuffer, CachedOrthoProjectionMatrixBuffer, FogRenderer, ParticleFeatureRenderer.
+- Full test suite validation:
+  - `./gradlew test --rerun-tasks`
+  - Result: **457 passed, 0 failed, BUILD SUCCESSFUL in 28s**.
+- Runtime smoke validation:
+  - `./gradlew runClient`
+  - Result: **BUILD SUCCESSFUL**; player logged in and joined world with render pipeline created for `minecraft:overworld` — no crashes or exceptions.
+
+### Progress Classes
+- **1 — Abstraction Improvement:** All migratable texture, texture-view, buffer, command-encoder, and render-pass callsites now use backend-owned `VulkanicAPI.*` seams. Concrete `GpuDevice` resource-allocation access has been removed from 18 production files.
+- **4 — Parity Improvement:** Both OpenGL and Vulkan backends now handle the full shared resource-creation workload through the same seam contract.
+- **5 — Debuggability Improvement:** Test guardrails now flag any callsite regression across the full texture/buffer/upload/render-pass cluster.
+
+### Still Unproven
+- Remaining 5 `VulkanicAPI.getDevice()` calls are intentional infrastructure: `RenderSystem.java` (device-registration bridge, 2 calls), `VertexFormat.java` (hardware workaround detection, 1 call), `Minecraft.java` (bootstrap/teardown lifecycle, 2 calls). These are candidates for further encapsulation but are not resource-allocation callsites.
+- All resource-creation seams still route through compatibility `GlDevice` under Vulkan-selected startup; fully native Vulkan resource ownership remains future work.
+
 ## Blocking Issues
 
 1. ~~**Vulkan backend covers only 43.0% of the `GraphicsBackend` interface.**~~ **RESOLVED.**

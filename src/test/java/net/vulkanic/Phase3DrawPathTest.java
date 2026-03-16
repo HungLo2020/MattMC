@@ -4755,7 +4755,16 @@ public class Phase3DrawPathTest {
             SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/SkyRenderer.java"),
             SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/ChunkSectionsToRender.java"),
             SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/CompiledSectionMesh.java"),
-            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/SpriteContents.java")
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/SpriteContents.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/DynamicTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/ReloadableTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/CubeMapTexture.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/MappableRingBuffer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/PerspectiveProjectionMatrixBuffer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CachedPerspectiveProjectionMatrixBuffer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CachedOrthoProjectionMatrixBuffer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/fog/FogRenderer.java"),
+            SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java")
         };
 
         for (Path file : migratedFiles) {

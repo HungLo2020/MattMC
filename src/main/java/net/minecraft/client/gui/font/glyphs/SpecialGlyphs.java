@@ -67,8 +67,7 @@ public enum SpecialGlyphs implements GlyphInfo {
 
 				@Override
 				public void upload(int i, int j, GpuTexture gpuTexture) {
-					net.vulkanic.VulkanicAPI.getDevice()
-						.createCommandEncoder()
+					net.vulkanic.VulkanicAPI.createCommandEncoder()
 						.writeToTexture(gpuTexture, SpecialGlyphs.this.image, 0, 0, i, j, SpecialGlyphs.this.image.getWidth(), SpecialGlyphs.this.image.getHeight(), 0, 0);
 				}
 
