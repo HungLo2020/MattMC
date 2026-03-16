@@ -250,13 +250,19 @@ public class GlCommandEncoder implements CommandEncoder {
 			return null;
 		}
 
+		boolean completeCoverage = boundResources.size() == layout.bindings().size();
+		if (!completeCoverage) {
+			LOGGER.warn("Building partial Vulkan descriptor set: {} of {} bindings resolved for pipeline {}",
+				boundResources.size(), layout.bindings().size(), glRenderPipeline.descriptor());
+		}
+
 		PipelineDescriptor filteredDescriptor = glRenderPipeline.descriptor()
 			.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
 
 		return new PipelineResourceBindingSubmission(
 			filteredDescriptor,
 			builder.build(),
-			boundResources.size() == layout.bindings().size()
+			completeCoverage
 		);
 	}
 
@@ -1151,26 +1157,41 @@ public class GlCommandEncoder implements CommandEncoder {
 
 		boolean immediateSeamHasCompleteCoverage = false;
 		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass);
+		LOGGER.debug("buildPipelineResourceBindings returned: {}, isImmediate={}", submission != null, ctx.isImmediate());
 		if (submission != null) {
 			net.vulkanic.PipelineHandle pipelineHandle;
 			if (ctx.isImmediate()) {
 				// OpenGL path: wrap the already-available GlRenderPipeline directly.
 				pipelineHandle = new net.vulkanic.backends.opengl.OpenGLPipelineHandle(glRenderPass.pipeline);
+				LOGGER.debug("Using GL compatibility path, pipelineHandle created");
 			} else {
 				// Vulkan path: resolve a precompiled VulkanPipelineHandle from the backend
 				// cache, or null if no precompiled handle is available yet.
 				pipelineHandle = VulkanicAPI.resolvePipelineHandle(
 						glRenderPass.pipeline.info(), glRenderPass.pipeline.descriptor());
+				LOGGER.debug("Resolving Vulkan pipeline handle: {}", pipelineHandle);
 			}
 			if (pipelineHandle != null) {
-				VulkanicAPI.bindPipelineResources(
-					ctx,
-					pipelineHandle,
-					submission.descriptor(),
-					submission.bindings()
-				);
-				immediateSeamHasCompleteCoverage = submission.completeCoverage();
+				LOGGER.debug("Pipeline handle is valid, completeCoverage={}", submission.completeCoverage());
+				if (submission.completeCoverage()) {
+					// All resource bindings are available - safe to bind descriptors
+					LOGGER.debug("Binding pipeline resources (complete coverage)");
+					VulkanicAPI.bindPipelineResources(
+						ctx,
+						pipelineHandle,
+						submission.descriptor(),
+						submission.bindings()
+					);
+					immediateSeamHasCompleteCoverage = true;
+				} else {
+					// Not all resource bindings available - use traditional GL path
+					LOGGER.debug("Skipping Vulkan descriptor binding: not all resource bindings available, falling back to direct GL uniform setting");
+				}
+			} else {
+				LOGGER.debug("Pipeline handle is null, cannot bind resources");
 			}
+		} else {
+			LOGGER.debug("buildPipelineResourceBindings returned null");
 		}
 
 		for (Entry<String, Uniform> entry2 : glProgram.getUniforms().entrySet()) {

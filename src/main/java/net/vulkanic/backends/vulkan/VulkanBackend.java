@@ -2010,6 +2010,8 @@ public class VulkanBackend {
         private final long vkPipelineHandle;
         private final long vkPipelineLayoutHandle;
         private final long vkDescriptorSetLayoutHandle;
+        /** Number of resource bindings in the DSL this pipeline was compiled with. */
+        private final int resourceBindingCount;
         private final NativeSpine spine;
         private volatile boolean closed;
 
@@ -2017,11 +2019,13 @@ public class VulkanBackend {
             long vkPipelineHandle,
             long vkPipelineLayoutHandle,
             long vkDescriptorSetLayoutHandle,
+            int resourceBindingCount,
             NativeSpine spine
         ) {
             this.vkPipelineHandle = vkPipelineHandle;
             this.vkPipelineLayoutHandle = vkPipelineLayoutHandle;
             this.vkDescriptorSetLayoutHandle = vkDescriptorSetLayoutHandle;
+            this.resourceBindingCount = resourceBindingCount;
             this.spine = Objects.requireNonNull(spine, "spine must not be null");
         }
 
@@ -2038,6 +2042,14 @@ public class VulkanBackend {
         /** Returns the native {@code VkDescriptorSetLayout} handle used by this pipeline. */
         long getVkDescriptorSetLayoutHandle() {
             return vkDescriptorSetLayoutHandle;
+        }
+
+        /**
+         * Returns the number of resource bindings in the descriptor set layout this pipeline
+         * was compiled with. Used to detect partial-write mismatches at draw time.
+         */
+        int getResourceBindingCount() {
+            return resourceBindingCount;
         }
 
         @Override
@@ -4905,9 +4917,38 @@ public class VulkanBackend {
             }
 
             List<PipelineDescriptor.ResourceBinding> layoutBindings = descriptor.getResourceLayout().bindings();
-            if (layoutBindings.isEmpty()) {
+
+            // If the pipeline has no descriptors at all, nothing more to do.
+            if (pipeline.getResourceBindingCount() == 0) {
+                // Even with no descriptors, bind the pipeline
+                bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
                 return;
             }
+
+            // The filtered descriptor must cover every slot in the pipeline's DSL.
+            // A partial write would leave slots in an indeterminate state.
+            if (layoutBindings.size() != pipeline.getResourceBindingCount()) {
+                // Partial bindings are not allowed — either all bindings must be provided
+                // or none at all. Don't bind the pipeline or descriptors to prevent GPU errors.
+                // This indicates a bug in the GL compatibility layer where not all required 
+                // uniforms are being bound.
+                LOGGER.error(
+                    "Vulkan render skipped: pipeline expects {} binding(s) but only {} were resolved. "
+                    + "This pipeline may not display correctly. Pipeline: {}",
+                    pipeline.getResourceBindingCount(), layoutBindings.size(), pipeline);
+                return;
+            }
+
+            if (layoutBindings.isEmpty()) {
+                // Even with empty descriptors, bind the pipeline
+                bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
+                return;
+            }
+
+            // Always bind the pipeline first so the GPU knows which shader/layout to use
+            // for subsequent draw calls. vkCmdBindPipeline is valid both inside and
+            // outside a render pass (Vulkan spec §19.3).
+            bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
 
             try (MemoryStack stack = stackPush()) {
                 VkDescriptorSetAllocateInfo allocInfo = VkDescriptorSetAllocateInfo.calloc(stack)
@@ -7882,6 +7923,7 @@ public class VulkanBackend {
 
                 return new VulkanPipelineHandle(
                     pipelineHandle, pipelineLayoutHandle, descriptorSetLayoutHandle,
+                    bindings.size(),
                     this);
             }
         }
@@ -7915,9 +7957,6 @@ public class VulkanBackend {
          */
         private void bindPipeline(long commandBufferHandle, long pipelineHandle) {
             ensureRecordingCommandBuffer(commandBufferHandle, "bindPipeline");
-            if (!renderPassRecording) {
-                throw new IllegalStateException("bindPipeline requires an active render pass");
-            }
             VK10.vkCmdBindPipeline(
                 primaryCommandBuffer,
                 VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
