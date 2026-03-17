@@ -48,6 +48,8 @@ import java.util.function.BiFunction;
  * Provides a unified API for graphics operations that can be backed by different graphics APIs.
  */
 public class VulkanicAPI {
+    private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
+    private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
     private static VulkanBackend rawVulkanBackend;
@@ -670,6 +672,7 @@ public class VulkanicAPI {
                     rawVulkanBackend = null;
                     break;
                 case VULKAN:
+                    ensureVulkanLwjglStackSize();
                     rawVulkanBackend = new VulkanBackend();
                     backend = createFailFastVulkanProxy(rawVulkanBackend);
             }
@@ -716,6 +719,20 @@ public class VulkanicAPI {
      */
     public static synchronized void initializeFromOptionsValue(@Nullable String configuredValue) {
         initialize(backendTypeFromOptionsValue(configuredValue));
+    }
+
+    private static void ensureVulkanLwjglStackSize() {
+        String configuredValue = System.getProperty(LWJGL_STACK_SIZE_PROPERTY);
+        if (configuredValue != null) {
+            try {
+                if (Integer.parseInt(configuredValue.trim()) >= VULKAN_LWJGL_STACK_SIZE_KB) {
+                    return;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        System.setProperty(LWJGL_STACK_SIZE_PROPERTY, Integer.toString(VULKAN_LWJGL_STACK_SIZE_KB));
     }
     
     /**

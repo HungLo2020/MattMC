@@ -7,6 +7,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * without any native Vulkan involvement.
  */
 public class VulkanManagedTextureLifecycleTest {
+
+    private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
 
     @BeforeEach
     public void beforeEach() throws Exception {
@@ -248,6 +253,36 @@ public class VulkanManagedTextureLifecycleTest {
             () -> VulkanicAPI.createManagedTexture("bad", VulkanicTexture.USAGE_TEXTURE_BINDING,
                 null, 64, 64, 1, 1),
             "Null format must be rejected");
+    }
+
+    @Test
+    public void testVulkanTextureCreationRejectsInvalidCubemapLayerCounts() {
+        VulkanicAPI.initialize(GraphicsBackendType.VULKAN);
+
+        int cubemapUsage = VulkanicTexture.USAGE_TEXTURE_BINDING | VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE;
+
+        assertThrows(IllegalArgumentException.class,
+            () -> VulkanicAPI.createManagedTexture("bad-cubemap", cubemapUsage,
+                VulkanicTextureFormat.RGBA8, 64, 64, 1, 1),
+            "Cubemap textures must reject layer counts smaller than 6");
+
+        assertThrows(IllegalArgumentException.class,
+            () -> VulkanicAPI.createManagedTexture("bad-cubemap", cubemapUsage,
+                VulkanicTextureFormat.RGBA8, 64, 64, 7, 1),
+            "Cubemap textures must reject layer counts that are not a multiple of 6");
+    }
+
+    @Test
+    public void testVulkanBackendSourceCreatesCubeCompatibleImagesAndViews() throws Exception {
+        Path backendFile = PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String source = Files.readString(backendFile);
+
+        assertTrue(source.contains("VK10.VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT"),
+            "Vulkan backend should mark cubemap-compatible textures with VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT");
+        assertTrue(source.contains("VK10.VK_IMAGE_VIEW_TYPE_CUBE"),
+            "Vulkan backend should create cube image views for cubemap-compatible textures");
+        assertTrue(source.contains("legacyTextureLayerCount"),
+            "Vulkan backend should preserve six-layer legacy cubemap storage instead of collapsing it to a single 2D layer");
     }
 
     // =========================================================================

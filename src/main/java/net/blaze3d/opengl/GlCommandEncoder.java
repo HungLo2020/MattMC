@@ -271,10 +271,6 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		boolean completeCoverage = boundResources.size() == layout.bindings().size();
-		if (!completeCoverage) {
-			LOGGER.warn("Building partial Vulkan descriptor set: {} of {} bindings resolved for pipeline {}",
-				boundResources.size(), layout.bindings().size(), glRenderPipeline.descriptor());
-		}
 
 		PipelineDescriptor filteredDescriptor = glRenderPipeline.descriptor()
 			.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
@@ -1219,13 +1215,13 @@ public class GlCommandEncoder implements CommandEncoder {
 						glRenderPass.pipeline.info(), glRenderPass.pipeline.descriptor());
 			}
 			if (pipelineHandle != null) {
+				VulkanicAPI.bindPipelineResources(
+					ctx,
+					pipelineHandle,
+					submission.descriptor(),
+					submission.bindings()
+				);
 				if (submission.completeCoverage()) {
-					VulkanicAPI.bindPipelineResources(
-						ctx,
-						pipelineHandle,
-						submission.descriptor(),
-						submission.bindings()
-					);
 					immediateSeamHasCompleteCoverage = true;
 				}
 			}

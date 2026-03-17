@@ -138,6 +138,11 @@ public final class Window implements AutoCloseable {
 
 		this.setMode();
 		this.refreshFramebufferSize();
+		if (useNoApiClientWindow) {
+			GLFW.glfwShowWindow(this.handle);
+			GLFW.glfwFocusWindow(this.handle);
+			GLFW.glfwPollEvents();
+		}
 		GLFW.glfwSetFramebufferSizeCallback(this.handle, this::onFramebufferResize);
 		GLFW.glfwSetWindowPosCallback(this.handle, this::onMove);
 		GLFW.glfwSetWindowSizeCallback(this.handle, this::onResize);

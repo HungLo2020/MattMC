@@ -40,25 +40,32 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVulkan;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.vulkan.KHRGetPhysicalDeviceProperties2;
+import org.lwjgl.vulkan.KHRPresentId;
+import org.lwjgl.vulkan.KHRPresentWait;
 import org.lwjgl.vulkan.KHRSurface;
 import org.lwjgl.vulkan.KHRSwapchain;
 import org.lwjgl.vulkan.VK;
 import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VK11;
 import org.lwjgl.vulkan.VkAttachmentDescription;
 import org.lwjgl.vulkan.VkAttachmentReference;
 import org.lwjgl.vulkan.VkApplicationInfo;
 import org.lwjgl.vulkan.VkBufferCreateInfo;
 import org.lwjgl.vulkan.VkBufferViewCreateInfo;
 import org.lwjgl.vulkan.VkBufferImageCopy;
+import org.lwjgl.vulkan.VkClearColorValue;
 import org.lwjgl.vulkan.VkClearValue;
 import org.lwjgl.vulkan.VkDescriptorBufferInfo;
 import org.lwjgl.vulkan.VkDescriptorImageInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolSize;
 import org.lwjgl.vulkan.VkDescriptorSetAllocateInfo;
+import org.lwjgl.vulkan.VkExtensionProperties;
 import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
+import org.lwjgl.vulkan.VkImageSubresourceRange;
 import org.lwjgl.vulkan.VkImageViewCreateInfo;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkCommandBufferAllocateInfo;
@@ -68,6 +75,7 @@ import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
 import org.lwjgl.vulkan.VkDeviceQueueCreateInfo;
 import org.lwjgl.vulkan.VkExtent2D;
+import org.lwjgl.vulkan.VkFenceCreateInfo;
 import org.lwjgl.vulkan.VkFramebufferCreateInfo;
 import org.lwjgl.vulkan.VkInstance;
 import org.lwjgl.vulkan.VkInstanceCreateInfo;
@@ -75,14 +83,19 @@ import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 import org.lwjgl.vulkan.VkMemoryBarrier;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 import org.lwjgl.vulkan.VkPhysicalDevice;
+import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
+import org.lwjgl.vulkan.VkPhysicalDevicePresentIdFeaturesKHR;
+import org.lwjgl.vulkan.VkPhysicalDevicePresentWaitFeaturesKHR;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
+import org.lwjgl.vulkan.VkPresentIdKHR;
 import org.lwjgl.vulkan.VkPresentInfoKHR;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 import org.lwjgl.vulkan.VkRenderPassBeginInfo;
 import org.lwjgl.vulkan.VkRenderPassCreateInfo;
 import org.lwjgl.vulkan.VkSamplerCreateInfo;
+import org.lwjgl.vulkan.VkSemaphoreCreateInfo;
 import org.lwjgl.vulkan.VkShaderModuleCreateInfo;
 import org.lwjgl.vulkan.VkSubpassDependency;
 import org.lwjgl.vulkan.VkSubpassDescription;
@@ -90,6 +103,8 @@ import org.lwjgl.vulkan.VkSubmitInfo;
 import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
+import org.lwjgl.vulkan.VkRect2D;
+import org.lwjgl.vulkan.VkViewport;
 import org.lwjgl.vulkan.VkWriteDescriptorSet;
 import net.blaze3d.platform.DepthTestFunction;
 import net.blaze3d.platform.DestFactor;
@@ -163,6 +178,7 @@ public class VulkanBackend {
     private final Map<RenderPipeline, PrecompiledPipelineState> precompiledPipelineCache = new ConcurrentHashMap<>();
     private final AtomicInteger nextVirtualShaderId = new AtomicInteger(1);
     private final AtomicInteger nextVirtualProgramId = new AtomicInteger(1);
+    private final AtomicInteger presentQueueLogCount = new AtomicInteger();
     private final Map<Integer, VirtualShader> virtualShaders = new ConcurrentHashMap<>();
     private final Map<Integer, VirtualProgram> virtualPrograms = new ConcurrentHashMap<>();
     private final Map<Long, BoundPipelineResources> boundPipelineResourcesByCommandBuffer = new ConcurrentHashMap<>();
@@ -611,6 +627,16 @@ public class VulkanBackend {
         net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
         net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
         net.irisshaders.iris.Iris.onRenderSystemInit();
+
+        if (mainWindowHandle != MemoryUtil.NULL) {
+            LOGGER.info("Reasserting GLFW main window visibility/focus after Vulkan renderer startup: 0x{}",
+                Long.toHexString(mainWindowHandle));
+            GLFW.glfwShowWindow(mainWindowHandle);
+            GLFW.glfwFocusWindow(mainWindowHandle);
+            GLFW.glfwPollEvents();
+        }
+
+        cleanupRendererBootstrapResources();
     }
 
     public void cleanupRendererBootstrapResources() {
@@ -893,6 +919,7 @@ public class VulkanBackend {
                 nativeSpine = createdSpine;
                 nativeBringUpFailure = null;
             } catch (Throwable throwable) {
+                LOGGER.error("Native Vulkan bring-up failed during renderer startup", throwable);
                 if (createdSpine != null) {
                     try {
                         createdSpine.close();
@@ -1546,6 +1573,7 @@ public class VulkanBackend {
         if (depthOrLayers < 1) {
             throw new IllegalArgumentException("depthOrLayers must be >= 1, got " + depthOrLayers);
         }
+        validateCubemapLayerCount(usage, depthOrLayers, "createManagedTexture");
         ensureNativeReady("createManagedTexture");
 
         NativeSpine spine = nativeSpine;
@@ -1605,6 +1633,26 @@ public class VulkanBackend {
 
     private static boolean isLegacyCubemapFaceTarget(int target) {
         return target >= 0x8515 && target <= 0x851A;
+    }
+
+    private static boolean isCubemapCompatibleUsage(int usage) {
+        return (usage & VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE) != 0;
+    }
+
+    private static boolean isLegacyCubemapTarget(int target) {
+        return target == VulkanicAPI.GL_TEXTURE_CUBE_MAP || isLegacyCubemapFaceTarget(target);
+    }
+
+    private static void validateCubemapLayerCount(int usage, int depthOrLayers, String operation) {
+        if (!isCubemapCompatibleUsage(usage)) {
+            return;
+        }
+        if (depthOrLayers < 6 || depthOrLayers % 6 != 0) {
+            throw new IllegalArgumentException(
+                operation + " requires cubemap-compatible textures to use a positive multiple of 6 layers, got: "
+                    + depthOrLayers
+            );
+        }
     }
 
     private static boolean isSupportedLegacyTextureTarget(int target) {
@@ -2711,7 +2759,7 @@ public class VulkanBackend {
     }
 
     public void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
-        long commandBufferHandle = requireVulkanCommandBufferHandle("presentTextureToScreen", ctx);
+        requireVulkanCommandBufferHandle("presentTextureToScreen", ctx);
         if (textureView == null) {
             throw new IllegalArgumentException("textureView must not be null");
         }
@@ -2736,8 +2784,21 @@ public class VulkanBackend {
             throw new IllegalStateException("Unable to resolve backend texture handle for presentation target");
         }
 
+        int queuedLogIndex = presentQueueLogCount.getAndIncrement();
+        if (queuedLogIndex < 8) {
+            LOGGER.info(
+                "Queueing Vulkan present source '{}' (legacyHandle={}, mip={}, extent={}x{}, format={}, usage=0x{})",
+                textureView.texture().getLabel(),
+                legacyTextureHandle,
+                textureView.baseMipLevel(),
+                textureView.getWidth(0),
+                textureView.getHeight(0),
+                textureView.texture().getFormat(),
+                textureView.texture().usage()
+            );
+        }
+
         spine.queuePresentTextureRequest(
-            commandBufferHandle,
             legacyTextureHandle,
             textureView.baseMipLevel(),
             textureView.getWidth(0),
@@ -3116,15 +3177,18 @@ public class VulkanBackend {
      * CULL_FACE, POLYGON_OFFSET_FILL) are mapped to Vulkan pipeline state.
      */
     public void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
-        requireVulkanCommandBufferHandle("setCapabilityEnabled", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("setCapabilityEnabled", ctx);
         final int GL_BLEND        = 0x0BE2;
         final int GL_DEPTH_TEST   = 0x0B71;
-        final int GL_CULL_FACE    = 0x0B44;
-        final int GL_POLYGON_OFFSET_FILL = 0x8037;
+        final int GL_SCISSOR_TEST = 0x0C11;
         if (cap == GL_BLEND) {
             this.pendingBlendEnabled = enabled;
         } else if (cap == GL_DEPTH_TEST) {
             this.pendingDepthTestEnabled = enabled;
+        } else if (cap == GL_SCISSOR_TEST) {
+            ensureNativeReady("setCapabilityEnabled(scissor)");
+            NativeSpine spine = requireNativeSpineForCommandOp("setCapabilityEnabled(scissor)");
+            spine.setScissorTestEnabled(commandBufferHandle, enabled);
         }
         // Other capabilities (GL_CULL_FACE, GL_POLYGON_OFFSET_FILL, etc.) are stored
         // implicitly via their own dedicated setXxx methods or are no-ops in Vulkan.
@@ -4584,12 +4648,20 @@ public class VulkanBackend {
         private VkPhysicalDevice physicalDevice;
         private VkDevice logicalDevice;
         private VkQueue graphicsQueue;
+        private VkQueue presentQueue;
 
         private long surface;
         private long swapchain;
         private long commandPool;
+        private final long[] frameCommandPools = new long[MAX_FRAMES_IN_FLIGHT];
         private long descriptorPool;
         private long defaultDescriptorSampler;
+        private final long[] swapchainImageAvailableSemaphores = new long[MAX_FRAMES_IN_FLIGHT];
+        private final long[] swapchainRenderFinishedSemaphores = new long[MAX_FRAMES_IN_FLIGHT];
+        private final long[] swapchainFrameFences = new long[MAX_FRAMES_IN_FLIGHT];
+        private long[] swapchainImagesInFlight = new long[0];
+        private int currentFrameSyncIndex;
+        private long immediateSubmitFence;
         private long minUniformBufferOffsetAlignment = 1L;
 
         private final Map<Long, Long> managedBufferAllocations = new ConcurrentHashMap<>();
@@ -4631,24 +4703,56 @@ public class VulkanBackend {
         private int swapchainHeight = 0;
         private final List<Long> swapchainImageHandles = new ArrayList<>();
         private final List<Long> swapchainImageViewHandles = new ArrayList<>();
+        private final List<Long> swapchainPresentFramebufferHandles = new ArrayList<>();
+        private final List<Integer> swapchainImageLayouts = new ArrayList<>();
+        private long swapchainPresentRenderPass = VK10.VK_NULL_HANDLE;
 
         private VkCommandBuffer primaryCommandBuffer;
+    private final VkCommandBuffer[] frameCommandBuffers = new VkCommandBuffer[MAX_FRAMES_IN_FLIGHT];
         private int graphicsQueueFamilyIndex;
+        private int graphicsQueueFamilyQueueCount = 1;
         private int physicalDeviceVendorId;
         private int physicalDeviceApiVersion = VK10.VK_API_VERSION_1_0;
         private String physicalDeviceName = "Vulkan GPU";
+        private boolean instanceProperties2ExtensionEnabled;
+        private boolean presentIdExtensionEnabled;
+        private boolean presentWaitExtensionEnabled;
+        private long nextPresentId = 1L;
         private long windowHandle;
         private boolean commandBufferRecording;
+        private final boolean[] frameCommandBufferRecording = new boolean[MAX_FRAMES_IN_FLIGHT];
         private boolean renderPassRecording;
         private boolean frameInProgress;
         private int acquiredSwapchainImageIndex = -1;
+        private int renderPassSwapchainImageIndex = -1;
+        private int activeRenderPassWidth;
+        private int activeRenderPassHeight;
+        private boolean activeRenderPassTargetsSwapchain;
+        private boolean scissorTestEnabled;
+        private boolean hasCachedScissorRect;
+        private int cachedScissorX;
+        private int cachedScissorY;
+        private int cachedScissorWidth;
+        private int cachedScissorHeight;
         private volatile PendingPresentTextureRequest pendingPresentTextureRequest;
         private int activeTextureUnitIndex;
+        private int consecutiveAcquireTimeouts;
+        private long lastAcquireTimeoutLogNanos;
+        private int successfulFrameAcquireCount;
+        private int successfulFramePresentCount;
 
         private final PixelStoreState pixelStoreState = new PixelStoreState();
 
+        private static final int MAX_FRAMES_IN_FLIGHT = 2;
+        private static final boolean DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT = false;
+        private static final boolean DEBUG_WAIT_FOR_PRESENT_COMPLETION_EXPERIMENT = false;
+        private static final boolean DEBUG_WAIT_FOR_PRESENT_QUEUE_IDLE_EXPERIMENT = false;
+        private static final boolean DEBUG_FORCE_FIFO_PRESENT_MODE_EXPERIMENT = true;
         private static final int GL_MAP_READ_BIT = 0x0001;
-
+        private static final long SWAPCHAIN_ACQUIRE_TIMEOUT_NANOS = 16_000_000L;
+        private static final long SWAPCHAIN_PRESENT_WAIT_POLL_TIMEOUT_NANOS = 5_000_000L;
+        private static final int ACQUIRE_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE = 180;
+        private static final long ACQUIRE_TIMEOUT_LOG_INTERVAL_NANOS = 5_000_000_000L;
         private static final class LegacyBufferObject {
             private final int id;
             private volatile VulkanBuffer buffer;
@@ -4695,6 +4799,7 @@ public class VulkanBackend {
             private final int target;
             private final Map<Integer, Integer> integerParameters = new ConcurrentHashMap<>();
             private final Map<Integer, TextureLevelInfo> levels = new ConcurrentHashMap<>();
+            private final Map<Integer, Integer> levelLayouts = new ConcurrentHashMap<>();
 
             private volatile long imageHandle;
             private volatile long memoryHandle;
@@ -4741,34 +4846,67 @@ public class VulkanBackend {
             }
         }
 
+        private static final class PresentCompletionSupport {
+            private final boolean presentId;
+            private final boolean presentWait;
+
+            private PresentCompletionSupport(boolean presentId, boolean presentWait) {
+                this.presentId = presentId;
+                this.presentWait = presentWait;
+            }
+        }
+
         private static NativeSpine create() {
             NativeSpine spine = new NativeSpine();
             try {
                 spine.initialize();
                 return spine;
             } catch (Throwable throwable) {
-                spine.close();
+                try {
+                    spine.close();
+                } catch (Throwable closeFailure) {
+                    throwable.addSuppressed(closeFailure);
+                }
                 throw throwable;
             }
         }
 
         private void initialize() {
-            windowHandle = GLFW.glfwGetCurrentContext();
-            if (windowHandle == 0L) {
-                windowHandle = net.vulkanic.VulkanicAPI.getRegisteredGlfwWindowHandleForVulkanSurface();
-            }
-            if (windowHandle == 0L) {
-                throw new IllegalStateException(
-                    "No current or registered GLFW window handle. Vulkan native spine requires a valid GLFW window for surface/swapchain bring-up.");
-            }
+            String startupPhase = "resolveWindowHandle";
+            try {
+                long registeredWindowHandle = net.vulkanic.VulkanicAPI.getRegisteredGlfwWindowHandleForVulkanSurface();
+                long currentContextWindowHandle = GLFW.glfwGetCurrentContext();
+                windowHandle = registeredWindowHandle != 0L ? registeredWindowHandle : currentContextWindowHandle;
+                if (windowHandle == 0L) {
+                    throw new IllegalStateException(
+                        "No current or registered GLFW window handle. Vulkan native spine requires a valid GLFW window for surface/swapchain bring-up.");
+                }
 
-            createInstance();
-            createSurface();
-            pickPhysicalDeviceAndQueueFamily();
-            createLogicalDeviceAndQueue();
-            createSharedDescriptorResources();
-            createSwapchain();
-            createCommandPoolAndPrimaryBuffer();
+                if (registeredWindowHandle != 0L && currentContextWindowHandle != 0L && registeredWindowHandle != currentContextWindowHandle) {
+                    LOGGER.info(
+                        "Using registered GLFW main window handle 0x{} for Vulkan surface (current context window is 0x{}).",
+                        Long.toHexString(registeredWindowHandle),
+                        Long.toHexString(currentContextWindowHandle)
+                    );
+                }
+
+                startupPhase = "createInstance";
+                createInstance();
+                startupPhase = "createSurface";
+                createSurface();
+                startupPhase = "pickPhysicalDeviceAndQueueFamily";
+                pickPhysicalDeviceAndQueueFamily();
+                startupPhase = "createLogicalDeviceAndQueue";
+                createLogicalDeviceAndQueue();
+                startupPhase = "createSharedDescriptorResources";
+                createSharedDescriptorResources();
+                startupPhase = "createSwapchain";
+                createSwapchain();
+                startupPhase = "createCommandPoolAndPrimaryBuffer";
+                createCommandPoolAndPrimaryBuffer();
+            } catch (Throwable throwable) {
+                throw new IllegalStateException("Failed to initialize Vulkan native spine during phase " + startupPhase, throwable);
+            }
         }
 
         private void createInstance() {
@@ -4779,22 +4917,86 @@ public class VulkanBackend {
                         "GLFW did not provide Vulkan required instance extensions (null/empty result).");
                 }
 
+                Set<String> availableInstanceExtensions = enumerateInstanceExtensionNames();
+                boolean enableProperties2Extension = availableInstanceExtensions.contains(
+                    KHRGetPhysicalDeviceProperties2.VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+                );
+
+                boolean properties2AlreadyRequested = false;
+                for (int index = requiredExtensions.position(); index < requiredExtensions.limit(); index++) {
+                    if (KHRGetPhysicalDeviceProperties2.VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+                        .equals(requiredExtensions.getStringUTF8(index))) {
+                        properties2AlreadyRequested = true;
+                        break;
+                    }
+                }
+
+                org.lwjgl.PointerBuffer enabledExtensions = requiredExtensions;
+                if (enableProperties2Extension && !properties2AlreadyRequested) {
+                    enabledExtensions = stack.mallocPointer(requiredExtensions.remaining() + 1);
+                    for (int index = requiredExtensions.position(); index < requiredExtensions.limit(); index++) {
+                        enabledExtensions.put(requiredExtensions.get(index));
+                    }
+                    enabledExtensions.put(stack.UTF8(KHRGetPhysicalDeviceProperties2.VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME));
+                    enabledExtensions.flip();
+                }
+
+                StringBuilder requiredExtensionSummary = new StringBuilder();
+                for (int index = enabledExtensions.position(); index < enabledExtensions.limit(); index++) {
+                    if (requiredExtensionSummary.length() > 0) {
+                        requiredExtensionSummary.append(", ");
+                    }
+                    requiredExtensionSummary.append(enabledExtensions.getStringUTF8(index));
+                }
+                LOGGER.info("GLFW required Vulkan instance extensions: [{}]", requiredExtensionSummary);
+
                 VkApplicationInfo appInfo = VkApplicationInfo.calloc(stack)
                     .sType$Default()
                     .pApplicationName(stack.UTF8("Vulkanic"))
                     .applicationVersion(VK10.VK_MAKE_API_VERSION(0, 0, 1, 0))
                     .pEngineName(stack.UTF8("Vulkanic"))
                     .engineVersion(VK10.VK_MAKE_API_VERSION(0, 0, 1, 0))
-                    .apiVersion(Math.max(VK.getInstanceVersionSupported(), VK10.VK_API_VERSION_1_0));
+                    // Request the baseline Vulkan API level directly during bring-up.
+                    // Probing VK.getInstanceVersionSupported() has proven unstable on this
+                    // Linux/NVIDIA path and is not required for successful instance creation.
+                    .apiVersion(VK10.VK_API_VERSION_1_0);
 
                 VkInstanceCreateInfo createInfo = VkInstanceCreateInfo.calloc(stack)
                     .sType$Default()
                     .pApplicationInfo(appInfo)
-                    .ppEnabledExtensionNames(requiredExtensions);
+                    .ppEnabledExtensionNames(enabledExtensions);
 
                 org.lwjgl.PointerBuffer pInstance = stack.mallocPointer(1);
                 checkVk("vkCreateInstance", VK10.vkCreateInstance(createInfo, null, pInstance));
                 instance = new VkInstance(pInstance.get(0), createInfo);
+                instanceProperties2ExtensionEnabled = enableProperties2Extension || properties2AlreadyRequested;
+            }
+        }
+
+        private Set<String> enumerateInstanceExtensionNames() {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer extensionCount = stack.ints(0);
+                checkVk(
+                    "vkEnumerateInstanceExtensionProperties(count)",
+                    VK10.vkEnumerateInstanceExtensionProperties((java.nio.ByteBuffer) null, extensionCount, null)
+                );
+
+                int count = extensionCount.get(0);
+                if (count <= 0) {
+                    return Collections.emptySet();
+                }
+
+                VkExtensionProperties.Buffer extensionProperties = VkExtensionProperties.malloc(count, stack);
+                checkVk(
+                    "vkEnumerateInstanceExtensionProperties(list)",
+                    VK10.vkEnumerateInstanceExtensionProperties((java.nio.ByteBuffer) null, extensionCount, extensionProperties)
+                );
+
+                Set<String> extensionNames = new HashSet<>();
+                for (int extensionIndex = 0; extensionIndex < extensionCount.get(0); extensionIndex++) {
+                    extensionNames.add(extensionProperties.get(extensionIndex).extensionNameString());
+                }
+                return extensionNames;
             }
         }
 
@@ -4876,6 +5078,7 @@ public class VulkanBackend {
                     checkVk("vkGetPhysicalDeviceSurfaceSupportKHR",
                         KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR(device, familyIndex, surface, supported));
                     if (supported.get(0) == VK10.VK_TRUE) {
+                        graphicsQueueFamilyQueueCount = Math.max(1, properties.queueCount());
                         return OptionalInt.of(familyIndex);
                     }
                 }
@@ -4886,7 +5089,11 @@ public class VulkanBackend {
 
         private void createLogicalDeviceAndQueue() {
             try (MemoryStack stack = stackPush()) {
-                java.nio.FloatBuffer priorities = stack.floats(1.0f);
+                int queueCount = Math.min(2, Math.max(1, graphicsQueueFamilyQueueCount));
+                java.nio.FloatBuffer priorities = stack.mallocFloat(queueCount);
+                for (int queueIndex = 0; queueIndex < queueCount; queueIndex++) {
+                    priorities.put(queueIndex, 1.0f);
+                }
 
                 VkDeviceQueueCreateInfo.Buffer queueCreateInfos = VkDeviceQueueCreateInfo.calloc(1, stack);
                 queueCreateInfos.get(0)
@@ -4894,23 +5101,105 @@ public class VulkanBackend {
                     .queueFamilyIndex(graphicsQueueFamilyIndex)
                     .pQueuePriorities(priorities);
 
-                org.lwjgl.PointerBuffer enabledExtensions = stack.pointers(
-                    stack.UTF8(KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME)
-                );
+                Set<String> supportedExtensions = enumerateDeviceExtensionNames(physicalDevice);
+                PresentCompletionSupport presentCompletionSupport = queryPresentCompletionSupport(physicalDevice, supportedExtensions);
+
+                int enabledExtensionCount = 1
+                    + (presentCompletionSupport.presentId ? 1 : 0)
+                    + (presentCompletionSupport.presentWait ? 1 : 0);
+                org.lwjgl.PointerBuffer enabledExtensions = stack.mallocPointer(enabledExtensionCount);
+                enabledExtensions.put(stack.UTF8(KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME));
+                if (presentCompletionSupport.presentId) {
+                    enabledExtensions.put(stack.UTF8(KHRPresentId.VK_KHR_PRESENT_ID_EXTENSION_NAME));
+                }
+                if (presentCompletionSupport.presentWait) {
+                    enabledExtensions.put(stack.UTF8(KHRPresentWait.VK_KHR_PRESENT_WAIT_EXTENSION_NAME));
+                }
+                enabledExtensions.flip();
+
+                long featureChainHead = MemoryUtil.NULL;
+                VkPhysicalDevicePresentIdFeaturesKHR presentIdFeatures = null;
+                if (presentCompletionSupport.presentId) {
+                    presentIdFeatures = VkPhysicalDevicePresentIdFeaturesKHR.calloc(stack)
+                        .sType$Default()
+                        .presentId(true);
+                    featureChainHead = presentIdFeatures.address();
+                }
+                if (presentCompletionSupport.presentWait) {
+                    VkPhysicalDevicePresentWaitFeaturesKHR presentWaitFeatures = VkPhysicalDevicePresentWaitFeaturesKHR.calloc(stack)
+                        .sType$Default()
+                        .presentWait(true);
+                    if (presentIdFeatures != null) {
+                        presentIdFeatures.pNext(presentWaitFeatures.address());
+                    } else {
+                        featureChainHead = presentWaitFeatures.address();
+                    }
+                }
 
                 VkDeviceCreateInfo createInfo = VkDeviceCreateInfo.calloc(stack)
                     .sType$Default()
                     .pQueueCreateInfos(queueCreateInfos)
                     .ppEnabledExtensionNames(enabledExtensions);
+                if (featureChainHead != MemoryUtil.NULL) {
+                    createInfo.pNext(featureChainHead);
+                }
 
                 org.lwjgl.PointerBuffer pDevice = stack.mallocPointer(1);
                 checkVk("vkCreateDevice", VK10.vkCreateDevice(physicalDevice, createInfo, null, pDevice));
                 logicalDevice = new VkDevice(pDevice.get(0), physicalDevice, createInfo);
+                presentIdExtensionEnabled = presentCompletionSupport.presentId;
+                presentWaitExtensionEnabled = presentCompletionSupport.presentWait;
 
                 org.lwjgl.PointerBuffer pQueue = stack.mallocPointer(1);
                 VK10.vkGetDeviceQueue(logicalDevice, graphicsQueueFamilyIndex, 0, pQueue);
                 graphicsQueue = new VkQueue(pQueue.get(0), logicalDevice);
+
+                if (queueCount > 1) {
+                    VK10.vkGetDeviceQueue(logicalDevice, graphicsQueueFamilyIndex, 1, pQueue);
+                    presentQueue = new VkQueue(pQueue.get(0), logicalDevice);
+                } else {
+                    presentQueue = graphicsQueue;
+                }
+
+                LOGGER.info(
+                    "Enabled Vulkan present completion extensions: presentId={}, presentWait={}",
+                    presentIdExtensionEnabled,
+                    presentWaitExtensionEnabled
+                );
             }
+        }
+
+        private Set<String> enumerateDeviceExtensionNames(VkPhysicalDevice device) {
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer extensionCount = stack.ints(0);
+                checkVk(
+                    "vkEnumerateDeviceExtensionProperties(count)",
+                    VK10.vkEnumerateDeviceExtensionProperties(device, (java.nio.ByteBuffer) null, extensionCount, null)
+                );
+
+                int count = extensionCount.get(0);
+                if (count <= 0) {
+                    return Collections.emptySet();
+                }
+
+                VkExtensionProperties.Buffer extensionProperties = VkExtensionProperties.malloc(count, stack);
+                checkVk(
+                    "vkEnumerateDeviceExtensionProperties(list)",
+                    VK10.vkEnumerateDeviceExtensionProperties(device, (java.nio.ByteBuffer) null, extensionCount, extensionProperties)
+                );
+
+                Set<String> extensionNames = new HashSet<>();
+                for (int extensionIndex = 0; extensionIndex < extensionCount.get(0); extensionIndex++) {
+                    extensionNames.add(extensionProperties.get(extensionIndex).extensionNameString());
+                }
+                return extensionNames;
+            }
+        }
+
+        private PresentCompletionSupport queryPresentCompletionSupport(VkPhysicalDevice device, Set<String> supportedExtensions) {
+            // Keep present completion extensions disabled on this startup path.
+            // They are optional and can destabilize acquire/present cadence on some Linux/NVIDIA stacks.
+            return new PresentCompletionSupport(false, false);
         }
 
         private void createSharedDescriptorResources() {
@@ -4958,6 +5247,39 @@ public class VulkanBackend {
                 checkVk("vkCreateSampler(default)",
                     VK10.vkCreateSampler(logicalDevice, samplerInfo, null, pSampler));
                 defaultDescriptorSampler = pSampler.get(0);
+
+                VkSemaphoreCreateInfo semaphoreInfo = VkSemaphoreCreateInfo.calloc(stack).sType$Default();
+                VkFenceCreateInfo frameFenceInfo = VkFenceCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
+                java.nio.LongBuffer pSemaphore = stack.mallocLong(1);
+                java.nio.LongBuffer pFrameFence = stack.mallocLong(1);
+                for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
+                    checkVk(
+                        "vkCreateSemaphore(swapchainImageAvailable[" + frameIndex + "])",
+                        VK10.vkCreateSemaphore(logicalDevice, semaphoreInfo, null, pSemaphore)
+                    );
+                    swapchainImageAvailableSemaphores[frameIndex] = pSemaphore.get(0);
+
+                    checkVk(
+                        "vkCreateSemaphore(swapchainRenderFinished[" + frameIndex + "])",
+                        VK10.vkCreateSemaphore(logicalDevice, semaphoreInfo, null, pSemaphore)
+                    );
+                    swapchainRenderFinishedSemaphores[frameIndex] = pSemaphore.get(0);
+
+                    checkVk(
+                        "vkCreateFence(swapchainFrame[" + frameIndex + "])",
+                        VK10.vkCreateFence(logicalDevice, frameFenceInfo, null, pFrameFence)
+                    );
+                    swapchainFrameFences[frameIndex] = pFrameFence.get(0);
+                }
+                currentFrameSyncIndex = 0;
+
+                checkVk(
+                    "vkCreateFence(immediateSubmit)",
+                    VK10.vkCreateFence(logicalDevice, frameFenceInfo, null, pFrameFence)
+                );
+                immediateSubmitFence = pFrameFence.get(0);
             }
         }
 
@@ -4987,18 +5309,6 @@ public class VulkanBackend {
             if (pipeline.getResourceBindingCount() == 0) {
                 // Even with no descriptors, bind the pipeline
                 bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
-                return;
-            }
-
-            // The filtered descriptor must cover every slot in the pipeline's DSL.
-            // A partial write would leave slots in an indeterminate state.
-            if (layoutBindings.size() != pipeline.getResourceBindingCount()) {
-                // Partial bindings are not allowed — either all bindings must be provided
-                // or none at all. Returning early here avoids binding an invalid descriptor state.
-                LOGGER.error(
-                    "Vulkan render skipped: pipeline expects {} binding(s) but only {} were resolved. "
-                    + "This pipeline may not display correctly. Pipeline: {}",
-                    pipeline.getResourceBindingCount(), layoutBindings.size(), pipeline);
                 return;
             }
 
@@ -5047,6 +5357,9 @@ public class VulkanBackend {
                                 throw new IllegalArgumentException(
                                     "Sampler binding '" + binding.name() + "' requires VulkanTextureView on Vulkan backend");
                             }
+
+                            LegacyTextureObject sampledLegacyTexture = tryResolveLegacyTexture(vulkanTextureView.texture());
+                            transitionLegacyTextureToSampleLayout(sampledLegacyTexture, vulkanTextureView);
 
                             long samplerHandle = resolveDescriptorSamplerHandle(vulkanTextureView);
                             VkDescriptorImageInfo.Buffer imageInfo = VkDescriptorImageInfo.calloc(1, stack);
@@ -5125,6 +5438,29 @@ public class VulkanBackend {
                     stack.longs(descriptorSetHandle),
                     null
                 );
+            }
+        }
+
+        private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,
+                                                           VulkanTextureView view) {
+            if (texture == null || texture.imageHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+
+            int baseMip = view.getBaseMipLevel();
+            int mipCount = Math.max(1, view.getMipLevelCount());
+            int targetLayout = texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
+                ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            for (int level = baseMip; level < baseMip + mipCount; level++) {
+                int trackedLayout = trackedLayoutForLevel(texture, level);
+                if (trackedLayout == targetLayout) {
+                    continue;
+                }
+
+                transitionImageLayout(texture, trackedLayout, targetLayout, level, 1);
+                trackLayoutForLevel(texture, level, targetLayout);
             }
         }
 
@@ -5709,13 +6045,14 @@ public class VulkanBackend {
                 int finalLayout = texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
                     ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                     : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                transitionImageLayout(texture, texture.currentLayout, finalLayout, level, 1);
-                texture.currentLayout = finalLayout;
+                int oldLayout = trackedLayoutForLevel(texture, level);
+                transitionImageLayout(texture, oldLayout, finalLayout, level, 1);
+                trackLayoutForLevel(texture, level, finalLayout);
                 return;
             }
 
             java.nio.ByteBuffer packedPixels = normalizePixelData(pixels, formatInfo, width, height);
-            uploadToLegacyTextureRegion(texture, level, 0, 0, width, height, packedPixels);
+            uploadToLegacyTextureRegion(texture, target, level, 0, 0, width, height, packedPixels);
         }
 
         private void uploadLegacyTexture2DSubImage(long commandBufferHandle,
@@ -5753,7 +6090,7 @@ public class VulkanBackend {
 
             java.nio.ByteBuffer source = MemoryUtil.memByteBuffer(pixelsPointer, required);
             java.nio.ByteBuffer packedPixels = normalizePixelData(source, formatInfo, width, height);
-            uploadToLegacyTextureRegion(texture, level, xOffset, yOffset, width, height, packedPixels);
+            uploadToLegacyTextureRegion(texture, target, level, xOffset, yOffset, width, height, packedPixels);
         }
 
         private void uploadLegacyTexture2DSubImage(long commandBufferHandle,
@@ -5784,7 +6121,7 @@ public class VulkanBackend {
                 type
             );
             java.nio.ByteBuffer packedPixels = normalizePixelData(pixels, formatInfo, width, height);
-            uploadToLegacyTextureRegion(texture, level, xOffset, yOffset, width, height, packedPixels);
+            uploadToLegacyTextureRegion(texture, target, level, xOffset, yOffset, width, height, packedPixels);
         }
 
         private LegacyTextureObject uploadLegacyTexture2DSubImageCommon(long commandBufferHandle,
@@ -5849,12 +6186,15 @@ public class VulkanBackend {
             long defaultViewHandle = VK10.VK_NULL_HANDLE;
 
             try (MemoryStack stack = stackPush()) {
+                int arrayLayers = legacyTextureLayerCount(texture);
+                boolean cubemapTexture = isLegacyCubemapTarget(texture.target);
                 VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
                     .sType$Default()
+                    .flags(cubemapTexture ? VK10.VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0)
                     .imageType(VK10.VK_IMAGE_TYPE_2D)
                     .format(formatInfo.vkFormat)
                     .mipLevels(mipLevels)
-                    .arrayLayers(1)
+                    .arrayLayers(arrayLayers)
                     .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
                     .tiling(VK10.VK_IMAGE_TILING_OPTIMAL)
                     .usage(VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
@@ -5938,7 +6278,8 @@ public class VulkanBackend {
                     formatInfo.aspectMask,
                     0,
                     mipLevels,
-                    1
+                    arrayLayers,
+                    cubemapTexture
                 );
 
                 texture.imageHandle = imageHandle;
@@ -5952,6 +6293,7 @@ public class VulkanBackend {
                 texture.width = width;
                 texture.height = height;
                 texture.levels.clear();
+                texture.levelLayouts.clear();
             } catch (RuntimeException exception) {
                 if (logicalDevice != null) {
                     if (defaultViewHandle != VK10.VK_NULL_HANDLE) {
@@ -5986,6 +6328,26 @@ public class VulkanBackend {
             texture.defaultViewHandle = VK10.VK_NULL_HANDLE;
             texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
             texture.levels.clear();
+            texture.levelLayouts.clear();
+        }
+
+        private static int trackedLayoutForLevel(LegacyTextureObject texture, int level) {
+            return texture.levelLayouts.getOrDefault(level, texture.currentLayout);
+        }
+
+        private static void trackLayoutForLevel(LegacyTextureObject texture, int level, int layout) {
+            texture.levelLayouts.put(level, layout);
+            if (level == 0) {
+                texture.currentLayout = layout;
+            }
+        }
+
+        private static int legacyTextureLayerCount(LegacyTextureObject texture) {
+            return isLegacyCubemapTarget(texture.target) ? 6 : 1;
+        }
+
+        private static int cubemapLayerIndexForTarget(int target) {
+            return isLegacyCubemapFaceTarget(target) ? target - 0x8515 : 0;
         }
 
         private StagingBuffer createStagingBuffer(java.nio.ByteBuffer data) {
@@ -6077,21 +6439,40 @@ public class VulkanBackend {
                                            int baseMipLevel,
                                            int levelCount) {
             transitionImageLayout(
+                primaryCommandBuffer,
                 texture.imageHandle,
                 texture.aspectMask,
                 oldLayout,
                 newLayout,
                 baseMipLevel,
-                levelCount
+                levelCount,
+                legacyTextureLayerCount(texture)
             );
         }
 
-        private void transitionImageLayout(long imageHandle,
+        private void transitionImageLayout(VkCommandBuffer commandBuffer,
+                                            long imageHandle,
                                             int aspectMask,
                                             int oldLayout,
                                             int newLayout,
                                             int baseMipLevel,
-                                            int levelCount) {
+                                            int levelCount,
+                                            int layerCount) {
+            if (imageHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("transitionImageLayout requires a valid VkImage handle");
+            }
+            if (commandBuffer == null) {
+                throw new IllegalStateException("transitionImageLayout requires a non-null recording command buffer");
+            }
+            if (baseMipLevel < 0 || levelCount <= 0 || layerCount <= 0) {
+                throw new IllegalArgumentException(
+                    "transitionImageLayout requires non-negative baseMipLevel and positive levelCount/layerCount"
+                );
+            }
+            if (oldLayout == newLayout) {
+                return;
+            }
+
             try (MemoryStack stack = stackPush()) {
                 VkImageMemoryBarrier.Buffer barrier = VkImageMemoryBarrier.calloc(1, stack);
                 barrier.get(0)
@@ -6106,14 +6487,14 @@ public class VulkanBackend {
                     .baseMipLevel(baseMipLevel)
                     .levelCount(levelCount)
                     .baseArrayLayer(0)
-                    .layerCount(1);
+                    .layerCount(layerCount);
 
                 barrier.get(0)
                     .srcAccessMask(accessMaskForLayout(oldLayout))
                     .dstAccessMask(accessMaskForLayout(newLayout));
 
                 VK10.vkCmdPipelineBarrier(
-                    primaryCommandBuffer,
+                    commandBuffer,
                     stageMaskForLayout(oldLayout),
                     stageMaskForLayout(newLayout),
                     0,
@@ -6158,6 +6539,7 @@ public class VulkanBackend {
         }
 
         private void uploadToLegacyTextureRegion(LegacyTextureObject texture,
+                             int target,
                                                  int level,
                                                  int xOffset,
                                                  int yOffset,
@@ -6166,7 +6548,8 @@ public class VulkanBackend {
                                                  java.nio.ByteBuffer pixels) {
             StagingBuffer stagingBuffer = createStagingBuffer(pixels);
             try {
-                transitionImageLayout(texture, texture.currentLayout, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, level, 1);
+                int oldLayout = trackedLayoutForLevel(texture, level);
+                transitionImageLayout(texture, oldLayout, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, level, 1);
 
                 try (MemoryStack stack = stackPush()) {
                     VkBufferImageCopy.Buffer regions = VkBufferImageCopy.calloc(1, stack);
@@ -6177,7 +6560,7 @@ public class VulkanBackend {
                     regions.get(0).imageSubresource()
                         .aspectMask(texture.aspectMask)
                         .mipLevel(level)
-                        .baseArrayLayer(0)
+                        .baseArrayLayer(cubemapLayerIndexForTarget(target))
                         .layerCount(1);
                     regions.get(0).imageOffset().set(xOffset, yOffset, 0);
                     regions.get(0).imageExtent().set(width, height, 1);
@@ -6195,7 +6578,7 @@ public class VulkanBackend {
                     ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                     : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 transitionImageLayout(texture, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout, level, 1);
-                texture.currentLayout = finalLayout;
+                trackLayoutForLevel(texture, level, finalLayout);
             } finally {
                 deferStagingBufferDestroy(stagingBuffer);
             }
@@ -6543,13 +6926,30 @@ public class VulkanBackend {
             return requireAllocatedLegacyBuffer(legacy, operation);
         }
 
+        private VulkanBuffer resolveOptionalLegacyDrawBuffer(int target) {
+            Integer bufferId = legacyBufferBindings.get(target);
+            if (bufferId == null || bufferId == 0) {
+                return null;
+            }
+
+            LegacyBufferObject legacy = requireLegacyBuffer(bufferId);
+            VulkanBuffer buffer = legacy.buffer;
+            if (buffer == null || buffer.isClosed() || legacy.logicalSizeBytes <= 0) {
+                return null;
+            }
+
+            return buffer;
+        }
+
         private void drawLegacyArrays(long commandBufferHandle,
                                       int mode,
                                       int first,
                                       int count,
                                       int instanceCount) {
-            VulkanBuffer vertexBuffer = requireLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER, "drawArrays");
-            bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
+            VulkanBuffer vertexBuffer = resolveOptionalLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER);
+            if (vertexBuffer != null) {
+                bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
+            }
             drawInstanced(commandBufferHandle, first, count, instanceCount);
         }
 
@@ -6560,7 +6960,7 @@ public class VulkanBackend {
                                         long indices,
                                         int instanceCount,
                                         int baseVertex) {
-            VulkanBuffer vertexBuffer = requireLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER, "drawElements(vertex)");
+            VulkanBuffer vertexBuffer = resolveOptionalLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER);
             VulkanBuffer indexBuffer = requireLegacyDrawBuffer(VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, "drawElements(index)");
 
             int bytesPerIndex = indexType.bytesPerIndex();
@@ -6574,7 +6974,9 @@ public class VulkanBackend {
                 throw new IllegalArgumentException("Computed firstIndex exceeds int range: " + firstIndexLong);
             }
 
-            bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
+            if (vertexBuffer != null) {
+                bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
+            }
             bindIndexBuffer(commandBufferHandle, indexBuffer.getVkBufferHandle(), indexType);
             drawIndexed(commandBufferHandle, (int) firstIndexLong, count, baseVertex, instanceCount);
         }
@@ -6789,9 +7191,11 @@ public class VulkanBackend {
             try (MemoryStack stack = stackPush()) {
                 int vkFormat = toVkFormat(format);
                 int imageUsageFlags = toVkImageUsageFlags(usage, format);
+                boolean cubemapCompatible = isCubemapCompatibleUsage(usage);
 
                 VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
                     .sType$Default()
+                    .flags(cubemapCompatible ? VK10.VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0)
                     .imageType(VK10.VK_IMAGE_TYPE_2D)
                     .format(vkFormat)
                     .mipLevels(mipLevels)
@@ -6839,7 +7243,7 @@ public class VulkanBackend {
 
                 int aspectMask = toVkImageAspectMask(format);
                 defaultViewHandle = createVkImageView(stack, imageHandle, vkFormat,
-                    aspectMask, 0, mipLevels, depthOrLayers);
+                    aspectMask, 0, mipLevels, depthOrLayers, cubemapCompatible);
 
                 managedImageAllocations.put(imageHandle, memoryHandle);
                 managedImageDefaultViews.put(imageHandle, defaultViewHandle);
@@ -6883,8 +7287,9 @@ public class VulkanBackend {
             try (MemoryStack stack = stackPush()) {
                 int vkFormat = toVkFormat(texture.getVulkanicFormat());
                 int aspectMask = toVkImageAspectMask(texture.getVulkanicFormat());
+                boolean cubemapCompatible = isCubemapCompatibleUsage(texture.usage());
                 long viewHandle = createVkImageView(stack, texture.getVkImageHandle(), vkFormat,
-                    aspectMask, baseMipLevel, mipLevelCount, texture.getDepthOrLayers());
+                    aspectMask, baseMipLevel, mipLevelCount, texture.getDepthOrLayers(), cubemapCompatible);
 
                 managedExtraImageViews.add(viewHandle);
                 long finalViewHandle = viewHandle;
@@ -6919,6 +7324,8 @@ public class VulkanBackend {
             }
 
             try (MemoryStack stack = stackPush()) {
+                int layerCount = legacyTextureLayerCount(legacyTexture);
+                boolean cubemapTexture = isLegacyCubemapTarget(legacyTexture.target);
                 long viewHandle = createVkImageView(
                     stack,
                     legacyTexture.imageHandle,
@@ -6926,7 +7333,8 @@ public class VulkanBackend {
                     legacyTexture.aspectMask,
                     baseMipLevel,
                     mipLevelCount,
-                    1
+                    layerCount,
+                    cubemapTexture
                 );
 
                 managedExtraImageViews.add(viewHandle);
@@ -6943,11 +7351,11 @@ public class VulkanBackend {
 
         private long createVkImageView(MemoryStack stack, long imageHandle, int vkFormat,
                                        int aspectMask, int baseMipLevel, int mipLevelCount,
-                                       int layerCount) {
+                                       int layerCount, boolean cubemapCompatible) {
             VkImageViewCreateInfo viewCreateInfo = VkImageViewCreateInfo.calloc(stack)
                 .sType$Default()
                 .image(imageHandle)
-                .viewType(VK10.VK_IMAGE_VIEW_TYPE_2D)
+                .viewType(determineVkImageViewType(layerCount, cubemapCompatible))
                 .format(vkFormat);
             viewCreateInfo.components()
                 .r(VK10.VK_COMPONENT_SWIZZLE_IDENTITY)
@@ -6964,6 +7372,13 @@ public class VulkanBackend {
             java.nio.LongBuffer pView = stack.mallocLong(1);
             checkVk("vkCreateImageView", VK10.vkCreateImageView(logicalDevice, viewCreateInfo, null, pView));
             return pView.get(0);
+        }
+
+        private static int determineVkImageViewType(int layerCount, boolean cubemapCompatible) {
+            if (cubemapCompatible) {
+                return layerCount > 6 ? VK10.VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK10.VK_IMAGE_VIEW_TYPE_CUBE;
+            }
+            return layerCount > 1 ? VK10.VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK10.VK_IMAGE_VIEW_TYPE_2D;
         }
 
         private static int toVkFormat(VulkanicTextureFormat format) {
@@ -7065,12 +7480,58 @@ public class VulkanBackend {
                 checkVk("vkGetPhysicalDeviceSurfacePresentModesKHR(list)",
                     KHRSurface.vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, presentModeCount, presentModes));
 
+                StringBuilder presentModeSummary = new StringBuilder();
+                for (int index = 0; index < presentModeCount.get(0); index++) {
+                    if (index > 0) {
+                        presentModeSummary.append(", ");
+                    }
+                    presentModeSummary.append("0x").append(Integer.toHexString(presentModes.get(index)));
+                }
+
                 int presentMode = choosePresentMode(presentModes);
                 VkExtent2D extent = chooseSwapExtent(capabilities, stack);
 
-                int minImageCount = capabilities.minImageCount() + 1;
+                LOGGER.info(
+                    "Vulkan surface formats: [{}]; selected=format=0x{}, colorSpace=0x{}",
+                    describeSurfaceFormats(surfaceFormats),
+                    Integer.toHexString(chosenFormat.format()),
+                    Integer.toHexString(chosenFormat.colorSpace())
+                );
+
+                LOGGER.info(
+                    "Vulkan surface present modes: [{}]; selected=0x{}",
+                    presentModeSummary,
+                    Integer.toHexString(presentMode)
+                );
+
+                LOGGER.info(
+                    "Vulkan surface capabilities: minImages={}, maxImages={}, currentExtent={}x{}, minExtent={}x{}, maxExtent={}x{}, supportedTransforms=0x{}, currentTransform=0x{}, supportedCompositeAlpha=0x{}",
+                    capabilities.minImageCount(),
+                    capabilities.maxImageCount(),
+                    capabilities.currentExtent().width(),
+                    capabilities.currentExtent().height(),
+                    capabilities.minImageExtent().width(),
+                    capabilities.minImageExtent().height(),
+                    capabilities.maxImageExtent().width(),
+                    capabilities.maxImageExtent().height(),
+                    Integer.toHexString(capabilities.supportedTransforms()),
+                    Integer.toHexString(capabilities.currentTransform()),
+                    Integer.toHexString(capabilities.supportedCompositeAlpha())
+                );
+
+                int minImageCount = Math.max(1, capabilities.minImageCount() + 1);
                 if (capabilities.maxImageCount() > 0 && minImageCount > capabilities.maxImageCount()) {
                     minImageCount = capabilities.maxImageCount();
+                }
+
+                int swapchainImageUsage = VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+                if ((capabilities.supportedUsageFlags() & VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT) != 0) {
+                    swapchainImageUsage |= VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+                } else {
+                    LOGGER.warn(
+                        "Vulkan surface does not report VK_IMAGE_USAGE_TRANSFER_DST_BIT support for swapchain images; present blit path may be unavailable. supportedUsageFlags=0x{}",
+                        Integer.toHexString(capabilities.supportedUsageFlags())
+                    );
                 }
 
                 VkSwapchainCreateInfoKHR createInfo = VkSwapchainCreateInfoKHR.calloc(stack)
@@ -7081,7 +7542,7 @@ public class VulkanBackend {
                     .imageColorSpace(chosenFormat.colorSpace())
                     .imageExtent(extent)
                     .imageArrayLayers(1)
-                    .imageUsage(VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+                    .imageUsage(swapchainImageUsage)
                     .imageSharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE)
                     .preTransform(capabilities.currentTransform())
                     .compositeAlpha(KHRSurface.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
@@ -7102,6 +7563,8 @@ public class VulkanBackend {
 
                 List<Long> previousImageViewHandles = new ArrayList<>(swapchainImageViewHandles);
 
+                destroySwapchainPresentTargets();
+
                 destroySwapchainImageViews(previousImageViewHandles);
 
                 swapchain = newSwapchainHandle;
@@ -7117,6 +7580,25 @@ public class VulkanBackend {
 
                 swapchainImageViewHandles.clear();
                 swapchainImageViewHandles.addAll(imageResources.imageViewHandles);
+                createSwapchainPresentTargets(imageResources.imageViewHandles, chosenFormat.format(), extent.width(), extent.height());
+                nextPresentId = 1L;
+
+                swapchainImageLayouts.clear();
+                for (int i = 0; i < swapchainImageCount; i++) {
+                    swapchainImageLayouts.add(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
+                }
+                swapchainImagesInFlight = new long[swapchainImageCount];
+
+                LOGGER.info(
+                    "Created Vulkan swapchain: extent={}x{}, images={}, format=0x{}, presentMode=0x{}, usage=0x{}, windowHandle=0x{}",
+                    swapchainWidth,
+                    swapchainHeight,
+                    swapchainImageCount,
+                    Integer.toHexString(swapchainImageFormat),
+                    Integer.toHexString(swapchainPresentMode),
+                    Integer.toHexString(swapchainImageUsage),
+                    Long.toHexString(windowHandle)
+                );
             } catch (RuntimeException exception) {
                 if (newSwapchainHandle != VK10.VK_NULL_HANDLE) {
                     KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, newSwapchainHandle, null);
@@ -7135,7 +7617,7 @@ public class VulkanBackend {
                 KHRSwapchain.vkGetSwapchainImagesKHR(logicalDevice, swapchainHandle, imageCount, null));
             int count = imageCount.get(0);
             if (count <= 0) {
-                throw new IllegalStateException("Vulkan swapchain reported zero images.");
+                throw new IllegalStateException("vkGetSwapchainImagesKHR returned no swapchain images");
             }
 
             java.nio.LongBuffer images = stack.mallocLong(count);
@@ -7145,8 +7627,8 @@ public class VulkanBackend {
             List<Long> imageHandles = new ArrayList<>(count);
             List<Long> imageViewHandles = new ArrayList<>(count);
             try {
-                for (int i = 0; i < count; i++) {
-                    long imageHandle = images.get(i);
+                for (int index = 0; index < count; index++) {
+                    long imageHandle = images.get(index);
                     imageHandles.add(imageHandle);
                     imageViewHandles.add(createSwapchainImageView(stack, imageHandle, imageFormat));
                 }
@@ -7194,11 +7676,148 @@ public class VulkanBackend {
             }
         }
 
+        private void createSwapchainPresentTargets(List<Long> imageViewHandles,
+                                                   int imageFormat,
+                                                   int width,
+                                                   int height) {
+            destroySwapchainPresentTargets();
+            if (logicalDevice == null || imageViewHandles == null || imageViewHandles.isEmpty()) {
+                return;
+            }
+
+            long renderPassHandle = VK10.VK_NULL_HANDLE;
+            List<Long> framebufferHandles = new ArrayList<>(imageViewHandles.size());
+            try (MemoryStack stack = stackPush()) {
+                VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.calloc(1, stack);
+                attachments.get(0)
+                    .format(imageFormat)
+                    .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                    .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_CLEAR)
+                    .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
+                    .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                    .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                    .initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED)
+                    .finalLayout(KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+                VkAttachmentReference.Buffer colorReference = VkAttachmentReference.calloc(1, stack);
+                colorReference.get(0)
+                    .attachment(0)
+                    .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+                VkSubpassDescription.Buffer subpasses = VkSubpassDescription.calloc(1, stack);
+                subpasses.get(0)
+                    .pipelineBindPoint(VK10.VK_PIPELINE_BIND_POINT_GRAPHICS)
+                    .colorAttachmentCount(1)
+                    .pColorAttachments(colorReference);
+
+                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(2, stack);
+                dependencies.get(0)
+                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                    .dstSubpass(0)
+                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .srcAccessMask(0)
+                    .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+                dependencies.get(1)
+                    .srcSubpass(0)
+                    .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .dstStageMask(VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)
+                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+                    .dstAccessMask(0);
+
+                VkRenderPassCreateInfo renderPassCreateInfo = VkRenderPassCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .pAttachments(attachments)
+                    .pSubpasses(subpasses)
+                    .pDependencies(dependencies);
+
+                java.nio.LongBuffer pRenderPass = stack.mallocLong(1);
+                checkVk("vkCreateRenderPass(swapchainPresent)",
+                    VK10.vkCreateRenderPass(logicalDevice, renderPassCreateInfo, null, pRenderPass));
+                renderPassHandle = pRenderPass.get(0);
+
+                for (Long imageViewHandle : imageViewHandles) {
+                    java.nio.LongBuffer pAttachments = stack.longs(imageViewHandle);
+                    VkFramebufferCreateInfo framebufferCreateInfo = VkFramebufferCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .renderPass(renderPassHandle)
+                        .pAttachments(pAttachments)
+                        .width(width)
+                        .height(height)
+                        .layers(1);
+
+                    java.nio.LongBuffer pFramebuffer = stack.mallocLong(1);
+                    checkVk("vkCreateFramebuffer(swapchainPresent)",
+                        VK10.vkCreateFramebuffer(logicalDevice, framebufferCreateInfo, null, pFramebuffer));
+                    framebufferHandles.add(pFramebuffer.get(0));
+                }
+            } catch (RuntimeException exception) {
+                for (Long framebufferHandle : framebufferHandles) {
+                    if (framebufferHandle != null && framebufferHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
+                    }
+                }
+                if (renderPassHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
+                }
+                throw exception;
+            }
+
+            swapchainPresentRenderPass = renderPassHandle;
+            swapchainPresentFramebufferHandles.clear();
+            swapchainPresentFramebufferHandles.addAll(framebufferHandles);
+        }
+
+        private void destroySwapchainPresentTargets() {
+            if (logicalDevice == null) {
+                swapchainPresentFramebufferHandles.clear();
+                swapchainPresentRenderPass = VK10.VK_NULL_HANDLE;
+                return;
+            }
+
+            for (Long framebufferHandle : new ArrayList<>(swapchainPresentFramebufferHandles)) {
+                if (framebufferHandle != null && framebufferHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
+                }
+            }
+            swapchainPresentFramebufferHandles.clear();
+
+            if (swapchainPresentRenderPass != VK10.VK_NULL_HANDLE) {
+                VK10.vkDestroyRenderPass(logicalDevice, swapchainPresentRenderPass, null);
+                swapchainPresentRenderPass = VK10.VK_NULL_HANDLE;
+            }
+        }
+
         private void destroyTrackedSwapchainImageViews() {
+            destroySwapchainPresentTargets();
             destroySwapchainImageViews(new ArrayList<>(swapchainImageViewHandles));
             swapchainImageViewHandles.clear();
             swapchainImageHandles.clear();
+            swapchainImageLayouts.clear();
+            swapchainImagesInFlight = new long[0];
             swapchainImageCount = 0;
+        }
+
+        private int trackedSwapchainImageLayout(int imageIndex) {
+            if (imageIndex < 0 || imageIndex >= swapchainImageLayouts.size()) {
+                return VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+            }
+            return swapchainImageLayouts.get(imageIndex);
+        }
+
+        private void trackSwapchainImageLayout(int imageIndex, int layout) {
+            if (imageIndex < 0 || imageIndex >= swapchainImageLayouts.size()) {
+                return;
+            }
+            swapchainImageLayouts.set(imageIndex, layout);
+        }
+
+        private int swapchainImageIndexForViewHandle(long imageViewHandle) {
+            if (imageViewHandle == VK10.VK_NULL_HANDLE) {
+                return -1;
+            }
+            return swapchainImageViewHandles.indexOf(imageViewHandle);
         }
 
         private void recreateSwapchain() {
@@ -7214,6 +7833,67 @@ public class VulkanBackend {
             if (oldSwapchainHandle != VK10.VK_NULL_HANDLE) {
                 KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, oldSwapchainHandle, null);
             }
+
+            acquiredSwapchainImageIndex = -1;
+            frameInProgress = false;
+            currentFrameSyncIndex = 0;
+            clearFrameCommandBufferRecordingState();
+        }
+
+        private void refreshSurfaceAndSwapchain() {
+            if (logicalDevice == null || instance == null) {
+                throw new IllegalStateException("Vulkan device/instance is unavailable for surface refresh.");
+            }
+
+            long registeredWindowHandle = net.vulkanic.VulkanicAPI.getRegisteredGlfwWindowHandleForVulkanSurface();
+            if (registeredWindowHandle != VK10.VK_NULL_HANDLE) {
+                windowHandle = registeredWindowHandle;
+            }
+
+            checkVk("vkDeviceWaitIdle(surfaceRefresh)", VK10.vkDeviceWaitIdle(logicalDevice));
+
+            destroyTrackedSwapchainImageViews();
+            if (swapchain != VK10.VK_NULL_HANDLE) {
+                KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, swapchain, null);
+                swapchain = VK10.VK_NULL_HANDLE;
+            }
+            if (surface != VK10.VK_NULL_HANDLE) {
+                KHRSurface.vkDestroySurfaceKHR(instance, surface, null);
+                surface = VK10.VK_NULL_HANDLE;
+            }
+
+            createSurface();
+            createSwapchain();
+
+            acquiredSwapchainImageIndex = -1;
+            frameInProgress = false;
+            currentFrameSyncIndex = 0;
+            consecutiveAcquireTimeouts = 0;
+            lastAcquireTimeoutLogNanos = 0L;
+            clearFrameCommandBufferRecordingState();
+        }
+
+        private void clearFrameCommandBufferRecordingState() {
+            for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
+                frameCommandBufferRecording[frameIndex] = false;
+            }
+        }
+
+        private String describeWindowState() {
+            if (windowHandle == VK10.VK_NULL_HANDLE) {
+                return "windowHandle=null";
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                java.nio.IntBuffer width = stack.ints(0);
+                java.nio.IntBuffer height = stack.ints(0);
+                GLFW.glfwGetFramebufferSize(windowHandle, width, height);
+                return "windowHandle=0x" + Long.toHexString(windowHandle)
+                    + ", visible=" + (GLFW.glfwGetWindowAttrib(windowHandle, GLFW.GLFW_VISIBLE) == GLFW.GLFW_TRUE)
+                    + ", iconified=" + (GLFW.glfwGetWindowAttrib(windowHandle, GLFW.GLFW_ICONIFIED) == GLFW.GLFW_TRUE)
+                    + ", focused=" + (GLFW.glfwGetWindowAttrib(windowHandle, GLFW.GLFW_FOCUSED) == GLFW.GLFW_TRUE)
+                    + ", framebuffer=" + width.get(0) + "x" + height.get(0);
+            }
         }
 
         private boolean recreateSwapchainIfFramebufferSizeChanged() {
@@ -7222,6 +7902,22 @@ public class VulkanBackend {
             }
 
             recreateSwapchain();
+            return true;
+        }
+
+        private boolean refreshSurfaceIfRegisteredWindowChanged() {
+            long registeredWindowHandle = net.vulkanic.VulkanicAPI.getRegisteredGlfwWindowHandleForVulkanSurface();
+            if (registeredWindowHandle == VK10.VK_NULL_HANDLE || registeredWindowHandle == windowHandle) {
+                return false;
+            }
+
+            LOGGER.info(
+                "Refreshing Vulkan surface/swapchain because registered GLFW window changed from 0x{} to 0x{}.",
+                Long.toHexString(windowHandle),
+                Long.toHexString(registeredWindowHandle)
+            );
+
+            refreshSurfaceAndSwapchain();
             return true;
         }
 
@@ -7245,21 +7941,89 @@ public class VulkanBackend {
             }
         }
 
+        private static String describeSurfaceFormats(VkSurfaceFormatKHR.Buffer formats) {
+            StringBuilder summary = new StringBuilder();
+            for (int index = 0; index < formats.remaining(); index++) {
+                if (index > 0) {
+                    summary.append(", ");
+                }
+
+                VkSurfaceFormatKHR format = formats.get(index);
+                summary.append("format=0x")
+                    .append(Integer.toHexString(format.format()))
+                    .append("/colorSpace=0x")
+                    .append(Integer.toHexString(format.colorSpace()));
+            }
+            return summary.toString();
+        }
+
         private static VkSurfaceFormatKHR chooseSurfaceFormat(VkSurfaceFormatKHR.Buffer formats) {
             for (int index = 0; index < formats.remaining(); index++) {
                 VkSurfaceFormatKHR format = formats.get(index);
-                if (format.format() == VK10.VK_FORMAT_B8G8R8A8_SRGB
-                    && format.colorSpace() == KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                if (isPreferredRgba8SurfaceFormat(format)) {
                     return format;
                 }
             }
+
+            for (int index = 0; index < formats.remaining(); index++) {
+                VkSurfaceFormatKHR format = formats.get(index);
+                if (format.colorSpace() == KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+                    && (format.format() == VK10.VK_FORMAT_B8G8R8A8_SRGB
+                        || format.format() == VK10.VK_FORMAT_B8G8R8A8_UNORM)) {
+                    return format;
+                }
+            }
+
             return formats.get(0);
         }
 
+        private static boolean isPreferredRgba8SurfaceFormat(VkSurfaceFormatKHR format) {
+            if (format.colorSpace() != KHRSurface.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                return false;
+            }
+
+            return format.format() == VK10.VK_FORMAT_R8G8B8A8_UNORM
+                || format.format() == VK10.VK_FORMAT_R8G8B8A8_SRGB;
+        }
+
         private static int choosePresentMode(java.nio.IntBuffer presentModes) {
+            if (DEBUG_FORCE_FIFO_PRESENT_MODE_EXPERIMENT) {
+                for (int index = 0; index < presentModes.remaining(); index++) {
+                    int mode = presentModes.get(index);
+                    if (mode == KHRSurface.VK_PRESENT_MODE_FIFO_KHR) {
+                        return mode;
+                    }
+                }
+            }
             for (int index = 0; index < presentModes.remaining(); index++) {
                 int mode = presentModes.get(index);
                 if (mode == KHRSurface.VK_PRESENT_MODE_MAILBOX_KHR) {
+                    return mode;
+                }
+            }
+            if (GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_X11) {
+                for (int index = 0; index < presentModes.remaining(); index++) {
+                    int mode = presentModes.get(index);
+                    if (mode == KHRSurface.VK_PRESENT_MODE_IMMEDIATE_KHR) {
+                        return mode;
+                    }
+                }
+            }
+            for (int index = 0; index < presentModes.remaining(); index++) {
+                int mode = presentModes.get(index);
+                if (mode == KHRSurface.VK_PRESENT_MODE_FIFO_KHR) {
+                    return mode;
+                }
+            }
+            for (int index = 0; index < presentModes.remaining(); index++) {
+                int mode = presentModes.get(index);
+                if (mode == KHRSurface.VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
+                    return mode;
+                }
+            }
+            for (int index = 0; index < presentModes.remaining(); index++) {
+                int mode = presentModes.get(index);
+                if (mode == KHRSurface.VK_PRESENT_MODE_IMMEDIATE_KHR) {
                     return mode;
                 }
             }
@@ -7310,7 +8074,83 @@ public class VulkanBackend {
                 checkVk("vkAllocateCommandBuffers",
                     VK10.vkAllocateCommandBuffers(logicalDevice, allocateInfo, pCommandBuffer));
                 primaryCommandBuffer = new VkCommandBuffer(pCommandBuffer.get(0), logicalDevice);
+
+                for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
+                    checkVk(
+                        "vkCreateCommandPool(frame[" + frameIndex + "])",
+                        VK10.vkCreateCommandPool(logicalDevice, poolCreateInfo, null, pCommandPool)
+                    );
+                    frameCommandPools[frameIndex] = pCommandPool.get(0);
+
+                    allocateInfo.commandPool(frameCommandPools[frameIndex]);
+                    checkVk(
+                        "vkAllocateCommandBuffers(frame[" + frameIndex + "])",
+                        VK10.vkAllocateCommandBuffers(logicalDevice, allocateInfo, pCommandBuffer)
+                    );
+                    frameCommandBuffers[frameIndex] = new VkCommandBuffer(pCommandBuffer.get(0), logicalDevice);
+                    frameCommandBufferRecording[frameIndex] = false;
+                }
             }
+        }
+
+        private boolean hasValidFrameSyncPrimitives() {
+            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                if (swapchainImageAvailableSemaphores[i] == VK10.VK_NULL_HANDLE
+                    || swapchainRenderFinishedSemaphores[i] == VK10.VK_NULL_HANDLE
+                    || swapchainFrameFences[i] == VK10.VK_NULL_HANDLE) {
+                    return false;
+                }
+            }
+            if (swapchainImageCount <= 0) {
+                return false;
+            }
+            if (swapchainImagesInFlight.length != swapchainImageCount) {
+                return false;
+            }
+            return true;
+        }
+
+        private long currentSwapchainImageAvailableSemaphore() {
+            return swapchainImageAvailableSemaphores[currentFrameSyncIndex];
+        }
+
+        private long currentSwapchainRenderFinishedSemaphore() {
+            long semaphoreHandle = swapchainRenderFinishedSemaphores[currentFrameSyncIndex];
+            if (semaphoreHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException(
+                    "Render-finished semaphore for sync slot " + currentFrameSyncIndex + " is unavailable."
+                );
+            }
+            return semaphoreHandle;
+        }
+
+        private long currentSwapchainFrameFence() {
+            return swapchainFrameFences[currentFrameSyncIndex];
+        }
+
+        private int swapchainAcquireWaitStageMask() {
+            return VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        }
+
+        private void waitForAllSwapchainFrameFences() {
+            if (logicalDevice == null || !hasValidFrameSyncPrimitives()) {
+                return;
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                java.nio.LongBuffer fenceBuffer = stack.mallocLong(MAX_FRAMES_IN_FLIGHT);
+                for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
+                    fenceBuffer.put(frameIndex, swapchainFrameFences[frameIndex]);
+                }
+                checkVk(
+                    "vkWaitForFences(allSwapchainFrames)",
+                    VK10.vkWaitForFences(logicalDevice, fenceBuffer, true, Long.MAX_VALUE)
+                );
+            }
+        }
+
+        private boolean shouldLogFrameSyncDetails() {
+            return successfulFrameAcquireCount < 8 || successfulFramePresentCount < 8;
         }
 
         private int beginFrame() {
@@ -7323,6 +8163,9 @@ public class VulkanBackend {
             if (swapchain == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Cannot begin frame: Vulkan swapchain is unavailable.");
             }
+            if (!hasValidFrameSyncPrimitives()) {
+                throw new IllegalStateException("Cannot begin frame: Vulkan swapchain frame sync primitives are unavailable.");
+            }
             if (frameInProgress) {
                 throw new IllegalStateException("beginFrame called while a Vulkan frame is already in progress.");
             }
@@ -7334,15 +8177,34 @@ public class VulkanBackend {
                 submitPrimaryCommandBuffer(primaryCommandBuffer.address());
             }
 
+            refreshSurfaceIfRegisteredWindowChanged();
             recreateSwapchainIfFramebufferSizeChanged();
 
             try (MemoryStack stack = stackPush()) {
+                long frameFence = currentSwapchainFrameFence();
+                long imageAvailableSemaphore = currentSwapchainImageAvailableSemaphore();
+
+                if (shouldLogFrameSyncDetails()) {
+                    LOGGER.info(
+                        "Beginning Vulkan frame on sync slot {} (imageAvailable=0x{}, frameFence=0x{}).",
+                        currentFrameSyncIndex,
+                        Long.toHexString(imageAvailableSemaphore),
+                        Long.toHexString(frameFence)
+                    );
+                }
+
+                java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
+                checkVk(
+                    "vkWaitForFences(swapchainFrame)",
+                    VK10.vkWaitForFences(logicalDevice, frameFenceBuffer, true, Long.MAX_VALUE)
+                );
+
                 java.nio.IntBuffer pImageIndex = stack.ints(0);
                 int acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
                     logicalDevice,
                     swapchain,
-                    Long.MAX_VALUE,
-                    VK10.VK_NULL_HANDLE,
+                    SWAPCHAIN_ACQUIRE_TIMEOUT_NANOS,
+                    imageAvailableSemaphore,
                     VK10.VK_NULL_HANDLE,
                     pImageIndex
                 );
@@ -7352,17 +8214,57 @@ public class VulkanBackend {
                     acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
                         logicalDevice,
                         swapchain,
-                        Long.MAX_VALUE,
-                        VK10.VK_NULL_HANDLE,
+                        SWAPCHAIN_ACQUIRE_TIMEOUT_NANOS,
+                        imageAvailableSemaphore,
                         VK10.VK_NULL_HANDLE,
                         pImageIndex
                     );
+                }
+
+                if (acquireResult == VK10.VK_TIMEOUT || acquireResult == VK10.VK_NOT_READY) {
+                    consecutiveAcquireTimeouts++;
+
+                    long nowNanos = System.nanoTime();
+                    if (lastAcquireTimeoutLogNanos == 0L
+                        || nowNanos - lastAcquireTimeoutLogNanos >= ACQUIRE_TIMEOUT_LOG_INTERVAL_NANOS) {
+                        LOGGER.warn(
+                            "vkAcquireNextImageKHR has no swapchain image ready yet ({} consecutive); skipping present for this frame. {}",
+                            consecutiveAcquireTimeouts,
+                            describeWindowState()
+                        );
+                        lastAcquireTimeoutLogNanos = nowNanos;
+                    }
+
+                    if (consecutiveAcquireTimeouts >= ACQUIRE_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE) {
+                        LOGGER.warn(
+                            "Refreshing Vulkan surface/swapchain after {} consecutive acquire timeouts.",
+                            consecutiveAcquireTimeouts
+                        );
+                        try {
+                            refreshSurfaceAndSwapchain();
+                        } catch (RuntimeException refreshFailure) {
+                            LOGGER.warn(
+                                "Surface refresh failed during acquire-timeout recovery; falling back to swapchain-only recreate.",
+                                refreshFailure
+                            );
+                            recreateSwapchain();
+                        }
+                        consecutiveAcquireTimeouts = 0;
+                        lastAcquireTimeoutLogNanos = 0L;
+                    }
+
+                    acquiredSwapchainImageIndex = -1;
+                    frameInProgress = false;
+                    currentFrameSyncIndex = (currentFrameSyncIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+                    return -1;
                 }
 
                 if (acquireResult != VK10.VK_SUCCESS && acquireResult != KHRSwapchain.VK_SUBOPTIMAL_KHR) {
                     throw new IllegalStateException(
                         "vkAcquireNextImageKHR failed with VkResult=" + acquireResult);
                 }
+
+                consecutiveAcquireTimeouts = 0;
 
                 int imageIndex = pImageIndex.get(0);
                 if (imageIndex < 0) {
@@ -7375,8 +8277,26 @@ public class VulkanBackend {
                             + swapchainImageHandles.size() + ", views=" + swapchainImageViewHandles.size() + ").");
                 }
 
+                long imageInFlightFence = swapchainImagesInFlight[imageIndex];
+                if (imageInFlightFence != VK10.VK_NULL_HANDLE && imageInFlightFence != frameFence) {
+                    checkVk(
+                        "vkWaitForFences(imageInFlight[" + imageIndex + "])",
+                        VK10.vkWaitForFences(logicalDevice, stack.longs(imageInFlightFence), true, Long.MAX_VALUE)
+                    );
+                }
+                swapchainImagesInFlight[imageIndex] = frameFence;
+
                 acquiredSwapchainImageIndex = imageIndex;
                 frameInProgress = true;
+                successfulFrameAcquireCount++;
+                if (successfulFrameAcquireCount <= 5) {
+                    LOGGER.info(
+                        "vkAcquireNextImageKHR succeeded for image {} (frame acquire #{}, sync slot {})",
+                        imageIndex,
+                        successfulFrameAcquireCount,
+                        currentFrameSyncIndex
+                    );
+                }
                 return imageIndex;
             }
         }
@@ -7389,43 +8309,98 @@ public class VulkanBackend {
                 throw new IllegalStateException("endFrame cannot run while a render pass is active.");
             }
 
-            composePendingPresentTexture(primaryCommandBuffer.address());
-
             if (commandBufferRecording) {
+                // Ensure current-frame render work is visible before present composition.
                 submitPrimaryCommandBuffer(primaryCommandBuffer.address());
+            }
+
+            if (pendingPresentTextureRequest == null && successfulFramePresentCount < 6) {
+                LOGGER.warn("Ending Vulkan frame without a queued present texture; swapchain image will contain only its current contents.");
+            }
+
+            composePendingPresentTexture();
+
+            if (isCurrentFrameCommandBufferRecording()) {
+                submitCurrentFrameCommandBuffer();
+            } else {
+                submitFrameSemaphoreBridge();
             }
 
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer pSwapchains = stack.longs(swapchain);
                 java.nio.IntBuffer pImageIndices = stack.ints(acquiredSwapchainImageIndex);
+                long presentId = 0L;
 
                 VkPresentInfoKHR presentInfo = VkPresentInfoKHR.calloc(stack)
                     .sType$Default()
+                    .pWaitSemaphores(stack.longs(currentSwapchainRenderFinishedSemaphore()))
+                    .swapchainCount(1)
                     .pSwapchains(pSwapchains)
                     .pImageIndices(pImageIndices);
+                if (presentIdExtensionEnabled) {
+                    presentId = nextPresentId++;
+                    VkPresentIdKHR presentIdInfo = VkPresentIdKHR.calloc(stack)
+                        .sType$Default()
+                        .swapchainCount(1)
+                        .pPresentIds(stack.longs(presentId));
+                    presentInfo.pNext(presentIdInfo.address());
+                }
 
-                int presentResult = KHRSwapchain.vkQueuePresentKHR(graphicsQueue, presentInfo);
+                VkQueue queueForPresent = presentQueue != null ? presentQueue : graphicsQueue;
+                int presentResult = KHRSwapchain.vkQueuePresentKHR(queueForPresent, presentInfo);
                 if (presentResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR
                     || presentResult == KHRSwapchain.VK_SUBOPTIMAL_KHR) {
                     recreateSwapchain();
                 } else {
                     checkVk("vkQueuePresentKHR", presentResult);
+                    if (DEBUG_WAIT_FOR_PRESENT_COMPLETION_EXPERIMENT && presentWaitExtensionEnabled && presentId != 0L) {
+                        waitForPresentCompletion(presentId);
+                    } else if (DEBUG_WAIT_FOR_PRESENT_QUEUE_IDLE_EXPERIMENT
+                        && GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_X11) {
+                        checkVk("vkQueueWaitIdle(presentQueue)", VK10.vkQueueWaitIdle(queueForPresent));
+                    }
+                    successfulFramePresentCount++;
+                    if (successfulFramePresentCount <= 5) {
+                        LOGGER.info(
+                            "vkQueuePresentKHR succeeded for image {} (frame present #{}, sync slot {})",
+                            acquiredSwapchainImageIndex,
+                            successfulFramePresentCount,
+                            currentFrameSyncIndex
+                        );
+                    }
                 }
 
-                checkVk("vkQueueWaitIdle", VK10.vkQueueWaitIdle(graphicsQueue));
             } finally {
                 pendingPresentTextureRequest = null;
                 acquiredSwapchainImageIndex = -1;
                 frameInProgress = false;
+                currentFrameSyncIndex = (currentFrameSyncIndex + 1) % MAX_FRAMES_IN_FLIGHT;
             }
         }
 
-        private void queuePresentTextureRequest(long commandBufferHandle,
-                                                int legacyTextureHandle,
+        private void waitForPresentCompletion(long presentId) {
+            while (true) {
+                int waitResult = KHRPresentWait.vkWaitForPresentKHR(
+                    logicalDevice,
+                    swapchain,
+                    presentId,
+                    SWAPCHAIN_PRESENT_WAIT_POLL_TIMEOUT_NANOS
+                );
+                if (waitResult == VK10.VK_SUCCESS) {
+                    return;
+                }
+                if (waitResult == VK10.VK_TIMEOUT) {
+                    GLFW.glfwPollEvents();
+                    continue;
+                }
+                checkVk("vkWaitForPresentKHR", waitResult);
+            }
+        }
+
+        private void queuePresentTextureRequest(int legacyTextureHandle,
                                                 int mipLevel,
                                                 int width,
                                                 int height) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "queuePresentTextureRequest");
             LegacyTextureObject legacyTexture = requireLegacyTexture(legacyTextureHandle);
             if (legacyTexture.imageHandle == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Texture " + legacyTextureHandle + " has no Vulkan image storage for presentation.");
@@ -7436,7 +8411,6 @@ public class VulkanBackend {
                         + legacyTexture.mipLevels + ")"
                 );
             }
-
             pendingPresentTextureRequest = new PendingPresentTextureRequest(
                 legacyTextureHandle,
                 mipLevel,
@@ -7445,9 +8419,10 @@ public class VulkanBackend {
             );
         }
 
-        private void composePendingPresentTexture(long commandBufferHandle) {
+        private void composePendingPresentTexture() {
             PendingPresentTextureRequest request = pendingPresentTextureRequest;
             if (request == null) {
+                ensureAcquiredSwapchainImagePresentLayout();
                 return;
             }
 
@@ -7477,84 +8452,210 @@ public class VulkanBackend {
             int dstHeight = Math.max(1, swapchainHeight);
             int srcWidth = Math.max(1, request.width);
             int srcHeight = Math.max(1, request.height);
-            int copyWidth = Math.min(srcWidth, dstWidth);
-            int copyHeight = Math.min(srcHeight, dstHeight);
-            if (copyWidth <= 0 || copyHeight <= 0) {
+            if (srcWidth <= 0 || srcHeight <= 0 || dstWidth <= 0 || dstHeight <= 0) {
+                ensureAcquiredSwapchainImagePresentLayout();
                 pendingPresentTextureRequest = null;
                 return;
             }
 
-            ensureRecordingCommandBuffer(commandBufferHandle, "composePendingPresentTexture");
+            VkCommandBuffer frameCommandBuffer = ensureCurrentFrameCommandBufferRecording("composePendingPresentTexture");
 
-            int originalSourceLayout = sourceTexture.currentLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                : sourceTexture.currentLayout;
-
-            transitionImageLayout(
-                sourceTexture.imageHandle,
-                sourceTexture.aspectMask,
-                originalSourceLayout,
-                VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                request.mipLevel,
-                1
-            );
-            transitionImageLayout(
-                swapchainImageHandle,
-                VK10.VK_IMAGE_ASPECT_COLOR_BIT,
-                KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                0,
-                1
-            );
-
-            try (MemoryStack stack = stackPush()) {
-                VkImageBlit.Buffer region = VkImageBlit.calloc(1, stack);
-                region.get(0).srcSubresource()
-                    .aspectMask(sourceTexture.aspectMask)
-                    .mipLevel(request.mipLevel)
-                    .baseArrayLayer(0)
-                    .layerCount(1);
-                region.get(0).srcOffsets(0).set(0, 0, 0);
-                region.get(0).srcOffsets(1).set(srcWidth, srcHeight, 1);
-
-                region.get(0).dstSubresource()
-                    .aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
-                    .mipLevel(0)
-                    .baseArrayLayer(0)
-                    .layerCount(1);
-                region.get(0).dstOffsets(0).set(0, 0, 0);
-                region.get(0).dstOffsets(1).set(copyWidth, copyHeight, 1);
-
-                VK10.vkCmdBlitImage(
-                    primaryCommandBuffer,
-                    sourceTexture.imageHandle,
-                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    swapchainImageHandle,
-                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    region,
-                    VK10.VK_FILTER_NEAREST
+            if (successfulFramePresentCount < 6) {
+                LOGGER.info(
+                    "Composing Vulkan present source handle {} format=0x{} {}x{} into swapchain format=0x{} {}x{}",
+                    request.legacyTextureHandle,
+                    Integer.toHexString(sourceTexture.vkFormat),
+                    srcWidth,
+                    srcHeight,
+                    Integer.toHexString(swapchainImageFormat),
+                    dstWidth,
+                    dstHeight
                 );
             }
 
+            int trackedSourceLayout = trackedLayoutForLevel(sourceTexture, request.mipLevel);
+            int originalSourceLayout = trackedSourceLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                : trackedSourceLayout;
+
+            if (!DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
+                transitionImageLayout(
+                    frameCommandBuffer,
+                    sourceTexture.imageHandle,
+                    sourceTexture.aspectMask,
+                    originalSourceLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    request.mipLevel,
+                    1,
+                    1
+                );
+            }
+
+            if (DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
+                clearSwapchainImageWithRenderPass(frameCommandBuffer, acquiredSwapchainImageIndex, request.legacyTextureHandle);
+            } else {
+                int swapchainImageLayout = trackedSwapchainImageLayout(acquiredSwapchainImageIndex);
+                transitionImageLayout(
+                    frameCommandBuffer,
+                    swapchainImageHandle,
+                    VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+                    swapchainImageLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    0,
+                    1,
+                    1
+                );
+                trackSwapchainImageLayout(acquiredSwapchainImageIndex, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+                try (MemoryStack stack = stackPush()) {
+                    VkImageBlit.Buffer region = VkImageBlit.calloc(1, stack);
+                    region.get(0).srcSubresource()
+                        .aspectMask(sourceTexture.aspectMask)
+                        .mipLevel(request.mipLevel)
+                        .baseArrayLayer(0)
+                        .layerCount(1);
+                    region.get(0).srcOffsets(0).set(0, 0, 0);
+                    region.get(0).srcOffsets(1).set(srcWidth, srcHeight, 1);
+
+                    region.get(0).dstSubresource()
+                        .aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
+                        .mipLevel(0)
+                        .baseArrayLayer(0)
+                        .layerCount(1);
+                    region.get(0).dstOffsets(0).set(0, 0, 0);
+                    region.get(0).dstOffsets(1).set(dstWidth, dstHeight, 1);
+
+                    VK10.vkCmdBlitImage(
+                        frameCommandBuffer,
+                        sourceTexture.imageHandle,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        swapchainImageHandle,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        region,
+                        VK10.VK_FILTER_NEAREST
+                    );
+                }
+
+                transitionImageLayout(
+                    frameCommandBuffer,
+                    swapchainImageHandle,
+                    VK10.VK_IMAGE_ASPECT_COLOR_BIT,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                    0,
+                    1,
+                    1
+                );
+                trackSwapchainImageLayout(acquiredSwapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            }
+
+            if (!DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
+                transitionImageLayout(
+                    frameCommandBuffer,
+                    sourceTexture.imageHandle,
+                    sourceTexture.aspectMask,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    originalSourceLayout,
+                    request.mipLevel,
+                    1,
+                    1
+                );
+                trackLayoutForLevel(sourceTexture, request.mipLevel, originalSourceLayout);
+            }
+
+            pendingPresentTextureRequest = null;
+        }
+
+        private void clearSwapchainImageWithRenderPass(VkCommandBuffer commandBuffer,
+                                                       int swapchainImageIndex,
+                                                       int sourceTextureHandle) {
+            if (swapchainPresentRenderPass == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("Swapchain present render pass is unavailable for debug clear composition.");
+            }
+            if (swapchainImageIndex < 0 || swapchainImageIndex >= swapchainPresentFramebufferHandles.size()) {
+                throw new IllegalStateException(
+                    "Swapchain present framebuffer is unavailable for image index " + swapchainImageIndex
+                );
+            }
+
+            if (successfulFramePresentCount < 12) {
+                LOGGER.warn(
+                    "DEBUG experiment active: clearing acquired swapchain image {} through a color-attachment render pass instead of blitting source texture {}.",
+                    swapchainImageIndex,
+                    sourceTextureHandle
+                );
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                VkClearValue.Buffer clearValues = VkClearValue.calloc(1, stack);
+                float red = ((successfulFramePresentCount + 1) & 1) == 0 ? 0.85f : 0.10f;
+                float green = ((successfulFramePresentCount + 1) & 2) == 0 ? 0.15f : 0.80f;
+                float blue = ((successfulFramePresentCount + 1) & 4) == 0 ? 0.20f : 0.90f;
+                clearValues.get(0).color()
+                    .float32(0, red)
+                    .float32(1, green)
+                    .float32(2, blue)
+                    .float32(3, 1.0f);
+
+                VkRenderPassBeginInfo beginInfo = VkRenderPassBeginInfo.calloc(stack)
+                    .sType$Default()
+                    .renderPass(swapchainPresentRenderPass)
+                    .framebuffer(swapchainPresentFramebufferHandles.get(swapchainImageIndex))
+                    .pClearValues(clearValues);
+                beginInfo.renderArea()
+                    .offset(it -> it.x(0).y(0))
+                    .extent(it -> it.width(swapchainWidth).height(swapchainHeight));
+
+                VK10.vkCmdBeginRenderPass(commandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
+                VK10.vkCmdEndRenderPass(commandBuffer);
+            }
+
+            trackSwapchainImageLayout(swapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        }
+
+        private void ensureAcquiredSwapchainImagePresentLayout() {
+            if (!frameInProgress || acquiredSwapchainImageIndex < 0) {
+                throw new IllegalStateException("Cannot prepare swapchain image for present without an acquired frame image.");
+            }
+            if (acquiredSwapchainImageIndex >= swapchainImageHandles.size()) {
+                throw new IllegalStateException(
+                    "Acquired swapchain image index " + acquiredSwapchainImageIndex
+                        + " is outside swapchain image range " + swapchainImageHandles.size()
+                );
+            }
+
+            long swapchainImageHandle = swapchainImageHandles.get(acquiredSwapchainImageIndex);
+            if (swapchainImageHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("Acquired swapchain image handle is null");
+            }
+
+            int swapchainImageLayout = trackedSwapchainImageLayout(acquiredSwapchainImageIndex);
+            VkCommandBuffer frameCommandBuffer = ensureCurrentFrameCommandBufferRecording("ensureAcquiredSwapchainImagePresentLayout");
+
+            if (swapchainImageLayout == KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+                VK10.vkCmdPipelineBarrier(
+                    frameCommandBuffer,
+                    VK10.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                    0,
+                    null,
+                    null,
+                    null
+                );
+                return;
+            }
+
             transitionImageLayout(
-                sourceTexture.imageHandle,
-                sourceTexture.aspectMask,
-                VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                originalSourceLayout,
-                request.mipLevel,
-                1
-            );
-            transitionImageLayout(
+                frameCommandBuffer,
                 swapchainImageHandle,
                 VK10.VK_IMAGE_ASPECT_COLOR_BIT,
-                VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                swapchainImageLayout,
                 KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                 0,
+                1,
                 1
             );
-
-            sourceTexture.currentLayout = originalSourceLayout;
-            pendingPresentTextureRequest = null;
+            trackSwapchainImageLayout(acquiredSwapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
         }
 
         private long beginPrimaryCommandBuffer() {
@@ -7567,6 +8668,11 @@ public class VulkanBackend {
             }
 
             try (MemoryStack stack = stackPush()) {
+                // A single primary command buffer/command pool is reused for all submissions.
+                // Wait for every in-flight frame to complete before resetting it or freeing any
+                // transient Vulkan objects recorded into prior submissions.
+                waitForAllSwapchainFrameFences();
+                destroyTransientRenderPassResources();
                 checkVk("vkResetCommandPool", VK10.vkResetCommandPool(logicalDevice, commandPool, 0));
                 resetSharedDescriptorPool();
 
@@ -7578,6 +8684,55 @@ public class VulkanBackend {
                 commandBufferRecording = true;
                 renderPassRecording = false;
                 return primaryCommandBuffer.address();
+            }
+        }
+
+        private VkCommandBuffer currentFrameCommandBuffer() {
+            VkCommandBuffer commandBuffer = frameCommandBuffers[currentFrameSyncIndex];
+            if (commandBuffer == null) {
+                throw new IllegalStateException(
+                    "Frame Vulkan command buffer for sync slot " + currentFrameSyncIndex + " has not been allocated."
+                );
+            }
+            return commandBuffer;
+        }
+
+        private boolean isCurrentFrameCommandBufferRecording() {
+            return frameCommandBufferRecording[currentFrameSyncIndex];
+        }
+
+        private VkCommandBuffer ensureCurrentFrameCommandBufferRecording(String operation) {
+            VkCommandBuffer commandBuffer = currentFrameCommandBuffer();
+            if (isCurrentFrameCommandBufferRecording()) {
+                return commandBuffer;
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                java.nio.LongBuffer frameFenceBuffer = stack.longs(currentSwapchainFrameFence());
+                checkVk(
+                    "vkWaitForFences(frameCommandBuffer[" + currentFrameSyncIndex + "])",
+                    VK10.vkWaitForFences(logicalDevice, frameFenceBuffer, true, Long.MAX_VALUE)
+                );
+                checkVk(
+                    "vkResetCommandPool(frame[" + currentFrameSyncIndex + "])",
+                    VK10.vkResetCommandPool(logicalDevice, frameCommandPools[currentFrameSyncIndex], 0)
+                );
+
+                VkCommandBufferBeginInfo beginInfo = VkCommandBufferBeginInfo.calloc(stack)
+                    .sType$Default()
+                    .flags(VK10.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+                checkVk(
+                    "vkBeginCommandBuffer(frame[" + currentFrameSyncIndex + "])",
+                    VK10.vkBeginCommandBuffer(commandBuffer, beginInfo)
+                );
+                frameCommandBufferRecording[currentFrameSyncIndex] = true;
+                return commandBuffer;
+            } catch (RuntimeException exception) {
+                throw new IllegalStateException(
+                    "Failed to begin Vulkan frame command buffer for sync slot " + currentFrameSyncIndex
+                        + " during " + operation,
+                    exception
+                );
             }
         }
 
@@ -7594,8 +8749,17 @@ public class VulkanBackend {
             if (renderPassRecording) {
                 throw new IllegalStateException("Cannot submit command buffer while a render pass is still active.");
             }
+            if (immediateSubmitFence == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException("Immediate Vulkan submit fence is unavailable.");
+            }
 
             try (MemoryStack stack = stackPush()) {
+                java.nio.LongBuffer immediateFenceBuffer = stack.longs(immediateSubmitFence);
+                checkVk(
+                    "vkWaitForFences(immediateSubmit)",
+                    VK10.vkWaitForFences(logicalDevice, immediateFenceBuffer, true, Long.MAX_VALUE)
+                );
+                checkVk("vkResetFences(immediateSubmit)", VK10.vkResetFences(logicalDevice, immediateFenceBuffer));
                 checkVk("vkEndCommandBuffer", VK10.vkEndCommandBuffer(primaryCommandBuffer));
 
                 VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
@@ -7604,11 +8768,69 @@ public class VulkanBackend {
                 commandBuffers.put(0, primaryCommandBuffer.address());
                 submitInfos.pCommandBuffers(commandBuffers);
 
-                checkVk("vkQueueSubmit",
-                    VK10.vkQueueSubmit(graphicsQueue, submitInfos, VK10.VK_NULL_HANDLE));
-                checkVk("vkQueueWaitIdle", VK10.vkQueueWaitIdle(graphicsQueue));
+                checkVk("vkQueueSubmit(immediate)",
+                    VK10.vkQueueSubmit(graphicsQueue, submitInfos, immediateSubmitFence));
+                checkVk(
+                    "vkWaitForFences(immediateSubmitComplete)",
+                    VK10.vkWaitForFences(logicalDevice, immediateFenceBuffer, true, Long.MAX_VALUE)
+                );
                 destroyTransientRenderPassResources();
                 commandBufferRecording = false;
+            }
+        }
+
+        private void submitFrameSemaphoreBridge() {
+            try (MemoryStack stack = stackPush()) {
+                long frameFence = currentSwapchainFrameFence();
+                long imageAvailableSemaphore = currentSwapchainImageAvailableSemaphore();
+                long renderFinishedSemaphore = currentSwapchainRenderFinishedSemaphore();
+
+                VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
+                    .sType$Default()
+                    .waitSemaphoreCount(1)
+                    .pWaitSemaphores(stack.longs(imageAvailableSemaphore))
+                    .pWaitDstStageMask(stack.ints(swapchainAcquireWaitStageMask()))
+                    .pSignalSemaphores(stack.longs(renderFinishedSemaphore));
+
+                java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
+                checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
+                checkVk("vkQueueSubmit(frameBridge)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
+            }
+        }
+
+        private void submitCurrentFrameCommandBuffer() {
+            VkCommandBuffer frameCommandBuffer = currentFrameCommandBuffer();
+            if (!isCurrentFrameCommandBufferRecording()) {
+                throw new IllegalStateException(
+                    "Cannot submit Vulkan frame command buffer for sync slot " + currentFrameSyncIndex + " because it is not recording."
+                );
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                long frameFence = currentSwapchainFrameFence();
+                long imageAvailableSemaphore = currentSwapchainImageAvailableSemaphore();
+                long renderFinishedSemaphore = currentSwapchainRenderFinishedSemaphore();
+
+                checkVk(
+                    "vkEndCommandBuffer(frame[" + currentFrameSyncIndex + "])",
+                    VK10.vkEndCommandBuffer(frameCommandBuffer)
+                );
+
+                VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
+                    .sType$Default()
+                    .waitSemaphoreCount(1)
+                    .pWaitSemaphores(stack.longs(imageAvailableSemaphore))
+                    .pWaitDstStageMask(stack.ints(swapchainAcquireWaitStageMask()))
+                    .pSignalSemaphores(stack.longs(renderFinishedSemaphore));
+                org.lwjgl.PointerBuffer commandBuffers = stack.mallocPointer(1);
+                commandBuffers.put(0, frameCommandBuffer.address());
+                submitInfos.pCommandBuffers(commandBuffers);
+
+                java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
+                checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
+                checkVk("vkQueueSubmit(frame)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
+
+                frameCommandBufferRecording[currentFrameSyncIndex] = false;
             }
         }
 
@@ -7676,10 +8898,13 @@ public class VulkanBackend {
                 int attachmentCount = targets.hasDepthTarget() ? 2 : 1;
                 VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.calloc(attachmentCount, stack);
                 boolean swapchainColorAttachment = isSwapchainImageViewHandle(colorView.getVkImageViewHandle());
+                int swapchainColorImageIndex = swapchainColorAttachment
+                    ? swapchainImageIndexForViewHandle(colorView.getVkImageViewHandle())
+                    : -1;
                 int colorInitialLayout = swapchainColorAttachment
-                    ? KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-                    : legacyColorTexture != null && legacyColorTexture.currentLayout != VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                        ? legacyColorTexture.currentLayout
+                    ? trackedSwapchainImageLayout(swapchainColorImageIndex)
+                    : legacyColorTexture != null && trackedLayoutForLevel(legacyColorTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                        ? trackedLayoutForLevel(legacyColorTexture, 0)
                         : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 int colorFinalLayout = swapchainColorAttachment
                     ? KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
@@ -7703,8 +8928,8 @@ public class VulkanBackend {
                 VkAttachmentReference depthReference = null;
                 if (targets.hasDepthTarget()) {
                     int depthInitialLayout = legacyDepthTexture != null
-                        && legacyDepthTexture.currentLayout != VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                            ? legacyDepthTexture.currentLayout
+                        && trackedLayoutForLevel(legacyDepthTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                            ? trackedLayoutForLevel(legacyDepthTexture, 0)
                             : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                     attachments.get(1)
                         .format(toVkFormat(depthTexture.getVulkanicFormat()))
@@ -7800,14 +9025,47 @@ public class VulkanBackend {
 
                 VK10.vkCmdBeginRenderPass(primaryCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
 
+                VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
+                defaultViewport.get(0)
+                    .x(0.0f)
+                    .y((float) height)
+                    .width((float) width)
+                    .height(-(float) height)
+                    .minDepth(0.0f)
+                    .maxDepth(1.0f);
+                VK10.vkCmdSetViewport(primaryCommandBuffer, 0, defaultViewport);
+
+                VkRect2D.Buffer defaultScissor = VkRect2D.calloc(1, stack);
+                defaultScissor.get(0)
+                    .offset(it -> it.x(0).y(0))
+                    .extent(it -> it.width(width).height(height));
+                VK10.vkCmdSetScissor(primaryCommandBuffer, 0, defaultScissor);
+
+                // Start each render pass with an unclipped scissor baseline.
+                scissorTestEnabled = false;
+                hasCachedScissorRect = false;
+                cachedScissorX = 0;
+                cachedScissorY = 0;
+                cachedScissorWidth = width;
+                cachedScissorHeight = height;
+
                 if (legacyColorTexture != null) {
-                    legacyColorTexture.currentLayout = VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    trackLayoutForLevel(legacyColorTexture, 0, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
                 }
+                if (swapchainColorAttachment && swapchainColorImageIndex >= 0) {
+                    trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                    renderPassSwapchainImageIndex = swapchainColorImageIndex;
+                } else {
+                    renderPassSwapchainImageIndex = -1;
+                }
+                activeRenderPassTargetsSwapchain = swapchainColorAttachment;
                 if (legacyDepthTexture != null) {
-                    legacyDepthTexture.currentLayout = VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                    trackLayoutForLevel(legacyDepthTexture, 0, VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
                 }
 
                 renderPassRecording = true;
+                activeRenderPassWidth = width;
+                activeRenderPassHeight = height;
                 transientRenderPassHandles.add(renderPassHandle);
                 transientFramebufferHandles.add(framebufferHandle);
             } catch (RuntimeException exception) {
@@ -7833,6 +9091,13 @@ public class VulkanBackend {
 
             VK10.vkCmdEndRenderPass(primaryCommandBuffer);
             renderPassRecording = false;
+            activeRenderPassWidth = 0;
+            activeRenderPassHeight = 0;
+            activeRenderPassTargetsSwapchain = false;
+            if (renderPassSwapchainImageIndex >= 0) {
+                trackSwapchainImageLayout(renderPassSwapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+                renderPassSwapchainImageIndex = -1;
+            }
         }
 
         private void bindVertexBuffer(long commandBufferHandle, int slot, long bufferHandle) {
@@ -8655,12 +9920,24 @@ public class VulkanBackend {
 
         private void cmdSetViewport(long commandBufferHandle, int x, int y, int width, int height) {
             ensureRecordingCommandBuffer(commandBufferHandle, "cmdSetViewport");
+            if (renderPassRecording && activeRenderPassTargetsSwapchain && activeRenderPassWidth > 0 && activeRenderPassHeight > 0) {
+                // Keep swapchain passes full-frame; shrinking viewport here clips title/loading output into a strip.
+                x = 0;
+                y = 0;
+                width = activeRenderPassWidth;
+                height = activeRenderPassHeight;
+            }
+            int viewportWidth = Math.max(width, 1);
+            int viewportHeight = Math.max(height, 1);
+            int framebufferHeight = activeRenderPassHeight > 0
+                ? activeRenderPassHeight
+                : Math.max(swapchainHeight, viewportHeight);
             try (MemoryStack stack = stackPush()) {
                 org.lwjgl.vulkan.VkViewport.Buffer viewport = org.lwjgl.vulkan.VkViewport.calloc(1, stack)
                     .x((float) x)
-                    .y((float) y)
-                    .width((float) Math.max(width, 1))
-                    .height((float) Math.max(height, 1))
+                    .y((float) (framebufferHeight - y))
+                    .width((float) viewportWidth)
+                    .height(-(float) viewportHeight)
                     .minDepth(0.0f)
                     .maxDepth(1.0f);
                 VK10.vkCmdSetViewport(primaryCommandBuffer, 0, viewport);
@@ -8669,12 +9946,83 @@ public class VulkanBackend {
 
         private void cmdSetScissor(long commandBufferHandle, int x, int y, int width, int height) {
             ensureRecordingCommandBuffer(commandBufferHandle, "cmdSetScissor");
+            cachedScissorX = x;
+            cachedScissorY = y;
+            cachedScissorWidth = width;
+            cachedScissorHeight = height;
+            hasCachedScissorRect = true;
+
+            if (renderPassRecording && activeRenderPassTargetsSwapchain) {
+                applyFullRenderAreaScissor();
+                return;
+            }
+
+            if (!renderPassRecording || !scissorTestEnabled) {
+                return;
+            }
+
+            applyScissorRect(x, y, width, height);
+        }
+
+        private void setScissorTestEnabled(long commandBufferHandle, boolean enabled) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "setScissorTestEnabled");
+            scissorTestEnabled = enabled;
+            if (!renderPassRecording) {
+                return;
+            }
+
+            if (!enabled) {
+                applyFullRenderAreaScissor();
+                return;
+            }
+
+            if (hasCachedScissorRect) {
+                applyScissorRect(cachedScissorX, cachedScissorY, cachedScissorWidth, cachedScissorHeight);
+            } else {
+                applyFullRenderAreaScissor();
+            }
+        }
+
+        private void applyScissorRect(int x, int y, int width, int height) {
+            int scissorWidth = Math.max(width, 0);
+            int scissorHeight = Math.max(height, 0);
+            int framebufferWidth = activeRenderPassWidth > 0
+                ? activeRenderPassWidth
+                : Math.max(swapchainWidth, scissorWidth);
+            int framebufferHeight = activeRenderPassHeight > 0
+                ? activeRenderPassHeight
+                : Math.max(swapchainHeight, scissorHeight);
+            int translatedY = framebufferHeight - (y + scissorHeight);
+            int clampedX = Math.max(0, Math.min(x, framebufferWidth));
+            int clampedY = Math.max(0, Math.min(translatedY, framebufferHeight));
+            int maxWidth = Math.max(0, framebufferWidth - clampedX);
+            int maxHeight = Math.max(0, framebufferHeight - clampedY);
+            int clampedWidth = Math.min(scissorWidth, maxWidth);
+            int clampedHeight = Math.min(scissorHeight, maxHeight);
             try (MemoryStack stack = stackPush()) {
                 org.lwjgl.vulkan.VkRect2D.Buffer scissor = org.lwjgl.vulkan.VkRect2D.calloc(1, stack);
-                scissor.get(0).offset().x(x).y(y);
-                scissor.get(0).extent().width(Math.max(width, 0)).height(Math.max(height, 0));
+                scissor.get(0).offset().x(clampedX).y(clampedY);
+                scissor.get(0).extent().width(clampedWidth).height(clampedHeight);
                 VK10.vkCmdSetScissor(primaryCommandBuffer, 0, scissor);
             }
+        }
+
+        private void resetScissorToRenderArea(long commandBufferHandle) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "resetScissorToRenderArea");
+            if (!renderPassRecording) {
+                return;
+            }
+
+            applyFullRenderAreaScissor();
+        }
+
+        private void applyFullRenderAreaScissor() {
+            int fullWidth = activeRenderPassWidth > 0 ? activeRenderPassWidth : swapchainWidth;
+            int fullHeight = activeRenderPassHeight > 0 ? activeRenderPassHeight : swapchainHeight;
+            if (fullWidth <= 0 || fullHeight <= 0) {
+                return;
+            }
+            applyScissorRect(0, 0, fullWidth, fullHeight);
         }
 
         private void cmdClearAttachments(long commandBufferHandle,
@@ -8807,10 +10155,41 @@ public class VulkanBackend {
                     commandPool = VK10.VK_NULL_HANDLE;
                 }
 
+                for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
+                    if (frameCommandPools[frameIndex] != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyCommandPool(logicalDevice, frameCommandPools[frameIndex], null);
+                        frameCommandPools[frameIndex] = VK10.VK_NULL_HANDLE;
+                    }
+                    frameCommandBuffers[frameIndex] = null;
+                    frameCommandBufferRecording[frameIndex] = false;
+                }
+
                 if (descriptorPool != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyDescriptorPool(logicalDevice, descriptorPool, null);
                     descriptorPool = VK10.VK_NULL_HANDLE;
                 }
+
+                if (immediateSubmitFence != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyFence(logicalDevice, immediateSubmitFence, null);
+                    immediateSubmitFence = VK10.VK_NULL_HANDLE;
+                }
+
+                for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
+                    if (swapchainImageAvailableSemaphores[frameIndex] != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroySemaphore(logicalDevice, swapchainImageAvailableSemaphores[frameIndex], null);
+                        swapchainImageAvailableSemaphores[frameIndex] = VK10.VK_NULL_HANDLE;
+                    }
+                    if (swapchainRenderFinishedSemaphores[frameIndex] != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroySemaphore(logicalDevice, swapchainRenderFinishedSemaphores[frameIndex], null);
+                        swapchainRenderFinishedSemaphores[frameIndex] = VK10.VK_NULL_HANDLE;
+                    }
+                    if (swapchainFrameFences[frameIndex] != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyFence(logicalDevice, swapchainFrameFences[frameIndex], null);
+                        swapchainFrameFences[frameIndex] = VK10.VK_NULL_HANDLE;
+                    }
+                }
+                swapchainImagesInFlight = new long[0];
+                currentFrameSyncIndex = 0;
 
                 if (!descriptorSamplerCache.isEmpty()) {
                     new ArrayList<>(descriptorSamplerCache.values()).forEach(samplerHandle -> {
@@ -8831,6 +10210,10 @@ public class VulkanBackend {
                 graphicsQueue = null;
                 primaryCommandBuffer = null;
                 commandBufferRecording = false;
+                instanceProperties2ExtensionEnabled = false;
+                presentIdExtensionEnabled = false;
+                presentWaitExtensionEnabled = false;
+                nextPresentId = 1L;
                 frameInProgress = false;
                 acquiredSwapchainImageIndex = -1;
                 pendingPresentTextureRequest = null;

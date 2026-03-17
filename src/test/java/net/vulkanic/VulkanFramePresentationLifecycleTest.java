@@ -95,8 +95,14 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should expose frame end lifecycle entrypoint");
         assertTrue(vulkanBackendSource.contains("composePendingPresentTexture("),
             "Vulkan backend should compose queued present textures into acquired swapchain images during endFrame");
-        assertTrue(vulkanBackendSource.contains("vkCmdBlitImage"),
-            "Vulkan backend should blit/copy queued present textures into swapchain images before queue present");
+        assertTrue(vulkanBackendSource.contains("frameCommandBuffers"),
+            "Vulkan backend should dedicate separate command buffers to swapchain frame submission");
+        assertTrue(vulkanBackendSource.contains("ensureCurrentFrameCommandBufferRecording"),
+            "Vulkan backend should begin frame-presentation command recording on a dedicated frame buffer path");
+        assertTrue(
+            vulkanBackendSource.contains("vkCmdBlitImage") || vulkanBackendSource.contains("vkCmdCopyImage"),
+            "Vulkan backend should blit/copy queued present textures into swapchain images before queue present"
+        );
 
         assertTrue(renderSystemSource.contains("VulkanicAPI.beginFrame()"),
             "RenderSystem flip path should begin Vulkan frame lifecycle when Vulkan routing is selected");

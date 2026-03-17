@@ -30,6 +30,7 @@ import org.joml.Vector4f;
 @Environment(EnvType.CLIENT)
 public class CubeMap implements AutoCloseable {
 	private static final int SIDES = 6;
+	private static final boolean DEBUG_SKIP_VULKAN_TITLE_PANORAMA_EXPERIMENT = false;
 	private final GpuBuffer vertexBuffer;
 	private final CachedPerspectiveProjectionMatrixBuffer projectionMatrixUbo;
 	private final ResourceLocation location;
@@ -41,6 +42,10 @@ public class CubeMap implements AutoCloseable {
 	}
 
 	public void render(Minecraft minecraft, float f, float g) {
+		if (DEBUG_SKIP_VULKAN_TITLE_PANORAMA_EXPERIMENT && VulkanicAPI.isVulkanBackendSelected()) {
+			return;
+		}
+
 		net.vulkanic.VulkanicAPI.setProjectionMatrix(
 			this.projectionMatrixUbo.getBuffer(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), 85.0F), ProjectionType.PERSPECTIVE
 		);

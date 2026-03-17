@@ -73,6 +73,23 @@ import org.slf4j.Logger;
  */
 @Environment(EnvType.CLIENT)
 public class Main {
+	private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
+	private static final int MINIMUM_LWJGL_STACK_SIZE_KB = 512;
+
+	private static void ensureMinimumLwjglStackSize() {
+		String configuredValue = System.getProperty(LWJGL_STACK_SIZE_PROPERTY);
+		if (configuredValue != null) {
+			try {
+				if (Integer.parseInt(configuredValue.trim()) >= MINIMUM_LWJGL_STACK_SIZE_KB) {
+					return;
+				}
+			} catch (NumberFormatException ignored) {
+			}
+		}
+
+		System.setProperty(LWJGL_STACK_SIZE_PROPERTY, Integer.toString(MINIMUM_LWJGL_STACK_SIZE_KB));
+	}
+
 	/**
 	 * Main entry point for the Minecraft client.
 	 * <p>
@@ -90,6 +107,8 @@ public class Main {
 	 * @param strings Command-line arguments passed to the application
 	 */
 	public static void main(String[] strings) {
+		ensureMinimumLwjglStackSize();
+
 		OptionParser optionParser = new OptionParser();
 		optionParser.allowsUnrecognizedOptions();
 		optionParser.accepts("demo");

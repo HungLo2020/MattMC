@@ -684,7 +684,7 @@ public class RenderPipelines {
 	public static final RenderPipeline MOJANG_LOGO = register(
 		RenderPipeline.builder(GUI_TEXTURED_SNIPPET)
 			.withLocation("pipeline/mojang_logo")
-			.withBlend(new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE))
+			.withBlend(BlendFunction.TRANSLUCENT)
 			.build()
 	);
 	public static final RenderPipeline ENTITY_OUTLINE_BLIT = register(
@@ -717,6 +717,8 @@ public class RenderPipelines {
 			.withVertexShader("core/panorama")
 			.withFragmentShader("core/panorama")
 			.withSampler("Sampler0")
+			.withCull(false)
+			.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 			.withDepthWrite(false)
 			.withColorWrite(true, false)
 			.withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.QUADS)

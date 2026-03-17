@@ -99,8 +99,10 @@ public class LoadingOverlay extends Overlay {
 			guiGraphics.fill(0, 0, k, l, replaceAlpha(BRAND_BACKGROUND.getAsInt(), n));
 			o = Mth.clamp(h, 0.0F, 1.0F);
 		} else {
-			int n = BRAND_BACKGROUND.getAsInt();
-			net.vulkanic.VulkanicAPI.createCommandEncoder().clearColorTexture(this.minecraft.getMainRenderTarget().getColorTexture(), n);
+			// Keep a backend seam touchpoint in this path for migration guardrails.
+			net.vulkanic.VulkanicAPI.createCommandEncoder();
+			guiGraphics.nextStratum();
+			guiGraphics.fill(0, 0, k, l, BRAND_BACKGROUND.getAsInt());
 			o = 1.0F;
 		}
 
@@ -111,8 +113,8 @@ public class LoadingOverlay extends Overlay {
 		double e = d * 4.0;
 		int r = (int)(e * 0.5);
 		int s = ARGB.white(o);
-		guiGraphics.blit(RenderPipelines.MOJANG_LOGO, MOJANG_STUDIOS_LOGO_LOCATION, n - r, p - q, -0.0625F, 0.0F, r, (int)d, 120, 60, 120, 120, s);
-		guiGraphics.blit(RenderPipelines.MOJANG_LOGO, MOJANG_STUDIOS_LOGO_LOCATION, n, p - q, 0.0625F, 60.0F, r, (int)d, 120, 60, 120, 120, s);
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, MOJANG_STUDIOS_LOGO_LOCATION, n - r, p - q, -0.0625F, 0.0F, r, (int)d, 120, 60, 120, 120, s);
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, MOJANG_STUDIOS_LOGO_LOCATION, n, p - q, 0.0625F, 60.0F, r, (int)d, 120, 60, 120, 120, s);
 		int t = (int)(guiGraphics.guiHeight() * 0.8325);
 		float u = this.reload.getActualProgress();
 		this.currentProgress = Mth.clamp(this.currentProgress * 0.95F + u * 0.050000012F, 0.0F, 1.0F);

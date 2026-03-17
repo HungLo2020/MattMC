@@ -51,13 +51,16 @@ public class RenderSystem {
 		}
 
 		boolean vulkanBackendSelected = net.vulkanic.VulkanicAPI.isVulkanBackendSelected();
+		boolean vulkanFrameAcquired = false;
 		if (vulkanBackendSelected) {
-			net.vulkanic.VulkanicAPI.beginFrame();
+			vulkanFrameAcquired = net.vulkanic.VulkanicAPI.beginFrame() >= 0;
 		}
 		
 		Tesselator.getInstance().clear();
 		if (vulkanBackendSelected) {
-			net.vulkanic.VulkanicAPI.endFrame();
+			if (vulkanFrameAcquired) {
+				net.vulkanic.VulkanicAPI.endFrame();
+			}
 		} else {
 			GLFW.glfwSwapBuffers(window.handle());
 		}
