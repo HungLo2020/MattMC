@@ -67,6 +67,7 @@ public class GlCommandEncoder implements CommandEncoder {
 	private net.vulkanic.VulkanicRenderPass activeVulkanicRenderPass;
 	@Nullable
 	private net.vulkanic.CommandContext activeRenderPassContext;
+	private static int DEBUG_PIPELINE_BIND_LOGS = 0;
 
 	private static CommandContext commandContext() {
 		return VulkanicAPI.getCommandContext();
@@ -118,12 +119,11 @@ public class GlCommandEncoder implements CommandEncoder {
 				this.inRenderPass = true;
 				this.device.debugLabels().pushDebugGroup(supplier);
 
-				// Iris: In shadow rendering or safe-multiply state, Iris manages the FBO
-				// directly. We must NOT delegate FBO creation to VulkanicAPI in this path
-				// because Iris intercepts the FBO handle for special handling.
-				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
-						|| net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
-					// Iris shadow/safeMultiply path: use GlTexture's cached FBO but do not bind it.
+				// Iris: In shadow rendering, Iris manages the FBO directly.
+				// Keep the Vulkan-owned render-pass path for non-shadow rendering so
+				// startup/menu passes render into the presented color target.
+				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+					// Iris shadow path: use GlTexture's cached FBO but do not bind it.
 					int i = VulkanicAPI.resolveFramebufferForTextures(gpuTextureView.texture(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
 					this.iris$tempFBO = i;
 					this.activeVulkanicRenderPass = null;
@@ -335,8 +335,21 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyColorTexture(gpuTexture);
 			this.verifyDepthTexture(gpuTexture2);
-			int j = VulkanicAPI.resolveFramebufferForTextures(gpuTexture, gpuTexture2);
 			CommandContext ctx = commandContext();
+			if (!ctx.isImmediate()) {
+				try (net.vulkanic.VulkanicRenderPass ignored = VulkanicAPI.beginRenderPass(
+					ctx,
+					() -> "Clear color/depth textures",
+					VulkanicAPI.createManagedTextureView(gpuTexture, 0, 1),
+					OptionalInt.of(i),
+					VulkanicAPI.createManagedTextureView(gpuTexture2, 0, 1),
+					OptionalDouble.of(d)
+				)) {
+				}
+				return;
+			}
+
+			int j = VulkanicAPI.resolveFramebufferForTextures(gpuTexture, gpuTexture2);
 			VulkanicAPI.bindFramebuffer(ctx, j);
 			VulkanicAPI.setScissorTestEnabled(ctx, false);
 			VulkanicAPI.setClearDepth(ctx, d);
@@ -1065,7 +1078,8 @@ public class GlCommandEncoder implements CommandEncoder {
 		// Iris: From MixinGlCommandEncoder - Unlock depth color and handle custom passes
 		net.irisshaders.iris.gl.blending.DepthColorStorage.unlockDepthColor();
 		
-		if (net.irisshaders.iris.vertices.ImmediateState.safeToMultiply && !(glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader)) {
+		if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
+			&& !(glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader)) {
 			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), iris$tempFBO);
 		}
 		
@@ -1206,6 +1220,21 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.prepareSamplerBindingsForVulkanDescriptors(glRenderPass, ctx);
 		}
 		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass);
+		if (!ctx.isImmediate() && DEBUG_PIPELINE_BIND_LOGS < 80) {
+			DEBUG_PIPELINE_BIND_LOGS++;
+			LOGGER.info(
+				"Vulkan trySetup bind#{} pipeline={} submissionPresent={} layoutBindings={} writeColor={} writeDepth={} depthTest={} cull={} blend={}",
+				DEBUG_PIPELINE_BIND_LOGS,
+				glRenderPass.pipeline.info().getLocation(),
+				submission != null,
+				glRenderPass.pipeline.descriptor().getResourceLayout().bindings().size(),
+				renderPipeline.isWriteColor(),
+				renderPipeline.isWriteDepth(),
+				renderPipeline.getDepthTestFunction(),
+				renderPipeline.isCull(),
+				renderPipeline.getBlendFunction().isPresent()
+			);
+		}
 		if (submission != null) {
 			net.vulkanic.PipelineHandle pipelineHandle;
 			if (ctx.isImmediate()) {
@@ -1213,6 +1242,16 @@ public class GlCommandEncoder implements CommandEncoder {
 			} else {
 				pipelineHandle = VulkanicAPI.resolvePipelineHandle(
 						glRenderPass.pipeline.info(), glRenderPass.pipeline.descriptor());
+				if (DEBUG_PIPELINE_BIND_LOGS < 80) {
+					DEBUG_PIPELINE_BIND_LOGS++;
+					LOGGER.info(
+						"Vulkan trySetup bind#{} pipeline={} resolvedPipelineHandle={} completeCoverage={}",
+						DEBUG_PIPELINE_BIND_LOGS,
+						glRenderPass.pipeline.info().getLocation(),
+						pipelineHandle != null,
+						submission.completeCoverage()
+					);
+				}
 			}
 			if (pipelineHandle != null) {
 				VulkanicAPI.bindPipelineResources(
@@ -1221,7 +1260,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					submission.descriptor(),
 					submission.bindings()
 				);
-				if (submission.completeCoverage()) {
+				if (ctx.isImmediate() && submission.completeCoverage()) {
 					immediateSeamHasCompleteCoverage = true;
 				}
 			}

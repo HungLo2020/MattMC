@@ -18,6 +18,8 @@ EOF
 BACKEND="vulkan"
 MAX_SECS="${MAX_SECS:-120}"
 DUMP_SECS="${DUMP_SECS:-45}"
+SCREENSHOT_INTERVAL_SECS="${SCREENSHOT_INTERVAL_SECS:-5}"
+SCREENSHOT_MAX_COUNT="${SCREENSHOT_MAX_COUNT:-6}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -55,6 +57,11 @@ if ! [[ "$MAX_SECS" =~ ^[0-9]+$ ]] || ! [[ "$DUMP_SECS" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
+if ! [[ "$SCREENSHOT_INTERVAL_SECS" =~ ^[0-9]+$ ]] || ! [[ "$SCREENSHOT_MAX_COUNT" =~ ^[0-9]+$ ]]; then
+    echo "SCREENSHOT_INTERVAL_SECS and SCREENSHOT_MAX_COUNT must be integers" >&2
+    exit 1
+fi
+
 # Find project root (where gradlew exists).
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
@@ -82,6 +89,47 @@ THREAD_DUMP="$ARTIFACT_DIR/thread_dump_${RUN_ID}.txt"
 PROCESS_SNAPSHOT="$ARTIFACT_DIR/process_snapshot_${RUN_ID}.txt"
 LATEST_TAIL="$ARTIFACT_DIR/latest_tail_${RUN_ID}.log"
 HSERR_LIST="$ARTIFACT_DIR/hs_err_${RUN_ID}.txt"
+WINDOW_TREE="$ARTIFACT_DIR/window_tree_${RUN_ID}.txt"
+
+screenshot_count=0
+screenshot_enabled="false"
+
+capture_root_screenshot() {
+    local label="$1"
+    local elapsed_secs="$2"
+
+    if [[ "$screenshot_enabled" != "true" || "$SCREENSHOT_MAX_COUNT" -eq 0 ]]; then
+        return
+    fi
+    if [[ "$screenshot_count" -ge "$SCREENSHOT_MAX_COUNT" ]]; then
+        return
+    fi
+
+    screenshot_count=$((screenshot_count + 1))
+    local screenshot_file="$ARTIFACT_DIR/screenshot_${RUN_ID}_${screenshot_count}_${label}_${elapsed_secs}s.png"
+    if import -window root "$screenshot_file" >/dev/null 2>&1; then
+        echo "screenshot_${screenshot_count}=$screenshot_file" >> "$META_LOG"
+    else
+        rm -f "$screenshot_file"
+        echo "screenshot_${screenshot_count}=failed:$label:$elapsed_secs" >> "$META_LOG"
+    fi
+}
+
+if command -v import >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
+    screenshot_enabled="true"
+    {
+        echo "screenshot_enabled=true"
+        echo "screenshot_interval_secs=$SCREENSHOT_INTERVAL_SECS"
+        echo "screenshot_max_count=$SCREENSHOT_MAX_COUNT"
+        echo "display=${DISPLAY}"
+    } >> "$META_LOG"
+    xwininfo -root -tree > "$WINDOW_TREE" 2>&1 || true
+else
+    {
+        echo "screenshot_enabled=false"
+        echo "display=${DISPLAY:-unset}"
+    } >> "$META_LOG"
+fi
 
 if [[ -f "$OPTIONS_FILE" ]]; then
     if rg -q '^graphics_backend=' "$OPTIONS_FILE"; then
@@ -138,6 +186,10 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
     sleep 1
     elapsed=$((elapsed + 1))
 
+    if [[ "$screenshot_enabled" == "true" && "$SCREENSHOT_INTERVAL_SECS" -gt 0 && $((elapsed % SCREENSHOT_INTERVAL_SECS)) -eq 0 ]]; then
+        capture_root_screenshot "tick" "$elapsed"
+    fi
+
     if [[ "$dump_taken" == "false" && "$elapsed" -ge "$DUMP_SECS" ]]; then
         CLIENT_PID="$(find_client_pid)"
         {
@@ -159,9 +211,11 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
                 echo "===== jcmd Thread.print (pid=$CLIENT_PID) ====="
                 jcmd "$CLIENT_PID" Thread.print
             } > "$THREAD_DUMP" 2>&1 || true
+            capture_root_screenshot "dump" "$elapsed"
             dump_taken="true"
         else
             echo "No Minecraft Java PID found at dump point." > "$THREAD_DUMP"
+            capture_root_screenshot "dump" "$elapsed"
             dump_taken="true"
         fi
     fi
@@ -174,6 +228,7 @@ done
 
 if [[ "$timed_out" == "true" ]]; then
     echo "timeout=true" >> "$META_LOG"
+    capture_root_screenshot "timeout" "$elapsed"
     # Final best-effort dump before terminating, in case dump window was too early.
     CLIENT_PID="$(find_client_pid)"
     if [[ -n "$CLIENT_PID" ]]; then
@@ -222,6 +277,9 @@ echo "- Thread dump: $THREAD_DUMP"
 echo "- Proc snap:   $PROCESS_SNAPSHOT"
 echo "- Latest tail: $LATEST_TAIL"
 echo "- hs_err list: $HSERR_LIST"
+if [[ -f "$WINDOW_TREE" ]]; then
+    echo "- Window tree: $WINDOW_TREE"
+fi
 
 if [[ "$timed_out" == "true" ]]; then
     echo "Result: timed out after ${MAX_SECS}s and was terminated automatically."

@@ -12,6 +12,8 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import net.logging.LogUtils;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
@@ -62,7 +64,7 @@ import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolSize;
 import org.lwjgl.vulkan.VkDescriptorSetAllocateInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
-import org.lwjgl.vulkan.VkImageBlit;
+import org.lwjgl.vulkan.VkImageCopy;
 import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
 import org.lwjgl.vulkan.VkImageSubresourceRange;
@@ -179,6 +181,7 @@ public class VulkanBackend {
     private final AtomicInteger nextVirtualShaderId = new AtomicInteger(1);
     private final AtomicInteger nextVirtualProgramId = new AtomicInteger(1);
     private final AtomicInteger presentQueueLogCount = new AtomicInteger();
+    private static final AtomicInteger PRESENT_FORMAT_MISMATCH_LOG_COUNT = new AtomicInteger();
     private final Map<Integer, VirtualShader> virtualShaders = new ConcurrentHashMap<>();
     private final Map<Integer, VirtualProgram> virtualPrograms = new ConcurrentHashMap<>();
     private final Map<Long, BoundPipelineResources> boundPipelineResourcesByCommandBuffer = new ConcurrentHashMap<>();
@@ -362,8 +365,14 @@ public class VulkanBackend {
                 return PrecompiledPipelineState.failed();
             }
 
-            String vertexWithDefines = GlslPreprocessor.injectDefines(vertexSource, renderPipeline.getShaderDefines());
-            String fragmentWithDefines = GlslPreprocessor.injectDefines(fragmentSource, renderPipeline.getShaderDefines());
+            String vertexWithDefines = injectExplicitVulkanBindings(
+                renderPipeline,
+                GlslPreprocessor.injectDefines(vertexSource, renderPipeline.getShaderDefines())
+            );
+            String fragmentWithDefines = injectExplicitVulkanBindings(
+                renderPipeline,
+                GlslPreprocessor.injectDefines(fragmentSource, renderPipeline.getShaderDefines())
+            );
 
             VulkanicSpirvModule vertexModule = compileSpirvModuleForBackend(
                 VulkanicShaderStage.VERTEX,
@@ -401,6 +410,104 @@ public class VulkanBackend {
             LOGGER.error("Failed to precompile Vulkan pipeline {}", renderPipeline.getLocation(), exception);
             return PrecompiledPipelineState.failed();
         }
+    }
+
+    private static String injectExplicitVulkanBindings(RenderPipeline renderPipeline, String shaderSource) {
+        String reboundSource = shaderSource;
+        int bindingIndex = 0;
+
+        for (String samplerName : renderPipeline.getSamplers()) {
+            reboundSource = injectExplicitNamedUniformBinding(reboundSource, samplerName, bindingIndex++);
+        }
+
+        for (RenderPipeline.UniformDescription uniform : renderPipeline.getUniforms()) {
+            reboundSource = switch (uniform.type()) {
+                case UNIFORM_BUFFER -> injectExplicitUniformBlockBinding(reboundSource, uniform.name(), bindingIndex++);
+                case TEXEL_BUFFER -> injectExplicitNamedUniformBinding(reboundSource, uniform.name(), bindingIndex++);
+            };
+        }
+
+        return reboundSource;
+    }
+
+    private static String injectExplicitUniformBlockBinding(String shaderSource, String blockName, int bindingIndex) {
+        java.util.regex.Pattern layoutPattern = java.util.regex.Pattern.compile(
+            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*uniform\\s+" + java.util.regex.Pattern.quote(blockName) + "\\s*\\{"
+        );
+        java.util.regex.Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
+        if (layoutMatcher.find()) {
+            String layoutBody = layoutMatcher.group(2);
+            if (layoutBody.contains("binding") || layoutBody.contains("set")) {
+                return shaderSource;
+            }
+
+            return layoutMatcher.replaceFirst(
+                java.util.regex.Matcher.quoteReplacement(
+                    layoutMatcher.group(1)
+                        + "layout(" + layoutBody + ", set = 0, binding = " + bindingIndex + ") uniform " + blockName + " {"
+                )
+            );
+        }
+
+        java.util.regex.Pattern plainPattern = java.util.regex.Pattern.compile(
+            "(?m)(^\\s*)uniform\\s+" + java.util.regex.Pattern.quote(blockName) + "\\s*\\{"
+        );
+        java.util.regex.Matcher plainMatcher = plainPattern.matcher(shaderSource);
+        if (!plainMatcher.find()) {
+            return shaderSource;
+        }
+
+        return plainMatcher.replaceFirst(
+            java.util.regex.Matcher.quoteReplacement(
+                plainMatcher.group(1)
+                    + "layout(set = 0, binding = " + bindingIndex + ") uniform " + blockName + " {"
+            )
+        );
+    }
+
+    private static String injectExplicitNamedUniformBinding(String shaderSource, String uniformName, int bindingIndex) {
+        java.util.regex.Pattern layoutPattern = java.util.regex.Pattern.compile(
+            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*uniform\\s+([A-Za-z0-9_]+)\\s+"
+                + java.util.regex.Pattern.quote(uniformName)
+                + "\\s*;"
+        );
+        java.util.regex.Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
+        if (layoutMatcher.find()) {
+            String layoutBody = layoutMatcher.group(2);
+            if (layoutBody.contains("binding") || layoutBody.contains("set")) {
+                return shaderSource;
+            }
+
+            return layoutMatcher.replaceFirst(
+                java.util.regex.Matcher.quoteReplacement(
+                    layoutMatcher.group(1)
+                        + "layout(" + layoutBody + ", set = 0, binding = " + bindingIndex + ") uniform "
+                        + layoutMatcher.group(3)
+                        + " "
+                        + uniformName
+                        + ";"
+                )
+            );
+        }
+
+        java.util.regex.Pattern plainPattern = java.util.regex.Pattern.compile(
+            "(?m)(^\\s*)uniform\\s+([A-Za-z0-9_]+)\\s+" + java.util.regex.Pattern.quote(uniformName) + "\\s*;"
+        );
+        java.util.regex.Matcher plainMatcher = plainPattern.matcher(shaderSource);
+        if (!plainMatcher.find()) {
+            return shaderSource;
+        }
+
+        return plainMatcher.replaceFirst(
+            java.util.regex.Matcher.quoteReplacement(
+                plainMatcher.group(1)
+                    + "layout(set = 0, binding = " + bindingIndex + ") uniform "
+                    + plainMatcher.group(2)
+                    + " "
+                    + uniformName
+                    + ";"
+            )
+        );
     }
 
     private static String resourceLayoutKey(PipelineDescriptor.ResourceLayout layout) {
@@ -913,7 +1020,7 @@ public class VulkanBackend {
             nativeBringUpAttempted = true;
             NativeSpine createdSpine = null;
             try {
-                createdSpine = NativeSpine.create();
+                createdSpine = NativeSpine.create(this);
                 materializeCompiledShaderModules(createdSpine);
 
                 nativeSpine = createdSpine;
@@ -1031,8 +1138,81 @@ public class VulkanBackend {
         String sourceName,
         String entryPoint
     ) {
-        String normalizedSource = GlslangSpirvCompiler.normalizeForVulkan(shaderStage, glslSource.toString());
+        String preprocessedSource = preprocessMojImportsForVulkan(sourceName, glslSource.toString());
+        String normalizedSource = GlslangSpirvCompiler.normalizeForVulkan(shaderStage, preprocessedSource);
         return spirvCompiler.compile(shaderStage, normalizedSource, sourceName, entryPoint);
+    }
+
+    private String preprocessMojImportsForVulkan(String sourceName, String shaderSource) {
+        if (!shaderSource.contains("#moj_import")) {
+            return shaderSource;
+        }
+
+        net.minecraft.resources.ResourceLocation baseSourceLocation = tryParseShaderSourceLocation(sourceName);
+        LOGGER.warn(
+            "Vulkan backend received raw GLSL imports for {}; applying backend-side moj_import preprocessing.",
+            sourceName
+        );
+
+        GlslPreprocessor preprocessor = new GlslPreprocessor() {
+            private final Set<net.minecraft.resources.ResourceLocation> importedLocations = new HashSet<>();
+
+            @Override
+            public String applyImport(boolean quotedImport, String importPath) {
+                net.minecraft.resources.ResourceLocation importLocation;
+
+                try {
+                    if (quotedImport) {
+                        if (baseSourceLocation == null) {
+                            String message = "Unable to resolve relative GLSL import '" + importPath + "' for source '" + sourceName + "'";
+                            LOGGER.error(message);
+                            return "#error " + message;
+                        }
+
+                        net.minecraft.resources.ResourceLocation fullBaseLocation = baseSourceLocation.withPath(net.minecraft.FileUtil::getFullResourcePath);
+                        importLocation = fullBaseLocation.withPath(path -> net.minecraft.FileUtil.normalizeResourcePath(path + importPath));
+                    } else {
+                        importLocation = net.minecraft.resources.ResourceLocation.parse(importPath).withPrefix("shaders/include/");
+                    }
+                } catch (net.minecraft.ResourceLocationException exception) {
+                    LOGGER.error("Malformed GLSL import {} while preprocessing Vulkan shader {}: {}", importPath, sourceName, exception.getMessage());
+                    return "#error " + exception.getMessage();
+                }
+
+                if (!this.importedLocations.add(importLocation)) {
+                    return null;
+                }
+
+                String includePath = "/assets/" + importLocation.getNamespace() + "/" + importLocation.getPath();
+                try (java.io.InputStream includeStream = VulkanBackend.class.getResourceAsStream(includePath)) {
+                    if (includeStream == null) {
+                        String message = "Missing bundled GLSL include " + importLocation;
+                        LOGGER.error(message);
+                        return "#error " + message;
+                    }
+
+                    return new String(includeStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                } catch (java.io.IOException exception) {
+                    LOGGER.error("Could not read bundled GLSL import {} while preprocessing Vulkan shader {}: {}", importLocation, sourceName, exception.getMessage());
+                    return "#error " + exception.getMessage();
+                }
+            }
+        };
+
+        return String.join("", preprocessor.process(shaderSource));
+    }
+
+    @Nullable
+    private static net.minecraft.resources.ResourceLocation tryParseShaderSourceLocation(String sourceName) {
+        if (sourceName == null || sourceName.isBlank()) {
+            return null;
+        }
+
+        try {
+            return net.minecraft.resources.ResourceLocation.parse(sourceName);
+        } catch (net.minecraft.ResourceLocationException ignored) {
+            return null;
+        }
     }
 
     public Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
@@ -4644,6 +4824,8 @@ public class VulkanBackend {
         ) {
         }
 
+        private final VulkanBackend backend;
+
         private VkInstance instance;
         private VkPhysicalDevice physicalDevice;
         private VkDevice logicalDevice;
@@ -4706,6 +4888,9 @@ public class VulkanBackend {
         private final List<Long> swapchainPresentFramebufferHandles = new ArrayList<>();
         private final List<Integer> swapchainImageLayouts = new ArrayList<>();
         private long swapchainPresentRenderPass = VK10.VK_NULL_HANDLE;
+        private VulkanPipelineHandle swapchainPresentComposePipeline;
+        private PipelineDescriptor swapchainPresentComposeDescriptor;
+        private int swapchainPresentComposePipelineFormat = VK10.VK_FORMAT_UNDEFINED;
 
         private VkCommandBuffer primaryCommandBuffer;
     private final VkCommandBuffer[] frameCommandBuffers = new VkCommandBuffer[MAX_FRAMES_IN_FLIGHT];
@@ -4738,8 +4923,15 @@ public class VulkanBackend {
         private int activeTextureUnitIndex;
         private int consecutiveAcquireTimeouts;
         private long lastAcquireTimeoutLogNanos;
+        private int consecutiveFrameFenceTimeouts;
+        private long lastFrameFenceTimeoutLogNanos;
         private int successfulFrameAcquireCount;
         private int successfulFramePresentCount;
+        private int debugColorAttachmentLogCount;
+        private int debugLegacyDrawLogCount;
+        private int debugDescriptorSamplerLogCount;
+        private int debugDescriptorSamplerViewMismatchLogCount;
+        private int debugDescriptorUboLogCount;
 
         private final PixelStoreState pixelStoreState = new PixelStoreState();
 
@@ -4750,9 +4942,16 @@ public class VulkanBackend {
         private static final boolean DEBUG_FORCE_FIFO_PRESENT_MODE_EXPERIMENT = true;
         private static final int GL_MAP_READ_BIT = 0x0001;
         private static final long SWAPCHAIN_ACQUIRE_TIMEOUT_NANOS = 16_000_000L;
+        private static final long SWAPCHAIN_FRAME_FENCE_WAIT_TIMEOUT_NANOS = 16_000_000L;
         private static final long SWAPCHAIN_PRESENT_WAIT_POLL_TIMEOUT_NANOS = 5_000_000L;
         private static final int ACQUIRE_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE = 180;
+        private static final int FRAME_FENCE_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE = 180;
         private static final long ACQUIRE_TIMEOUT_LOG_INTERVAL_NANOS = 5_000_000_000L;
+
+        private NativeSpine(VulkanBackend backend) {
+            this.backend = Objects.requireNonNull(backend, "backend must not be null");
+        }
+
         private static final class LegacyBufferObject {
             private final int id;
             private volatile VulkanBuffer buffer;
@@ -4796,10 +4995,11 @@ public class VulkanBackend {
 
         private static final class LegacyTextureObject {
             private final int id;
-            private final int target;
+            private volatile int target;
             private final Map<Integer, Integer> integerParameters = new ConcurrentHashMap<>();
             private final Map<Integer, TextureLevelInfo> levels = new ConcurrentHashMap<>();
             private final Map<Integer, Integer> levelLayouts = new ConcurrentHashMap<>();
+            private final Set<Long> managedViewHandles = ConcurrentHashMap.newKeySet();
 
             private volatile long imageHandle;
             private volatile long memoryHandle;
@@ -4856,8 +5056,8 @@ public class VulkanBackend {
             }
         }
 
-        private static NativeSpine create() {
-            NativeSpine spine = new NativeSpine();
+        private static NativeSpine create(VulkanBackend backend) {
+            NativeSpine spine = new NativeSpine(backend);
             try {
                 spine.initialize();
                 return spine;
@@ -5294,7 +5494,7 @@ public class VulkanBackend {
                                                 VulkanPipelineHandle pipeline,
                                                 PipelineDescriptor descriptor,
                                                 PipelineResourceBindings bindings) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "bindPipelineResources");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindPipelineResources");
 
             if (descriptorPool == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException("Descriptor pool is unavailable for Vulkan descriptor updates");
@@ -5361,11 +5561,85 @@ public class VulkanBackend {
                             LegacyTextureObject sampledLegacyTexture = tryResolveLegacyTexture(vulkanTextureView.texture());
                             transitionLegacyTextureToSampleLayout(sampledLegacyTexture, vulkanTextureView);
 
+                            long requestedImageViewHandle = vulkanTextureView.getVkImageViewHandle();
+                            long descriptorImageViewHandle = requestedImageViewHandle;
+                            long sampledDefaultViewHandle = sampledLegacyTexture != null
+                                ? sampledLegacyTexture.defaultViewHandle
+                                : VK10.VK_NULL_HANDLE;
+
+                            // Legacy textures can be recreated under the same logical texture object.
+                            // Prefer the current default image view for full-range views so descriptor
+                            // sampling always targets live image storage.
+                            if (sampledLegacyTexture != null
+                                && sampledDefaultViewHandle != VK10.VK_NULL_HANDLE
+                                && vulkanTextureView.getBaseMipLevel() == 0
+                                && vulkanTextureView.getMipLevelCount() >= sampledLegacyTexture.mipLevels) {
+                                descriptorImageViewHandle = sampledDefaultViewHandle;
+                            }
+
+                            String sampledTextureLabel = vulkanTextureView.texture().getLabel();
+                            int sampledUsage = vulkanTextureView.texture().usage();
+
+                            if (sampledLegacyTexture != null
+                                && sampledDefaultViewHandle != VK10.VK_NULL_HANDLE
+                                && requestedImageViewHandle != descriptorImageViewHandle
+                                && debugDescriptorSamplerViewMismatchLogCount < 40) {
+                                debugDescriptorSamplerViewMismatchLogCount++;
+                                LOGGER.info(
+                                    "Vulkan sampler view remap#{} binding={} texId={} label={} usage=0x{} requestedView=0x{} remappedView=0x{} image=0x{} baseMip={} mipCount={} textureMipLevels={}",
+                                    debugDescriptorSamplerViewMismatchLogCount,
+                                    binding.name(),
+                                    sampledLegacyTexture.id,
+                                    sampledTextureLabel,
+                                    Integer.toHexString(sampledUsage),
+                                    Long.toHexString(requestedImageViewHandle),
+                                    Long.toHexString(descriptorImageViewHandle),
+                                    Long.toHexString(sampledLegacyTexture.imageHandle),
+                                    vulkanTextureView.getBaseMipLevel(),
+                                    vulkanTextureView.getMipLevelCount(),
+                                    sampledLegacyTexture.mipLevels
+                                );
+                            }
+
+                            if (debugDescriptorSamplerLogCount < 160) {
+                                debugDescriptorSamplerLogCount++;
+                                int sampledLegacyId = sampledLegacyTexture != null ? sampledLegacyTexture.id : 0;
+                                int sampledLayout = sampledLegacyTexture != null
+                                    ? trackedLayoutForLevel(sampledLegacyTexture, vulkanTextureView.getBaseMipLevel())
+                                    : VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+                                int sampledWidth = sampledLegacyTexture != null ? sampledLegacyTexture.width : 0;
+                                int sampledHeight = sampledLegacyTexture != null ? sampledLegacyTexture.height : 0;
+                                int sampledVkFormat = sampledLegacyTexture != null ? sampledLegacyTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED;
+                                long sampledImageHandle = sampledLegacyTexture != null ? sampledLegacyTexture.imageHandle : VK10.VK_NULL_HANDLE;
+                                int sampledTarget = sampledLegacyTexture != null ? sampledLegacyTexture.target : 0;
+                                int sampledLayerCount = sampledLegacyTexture != null ? legacyTextureLayerCount(sampledLegacyTexture) : 0;
+                                boolean sampledCubemap = sampledLegacyTexture != null && isLegacyCubemapTarget(sampledLegacyTexture.target);
+                                LOGGER.info(
+                                    "Vulkan samplerDescriptor#{} binding={} texId={} label={} usage=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} target=0x{} layers={} cubemap={}",
+                                    debugDescriptorSamplerLogCount,
+                                    binding.name(),
+                                    sampledLegacyId,
+                                    sampledTextureLabel,
+                                    Integer.toHexString(sampledUsage),
+                                    Long.toHexString(descriptorImageViewHandle),
+                                    Long.toHexString(sampledImageHandle),
+                                    sampledWidth,
+                                    sampledHeight,
+                                    Integer.toHexString(sampledVkFormat),
+                                    vulkanTextureView.getBaseMipLevel(),
+                                    vulkanTextureView.getMipLevelCount(),
+                                    Integer.toHexString(sampledLayout),
+                                    Integer.toHexString(sampledTarget),
+                                    sampledLayerCount,
+                                    sampledCubemap
+                                );
+                            }
+
                             long samplerHandle = resolveDescriptorSamplerHandle(vulkanTextureView);
                             VkDescriptorImageInfo.Buffer imageInfo = VkDescriptorImageInfo.calloc(1, stack);
                             imageInfo.get(0)
                                 .sampler(samplerHandle)
-                                .imageView(vulkanTextureView.getVkImageViewHandle())
+                                .imageView(descriptorImageViewHandle)
                                 .imageLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                             write.pImageInfo(imageInfo);
                         }
@@ -5391,6 +5665,22 @@ public class VulkanBackend {
                                 descriptorBuffer = materializeDescriptorUniformBuffer(binding.name(), slice, vulkanBuffer);
                                 descriptorOffset = 0;
                                 descriptorRange = slice.length();
+                            }
+
+                            if (debugDescriptorUboLogCount < 200) {
+                                debugDescriptorUboLogCount++;
+                                LOGGER.info(
+                                    "Vulkan uboDescriptor#{} binding={} sourceBuffer=0x{} sourceOffset={} sourceLength={} transientCopy={} descriptorBuffer=0x{} descriptorOffset={} descriptorRange={}",
+                                    debugDescriptorUboLogCount,
+                                    binding.name(),
+                                    Long.toHexString(vulkanBuffer.getVkBufferHandle()),
+                                    slice.offset(),
+                                    slice.length(),
+                                    requiresTransientUniformCopy,
+                                    Long.toHexString(descriptorBuffer.getVkBufferHandle()),
+                                    descriptorOffset,
+                                    descriptorRange
+                                );
                             }
 
                             VkDescriptorBufferInfo.Buffer bufferInfo = VkDescriptorBufferInfo.calloc(1, stack);
@@ -5431,7 +5721,7 @@ public class VulkanBackend {
 
                 VK10.vkUpdateDescriptorSets(logicalDevice, writes, null);
                 VK10.vkCmdBindDescriptorSets(
-                    primaryCommandBuffer,
+                    activeCommandBuffer,
                     VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline.getVkPipelineLayoutHandle(),
                     0,
@@ -5710,7 +6000,8 @@ public class VulkanBackend {
                 return;
             }
 
-            legacyTextures.computeIfAbsent(textureId, id -> new LegacyTextureObject(id, target));
+            LegacyTextureObject legacyTexture = legacyTextures.computeIfAbsent(textureId, id -> new LegacyTextureObject(id, target));
+            maybeUpgradeLegacyTextureTarget(legacyTexture, target);
             legacyTexture2DBindingsByUnit.put(activeTextureUnitIndex, textureId);
         }
 
@@ -5722,6 +6013,27 @@ public class VulkanBackend {
 
             legacyTextures.computeIfAbsent(textureId, id -> new LegacyTextureObject(id, VulkanicAPI.GL_TEXTURE_2D));
             legacyTexture2DBindingsByUnit.put(unit, textureId);
+        }
+
+        private void maybeUpgradeLegacyTextureTarget(LegacyTextureObject texture, int requestedTarget) {
+            if (texture == null) {
+                return;
+            }
+
+            boolean existingCubemap = isLegacyCubemapTarget(texture.target);
+            boolean requestedCubemap = isLegacyCubemapTarget(requestedTarget);
+            if (existingCubemap || !requestedCubemap) {
+                return;
+            }
+
+            texture.target = VulkanicAPI.GL_TEXTURE_CUBE_MAP;
+
+            // Texture names are created as 2D by IrisRenderSystem.createTextureId().
+            // If the name is later first used for a cubemap, any 2D Vulkan image/view
+            // allocation tied to that placeholder target is invalid and must be dropped.
+            if (texture.imageHandle != VK10.VK_NULL_HANDLE) {
+                destroyLegacyTextureStorage(texture);
+            }
         }
 
         private void setActiveTextureUnit(int unit) {
@@ -6083,10 +6395,10 @@ public class VulkanBackend {
                 type
             );
             int rowLength = pixelStoreState.unpackRowLength > 0 ? pixelStoreState.unpackRowLength : width;
-            int stride = align(rowLength * formatInfo.pixelBytes, pixelStoreState.unpackAlignment);
+            int stride = align(rowLength * formatInfo.unpackPixelBytes, pixelStoreState.unpackAlignment);
             int startOffset = pixelStoreState.unpackSkipRows * stride
-                + pixelStoreState.unpackSkipPixels * formatInfo.pixelBytes;
-            int required = startOffset + (height - 1) * stride + width * formatInfo.pixelBytes;
+                + pixelStoreState.unpackSkipPixels * formatInfo.unpackPixelBytes;
+            int required = startOffset + (height - 1) * stride + width * formatInfo.unpackPixelBytes;
 
             java.nio.ByteBuffer source = MemoryUtil.memByteBuffer(pixelsPointer, required);
             java.nio.ByteBuffer packedPixels = normalizePixelData(source, formatInfo, width, height);
@@ -6310,7 +6622,30 @@ public class VulkanBackend {
             }
         }
 
+        private void destroyLegacyManagedImageViews(LegacyTextureObject texture) {
+            if (texture.managedViewHandles.isEmpty()) {
+                return;
+            }
+
+            java.util.List<Long> managedViews = new ArrayList<>(texture.managedViewHandles);
+            texture.managedViewHandles.clear();
+            LOGGER.info(
+                "Invalidating {} legacy managed image view(s) for texId={} before storage teardown.",
+                managedViews.size(),
+                texture.id
+            );
+            managedViews.forEach(this::destroyManagedImageView);
+        }
+
+        private Runnable createLegacyManagedImageViewCloseAction(LegacyTextureObject texture, long viewHandle) {
+            return () -> {
+                texture.managedViewHandles.remove(viewHandle);
+                destroyManagedImageView(viewHandle);
+            };
+        }
+
         private void destroyLegacyTextureStorage(LegacyTextureObject texture) {
+            destroyLegacyManagedImageViews(texture);
             if (logicalDevice != null) {
                 if (texture.defaultViewHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyImageView(logicalDevice, texture.defaultViewHandle, null);
@@ -6946,6 +7281,18 @@ public class VulkanBackend {
                                       int first,
                                       int count,
                                       int instanceCount) {
+            if (debugLegacyDrawLogCount < 120) {
+                debugLegacyDrawLogCount++;
+                LOGGER.info(
+                    "Vulkan draw#{} kind=arrays mode={} first={} count={} instances={} renderPassRecording={}",
+                    debugLegacyDrawLogCount,
+                    mode,
+                    first,
+                    count,
+                    instanceCount,
+                    renderPassRecording
+                );
+            }
             VulkanBuffer vertexBuffer = resolveOptionalLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER);
             if (vertexBuffer != null) {
                 bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
@@ -6960,6 +7307,20 @@ public class VulkanBackend {
                                         long indices,
                                         int instanceCount,
                                         int baseVertex) {
+            if (debugLegacyDrawLogCount < 120) {
+                debugLegacyDrawLogCount++;
+                LOGGER.info(
+                    "Vulkan draw#{} kind=indexed mode={} count={} indexType={} indexOffset={} instances={} baseVertex={} renderPassRecording={}",
+                    debugLegacyDrawLogCount,
+                    mode,
+                    count,
+                    indexType,
+                    indices,
+                    instanceCount,
+                    baseVertex,
+                    renderPassRecording
+                );
+            }
             VulkanBuffer vertexBuffer = resolveOptionalLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER);
             VulkanBuffer indexBuffer = requireLegacyDrawBuffer(VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, "drawElements(index)");
 
@@ -7317,7 +7678,8 @@ public class VulkanBackend {
                     "Legacy texture " + legacyTextureHandle + " has no Vulkan image/view storage for render-pass usage.");
             }
 
-            boolean canUseDefaultView = baseMipLevel == 0 && mipLevelCount == texture.getMipLevels();
+            boolean forceOwnedView = (texture.usage() & VulkanicTexture.USAGE_RENDER_ATTACHMENT) == 0;
+            boolean canUseDefaultView = !forceOwnedView && baseMipLevel == 0 && mipLevelCount == texture.getMipLevels();
             if (canUseDefaultView) {
                 return new VulkanTextureView(texture, legacyTexture.defaultViewHandle, baseMipLevel, mipLevelCount, () -> {
                 });
@@ -7338,13 +7700,14 @@ public class VulkanBackend {
                 );
 
                 managedExtraImageViews.add(viewHandle);
+                legacyTexture.managedViewHandles.add(viewHandle);
                 long finalViewHandle = viewHandle;
                 return new VulkanTextureView(
                     texture,
                     finalViewHandle,
                     baseMipLevel,
                     mipLevelCount,
-                    () -> destroyManagedImageView(finalViewHandle)
+                    createLegacyManagedImageViewCloseAction(legacyTexture, finalViewHandle)
                 );
             }
         }
@@ -7439,7 +7802,9 @@ public class VulkanBackend {
         }
 
         private void destroyManagedImageView(long viewHandle) {
-            managedExtraImageViews.remove(viewHandle);
+            if (!managedExtraImageViews.remove(viewHandle)) {
+                return;
+            }
             if (logicalDevice != null && viewHandle != VK10.VK_NULL_HANDLE) {
                 VK10.vkDestroyImageView(logicalDevice, viewHandle, null);
             }
@@ -8194,10 +8559,52 @@ public class VulkanBackend {
                 }
 
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
-                checkVk(
-                    "vkWaitForFences(swapchainFrame)",
-                    VK10.vkWaitForFences(logicalDevice, frameFenceBuffer, true, Long.MAX_VALUE)
+                int frameFenceWaitResult = VK10.vkWaitForFences(
+                    logicalDevice,
+                    frameFenceBuffer,
+                    true,
+                    SWAPCHAIN_FRAME_FENCE_WAIT_TIMEOUT_NANOS
                 );
+                if (frameFenceWaitResult == VK10.VK_TIMEOUT) {
+                    consecutiveFrameFenceTimeouts++;
+
+                    long nowNanos = System.nanoTime();
+                    if (lastFrameFenceTimeoutLogNanos == 0L
+                        || nowNanos - lastFrameFenceTimeoutLogNanos >= ACQUIRE_TIMEOUT_LOG_INTERVAL_NANOS) {
+                        LOGGER.warn(
+                            "vkWaitForFences(swapchainFrame) timed out ({} consecutive); skipping frame acquire. {}",
+                            consecutiveFrameFenceTimeouts,
+                            describeWindowState()
+                        );
+                        lastFrameFenceTimeoutLogNanos = nowNanos;
+                    }
+
+                    if (consecutiveFrameFenceTimeouts >= FRAME_FENCE_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE) {
+                        LOGGER.warn(
+                            "Refreshing Vulkan surface/swapchain after {} consecutive frame-fence timeouts.",
+                            consecutiveFrameFenceTimeouts
+                        );
+                        try {
+                            refreshSurfaceAndSwapchain();
+                        } catch (RuntimeException refreshFailure) {
+                            LOGGER.warn(
+                                "Surface refresh failed during frame-fence-timeout recovery; falling back to swapchain-only recreate.",
+                                refreshFailure
+                            );
+                            recreateSwapchain();
+                        }
+                        consecutiveFrameFenceTimeouts = 0;
+                        lastFrameFenceTimeoutLogNanos = 0L;
+                    }
+
+                    acquiredSwapchainImageIndex = -1;
+                    frameInProgress = false;
+                    currentFrameSyncIndex = (currentFrameSyncIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+                    return -1;
+                }
+
+                checkVk("vkWaitForFences(swapchainFrame)", frameFenceWaitResult);
+                consecutiveFrameFenceTimeouts = 0;
 
                 java.nio.IntBuffer pImageIndex = stack.ints(0);
                 int acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
@@ -8224,11 +8631,46 @@ public class VulkanBackend {
                 if (acquireResult == VK10.VK_TIMEOUT || acquireResult == VK10.VK_NOT_READY) {
                     consecutiveAcquireTimeouts++;
 
+                    LOGGER.warn(
+                        "vkAcquireNextImageKHR timed out ({} consecutive); retrying with another bounded wait. {}",
+                        consecutiveAcquireTimeouts,
+                        describeWindowState()
+                    );
+
+                    GLFW.glfwPollEvents();
+                    acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
+                        logicalDevice,
+                        swapchain,
+                        SWAPCHAIN_ACQUIRE_TIMEOUT_NANOS,
+                        imageAvailableSemaphore,
+                        VK10.VK_NULL_HANDLE,
+                        pImageIndex
+                    );
+
+                    if (acquireResult == KHRSwapchain.VK_ERROR_OUT_OF_DATE_KHR) {
+                        recreateSwapchain();
+                        acquireResult = KHRSwapchain.vkAcquireNextImageKHR(
+                            logicalDevice,
+                            swapchain,
+                            SWAPCHAIN_ACQUIRE_TIMEOUT_NANOS,
+                            imageAvailableSemaphore,
+                            VK10.VK_NULL_HANDLE,
+                            pImageIndex
+                        );
+                    }
+
+                    if (acquireResult != VK10.VK_TIMEOUT && acquireResult != VK10.VK_NOT_READY) {
+                        consecutiveAcquireTimeouts = 0;
+                    }
+                }
+
+                if (acquireResult == VK10.VK_TIMEOUT || acquireResult == VK10.VK_NOT_READY) {
+
                     long nowNanos = System.nanoTime();
                     if (lastAcquireTimeoutLogNanos == 0L
                         || nowNanos - lastAcquireTimeoutLogNanos >= ACQUIRE_TIMEOUT_LOG_INTERVAL_NANOS) {
                         LOGGER.warn(
-                            "vkAcquireNextImageKHR has no swapchain image ready yet ({} consecutive); skipping present for this frame. {}",
+                            "vkAcquireNextImageKHR still has no swapchain image ready after bounded retries ({} consecutive); skipping present for this frame. {}",
                             consecutiveAcquireTimeouts,
                             describeWindowState()
                         );
@@ -8473,10 +8915,28 @@ public class VulkanBackend {
                 );
             }
 
+            boolean requiresShaderCompose = sourceTexture.vkFormat != swapchainImageFormat
+                || srcWidth != dstWidth
+                || srcHeight != dstHeight;
+            if (requiresShaderCompose && PRESENT_FORMAT_MISMATCH_LOG_COUNT.getAndIncrement() < 12) {
+                LOGGER.warn(
+                    "Vulkan present source requires shader compose into swapchain (srcFormat=0x{}, dstFormat=0x{}, src={}x{}, dst={}x{}).",
+                    Integer.toHexString(sourceTexture.vkFormat),
+                    Integer.toHexString(swapchainImageFormat),
+                    srcWidth,
+                    srcHeight,
+                    dstWidth,
+                    dstHeight
+                );
+            }
+
             int trackedSourceLayout = trackedLayoutForLevel(sourceTexture, request.mipLevel);
             int originalSourceLayout = trackedSourceLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED
                 ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                 : trackedSourceLayout;
+            int composeSourceLayout = requiresShaderCompose
+                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                : VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
             if (!DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
                 transitionImageLayout(
@@ -8484,15 +8944,25 @@ public class VulkanBackend {
                     sourceTexture.imageHandle,
                     sourceTexture.aspectMask,
                     originalSourceLayout,
-                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    composeSourceLayout,
                     request.mipLevel,
                     1,
                     1
                 );
+                trackLayoutForLevel(sourceTexture, request.mipLevel, composeSourceLayout);
             }
 
             if (DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
                 clearSwapchainImageWithRenderPass(frameCommandBuffer, acquiredSwapchainImageIndex, request.legacyTextureHandle);
+            } else if (requiresShaderCompose) {
+                composePendingPresentTextureWithFullscreenPass(
+                    frameCommandBuffer,
+                    sourceTexture,
+                    request.mipLevel,
+                    acquiredSwapchainImageIndex,
+                    dstWidth,
+                    dstHeight
+                );
             } else {
                 int swapchainImageLayout = trackedSwapchainImageLayout(acquiredSwapchainImageIndex);
                 transitionImageLayout(
@@ -8508,31 +8978,28 @@ public class VulkanBackend {
                 trackSwapchainImageLayout(acquiredSwapchainImageIndex, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
                 try (MemoryStack stack = stackPush()) {
-                    VkImageBlit.Buffer region = VkImageBlit.calloc(1, stack);
+                    VkImageCopy.Buffer region = VkImageCopy.calloc(1, stack);
                     region.get(0).srcSubresource()
                         .aspectMask(sourceTexture.aspectMask)
                         .mipLevel(request.mipLevel)
                         .baseArrayLayer(0)
                         .layerCount(1);
-                    region.get(0).srcOffsets(0).set(0, 0, 0);
-                    region.get(0).srcOffsets(1).set(srcWidth, srcHeight, 1);
-
+                    region.get(0).srcOffset().set(0, 0, 0);
                     region.get(0).dstSubresource()
                         .aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
                         .mipLevel(0)
                         .baseArrayLayer(0)
                         .layerCount(1);
-                    region.get(0).dstOffsets(0).set(0, 0, 0);
-                    region.get(0).dstOffsets(1).set(dstWidth, dstHeight, 1);
+                    region.get(0).dstOffset().set(0, 0, 0);
+                    region.get(0).extent().set(dstWidth, dstHeight, 1);
 
-                    VK10.vkCmdBlitImage(
+                    VK10.vkCmdCopyImage(
                         frameCommandBuffer,
                         sourceTexture.imageHandle,
                         VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                         swapchainImageHandle,
                         VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        region,
-                        VK10.VK_FILTER_NEAREST
+                        region
                     );
                 }
 
@@ -8554,7 +9021,7 @@ public class VulkanBackend {
                     frameCommandBuffer,
                     sourceTexture.imageHandle,
                     sourceTexture.aspectMask,
-                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    composeSourceLayout,
                     originalSourceLayout,
                     request.mipLevel,
                     1,
@@ -8564,6 +9031,219 @@ public class VulkanBackend {
             }
 
             pendingPresentTextureRequest = null;
+        }
+
+        private void composePendingPresentTextureWithFullscreenPass(
+            VkCommandBuffer commandBuffer,
+            LegacyTextureObject sourceTexture,
+            int sourceMipLevel,
+            int swapchainImageIndex,
+            int dstWidth,
+            int dstHeight
+        ) {
+            VulkanPipelineHandle composePipeline = ensureSwapchainPresentComposePipeline();
+            PipelineDescriptor composeDescriptor = swapchainPresentComposeDescriptor;
+            if (composeDescriptor == null) {
+                throw new IllegalStateException("Swapchain present compose descriptor is unavailable");
+            }
+
+            VulkanTextureView sourceView = createPresentSourceTextureView(sourceTexture, sourceMipLevel);
+            boolean passStarted = false;
+            try {
+                ResolvedRenderTargets swapchainTargets = createSwapchainPresentResolvedTargets(swapchainImageIndex, dstWidth, dstHeight);
+                VulkanicRenderPassDescriptor descriptor = VulkanicRenderPassDescriptor.color(
+                    () -> "Vulkan-SwapchainPresentCompose",
+                    swapchainTargets.colorView,
+                    java.util.OptionalInt.of(0xFF000000)
+                );
+
+                beginRenderPass(commandBuffer.address(), descriptor, swapchainTargets);
+                passStarted = true;
+                bindPipeline(commandBuffer.address(), composePipeline.getVkPipelineHandle());
+
+                PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+                    .bindSampler("InSampler", sourceView, 0)
+                    .build();
+                updateAndBindDescriptorSet(commandBuffer.address(), composePipeline, composeDescriptor, bindings);
+                draw(commandBuffer.address(), 0, 3);
+            } finally {
+                if (passStarted && renderPassRecording) {
+                    endRenderPass(commandBuffer.address());
+                }
+                sourceView.close();
+            }
+        }
+
+        private synchronized VulkanPipelineHandle ensureSwapchainPresentComposePipeline() {
+            if (swapchainPresentComposePipeline != null
+                && swapchainPresentComposePipeline.isValid()
+                && swapchainPresentComposePipelineFormat == swapchainImageFormat) {
+                return swapchainPresentComposePipeline;
+            }
+
+            releaseSwapchainPresentComposePipeline();
+
+            RenderPipeline renderPipeline = RenderPipelines.TRACY_BLIT;
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft == null || minecraft.getShaderManager() == null) {
+                throw new IllegalStateException("Minecraft shader manager is unavailable for Vulkan swapchain present compose pipeline");
+            }
+
+            String vertexSource = loadSwapchainComposeShaderSource(minecraft, renderPipeline.getVertexShader(), ShaderType.VERTEX);
+            String fragmentSource = loadSwapchainComposeShaderSource(minecraft, renderPipeline.getFragmentShader(), ShaderType.FRAGMENT);
+            if (vertexSource == null || fragmentSource == null) {
+                throw new IllegalStateException(
+                    "Missing shader source for Vulkan swapchain present compose pipeline (vertex="
+                        + renderPipeline.getVertexShader() + ", fragment=" + renderPipeline.getFragmentShader() + ")"
+                );
+            }
+
+            String vertexWithDefines = GlslPreprocessor.injectDefines(vertexSource, renderPipeline.getShaderDefines());
+            String fragmentWithDefines = GlslPreprocessor.injectDefines(fragmentSource, renderPipeline.getShaderDefines());
+            VulkanicSpirvModule vertexModule = backend.compileSpirvModuleForBackend(
+                VulkanicShaderStage.VERTEX,
+                vertexWithDefines,
+                renderPipeline.getVertexShader().toString(),
+                "main"
+            );
+            VulkanicSpirvModule fragmentModule = backend.compileSpirvModuleForBackend(
+                VulkanicShaderStage.FRAGMENT,
+                fragmentWithDefines,
+                renderPipeline.getFragmentShader().toString(),
+                "main"
+            );
+
+            PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipelineAndSpirvModules(
+                renderPipeline,
+                List.of(vertexModule, fragmentModule)
+            );
+
+            long vertShaderModuleHandle = createShaderModule(vertexModule);
+            long fragShaderModuleHandle = createShaderModule(fragmentModule);
+            try {
+                swapchainPresentComposePipeline = createVulkanPipeline(
+                    descriptor,
+                    vertShaderModuleHandle,
+                    fragShaderModuleHandle,
+                    swapchainImageFormat
+                );
+                swapchainPresentComposeDescriptor = descriptor;
+                swapchainPresentComposePipelineFormat = swapchainImageFormat;
+                return swapchainPresentComposePipeline;
+            } finally {
+                destroyShaderModule(vertShaderModuleHandle);
+                destroyShaderModule(fragShaderModuleHandle);
+            }
+        }
+
+        private void releaseSwapchainPresentComposePipeline() {
+            if (swapchainPresentComposePipeline != null) {
+                swapchainPresentComposePipeline.close();
+                swapchainPresentComposePipeline = null;
+            }
+            swapchainPresentComposeDescriptor = null;
+            swapchainPresentComposePipelineFormat = VK10.VK_FORMAT_UNDEFINED;
+        }
+
+        private VulkanTextureView createPresentSourceTextureView(LegacyTextureObject sourceTexture, int mipLevel) {
+            VulkanTexture wrapperTexture = new VulkanTexture(
+                sourceTexture.imageHandle,
+                sourceTexture.memoryHandle,
+                sourceTexture.defaultViewHandle,
+                VulkanicTexture.USAGE_TEXTURE_BINDING | VulkanicTexture.USAGE_COPY_SRC,
+                wrappedTextureFormatForVkFormat(sourceTexture.vkFormat),
+                Math.max(1, sourceTexture.width),
+                Math.max(1, sourceTexture.height),
+                1,
+                Math.max(1, sourceTexture.mipLevels),
+                "PresentSource-" + sourceTexture.id,
+                () -> {}
+            );
+
+            long imageViewHandle;
+            Runnable closeAction;
+            if (mipLevel == 0 && sourceTexture.mipLevels <= 1 && sourceTexture.defaultViewHandle != VK10.VK_NULL_HANDLE) {
+                imageViewHandle = sourceTexture.defaultViewHandle;
+                closeAction = () -> {};
+            } else {
+                try (MemoryStack stack = stackPush()) {
+                    imageViewHandle = createVkImageView(
+                        stack,
+                        sourceTexture.imageHandle,
+                        sourceTexture.vkFormat,
+                        sourceTexture.aspectMask,
+                        mipLevel,
+                        1,
+                        1,
+                        false
+                    );
+                }
+                long finalImageViewHandle = imageViewHandle;
+                closeAction = () -> {
+                    if (logicalDevice != null && finalImageViewHandle != VK10.VK_NULL_HANDLE) {
+                        VK10.vkDestroyImageView(logicalDevice, finalImageViewHandle, null);
+                    }
+                };
+            }
+
+            return new VulkanTextureView(wrapperTexture, imageViewHandle, mipLevel, 1, closeAction);
+        }
+
+        private ResolvedRenderTargets createSwapchainPresentResolvedTargets(int swapchainImageIndex, int width, int height) {
+            if (swapchainImageIndex < 0 || swapchainImageIndex >= swapchainImageHandles.size()) {
+                throw new IllegalArgumentException("Invalid swapchain image index for present compose: " + swapchainImageIndex);
+            }
+
+            long swapchainImageHandle = swapchainImageHandles.get(swapchainImageIndex);
+            long swapchainImageViewHandle = swapchainImageViewHandles.get(swapchainImageIndex);
+            VulkanTexture swapchainTexture = new VulkanTexture(
+                swapchainImageHandle,
+                VK10.VK_NULL_HANDLE,
+                swapchainImageViewHandle,
+                VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+                VulkanicTextureFormat.RGBA8,
+                width,
+                height,
+                1,
+                1,
+                "SwapchainImage-" + swapchainImageIndex,
+                () -> {}
+            );
+            VulkanTextureView swapchainView = new VulkanTextureView(swapchainTexture, swapchainImageViewHandle, 0, 1, () -> {});
+            return new ResolvedRenderTargets(swapchainView, swapchainTexture, null, null, width, height);
+        }
+
+        private static VulkanicTextureFormat wrappedTextureFormatForVkFormat(int vkFormat) {
+            return switch (vkFormat) {
+                case VK10.VK_FORMAT_R8G8B8A8_UNORM, VK10.VK_FORMAT_R8G8B8A8_SRGB,
+                    VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> VulkanicTextureFormat.RGBA8;
+                case VK10.VK_FORMAT_R8_UNORM -> VulkanicTextureFormat.RED8;
+                case VK10.VK_FORMAT_R8_SINT -> VulkanicTextureFormat.RED8I;
+                case VK10.VK_FORMAT_D32_SFLOAT -> VulkanicTextureFormat.DEPTH32;
+                default -> throw new IllegalArgumentException(
+                    "Unsupported VkFormat for temporary Vulkanic texture wrapper: 0x" + Integer.toHexString(vkFormat)
+                );
+            };
+        }
+
+        @Nullable
+        private String loadSwapchainComposeShaderSource(Minecraft minecraft, net.minecraft.resources.ResourceLocation shaderId, ShaderType shaderType) {
+            String shaderSource = minecraft.getShaderManager().getShader(shaderId, shaderType);
+            if (shaderSource != null) {
+                return shaderSource;
+            }
+
+            net.minecraft.resources.ResourceLocation shaderFile = shaderType.idConverter().idToFile(shaderId);
+            return minecraft.getResourceManager().getResource(shaderFile)
+                .map(resource -> {
+                    try (java.io.Reader reader = resource.openAsReader()) {
+                        return org.apache.commons.io.IOUtils.toString(reader);
+                    } catch (java.io.IOException exception) {
+                        LOGGER.error("Failed to read fallback shader source {} for Vulkan swapchain compose", shaderFile, exception);
+                        return null;
+                    }
+                })
+                .orElse(null);
         }
 
         private void clearSwapchainImageWithRenderPass(VkCommandBuffer commandBuffer,
@@ -8857,25 +9537,42 @@ public class VulkanBackend {
             }
         }
 
-        private void ensureRecordingCommandBuffer(long commandBufferHandle, String operation) {
+        private VkCommandBuffer requireRecordingCommandBuffer(long commandBufferHandle, String operation) {
             if (primaryCommandBuffer == null) {
                 throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
             }
-            if (commandBufferHandle != primaryCommandBuffer.address()) {
-                throw new IllegalArgumentException(
-                    operation + " received unknown VkCommandBuffer handle. Expected 0x"
-                        + Long.toHexString(primaryCommandBuffer.address())
-                        + " but got 0x" + Long.toHexString(commandBufferHandle));
+
+            if (commandBufferHandle == primaryCommandBuffer.address()) {
+                if (!commandBufferRecording) {
+                    beginPrimaryCommandBuffer();
+                }
+                return primaryCommandBuffer;
             }
-            if (!commandBufferRecording) {
-                beginPrimaryCommandBuffer();
+
+            VkCommandBuffer frameCommandBuffer = currentFrameCommandBuffer();
+            if (frameCommandBuffer != null && commandBufferHandle == frameCommandBuffer.address()) {
+                if (!isCurrentFrameCommandBufferRecording()) {
+                    frameCommandBuffer = ensureCurrentFrameCommandBufferRecording(operation);
+                }
+                return frameCommandBuffer;
             }
+
+            throw new IllegalArgumentException(
+                operation + " received unknown VkCommandBuffer handle. Expected primary 0x"
+                    + Long.toHexString(primaryCommandBuffer.address())
+                    + (frameCommandBuffer == null ? "" : " or frame 0x" + Long.toHexString(frameCommandBuffer.address()))
+                    + " but got 0x" + Long.toHexString(commandBufferHandle)
+            );
+        }
+
+        private void ensureRecordingCommandBuffer(long commandBufferHandle, String operation) {
+            requireRecordingCommandBuffer(commandBufferHandle, operation);
         }
 
         private void beginRenderPass(long commandBufferHandle,
                                      VulkanicRenderPassDescriptor descriptor,
                                      ResolvedRenderTargets targets) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "beginRenderPass");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "beginRenderPass");
             if (renderPassRecording) {
                 throw new IllegalStateException("Nested Vulkan render passes are not supported yet.");
             }
@@ -8901,6 +9598,94 @@ public class VulkanBackend {
                 int swapchainColorImageIndex = swapchainColorAttachment
                     ? swapchainImageIndexForViewHandle(colorView.getVkImageViewHandle())
                     : -1;
+                boolean usePersistentSwapchainPass = swapchainColorAttachment
+                    && !targets.hasDepthTarget()
+                    && descriptor.colorAttachment().loadOp() == VulkanicRenderPassDescriptor.LoadOp.CLEAR
+                    && descriptor.colorAttachment().storeOp() == VulkanicRenderPassDescriptor.StoreOp.STORE;
+                if (legacyColorTexture != null && debugColorAttachmentLogCount < 120) {
+                    debugColorAttachmentLogCount++;
+                    int clearColor = descriptor.colorAttachment().clearColor().orElse(0);
+                    LOGGER.info(
+                        "Vulkan beginRenderPass color#{} texId={} loadOp={} clearColorPresent={} clearColor=0x{} extent={}x{} swapchainAttachment={}",
+                        debugColorAttachmentLogCount,
+                        legacyColorTexture.id,
+                        descriptor.colorAttachment().loadOp(),
+                        descriptor.colorAttachment().clearColor().isPresent(),
+                        Integer.toHexString(clearColor),
+                        width,
+                        height,
+                        swapchainColorAttachment
+                    );
+                }
+
+                if (usePersistentSwapchainPass) {
+                    if (swapchainPresentRenderPass == VK10.VK_NULL_HANDLE) {
+                        throw new IllegalStateException("Swapchain present render pass is unavailable for swapchain-targeted compose pass.");
+                    }
+                    if (swapchainColorImageIndex < 0 || swapchainColorImageIndex >= swapchainPresentFramebufferHandles.size()) {
+                        throw new IllegalStateException(
+                            "Swapchain present framebuffer is unavailable for image index " + swapchainColorImageIndex
+                        );
+                    }
+
+                    VkClearValue.Buffer clearValues = VkClearValue.calloc(1, stack);
+                    int argb = descriptor.colorAttachment().clearColor().orElse(0);
+                    float a = ((argb >> 24) & 0xFF) / 255.0f;
+                    float r = ((argb >> 16) & 0xFF) / 255.0f;
+                    float g = ((argb >> 8) & 0xFF) / 255.0f;
+                    float b = (argb & 0xFF) / 255.0f;
+                    clearValues.get(0).color()
+                        .float32(0, r)
+                        .float32(1, g)
+                        .float32(2, b)
+                        .float32(3, a);
+
+                    VkRenderPassBeginInfo beginInfo = VkRenderPassBeginInfo.calloc(stack)
+                        .sType$Default()
+                        .renderPass(swapchainPresentRenderPass)
+                        .framebuffer(swapchainPresentFramebufferHandles.get(swapchainColorImageIndex))
+                        .pClearValues(clearValues);
+                    beginInfo.renderArea()
+                        .offset(it -> it.x(0).y(0))
+                        .extent(it -> it.width(width).height(height));
+
+                    VK10.vkCmdBeginRenderPass(activeCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
+
+                    VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
+                    defaultViewport.get(0)
+                        .x(0.0f)
+                        .y(0.0f)
+                        .width((float) width)
+                        .height((float) height)
+                        .minDepth(0.0f)
+                        .maxDepth(1.0f);
+                    VK10.vkCmdSetViewport(activeCommandBuffer, 0, defaultViewport);
+
+                    VkRect2D.Buffer defaultScissor = VkRect2D.calloc(1, stack);
+                    defaultScissor.get(0)
+                        .offset(it -> it.x(0).y(0))
+                        .extent(it -> it.width(width).height(height));
+                    VK10.vkCmdSetScissor(activeCommandBuffer, 0, defaultScissor);
+
+                    scissorTestEnabled = false;
+                    hasCachedScissorRect = false;
+                    cachedScissorX = 0;
+                    cachedScissorY = 0;
+                    cachedScissorWidth = width;
+                    cachedScissorHeight = height;
+
+                    if (legacyColorTexture != null) {
+                        trackLayoutForLevel(legacyColorTexture, 0, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                    }
+                    trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                    renderPassSwapchainImageIndex = swapchainColorImageIndex;
+                    activeRenderPassTargetsSwapchain = true;
+                    renderPassRecording = true;
+                    activeRenderPassWidth = width;
+                    activeRenderPassHeight = height;
+                    return;
+                }
+
                 int colorInitialLayout = swapchainColorAttachment
                     ? trackedSwapchainImageLayout(swapchainColorImageIndex)
                     : legacyColorTexture != null && trackedLayoutForLevel(legacyColorTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
@@ -8911,7 +9696,9 @@ public class VulkanBackend {
                     : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
                 attachments.get(0)
-                    .format(toVkFormat(colorTexture.getVulkanicFormat()))
+                    .format(swapchainColorAttachment
+                        ? swapchainImageFormat
+                        : toVkFormat(colorTexture.getVulkanicFormat()))
                     .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
                     .loadOp(toVkLoadOp(descriptor.colorAttachment().loadOp()))
                     .storeOp(toVkStoreOp(descriptor.colorAttachment().storeOp()))
@@ -9023,23 +9810,23 @@ public class VulkanBackend {
                     .offset(it -> it.x(0).y(0))
                     .extent(it -> it.width(width).height(height));
 
-                VK10.vkCmdBeginRenderPass(primaryCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
+                VK10.vkCmdBeginRenderPass(activeCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
 
                 VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
                 defaultViewport.get(0)
                     .x(0.0f)
-                    .y((float) height)
+                    .y(swapchainColorAttachment ? 0.0f : (float) height)
                     .width((float) width)
-                    .height(-(float) height)
+                    .height(swapchainColorAttachment ? (float) height : -(float) height)
                     .minDepth(0.0f)
                     .maxDepth(1.0f);
-                VK10.vkCmdSetViewport(primaryCommandBuffer, 0, defaultViewport);
+                VK10.vkCmdSetViewport(activeCommandBuffer, 0, defaultViewport);
 
                 VkRect2D.Buffer defaultScissor = VkRect2D.calloc(1, stack);
                 defaultScissor.get(0)
                     .offset(it -> it.x(0).y(0))
                     .extent(it -> it.width(width).height(height));
-                VK10.vkCmdSetScissor(primaryCommandBuffer, 0, defaultScissor);
+                VK10.vkCmdSetScissor(activeCommandBuffer, 0, defaultScissor);
 
                 // Start each render pass with an unclipped scissor baseline.
                 scissorTestEnabled = false;
@@ -9084,12 +9871,12 @@ public class VulkanBackend {
         }
 
         private void endRenderPass(long commandBufferHandle) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "endRenderPass");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "endRenderPass");
             if (!renderPassRecording) {
                 throw new IllegalStateException("No active Vulkan render pass to end");
             }
 
-            VK10.vkCmdEndRenderPass(primaryCommandBuffer);
+            VK10.vkCmdEndRenderPass(activeCommandBuffer);
             renderPassRecording = false;
             activeRenderPassWidth = 0;
             activeRenderPassHeight = 0;
@@ -9101,7 +9888,7 @@ public class VulkanBackend {
         }
 
         private void bindVertexBuffer(long commandBufferHandle, int slot, long bufferHandle) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "bindVertexBuffer");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindVertexBuffer");
             if (!renderPassRecording) {
                 throw new IllegalStateException("bindVertexBuffer requires an active render pass");
             }
@@ -9112,12 +9899,12 @@ public class VulkanBackend {
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer buffers = stack.longs(bufferHandle);
                 java.nio.LongBuffer offsets = stack.longs(0L);
-                VK10.vkCmdBindVertexBuffers(primaryCommandBuffer, slot, buffers, offsets);
+                VK10.vkCmdBindVertexBuffers(activeCommandBuffer, slot, buffers, offsets);
             }
         }
 
         private void bindIndexBuffer(long commandBufferHandle, long bufferHandle, VulkanicIndexType indexType) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "bindIndexBuffer");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindIndexBuffer");
             if (!renderPassRecording) {
                 throw new IllegalStateException("bindIndexBuffer requires an active render pass");
             }
@@ -9132,11 +9919,11 @@ public class VulkanBackend {
                 default -> throw new IllegalArgumentException("Unsupported VulkanicIndexType: " + indexType);
             }
 
-            VK10.vkCmdBindIndexBuffer(primaryCommandBuffer, bufferHandle, 0L, vkIndexType);
+            VK10.vkCmdBindIndexBuffer(activeCommandBuffer, bufferHandle, 0L, vkIndexType);
         }
 
         private void drawIndexed(long commandBufferHandle, int firstIndex, int indexCount, int baseVertex, int instanceCount) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "drawIndexed");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "drawIndexed");
             if (!renderPassRecording) {
                 throw new IllegalStateException("drawIndexed requires an active render pass");
             }
@@ -9144,11 +9931,11 @@ public class VulkanBackend {
                 throw new IllegalArgumentException("Invalid indexed draw arguments");
             }
 
-            VK10.vkCmdDrawIndexed(primaryCommandBuffer, indexCount, instanceCount, firstIndex, baseVertex, 0);
+            VK10.vkCmdDrawIndexed(activeCommandBuffer, indexCount, instanceCount, firstIndex, baseVertex, 0);
         }
 
         private void draw(long commandBufferHandle, int firstVertex, int vertexCount) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "draw");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "draw");
             if (!renderPassRecording) {
                 throw new IllegalStateException("draw requires an active render pass");
             }
@@ -9156,11 +9943,11 @@ public class VulkanBackend {
                 throw new IllegalArgumentException("Invalid draw arguments");
             }
 
-            VK10.vkCmdDraw(primaryCommandBuffer, vertexCount, 1, firstVertex, 0);
+            VK10.vkCmdDraw(activeCommandBuffer, vertexCount, 1, firstVertex, 0);
         }
 
         private void drawInstanced(long commandBufferHandle, int firstVertex, int vertexCount, int instanceCount) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "drawInstanced");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "drawInstanced");
             if (!renderPassRecording) {
                 throw new IllegalStateException("drawInstanced requires an active render pass");
             }
@@ -9168,7 +9955,7 @@ public class VulkanBackend {
                 throw new IllegalArgumentException("Invalid instanced draw arguments");
             }
 
-            VK10.vkCmdDraw(primaryCommandBuffer, vertexCount, instanceCount, firstVertex, 0);
+            VK10.vkCmdDraw(activeCommandBuffer, vertexCount, instanceCount, firstVertex, 0);
         }
 
         private static int toVkLoadOp(VulkanicRenderPassDescriptor.LoadOp loadOp) {
@@ -9266,9 +10053,26 @@ public class VulkanBackend {
             long vertShaderModuleHandle,
             long fragShaderModuleHandle
         ) {
+            return createVulkanPipeline(
+                descriptor,
+                vertShaderModuleHandle,
+                fragShaderModuleHandle,
+                VK10.VK_FORMAT_R8G8B8A8_UNORM
+            );
+        }
+
+        private VulkanPipelineHandle createVulkanPipeline(
+            PipelineDescriptor descriptor,
+            long vertShaderModuleHandle,
+            long fragShaderModuleHandle,
+            int colorFormat
+        ) {
             Objects.requireNonNull(descriptor, "descriptor must not be null");
             if (logicalDevice == null) {
                 throw new IllegalStateException("Cannot create pipeline: Vulkan logical device is unavailable.");
+            }
+            if (colorFormat == VK10.VK_FORMAT_UNDEFINED) {
+                throw new IllegalArgumentException("Cannot create Vulkan pipeline with VK_FORMAT_UNDEFINED color attachment format");
             }
 
             PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
@@ -9368,7 +10172,7 @@ public class VulkanBackend {
                 for (int i = 0; i < vfElements.size(); i++) {
                     VertexFormatElement elem = vfElements.get(i);
                     vAttribs.get(i)
-                        .location(elem.id())
+                        .location(i)
                         .binding(0)
                         .format(toVkVertexElementFormat(elem.type(), elem.count()))
                         .offset(vertexFormat.getOffset(elem));
@@ -9404,10 +10208,8 @@ public class VulkanBackend {
                         .rasterizerDiscardEnable(false)
                         .polygonMode(toVkPolygonMode(portableState.polygonMode()))
                         .lineWidth(1.0f)
-                        .cullMode(portableState.cull()
-                            ? VK10.VK_CULL_MODE_BACK_BIT
-                            : VK10.VK_CULL_MODE_NONE)
-                        .frontFace(VK10.VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                        .cullMode(VK10.VK_CULL_MODE_NONE)
+                        .frontFace(VK10.VK_FRONT_FACE_CLOCKWISE)
                         .depthBiasEnable(hasBias)
                         .depthBiasConstantFactor(portableState.depthBiasConstant())
                         .depthBiasSlopeFactor(portableState.depthBiasScaleFactor())
@@ -9485,7 +10287,8 @@ public class VulkanBackend {
                 // color format + D32_SFLOAT depth format so it matches the transient render
                 // passes created by beginRenderPass() for standard Minecraft draw calls.
                 long placeholderRenderPass = createPipelineCompatibleRenderPass(stack,
-                    depthTestEnabled || portableState.writeDepth());
+                    depthTestEnabled || portableState.writeDepth(),
+                    colorFormat);
 
                 // --- 13. VkGraphicsPipelineCreateInfo ---
                 VkGraphicsPipelineCreateInfo.Buffer pipelineInfo =
@@ -9553,9 +10356,9 @@ public class VulkanBackend {
          * Records a {@code vkCmdBindPipeline} command for {@code VK_PIPELINE_BIND_POINT_GRAPHICS}.
          */
         private void bindPipeline(long commandBufferHandle, long pipelineHandle) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "bindPipeline");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindPipeline");
             VK10.vkCmdBindPipeline(
-                primaryCommandBuffer,
+                activeCommandBuffer,
                 VK10.VK_PIPELINE_BIND_POINT_GRAPHICS,
                 pipelineHandle);
         }
@@ -9570,9 +10373,10 @@ public class VulkanBackend {
          * @param includeDepth whether to include a D32_SFLOAT depth/stencil attachment
          */
         private long createPipelineCompatibleRenderPass(MemoryStack stack, boolean includeDepth) {
-            int colorFormat = swapchainImageFormat != VK10.VK_FORMAT_UNDEFINED
-                ? swapchainImageFormat
-                : VK10.VK_FORMAT_B8G8R8A8_UNORM;   // safe fallback
+            return createPipelineCompatibleRenderPass(stack, includeDepth, VK10.VK_FORMAT_R8G8B8A8_UNORM);
+        }
+
+        private long createPipelineCompatibleRenderPass(MemoryStack stack, boolean includeDepth, int colorFormat) {
             int attachmentCount = includeDepth ? 2 : 1;
 
             VkAttachmentDescription.Buffer attachments =
@@ -9919,7 +10723,7 @@ public class VulkanBackend {
         }
 
         private void cmdSetViewport(long commandBufferHandle, int x, int y, int width, int height) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "cmdSetViewport");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "cmdSetViewport");
             if (renderPassRecording && activeRenderPassTargetsSwapchain && activeRenderPassWidth > 0 && activeRenderPassHeight > 0) {
                 // Keep swapchain passes full-frame; shrinking viewport here clips title/loading output into a strip.
                 x = 0;
@@ -9935,12 +10739,17 @@ public class VulkanBackend {
             try (MemoryStack stack = stackPush()) {
                 org.lwjgl.vulkan.VkViewport.Buffer viewport = org.lwjgl.vulkan.VkViewport.calloc(1, stack)
                     .x((float) x)
-                    .y((float) (framebufferHeight - y))
                     .width((float) viewportWidth)
-                    .height(-(float) viewportHeight)
                     .minDepth(0.0f)
                     .maxDepth(1.0f);
-                VK10.vkCmdSetViewport(primaryCommandBuffer, 0, viewport);
+                if (renderPassRecording && activeRenderPassTargetsSwapchain) {
+                    viewport.y((float) y)
+                        .height((float) viewportHeight);
+                } else {
+                    viewport.y((float) (framebufferHeight - y))
+                        .height(-(float) viewportHeight);
+                }
+                VK10.vkCmdSetViewport(activeCommandBuffer, 0, viewport);
             }
         }
 
@@ -10110,6 +10919,8 @@ public class VulkanBackend {
                             defView != null ? defView : VK10.VK_NULL_HANDLE);
                     });
                 }
+
+                releaseSwapchainPresentComposePipeline();
 
                 // Destroy pipelines before their layouts and descriptor set layouts.
                 if (!managedVkPipelineHandles.isEmpty()) {

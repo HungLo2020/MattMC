@@ -264,6 +264,7 @@ import org.slf4j.Logger;
 public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements WindowEventHandler {
 	static Minecraft instance;
 	private static final Logger LOGGER = LogUtils.getLogger();
+	private static int DEBUG_FPS_LIMIT_LOGS = 0;
 	private static final int MAX_TICKS_PER_UPDATE = 10;
 	public static final ResourceLocation DEFAULT_FONT = ResourceLocation.withDefaultNamespace("default");
 	public static final ResourceLocation UNIFORM_FONT = ResourceLocation.withDefaultNamespace("uniform");
@@ -1408,6 +1409,25 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		this.window.updateDisplay(this.tracyFrameCapture);
 		int k = this.framerateLimitTracker.getFramerateLimit();
+		if (DEBUG_FPS_LIMIT_LOGS < 20) {
+			DEBUG_FPS_LIMIT_LOGS++;
+			net.blaze3d.textures.GpuTexture mainColorTexture = renderTarget.getColorTexture();
+			int mainColorTextureId = mainColorTexture == null ? 0 : net.vulkanic.VulkanicCoreAPI.textureId(mainColorTexture);
+			String mainColorTextureLabel = mainColorTexture == null ? "null" : mainColorTexture.getLabel();
+			LOGGER.info(
+				"FPS limit debug#{}: limit={} reason={} iconified={} minimized={} levelPresent={} screen={} overlay={} mainColorTexId={} mainColorTexLabel={}",
+				DEBUG_FPS_LIMIT_LOGS,
+				k,
+				this.framerateLimitTracker.getThrottleReason(),
+				this.window.isIconified(),
+				this.window.isMinimized(),
+				this.level != null,
+				this.screen == null ? "null" : this.screen.getClass().getSimpleName(),
+				this.overlay == null ? "null" : this.overlay.getClass().getSimpleName(),
+				mainColorTextureId,
+				mainColorTextureLabel
+			);
+		}
 		if (k < 260) {
 			VulkanicAPI.limitDisplayFPS(k);
 		}

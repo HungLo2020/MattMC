@@ -15,6 +15,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
     private static final java.util.regex.Pattern LEGACY_VERTEX_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_VertexID\\b");
     private static final java.util.regex.Pattern LEGACY_INSTANCE_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_InstanceID\\b");
+    private static final java.util.regex.Pattern GLSL_VERSION_PATTERN = java.util.regex.Pattern.compile("(?m)^\\s*#version\\s+(\\d+)");
 
     @Override
     public VulkanicSpirvModule compile(VulkanicShaderStage stage, CharSequence source, String sourceName, String entryPoint) {
@@ -119,12 +120,34 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     }
 
     static String normalizeForVulkan(VulkanicShaderStage stage, String shaderSource) {
-        if (stage != VulkanicShaderStage.VERTEX || shaderSource.isEmpty()) {
+        if (shaderSource.isEmpty()) {
             return shaderSource;
         }
 
-        String normalized = LEGACY_VERTEX_ID_PATTERN.matcher(shaderSource).replaceAll("gl_VertexIndex");
+        String normalized = promoteVersionForVulkan(shaderSource);
+
+        if (stage != VulkanicShaderStage.VERTEX) {
+            return normalized;
+        }
+
+        normalized = LEGACY_VERTEX_ID_PATTERN.matcher(normalized).replaceAll("gl_VertexIndex");
         return LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
+    }
+
+    private static String promoteVersionForVulkan(String shaderSource) {
+        java.util.regex.Matcher versionMatcher = GLSL_VERSION_PATTERN.matcher(shaderSource);
+        if (!versionMatcher.find()) {
+            return "#version 450\n" + shaderSource;
+        }
+
+        int declaredVersion = Integer.parseInt(versionMatcher.group(1));
+        if (declaredVersion >= 450) {
+            return shaderSource;
+        }
+
+        return shaderSource.substring(0, versionMatcher.start(1))
+            + "450"
+            + shaderSource.substring(versionMatcher.end(1));
     }
 
     private static void deleteTempDirectoryQuietly(Path directory) {

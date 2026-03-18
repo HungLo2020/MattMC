@@ -3350,14 +3350,45 @@ public class VulkanicAPI {
     }
 
     public static void limitDisplayFPS(int fpsLimit) {
-        double targetTime = lastDrawTime + 1.0 / fpsLimit;
-
-        double currentTime;
-        for (currentTime = GLFW.glfwGetTime(); currentTime < targetTime; currentTime = GLFW.glfwGetTime()) {
-            GLFW.glfwWaitEventsTimeout(targetTime - currentTime);
+        if (fpsLimit <= 0) {
+            lastDrawTime = GLFW.glfwGetTime();
+            return;
         }
 
-        lastDrawTime = currentTime;
+        double frameDuration = 1.0 / fpsLimit;
+        double currentTime = GLFW.glfwGetTime();
+        if (lastDrawTime == Double.MIN_VALUE) {
+            lastDrawTime = currentTime;
+            return;
+        }
+
+        // Resync when the timer jumps or we've stalled far longer than one frame budget.
+        if (lastDrawTime > currentTime + frameDuration * 4.0D || currentTime - lastDrawTime > 1.0D) {
+            lastDrawTime = currentTime;
+            return;
+        }
+
+        double targetTime = lastDrawTime + frameDuration;
+        while (currentTime < targetTime) {
+            double remainingSeconds = targetTime - currentTime;
+            if (remainingSeconds > 0.0015D) {
+                long sleepNanos = (long)(Math.min(remainingSeconds, 0.010D) * 1_000_000_000.0D);
+                if (sleepNanos > 0L) {
+                    try {
+                        Thread.sleep(sleepNanos / 1_000_000L, (int)(sleepNanos % 1_000_000L));
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            } else {
+                Thread.onSpinWait();
+            }
+
+            currentTime = GLFW.glfwGetTime();
+        }
+
+        lastDrawTime = Math.max(targetTime, currentTime);
     }
 
     public static void initializeDynamicUniforms() {

@@ -29,6 +29,8 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.FileUtil;
+import net.minecraft.ResourceLocationException;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
@@ -483,7 +485,12 @@ public class GlDevice implements GpuDevice {
 	@Nullable
 	private String resolveShaderSource(GlDevice.ShaderCompilationKey shaderCompilationKey, BiFunction<ResourceLocation, ShaderType, String> biFunction) {
 		String string = (String)biFunction.apply(shaderCompilationKey.id, shaderCompilationKey.type);
-		return string != null ? string : loadBundledShaderSource(shaderCompilationKey.id, shaderCompilationKey.type);
+		if (string != null) {
+			ResourceLocation sourceFileLocation = shaderCompilationKey.type.idConverter().idToFile(shaderCompilationKey.id);
+			return preprocessBundledShaderSource(sourceFileLocation, string);
+		}
+
+		return loadBundledShaderSource(shaderCompilationKey.id, shaderCompilationKey.type);
 	}
 
 	@Nullable
@@ -496,10 +503,54 @@ public class GlDevice implements GpuDevice {
 				return null;
 			}
 
-			return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+			String rawSource = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+			return preprocessBundledShaderSource(resourceLocation2, rawSource);
 		} catch (IOException var5) {
 			throw new UncheckedIOException("Failed to read bundled shader source " + resourceLocation + " (" + shaderType.getName() + ")", var5);
 		}
+	}
+
+	private static String preprocessBundledShaderSource(ResourceLocation sourceFileLocation, String sourceText) {
+		ResourceLocation baseLocation = sourceFileLocation.withPath(FileUtil::getFullResourcePath);
+		GlslPreprocessor preprocessor = new GlslPreprocessor() {
+			private final Set<ResourceLocation> importedLocations = new HashSet<>();
+
+			@Override
+			public String applyImport(boolean quotedImport, String importPath) {
+				ResourceLocation importLocation;
+				try {
+					if (quotedImport) {
+						importLocation = baseLocation.withPath(path -> FileUtil.normalizeResourcePath(path + importPath));
+					} else {
+						importLocation = ResourceLocation.parse(importPath).withPrefix("shaders/include/");
+					}
+				} catch (ResourceLocationException exception) {
+					LOGGER.error("Malformed bundled GLSL import {}: {}", importPath, exception.getMessage());
+					return "#error " + exception.getMessage();
+				}
+
+				if (!this.importedLocations.add(importLocation)) {
+					return null;
+				}
+
+				String includePath = "/assets/" + importLocation.getNamespace() + "/" + importLocation.getPath();
+				try (InputStream includeStream = GlDevice.class.getResourceAsStream(includePath)) {
+					if (includeStream == null) {
+						String message = "Missing bundled GLSL include " + importLocation;
+						LOGGER.error(message);
+						return "#error " + message;
+					}
+
+					return new String(includeStream.readAllBytes(), StandardCharsets.UTF_8);
+				} catch (IOException exception) {
+					LOGGER.error("Could not read bundled GLSL import {}: {}", importLocation, exception.getMessage());
+					return "#error " + exception.getMessage();
+				}
+			}
+		};
+
+		List<String> processed = preprocessor.process(sourceText);
+		return String.join("", processed);
 	}
 
 	private static net.vulkanic.VulkanicShaderStage toVulkanicShaderStage(ShaderType shaderType) {

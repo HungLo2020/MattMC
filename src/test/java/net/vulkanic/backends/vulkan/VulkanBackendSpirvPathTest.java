@@ -95,6 +95,16 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanPromotesLegacyShaderVersions() {
+        String source = "#version 330\nvoid main(){}";
+
+        assertEquals(
+            "#version 450\nvoid main(){}",
+            GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
+        );
+    }
+
+    @Test
     public void testProgramLinkUsesCompiledSpirvShaders() {
         VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
             new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x0A, 0x0B}, sourceName, "stub")
