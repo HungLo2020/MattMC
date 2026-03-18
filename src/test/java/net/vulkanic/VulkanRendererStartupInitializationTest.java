@@ -221,6 +221,29 @@ public class VulkanRendererStartupInitializationTest {
             "Iris shaderpack loading should fail over explicitly on the Vulkan path instead of attempting incompatible shaderpack GLSL startup");
     }
 
+    @Test
+    public void testPanoramaShadersUseSkyboxClipProjectionAndCubemapSampling() throws Exception {
+        String panoramaVertexSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/resources/assets/minecraft/shaders/core/panorama.vsh"));
+        String panoramaFragmentSource = Files.readString(PROJECT_ROOT
+            .resolve("src/main/resources/assets/minecraft/shaders/core/panorama.fsh"));
+
+        assertTrue(panoramaVertexSource.contains("vec2 uv = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);"),
+            "panorama.vsh should generate a fullscreen triangle procedurally so Vulkan does not depend on the custom panorama vertex buffer path");
+        assertTrue(panoramaVertexSource.contains("vec2 clipPos = uv * 2.0 - 1.0;"),
+            "panorama.vsh should reconstruct clip-space positions from the fullscreen triangle vertices before deriving view rays");
+        assertTrue(panoramaVertexSource.contains("vec3 viewDirection = vec3(clipPos.x / ProjMat[0][0], clipPos.y / ProjMat[1][1], -1.0);"),
+            "panorama.vsh should reconstruct view rays from fullscreen triangle clip positions and the perspective projection scale factors");
+        assertTrue(panoramaVertexSource.contains("transpose(mat3(ModelViewMat))"),
+            "panorama.vsh should rotate reconstructed view rays back into cubemap space before interpolation");
+        assertTrue(panoramaFragmentSource.contains("uniform sampler2D Sampler0;"),
+            "panorama.fsh should sample the stacked panorama atlas through a regular 2D sampler");
+        assertTrue(panoramaFragmentSource.contains("uv.y = (faceIndex + uv.y) / 6.0;"),
+            "panorama.fsh should map the selected cubemap face into the stacked six-row atlas");
+        assertTrue(panoramaFragmentSource.contains("fragColor = texture(Sampler0, uv);"),
+            "panorama.fsh should sample the panorama atlas after selecting the correct face and UV coordinates");
+    }
+
     private static Object getBackendFieldValue() throws Exception {
         Field backendField = VulkanicAPI.class.getDeclaredField("backend");
         backendField.setAccessible(true);

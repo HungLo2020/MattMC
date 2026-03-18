@@ -721,7 +721,7 @@ public class RenderPipelines {
 			.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 			.withDepthWrite(false)
 			.withColorWrite(true, false)
-			.withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.QUADS)
+			.withVertexFormat(DefaultVertexFormat.EMPTY, VertexFormat.Mode.TRIANGLES)
 			.build()
 	);
 	public static final RenderPipeline OUTLINE_CULL = register(RenderPipeline.builder(OUTLINE_SNIPPET).withLocation("pipeline/outline_cull").build());
