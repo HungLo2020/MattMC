@@ -105,6 +105,53 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanRewritesStandaloneNonOpaqueUniformsIntoBlock() {
+        String source = "#version 330\n"
+            + "uniform vec3 u_RegionOffset;\n"
+            + "uniform vec2 u_TexCoordShrink;\n"
+            + "uniform sampler2D u_LightTex;\n"
+            + "void main(){}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+
+        assertTrue(normalized.contains("layout(std140) uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("vec3 u_RegionOffset;"));
+        assertTrue(normalized.contains("vec2 u_TexCoordShrink;"));
+        assertTrue(normalized.contains("uniform sampler2D u_LightTex;"));
+        assertFalse(normalized.contains("uniform vec3 u_RegionOffset;"));
+        assertFalse(normalized.contains("uniform vec2 u_TexCoordShrink;"));
+    }
+
+    @Test
+    public void testCompileShaderNormalizesSodiumStyleStandaloneUniformsForVulkan() {
+        AtomicReference<String> capturedSource = new AtomicReference<>();
+
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) -> {
+            capturedSource.set(source.toString());
+            return new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x21, 0x22}, sourceName, "stub");
+        });
+
+        int shader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+        uploadSource(
+            backend,
+            shader,
+            "#version 330\n"
+                + "uniform sampler2D u_BlockTex;\n"
+                + "uniform vec4 u_FogColor;\n"
+                + "uniform vec2 u_EnvironmentFog;\n"
+                + "uniform vec2 u_RenderFog;\n"
+                + "void main(){}"
+        );
+        backend.compileShader(TEST_CONTEXT, shader);
+
+        assertTrue(capturedSource.get().contains("layout(std140) uniform VulkanicStandaloneUniforms {"));
+        assertTrue(capturedSource.get().contains("vec4 u_FogColor;"));
+        assertTrue(capturedSource.get().contains("vec2 u_EnvironmentFog;"));
+        assertTrue(capturedSource.get().contains("vec2 u_RenderFog;"));
+        assertTrue(capturedSource.get().contains("uniform sampler2D u_BlockTex;"));
+    }
+
+    @Test
     public void testProgramLinkUsesCompiledSpirvShaders() {
         VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
             new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x0A, 0x0B}, sourceName, "stub")

@@ -10174,7 +10174,7 @@ public class VulkanBackend {
                     vAttribs.get(i)
                         .location(i)
                         .binding(0)
-                        .format(toVkVertexElementFormat(elem.type(), elem.count()))
+                        .format(toVkVertexElementFormat(elem))
                         .offset(vertexFormat.getOffset(elem));
                 }
 
@@ -10482,7 +10482,11 @@ public class VulkanBackend {
          * (denormalized signed integer scaled to float) since Minecraft's UV coordinates span
          * full short ranges and are not pre-normalized to [0..1].</p>
          */
-        private static int toVkVertexElementFormat(VertexFormatElement.Type type, int count) {
+        private static int toVkVertexElementFormat(VertexFormatElement element) {
+            VertexFormatElement.Type type = element.type();
+            int count = element.count();
+            boolean useIntegerFormat = element.usage() == VertexFormatElement.Usage.GENERIC;
+
             return switch (type) {
                 case FLOAT -> switch (count) {
                     case 1 -> VK10.VK_FORMAT_R32_SFLOAT;
@@ -10493,34 +10497,34 @@ public class VulkanBackend {
                         "Unsupported FLOAT vertex component count: " + count);
                 };
                 case UBYTE -> switch (count) {
-                    case 1 -> VK10.VK_FORMAT_R8_UNORM;
-                    case 2 -> VK10.VK_FORMAT_R8G8_UNORM;
-                    case 3 -> VK10.VK_FORMAT_R8G8B8_UNORM;
-                    case 4 -> VK10.VK_FORMAT_R8G8B8A8_UNORM;
+                    case 1 -> useIntegerFormat ? VK10.VK_FORMAT_R8_UINT : VK10.VK_FORMAT_R8_UNORM;
+                    case 2 -> useIntegerFormat ? VK10.VK_FORMAT_R8G8_UINT : VK10.VK_FORMAT_R8G8_UNORM;
+                    case 3 -> useIntegerFormat ? VK10.VK_FORMAT_R8G8B8_UINT : VK10.VK_FORMAT_R8G8B8_UNORM;
+                    case 4 -> useIntegerFormat ? VK10.VK_FORMAT_R8G8B8A8_UINT : VK10.VK_FORMAT_R8G8B8A8_UNORM;
                     default -> throw new IllegalArgumentException(
                         "Unsupported UBYTE vertex component count: " + count);
                 };
                 case BYTE -> switch (count) {
-                    case 1 -> VK10.VK_FORMAT_R8_SNORM;
-                    case 2 -> VK10.VK_FORMAT_R8G8_SNORM;
-                    case 3 -> VK10.VK_FORMAT_R8G8B8_SNORM;
-                    case 4 -> VK10.VK_FORMAT_R8G8B8A8_SNORM;
+                    case 1 -> useIntegerFormat ? VK10.VK_FORMAT_R8_SINT : VK10.VK_FORMAT_R8_SNORM;
+                    case 2 -> useIntegerFormat ? VK10.VK_FORMAT_R8G8_SINT : VK10.VK_FORMAT_R8G8_SNORM;
+                    case 3 -> useIntegerFormat ? VK10.VK_FORMAT_R8G8B8_SINT : VK10.VK_FORMAT_R8G8B8_SNORM;
+                    case 4 -> useIntegerFormat ? VK10.VK_FORMAT_R8G8B8A8_SINT : VK10.VK_FORMAT_R8G8B8A8_SNORM;
                     default -> throw new IllegalArgumentException(
                         "Unsupported BYTE vertex component count: " + count);
                 };
                 case SHORT -> switch (count) {
-                    case 1 -> VK10.VK_FORMAT_R16_SSCALED;
-                    case 2 -> VK10.VK_FORMAT_R16G16_SSCALED;
-                    case 3 -> VK10.VK_FORMAT_R16G16B16_SSCALED;
-                    case 4 -> VK10.VK_FORMAT_R16G16B16A16_SSCALED;
+                    case 1 -> useIntegerFormat ? VK10.VK_FORMAT_R16_SINT : VK10.VK_FORMAT_R16_SSCALED;
+                    case 2 -> useIntegerFormat ? VK10.VK_FORMAT_R16G16_SINT : VK10.VK_FORMAT_R16G16_SSCALED;
+                    case 3 -> useIntegerFormat ? VK10.VK_FORMAT_R16G16B16_SINT : VK10.VK_FORMAT_R16G16B16_SSCALED;
+                    case 4 -> useIntegerFormat ? VK10.VK_FORMAT_R16G16B16A16_SINT : VK10.VK_FORMAT_R16G16B16A16_SSCALED;
                     default -> throw new IllegalArgumentException(
                         "Unsupported SHORT vertex component count: " + count);
                 };
                 case USHORT -> switch (count) {
-                    case 1 -> VK10.VK_FORMAT_R16_USCALED;
-                    case 2 -> VK10.VK_FORMAT_R16G16_USCALED;
-                    case 3 -> VK10.VK_FORMAT_R16G16B16_USCALED;
-                    case 4 -> VK10.VK_FORMAT_R16G16B16A16_USCALED;
+                    case 1 -> useIntegerFormat ? VK10.VK_FORMAT_R16_UINT : VK10.VK_FORMAT_R16_USCALED;
+                    case 2 -> useIntegerFormat ? VK10.VK_FORMAT_R16G16_UINT : VK10.VK_FORMAT_R16G16_USCALED;
+                    case 3 -> useIntegerFormat ? VK10.VK_FORMAT_R16G16B16_UINT : VK10.VK_FORMAT_R16G16B16_USCALED;
+                    case 4 -> useIntegerFormat ? VK10.VK_FORMAT_R16G16B16A16_UINT : VK10.VK_FORMAT_R16G16B16A16_USCALED;
                     default -> throw new IllegalArgumentException(
                         "Unsupported USHORT vertex component count: " + count);
                 };

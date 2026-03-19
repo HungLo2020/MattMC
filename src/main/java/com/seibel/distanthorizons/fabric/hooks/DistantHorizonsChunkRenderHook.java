@@ -7,6 +7,7 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.hooks.ChunkRenderLayerHooks;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Hook implementation for Distant Horizons chunk rendering.
@@ -17,6 +18,10 @@ public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
 
     @Override
     public void onBeforeRenderLayer(ChunkSectionLayerGroup layerGroup) {
+        if (VulkanicAPI.isVulkanBackendSelected()) {
+            return;
+        }
+
         ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(
             ClientApi.RENDER_STATE.clientLevelWrapper,
             Minecraft.getInstance().levelRenderer.level

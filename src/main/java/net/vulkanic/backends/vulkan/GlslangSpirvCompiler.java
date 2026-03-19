@@ -16,6 +16,10 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     private static final java.util.regex.Pattern LEGACY_VERTEX_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_VertexID\\b");
     private static final java.util.regex.Pattern LEGACY_INSTANCE_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_InstanceID\\b");
     private static final java.util.regex.Pattern GLSL_VERSION_PATTERN = java.util.regex.Pattern.compile("(?m)^\\s*#version\\s+(\\d+)");
+    private static final java.util.regex.Pattern STANDALONE_UNIFORM_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
+        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+([^;{}]+?)\\s*;\\s*(?://.*)?$"
+    );
+    private static final String GENERATED_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
 
     @Override
     public VulkanicSpirvModule compile(VulkanicShaderStage stage, CharSequence source, String sourceName, String entryPoint) {
@@ -125,6 +129,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         }
 
         String normalized = promoteVersionForVulkan(shaderSource);
+        normalized = rewriteStandaloneUniformsForVulkan(normalized);
 
         if (stage != VulkanicShaderStage.VERTEX) {
             return normalized;
@@ -148,6 +153,87 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         return shaderSource.substring(0, versionMatcher.start(1))
             + "450"
             + shaderSource.substring(versionMatcher.end(1));
+    }
+
+    private static String rewriteStandaloneUniformsForVulkan(String shaderSource) {
+        java.util.regex.Matcher matcher = STANDALONE_UNIFORM_DECLARATION_PATTERN.matcher(shaderSource);
+        StringBuffer strippedSource = new StringBuffer();
+        List<String> blockMembers = new ArrayList<>();
+
+        while (matcher.find()) {
+            String declaration = matcher.group(1).trim();
+            if (declaration.isEmpty()) {
+                matcher.appendReplacement(strippedSource, java.util.regex.Matcher.quoteReplacement(matcher.group()));
+                continue;
+            }
+
+            String typeToken = declaration.split("\\s+", 2)[0];
+            if (isOpaqueUniformType(typeToken)) {
+                matcher.appendReplacement(strippedSource, java.util.regex.Matcher.quoteReplacement(matcher.group()));
+                continue;
+            }
+
+            blockMembers.add(declaration + ";");
+            matcher.appendReplacement(strippedSource, "");
+        }
+
+        matcher.appendTail(strippedSource);
+
+        if (blockMembers.isEmpty()) {
+            return shaderSource;
+        }
+
+        int insertOffset = findUniformBlockInsertionOffset(strippedSource.toString());
+        StringBuilder block = new StringBuilder();
+        block.append("layout(std140) uniform ")
+            .append(GENERATED_UNIFORM_BLOCK_NAME)
+            .append(" {\n");
+
+        for (String member : blockMembers) {
+            block.append("    ").append(member).append("\n");
+        }
+
+        block.append("};\n\n");
+
+        return strippedSource.substring(0, insertOffset)
+            + block
+            + strippedSource.substring(insertOffset);
+    }
+
+    private static boolean isOpaqueUniformType(String typeToken) {
+        return typeToken.contains("sampler")
+            || typeToken.contains("image")
+            || typeToken.equals("atomic_uint");
+    }
+
+    private static int findUniformBlockInsertionOffset(String shaderSource) {
+        java.util.regex.Matcher versionMatcher = GLSL_VERSION_PATTERN.matcher(shaderSource);
+        if (!versionMatcher.find()) {
+            return 0;
+        }
+
+        int lineEnd = shaderSource.indexOf('\n', versionMatcher.end());
+        if (lineEnd < 0) {
+            return shaderSource.length();
+        }
+
+        int offset = lineEnd + 1;
+        while (offset < shaderSource.length()) {
+            int nextLineEnd = shaderSource.indexOf('\n', offset);
+            if (nextLineEnd < 0) {
+                nextLineEnd = shaderSource.length();
+            }
+
+            String trimmed = shaderSource.substring(offset, nextLineEnd).trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#extension")) {
+                offset = nextLineEnd < shaderSource.length() ? nextLineEnd + 1 : nextLineEnd;
+                continue;
+            }
+
+            break;
+        }
+
+        return offset;
     }
 
     private static void deleteTempDirectoryQuietly(Path directory) {

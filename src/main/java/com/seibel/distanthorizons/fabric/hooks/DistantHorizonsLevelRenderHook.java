@@ -10,6 +10,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.hooks.LevelRendererHooks;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 
@@ -22,6 +23,10 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforeRenderLevel(Camera camera, Matrix4f positionMatrix, Matrix4f projectionMatrix) {
+        if (VulkanicAPI.isVulkanBackendSelected()) {
+            return;
+        }
+
         ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(positionMatrix);
         ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(projectionMatrix);
         
@@ -39,6 +44,10 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforePrepareChunkRenders(Matrix4fc modelViewMatrix, double camX, double camY, double camZ) {
+        if (VulkanicAPI.isVulkanBackendSelected()) {
+            return;
+        }
+
         ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
         
         LevelRenderer levelRenderer = Minecraft.getInstance().levelRenderer;
