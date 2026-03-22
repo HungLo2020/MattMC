@@ -1128,6 +1128,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	public void endFrame() {
 		this.cloudRenderer.endFrame();
+		if (this.renderer != null) {
+			this.renderer.endFrame();
+		}
 	}
 
 	public void captureFrustum() {

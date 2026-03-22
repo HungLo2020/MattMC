@@ -6,10 +6,12 @@ import net.blaze3d.shaders.UniformType;
 import net.blaze3d.vertex.VertexFormat;
 import net.blaze3d.vertex.VertexFormatElement;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.gl.device.RenderDevice;
+import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +46,7 @@ public final class SodiumChunkRenderPipelines {
     }
 
     public static RenderPipeline forPass(TerrainRenderPass pass) {
-        Pipelines pipelines = PIPELINES_BY_STRIDE.computeIfAbsent(getActiveVertexStride(), SodiumChunkRenderPipelines::createPipelines);
+        Pipelines pipelines = PIPELINES_BY_STRIDE.computeIfAbsent(getActiveVertexStride(), stride -> createPipelines(stride));
 
         if (pass.isTranslucent()) {
             return pipelines.translucent();
@@ -71,24 +73,32 @@ public final class SodiumChunkRenderPipelines {
             .withSampler("Sampler0")
             .withSampler("Sampler2")
             .withUniform("SodiumChunkParams", UniformType.UNIFORM_BUFFER)
-            .withUniform("SodiumChunkRegion", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(vertexFormat, VertexFormat.Mode.TRIANGLES)
             .withShaderDefine("MAX_TEXTURE_LOD_BIAS", RenderDevice.INSTANCE.getMaxTextureLodBias())
             .buildSnippet();
 
-        return new Pipelines(
-            RenderPipeline.builder(snippet)
-                .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_solid_stride_" + stride))
-                .build(),
-            RenderPipeline.builder(snippet)
-                .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_cutout_stride_" + stride))
-                .withShaderDefine("USE_FRAGMENT_DISCARD")
-                .build(),
-            RenderPipeline.builder(snippet)
-                .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_translucent_stride_" + stride))
-                .withBlend(BlendFunction.TRANSLUCENT)
-                .build()
-        );
+        RenderPipeline solid = RenderPipeline.builder(snippet)
+            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_solid_stride_" + stride))
+            .build();
+        RenderPipeline cutout = RenderPipeline.builder(snippet)
+            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_cutout_stride_" + stride))
+            .withShaderDefine("USE_FRAGMENT_DISCARD")
+            .build();
+        RenderPipeline translucent = RenderPipeline.builder(snippet)
+            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_translucent_stride_" + stride))
+            .withBlend(BlendFunction.TRANSLUCENT)
+            .build();
+
+        Minecraft minecraft = Minecraft.getInstance();
+        RenderPipeline registeredSolid = RenderPipelines.register(solid);
+        RenderPipeline registeredCutout = RenderPipelines.register(cutout);
+        RenderPipeline registeredTranslucent = RenderPipelines.register(translucent);
+
+        VulkanicAPI.precompileRenderPipeline(registeredSolid, minecraft.getShaderManager()::getShader);
+        VulkanicAPI.precompileRenderPipeline(registeredCutout, minecraft.getShaderManager()::getShader);
+        VulkanicAPI.precompileRenderPipeline(registeredTranslucent, minecraft.getShaderManager()::getShader);
+
+        return new Pipelines(registeredSolid, registeredCutout, registeredTranslucent);
     }
 
     private static VertexFormat createVertexFormat(int stride) {

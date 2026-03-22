@@ -8,7 +8,7 @@ import net.blaze3d.opengl.LegacyHandleGlBuffer;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
-import net.minecraft.client.renderer.DynamicUniformStorage;
+import net.blaze3d.textures.GpuTextureView;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gl.buffer.GlMutableBuffer;
 import net.sodium.client.gl.device.CommandList;
@@ -48,17 +48,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class DefaultChunkRenderer extends ShaderChunkRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultChunkRenderer.class);
     private static final int SODIUM_CHUNK_PARAMS_UBO_SIZE = new Std140SizeCalculator().putVec2().get();
-    private static final int SODIUM_CHUNK_REGION_UBO_SIZE = new Std140SizeCalculator().putVec3().get();
-    private static final AtomicInteger VULKAN_DEBUG_FRAME_COUNTER = new AtomicInteger();
+    private static boolean loggedVulkanTransformProbe;
 
     private final SharedQuadIndexBuffer sharedIndexBuffer;
     private final GpuBuffer sodiumChunkParamsBuffer;
-    private final DynamicUniformStorage<SodiumChunkRegionUniform> sodiumChunkRegionUniforms;
 
     public DefaultChunkRenderer(RenderDevice device, ChunkVertexType vertexType) {
         super(device, vertexType);
@@ -69,7 +66,6 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST,
             SODIUM_CHUNK_PARAMS_UBO_SIZE
         );
-        this.sodiumChunkRegionUniforms = new DynamicUniformStorage<>("Sodium chunk region UBO", SODIUM_CHUNK_REGION_UBO_SIZE, 16);
     }
 
     /**
@@ -156,39 +152,44 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             ? false
             : SodiumClientMod.options().performance.useBlockFaceCulling;
         final boolean useIndexedTessellation = terrainPass.isTranslucent() && indexedRenderingEnabled;
-        this.sodiumChunkRegionUniforms.endFrame();
 
         RenderTarget target = terrainPass.getTarget();
+        GpuTextureView colorTargetView = VulkanicAPI.getOutputColorTextureOverride() != null
+            ? VulkanicAPI.getOutputColorTextureOverride()
+            : target.getColorTextureView();
+        GpuTextureView depthTargetView = target.useDepth
+            ? (VulkanicAPI.getOutputDepthTextureOverride() != null ? VulkanicAPI.getOutputDepthTextureOverride() : target.getDepthTextureView())
+            : null;
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
             VulkanicAPI.setDynamicViewport(
                 VulkanicAPI.getCommandContext(),
                 0,
                 0,
-                target.getColorTexture().getWidth(0),
-                target.getColorTexture().getHeight(0)
+                colorTargetView.getWidth(0),
+                colorTargetView.getHeight(0)
             );
         }
 
         CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
         GpuBufferSlice chunkParams = this.writeChunkParams(commandEncoder);
         List<PreparedRegionDraw> preparedDraws = new ArrayList<>();
-        int regionCount = 0;
-        int storageCount = 0;
-        int drawCommandCount = 0;
-        long indexCountTotal = 0L;
-
+        double nearestRegionDistanceSq = Double.POSITIVE_INFINITY;
+        int nearestRegionOriginX = 0;
+        int nearestRegionOriginY = 0;
+        int nearestRegionOriginZ = 0;
+        float nearestModelOffsetX = 0.0F;
+        float nearestModelOffsetY = 0.0F;
+        float nearestModelOffsetZ = 0.0F;
+        int nearestBatchSize = 0;
         Iterator<ChunkRenderList> iterator = renderLists.iterator(terrainPass.isTranslucent());
         while (iterator.hasNext()) {
             ChunkRenderList renderList = iterator.next();
-            regionCount++;
             RenderRegion region = renderList.getRegion();
             SectionRenderDataStorage storage = region.getStorage(terrainPass);
 
             if (storage == null) {
                 continue;
             }
-
-            storageCount++;
 
             MultiDrawBatch batch = region.getCachedBatch(terrainPass);
             if (!batch.isFilled) {
@@ -197,14 +198,6 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
             if (batch.isEmpty()) {
                 continue;
-            }
-
-            for (int drawIndex = 0; drawIndex < batch.size; drawIndex++) {
-                int indexCount = MemoryUtil.memGetInt(batch.pElementCount + ((long) drawIndex << 2));
-                if (indexCount > 0) {
-                    drawCommandCount++;
-                    indexCountTotal += indexCount;
-                }
             }
 
             GpuBuffer vertexBuffer = this.wrapLegacyBuffer(region.getResources().getGeometryBuffer(), GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST);
@@ -216,37 +209,52 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 indexBuffer = this.wrapLegacyBuffer(this.sharedIndexBuffer.getBufferObject(), GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST);
             }
 
+            float modelOffsetX = getCameraTranslation(region.getOriginX(), camera.intX, camera.fracX);
+            float modelOffsetY = getCameraTranslation(region.getOriginY(), camera.intY, camera.fracY);
+            float modelOffsetZ = getCameraTranslation(region.getOriginZ(), camera.intZ, camera.fracZ);
+            double regionDistanceSq = modelOffsetX * modelOffsetX + modelOffsetY * modelOffsetY + modelOffsetZ * modelOffsetZ;
+            if (regionDistanceSq < nearestRegionDistanceSq) {
+                nearestRegionDistanceSq = regionDistanceSq;
+                nearestRegionOriginX = region.getOriginX();
+                nearestRegionOriginY = region.getOriginY();
+                nearestRegionOriginZ = region.getOriginZ();
+                nearestModelOffsetX = modelOffsetX;
+                nearestModelOffsetY = modelOffsetY;
+                nearestModelOffsetZ = modelOffsetZ;
+                nearestBatchSize = batch.size;
+            }
+
             preparedDraws.add(new PreparedRegionDraw(
                 batch,
                 vertexBuffer,
                 indexBuffer,
-                this.writeDynamicTransforms(matrices.modelView()),
-                this.writeRegionOffset(region, camera)
+                this.writeDynamicTransforms(matrices.modelView(), modelOffsetX, modelOffsetY, modelOffsetZ)
             ));
         }
 
-        int debugFrame = VULKAN_DEBUG_FRAME_COUNTER.incrementAndGet();
-        if (debugFrame <= 16 || (preparedDraws.isEmpty() && debugFrame <= 64)) {
+        if (!loggedVulkanTransformProbe && !preparedDraws.isEmpty()) {
+            loggedVulkanTransformProbe = true;
             LOGGER.info(
-                "Vulkan chunk frame#{} translucent={} discard={} regions={} storages={} preparedDraws={} drawCommands={} totalIndices={} indexedTessellation={} faceCulling={}",
-                debugFrame,
-                terrainPass.isTranslucent(),
-                terrainPass.supportsFragmentDiscard(),
-                regionCount,
-                storageCount,
-                preparedDraws.size(),
-                drawCommandCount,
-                indexCountTotal,
-                useIndexedTessellation,
-                useBlockFaceCulling
+                "Vulkan chunk transform probe camera=({},{},{}) nearestRegionOrigin=({},{},{}) modelOffset=({},{},{}) batchSize={} preparedRegions={}",
+                camera.x,
+                camera.y,
+                camera.z,
+                nearestRegionOriginX,
+                nearestRegionOriginY,
+                nearestRegionOriginZ,
+                nearestModelOffsetX,
+                nearestModelOffsetY,
+                nearestModelOffsetZ,
+                nearestBatchSize,
+                preparedDraws.size()
             );
         }
 
         try (RenderPass renderPass = commandEncoder.createRenderPass(
             () -> "Sodium chunk terrain",
-            target.getColorTextureView(),
+            colorTargetView,
             OptionalInt.empty(),
-            target.getDepthTextureView(),
+            depthTargetView,
             OptionalDouble.empty()
         )) {
             VulkanicAPI.bindDefaultUniforms(renderPass);
@@ -259,7 +267,6 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 renderPass.setVertexBuffer(0, preparedDraw.vertexBuffer());
                 renderPass.setIndexBuffer(preparedDraw.indexBuffer(), net.blaze3d.vertex.VertexFormat.IndexType.INT);
                 renderPass.setUniform("DynamicTransforms", preparedDraw.transforms());
-                renderPass.setUniform("SodiumChunkRegion", preparedDraw.regionOffset());
 
                 for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
                     int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
@@ -267,13 +274,18 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                         continue;
                     }
 
-                    long indexOffsetBytes = MemoryUtil.memGetAddress(preparedDraw.batch().pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
                     int baseVertex = MemoryUtil.memGetInt(preparedDraw.batch().pBaseVertex + ((long) drawIndex << 2));
-                    int firstIndex = Math.toIntExact(indexOffsetBytes / Integer.BYTES);
+                    long rawIndexOffsetBytes = MemoryUtil.memGetAddress(preparedDraw.batch().pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
+                    int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
+
                     renderPass.drawIndexed(baseVertex, firstIndex, indexCount, 1);
                 }
             }
         }
+    }
+
+    @Override
+    public void endFrame() {
     }
 
     private GpuBufferSlice writeChunkParams(CommandEncoder commandEncoder) {
@@ -298,44 +310,27 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         return this.sodiumChunkParamsBuffer.slice();
     }
 
-    private GpuBufferSlice writeDynamicTransforms(Matrix4fc modelViewMatrix) {
+    private GpuBufferSlice writeDynamicTransforms(Matrix4fc modelViewMatrix, float modelOffsetX, float modelOffsetY, float modelOffsetZ) {
         return VulkanicAPI.getDynamicUniforms().writeTransform(
             modelViewMatrix,
             new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
-            new Vector3f(),
+            new Vector3f(modelOffsetX, modelOffsetY, modelOffsetZ),
             VulkanicAPI.getTextureMatrix(),
             1.0F
         );
     }
 
-    private GpuBufferSlice writeRegionOffset(RenderRegion region, CameraTransform camera) {
-        return this.sodiumChunkRegionUniforms.writeUniform(new SodiumChunkRegionUniform(
-            getCameraTranslation(region.getOriginX(), camera.intX, camera.fracX),
-            getCameraTranslation(region.getOriginY(), camera.intY, camera.fracY),
-            getCameraTranslation(region.getOriginZ(), camera.intZ, camera.fracZ)
-        ));
-    }
-
     private GpuBuffer wrapLegacyBuffer(net.sodium.client.gl.buffer.GlBuffer buffer, int usage) {
         int size = buffer instanceof GlMutableBuffer mutableBuffer ? Math.toIntExact(mutableBuffer.getSize()) : 0;
-        return new LegacyHandleGlBuffer(null, usage, size, buffer.handle());
+        return new LegacyHandleGlBuffer(() -> "Legacy chunk buffer", usage, size, buffer.handle());
     }
 
     private record PreparedRegionDraw(
         MultiDrawBatch batch,
         GpuBuffer vertexBuffer,
         GpuBuffer indexBuffer,
-        GpuBufferSlice transforms,
-        GpuBufferSlice regionOffset
+        GpuBufferSlice transforms
     ) {
-    }
-
-    private record SodiumChunkRegionUniform(float x, float y, float z) implements DynamicUniformStorage.DynamicUniform {
-        @Override
-        public void write(java.nio.ByteBuffer byteBuffer) {
-            Std140Builder.intoBuffer(byteBuffer)
-                .putVec3(this.x, this.y, this.z);
-        }
     }
 
     private static void fillCommandBuffer(MultiDrawBatch batch,
@@ -603,6 +598,5 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
         this.sharedIndexBuffer.delete(commandList);
         this.sodiumChunkParamsBuffer.close();
-        this.sodiumChunkRegionUniforms.close();
     }
 }

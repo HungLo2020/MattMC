@@ -8,23 +8,18 @@ layout(std140) uniform SodiumChunkParams {
     vec2 TexCoordShrink;
 };
 
-layout(std140) uniform SodiumChunkRegion {
-    vec3 RegionOffset;
-};
+layout(location = 0) in uvec2 a_Position;
+layout(location = 1) in vec4 a_Color;
+layout(location = 2) in uvec2 a_TexCoord;
+layout(location = 3) in uvec4 a_LightAndData;
 
-uniform sampler2D Sampler2;
+layout(location = 0) out float sphericalVertexDistance;
+layout(location = 1) out float cylindricalVertexDistance;
+layout(location = 2) out vec4 vertexColor;
+layout(location = 3) out vec2 texCoord0;
+layout(location = 4) out vec2 lightCoord0;
 
-in uvec2 a_Position;
-in vec4 a_Color;
-in uvec2 a_TexCoord;
-in uvec4 a_LightAndData;
-
-out float sphericalVertexDistance;
-out float cylindricalVertexDistance;
-out vec4 vertexColor;
-out vec2 texCoord0;
-
-flat out uint materialBits;
+layout(location = 5) flat out uint materialBits;
 
 const uint POSITION_BITS = 20u;
 const uint POSITION_MAX_COORD = 1u << POSITION_BITS;
@@ -61,12 +56,13 @@ vec3 decodeDrawTranslation(uint drawId) {
 }
 
 void main() {
-    vec3 position = decodePosition() + RegionOffset + decodeDrawTranslation(a_LightAndData[3]);
+    vec3 position = decodePosition() + ModelOffset + decodeDrawTranslation(a_LightAndData[3]);
     gl_Position = ProjMat * ModelViewMat * vec4(position, 1.0);
 
     sphericalVertexDistance = fog_spherical_distance(position);
     cylindricalVertexDistance = fog_cylindrical_distance(position);
-    vertexColor = a_Color * texture(Sampler2, vec2(a_LightAndData.xy) / vec2(256.0)) * ColorModulator;
+    vertexColor = a_Color * ColorModulator;
     texCoord0 = decodeTexCoord(a_TexCoord) + decodeTexCoordBias(a_TexCoord) * TexCoordShrink;
+    lightCoord0 = vec2(a_LightAndData.xy) / vec2(256.0);
     materialBits = a_LightAndData[2];
 }

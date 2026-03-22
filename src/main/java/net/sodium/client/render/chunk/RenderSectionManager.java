@@ -185,6 +185,10 @@ public class RenderSectionManager {
         this.cameraPosition = cameraPosition;
     }
 
+    public void endFrame() {
+        this.chunkRenderer.endFrame();
+    }
+
     public void update(Camera camera, Viewport viewport, FogParameters fogParameters, boolean spectator) {
         this.lastUpdatedFrame += 1;
 
@@ -242,6 +246,7 @@ public class RenderSectionManager {
         if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
             this.shadowTaskLists = this.sectionCollector.getTaskLists();
         } else {
+            this.seedCollectorIfStarved(this.sectionCollector);
             this.taskLists = this.sectionCollector.getTaskLists();
         }
 
@@ -250,6 +255,84 @@ public class RenderSectionManager {
         // since not all tasks necessarily change the section info to trigger a graph update,
         // without this pending updates might be missed when the camera is stationary
         return this.sectionCollector.needsRevisitForPendingUpdates();
+    }
+
+    private void seedCollectorIfStarved(SectionCollector collector) {
+        if (this.cameraPosition == null) {
+            return;
+        }
+
+        if (!collector.getUnsortedRenderLists().isEmpty()) {
+            return;
+        }
+
+        var taskLists = collector.getTaskLists();
+        if (!taskLists.get(TaskQueueType.ZERO_FRAME_DEFER).isEmpty()
+                || !taskLists.get(TaskQueueType.ONE_FRAME_DEFER).isEmpty()
+                || !taskLists.get(TaskQueueType.ALWAYS_DEFER).isEmpty()
+                || !taskLists.get(TaskQueueType.INITIAL_BUILD).isEmpty()) {
+            return;
+        }
+
+        float distanceLimit = this.getRenderDistance();
+        float distanceLimitSq = distanceLimit * distanceLimit;
+        ArrayList<RenderSection> candidates = new ArrayList<>();
+
+        for (var section : this.sectionByPosition.values()) {
+            if (section.isDisposed()) {
+                continue;
+            }
+
+            int pendingUpdate = section.getPendingUpdate();
+            if (section.getFlags() == 0 && pendingUpdate == 0) {
+                continue;
+            }
+
+            if (!this.isSectionWithinFallbackRange(section, distanceLimit, distanceLimitSq)) {
+                continue;
+            }
+
+            candidates.add(section);
+        }
+
+        if (candidates.isEmpty()) {
+            return;
+        }
+
+        candidates.sort(Comparator.comparingDouble(section -> section.getSquaredDistance(
+                (float) this.cameraPosition.x(),
+                (float) this.cameraPosition.y(),
+                (float) this.cameraPosition.z())));
+
+        int visited = 0;
+        int renderable = 0;
+        int pending = 0;
+
+        for (var section : candidates) {
+            collector.visit(section);
+            visited++;
+
+            if (section.getFlags() != 0) {
+                renderable++;
+            }
+
+            if (section.getPendingUpdate() != 0) {
+                pending++;
+            }
+
+            if (visited >= 2048) {
+                break;
+            }
+        }
+
+    }
+
+    private boolean isSectionWithinFallbackRange(RenderSection section, float distanceLimit, float distanceLimitSq) {
+        float dx = section.getCenterX() - (float) this.cameraPosition.x();
+        float dy = section.getCenterY() - (float) this.cameraPosition.y();
+        float dz = section.getCenterZ() - (float) this.cameraPosition.z();
+
+        return (dx * dx) + (dz * dz) < distanceLimitSq && Math.abs(dy) < distanceLimit;
     }
 
     public void finalizeRenderLists(Viewport viewport) {
@@ -267,7 +350,12 @@ public class RenderSectionManager {
 
     private boolean isOutOfGraph(SectionPos pos) {
         var sectionY = pos.getY();
-        return this.level.getMinSectionY() <= sectionY && sectionY <= this.level.getMaxSectionY() && !this.sectionByPosition.containsKey(pos.asLong());
+        if (this.level.getMinSectionY() > sectionY || sectionY > this.level.getMaxSectionY()) {
+            return false;
+        }
+
+        RenderSection section = this.sectionByPosition.get(pos.asLong());
+        return section == null || !section.isBuilt();
     }
 
     private float getSearchDistance(FogParameters fogParameters) {
@@ -627,7 +715,7 @@ public class RenderSectionManager {
         if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
             return;
         }
-        
+
         this.thisFrameBlockingTasks = 0;
         this.nextFrameBlockingTasks = 0;
         this.deferredTasks = 0;
@@ -1026,9 +1114,18 @@ public class RenderSectionManager {
     }
 
     public void onChunkAdded(int x, int z) {
+        int totalBefore = this.sectionByPosition.size();
+        int nonAirSections = 0;
+
         for (int y = this.level.getMinSectionY(); y <= this.level.getMaxSectionY(); y++) {
+            ChunkAccess chunk = this.level.getChunk(x, z);
+            LevelChunkSection section = chunk.getSections()[this.level.getSectionIndexFromSectionY(y)];
+            if (!section.hasOnlyAir()) {
+                nonAirSections++;
+            }
             this.onSectionAdded(x, y, z);
         }
+
     }
 
     public void onChunkRemoved(int x, int z) {

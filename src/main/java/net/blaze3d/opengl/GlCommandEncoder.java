@@ -36,6 +36,7 @@ import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicLogicOp;
 import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicPrimitiveMode;
+import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
 import org.jetbrains.annotations.Nullable;
@@ -68,6 +69,7 @@ public class GlCommandEncoder implements CommandEncoder {
 	@Nullable
 	private net.vulkanic.CommandContext activeRenderPassContext;
 	private static int DEBUG_PIPELINE_BIND_LOGS = 0;
+	private static int DEBUG_SODIUM_SAMPLER_BIND_LOGS = 0;
 
 	private static CommandContext commandContext() {
 		return VulkanicAPI.getCommandContext();
@@ -226,20 +228,50 @@ public class GlCommandEncoder implements CommandEncoder {
 	@Nullable
 	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass) {
 		GlRenderPipeline glRenderPipeline = glRenderPass.pipeline;
+		RenderPipeline pipelineInfo = glRenderPipeline.info();
 		PipelineDescriptor.ResourceLayout layout = glRenderPipeline.descriptor().getResourceLayout();
 		PipelineResourceBindings.Builder builder = PipelineResourceBindings.builder();
 		java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>();
+		boolean logSodiumChunkSamplers = DEBUG_SODIUM_SAMPLER_BIND_LOGS < 24
+			&& pipelineInfo.getLocation().toString().contains("sodium:pipeline/vulkan_chunk_");
+
+		if (logSodiumChunkSamplers) {
+			DEBUG_SODIUM_SAMPLER_BIND_LOGS++;
+			LOGGER.info(
+				"Sodium Vulkan sampler prep#{} pipeline={} declaredSamplers={} renderPassSamplers={} layoutBindings={}",
+				DEBUG_SODIUM_SAMPLER_BIND_LOGS,
+				pipelineInfo.getLocation(),
+				pipelineInfo.getSamplers(),
+				glRenderPass.samplers.keySet(),
+				layout.bindings().stream().map(PipelineDescriptor.ResourceBinding::name).toList()
+			);
+		}
 
 		for (PipelineDescriptor.ResourceBinding resourceBinding : layout.bindings()) {
 			switch (resourceBinding.type()) {
 				case SAMPLER -> {
 					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
-					if (uniform instanceof Uniform.Sampler(int location, int samplerIndex)) {
-						net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
-						if (textureView != null) {
-							builder.bindSampler(resourceBinding.name(), textureView, samplerIndex);
-							boundResources.add(resourceBinding);
-						}
+					net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
+					if (logSodiumChunkSamplers) {
+						LOGGER.info(
+							"Sodium Vulkan sampler resource pipeline={} binding={} uniformPresent={} textureViewPresent={} boundSamplerKeys={} resourceSamplerKeys={}",
+							pipelineInfo.getLocation(),
+							resourceBinding.name(),
+							uniform instanceof Uniform.Sampler,
+							textureView != null,
+							glRenderPass.samplers.keySet(),
+							layout.bindings().stream()
+								.filter(binding -> binding.type() == PipelineDescriptor.ResourceType.SAMPLER)
+								.map(PipelineDescriptor.ResourceBinding::name)
+								.toList()
+						);
+					}
+					if (textureView != null) {
+						int samplerIndex = uniform instanceof Uniform.Sampler(int location, int reflectedSamplerIndex)
+							? reflectedSamplerIndex
+							: resourceBinding.binding();
+						builder.bindSampler(resourceBinding.name(), textureView, samplerIndex);
+						boundResources.add(resourceBinding);
 					}
 				}
 				case UNIFORM_BUFFER -> {
@@ -1008,10 +1040,14 @@ public class GlCommandEncoder implements CommandEncoder {
 	private void drawFromBuffers(
 		GlRenderPass glRenderPass, int i, int j, int k, @Nullable VertexFormat.IndexType indexType, GlRenderPipeline glRenderPipeline, int l
 	) {
-		this.device.vertexArrayCache().bindVertexArray(glRenderPipeline.info().getVertexFormat(), (GlBuffer)glRenderPass.vertexBuffers[0]);
+		GlBuffer vertexBuffer = (GlBuffer)glRenderPass.vertexBuffers[0];
+		this.device.vertexArrayCache().bindVertexArray(glRenderPipeline.info().getVertexFormat(), vertexBuffer);
 		// Obtain a single context for all VulkanicAPI calls in this draw — avoids repeated singleton lookups
 		// and makes explicit that every draw operation flows through VulkanicAPI → OpenGLBackend.
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+		if (vertexBuffer != null) {
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, vertexBuffer.handle);
+		}
 		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		java.util.Optional<VulkanicPrimitiveMode> typedPrimitiveMode = VulkanicPrimitiveMode.fromLegacyGlConstant(glPrimitiveMode);
 		if (indexType != null) {

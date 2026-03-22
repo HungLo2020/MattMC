@@ -54,7 +54,15 @@ public class LightTexture implements AutoCloseable {
 	public LightTexture(GameRenderer gameRenderer, Minecraft minecraft) {
 		this.renderer = gameRenderer;
 		this.minecraft = minecraft;
-		this.texture = VulkanicAPI.createTexture("Light Texture", 12, TextureFormat.RGBA8, 16, 16, 1, 1);
+		this.texture = VulkanicAPI.createTexture(
+			"Light Texture",
+			GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT,
+			TextureFormat.RGBA8,
+			16,
+			16,
+			1,
+			1
+		);
 		this.texture.setTextureFilter(FilterMode.LINEAR, false);
 		this.textureView = VulkanicAPI.createTextureView(this.texture);
 		VulkanicAPI.createCommandEncoder().clearColorTexture(this.texture, -1);

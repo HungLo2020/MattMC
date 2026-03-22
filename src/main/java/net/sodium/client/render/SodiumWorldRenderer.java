@@ -301,6 +301,12 @@ public class SodiumWorldRenderer {
         }
     }
 
+    public void endFrame() {
+        if (this.renderSectionManager != null) {
+            this.renderSectionManager.endFrame();
+        }
+    }
+
     public void reload() {
         if (this.level == null) {
             return;

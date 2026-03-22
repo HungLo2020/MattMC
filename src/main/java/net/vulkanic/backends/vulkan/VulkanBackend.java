@@ -4931,6 +4931,7 @@ public class VulkanBackend {
         private int debugLegacyDrawLogCount;
         private int debugDescriptorSamplerLogCount;
         private int debugDescriptorSamplerViewMismatchLogCount;
+        private int debugSodiumChunkDescriptorSamplerLogCount;
         private int debugDescriptorUboLogCount;
 
         private final PixelStoreState pixelStoreState = new PixelStoreState();
@@ -5504,6 +5505,8 @@ public class VulkanBackend {
             }
 
             List<PipelineDescriptor.ResourceBinding> layoutBindings = descriptor.getResourceLayout().bindings();
+            boolean sodiumChunkDescriptor = layoutBindings.stream()
+                .anyMatch(layoutBinding -> "SodiumChunkParams".contentEquals(layoutBinding.name()));
 
             // If the pipeline has no descriptors at all, nothing more to do.
             if (pipeline.getResourceBindingCount() == 0) {
@@ -5601,6 +5604,8 @@ public class VulkanBackend {
                                 );
                             }
 
+                            long samplerHandle = resolveDescriptorSamplerHandle(vulkanTextureView);
+
                             if (debugDescriptorSamplerLogCount < 160) {
                                 debugDescriptorSamplerLogCount++;
                                 int sampledLegacyId = sampledLegacyTexture != null ? sampledLegacyTexture.id : 0;
@@ -5635,7 +5640,40 @@ public class VulkanBackend {
                                 );
                             }
 
-                            long samplerHandle = resolveDescriptorSamplerHandle(vulkanTextureView);
+                            if (sodiumChunkDescriptor
+                                && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name()))
+                                && debugSodiumChunkDescriptorSamplerLogCount < 80) {
+                                debugSodiumChunkDescriptorSamplerLogCount++;
+                                int sampledLegacyId = sampledLegacyTexture != null ? sampledLegacyTexture.id : 0;
+                                int sampledLayout = sampledLegacyTexture != null
+                                    ? trackedLayoutForLevel(sampledLegacyTexture, vulkanTextureView.getBaseMipLevel())
+                                    : VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+                                int sampledWidth = sampledLegacyTexture != null ? sampledLegacyTexture.width : 0;
+                                int sampledHeight = sampledLegacyTexture != null ? sampledLegacyTexture.height : 0;
+                                int sampledVkFormat = sampledLegacyTexture != null ? sampledLegacyTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED;
+                                long sampledImageHandle = sampledLegacyTexture != null ? sampledLegacyTexture.imageHandle : VK10.VK_NULL_HANDLE;
+                                LOGGER.info(
+                                    "Sodium Vulkan descriptor write#{} binding={} texId={} label={} usage=0x{} sampler=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} requestedView=0x{} remappedDefaultView={} pipeline=0x{}",
+                                    debugSodiumChunkDescriptorSamplerLogCount,
+                                    binding.name(),
+                                    sampledLegacyId,
+                                    sampledTextureLabel,
+                                    Integer.toHexString(sampledUsage),
+                                    Long.toHexString(samplerHandle),
+                                    Long.toHexString(descriptorImageViewHandle),
+                                    Long.toHexString(sampledImageHandle),
+                                    sampledWidth,
+                                    sampledHeight,
+                                    Integer.toHexString(sampledVkFormat),
+                                    vulkanTextureView.getBaseMipLevel(),
+                                    vulkanTextureView.getMipLevelCount(),
+                                    Integer.toHexString(sampledLayout),
+                                    Long.toHexString(requestedImageViewHandle),
+                                    requestedImageViewHandle != descriptorImageViewHandle,
+                                    Long.toHexString(pipeline.getVkPipelineHandle())
+                                );
+                            }
+
                             VkDescriptorImageInfo.Buffer imageInfo = VkDescriptorImageInfo.calloc(1, stack);
                             imageInfo.get(0)
                                 .sampler(samplerHandle)

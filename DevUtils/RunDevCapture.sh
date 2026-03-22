@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: ./DevUtils/RunDevCapture.sh [--backend vulkan|opengl] [--max-secs N] [--dump-secs N]
+Usage: ./DevUtils/RunDevCapture.sh [--backend vulkan|opengl] [--max-secs N] [--dump-secs N] [--client-args "..."]
 
 Runs ./gradlew runClient in a bounded session, captures diagnostics, and
 self-terminates so no manual kill is required.
@@ -12,6 +12,7 @@ self-terminates so no manual kill is required.
 Environment overrides:
   MAX_SECS   (default: 120)
   DUMP_SECS  (default: 45)
+    CLIENT_ARGS
 EOF
 }
 
@@ -20,6 +21,8 @@ MAX_SECS="${MAX_SECS:-120}"
 DUMP_SECS="${DUMP_SECS:-45}"
 SCREENSHOT_INTERVAL_SECS="${SCREENSHOT_INTERVAL_SECS:-5}"
 SCREENSHOT_MAX_COUNT="${SCREENSHOT_MAX_COUNT:-6}"
+SCREENSHOT_START_DELAY_SECS="${SCREENSHOT_START_DELAY_SECS:-0}"
+CLIENT_ARGS="${CLIENT_ARGS:-}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -33,6 +36,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dump-secs)
             DUMP_SECS="${2:-}"
+            shift 2
+            ;;
+        --client-args)
+            CLIENT_ARGS="${2:-}"
             shift 2
             ;;
         -h|--help)
@@ -57,8 +64,8 @@ if ! [[ "$MAX_SECS" =~ ^[0-9]+$ ]] || ! [[ "$DUMP_SECS" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-if ! [[ "$SCREENSHOT_INTERVAL_SECS" =~ ^[0-9]+$ ]] || ! [[ "$SCREENSHOT_MAX_COUNT" =~ ^[0-9]+$ ]]; then
-    echo "SCREENSHOT_INTERVAL_SECS and SCREENSHOT_MAX_COUNT must be integers" >&2
+if ! [[ "$SCREENSHOT_INTERVAL_SECS" =~ ^[0-9]+$ ]] || ! [[ "$SCREENSHOT_MAX_COUNT" =~ ^[0-9]+$ ]] || ! [[ "$SCREENSHOT_START_DELAY_SECS" =~ ^[0-9]+$ ]]; then
+    echo "SCREENSHOT_INTERVAL_SECS, SCREENSHOT_MAX_COUNT, and SCREENSHOT_START_DELAY_SECS must be integers" >&2
     exit 1
 fi
 
@@ -90,13 +97,43 @@ PROCESS_SNAPSHOT="$ARTIFACT_DIR/process_snapshot_${RUN_ID}.txt"
 LATEST_TAIL="$ARTIFACT_DIR/latest_tail_${RUN_ID}.log"
 HSERR_LIST="$ARTIFACT_DIR/hs_err_${RUN_ID}.txt"
 WINDOW_TREE="$ARTIFACT_DIR/window_tree_${RUN_ID}.txt"
+WINDOW_TREE_DUMP="$ARTIFACT_DIR/window_tree_dump_${RUN_ID}.txt"
 
 screenshot_count=0
 screenshot_enabled="false"
 
+find_client_window_id() {
+    local client_pid="$1"
+    local client_list raw_ids id props pid
+
+    if [[ -z "$client_pid" ]] || ! command -v xprop >/dev/null 2>&1; then
+        return 1
+    fi
+
+    client_list="$(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null || true)"
+    raw_ids="$(printf '%s\n' "$client_list" | grep -o '0x[0-9a-fA-F]\+' || true)"
+    if [[ -z "$raw_ids" ]]; then
+        return 1
+    fi
+
+    while IFS= read -r id; do
+        [[ -z "$id" ]] && continue
+        props="$(xprop -id "$id" _NET_WM_PID WM_NAME 2>/dev/null || true)"
+        pid="$(printf '%s\n' "$props" | awk -F' = ' '/_NET_WM_PID\(CARDINAL\)/ {print $2; exit}' | tr -d '[:space:]')"
+        if [[ "$pid" == "$client_pid" ]]; then
+            printf '%s\n' "$id"
+            return 0
+        fi
+    done < <(printf '%s\n' "$raw_ids" | tac)
+
+    return 1
+}
+
 capture_root_screenshot() {
     local label="$1"
     local elapsed_secs="$2"
+    local client_pid="${3:-}"
+    local target_window="root"
 
     if [[ "$screenshot_enabled" != "true" || "$SCREENSHOT_MAX_COUNT" -eq 0 ]]; then
         return
@@ -107,8 +144,15 @@ capture_root_screenshot() {
 
     screenshot_count=$((screenshot_count + 1))
     local screenshot_file="$ARTIFACT_DIR/screenshot_${RUN_ID}_${screenshot_count}_${label}_${elapsed_secs}s.png"
-    if import -window root "$screenshot_file" >/dev/null 2>&1; then
+    if target_window="$(find_client_window_id "$client_pid" 2>/dev/null)"; then
+        :
+    else
+        target_window="root"
+    fi
+
+    if import -window "$target_window" "$screenshot_file" >/dev/null 2>&1; then
         echo "screenshot_${screenshot_count}=$screenshot_file" >> "$META_LOG"
+        echo "screenshot_${screenshot_count}_target=$target_window" >> "$META_LOG"
     else
         rm -f "$screenshot_file"
         echo "screenshot_${screenshot_count}=failed:$label:$elapsed_secs" >> "$META_LOG"
@@ -121,6 +165,7 @@ if command -v import >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
         echo "screenshot_enabled=true"
         echo "screenshot_interval_secs=$SCREENSHOT_INTERVAL_SECS"
         echo "screenshot_max_count=$SCREENSHOT_MAX_COUNT"
+        echo "screenshot_start_delay_secs=$SCREENSHOT_START_DELAY_SECS"
         echo "display=${DISPLAY}"
     } >> "$META_LOG"
     xwininfo -root -tree > "$WINDOW_TREE" 2>&1 || true
@@ -174,10 +219,15 @@ exit_code=""
     echo "backend=$BACKEND"
     echo "max_secs=$MAX_SECS"
     echo "dump_secs=$DUMP_SECS"
+    echo "client_args=$CLIENT_ARGS"
 } > "$META_LOG"
 
 echo "Starting bounded runClient capture (run_id=$RUN_ID, backend=$BACKEND)"
-setsid ./gradlew -x test runClient > "$RUN_LOG" 2>&1 &
+GRADLE_CMD=(./gradlew -x test runClient)
+if [[ -n "$CLIENT_ARGS" ]]; then
+    GRADLE_CMD+=("--args=$CLIENT_ARGS")
+fi
+setsid "${GRADLE_CMD[@]}" > "$RUN_LOG" 2>&1 &
 GRADLE_PID=$!
 echo "gradle_pid=$GRADLE_PID" >> "$META_LOG"
 
@@ -186,12 +236,13 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
     sleep 1
     elapsed=$((elapsed + 1))
 
-    if [[ "$screenshot_enabled" == "true" && "$SCREENSHOT_INTERVAL_SECS" -gt 0 && $((elapsed % SCREENSHOT_INTERVAL_SECS)) -eq 0 ]]; then
-        capture_root_screenshot "tick" "$elapsed"
+    CLIENT_PID="$(find_client_pid)"
+
+    if [[ "$screenshot_enabled" == "true" && "$SCREENSHOT_INTERVAL_SECS" -gt 0 && "$elapsed" -ge "$SCREENSHOT_START_DELAY_SECS" && $(((elapsed - SCREENSHOT_START_DELAY_SECS) % SCREENSHOT_INTERVAL_SECS)) -eq 0 ]]; then
+        capture_root_screenshot "tick" "$elapsed" "$CLIENT_PID"
     fi
 
     if [[ "$dump_taken" == "false" && "$elapsed" -ge "$DUMP_SECS" ]]; then
-        CLIENT_PID="$(find_client_pid)"
         {
             echo "===== process snapshot at dump point (elapsed=${elapsed}s, gradle_pid=${GRADLE_PID}) ====="
             ps -eo pid,ppid,pgid,cmd | awk -v pg="$GRADLE_PID" '$3 == pg {print}'
@@ -199,6 +250,11 @@ while kill -0 "$GRADLE_PID" 2>/dev/null; do
             echo "===== jcmd -l ====="
             jcmd -l || true
         } > "$PROCESS_SNAPSHOT" 2>&1
+
+        if [[ "$screenshot_enabled" == "true" ]]; then
+            xwininfo -root -tree > "$WINDOW_TREE_DUMP" 2>&1 || true
+            echo "window_tree_dump=$WINDOW_TREE_DUMP" >> "$META_LOG"
+        fi
 
         {
             echo "dump_epoch=$(date +%s)"
