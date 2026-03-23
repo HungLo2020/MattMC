@@ -159,4 +159,21 @@ public enum VulkanicUniformReflectionType {
             default -> Optional.empty();
         };
     }
+
+    /**
+     * Converts a GLSL uniform type token to a typed descriptor when known.
+     */
+    public static Optional<VulkanicUniformReflectionType> fromGlslTypeName(String glslTypeName) {
+        if (glslTypeName == null || glslTypeName.isBlank()) {
+            return Optional.empty();
+        }
+
+        for (VulkanicUniformReflectionType reflectionType : values()) {
+            if (reflectionType.glslTypeName.equals(glslTypeName)) {
+                return Optional.of(reflectionType);
+            }
+        }
+
+        return Optional.empty();
+    }
 }

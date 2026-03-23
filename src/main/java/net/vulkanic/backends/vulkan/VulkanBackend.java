@@ -164,7 +164,7 @@ public class VulkanBackend {
     private static final Pattern GLSL_LINE_COMMENT_PATTERN = Pattern.compile("(?m)//.*$");
     private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
     private static final Pattern GLSL_STANDALONE_UNIFORM_PATTERN = Pattern.compile(
-        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+\\w+(?:\\s*\\[[^\\]]+\\])?\\s+(\\w+)(?:\\s*\\[[^\\]]+\\])?\\s*;"
+        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;"
     );
 
     private final Object nativeInitLock = new Object();
@@ -1302,7 +1302,6 @@ public class VulkanBackend {
     public void detachShader(CommandContext ctx, int program, int shader) {
         VirtualProgram virtualProgram = requireVirtualProgram(program);
         virtualProgram.attachedShaderIds.remove(shader);
-        virtualProgram.linkStatus = false;
     }
 
     public void linkProgram(CommandContext ctx, int program) {
@@ -1345,6 +1344,7 @@ public class VulkanBackend {
             virtualProgram.linkStatus = false;
             virtualProgram.infoLog = String.join("\n", issues);
             virtualProgram.activeUniformNames = List.of();
+            virtualProgram.activeUniforms = List.of();
             virtualProgram.activeUniformBlocks = List.of();
             return;
         }
@@ -1373,6 +1373,7 @@ public class VulkanBackend {
     }
 
     private void reflectVirtualProgramResources(VirtualProgram virtualProgram) {
+        java.util.LinkedHashMap<String, ReflectedUniform> activeUniforms = new java.util.LinkedHashMap<>();
         Set<String> activeUniformNames = new java.util.LinkedHashSet<>();
         Set<String> activeUniformBlocks = new java.util.LinkedHashSet<>();
 
@@ -1392,11 +1393,26 @@ public class VulkanBackend {
 
             Matcher uniformMatcher = GLSL_STANDALONE_UNIFORM_PATTERN.matcher(normalizedSource);
             while (uniformMatcher.find()) {
-                activeUniformNames.add(uniformMatcher.group(1));
+                String uniformTypeName = uniformMatcher.group(1);
+                String uniformName = uniformMatcher.group(2);
+                int arraySize = uniformMatcher.group(3) == null ? 1 : Integer.parseInt(uniformMatcher.group(3));
+
+                activeUniformNames.add(uniformName);
+                activeUniforms.putIfAbsent(
+                    uniformName,
+                    new ReflectedUniform(
+                        uniformName,
+                        arraySize,
+                        net.vulkanic.VulkanicUniformReflectionType.fromGlslTypeName(uniformTypeName)
+                            .map(net.vulkanic.VulkanicUniformReflectionType::toLegacyGlConstant)
+                            .orElse(0)
+                    )
+                );
             }
         }
 
         virtualProgram.activeUniformNames = List.copyOf(activeUniformNames);
+        virtualProgram.activeUniforms = List.copyOf(activeUniforms.values());
         virtualProgram.activeUniformBlocks = List.copyOf(activeUniformBlocks);
     }
 
@@ -4447,10 +4463,18 @@ public class VulkanBackend {
                                    java.nio.IntBuffer type, java.nio.IntBuffer name) {
         requireVulkanCommandBufferHandle("getActiveUniform", ctx);
         VirtualProgram virtualProgram = virtualPrograms.get(program);
-        if (virtualProgram == null || index < 0 || index >= virtualProgram.activeUniformNames.size()) {
+        if (virtualProgram == null || index < 0 || index >= virtualProgram.activeUniforms.size()) {
             return "";
         }
-        return virtualProgram.activeUniformNames.get(index);
+
+        ReflectedUniform reflectedUniform = virtualProgram.activeUniforms.get(index);
+        if (type != null && type.hasRemaining()) {
+            type.put(type.position(), reflectedUniform.arraySize());
+        }
+        if (name != null && name.hasRemaining()) {
+            name.put(name.position(), reflectedUniform.legacyType());
+        }
+        return reflectedUniform.name();
     }
 
     // =====================================================================
@@ -4794,7 +4818,8 @@ public class VulkanBackend {
             case CULL_FACE_MODE -> pendingCullFaceMode;
             case POLYGON_MODE -> pendingPolygonMode;
             case MAX_TEXTURE_SIZE -> 16384;
-            case MAX_TEXTURE_IMAGE_UNITS, MAX_COLOR_ATTACHMENTS -> 16;
+            case MAX_TEXTURE_IMAGE_UNITS -> spine != null ? spine.maxTextureImageUnits : 32;
+            case MAX_COLOR_ATTACHMENTS -> 16;
             case MAX_DRAW_BUFFERS -> 8;
             case MAX_SHADER_STORAGE_BUFFER_BINDINGS -> 8;
             case UNIFORM_BUFFER_OFFSET_ALIGNMENT -> 256;
@@ -4856,9 +4881,13 @@ public class VulkanBackend {
     private static final class VirtualProgram {
         private final Set<Integer> attachedShaderIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
         private volatile List<String> activeUniformNames = List.of();
+        private volatile List<ReflectedUniform> activeUniforms = List.of();
         private volatile List<String> activeUniformBlocks = List.of();
         private volatile boolean linkStatus;
         private volatile String infoLog = "";
+    }
+
+    private record ReflectedUniform(String name, int arraySize, int legacyType) {
     }
 
     private static final class NativeSpine {
@@ -4893,6 +4922,7 @@ public class VulkanBackend {
         private int currentFrameSyncIndex;
         private long immediateSubmitFence;
         private long minUniformBufferOffsetAlignment = 1L;
+        private int maxTextureImageUnits = 32;
 
         private final Map<Long, Long> managedBufferAllocations = new ConcurrentHashMap<>();
         private final AtomicInteger nextLegacyBufferId = new AtomicInteger(1);
@@ -5296,6 +5326,10 @@ public class VulkanBackend {
                 physicalDeviceVendorId = properties.vendorID();
                 physicalDeviceApiVersion = properties.apiVersion();
                 minUniformBufferOffsetAlignment = Math.max(1L, properties.limits().minUniformBufferOffsetAlignment());
+                int maxPerStageSamplers = properties.limits().maxPerStageDescriptorSamplers();
+                int maxPerStageSampledImages = properties.limits().maxPerStageDescriptorSampledImages();
+                int combinedImageSamplerBudget = Math.min(maxPerStageSamplers, maxPerStageSampledImages);
+                maxTextureImageUnits = Math.max(16, Math.min(32, combinedImageSamplerBudget));
                 String name = properties.deviceNameString();
                 if (name != null && !name.isBlank()) {
                     physicalDeviceName = name;

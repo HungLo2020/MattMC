@@ -2,10 +2,13 @@ package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
+import net.vulkanic.VulkanicUniformReflectionType;
 import org.junit.jupiter.api.Test;
 
+import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -152,6 +155,15 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testVulkanFallbackTextureUnitBudgetSupportsModernShaderpacks() {
+        VulkanBackend backend = new VulkanBackend();
+        VulkanCommandContext queryContext = new VulkanCommandContext(1L, "texture-unit-query");
+
+        assertEquals(32,
+            backend.getInteger(queryContext, VulkanicIntegerQuery.MAX_TEXTURE_IMAGE_UNITS));
+    }
+
+    @Test
     public void testProgramLinkUsesCompiledSpirvShaders() {
         VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
             new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x0A, 0x0B}, sourceName, "stub")
@@ -170,6 +182,34 @@ public class VulkanBackendSpirvPathTest {
         backend.attachShader(TEST_CONTEXT, program, vertexShader);
         backend.attachShader(TEST_CONTEXT, program, fragmentShader);
         backend.linkProgram(TEST_CONTEXT, program);
+
+        assertEquals(VulkanicAPI.GL_TRUE,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_LINK_STATUS));
+        assertEquals("", backend.getProgramInfoLog(TEST_CONTEXT, program));
+    }
+
+    @Test
+    public void testDetachingShadersAfterSuccessfulLinkPreservesProgramLinkStatus() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x1A, 0x1B}, sourceName, "stub")
+        );
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+
+        uploadSource(backend, vertexShader, "#version 450\nvoid main(){gl_Position=vec4(0.0);}");
+        uploadSource(backend, fragmentShader, "#version 450\nvoid main(){}");
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        backend.detachShader(TEST_CONTEXT, program, vertexShader);
+        backend.detachShader(TEST_CONTEXT, program, fragmentShader);
 
         assertEquals(VulkanicAPI.GL_TRUE,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_LINK_STATUS));
@@ -198,8 +238,9 @@ public class VulkanBackendSpirvPathTest {
             fragmentShader,
             "#version 450\n"
                 + "uniform sampler2D Sampler0;\n"
+                + "uniform vec4 FogColor;\n"
                 + "layout(location = 0) out vec4 fragColor;\n"
-                + "void main(){ fragColor = texture(Sampler0, vec2(0.0)); }"
+                + "void main(){ fragColor = texture(Sampler0, vec2(0.0)) + FogColor * 0.0; }"
         );
 
         backend.compileShader(TEST_CONTEXT, vertexShader);
@@ -212,12 +253,14 @@ public class VulkanBackendSpirvPathTest {
 
         VulkanCommandContext introspectionContext = new VulkanCommandContext(1L, "introspection-test");
 
-        assertEquals(1,
+        assertEquals(2,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORMS));
         assertEquals(2,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORM_BLOCKS));
         assertEquals(0,
             backend.getUniformLocation(introspectionContext, program, "Sampler0"));
+        assertEquals(1,
+            backend.getUniformLocation(introspectionContext, program, "FogColor"));
         assertEquals(0,
             backend.getUniformBlockIndex(introspectionContext, program, "DynamicTransforms"));
         assertEquals(1,
@@ -228,6 +271,14 @@ public class VulkanBackendSpirvPathTest {
             backend.retrieveActiveUniformBlockName(introspectionContext, program, 1));
         assertEquals("Sampler0",
             backend.getActiveUniform(introspectionContext, program, 0, 256, null, null));
+        IntBuffer fogColorArraySize = IntBuffer.allocate(1);
+        IntBuffer fogColorType = IntBuffer.allocate(1);
+        assertEquals("FogColor",
+            backend.getActiveUniform(introspectionContext, program, 1, 256, fogColorArraySize, fogColorType));
+        assertEquals(1, fogColorArraySize.get(0));
+        assertEquals(VulkanicAPI.GL_FLOAT_VEC4, fogColorType.get(0));
+        assertEquals(VulkanicUniformReflectionType.FLOAT_VEC4,
+            VulkanicUniformReflectionType.fromLegacyGlConstant(fogColorType.get(0)).orElseThrow());
     }
 
     @Test

@@ -217,8 +217,8 @@ public class VulkanRendererStartupInitializationTest {
             "centerDepth.fsh should avoid standalone scalar uniforms that fail Vulkan GLSL compilation");
         assertTrue(centerDepthSamplerSource.contains("if (VulkanicAPI.isVulkanBackendSelected())"),
             "CenterDepthSampler should include a Vulkan compatibility guard to skip legacy smoothing program creation during startup");
-        assertTrue(irisSource.contains("Disabling Iris shaderpack loading on the Vulkan path"),
-            "Iris shaderpack loading should fail over explicitly on the Vulkan path instead of attempting incompatible shaderpack GLSL startup");
+        assertFalse(irisSource.contains("Disabling Iris shaderpack loading on the Vulkan path"),
+            "Iris should not hard-disable shaderpack loading on Vulkan now that shaderpack startup is allowed to use the migrated backend path");
     }
 
     @Test
