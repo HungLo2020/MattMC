@@ -57,6 +57,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3dc;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -65,6 +66,8 @@ public class RenderSectionManager {
     private static final float NEARBY_REBUILD_DISTANCE = Mth.square(16.0f);
     private static final float IMMEDIATE_PRESENT_DISTANCE = Mth.square(64.0f);
     private static final float NEARBY_SORT_DISTANCE = Mth.square(25.0f);
+    private static final int FALLBACK_VISIT_LIMIT = 2048;
+    private static final int MIN_NEARBY_INITIAL_BUILD_QUEUE = 32;
 
     private static final float FRAME_DURATION_UPLOAD_FRACTION = 0.1f;
     private static final long MIN_UPLOAD_DURATION_BUDGET = 2_000_000L; // 2ms
@@ -246,7 +249,9 @@ public class RenderSectionManager {
         if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
             this.shadowTaskLists = this.sectionCollector.getTaskLists();
         } else {
-            this.seedCollectorIfStarved(this.sectionCollector);
+            if (VulkanicAPI.isVulkanBackendSelected()) {
+                this.seedCollectorIfStarved(this.sectionCollector);
+            }
             this.taskLists = this.sectionCollector.getTaskLists();
         }
 
@@ -262,18 +267,22 @@ public class RenderSectionManager {
             return;
         }
 
-        if (!collector.getUnsortedRenderLists().isEmpty()) {
-            return;
-        }
-
         var taskLists = collector.getTaskLists();
-        if (!taskLists.get(TaskQueueType.ZERO_FRAME_DEFER).isEmpty()
+        boolean hasRenderLists = !collector.getUnsortedRenderLists().isEmpty();
+        boolean hasQueuedTasks = !taskLists.get(TaskQueueType.ZERO_FRAME_DEFER).isEmpty()
                 || !taskLists.get(TaskQueueType.ONE_FRAME_DEFER).isEmpty()
                 || !taskLists.get(TaskQueueType.ALWAYS_DEFER).isEmpty()
-                || !taskLists.get(TaskQueueType.INITIAL_BUILD).isEmpty()) {
+                || !taskLists.get(TaskQueueType.INITIAL_BUILD).isEmpty();
+
+        if (!hasRenderLists && !hasQueuedTasks) {
+            this.seedNearbySections(collector);
             return;
         }
 
+        this.ensureNearbyInitialBuildTasks(collector, taskLists);
+    }
+
+    private void seedNearbySections(SectionCollector collector) {
         float distanceLimit = this.getRenderDistance();
         float distanceLimitSq = distanceLimit * distanceLimit;
         ArrayList<RenderSection> candidates = new ArrayList<>();
@@ -320,7 +329,59 @@ public class RenderSectionManager {
                 pending++;
             }
 
-            if (visited >= 2048) {
+            if (visited >= FALLBACK_VISIT_LIMIT) {
+                break;
+            }
+        }
+    }
+
+    private void ensureNearbyInitialBuildTasks(SectionCollector collector, Map<TaskQueueType, ArrayDeque<RenderSection>> taskLists) {
+        var initialBuildQueue = taskLists.get(TaskQueueType.INITIAL_BUILD);
+        int targetQueueSize = Math.min(MIN_NEARBY_INITIAL_BUILD_QUEUE, TaskQueueType.INITIAL_BUILD.queueSizeLimit());
+
+        if (initialBuildQueue.size() >= targetQueueSize) {
+            return;
+        }
+
+        float distanceLimit = this.getRenderDistance();
+        float distanceLimitSq = distanceLimit * distanceLimit;
+        ArrayList<RenderSection> candidates = new ArrayList<>();
+
+        for (var section : this.sectionByPosition.values()) {
+            if (section.isDisposed() || section.getRunningJob() != null) {
+                continue;
+            }
+
+            if (!ChunkUpdateTypes.isInitialBuild(section.getPendingUpdate())) {
+                continue;
+            }
+
+            if (initialBuildQueue.contains(section)) {
+                continue;
+            }
+
+            if (!this.isSectionWithinFallbackRange(section, distanceLimit, distanceLimitSq)) {
+                continue;
+            }
+
+            candidates.add(section);
+        }
+
+        if (candidates.isEmpty()) {
+            return;
+        }
+
+        candidates.sort(Comparator.comparingDouble(section -> section.getSquaredDistance(
+                (float) this.cameraPosition.x(),
+                (float) this.cameraPosition.y(),
+                (float) this.cameraPosition.z())));
+
+        int visited = 0;
+        for (var section : candidates) {
+            collector.visit(section);
+            visited++;
+
+            if (initialBuildQueue.size() >= targetQueueSize || visited >= FALLBACK_VISIT_LIMIT) {
                 break;
             }
         }

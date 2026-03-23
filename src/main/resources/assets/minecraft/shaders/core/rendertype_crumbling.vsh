@@ -7,7 +7,7 @@
 in vec3 Position;
 in vec4 Color;
 in vec2 UV0;
-in vec2 UV2;
+in ivec2 UV2;
 in vec3 Normal;
 
 out float sphericalVertexDistance;
@@ -23,5 +23,5 @@ void main() {
     cylindricalVertexDistance = fog_cylindrical_distance(Position);
     vertexColor = Color;
     texCoord0 = UV0;
-    texCoord2 = UV2;
+    texCoord2 = vec2(UV2);
 }

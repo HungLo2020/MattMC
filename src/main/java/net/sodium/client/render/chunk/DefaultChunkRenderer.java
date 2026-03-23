@@ -34,6 +34,7 @@ import net.sodium.client.util.BitwiseMath;
 import net.sodium.client.util.FogParameters;
 import net.sodium.client.util.UInt32;
 import net.vulkanic.VulkanicAPI;
+import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -53,10 +54,12 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultChunkRenderer.class);
     private static final int SODIUM_CHUNK_PARAMS_UBO_SIZE = new Std140SizeCalculator().putVec2().get();
     private static boolean loggedVulkanTransformProbe;
+    private static boolean loggedVulkanTargetProbe;
+    private static boolean loggedVulkanFirstPreparedDraw;
+    private static boolean loggedVulkanFirstIndexedSubmission;
 
     private final SharedQuadIndexBuffer sharedIndexBuffer;
     private final GpuBuffer sodiumChunkParamsBuffer;
-
     public DefaultChunkRenderer(RenderDevice device, ChunkVertexType vertexType) {
         super(device, vertexType);
 
@@ -160,6 +163,24 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         GpuTextureView depthTargetView = target.useDepth
             ? (VulkanicAPI.getOutputDepthTextureOverride() != null ? VulkanicAPI.getOutputDepthTextureOverride() : target.getDepthTextureView())
             : null;
+        if (!loggedVulkanTargetProbe) {
+            loggedVulkanTargetProbe = true;
+            var minecraft = net.minecraft.client.Minecraft.getInstance();
+            LOGGER.info(
+                "Vulkan chunk target probe terrainPass={} targetClass={} targetIsMain={} targetIsTranslucent={} colorView={}x{} depthViewPresent={} colorOverride={} depthOverride={} atlas={}x{}",
+                terrainPass.getPipeline().getLocation(),
+                target.getClass().getSimpleName(),
+                target == minecraft.getMainRenderTarget(),
+                target == minecraft.levelRenderer.getTranslucentTarget(),
+                colorTargetView.getWidth(0),
+                colorTargetView.getHeight(0),
+                depthTargetView != null,
+                VulkanicAPI.getOutputColorTextureOverride() != null,
+                VulkanicAPI.getOutputDepthTextureOverride() != null,
+                terrainPass.getAtlas() != null ? terrainPass.getAtlas().getWidth(0) : -1,
+                terrainPass.getAtlas() != null ? terrainPass.getAtlas().getHeight(0) : -1
+            );
+        }
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
             VulkanicAPI.setDynamicViewport(
                 VulkanicAPI.getCommandContext(),
@@ -228,7 +249,8 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 batch,
                 vertexBuffer,
                 indexBuffer,
-                this.writeDynamicTransforms(matrices.modelView(), modelOffsetX, modelOffsetY, modelOffsetZ)
+                region,
+                this.writeDynamicTransforms(new Matrix4f(matrices.projection()).mul(matrices.modelView()), modelOffsetX, modelOffsetY, modelOffsetZ)
             ));
         }
 
@@ -268,6 +290,23 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 renderPass.setIndexBuffer(preparedDraw.indexBuffer(), net.blaze3d.vertex.VertexFormat.IndexType.INT);
                 renderPass.setUniform("DynamicTransforms", preparedDraw.transforms());
 
+                if (!loggedVulkanFirstPreparedDraw) {
+                    loggedVulkanFirstPreparedDraw = true;
+                    LOGGER.info(
+                        "Vulkan first prepared region origin=({},{},{}) batchSize={} vertexBufferSize={} indexBufferSize={} indexBytes={} cameraModelOffsetApprox=({}, {}, {})",
+                        preparedDraw.region().getOriginX(),
+                        preparedDraw.region().getOriginY(),
+                        preparedDraw.region().getOriginZ(),
+                        preparedDraw.batch().size,
+                        preparedDraw.vertexBuffer().size(),
+                        preparedDraw.indexBuffer().size(),
+                        preparedDraw.batch().getIndexBufferSize(),
+                        nearestModelOffsetX,
+                        nearestModelOffsetY,
+                        nearestModelOffsetZ
+                    );
+                }
+
                 for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
                     int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
                     if (indexCount <= 0) {
@@ -278,7 +317,24 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                     long rawIndexOffsetBytes = MemoryUtil.memGetAddress(preparedDraw.batch().pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
                     int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
 
-                    renderPass.drawIndexed(baseVertex, firstIndex, indexCount, 1);
+                    if (!loggedVulkanFirstIndexedSubmission) {
+                        loggedVulkanFirstIndexedSubmission = true;
+                        LOGGER.info(
+                            "Vulkan first indexed submission regionOrigin=({},{},{}) drawIndex={} firstIndex={} indexCount={} baseVertex={} rawIndexOffsetBytes={} vertexBufferSize={} indexBufferSize={}",
+                            preparedDraw.region().getOriginX(),
+                            preparedDraw.region().getOriginY(),
+                            preparedDraw.region().getOriginZ(),
+                            drawIndex,
+                            firstIndex,
+                            indexCount,
+                            baseVertex,
+                            rawIndexOffsetBytes,
+                            preparedDraw.vertexBuffer().size(),
+                            preparedDraw.indexBuffer().size()
+                        );
+                    }
+
+                    renderPass.drawIndexed(firstIndex, indexCount, baseVertex, 1);
                 }
             }
         }
@@ -329,6 +385,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         MultiDrawBatch batch,
         GpuBuffer vertexBuffer,
         GpuBuffer indexBuffer,
+        RenderRegion region,
         GpuBufferSlice transforms
     ) {
     }

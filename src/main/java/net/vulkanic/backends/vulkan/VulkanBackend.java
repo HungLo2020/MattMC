@@ -10515,15 +10515,14 @@ public class VulkanBackend {
         /**
          * Maps {@link VertexFormatElement.Type} + component count to a {@code VkFormat}.
          *
-         * <p>UBYTE components are mapped to UNORM (normalized [0..1]) since they are typically
-         * used for color data.  SHORT components used for UV coordinates are mapped to SSCALED
-         * (denormalized signed integer scaled to float) since Minecraft's UV coordinates span
-         * full short ranges and are not pre-normalized to [0..1].</p>
+         * <p>Vanilla feeds overlay and light UV channels as integral short pairs and most shaders
+         * consume them as {@code ivec2}. Those must use integer vertex formats on Vulkan or the
+         * shader sees the wrong values for texelFetch-based overlay/lightmap sampling.</p>
          */
         private static int toVkVertexElementFormat(VertexFormatElement element) {
             VertexFormatElement.Type type = element.type();
             int count = element.count();
-            boolean useIntegerFormat = element.usage() == VertexFormatElement.Usage.GENERIC;
+            boolean useIntegerFormat = element.usage() == VertexFormatElement.Usage.GENERIC || element.usage() == VertexFormatElement.Usage.UV;
 
             return switch (type) {
                 case FLOAT -> switch (count) {

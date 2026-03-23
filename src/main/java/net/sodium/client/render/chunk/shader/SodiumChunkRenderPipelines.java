@@ -79,14 +79,17 @@ public final class SodiumChunkRenderPipelines {
 
         RenderPipeline solid = RenderPipeline.builder(snippet)
             .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_solid_stride_" + stride))
+            .withCull(false)
             .build();
         RenderPipeline cutout = RenderPipeline.builder(snippet)
             .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_cutout_stride_" + stride))
             .withShaderDefine("USE_FRAGMENT_DISCARD")
+            .withCull(false)
             .build();
         RenderPipeline translucent = RenderPipeline.builder(snippet)
             .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_translucent_stride_" + stride))
             .withBlend(BlendFunction.TRANSLUCENT)
+            .withCull(false)
             .build();
 
         Minecraft minecraft = Minecraft.getInstance();

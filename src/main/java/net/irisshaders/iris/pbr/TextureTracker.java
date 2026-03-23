@@ -62,6 +62,9 @@ public class TextureTracker {
 		if (unit >= 0 && unit < shaderTexturesByUnit.length) {
 			shaderTexturesByUnit[unit] = id;
 		}
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			IrisRenderSystem.setTextureBinding(unit, id == null ? 0 : VulkanicCoreAPI.textureId(id));
+		}
 		if (id != null) {
 			textureViews.put(VulkanicCoreAPI.textureId(id), id);
 		}

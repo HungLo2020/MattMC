@@ -57,7 +57,8 @@ vec3 decodeDrawTranslation(uint drawId) {
 
 void main() {
     vec3 position = decodePosition() + ModelOffset + decodeDrawTranslation(a_LightAndData[3]);
-    gl_Position = ProjMat * ModelViewMat * vec4(position, 1.0);
+    gl_Position = ModelViewMat * vec4(position, 1.0);
+    gl_Position.z = 0.5 * (gl_Position.z + gl_Position.w);
 
     sphericalVertexDistance = fog_spherical_distance(position);
     cylindricalVertexDistance = fog_cylindrical_distance(position);
