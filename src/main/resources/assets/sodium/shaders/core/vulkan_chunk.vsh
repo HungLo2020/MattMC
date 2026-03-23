@@ -4,6 +4,8 @@
 #moj_import <minecraft:dynamictransforms.glsl>
 #moj_import <minecraft:projection.glsl>
 
+uniform sampler2D Sampler2;
+
 layout(std140) uniform SodiumChunkParams {
     vec2 TexCoordShrink;
 };
@@ -55,15 +57,18 @@ vec3 decodeDrawTranslation(uint drawId) {
     return vec3(decodeRelativeChunkCoord(drawId)) * vec3(16.0);
 }
 
+vec4 minecraft_sample_lightmap(sampler2D lightMap, vec2 uv) {
+    return texture(lightMap, clamp(uv + vec2(0.5 / 16.0), vec2(0.5 / 16.0), vec2(15.5 / 16.0)));
+}
+
 void main() {
     vec3 position = decodePosition() + ModelOffset + decodeDrawTranslation(a_LightAndData[3]);
-    gl_Position = ModelViewMat * vec4(position, 1.0);
-    gl_Position.z = 0.5 * (gl_Position.z + gl_Position.w);
+    gl_Position = ProjMat * ModelViewMat * vec4(position, 1.0);
 
     sphericalVertexDistance = fog_spherical_distance(position);
     cylindricalVertexDistance = fog_cylindrical_distance(position);
-    vertexColor = a_Color * ColorModulator;
-    texCoord0 = decodeTexCoord(a_TexCoord) + decodeTexCoordBias(a_TexCoord) * TexCoordShrink;
     lightCoord0 = vec2(a_LightAndData.xy) / vec2(256.0);
+    vertexColor = a_Color * ColorModulator * minecraft_sample_lightmap(Sampler2, lightCoord0);
+    texCoord0 = decodeTexCoord(a_TexCoord) + decodeTexCoordBias(a_TexCoord) * TexCoordShrink;
     materialBits = a_LightAndData[2];
 }

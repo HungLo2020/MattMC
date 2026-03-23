@@ -4136,7 +4136,43 @@ public class VulkanBackend {
 
     public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type,
                                             long pIndices, int drawCount, long pBaseVertex) {
-        requireVulkanCommandBufferHandle("multiDrawElementsBaseVertex", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("multiDrawElementsBaseVertex", ctx);
+        VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Unsupported multiDrawElementsBaseVertex index type constant: " + type));
+
+        if (drawCount < 0 || pCount == 0L || pIndices == 0L || pBaseVertex == 0L) {
+            throw new IllegalArgumentException(
+                "multiDrawElementsBaseVertex requires drawCount >= 0 and non-null count/index/baseVertex arrays");
+        }
+        if (drawCount == 0) {
+            return;
+        }
+
+        ensureNativeReady("multiDrawElementsBaseVertex");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        for (int drawIndex = 0; drawIndex < drawCount; drawIndex++) {
+            int count = MemoryUtil.memGetInt(pCount + ((long) drawIndex * Integer.BYTES));
+            long indices = MemoryUtil.memGetAddress(pIndices + ((long) drawIndex * org.lwjgl.system.Pointer.POINTER_SIZE));
+            int baseVertex = MemoryUtil.memGetInt(pBaseVertex + ((long) drawIndex * Integer.BYTES));
+
+            if (count <= 0) {
+                continue;
+            }
+            if (indices < 0L) {
+                throw new IllegalArgumentException("Index offset must be >= 0, got: " + indices);
+            }
+            if ((indices % indexType.bytesPerIndex()) != 0L) {
+                throw new IllegalArgumentException(
+                    "Index offset must align to index type size. offset=" + indices + ", bytesPerIndex=" + indexType.bytesPerIndex());
+            }
+
+            spine.drawLegacyElements(commandBufferHandle, mode, count, indexType, indices, 1, baseVertex);
+        }
     }
 
     public void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {

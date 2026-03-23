@@ -34,7 +34,6 @@ import net.sodium.client.util.BitwiseMath;
 import net.sodium.client.util.FogParameters;
 import net.sodium.client.util.UInt32;
 import net.vulkanic.VulkanicAPI;
-import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -51,12 +50,11 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
 public class DefaultChunkRenderer extends ShaderChunkRenderer {
-    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultChunkRenderer.class);
     private static final int SODIUM_CHUNK_PARAMS_UBO_SIZE = new Std140SizeCalculator().putVec2().get();
-    private static boolean loggedVulkanTransformProbe;
-    private static boolean loggedVulkanTargetProbe;
-    private static boolean loggedVulkanFirstPreparedDraw;
-    private static boolean loggedVulkanFirstIndexedSubmission;
+    private static final Logger LOGGER = LoggerFactory.getLogger("Sodium-VulkanTerrain");
+    private static final int MAX_VULKAN_RENDER_PROBES = 48;
+
+    private static int vulkanRenderProbeCount;
 
     private final SharedQuadIndexBuffer sharedIndexBuffer;
     private final GpuBuffer sodiumChunkParamsBuffer;
@@ -163,24 +161,6 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         GpuTextureView depthTargetView = target.useDepth
             ? (VulkanicAPI.getOutputDepthTextureOverride() != null ? VulkanicAPI.getOutputDepthTextureOverride() : target.getDepthTextureView())
             : null;
-        if (!loggedVulkanTargetProbe) {
-            loggedVulkanTargetProbe = true;
-            var minecraft = net.minecraft.client.Minecraft.getInstance();
-            LOGGER.info(
-                "Vulkan chunk target probe terrainPass={} targetClass={} targetIsMain={} targetIsTranslucent={} colorView={}x{} depthViewPresent={} colorOverride={} depthOverride={} atlas={}x{}",
-                terrainPass.getPipeline().getLocation(),
-                target.getClass().getSimpleName(),
-                target == minecraft.getMainRenderTarget(),
-                target == minecraft.levelRenderer.getTranslucentTarget(),
-                colorTargetView.getWidth(0),
-                colorTargetView.getHeight(0),
-                depthTargetView != null,
-                VulkanicAPI.getOutputColorTextureOverride() != null,
-                VulkanicAPI.getOutputDepthTextureOverride() != null,
-                terrainPass.getAtlas() != null ? terrainPass.getAtlas().getWidth(0) : -1,
-                terrainPass.getAtlas() != null ? terrainPass.getAtlas().getHeight(0) : -1
-            );
-        }
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
             VulkanicAPI.setDynamicViewport(
                 VulkanicAPI.getCommandContext(),
@@ -202,6 +182,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         float nearestModelOffsetY = 0.0F;
         float nearestModelOffsetZ = 0.0F;
         int nearestBatchSize = 0;
+        int totalBatchDrawCommands = 0;
         Iterator<ChunkRenderList> iterator = renderLists.iterator(terrainPass.isTranslucent());
         while (iterator.hasNext()) {
             ChunkRenderList renderList = iterator.next();
@@ -220,6 +201,8 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             if (batch.isEmpty()) {
                 continue;
             }
+
+            totalBatchDrawCommands += batch.size;
 
             GpuBuffer vertexBuffer = this.wrapLegacyBuffer(region.getResources().getGeometryBuffer(), GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST);
             GpuBuffer indexBuffer;
@@ -250,28 +233,13 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 vertexBuffer,
                 indexBuffer,
                 region,
-                this.writeDynamicTransforms(new Matrix4f(matrices.projection()).mul(matrices.modelView()), modelOffsetX, modelOffsetY, modelOffsetZ)
+                this.writeDynamicTransforms(matrices.modelView(), modelOffsetX, modelOffsetY, modelOffsetZ)
             ));
         }
 
-        if (!loggedVulkanTransformProbe && !preparedDraws.isEmpty()) {
-            loggedVulkanTransformProbe = true;
-            LOGGER.info(
-                "Vulkan chunk transform probe camera=({},{},{}) nearestRegionOrigin=({},{},{}) modelOffset=({},{},{}) batchSize={} preparedRegions={}",
-                camera.x,
-                camera.y,
-                camera.z,
-                nearestRegionOriginX,
-                nearestRegionOriginY,
-                nearestRegionOriginZ,
-                nearestModelOffsetX,
-                nearestModelOffsetY,
-                nearestModelOffsetZ,
-                nearestBatchSize,
-                preparedDraws.size()
-            );
-        }
 
+        int submittedDrawCommands = 0;
+        long submittedIndexCount = 0L;
         try (RenderPass renderPass = commandEncoder.createRenderPass(
             () -> "Sodium chunk terrain",
             colorTargetView,
@@ -290,23 +258,6 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 renderPass.setIndexBuffer(preparedDraw.indexBuffer(), net.blaze3d.vertex.VertexFormat.IndexType.INT);
                 renderPass.setUniform("DynamicTransforms", preparedDraw.transforms());
 
-                if (!loggedVulkanFirstPreparedDraw) {
-                    loggedVulkanFirstPreparedDraw = true;
-                    LOGGER.info(
-                        "Vulkan first prepared region origin=({},{},{}) batchSize={} vertexBufferSize={} indexBufferSize={} indexBytes={} cameraModelOffsetApprox=({}, {}, {})",
-                        preparedDraw.region().getOriginX(),
-                        preparedDraw.region().getOriginY(),
-                        preparedDraw.region().getOriginZ(),
-                        preparedDraw.batch().size,
-                        preparedDraw.vertexBuffer().size(),
-                        preparedDraw.indexBuffer().size(),
-                        preparedDraw.batch().getIndexBufferSize(),
-                        nearestModelOffsetX,
-                        nearestModelOffsetY,
-                        nearestModelOffsetZ
-                    );
-                }
-
                 for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
                     int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
                     if (indexCount <= 0) {
@@ -317,27 +268,28 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                     long rawIndexOffsetBytes = MemoryUtil.memGetAddress(preparedDraw.batch().pElementPointer + ((long) drawIndex << Pointer.POINTER_SHIFT));
                     int firstIndex = Math.toIntExact(rawIndexOffsetBytes / Integer.BYTES);
 
-                    if (!loggedVulkanFirstIndexedSubmission) {
-                        loggedVulkanFirstIndexedSubmission = true;
-                        LOGGER.info(
-                            "Vulkan first indexed submission regionOrigin=({},{},{}) drawIndex={} firstIndex={} indexCount={} baseVertex={} rawIndexOffsetBytes={} vertexBufferSize={} indexBufferSize={}",
-                            preparedDraw.region().getOriginX(),
-                            preparedDraw.region().getOriginY(),
-                            preparedDraw.region().getOriginZ(),
-                            drawIndex,
-                            firstIndex,
-                            indexCount,
-                            baseVertex,
-                            rawIndexOffsetBytes,
-                            preparedDraw.vertexBuffer().size(),
-                            preparedDraw.indexBuffer().size()
-                        );
-                    }
-
-                    renderPass.drawIndexed(firstIndex, indexCount, baseVertex, 1);
+                    renderPass.drawIndexed(baseVertex, firstIndex, indexCount, 1);
+                    submittedDrawCommands++;
+                    submittedIndexCount += indexCount;
                 }
             }
         }
+
+        this.logVulkanRenderProbe(
+            terrainPass,
+            preparedDraws.size(),
+            totalBatchDrawCommands,
+            submittedDrawCommands,
+            submittedIndexCount,
+            nearestRegionDistanceSq,
+            nearestRegionOriginX,
+            nearestRegionOriginY,
+            nearestRegionOriginZ,
+            nearestModelOffsetX,
+            nearestModelOffsetY,
+            nearestModelOffsetZ,
+            nearestBatchSize
+        );
     }
 
     @Override
@@ -379,6 +331,47 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     private GpuBuffer wrapLegacyBuffer(net.sodium.client.gl.buffer.GlBuffer buffer, int usage) {
         int size = buffer instanceof GlMutableBuffer mutableBuffer ? Math.toIntExact(mutableBuffer.getSize()) : 0;
         return new LegacyHandleGlBuffer(() -> "Legacy chunk buffer", usage, size, buffer.handle());
+    }
+
+    private void logVulkanRenderProbe(
+        TerrainRenderPass terrainPass,
+        int preparedRegionCount,
+        int totalBatchDrawCommands,
+        int submittedDrawCommands,
+        long submittedIndexCount,
+        double nearestRegionDistanceSq,
+        int nearestRegionOriginX,
+        int nearestRegionOriginY,
+        int nearestRegionOriginZ,
+        float nearestModelOffsetX,
+        float nearestModelOffsetY,
+        float nearestModelOffsetZ,
+        int nearestBatchSize
+    ) {
+        if (vulkanRenderProbeCount >= MAX_VULKAN_RENDER_PROBES) {
+            return;
+        }
+
+        vulkanRenderProbeCount++;
+        LOGGER.info(
+            "Sodium Vulkan chunk render probe#{} pass={} fragmentDiscard={} translucent={} preparedRegions={} batchDraws={} submittedDraws={} submittedIndices={} nearestRegionOrigin=({}, {}, {}) nearestModelOffset=({}, {}, {}) nearestRegionDistanceSq={} nearestBatchSize={}",
+            vulkanRenderProbeCount,
+            terrainPass.getPipeline().getLocation(),
+            terrainPass.supportsFragmentDiscard(),
+            terrainPass.isTranslucent(),
+            preparedRegionCount,
+            totalBatchDrawCommands,
+            submittedDrawCommands,
+            submittedIndexCount,
+            nearestRegionOriginX,
+            nearestRegionOriginY,
+            nearestRegionOriginZ,
+            nearestModelOffsetX,
+            nearestModelOffsetY,
+            nearestModelOffsetZ,
+            nearestRegionDistanceSq,
+            nearestBatchSize
+        );
     }
 
     private record PreparedRegionDraw(
