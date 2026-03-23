@@ -24,6 +24,8 @@ import net.minecraft.ReportedException;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -64,6 +66,14 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		this.mipLevel = k;
 	}
 
+	private void refreshVulkanMipmaps() {
+		if (this.texture == null || this.texture.getMipLevels() <= 1 || !VulkanicAPI.isVulkanBackendSelected()) {
+			return;
+		}
+
+		IrisRenderSystem.generateMipmaps(VulkanicCoreAPI.textureId(this.texture));
+	}
+
 	public void upload(SpriteLoader.Preparations preparations) {
 		this.createTexture(preparations.width(), preparations.height(), preparations.mipLevel());
 		this.clearTextureData();
@@ -97,6 +107,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 			this.sprites = List.copyOf(list);
 			this.animatedTextures = List.copyOf(list2);
+			this.refreshVulkanMipmaps();
 			if (SharedConstants.DEBUG_DUMP_TEXTURE_ATLAS) {
 				Path path = TextureUtil.getDebugTexturePath();
 
@@ -170,6 +181,9 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		if (this.texture != null) {
 			for (TextureAtlasSprite.Ticker ticker : this.animatedTextures) {
 				ticker.tickAndUpload(this.texture);
+			}
+			if (!this.animatedTextures.isEmpty()) {
+				this.refreshVulkanMipmaps();
 			}
 		}
 		// Iris PBR: From texture.pbr.MixinTextureAtlas - cycle PBR animation frames

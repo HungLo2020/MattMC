@@ -540,8 +540,9 @@ public class RenderSectionManager {
     private float getSearchDistance(FogParameters fogParameters) {
         float distance;
 
-        // Iris: From MixinRenderSectionManager - disable fog occlusion when shader pack is loaded
-        boolean useFogOcclusion = net.irisshaders.iris.Iris.getCurrentPack().isPresent() 
+        // Vulkan terrain currently has backend-specific fog state differences, so avoid culling chunks from fog distance.
+        boolean useFogOcclusion = net.irisshaders.iris.Iris.getCurrentPack().isPresent()
+            || VulkanicAPI.isVulkanBackendSelected()
             ? false 
             : SodiumClientMod.options().performance.useFogOcclusion;
 

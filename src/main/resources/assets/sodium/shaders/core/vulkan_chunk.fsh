@@ -20,12 +20,8 @@ layout(location = 5) flat in uint materialBits;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-#ifdef VULKAN_FORCE_BASE_MIP
-    vec4 color = textureLod(Sampler0, texCoord0, 0.0);
-#else
     float lodBias = _material_use_mips(materialBits) ? 0.0 : float(-MAX_TEXTURE_LOD_BIAS);
     vec4 color = texture(Sampler0, texCoord0, lodBias);
-#endif
     color *= vertexColor;
 
 #ifdef USE_FRAGMENT_DISCARD
@@ -34,6 +30,9 @@ void main() {
     }
 #endif
 
+#ifdef VULKAN_DISABLE_TERRAIN_FOG
+    fragColor = color;
+#else
     fragColor = apply_fog(
         color,
         sphericalVertexDistance,
@@ -44,4 +43,5 @@ void main() {
         FogRenderDistanceEnd,
         FogColor
     );
+#endif
 }

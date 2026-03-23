@@ -79,19 +79,19 @@ public final class SodiumChunkRenderPipelines {
             .buildSnippet();
 
         RenderPipeline solid = RenderPipeline.builder(snippet)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_solid_nomip_stride_" + stride))
-            .withShaderDefine("VULKAN_FORCE_BASE_MIP")
+            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_solid_stride_" + stride))
+            .withShaderDefine("VULKAN_DISABLE_TERRAIN_FOG")
             .withCull(false)
             .build();
         RenderPipeline cutout = RenderPipeline.builder(snippet)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_cutout_nomip_stride_" + stride))
+            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_cutout_stride_" + stride))
             .withShaderDefine("USE_FRAGMENT_DISCARD")
-            .withShaderDefine("VULKAN_FORCE_BASE_MIP")
+            .withShaderDefine("VULKAN_DISABLE_TERRAIN_FOG")
             .withCull(false)
             .build();
         RenderPipeline translucent = RenderPipeline.builder(snippet)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_translucent_nomip_stride_" + stride))
-            .withShaderDefine("VULKAN_FORCE_BASE_MIP")
+            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/vulkan_chunk_translucent_stride_" + stride))
+            .withShaderDefine("VULKAN_DISABLE_TERRAIN_FOG")
             .withBlend(BlendFunction.TRANSLUCENT)
             .withDepthWrite(false)
             .withCull(false)

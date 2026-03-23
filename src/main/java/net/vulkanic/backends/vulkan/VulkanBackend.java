@@ -64,6 +64,7 @@ import org.lwjgl.vulkan.VkDescriptorPoolCreateInfo;
 import org.lwjgl.vulkan.VkDescriptorPoolSize;
 import org.lwjgl.vulkan.VkDescriptorSetAllocateInfo;
 import org.lwjgl.vulkan.VkExtensionProperties;
+import org.lwjgl.vulkan.VkImageBlit;
 import org.lwjgl.vulkan.VkImageCopy;
 import org.lwjgl.vulkan.VkImageCreateInfo;
 import org.lwjgl.vulkan.VkImageMemoryBarrier;
@@ -3835,7 +3836,18 @@ public class VulkanBackend {
     }
 
     public void generateMipmap(CommandContext ctx, int target) {
-        requireVulkanCommandBufferHandle("generateMipmap", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("generateMipmap", ctx);
+        if (!isSupportedLegacyTextureTarget(target)) {
+            throw new IllegalArgumentException("Unsupported legacy Vulkan texture target for generateMipmap: " + target);
+        }
+
+        ensureNativeReady("generateMipmap");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.generateLegacyTextureMipmap(commandBufferHandle, target);
     }
 
     public int generateQueryObject(CommandContext ctx) {
@@ -6438,7 +6450,7 @@ public class VulkanBackend {
             }
 
             java.nio.ByteBuffer packedPixels = normalizePixelData(pixels, formatInfo, width, height);
-            uploadToLegacyTextureRegion(texture, target, level, 0, 0, width, height, packedPixels);
+            uploadToLegacyTextureRegion(commandBufferHandle, "uploadTexture2D", texture, target, level, 0, 0, width, height, packedPixels);
         }
 
         private void uploadLegacyTexture2DSubImage(long commandBufferHandle,
@@ -6476,7 +6488,7 @@ public class VulkanBackend {
 
             java.nio.ByteBuffer source = MemoryUtil.memByteBuffer(pixelsPointer, required);
             java.nio.ByteBuffer packedPixels = normalizePixelData(source, formatInfo, width, height);
-            uploadToLegacyTextureRegion(texture, target, level, xOffset, yOffset, width, height, packedPixels);
+            uploadToLegacyTextureRegion(commandBufferHandle, "uploadTexture2DSubImage", texture, target, level, xOffset, yOffset, width, height, packedPixels);
         }
 
         private void uploadLegacyTexture2DSubImage(long commandBufferHandle,
@@ -6507,7 +6519,7 @@ public class VulkanBackend {
                 type
             );
             java.nio.ByteBuffer packedPixels = normalizePixelData(pixels, formatInfo, width, height);
-            uploadToLegacyTextureRegion(texture, target, level, xOffset, yOffset, width, height, packedPixels);
+            uploadToLegacyTextureRegion(commandBufferHandle, "uploadTexture2DSubImage", texture, target, level, xOffset, yOffset, width, height, packedPixels);
         }
 
         private LegacyTextureObject uploadLegacyTexture2DSubImageCommon(long commandBufferHandle,
@@ -6947,18 +6959,30 @@ public class VulkanBackend {
             };
         }
 
-        private void uploadToLegacyTextureRegion(LegacyTextureObject texture,
-                             int target,
+        private void uploadToLegacyTextureRegion(long commandBufferHandle,
+                                                 String operation,
+                                                 LegacyTextureObject texture,
+                                                 int target,
                                                  int level,
                                                  int xOffset,
                                                  int yOffset,
                                                  int width,
                                                  int height,
                                                  java.nio.ByteBuffer pixels) {
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
             StagingBuffer stagingBuffer = createStagingBuffer(pixels);
             try {
                 int oldLayout = trackedLayoutForLevel(texture, level);
-                transitionImageLayout(texture, oldLayout, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, level, 1);
+                transitionImageLayout(
+                    commandBuffer,
+                    texture.imageHandle,
+                    texture.aspectMask,
+                    oldLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    level,
+                    1,
+                    legacyTextureLayerCount(texture)
+                );
 
                 try (MemoryStack stack = stackPush()) {
                     VkBufferImageCopy.Buffer regions = VkBufferImageCopy.calloc(1, stack);
@@ -6975,7 +6999,7 @@ public class VulkanBackend {
                     regions.get(0).imageExtent().set(width, height, 1);
 
                     VK10.vkCmdCopyBufferToImage(
-                        primaryCommandBuffer,
+                        commandBuffer,
                         stagingBuffer.bufferHandle,
                         texture.imageHandle,
                         VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -6986,10 +7010,129 @@ public class VulkanBackend {
                 int finalLayout = texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
                     ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                     : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                transitionImageLayout(texture, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout, level, 1);
+                transitionImageLayout(
+                    commandBuffer,
+                    texture.imageHandle,
+                    texture.aspectMask,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    finalLayout,
+                    level,
+                    1,
+                    legacyTextureLayerCount(texture)
+                );
                 trackLayoutForLevel(texture, level, finalLayout);
             } finally {
                 deferStagingBufferDestroy(stagingBuffer);
+            }
+        }
+
+        private void generateLegacyTextureMipmap(long commandBufferHandle, int target) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "generateMipmap");
+            if (renderPassRecording) {
+                throw new IllegalStateException("generateMipmap requires command recording outside an active render pass");
+            }
+            if (target == VulkanicAPI.GL_PROXY_TEXTURE_2D) {
+                throw new IllegalArgumentException("generateMipmap does not support GL_PROXY_TEXTURE_2D target");
+            }
+
+            LegacyTextureObject texture = requireBoundLegacyTexture2D(target, "generateMipmap");
+            if (texture.imageHandle == VK10.VK_NULL_HANDLE || texture.mipLevels <= 1) {
+                return;
+            }
+            if (texture.aspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
+                throw new UnsupportedOperationException("generateMipmap currently supports only color textures");
+            }
+
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "generateMipmap");
+            int layerCount = legacyTextureLayerCount(texture);
+            int finalLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            for (int level = 1; level < texture.mipLevels; level++) {
+                int sourceLevel = level - 1;
+                int sourceLayout = trackedLayoutForLevel(texture, sourceLevel);
+                if (sourceLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+                    transitionImageLayout(
+                        commandBuffer,
+                        texture.imageHandle,
+                        texture.aspectMask,
+                        sourceLayout,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        sourceLevel,
+                        1,
+                        layerCount
+                    );
+                    trackLayoutForLevel(texture, sourceLevel, VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                }
+
+                int destinationLayout = trackedLayoutForLevel(texture, level);
+                if (destinationLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                    transitionImageLayout(
+                        commandBuffer,
+                        texture.imageHandle,
+                        texture.aspectMask,
+                        destinationLayout,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        level,
+                        1,
+                        layerCount
+                    );
+                    trackLayoutForLevel(texture, level, VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                }
+
+                try (MemoryStack stack = stackPush()) {
+                    VkImageBlit.Buffer blit = VkImageBlit.calloc(1, stack);
+                    blit.get(0).srcSubresource()
+                        .aspectMask(texture.aspectMask)
+                        .mipLevel(sourceLevel)
+                        .baseArrayLayer(0)
+                        .layerCount(layerCount);
+                    blit.get(0).srcOffsets(0).set(0, 0, 0);
+                    blit.get(0).srcOffsets(1).set(
+                        Math.max(1, texture.width >> sourceLevel),
+                        Math.max(1, texture.height >> sourceLevel),
+                        1
+                    );
+                    blit.get(0).dstSubresource()
+                        .aspectMask(texture.aspectMask)
+                        .mipLevel(level)
+                        .baseArrayLayer(0)
+                        .layerCount(layerCount);
+                    blit.get(0).dstOffsets(0).set(0, 0, 0);
+                    blit.get(0).dstOffsets(1).set(
+                        Math.max(1, texture.width >> level),
+                        Math.max(1, texture.height >> level),
+                        1
+                    );
+
+                    VK10.vkCmdBlitImage(
+                        commandBuffer,
+                        texture.imageHandle,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        texture.imageHandle,
+                        VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        blit,
+                        VK10.VK_FILTER_LINEAR
+                    );
+                }
+            }
+
+            for (int level = 0; level < texture.mipLevels; level++) {
+                int trackedLayout = trackedLayoutForLevel(texture, level);
+                if (trackedLayout == finalLayout) {
+                    continue;
+                }
+
+                transitionImageLayout(
+                    commandBuffer,
+                    texture.imageHandle,
+                    texture.aspectMask,
+                    trackedLayout,
+                    finalLayout,
+                    level,
+                    1,
+                    layerCount
+                );
+                trackLayoutForLevel(texture, level, finalLayout);
             }
         }
 
