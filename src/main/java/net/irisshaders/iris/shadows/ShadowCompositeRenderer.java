@@ -196,41 +196,40 @@ public class ShadowCompositeRenderer {
 		GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
 		VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 
-		try (RenderPass pass = VulkanicAPI.createRenderPass(() -> "Shadow composites", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
-			pass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
-			pass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
-			pass.setIndexBuffer(indices, type);
-
-			for (Pass renderPass : passes) {
-				boolean ranCompute = false;
-				for (ComputeProgram computeProgram : renderPass.computes) {
-					if (computeProgram != null) {
-						ranCompute = true;
-						computeProgram.use();
-						this.customUniforms.push(computeProgram);
-						net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
-						computeProgram.dispatch(main.width, main.height);
-					}
+		for (Pass renderPass : passes) {
+			boolean ranCompute = false;
+			for (ComputeProgram computeProgram : renderPass.computes) {
+				if (computeProgram != null) {
+					ranCompute = true;
+					computeProgram.use();
+					this.customUniforms.push(computeProgram);
+					net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+					computeProgram.dispatch(main.width, main.height);
 				}
+			}
 
-				if (ranCompute) {
-					IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
+			if (ranCompute) {
+				IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
+			}
+
+			Program.unbind();
+
+			if (renderPass instanceof ComputeOnlyPass) {
+				continue;
+			}
+
+			if (!renderPass.mipmappedBuffers.isEmpty()) {
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
+
+				for (int index : renderPass.mipmappedBuffers) {
+					setupMipmapping(renderTargets.get(index), renderPass.stageReadsFromAlt.contains(index));
 				}
+			}
 
-				Program.unbind();
-
-				if (renderPass instanceof ComputeOnlyPass) {
-					continue;
-				}
-
-				if (!renderPass.mipmappedBuffers.isEmpty()) {
-					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
-
-					for (int index : renderPass.mipmappedBuffers) {
-						setupMipmapping(renderTargets.get(index), renderPass.stageReadsFromAlt.contains(index));
-					}
-				}
-
+			try (RenderPass pass = VulkanicAPI.createRenderPass(() -> "Shadow composites", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
+				pass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
+				pass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
+				pass.setIndexBuffer(indices, type);
 				pass.iris$setCustomPass(renderPass);
 
 				float scaledWidth = renderTargets.getResolution() * renderPass.viewportScale.scale();
@@ -323,10 +322,14 @@ public class ShadowCompositeRenderer {
 
 					ShaderPrinter.printProgram(source.getName()).addSource(PatchShaderType.COMPUTE, transformed).print();
 
-					builder = ProgramBuilder.beginCompute(source.getName(), transformed, IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
+					builder = ProgramBuilder.beginComputeIfSupported(source.getName(), transformed, IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
 				} catch (RuntimeException e) {
 					// TODO: Better error handling
 					throw new RuntimeException("Shader compilation failed for shadowcomp compute " + source.getName() + "!", e);
+				}
+
+				if (builder == null) {
+					continue;
 				}
 
 				ProgramSamplers.CustomTextureSamplerInterceptor customTextureSamplerInterceptor = ProgramSamplers.customTextureSamplerInterceptor(builder, customTextureIds, flippedAtLeastOnceSnapshot);

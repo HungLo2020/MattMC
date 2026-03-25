@@ -233,6 +233,21 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testCompositeMipmappingRunsBeforePerPassRenderPassCreation() throws IOException {
+        String compositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+        String shadowCompositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+
+        assertTrue(compositeRendererSource.contains("for (int index : compositePass.mipmappedBuffers) {\n\t\t\t\t\tsetupMipmapping")
+            && compositeRendererSource.indexOf("for (int index : compositePass.mipmappedBuffers)")
+            < compositeRendererSource.indexOf("try (RenderPass renderPass = VulkanicAPI.createRenderPass("),
+            "CompositeRenderer should generate mipmaps before opening the per-pass render pass on Vulkan");
+        assertTrue(shadowCompositeRendererSource.contains("for (int index : renderPass.mipmappedBuffers) {\n\t\t\t\t\tsetupMipmapping")
+            && shadowCompositeRendererSource.indexOf("for (int index : renderPass.mipmappedBuffers)")
+            < shadowCompositeRendererSource.indexOf("try (RenderPass pass = VulkanicAPI.createRenderPass("),
+            "ShadowCompositeRenderer should generate mipmaps before opening the per-pass render pass on Vulkan");
+    }
+
+    @Test
     public void testVulkanBackendBootstrapPathExists() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         assertTrue(Files.exists(vulkanBackendFile),
@@ -1241,6 +1256,11 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should pass explicit command-buffer context into VulkanicAPI.beginRenderPass");
         assertTrue(source.contains("VulkanicAPI.submitCommandBuffer(renderPassCtx);"),
             "GlCommandEncoder should submit command-buffer scope when finishing Vulkanic render passes");
+        assertTrue(source.contains("ShadowRenderingState.areShadowsCurrentlyBeingRendered() && commandContext().isImmediate()"),
+            "GlCommandEncoder should restrict the Iris shadow temp-FBO shortcut to immediate contexts so Vulkan shadow draws keep a real active render pass");
+        assertTrue(source.contains("if (ctx.isImmediate()")
+                && source.contains("VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), iris$tempFBO);"),
+            "GlCommandEncoder trySetup should only rebind the Iris shadow temp FBO on the immediate compatibility seam");
     }
 
     @Test
@@ -3736,12 +3756,30 @@ public class Phase3DrawPathTest {
         String renderTargetsSource = Files.readString(renderTargetsFile);
         assertFalse(renderTargetsSource.contains("GlStateManager._bindTexture("),
             "RenderTargets should not call removed GlStateManager._bindTexture wrapper");
-        assertTrue(renderTargetsSource.contains("VulkanicAPI.bindTexture2D("),
-            "RenderTargets should bind textures through VulkanicAPI.bindTexture2D");
         assertFalse(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D"),
             "RenderTargets should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
-        assertTrue(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(0"),
-            "RenderTargets should use IrisRenderSystem default-2D copyTexImage2D helper");
+        assertFalse(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(0"),
+            "RenderTargets depth snapshots should avoid legacy copyTexImage2D now that depth targets are preallocated");
+        assertTrue(renderTargetsSource.contains("DepthCopyStrategy.fastestDepthSnapshot(currentDepthFormat.isCombinedStencil())"),
+            "RenderTargets should use the Vulkan-safe depth snapshot strategy selector");
+        assertTrue(renderTargetsSource.contains("copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noHandDestFb, VulkanicCoreAPI.textureId(noHand),"),
+            "RenderTargets pre-hand depth path should route through the shared depth copy strategy");
+        assertTrue(renderTargetsSource.contains("copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noTranslucentsDestFb, VulkanicCoreAPI.textureId(noTranslucents),"),
+            "RenderTargets pre-translucent depth path should route through the shared depth copy strategy");
+
+        Path depthCopyStrategyFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/DepthCopyStrategy.java");
+        String depthCopyStrategySource = Files.readString(depthCopyStrategyFile);
+        assertTrue(depthCopyStrategySource.contains("fastestDepthSnapshot(boolean combinedStencilRequired)"),
+            "DepthCopyStrategy should expose a dedicated depth snapshot selector");
+        assertTrue(depthCopyStrategySource.contains("VulkanicAPI.isVulkanBackendSelected()"),
+            "DepthCopyStrategy depth snapshot selector should special-case Vulkan");
+        assertTrue(depthCopyStrategySource.contains("class Gl30BlitFbDepth implements DepthCopyStrategy"),
+            "DepthCopyStrategy should provide a depth-only framebuffer blit strategy");
+
+        Path shadowRenderTargetsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderTargets.java");
+        String shadowRenderTargetsSource = Files.readString(shadowRenderTargetsFile);
+        assertTrue(shadowRenderTargetsSource.contains("DepthCopyStrategy.fastestDepthSnapshot(false).copy("),
+            "ShadowRenderTargets should reuse the Vulkan-safe depth snapshot strategy after the initial blit");
 
         Path dhCompatInternalFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/DHCompatInternal.java");
         String dhCompatInternalSource = Files.readString(dhCompatInternalFile);
@@ -3759,6 +3797,41 @@ public class Phase3DrawPathTest {
         String dhTextureStateSource = Files.readString(dhTextureStateFile);
         assertTrue(dhTextureStateSource.contains("VulkanicAPI.bindTexture2D("),
             "DhTextureState should bind textures through VulkanicAPI.bindTexture2D");
+    }
+
+    @Test
+    public void testIrisComputePipelinesFailOpenWhenComputeUnsupported() throws IOException {
+        Path programBuilderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramBuilder.java");
+        String programBuilderSource = Files.readString(programBuilderFile);
+
+        assertTrue(programBuilderSource.contains("beginComputeIfSupported("),
+            "ProgramBuilder should expose a compute fail-open helper for unsupported runtimes");
+        assertTrue(programBuilderSource.contains("return null;"),
+            "ProgramBuilder compute fail-open helper should return null when compute is unsupported");
+        assertTrue(programBuilderSource.contains("Skipping compute shader program"),
+            "ProgramBuilder compute fail-open helper should log when compute programs are skipped");
+
+        List<String> pipelineFiles = List.of(
+            "net/irisshaders/iris/shadows/ShadowCompositeRenderer.java",
+            "net/irisshaders/iris/pipeline/CompositeRenderer.java",
+            "net/irisshaders/iris/pipeline/FinalPassRenderer.java",
+            "net/irisshaders/iris/pipeline/IrisRenderingPipeline.java"
+        );
+
+        for (String relative : pipelineFiles) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertTrue(source.contains("ProgramBuilder.beginComputeIfSupported("),
+                "Iris compute pipeline should use compute fail-open helper: " + relative);
+        }
+
+        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java")).contains("ProgramBuilder.beginCompute("),
+            "ShadowCompositeRenderer should not use fatal compute builder directly");
+        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java")).contains("ProgramBuilder.beginCompute("),
+            "CompositeRenderer should not use fatal compute builder directly");
+        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java")).contains("ProgramBuilder.beginCompute("),
+            "FinalPassRenderer should not use fatal compute builder directly");
+        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java")).contains("ProgramBuilder.beginCompute("),
+            "IrisRenderingPipeline should not use fatal compute builder directly");
     }
 
     @Test

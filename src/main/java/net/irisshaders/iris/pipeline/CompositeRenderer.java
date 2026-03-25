@@ -276,43 +276,42 @@ public class CompositeRenderer {
 		GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
 		VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 
-		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Composites", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
-			renderPass.setPipeline(COMPOSITE_PIPELINE);
-			renderPass.setIndexBuffer(indices, type);
-			renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
-
-			for (int i = 0, passesSize = passes.size(); i < passesSize; i++) {
-				Pass compositePass = passes.get(i);
-				GLDebug.pushGroup(20 * this.compositePass.ordinal() + i, compositePass.name);
-				boolean ranCompute = false;
-				for (ComputeProgram computeProgram : compositePass.computes) {
-					if (computeProgram != null) {
-						ranCompute = true;
-						computeProgram.use();
-						this.customUniforms.push(computeProgram);
-						computeProgram.dispatch(main.width, main.height);
-					}
+		for (int i = 0, passesSize = passes.size(); i < passesSize; i++) {
+			Pass compositePass = passes.get(i);
+			GLDebug.pushGroup(20 * this.compositePass.ordinal() + i, compositePass.name);
+			boolean ranCompute = false;
+			for (ComputeProgram computeProgram : compositePass.computes) {
+				if (computeProgram != null) {
+					ranCompute = true;
+					computeProgram.use();
+					this.customUniforms.push(computeProgram);
+					computeProgram.dispatch(main.width, main.height);
 				}
+			}
 
-				if (ranCompute) {
-					IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
+			if (ranCompute) {
+				IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
+			}
+
+			Program.unbind();
+
+			if (compositePass instanceof ComputeOnlyPass) {
+				GLDebug.popGroup();
+				continue;
+			}
+
+			if (!compositePass.mipmappedBuffers.isEmpty()) {
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
+
+				for (int index : compositePass.mipmappedBuffers) {
+					setupMipmapping(CompositeRenderer.this.renderTargets.get(index), compositePass.stageReadsFromAlt.contains(index));
 				}
+			}
 
-				Program.unbind();
-
-				if (compositePass instanceof ComputeOnlyPass) {
-					GLDebug.popGroup();
-					continue;
-				}
-
-				if (!compositePass.mipmappedBuffers.isEmpty()) {
-					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
-
-					for (int index : compositePass.mipmappedBuffers) {
-						setupMipmapping(CompositeRenderer.this.renderTargets.get(index), compositePass.stageReadsFromAlt.contains(index));
-					}
-				}
-
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Composites", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
+				renderPass.setPipeline(COMPOSITE_PIPELINE);
+				renderPass.setIndexBuffer(indices, type);
+				renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
 				renderPass.iris$setCustomPass(compositePass);
 
 				float scaledWidth = compositePass.viewWidth * compositePass.viewportScale.scale();
@@ -327,10 +326,10 @@ public class CompositeRenderer {
 				this.customUniforms.push(compositePass.program);
 
 				renderPass.drawIndexed(0, 0, 6, 1);
-
-				BlendModeOverride.restore();
-				GLDebug.popGroup();
 			}
+
+			BlendModeOverride.restore();
+			GLDebug.popGroup();
 		}
 
 
@@ -434,12 +433,16 @@ public class CompositeRenderer {
 
 					ShaderPrinter.printProgram(source.getName()).addSource(PatchShaderType.COMPUTE, transformed).print();
 
-					builder = ProgramBuilder.beginCompute(source.getName(), transformed, IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
+					builder = ProgramBuilder.beginComputeIfSupported(source.getName(), transformed, IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
 				} catch (ShaderCompileException e) {
 					throw e;
 				} catch (RuntimeException e) {
 					// TODO: Better error handling
 					throw new RuntimeException("Shader compilation failed for compute " + source.getName() + "!", e);
+				}
+
+				if (builder == null) {
+					continue;
 				}
 
 				ProgramSamplers.CustomTextureSamplerInterceptor customTextureSamplerInterceptor = ProgramSamplers.customTextureSamplerInterceptor(builder, customTextureIds, flippedAtLeastOnceSnapshot);

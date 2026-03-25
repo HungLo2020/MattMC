@@ -538,12 +538,16 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 					ShaderPrinter.printProgram(source.getName()).addSource(PatchShaderType.COMPUTE, transformed).print();
 
-					builder = ProgramBuilder.beginCompute(source.getName(), transformed, IrisSamplers.WORLD_RESERVED_TEXTURE_UNITS);
+					builder = ProgramBuilder.beginComputeIfSupported(source.getName(), transformed, IrisSamplers.WORLD_RESERVED_TEXTURE_UNITS);
 				} catch (ShaderCompileException e) {
 					throw e;
 				} catch (RuntimeException e) {
 					// TODO: Better error handling
 					throw new RuntimeException("Shader compilation failed for compute " + source.getName() + "!", e);
+				}
+
+				if (builder == null) {
+					continue;
 				}
 
 				CommonUniforms.addDynamicUniforms(builder, FogMode.OFF);
@@ -601,10 +605,14 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 					ShaderPrinter.printProgram(source.getName()).addSource(PatchShaderType.COMPUTE, transformed).print();
 
-					builder = ProgramBuilder.beginCompute(source.getName(), transformed, IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
+					builder = ProgramBuilder.beginComputeIfSupported(source.getName(), transformed, IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
 				} catch (RuntimeException e) {
 					// TODO: Better error handling
 					throw new RuntimeException("Shader compilation failed for setup compute " + source.getName() + "!", e);
+				}
+
+				if (builder == null) {
+					continue;
 				}
 
 				CommonUniforms.addDynamicUniforms(builder, FogMode.OFF);

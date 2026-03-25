@@ -121,10 +121,9 @@ public class GlCommandEncoder implements CommandEncoder {
 				this.inRenderPass = true;
 				this.device.debugLabels().pushDebugGroup(supplier);
 
-				// Iris: In shadow rendering, Iris manages the FBO directly.
-				// Keep the Vulkan-owned render-pass path for non-shadow rendering so
-				// startup/menu passes render into the presented color target.
-				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+				// Iris: the shadow temp-FBO shortcut is only safe on the immediate/OpenGL seam.
+				// Recorded Vulkan shadow passes still need a real backend beginRenderPass.
+				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() && commandContext().isImmediate()) {
 					// Iris shadow path: use GlTexture's cached FBO but do not bind it.
 					int i = VulkanicAPI.resolveFramebufferForTextures(gpuTextureView.texture(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
 					this.iris$tempFBO = i;
@@ -1114,7 +1113,8 @@ public class GlCommandEncoder implements CommandEncoder {
 		// Iris: From MixinGlCommandEncoder - Unlock depth color and handle custom passes
 		net.irisshaders.iris.gl.blending.DepthColorStorage.unlockDepthColor();
 		
-		if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
+		if (commandContext().isImmediate()
+			&& net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
 			&& !(glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader)) {
 			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), iris$tempFBO);
 		}
