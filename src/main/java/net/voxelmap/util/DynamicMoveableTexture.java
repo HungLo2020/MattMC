@@ -1,7 +1,7 @@
 package net.voxelmap.util;
 
-import net.blaze3d.opengl.GlTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryUtil;
 
 public class DynamicMoveableTexture extends DynamicTexture {
@@ -20,7 +20,7 @@ public class DynamicMoveableTexture extends DynamicTexture {
     }
 
     public int getIndex() {
-        return ((GlTexture) this.getTexture()).glId();
+        return net.vulkanic.VulkanicCoreAPI.textureId(this.getTexture());
     }
 
     public void moveX(int offset) {

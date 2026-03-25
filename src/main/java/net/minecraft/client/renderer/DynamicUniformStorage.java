@@ -2,7 +2,6 @@ package net.minecraft.client.renderer;
 
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.logging.LogUtils;
 import java.nio.ByteBuffer;
@@ -27,8 +26,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 	private final String label;
 
 	public DynamicUniformStorage(String string, int i, int j) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		this.blockSize = Mth.roundToward(i, gpuDevice.getUniformOffsetAlignment());
+		this.blockSize = Mth.roundToward(i, net.vulkanic.VulkanicAPI.getBackendUniformOffsetAlignment());
 		this.capacity = Mth.smallestEncompassingPowerOfTwo(j);
 		this.nextBlock = 0;
 		this.ringBuffer = new MappableRingBuffer(() -> string + " x" + this.blockSize, 130, this.blockSize * this.capacity);
@@ -68,8 +66,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 
 			int i = this.nextBlock * this.blockSize;
 
-			try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice()
-					.createCommandEncoder()
+			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder()
 					.mapBuffer(this.ringBuffer.currentBuffer().slice(i, this.blockSize), false, true)) {
 				dynamicUniform.write(mappedView.data());
 			}
@@ -93,8 +90,7 @@ public class DynamicUniformStorage<T extends DynamicUniformStorage.DynamicUnifor
 			int i = this.nextBlock * this.blockSize;
 			GpuBufferSlice[] gpuBufferSlices = new GpuBufferSlice[dynamicUniforms.length];
 
-			try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice()
-					.createCommandEncoder()
+			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder()
 					.mapBuffer(this.ringBuffer.currentBuffer().slice(i, dynamicUniforms.length * this.blockSize), false, true)) {
 				ByteBuffer byteBuffer = mappedView.data();
 

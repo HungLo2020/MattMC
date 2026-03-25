@@ -1,15 +1,15 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.SSAORenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
-import com.seibel.distanthorizons.core.util.NumberUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -23,10 +23,10 @@ public class SSAOShader extends AbstractShaderRenderer
 {
 	public static SSAOShader INSTANCE = new SSAOShader();
 	
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
-	
-	public int frameBuffer;
+	public DhFramebuffer frameBuffer;
+	private DhFramebuffer activeFrameBuffer;
+	private int activeDepthTextureId = -1;
 	
 	private Mat4f projection;
 	private Mat4f invertedProjection;
@@ -83,32 +83,32 @@ public class SSAOShader extends AbstractShaderRenderer
 	}
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
-		this.shader.setUniform(this.uProj, this.projection);
+		this.shader.setUniform(ctx, this.uProj, this.projection);
 		
-		this.shader.setUniform(this.uInvProj, this.invertedProjection);
+		this.shader.setUniform(ctx, this.uInvProj, this.invertedProjection);
 		
-		this.shader.setUniform(this.uSampleCount, Config.Client.Advanced.Graphics.Ssao.sampleCount.get());
+		this.shader.setUniform(ctx, this.uSampleCount, Config.Client.Advanced.Graphics.Ssao.sampleCount.get());
 		
 		// Explicit Number casts need to be done to prevent issues with the default value being an int
 		Number radius = Config.Client.Advanced.Graphics.Ssao.radius.get(); 
-		this.shader.setUniform(this.uRadius, radius.floatValue());
+		this.shader.setUniform(ctx, this.uRadius, radius.floatValue());
 		
 		Number strength = Config.Client.Advanced.Graphics.Ssao.strength.get();
-		this.shader.setUniform(this.uStrength, strength.floatValue());
+		this.shader.setUniform(ctx, this.uStrength, strength.floatValue());
 		
 		Number minLight = Config.Client.Advanced.Graphics.Ssao.minLight.get();
-		this.shader.setUniform(this.uMinLight, minLight.floatValue());
+		this.shader.setUniform(ctx, this.uMinLight, minLight.floatValue());
 		
 		Number bias = Config.Client.Advanced.Graphics.Ssao.bias.get();
-		this.shader.setUniform(this.uBias, bias.floatValue());
+		this.shader.setUniform(ctx, this.uBias, bias.floatValue());
 		
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDepthMap, 0);
+		VulkanicAPI.setUniform1i(ctx, this.uDepthMap, 0);
 		
 		float fadeDistanceInBlocks = Config.Client.Advanced.Graphics.Ssao.fadeDistanceInBlocks.get().floatValue();
 		fadeDistanceInBlocks = MathUtil.clamp(0.0f, fadeDistanceInBlocks, Float.MAX_VALUE); // clamp to prevent accidentally setting a negative number
-		this.shader.setUniform(this.uFadeDistanceInBlocks, fadeDistanceInBlocks);
+		this.shader.setUniform(ctx, this.uFadeDistanceInBlocks, fadeDistanceInBlocks);
 	}
 	
 	
@@ -116,17 +116,33 @@ public class SSAOShader extends AbstractShaderRenderer
 	//========//
 	// render //
 	//========//
+
+	@Override
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
+	{
+		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		if (this.frameBuffer == null || depthTextureId == -1)
+		{
+			this.activeFrameBuffer = null;
+			this.activeDepthTextureId = -1;
+			return false;
+		}
+
+		this.activeFrameBuffer = this.frameBuffer;
+		this.activeDepthTextureId = depthTextureId;
+		return true;
+	}
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.frameBuffer);
-		GLMC.disableScissorTest();
-		GLMC.disableDepthTest();
-		GLMC.disableBlend();
+		this.activeFrameBuffer.bind(ctx);
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
+		DhTextureState.setActiveTextureUnitIndex(0);
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
 		
 		ScreenQuad.INSTANCE.render();
 	}

@@ -28,6 +28,14 @@ fi
 JAVA_CMD="$BUNDLED_JAVA"
 echo "Using bundled JDK ${JAVA_VERSION}"
 
+# Prefer bundled SPIR-V compiler when present
+SPIRV_COMPILER="${SCRIPT_DIR}/../libraries/deps/glslangValidator"
+SPIRV_JVM_ARG=""
+if [[ -x "$SPIRV_COMPILER" ]]; then
+    SPIRV_JVM_ARG="-Dvulkanic.spirv.compiler=$SPIRV_COMPILER"
+    echo "Using bundled SPIR-V compiler"
+fi
+
 # Launch the dedicated server
 # Note: Server runs in headless mode by default (--nogui)
 # Remove --nogui to run with GUI
@@ -42,6 +50,7 @@ else
 fi
 
 $JAVA_CMD $JVM_ARGS \
+    $SPIRV_JVM_ARG \
     -cp "@CLASSPATH_LINUX@" \
     net.minecraft.server.Main \
     --nogui

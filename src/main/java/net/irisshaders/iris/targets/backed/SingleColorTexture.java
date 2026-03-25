@@ -1,6 +1,5 @@
 package net.irisshaders.iris.targets.backed;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
@@ -12,7 +11,7 @@ import java.nio.ByteBuffer;
 
 public class SingleColorTexture extends GlResource {
 	public SingleColorTexture(int red, int green, int blue, int alpha) {
-		super(IrisRenderSystem.createTexture(VulkanicAPI.GL_TEXTURE_2D));
+		super(IrisRenderSystem.createTexture2D());
 		ByteBuffer pixel = BufferUtils.createByteBuffer(4);
 		pixel.put((byte) red);
 		pixel.put((byte) green);
@@ -24,13 +23,11 @@ public class SingleColorTexture extends GlResource {
 
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, "single color (" + red + ", " + green + "," + blue + "," + alpha + ")");
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_REPEAT);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_REPEAT);
+		IrisRenderSystem.setTextureLinearFiltering(texture);
+		IrisRenderSystem.setTextureWrapMode2D(texture, false);
 
 		TextureUploadHelper.resetTextureUploadState();
-		IrisRenderSystem.texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA, 1, 1, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, pixel);
+		IrisRenderSystem.texImage2D(texture, 0, VulkanicAPI.GL_RGBA, 1, 1, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, pixel);
 	}
 
 	public int getTextureId() {
@@ -39,6 +36,6 @@ public class SingleColorTexture extends GlResource {
 
 	@Override
 	protected void destroyInternal() {
-		GlStateManager._deleteTexture(getGlId());
+		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(getGlId());
 	}
 }

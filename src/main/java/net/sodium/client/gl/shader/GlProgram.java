@@ -7,6 +7,9 @@ import net.sodium.client.render.chunk.shader.ShaderBindingContext;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
+import net.vulkanic.VulkanicUniformLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -22,6 +25,10 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     private final T shaderInterface;
 
+    private static CommandContext commandContext() {
+        return VulkanicAPI.getCommandContext();
+    }
+
     protected GlProgram(int program, Function<ShaderBindingContext, T> interfaceFactory) {
         this.setHandle(program);
         this.shaderInterface = interfaceFactory.apply(this);
@@ -36,24 +43,25 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
     }
 
     public void bind() {
-        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        CommandContext ctx = commandContext();
         VulkanicAPI.bindShaderProgram(ctx, this.handle());
     }
 
     public void unbind() {
-        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        CommandContext ctx = commandContext();
         VulkanicAPI.bindShaderProgram(ctx, 0);
     }
 
     public void delete() {
-        VulkanicAPI.deleteProgram(VulkanicAPI.getImmediateContext(), this.handle());
+        VulkanicAPI.deleteProgram(commandContext(), VulkanicProgramHandle.of(this.handle()));
 
         this.invalidateHandle();
     }
 
     @Override
     public <U extends GlUniform<?>> @NotNull U bindUniform(String name, IntFunction<U> factory) {
-        int index = VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.handle(), name);
+        VulkanicUniformLocation location = VulkanicAPI.resolveUniformLocation(commandContext(), this.handle(), name);
+        int index = location.value();
 
         if (index < 0) {
             throw new NullPointerException("No uniform exists with name: " + name);
@@ -64,7 +72,8 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public <U extends GlUniform<?>> U bindUniformOptional(String name, IntFunction<U> factory) {
-        int index = VulkanicAPI.getUniformLocation(VulkanicAPI.getImmediateContext(), this.handle(), name);
+        VulkanicUniformLocation location = VulkanicAPI.resolveUniformLocation(commandContext(), this.handle(), name);
+        int index = location.value();
 
         if (index < 0) {
             return null;
@@ -75,41 +84,43 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public @NotNull GlUniformBlock bindUniformBlock(String name, int bindingPoint) {
-        int index = VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), this.handle(), name);
+        CommandContext ctx = commandContext();
+        int index = VulkanicAPI.getUniformBlockIndex(ctx, this.handle(), name);
 
         if (index < 0) {
             throw new NullPointerException("No uniform block exists with name: " + name);
         }
 
-        VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), this.handle(), index, bindingPoint);
+        VulkanicAPI.uniformBlockBinding(ctx, this.handle(), index, bindingPoint);
 
         return new GlUniformBlock(bindingPoint);
     }
 
     @Override
     public GlUniformBlock bindUniformBlockOptional(String name, int bindingPoint) {
-        int index = VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getImmediateContext(), this.handle(), name);
+        CommandContext ctx = commandContext();
+        int index = VulkanicAPI.getUniformBlockIndex(ctx, this.handle(), name);
 
         if (index < 0) {
             return null;
         }
 
-        VulkanicAPI.uniformBlockBinding(VulkanicAPI.getImmediateContext(), this.handle(), index, bindingPoint);
+        VulkanicAPI.uniformBlockBinding(ctx, this.handle(), index, bindingPoint);
 
         return new GlUniformBlock(bindingPoint);
     }
 
     public static class Builder {
         private final ResourceLocation name;
-        private final int program;
+        private final VulkanicProgramHandle program;
 
         public Builder(ResourceLocation name) {
             this.name = name;
-            this.program = VulkanicAPI.createShaderProgram(VulkanicAPI.getImmediateContext());
+            this.program = VulkanicAPI.createShaderProgramHandle(commandContext());
         }
 
         public Builder attachShader(GlShader shader) {
-            VulkanicAPI.attachShader(VulkanicAPI.getImmediateContext(), this.program, shader.handle());
+            VulkanicAPI.attachShader(commandContext(), this.program, VulkanicShaderHandle.of(shader.handle()));
 
             return this;
         }
@@ -124,31 +135,30 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
          * @return An instantiated shader container as provided by the factory
          */
         public <U> GlProgram<U> link(Function<ShaderBindingContext, U> factory) {
-            VulkanicAPI.linkProgram(VulkanicAPI.getImmediateContext(), this.program);
+            CommandContext ctx = commandContext();
+            VulkanicAPI.linkProgram(ctx, this.program);
 
-            String log = VulkanicAPI.getProgramInfoLog(VulkanicAPI.getImmediateContext(), this.program);
+            String log = VulkanicAPI.getProgramInfoLog(ctx, this.program);
 
             if (!log.isEmpty()) {
                 LOGGER.warn("Program link log for " + this.name + ": " + log);
             }
 
-            int result = VulkanicAPI.getProgramParameter(VulkanicAPI.getImmediateContext(), this.program, VulkanicAPI.GL_LINK_STATUS);
-
-            if (result != 1) { // GL_TRUE
+            if (!VulkanicAPI.isProgramLinkSuccessful(ctx, this.program)) {
                 throw new RuntimeException("Shader program linking failed, see log for details");
             }
 
-            return new GlProgram<>(this.program, factory);
+            return new GlProgram<>(this.program.value(), factory);
         }
 
         public Builder bindAttribute(String name, int index) {
-            VulkanicAPI.setAttributeLocation(VulkanicAPI.getImmediateContext(), this.program, index, name);
+            VulkanicAPI.setAttributeLocation(commandContext(), this.program.value(), index, name);
 
             return this;
         }
 
         public Builder bindFragmentData(String name, int index) {
-            VulkanicAPI.bindFragDataLocation(VulkanicAPI.getImmediateContext(), this.program, index, name);
+            VulkanicAPI.bindFragDataLocation(commandContext(), this.program.value(), index, name);
 
             return this;
         }

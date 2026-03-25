@@ -1,6 +1,5 @@
 package net.sodium.client.render.chunk.shader;
 
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.sodium.client.gl.device.GLRenderDevice;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat2v;
@@ -14,6 +13,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureTarget;
 import org.joml.Matrix4fc;
 
 import java.util.EnumMap;
@@ -76,13 +77,13 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
 
     @Deprecated(forRemoval = true) // should be handled properly in GFX instead.
     private void bindTexture(ChunkShaderTextureSlot slot, GpuTextureView textureView) {
-        GlTexture tex = (GlTexture) textureView.texture();
-        CommandContext ctx = VulkanicAPI.getImmediateContext();
-        VulkanicAPI.setActiveTextureUnit(ctx, VulkanicAPI.GL_TEXTURE0 + slot.ordinal());
-        VulkanicAPI.bindTexture2D(ctx, tex.glId());
-        VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, textureView.baseMipLevel());
-        VulkanicAPI.setTextureParameter(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
-        tex.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
+        var tex = textureView.texture();
+        CommandContext ctx = VulkanicAPI.getCommandContext();
+        VulkanicAPI.setActiveTextureUnitIndex(ctx, slot.ordinal());
+        VulkanicAPI.bindTexture2D(ctx, net.vulkanic.VulkanicCoreAPI.textureId(tex));
+        VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, textureView.baseMipLevel());
+        VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
+        tex.flushModeChanges2D();
 
         var uniform = this.uniformTextures.get(slot);
         uniform.setInt(slot.ordinal());

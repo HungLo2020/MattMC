@@ -3,7 +3,6 @@ package net.minecraft.client.renderer;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
@@ -24,8 +23,7 @@ public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	public CachedPerspectiveProjectionMatrixBuffer(String string, float f, float g) {
 		this.zNear = f;
 		this.zFar = g;
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		this.buffer = gpuDevice.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
+		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 		this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 	}
 
@@ -35,7 +33,7 @@ public class CachedPerspectiveProjectionMatrixBuffer implements AutoCloseable {
 
 			try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 				ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE).putMat4f(matrix4f).get();
-				RenderSystem.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
+				net.vulkanic.VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
 			}
 
 			this.width = i;

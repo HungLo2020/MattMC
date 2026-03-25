@@ -1,13 +1,15 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public class DhFadeShader extends AbstractShaderRenderer
@@ -15,10 +17,13 @@ public class DhFadeShader extends AbstractShaderRenderer
 	public static DhFadeShader INSTANCE = new DhFadeShader();
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
-	public int frameBuffer = -1;
+	public DhFramebuffer frameBuffer;
+	private DhFramebuffer activeFrameBuffer;
+	private int activeDepthTextureId = -1;
+	private int activeColorTextureId = -1;
+	private int activeMcColorTextureId = -1;
 	
 	private Mat4f inverseDhMvmProjMatrix;
 	
@@ -75,17 +80,17 @@ public class DhFadeShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
-		this.shader.setUniform(this.uDhInvMvmProj, this.inverseDhMvmProjMatrix);
+		this.shader.setUniform(ctx, this.uDhInvMvmProj, this.inverseDhMvmProjMatrix);
 		
 		
 		float dhFarClipDistance = RenderUtil.getFarClipPlaneDistanceInBlocks();
 		float fadeStartDistance = dhFarClipDistance * 0.5f;
 		float fadeEndDistance = dhFarClipDistance * 0.9f;
 		
-		this.shader.setUniform(this.uStartFadeBlockDistance, fadeStartDistance);
-		this.shader.setUniform(this.uEndFadeBlockDistance, fadeEndDistance);
+		this.shader.setUniform(ctx, this.uStartFadeBlockDistance, fadeStartDistance);
+		this.shader.setUniform(ctx, this.uEndFadeBlockDistance, fadeEndDistance);
 		
 	}
 	
@@ -104,40 +109,53 @@ public class DhFadeShader extends AbstractShaderRenderer
 	//========//
 	// render //
 	//========//
-	
+
 	@Override
-	protected void onRender()
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
 		int colorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
-		
+		int mcColorTextureId = MC_RENDER.getColorTextureId();
+
 		if (depthTextureId == -1
-			|| colorTextureId == -1)
+			|| colorTextureId == -1
+			|| mcColorTextureId == -1
+			|| this.frameBuffer == null)
 		{
-			// the renderer is currently being re-built and/or inactive,
-			// we don't need to/can't render fading
-			return;
+			this.activeDepthTextureId = -1;
+			this.activeColorTextureId = -1;
+			this.activeMcColorTextureId = -1;
+			this.activeFrameBuffer = null;
+			return false;
 		}
+
+		this.activeDepthTextureId = depthTextureId;
+		this.activeColorTextureId = colorTextureId;
+		this.activeMcColorTextureId = mcColorTextureId;
+		this.activeFrameBuffer = this.frameBuffer;
+		return true;
+	}
+	
+	@Override
+	protected void onRender(CommandContext ctx)
+	{
+		this.activeFrameBuffer.bind(ctx);
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
 		
+		DhTextureState.setActiveTextureUnitIndex(0);
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
+		VulkanicAPI.setUniform1i(ctx, this.uDhDepthTexture, 0);
 		
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.frameBuffer);
-		GLMC.disableScissorTest();
-		GLMC.disableDepthTest();
-		GLMC.disableBlend();
+		DhTextureState.setActiveTextureUnitIndex(1);
+		DhTextureState.bindTexture2D(this.activeMcColorTextureId);
+		VulkanicAPI.setUniform1i(ctx, this.uMcColorTexture, 1);
 		
-		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(depthTextureId);
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhDepthTexture, 0);
-		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(MC_RENDER.getColorTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uMcColorTexture, 1);
-		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2);
-		GLMC.glBindTexture(colorTextureId);
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDhColorTexture, 2);
+		DhTextureState.setActiveTextureUnitIndex(2);
+		DhTextureState.bindTexture2D(this.activeColorTextureId);
+		VulkanicAPI.setUniform1i(ctx, this.uDhColorTexture, 2);
 		
 		
 		ScreenQuad.INSTANCE.render();

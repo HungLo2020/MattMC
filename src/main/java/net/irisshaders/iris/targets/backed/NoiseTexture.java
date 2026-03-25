@@ -1,6 +1,5 @@
 package net.irisshaders.iris.targets.backed;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
@@ -19,38 +18,34 @@ public class NoiseTexture extends GlResource {
 	int height;
 
 	public NoiseTexture(int width, int height) {
-		super(IrisRenderSystem.createTexture(VulkanicAPI.GL_TEXTURE_2D));
+		super(IrisRenderSystem.createTexture2D());
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		int texture = getGlId();
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_REPEAT);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_REPEAT);
-
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_LOD, 0);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LOD, 0);
-		IrisRenderSystem.texParameterf(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_LOD_BIAS, 0.0F);
+		IrisRenderSystem.setTextureLinearFiltering(texture);
+		IrisRenderSystem.setTextureWrapMode2D(texture, false);
+		IrisRenderSystem.resetTextureLodRangeToZero(texture);
 		resize(texture, width, height);
 
 		GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, "noise texture");
 
-		GlStateManager._bindTexture(0);
+		VulkanicAPI.bindTexture2D(ctx, 0);
 	}
 
 	void resize(int texture, int width, int height) {
 		this.width = width;
 		this.height = height;
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		ByteBuffer pixels = generateNoise();
 
 		TextureUploadHelper.resetTextureUploadState();
 
 		// Since we're using tightly-packed RGB data, we must use an alignment of 1 byte instead of the usual 4 bytes.
-		GlStateManager._pixelStore(VulkanicAPI.GL_UNPACK_ALIGNMENT, 1);
-		IrisRenderSystem.texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGB, width, height, 0, VulkanicAPI.GL_RGB, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
+		VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ALIGNMENT, 1);
+		IrisRenderSystem.texImage2D(texture, 0, VulkanicAPI.GL_RGB, width, height, 0, VulkanicAPI.GL_RGB, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
 
-		GlStateManager._bindTexture(0);
+		VulkanicAPI.bindTexture2D(ctx, 0);
 	}
 
 	private ByteBuffer generateNoise() {
@@ -72,6 +67,6 @@ public class NoiseTexture extends GlResource {
 
 	@Override
 	protected void destroyInternal() {
-		GlStateManager._deleteTexture(getGlId());
+		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(getGlId());
 	}
 }

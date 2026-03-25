@@ -10,7 +10,6 @@ import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.platform.Lighting;
 import net.blaze3d.platform.Window;
 import net.blaze3d.systems.CommandEncoder;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
@@ -62,6 +61,7 @@ import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
+import net.vulkanic.VulkanicAPI;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
@@ -81,7 +81,7 @@ public class GuiRenderer implements AutoCloseable {
 	public static final int GUI_3D_Z_NEAR = -1000;
 	public static final int DEFAULT_ITEM_SIZE = 16;
 	private static final int MINIMUM_ITEM_ATLAS_SIZE = 512;
-	private static final int MAXIMUM_ITEM_ATLAS_SIZE = RenderSystem.getDevice().getMaxTextureSize();
+	private static final int MAXIMUM_ITEM_ATLAS_SIZE = VulkanicAPI.getBackendMaxTextureSize();
 	public static final int CLEAR_COLOR = 0;
 	private static final Comparator<ScreenRectangle> SCISSOR_COMPARATOR = Comparator.nullsFirst(
 		Comparator.comparing(ScreenRectangle::top).thenComparing(ScreenRectangle::bottom).thenComparing(ScreenRectangle::left).thenComparing(ScreenRectangle::right)
@@ -210,7 +210,7 @@ public class GuiRenderer implements AutoCloseable {
 		if (!this.draws.isEmpty()) {
 			Minecraft minecraft = Minecraft.getInstance();
 			Window window = minecraft.getWindow();
-			RenderSystem.setProjectionMatrix(
+			net.vulkanic.VulkanicAPI.setProjectionMatrix(
 				this.guiProjectionMatrixBuffer.getBuffer((float)window.getWidth() / window.getGuiScale(), (float)window.getHeight() / window.getGuiScale()),
 				ProjectionType.ORTHOGRAPHIC
 			);
@@ -223,10 +223,10 @@ public class GuiRenderer implements AutoCloseable {
 				}
 			}
 
-			RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+			VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 			GpuBuffer gpuBuffer = autoStorageIndexBuffer.getBuffer(i);
 			VertexFormat.IndexType indexType = autoStorageIndexBuffer.type();
-			GpuBufferSlice gpuBufferSlice2 = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice2 = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(new Matrix4f().setTranslation(0.0F, 0.0F, -11000.0F), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 			if (this.firstDrawIndexAfterBlur > 0) {
 				this.executeDrawRange(
@@ -235,7 +235,7 @@ public class GuiRenderer implements AutoCloseable {
 			}
 
 			if (this.draws.size() > this.firstDrawIndexAfterBlur) {
-				RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
+				VulkanicAPI.createCommandEncoder().clearDepthTexture(renderTarget.getDepthTexture(), 1.0);
 				minecraft.gameRenderer.processBlurEffect();
 				this.executeDrawRange(
 					() -> "GUI after blur", renderTarget, gpuBufferSlice, gpuBufferSlice2, gpuBuffer, indexType, this.firstDrawIndexAfterBlur, this.draws.size()
@@ -254,16 +254,14 @@ public class GuiRenderer implements AutoCloseable {
 		int i,
 		int j
 	) {
-		try (RenderPass renderPass = RenderSystem.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(
 					supplier,
 					renderTarget.getColorTextureView(),
 					OptionalInt.empty(),
 					renderTarget.useDepth ? renderTarget.getDepthTextureView() : null,
 					OptionalDouble.empty()
 				)) {
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("Fog", gpuBufferSlice);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice2);
 
@@ -325,9 +323,9 @@ public class GuiRenderer implements AutoCloseable {
 				this.createAtlasTextures(k);
 			}
 
-			RenderSystem.outputColorTextureOverride = this.itemsAtlasView;
-			RenderSystem.outputDepthTextureOverride = this.itemsAtlasDepthView;
-			RenderSystem.setProjectionMatrix(this.itemsProjectionMatrixBuffer.getBuffer(k, k), ProjectionType.ORTHOGRAPHIC);
+			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(this.itemsAtlasView);
+			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(this.itemsAtlasDepthView);
+			net.vulkanic.VulkanicAPI.setProjectionMatrix(this.itemsProjectionMatrixBuffer.getBuffer(k, k), ProjectionType.ORTHOGRAPHIC);
 			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 			PoseStack poseStack = new PoseStack();
 			MutableBoolean mutableBoolean = new MutableBoolean(false);
@@ -356,7 +354,7 @@ public class GuiRenderer implements AutoCloseable {
 									int kx = bl ? atlasPosition.x : this.itemAtlasX;
 									int l = bl ? atlasPosition.y : this.itemAtlasY;
 									if (bl) {
-										RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0, kx, k - l - j, j, j);
+										VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0, kx, k - l - j, j, j);
 									}
 
 									this.renderItemToAtlas(trackingItemStackRenderState, poseStack, kx, l, j);
@@ -380,8 +378,8 @@ public class GuiRenderer implements AutoCloseable {
 						}
 					}
 				);
-			RenderSystem.outputColorTextureOverride = null;
-			RenderSystem.outputDepthTextureOverride = null;
+			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(null);
+			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(null);
 			if (mutableBoolean2.getValue()) {
 				this.renderState
 					.forEachItem(
@@ -426,11 +424,11 @@ public class GuiRenderer implements AutoCloseable {
 			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 		}
 
-		RenderSystem.enableScissorForRenderTypeDraws(i, this.itemsAtlas.getHeight(0) - j - k, k, k);
+		net.vulkanic.VulkanicAPI.enableScissorForRenderTypeDraws(i, this.itemsAtlas.getHeight(0) - j - k, k, k);
 		trackingItemStackRenderState.submit(poseStack, this.submitNodeCollector, 15728880, OverlayTexture.NO_OVERLAY, 0);
 		this.featureRenderDispatcher.renderAllFeatures();
 		this.bufferSource.endBatch();
-		RenderSystem.disableScissorForRenderTypeDraws();
+		net.vulkanic.VulkanicAPI.disableScissorForRenderTypeDraws();
 		poseStack.popPose();
 	}
 
@@ -459,13 +457,12 @@ public class GuiRenderer implements AutoCloseable {
 	}
 
 	private void createAtlasTextures(int i) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		this.itemsAtlas = gpuDevice.createTexture("UI items atlas", 12, TextureFormat.RGBA8, i, i, 1, 1);
+		this.itemsAtlas = VulkanicAPI.createTexture("UI items atlas", 12, TextureFormat.RGBA8, i, i, 1, 1);
 		this.itemsAtlas.setTextureFilter(FilterMode.NEAREST, false);
-		this.itemsAtlasView = gpuDevice.createTextureView(this.itemsAtlas);
-		this.itemsAtlasDepth = gpuDevice.createTexture("UI items atlas depth", 8, TextureFormat.DEPTH32, i, i, 1, 1);
-		this.itemsAtlasDepthView = gpuDevice.createTextureView(this.itemsAtlasDepth);
-		gpuDevice.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0);
+		this.itemsAtlasView = VulkanicAPI.createTextureView(this.itemsAtlas);
+		this.itemsAtlasDepth = VulkanicAPI.createTexture("UI items atlas depth", 8, TextureFormat.DEPTH32, i, i, 1, 1);
+		this.itemsAtlasDepthView = VulkanicAPI.createTextureView(this.itemsAtlasDepth);
+		VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0);
 	}
 
 	private int calculateAtlasSizeInPixels(int i) {
@@ -547,7 +544,7 @@ public class GuiRenderer implements AutoCloseable {
 
 	private void recordDraws() {
 		this.ensureVertexBufferSizes();
-		CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+		CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 		Object2IntMap<VertexFormat> object2IntMap = new Object2IntOpenHashMap<>();
 
 		for (GuiRenderer.MeshToDraw meshToDraw : this.meshesToDraw) {

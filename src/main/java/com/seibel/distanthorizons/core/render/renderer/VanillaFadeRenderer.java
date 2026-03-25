@@ -2,18 +2,23 @@ package com.seibel.distanthorizons.core.render.renderer;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.GLState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.renderer.shaders.DhFadeShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FadeApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.VanillaFadeShader;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicTextureTarget;
 
 import java.nio.ByteBuffer;
 
@@ -31,14 +36,13 @@ public class VanillaFadeRenderer
 	
 	private static final IMinecraftClientWrapper MC_CLIENT = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	private boolean init = false;
 	
 	private int width = -1;
 	private int height = -1;
-	private int fadeFramebuffer = -1;
+	private DhFramebuffer fadeFramebuffer;
 	
 	private int fadeTexture = -1;
 	
@@ -59,16 +63,15 @@ public class VanillaFadeRenderer
 		FadeApplyShader.INSTANCE.init();
 	}
 	
-	private void createFramebuffer(int width, int height)
+	private void createFramebuffer(CommandContext ctx, int width, int height, int mcColorTextureId)
 	{
-		if (this.fadeFramebuffer != -1)
+		if (this.fadeFramebuffer != null)
 		{
-			VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.fadeFramebuffer);
-			this.fadeFramebuffer = -1;
+			this.fadeFramebuffer.destroy(ctx);
+			this.fadeFramebuffer = null;
 		}
 		
-		this.fadeFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fadeFramebuffer);
+		this.fadeFramebuffer = new DhFramebuffer();
 		
 		
 		// Applying the fade texture is only needed if MC is drawing to their own frame buffer,
@@ -77,20 +80,20 @@ public class VanillaFadeRenderer
 		{
 			if (this.fadeTexture != -1)
 			{
-				GLMC.glDeleteTextures(this.fadeTexture);
+				VulkanicAPI.deleteTexture(ctx, this.fadeTexture);
 				this.fadeTexture = -1;
 			}
 			
-			this.fadeTexture = VulkanicAPI.createTexture2D(net.vulkanic.VulkanicAPI.getImmediateContext());
-			GLMC.glBindTexture(this.fadeTexture);
-			VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fadeTexture, 0);
+			this.fadeTexture = VulkanicAPI.createTexture2D(ctx);
+			DhTextureState.bindTexture2D(this.fadeTexture);
+			VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
+			this.fadeFramebuffer.addColorAttachment(ctx, 0, this.fadeTexture);
 		}
 		else
 		{
-			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, MC_RENDER.getColorTextureId(), 0);
+			this.fadeFramebuffer.addColorAttachment(ctx, 0, mcColorTextureId);
 		}
 	}
 	
@@ -117,22 +120,49 @@ public class VanillaFadeRenderer
 		profiler.push("DH-Vanilla Fade");
 		
 		
-		GLState mcState = new GLState();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		GLState mcState = new GLState(ctx);
 		
 		try
 		{
 			profiler.push("Vanilla Fade Generate");
 			
 			this.init();
+			int mcColorTextureId = -1;
+			if (!MC_RENDER.mcRendersToFrameBuffer())
+			{
+				mcColorTextureId = MC_RENDER.getColorTextureId();
+				if (mcColorTextureId == -1)
+				{
+					return;
+				}
+			}
 			
 			// resize the framebuffer if necessary
 			int width = MC_RENDER.getTargetFramebufferViewportWidth();
 			int height = MC_RENDER.getTargetFramebufferViewportHeight();
+			if (width <= 0 || height <= 0)
+			{
+				this.width = -1;
+				this.height = -1;
+				return;
+			}
+
 			if (this.width != width || this.height != height)
 			{
 				this.width = width;
 				this.height = height;
-				this.createFramebuffer(width, height);
+				this.createFramebuffer(ctx, width, height, mcColorTextureId);
+			}
+
+			if (this.fadeFramebuffer == null)
+			{
+				return;
+			}
+
+			if (MC_RENDER.mcRendersToFrameBuffer() && this.fadeTexture == -1)
+			{
+				return;
 			}
 			
 			
@@ -149,7 +179,8 @@ public class VanillaFadeRenderer
 				
 				FadeApplyShader.INSTANCE.fadeTexture = this.fadeTexture;
 				FadeApplyShader.INSTANCE.readFramebuffer = DhFadeShader.INSTANCE.frameBuffer;
-				FadeApplyShader.INSTANCE.drawFramebuffer = MC_RENDER.getTargetFramebuffer();
+				FadeApplyShader.INSTANCE.drawToMinecraftTarget = true;
+				FadeApplyShader.INSTANCE.drawToLodTarget = false;
 				FadeApplyShader.INSTANCE.render(partialTicks);
 			}
 			
@@ -163,7 +194,7 @@ public class VanillaFadeRenderer
 		{
 			// make sure we always revert to MC's state to prevent GL state corruption
 			// this is especially important on MC 1.16.5 or when other rendering mods are present
-			mcState.restore();
+			mcState.restore(ctx);
 		}
 	}
 	

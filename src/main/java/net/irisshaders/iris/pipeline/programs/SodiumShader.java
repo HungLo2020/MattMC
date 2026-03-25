@@ -1,9 +1,6 @@
 package net.irisshaders.iris.pipeline.programs;
 
 import com.google.common.collect.ImmutableSet;
-import net.blaze3d.opengl.GlStateManager;
-import net.blaze3d.opengl.GlTexture;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTextureView;
 import net.sodium.client.gl.device.GLRenderDevice;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat2v;
@@ -23,6 +20,7 @@ import net.irisshaders.iris.gl.program.ProgramSamplers;
 import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.irisshaders.iris.samplers.IrisSamplers;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.irisshaders.iris.uniforms.CommonUniforms;
@@ -35,6 +33,8 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureTarget;
 
 import java.util.List;
 import java.util.Locale;
@@ -155,13 +155,13 @@ public class SodiumShader implements ChunkShaderInterface {
 		DepthColorStorage.unlockDepthColor();
 
 		applyBlendModes();
-		RenderSystem.setShaderTexture(0, pass.getAtlas());
+		TextureTracker.INSTANCE.onSetShaderTexture(0, pass.getAtlas());
 		updateUniforms();
 		images.update();
 
 
 		if (isShadowPass) {
-			GlStateManager._disableCull();
+			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getCommandContext(), false);
 		}
 
 		var textureAtlas = Minecraft.getInstance()
@@ -189,17 +189,18 @@ public class SodiumShader implements ChunkShaderInterface {
 	}
 
 	private void bindTextures(GpuTextureView atlas) {
-		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0, atlas.texture().iris$getGlId());
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
-		GlStateManager._texParameter(3553, 33084, atlas.baseMipLevel());
-		GlStateManager._texParameter(3553, 33085, atlas.baseMipLevel() + atlas.mipLevels() - 1);
-		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+		atlas.texture().flushModeChanges2D();
+		IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(atlas));
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
+		VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, atlas.baseMipLevel());
+		VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, atlas.baseMipLevel() + atlas.mipLevels() - 1);
+		atlas.texture().flushModeChanges2D();
 
 		GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
-		((GlTexture) lightmap.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
-		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, lightmap.texture().iris$getGlId());
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + IrisSamplers.LIGHTMAP_TEXTURE_UNIT);
+		lightmap.texture().flushModeChanges2D();
+		IrisRenderSystem.bindTextureToUnit(2, net.vulkanic.VulkanicCoreAPI.textureId(lightmap));
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(IrisSamplers.LIGHTMAP_TEXTURE_UNIT);
 	}
 
 	private void applyBlendModes() {

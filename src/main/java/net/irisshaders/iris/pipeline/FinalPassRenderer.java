@@ -3,15 +3,14 @@ package net.irisshaders.iris.pipeline;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.features.FeatureFlags;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.gl.buffer.ShaderStorageBufferHolder;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
@@ -50,6 +49,9 @@ import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
@@ -123,7 +125,7 @@ public class FinalPassRenderer {
 		// passes that write to framebuffers).
 		this.baseline = renderTargets.createGbufferFramebuffer(flippedBuffers, new int[]{0});
 		this.colorHolder = new GlFramebuffer();
-		this.lastColorTextureId = Minecraft.getInstance().getMainRenderTarget().getColorTexture().iris$getGlId();
+		this.lastColorTextureId = VulkanicCoreAPI.textureId(Minecraft.getInstance().getMainRenderTarget().getColorTexture());
 		this.lastColorTextureVersion = ((Blaze3dRenderTargetExt) Minecraft.getInstance().getMainRenderTarget()).iris$getColorBufferVersion();
 		this.colorHolder.addColorAttachment(0, lastColorTextureId);
 
@@ -154,7 +156,8 @@ public class FinalPassRenderer {
 
 		this.swapPasses = swapPasses.build();
 
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindReadFramebuffer(ctx, 0);
 	}
 
 	private static void setupMipmapping(RenderTarget target, boolean readFromAlt) {
@@ -173,35 +176,37 @@ public class FinalPassRenderer {
 		//
 		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
 		// unlikely that this issue occurs in practice with most shader packs.
-		IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
+		IrisRenderSystem.generateMipmaps(texture);
 
-		int filter = VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
+		VulkanicTextureParameterValue filter = VulkanicTextureParameterValue.LINEAR_MIPMAP_LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST;
+			filter = VulkanicTextureParameterValue.NEAREST_MIPMAP_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(texture, VulkanicTextureParameterName.MIN_FILTER, filter);
 	}
 
 	private static void resetRenderTarget(RenderTarget target) {
 		if (target == null) return;
 		// Resets the sampling mode of the given render target and then unbinds it to prevent accidental sampling of it
 		// elsewhere.
-		int filter = VulkanicAPI.GL_LINEAR;
+		VulkanicTextureParameterValue filter = VulkanicTextureParameterValue.LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST;
+			filter = VulkanicTextureParameterValue.NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
-		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicTextureParameterName.MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicTextureParameterName.MIN_FILTER, filter);
 
-		GlStateManager._bindTexture(0);
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindTexture2D(ctx, 0);
 	}
 
 	public void renderFinalPass() {
 		final net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
 		final int baseWidth = main.width;
 		final int baseHeight = main.height;
+		final var ctx = VulkanicAPI.getCommandContext();
 
 		// Note that since DeferredWorldRenderingPipeline uses the depth texture of the main Minecraft framebuffer,
 		// we'll be writing to that depth buffer directly automatically and won't need to futz around with copying
@@ -216,9 +221,9 @@ public class FinalPassRenderer {
 		//
 		// This is not a concern for depthtex1 / depthtex2 since the copy call extracts the depth values, and the
 		// shader pack only ever uses them to read the depth values.
-		if (((Blaze3dRenderTargetExt) main).iris$getColorBufferVersion() != lastColorTextureVersion || main.getColorTexture().iris$getGlId() != lastColorTextureId) {
+		if (((Blaze3dRenderTargetExt) main).iris$getColorBufferVersion() != lastColorTextureVersion || VulkanicCoreAPI.textureId(main.getColorTexture()) != lastColorTextureId) {
 			lastColorTextureVersion = ((Blaze3dRenderTargetExt) main).iris$getColorBufferVersion();
-			this.lastColorTextureId = main.getColorTexture().iris$getGlId();
+			this.lastColorTextureId = VulkanicCoreAPI.textureId(main.getColorTexture());
 			colorHolder.addColorAttachment(0, lastColorTextureId);
 		}
 
@@ -235,20 +240,20 @@ public class FinalPassRenderer {
 				}
 			}
 
-			IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+			IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
 
 			if (!finalPass.mipmappedBuffers.isEmpty()) {
-				GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 				for (int index : finalPass.mipmappedBuffers) {
 					setupMipmapping(renderTargets.get(index), finalPass.stageReadsFromAlt.contains(index));
 				}
 			}
 
-			GpuBuffer indices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
-			VertexFormat.IndexType type = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
+			GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
+			VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 
-			try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Final pass", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Final pass", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
 				renderPass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
 				renderPass.setIndexBuffer(indices, type);
 				renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
@@ -258,7 +263,7 @@ public class FinalPassRenderer {
 				finalPass.program.use();
 
 				BlendModeOverride.restore();
-				GlStateManager._disableBlend();
+				BlendModeStorage.setBlendEnabled(false);
 
 				// program is the identifier for final :shrug:
 				this.customUniforms.push(finalPass.program);
@@ -279,10 +284,10 @@ public class FinalPassRenderer {
 			// https://stackoverflow.com/a/23994979/18166885
 			this.baseline.bindAsReadBuffer();
 
-			IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, baseWidth, baseHeight);
+			IrisRenderSystem.copyTexSubImage2D(VulkanicCoreAPI.textureId(main.getColorTexture()), 0, 0, 0, 0, 0, baseWidth, baseHeight);
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 		for (int i = 0; i < renderTargets.getRenderTargetCount(); i++) {
 			// Reset mipmapping states at the end of the frame.
@@ -300,26 +305,26 @@ public class FinalPassRenderer {
 			// Also note that RenderTargets already calls readBuffer(0) for us.
 			swapPass.from.bind();
 
-			GlStateManager._bindTexture(swapPass.targetTexture);
-			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
+			VulkanicAPI.bindTexture2D(ctx, swapPass.targetTexture);
+			VulkanicAPI.copyTexSubImage2D(ctx, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
 		}
 
 		// Make sure to reset the viewport to how it was before... Otherwise weird issues could occur.
 		// Also bind the "main" framebuffer if it isn't already bound.
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
-		GlStateManager._glUseProgram(0);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(0);
 
 		for (int i = 0; i < SamplerLimits.get().getMaxTextureUnits(); i++) {
 			// Unbind all textures that we may have used.
 			// NB: This is necessary for shader pack reloading to work properly
-			if (GlStateManager.TEXTURES[i].binding != 0) {
-				GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
-				GlStateManager._bindTexture(0);
+			if (net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(i) != 0) {
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
+				VulkanicAPI.bindTexture2D(ctx, 0);
 			}
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
 	public void recalculateSwapPassSize() {

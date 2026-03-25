@@ -1,9 +1,7 @@
 package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableList;
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import net.irisshaders.iris.gl.uniform.DynamicLocationalUniformHolder;
 import net.irisshaders.iris.gl.uniform.Uniform;
@@ -13,9 +11,8 @@ import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.BufferUtils;
+import net.vulkanic.VulkanicUniformReflectionType;
 
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -60,134 +57,39 @@ public class ProgramUniforms {
 		return new Builder(name, program);
 	}
 
-	private static String getTypeName(int type) {
-		String typeName;
+	private static String getTypeName(VulkanicAPI.ActiveUniformInfo activeUniformInfo) {
+		return activeUniformInfo.reflectionTypeName();
+	}
 
-		if (type == VulkanicAPI.GL_FLOAT) {
-			typeName = "float";
-		} else if (type == VulkanicAPI.GL_INT) {
-			typeName = "int";
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT4) {
-			typeName = "mat4";
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC4) {
-			typeName = "vec4";
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT3) {
-			typeName = "mat3";
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC3) {
-			typeName = "vec3";
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT2) {
-			typeName = "mat2";
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC2) {
-			typeName = "vec2";
-		} else if (type == VulkanicAPI.GL_INT_VEC2) {
-			typeName = "ivec2";
-		} else if (type == VulkanicAPI.GL_INT_VEC4) {
-			typeName = "ivec4";
-		} else if (type == VulkanicAPI.GL_SAMPLER_3D) {
-			typeName = "sampler3D";
-		} else if (type == VulkanicAPI.GL_SAMPLER_2D) {
-			typeName = "sampler2D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D) {
-			typeName = "usampler2D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D) {
-			typeName = "usampler3D";
-		} else if (type == VulkanicAPI.GL_SAMPLER_1D) {
-			typeName = "sampler1D";
-		} else if (type == VulkanicAPI.GL_SAMPLER_2D_SHADOW) {
-			typeName = "sampler2DShadow";
-		} else if (type == VulkanicAPI.GL_SAMPLER_1D_SHADOW) {
-			typeName = "sampler1DShadow";
-		} else if (type == VulkanicAPI.GL_IMAGE_1D) {
-			typeName = "image1D";
-		} else if (type == VulkanicAPI.GL_IMAGE_2D) {
-			typeName = "image2D";
-		} else if (type == VulkanicAPI.GL_IMAGE_3D) {
-			typeName = "image3D";
-		} else if (type == VulkanicAPI.GL_INT_IMAGE_1D) {
-			typeName = "iimage1D";
-		} else if (type == VulkanicAPI.GL_INT_IMAGE_2D) {
-			typeName = "iimage2D";
-		} else if (type == VulkanicAPI.GL_INT_IMAGE_3D) {
-			typeName = "iimage3D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D) {
-			typeName = "uimage1D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D) {
-			typeName = "uimage2D";
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D) {
-			typeName = "uimage3D";
-		} else {
-			typeName = "(unknown:" + type + ")";
+	private static UniformType getExpectedType(VulkanicAPI.ActiveUniformInfo activeUniformInfo) {
+		return activeUniformInfo.reflectionType()
+			.map(ProgramUniforms::getExpectedType)
+			.orElse(null);
+	}
+
+	private static UniformType getExpectedType(VulkanicUniformReflectionType type) {
+		if (type.isSampler()) {
+			return UniformType.INT;
 		}
 
-		return typeName;
-	}
-
-	private static UniformType getExpectedType(int type) {
-		if (type == VulkanicAPI.GL_FLOAT) {
-			return UniformType.FLOAT;
-		} else if (type == VulkanicAPI.GL_INT) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_BOOL) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT4) {
-			return UniformType.MAT4;
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC4) {
-			return UniformType.VEC4;
-		} else if (type == VulkanicAPI.GL_INT_VEC4) {
-			return UniformType.VEC4I;
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT3) {
-			return UniformType.MAT3;
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC3) {
-			return UniformType.VEC3;
-		} else if (type == VulkanicAPI.GL_INT_VEC3) {
-			return UniformType.VEC3I;
-		} else if (type == VulkanicAPI.GL_FLOAT_MAT2) {
-			return null;
-		} else if (type == VulkanicAPI.GL_FLOAT_VEC2) {
-			return UniformType.VEC2;
-		} else if (type == VulkanicAPI.GL_INT_VEC2) {
-			return UniformType.VEC2I;
-		} else if (type == VulkanicAPI.GL_SAMPLER_3D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_SAMPLER_2D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_SAMPLER_1D) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_SAMPLER_2D_SHADOW) {
-			return UniformType.INT;
-		} else if (type == VulkanicAPI.GL_SAMPLER_1D_SHADOW) {
-			return UniformType.INT;
-		} else {
+		if (type.isImage()) {
 			return null;
 		}
-	}
 
-	private static boolean isSampler(int type) {
-		return type == VulkanicAPI.GL_SAMPLER_1D
-			|| type == VulkanicAPI.GL_SAMPLER_2D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D
-			|| type == VulkanicAPI.GL_SAMPLER_3D
-			|| type == VulkanicAPI.GL_SAMPLER_1D_SHADOW
-			|| type == VulkanicAPI.GL_SAMPLER_2D_SHADOW;
-	}
-
-	private static boolean isImage(int type) {
-		return type == VulkanicAPI.GL_IMAGE_1D
-			|| type == VulkanicAPI.GL_IMAGE_2D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D
-			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D
-			|| type == VulkanicAPI.GL_INT_IMAGE_1D
-			|| type == VulkanicAPI.GL_INT_IMAGE_2D
-			|| type == VulkanicAPI.GL_INT_IMAGE_3D
-			|| type == VulkanicAPI.GL_IMAGE_3D
-			|| type == VulkanicAPI.GL_IMAGE_1D_ARRAY
-			|| type == VulkanicAPI.GL_IMAGE_2D_ARRAY;
+		return switch (type) {
+			case FLOAT -> UniformType.FLOAT;
+			case INT, UINT, BOOL -> UniformType.INT;
+			case FLOAT_MAT4 -> UniformType.MAT4;
+			case FLOAT_VEC4 -> UniformType.VEC4;
+			case INT_VEC4, UINT_VEC4, BOOL_VEC4 -> UniformType.VEC4I;
+			case FLOAT_MAT3 -> UniformType.MAT3;
+			case FLOAT_VEC3 -> UniformType.VEC3;
+			case INT_VEC3, UINT_VEC3, BOOL_VEC3 -> UniformType.VEC3I;
+			case FLOAT_MAT2 -> null;
+			case FLOAT_VEC2 -> UniformType.VEC2;
+			case INT_VEC2, UINT_VEC2, BOOL_VEC2 -> UniformType.VEC2I;
+			default -> null;
+		};
 	}
 
 	private void updateStage(ImmutableList<Uniform> uniforms) {
@@ -289,7 +191,7 @@ public class ProgramUniforms {
 
 		@Override
 		public OptionalInt location(String name, UniformType type) {
-			int id = GlStateManager._glGetUniformLocation(program, name);
+			int id = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
 
 			if (id == -1) {
 				return OptionalInt.empty();
@@ -310,23 +212,16 @@ public class ProgramUniforms {
 		public ProgramUniforms buildUniforms() {
 			// Check for any unsupported uniforms and warn about them so that we can easily figure out what uniforms we
 			// need to add.
-			int activeUniforms = GlStateManager.glGetProgrami(program, VulkanicAPI.GL_ACTIVE_UNIFORMS);
-			IntBuffer sizeBuf = BufferUtils.createIntBuffer(1);
-			IntBuffer typeBuf = BufferUtils.createIntBuffer(1);
-
-			for (int index = 0; index < activeUniforms; index++) {
-				String name = IrisRenderSystem.getActiveUniform(program, index, 128, sizeBuf, typeBuf);
+			for (VulkanicAPI.ActiveUniformInfo activeUniformInfo : VulkanicAPI.getActiveUniforms(VulkanicAPI.getCommandContext(), program, 128)) {
+				String name = activeUniformInfo.name();
 
 				if (name.isEmpty()) {
 					// No further information available.
 					continue;
 				}
 
-				int size = sizeBuf.get(0);
-				int type = typeBuf.get(0);
-
 				UniformType provided = uniformNames.get(name);
-				UniformType expected = getExpectedType(type);
+				UniformType expected = getExpectedType(activeUniformInfo);
 
 				if (provided != null && provided != expected) {
 					String expectedName;
@@ -334,7 +229,7 @@ public class ProgramUniforms {
 					if (expected != null) {
 						expectedName = expected.toString();
 					} else {
-						expectedName = "(unsupported type: " + getTypeName(type) + ")";
+						expectedName = "(unsupported type: " + getTypeName(activeUniformInfo) + ")";
 					}
 
 					Iris.logger.error("[" + this.name + "] Wrong uniform type for " + name + ": Iris is providing " + provided + " but the program expects " + expectedName + ". Disabling that uniform.");

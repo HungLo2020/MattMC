@@ -1,6 +1,5 @@
 package net.irisshaders.iris.compat.dh;
 
-import net.blaze3d.opengl.GlStateManager;
 import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiFogDrawMode;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiRenderPass;
@@ -33,6 +32,7 @@ import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicCapability;
 import net.vulkanic.VulkanicAPI;
 
 public class LodRendererEvents {
@@ -210,7 +210,7 @@ public class LodRendererEvents {
 					if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
 						event.cancelEvent();
 					} else if (getInstance().shouldOverride) {
-						GlStateManager._clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+						VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext());
 						event.cancelEvent();
 					}
 				}
@@ -375,8 +375,8 @@ public class LodRendererEvents {
 						Matrix4fc projection = CapturedRenderingState.INSTANCE.getGbufferProjection();
 						//float nearClip = DhApi.Delayed.renderProxy.getNearClipPlaneDistanceInBlocks(partialTicks);
 						//float farClip = (float) ((double) (DHCompatInternal.getDhBlockRenderDistance() + 512) * Math.sqrt(2.0));
-						CommandContext ctx = VulkanicAPI.getImmediateContext();
-						VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_CULL_FACE, false);
+						CommandContext ctx = VulkanicAPI.getCommandContext();
+						VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.CULL_FACE, false);
 						//Iris.logger.info("event near clip: "+event.value.nearClipPlane+" event far clip: "+event.value.farClipPlane+
 						//	" \niris near clip: "+nearClip+" iris far clip: "+farClip);
 

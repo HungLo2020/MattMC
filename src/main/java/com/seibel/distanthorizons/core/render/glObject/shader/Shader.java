@@ -6,16 +6,14 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.ByteBuffer;
 
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
+import net.vulkanic.VulkanicShaderHandle;
+import net.vulkanic.VulkanicShaderStage;
 import org.lwjgl.system.NativeType;
 
 /**
@@ -49,30 +47,60 @@ public class Shader
 	 */
 	public Shader(int type, String path, boolean absoluteFilePath)
 	{
+		this(VulkanicAPI.getCommandContext(), type, path, absoluteFilePath);
+	}
+
+	public Shader(VulkanicShaderStage stage, String path, boolean absoluteFilePath)
+	{
+		this(VulkanicAPI.getCommandContext(), stage, path, absoluteFilePath);
+	}
+
+	public Shader(CommandContext ctx, VulkanicShaderStage stage, String path, boolean absoluteFilePath)
+	{
+		this(ctx, stage.toLegacyGlShaderType(), path, absoluteFilePath);
+	}
+
+	public Shader(CommandContext ctx, int type, String path, boolean absoluteFilePath)
+	{
 		LOGGER.info("Loading shader at [" + path + "]");
 		// Create an empty shader object
-		this.id = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type);
+		this.id = createShaderId(ctx, type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"].");
 		}
 		
+		VulkanicShaderHandle shaderHandle = VulkanicShaderHandle.of(this.id);
 		StringBuilder source = loadFile(path, absoluteFilePath, new StringBuilder());
-		safeShaderSource(this.id, source);
+		safeShaderSource(ctx, shaderHandle, source);
 		
-		VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), this.id);
+		VulkanicAPI.compileShader(ctx, shaderHandle);
 		// check if the shader compiled
-		int status = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_COMPILE_STATUS);
-		if (status != VulkanicAPI.GL_TRUE)
+		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, shaderHandle))
 		{
-			String message = "Shader compiler error. Details: ["+VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), this.id)+"].";
-			this.free(); // important!
+			String message = "Shader compiler error. Details: ["+VulkanicAPI.getShaderInfoLog(ctx, shaderHandle)+"].";
+			this.free(ctx); // important!
 			throw new RuntimeException(message);
 		}
 		LOGGER.info("Shader at " + path + " loaded successfully.");
 	}
 	
 	public Shader(int type, String sourceString)
+	{
+		this(VulkanicAPI.getCommandContext(), type, sourceString);
+	}
+
+	public Shader(VulkanicShaderStage stage, String sourceString)
+	{
+		this(VulkanicAPI.getCommandContext(), stage, sourceString);
+	}
+
+	public Shader(CommandContext ctx, VulkanicShaderStage stage, String sourceString)
+	{
+		this(ctx, stage.toLegacyGlShaderType(), sourceString);
+	}
+
+	public Shader(CommandContext ctx, int type, String sourceString)
 	{
 		LOGGER.info("Loading shader with type: ["+type+"]");
 		LOGGER.debug("Source: \n["+sourceString+"]");
@@ -82,22 +110,22 @@ public class Shader
 		}
 		
 		// Create an empty shader object
-		this.id = VulkanicAPI.createShader(VulkanicAPI.getImmediateContext(), type);
+		this.id = createShaderId(ctx, type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"] and Source: \n["+sourceString+"].");
 		}
 		
-		safeShaderSource(this.id, sourceString);
-		VulkanicAPI.compileShader(VulkanicAPI.getImmediateContext(), this.id);
+		VulkanicShaderHandle shaderHandle = VulkanicShaderHandle.of(this.id);
+		safeShaderSource(ctx, shaderHandle, sourceString);
+		VulkanicAPI.compileShader(ctx, shaderHandle);
 		// check if the shader compiled
-		int status = VulkanicAPI.getShaderParameter(VulkanicAPI.getImmediateContext(), this.id, VulkanicAPI.GL_COMPILE_STATUS);
-		if (status != VulkanicAPI.GL_TRUE)
+		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, shaderHandle))
 		{
 			
-			String message = "Shader compiler error. Details: [" + VulkanicAPI.getShaderInfoLog(VulkanicAPI.getImmediateContext(), this.id) + "]\n";
+			String message = "Shader compiler error. Details: [" + VulkanicAPI.getShaderInfoLog(ctx, shaderHandle) + "]\n";
 			message += "Source: \n[" + sourceString + "]";
-			this.free(); // important!
+			this.free(ctx); // important!
 			throw new RuntimeException(message);
 		}
 		LOGGER.info("Shader loaded sucessfully.");
@@ -120,27 +148,19 @@ public class Shader
 	 * 
 	 * <p>Source: https://github.com/vram-guild/canvas/commit/820bf754092ccaf8d0c169620c2ff575722d7d96
 	 */
-	private static void safeShaderSource(@NativeType("GLuint") int glId, @NativeType("GLchar const **") CharSequence source)
+	private static void safeShaderSource(CommandContext ctx, VulkanicShaderHandle shader, @NativeType("GLchar const **") CharSequence source)
 	{
-		final MemoryStack stack = MemoryStack.stackGet();
-		final int stackPointer = stack.getPointer();
+		VulkanicAPI.uploadShaderSource(ctx, shader, source);
+	}
 
-		try
-		{
-			final ByteBuffer sourceBuffer = MemoryUtil.memUTF8(source, true);
-			final PointerBuffer pointers = stack.mallocPointer(1);
-			pointers.put(sourceBuffer);
-
-			VulkanicAPI.uploadShaderSource(VulkanicAPI.getImmediateContext(), glId, pointers.address0(), 1, 0);
-			org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
-		}
-		finally
-		{
-			stack.setPointer(stackPointer);
-		}
+	private static int createShaderId(CommandContext ctx, int type)
+	{
+		return VulkanicAPI.createShaderHandle(ctx, type).value();
 	}
 	
-	public void free() { VulkanicAPI.deleteShader(VulkanicAPI.getImmediateContext(), this.id); }
+	public void free() { this.free(VulkanicAPI.getCommandContext()); }
+
+	public void free(CommandContext ctx) { VulkanicAPI.deleteShader(ctx, VulkanicShaderHandle.of(this.id)); }
 	
 	public static StringBuilder loadFile(String path, boolean absoluteFilePath, StringBuilder stringBuilder)
 	{

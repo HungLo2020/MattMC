@@ -8,11 +8,13 @@ import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPolygonMode;
+import net.vulkanic.VulkanicPrimitiveMode;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -23,7 +25,6 @@ public class TestRenderer
 	public static final DhLogger LOGGER = new DhLoggerBuilder().build(); 
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	
@@ -86,25 +87,29 @@ public class TestRenderer
 		// TODO fix for MC 1.21.5+
 		this.init();
 		
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, MC_RENDER.getTargetFramebuffer());
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		if (!MC_RENDER.bindTargetRenderTarget(ctx))
+		{
+			return;
+		}
+
 		VulkanicAPI.setDynamicViewport(ctx, 0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
-		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 		
-		GLMC.disableFaceCulling();
-		GLMC.disableDepthTest();
-		GLMC.disableBlend();
-		GLMC.disableScissorTest();
+		VulkanicAPI.setCullFaceEnabled(ctx, false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		
-		this.basicShader.bind();
-		this.va.bind();
+		this.basicShader.bind(ctx);
+		this.va.bind(ctx);
 		
 		this.vbo.bind();
 		this.va.bindBufferToAllBindingPoints(this.vbo.getId());
 		
 		// Render the square
-		VulkanicAPI.drawArrays(ctx, VulkanicAPI.GL_TRIANGLE_FAN, 0, 4);
-		VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+		VulkanicAPI.drawArrays(ctx, VulkanicPrimitiveMode.TRIANGLE_FAN, 0, 4);
+		VulkanicAPI.clearDepthBuffer(ctx);
 	}
 	
 	

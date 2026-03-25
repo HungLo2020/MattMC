@@ -1,5 +1,14 @@
 package net.vulkanic;
 
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.DepthTestFunction;
+import net.blaze3d.platform.LogicOp;
+import net.blaze3d.platform.PolygonMode;
+import net.blaze3d.shaders.UniformType;
+import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
+import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.backends.opengl.OpenGLBuffer;
 import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import net.vulkanic.backends.opengl.OpenGLTexture;
@@ -188,6 +197,535 @@ public class Phase3ResourceTypesTest {
             () -> PipelineDescriptor.fromRenderPipeline(null));
     }
 
+    @Test
+    public void testPipelineDescriptorPortableStateFromRenderPipeline() {
+        RenderPipeline pipeline = buildTestPipeline();
+
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(pipeline);
+        PipelineDescriptor.PortableState state = descriptor.getPortableState();
+
+        assertTrue(descriptor.hasNativeDescriptor(),
+            "fromRenderPipeline() should preserve native pipeline object for OpenGL path");
+        assertSame(pipeline, descriptor.requireRenderPipeline(),
+            "Native descriptor path should return original RenderPipeline");
+
+        assertEquals(ResourceLocation.withDefaultNamespace("vulkanic/test_pipeline"), state.location());
+        assertEquals(ResourceLocation.withDefaultNamespace("core/test_vertex"), state.vertexShader());
+        assertEquals(ResourceLocation.withDefaultNamespace("core/test_fragment"), state.fragmentShader());
+        assertEquals(DepthTestFunction.GREATER_DEPTH_TEST, state.depthTestFunction());
+        assertEquals(PolygonMode.WIREFRAME, state.polygonMode());
+        assertFalse(state.cull());
+        assertTrue(state.writeColor());
+        assertFalse(state.writeAlpha());
+        assertFalse(state.writeDepth());
+        assertEquals(LogicOp.OR_REVERSE, state.colorLogic());
+        assertEquals(VertexFormat.Mode.QUADS, state.vertexFormatMode());
+        assertEquals(2.5f, state.depthBiasScaleFactor());
+        assertEquals(1.25f, state.depthBiasConstant());
+
+        assertTrue(state.shaderDefineFlags().contains("FLAG_TEST"));
+        assertEquals("123", state.shaderDefineValues().get("VALUE_TEST"));
+        assertEquals(1, state.samplers().size());
+        assertEquals("Sampler0", state.samplers().get(0));
+        assertEquals(2, state.uniforms().size());
+        assertTrue(state.uniforms().stream().anyMatch(uniform ->
+                uniform.name().equals("Globals") && uniform.type() == UniformType.UNIFORM_BUFFER));
+        assertTrue(state.uniforms().stream().anyMatch(uniform ->
+                uniform.name().equals("CloudFaces") &&
+                uniform.type() == UniformType.TEXEL_BUFFER &&
+                uniform.textureFormat() == TextureFormat.RED8I));
+    }
+
+    @Test
+    public void testPipelineDescriptorRoundTripFromPortableState() {
+        RenderPipeline original = buildTestPipeline();
+        PipelineDescriptor originalDescriptor = PipelineDescriptor.fromRenderPipeline(original);
+
+        PipelineDescriptor portableDescriptor = PipelineDescriptor.fromPortableState(
+            originalDescriptor.getPortableState());
+
+        assertFalse(portableDescriptor.hasNativeDescriptor(),
+            "Portable-only descriptor should not expose native object");
+
+        RenderPipeline reconstructed = portableDescriptor.requireRenderPipeline();
+        assertEquals(original.getLocation(), reconstructed.getLocation());
+        assertEquals(original.getVertexShader(), reconstructed.getVertexShader());
+        assertEquals(original.getFragmentShader(), reconstructed.getFragmentShader());
+        assertEquals(original.getDepthTestFunction(), reconstructed.getDepthTestFunction());
+        assertEquals(original.getPolygonMode(), reconstructed.getPolygonMode());
+        assertEquals(original.isCull(), reconstructed.isCull());
+        assertEquals(original.isWriteColor(), reconstructed.isWriteColor());
+        assertEquals(original.isWriteAlpha(), reconstructed.isWriteAlpha());
+        assertEquals(original.isWriteDepth(), reconstructed.isWriteDepth());
+        assertEquals(original.getColorLogic(), reconstructed.getColorLogic());
+        assertEquals(original.getVertexFormatMode(), reconstructed.getVertexFormatMode());
+        assertEquals(original.getDepthBiasScaleFactor(), reconstructed.getDepthBiasScaleFactor());
+        assertEquals(original.getDepthBiasConstant(), reconstructed.getDepthBiasConstant());
+
+        assertEquals(original.getSamplers(), reconstructed.getSamplers());
+        assertEquals(original.getUniforms().size(), reconstructed.getUniforms().size());
+        assertEquals(original.getBlendFunction().isPresent(), reconstructed.getBlendFunction().isPresent());
+        assertEquals(original.getShaderDefines().values(), reconstructed.getShaderDefines().values());
+        assertEquals(original.getShaderDefines().flags(), reconstructed.getShaderDefines().flags());
+    }
+
+    @Test
+    public void testPipelineDescriptorResourceLayoutFromPortableState() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+
+        assertEquals(3, layout.bindings().size(),
+            "Sampler + two uniforms should produce three resource bindings");
+
+        PipelineDescriptor.ResourceBinding samplerBinding = layout.bindings().get(0);
+        assertEquals(0, samplerBinding.set());
+        assertEquals(0, samplerBinding.binding());
+        assertEquals("Sampler0", samplerBinding.name());
+        assertEquals(PipelineDescriptor.ResourceType.SAMPLER, samplerBinding.type());
+        assertNull(samplerBinding.textureFormat());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), samplerBinding.stages());
+
+        PipelineDescriptor.ResourceBinding uniformBinding = layout.bindings().get(1);
+        assertEquals(1, uniformBinding.binding());
+        assertEquals("Globals", uniformBinding.name());
+        assertEquals(PipelineDescriptor.ResourceType.UNIFORM_BUFFER, uniformBinding.type());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), uniformBinding.stages());
+
+        PipelineDescriptor.ResourceBinding texelBinding = layout.bindings().get(2);
+        assertEquals(2, texelBinding.binding());
+        assertEquals("CloudFaces", texelBinding.name());
+        assertEquals(PipelineDescriptor.ResourceType.TEXEL_BUFFER, texelBinding.type());
+        assertEquals(TextureFormat.RED8I, texelBinding.textureFormat());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), texelBinding.stages());
+
+        assertTrue(layout.findByName("Sampler0").isPresent());
+        assertTrue(layout.findByName("CloudFaces").isPresent());
+        assertTrue(layout.findByName("Missing").isEmpty());
+    }
+
+    @Test
+    public void testPipelineDescriptorWithExplicitResourceLayoutOverridesPortableLayout() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineDescriptor.ResourceLayout explicitLayout = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "ReflectedSampler",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null
+            )
+        ));
+
+        PipelineDescriptor reflectedDescriptor = descriptor.withResourceLayout(explicitLayout);
+
+        assertFalse(descriptor.hasExplicitResourceLayout(),
+            "RenderPipeline-derived descriptor should start without explicit reflected layout metadata");
+        assertTrue(reflectedDescriptor.hasExplicitResourceLayout(),
+            "withResourceLayout should mark descriptor as carrying explicit reflected layout metadata");
+        assertEquals(explicitLayout, reflectedDescriptor.getResourceLayout(),
+            "Explicit reflected layout should override portable-state derived resource layout");
+    }
+
+    @Test
+    public void testPipelineCompilationKeyTracksExplicitResourceLayoutMetadata() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineDescriptor.ResourceLayout layoutA = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "SamplerA",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null
+            )
+        ));
+
+        PipelineDescriptor.ResourceLayout layoutB = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "SamplerB",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null
+            )
+        ));
+
+        String keyA = base.withResourceLayout(layoutA).getPipelineCompilationKey();
+        String keyB = base.withResourceLayout(layoutB).getPipelineCompilationKey();
+
+        assertNotEquals(keyA, keyB,
+            "Pipeline compilation key should include explicit reflected resource-layout metadata");
+
+        PipelineDescriptor.ResourceLayout layoutC = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "SamplerA",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null,
+                java.util.Set.of(VulkanicShaderStage.FRAGMENT)
+            )
+        ));
+
+        String keyC = base.withResourceLayout(layoutC).getPipelineCompilationKey();
+        assertNotEquals(keyA, keyC,
+            "Pipeline compilation key should include resource stage-visibility metadata");
+    }
+
+    @Test
+    public void testPipelineDescriptorPortableLayoutInfersStagesFromSpirvModules() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineDescriptor descriptor = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(
+                createTestSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[] {1, 2, 3, 4}),
+                createTestSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[] {5, 6, 7, 8})
+            )
+        );
+
+        PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+        for (PipelineDescriptor.ResourceBinding binding : layout.bindings()) {
+            assertEquals(
+                java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT),
+                binding.stages(),
+                "Portable resource layout should inherit stage visibility from attached SPIR-V modules"
+            );
+        }
+    }
+
+    @Test
+    public void testPipelineDescriptorResourceLayoutRejectsDuplicateNames() {
+        PipelineDescriptor.PortableState base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline())
+            .getPortableState();
+
+        PipelineDescriptor.PortableState duplicate = new PipelineDescriptor.PortableState(
+            base.location(),
+            base.vertexShader(),
+            base.fragmentShader(),
+            base.shaderDefineValues(),
+            base.shaderDefineFlags(),
+            java.util.List.of("SharedName"),
+            java.util.List.of(new PipelineDescriptor.UniformBinding("SharedName", UniformType.UNIFORM_BUFFER, null)),
+            base.blendState(),
+            base.depthTestFunction(),
+            base.polygonMode(),
+            base.cull(),
+            base.writeColor(),
+            base.writeAlpha(),
+            base.writeDepth(),
+            base.colorLogic(),
+            base.vertexFormat(),
+            base.vertexFormatMode(),
+            base.depthBiasScaleFactor(),
+            base.depthBiasConstant()
+        );
+
+        assertThrows(IllegalStateException.class, duplicate::toResourceLayout,
+            "Duplicate sampler/uniform names must fail to ensure deterministic layout mapping");
+    }
+
+    @Test
+    public void testPipelineDescriptorStableCacheKeyRoundTrip() {
+        PipelineDescriptor original = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        PipelineDescriptor reconstructed = PipelineDescriptor.fromPortableState(original.getPortableState());
+
+        String keyA = original.getStableCacheKey();
+        String keyB = reconstructed.getStableCacheKey();
+
+        assertEquals(keyA, keyB,
+            "Stable cache key should match when portable state is semantically identical");
+        assertEquals(64, keyA.length(),
+            "Stable cache key should be SHA-256 hex");
+    }
+
+    @Test
+    public void testPipelineDescriptorStableCacheKeyChangesWithState() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        PipelineDescriptor altered = PipelineDescriptor.fromRenderPipeline(
+            RenderPipeline.builder()
+                .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/test_pipeline_changed"))
+                .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+                .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+                .withShaderDefine("FLAG_TEST")
+                .withShaderDefine("VALUE_TEST", 123)
+                .withSampler("Sampler0")
+                .withUniform("Globals", UniformType.UNIFORM_BUFFER)
+                .withUniform("CloudFaces", UniformType.TEXEL_BUFFER, TextureFormat.RED8I)
+                .withDepthTestFunction(DepthTestFunction.GREATER_DEPTH_TEST)
+                .withPolygonMode(PolygonMode.WIREFRAME)
+                .withCull(false)
+                .withoutBlend()
+                .withColorWrite(true, false)
+                .withDepthWrite(false)
+                .withColorLogic(LogicOp.OR_REVERSE)
+                .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+                .withDepthBias(2.5f, 1.25f)
+                .build());
+
+        assertNotEquals(base.getStableCacheKey(), altered.getStableCacheKey(),
+            "Stable cache key should change when pipeline semantics change");
+    }
+
+    @Test
+    public void testPipelineDescriptorFromPortableStateAndSpirvModules() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        VulkanicSpirvModule vertexModule = createTestSpirvModule(
+            VulkanicShaderStage.VERTEX,
+            "main",
+            new byte[] {0x03, 0x02, 0x23, 0x07}
+        );
+        VulkanicSpirvModule fragmentModule = createTestSpirvModule(
+            VulkanicShaderStage.FRAGMENT,
+            "main",
+            new byte[] {0x07, 0x23, 0x02, 0x03}
+        );
+
+        PipelineDescriptor descriptor = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(vertexModule, fragmentModule)
+        );
+
+        assertFalse(descriptor.hasNativeDescriptor(),
+            "Portable+SPIR-V descriptor should remain backend-neutral without native descriptor");
+        assertTrue(descriptor.hasSpirvModules(),
+            "Portable+SPIR-V descriptor should report SPIR-V module presence");
+        assertEquals(2, descriptor.getSpirvModules().size());
+        assertEquals(VulkanicShaderStage.VERTEX, descriptor.getSpirvModules().get(0).stage());
+        assertEquals(VulkanicShaderStage.FRAGMENT, descriptor.getSpirvModules().get(1).stage());
+    }
+
+    @Test
+    public void testPipelineDescriptorRejectsDuplicateSpirvStages() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        VulkanicSpirvModule firstVertex = createTestSpirvModule(
+            VulkanicShaderStage.VERTEX,
+            "main",
+            new byte[] {1, 2, 3, 4}
+        );
+        VulkanicSpirvModule secondVertex = createTestSpirvModule(
+            VulkanicShaderStage.VERTEX,
+            "secondary",
+            new byte[] {4, 3, 2, 1}
+        );
+
+        assertThrows(IllegalArgumentException.class,
+            () -> PipelineDescriptor.fromPortableStateAndSpirvModules(
+                base.getPortableState(),
+                java.util.List.of(firstVertex, secondVertex)
+            ));
+    }
+
+    @Test
+    public void testPipelineDescriptorPushConstantRangesValidation() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineDescriptor.PushConstantRange validRange = new PipelineDescriptor.PushConstantRange(
+            0,
+            64,
+            java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT)
+        );
+
+        PipelineDescriptor withPushConstants = base.withPushConstantRanges(java.util.List.of(validRange));
+
+        assertEquals(1, withPushConstants.getPushConstantRanges().size());
+        assertEquals(64, withPushConstants.getPushConstantRanges().get(0).size());
+
+        PipelineDescriptor.PushConstantRange overlapA = new PipelineDescriptor.PushConstantRange(
+            0,
+            32,
+            java.util.Set.of(VulkanicShaderStage.VERTEX)
+        );
+        PipelineDescriptor.PushConstantRange overlapB = new PipelineDescriptor.PushConstantRange(
+            16,
+            32,
+            java.util.Set.of(VulkanicShaderStage.FRAGMENT)
+        );
+
+        assertThrows(IllegalArgumentException.class,
+            () -> base.withPushConstantRanges(java.util.List.of(overlapA, overlapB)),
+            "Overlapping push-constant ranges should be rejected for deterministic layout derivation");
+    }
+
+    @Test
+    public void testPipelineDescriptorCompilationKeyTracksSpirvAndPushConstants() {
+        PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        VulkanicSpirvModule vertexModuleA = createTestSpirvModule(
+            VulkanicShaderStage.VERTEX,
+            "main",
+            new byte[] {10, 20, 30, 40}
+        );
+        VulkanicSpirvModule fragmentModuleA = createTestSpirvModule(
+            VulkanicShaderStage.FRAGMENT,
+            "main",
+            new byte[] {11, 21, 31, 41}
+        );
+
+        PipelineDescriptor descriptorA = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(vertexModuleA, fragmentModuleA)
+        ).withPushConstantRanges(java.util.List.of(
+            new PipelineDescriptor.PushConstantRange(
+                0,
+                16,
+                java.util.Set.of(VulkanicShaderStage.VERTEX)
+            )
+        ));
+
+        PipelineDescriptor descriptorB = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(
+                createTestSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[] {10, 20, 30, 40}),
+                createTestSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[] {11, 21, 31, 41})
+            )
+        ).withPushConstantRanges(java.util.List.of(
+            new PipelineDescriptor.PushConstantRange(
+                0,
+                16,
+                java.util.Set.of(VulkanicShaderStage.VERTEX)
+            )
+        ));
+
+        PipelineDescriptor descriptorChanged = PipelineDescriptor.fromPortableStateAndSpirvModules(
+            base.getPortableState(),
+            java.util.List.of(
+                createTestSpirvModule(VulkanicShaderStage.VERTEX, "main", new byte[] {10, 20, 30, 40}),
+                createTestSpirvModule(VulkanicShaderStage.FRAGMENT, "main", new byte[] {99, 88, 77, 66})
+            )
+        ).withPushConstantRanges(java.util.List.of(
+            new PipelineDescriptor.PushConstantRange(
+                0,
+                16,
+                java.util.Set.of(VulkanicShaderStage.VERTEX)
+            )
+        ));
+
+        String keyA = descriptorA.getPipelineCompilationKey();
+        String keyB = descriptorB.getPipelineCompilationKey();
+        String changedKey = descriptorChanged.getPipelineCompilationKey();
+
+        assertEquals(keyA, keyB,
+            "Pipeline compilation key should be deterministic for equivalent SPIR-V/push-constant inputs");
+        assertNotEquals(keyA, changedKey,
+            "Pipeline compilation key should change when SPIR-V payload changes");
+        assertEquals(64, keyA.length(), "Pipeline compilation key should be SHA-256 hex");
+    }
+
+    @Test
+    public void testPipelineResourceBindingsValidateAgainstLayout() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", 0)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(
+                new OpenGLBuffer(7, VulkanicBuffer.USAGE_UNIFORM, 256), 0, 256))
+            .bindTexelBuffer("CloudFaces", 3)
+            .build();
+
+        assertDoesNotThrow(() -> bindings.validateAgainst(descriptor.getResourceLayout()));
+    }
+
+    @Test
+    public void testPipelineResourceBindingsSamplerCanCarryTextureView() {
+        OpenGLTexture texture = OpenGLTexture.nonOwning(
+            33,
+            VulkanicTexture.USAGE_TEXTURE_BINDING,
+            VulkanicTextureFormat.RGBA8,
+            16,
+            16,
+            1,
+            1,
+            "sampler-view-test"
+        );
+        OpenGLTextureView textureView = new OpenGLTextureView(texture, 0, 1);
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", textureView, 2)
+            .build();
+
+        PipelineResourceBindings.SamplerBinding samplerBinding = bindings.getSamplerBinding("Sampler0")
+            .orElseThrow(() -> new IllegalStateException("Sampler binding missing"));
+
+        assertEquals(2, samplerBinding.textureUnit());
+        assertSame(textureView, samplerBinding.textureView(),
+            "Sampler binding should retain the backend-neutral texture view so backends can own the actual texture bind");
+    }
+
+    @Test
+    public void testPipelineResourceBindingsMissingResourceFailsValidation() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", 0)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(
+                new OpenGLBuffer(8, VulkanicBuffer.USAGE_UNIFORM, 256), 0, 256))
+            .build();
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+            () -> bindings.validateAgainst(descriptor.getResourceLayout()));
+        assertTrue(error.getMessage().contains("CloudFaces"));
+    }
+
+    @Test
+    public void testPipelineResourceBindingsUnknownNameFailsValidation() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineResourceBindings bindings = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", 0)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(
+                new OpenGLBuffer(9, VulkanicBuffer.USAGE_UNIFORM, 256), 0, 256))
+            .bindTexelBuffer("CloudFaces", 3)
+            .bindSampler("UnexpectedResource", 4)
+            .build();
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+            () -> bindings.validateAgainst(descriptor.getResourceLayout()));
+        assertTrue(error.getMessage().contains("UnexpectedResource"));
+    }
+
+    @Test
+    public void testPipelineResourceBindingsBuilderRejectsDuplicateNames() {
+        OpenGLBuffer buffer = new OpenGLBuffer(10, VulkanicBuffer.USAGE_UNIFORM, 128);
+
+        assertThrows(IllegalArgumentException.class,
+            () -> PipelineResourceBindings.builder()
+                .bindSampler("SharedName", 0)
+                .bindUniformBuffer("SharedName", new VulkanicBufferSlice(buffer, 0, 64)));
+    }
+
+    @Test
+    public void testPipelineDescriptorFromPortableStateNull() {
+        assertThrows(IllegalArgumentException.class,
+            () -> PipelineDescriptor.fromPortableState(null));
+    }
+
+    @Test
+    public void testUniformBindingValidation() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.UniformBinding("texelMissingFormat", UniformType.TEXEL_BUFFER, null));
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.UniformBinding("uniformWithFormat", UniformType.UNIFORM_BUFFER, TextureFormat.RGBA8));
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.ResourceBinding(0, 0, "samplerWithFormat",
+                PipelineDescriptor.ResourceType.SAMPLER, TextureFormat.RGBA8));
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.ResourceBinding(0, 0, "texelMissingFormat",
+                PipelineDescriptor.ResourceType.TEXEL_BUFFER, null));
+        assertThrows(IllegalArgumentException.class,
+            () -> new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "samplerMissingStages",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null,
+                java.util.Set.of()
+            ));
+    }
+
     // ---- PipelineHandle tests ----------------------------------------------
 
     @Test
@@ -197,6 +735,42 @@ public class Phase3ResourceTypesTest {
             @Override public void close() {}
         };
         assertInstanceOf(PipelineHandle.class, handle);
+    }
+
+    private static RenderPipeline buildTestPipeline() {
+        return RenderPipeline.builder()
+            .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/test_pipeline"))
+            .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+            .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+            .withShaderDefine("FLAG_TEST")
+            .withShaderDefine("VALUE_TEST", 123)
+            .withSampler("Sampler0")
+            .withUniform("Globals", UniformType.UNIFORM_BUFFER)
+            .withUniform("CloudFaces", UniformType.TEXEL_BUFFER, TextureFormat.RED8I)
+            .withDepthTestFunction(DepthTestFunction.GREATER_DEPTH_TEST)
+            .withPolygonMode(PolygonMode.WIREFRAME)
+            .withCull(false)
+            .withoutBlend()
+            .withColorWrite(true, false)
+            .withDepthWrite(false)
+            .withColorLogic(LogicOp.OR_REVERSE)
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .withDepthBias(2.5f, 1.25f)
+            .build();
+    }
+
+    private static VulkanicSpirvModule createTestSpirvModule(
+        VulkanicShaderStage stage,
+        String entryPoint,
+        byte[] bytes
+    ) {
+        return new VulkanicSpirvModule(
+            stage,
+            entryPoint,
+            bytes,
+            "unit-test-" + stage.name().toLowerCase(),
+            "unit-test-compiler"
+        );
     }
 
     // ---- VulkanicAPI.registerDevice / beginCommandBuffer tests -------------

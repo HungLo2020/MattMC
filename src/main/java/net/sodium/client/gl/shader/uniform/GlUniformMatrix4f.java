@@ -17,7 +17,7 @@ public class GlUniformMatrix4f extends GlUniform<Matrix4fc>  {
             FloatBuffer buf = stack.callocFloat(16);
             value.get(buf);
 
-            VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getImmediateContext(), this.index, false, buf);
+            VulkanicAPI.setUniformMatrix4fv(VulkanicAPI.getCommandContext(), this.index, false, buf);
         }
     }
 }

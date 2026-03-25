@@ -2,10 +2,8 @@ package net.irisshaders.iris.pathways.colorspace;
 
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlStateManager;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
@@ -44,7 +42,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 	private GlFramebuffer framebuffer;
 	private int swapTexture;
 
-	private GlTexture target;
+	private GpuTexture target;
 
 	public ColorSpaceFragmentConverter(int width, int height, ColorSpace colorSpace) {
 		rebuildProgram(width, height, colorSpace);
@@ -56,7 +54,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 			program = null;
 			framebuffer.destroy();
 			framebuffer = null;
-			GlStateManager._deleteTexture(swapTexture);
+			IrisRenderSystem.deleteTextureId(swapTexture);
 			swapTexture = 0;
 		}
 
@@ -84,24 +82,24 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		ProgramBuilder builder = ProgramBuilder.begin("colorSpaceFragment", vertexSource, null, source, ImmutableSet.of());
 
 		builder.uniformMatrix(UniformUpdateFrequency.ONCE, "projection", () -> new Matrix4f(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, -1, -1, 0, 1));
-		builder.addDynamicSampler(() -> target.glId(), "readImage");
+		builder.addDynamicSampler(() -> net.vulkanic.VulkanicCoreAPI.textureId(target), "readImage");
 
-		swapTexture = GlStateManager._genTexture();
-		IrisRenderSystem.texImage2D(swapTexture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, null);
+		swapTexture = IrisRenderSystem.createTextureId();
+		IrisRenderSystem.texImage2D(swapTexture, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, null);
 
 		this.framebuffer = new GlFramebuffer();
 		framebuffer.addColorAttachment(0, swapTexture);
 		this.program = builder.build();
 	}
 
-	public void process(GlTexture targetImage) {
+	public void process(GpuTexture targetImage) {
 		if (colorSpace == ColorSpace.SRGB) return;
 
 		this.target = targetImage;
-		GpuBuffer indices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
-		VertexFormat.IndexType type = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
+		GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
+		VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 
-		try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Color space", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
+		try (RenderPass pass = VulkanicAPI.createRenderPass(() -> "Color space", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
 			pass.setPipeline(COMPOSITE_PIPELINE);
 			pass.iris$setCustomPass(EMPTY);
 
@@ -115,6 +113,6 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		}
 		Program.unbind();
 		framebuffer.bindAsReadBuffer();
-		IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+		IrisRenderSystem.copyTexSubImage2D(net.vulkanic.VulkanicCoreAPI.textureId(targetImage), 0, 0, 0, 0, 0, width, height);
 	}
 }

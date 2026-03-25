@@ -29,6 +29,14 @@ fi
 JAVA_CMD="$BUNDLED_JAVA"
 echo "Using bundled JDK ${JAVA_VERSION}"
 
+# Prefer bundled SPIR-V compiler when present
+SPIRV_COMPILER="${SCRIPT_DIR}/libraries/deps/glslangValidator"
+SPIRV_JVM_ARG=""
+if [[ -x "$SPIRV_COMPILER" ]]; then
+    SPIRV_JVM_ARG="-Dvulkanic.spirv.compiler=$SPIRV_COMPILER"
+    echo "Using bundled SPIR-V compiler"
+fi
+
 # Launch the game with Fabric Loader
 # Note: Minecraft classes are included in the main JAR, no separate game JAR needed
 # Note: Assets are loaded directly from JAR classpath - no --assetsDir needed
@@ -45,6 +53,7 @@ else
 fi
 
 $JAVA_CMD $JVM_ARGS \
+    $SPIRV_JVM_ARG \
     -Dfabric.development=true \
     -cp "@CLASSPATH_LINUX@" \
     net.fabricmc.loader.impl.launch.knot.KnotClient \

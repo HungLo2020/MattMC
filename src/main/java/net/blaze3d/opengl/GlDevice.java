@@ -12,7 +12,11 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import net.logging.LogUtils;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,9 +29,15 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.FileUtil;
+import net.minecraft.ResourceLocationException;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.CommandContext;
+import net.vulkanic.PipelineDescriptor;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureTarget;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -58,6 +68,10 @@ public class GlDevice implements GpuDevice {
 	// Iris: Track missing shaders to avoid log spam
 	private Set<RenderPipeline> missingShaders = new HashSet();
 
+	private static CommandContext commandContext() {
+		return VulkanicAPI.getCommandContext();
+	}
+
 	public GlDevice(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		GLFW.glfwMakeContextCurrent(l);
 		net.vulkanic.GraphicsCapabilities gLCapabilities = net.vulkanic.VulkanicAPI.initializeGraphicsCapabilities();
@@ -72,9 +86,9 @@ public class GlDevice implements GpuDevice {
 		this.maxSupportedTextureSize = j;
 		this.defaultShaderSource = biFunction;
 		this.encoder = new GlCommandEncoder(this);
-		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getImmediateContext(), 35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
-		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
-		net.vulkanic.VulkanicAPI.setCapabilityEnabled(ctx, 34895, true); // GL_PROGRAM_POINT_SIZE
+		CommandContext ctx = commandContext();
+		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.getUniformBufferOffsetAlignment(ctx);
+		net.vulkanic.VulkanicAPI.setProgramPointSizeEnabled(ctx, true);
 		// Register this device with the Vulkanic backend so it can delegate
 		// device-level operations (pipeline compilation, etc.) back to this GlDevice.
 		net.vulkanic.VulkanicAPI.registerDevice(this);
@@ -118,45 +132,67 @@ public class GlDevice implements GpuDevice {
 				throw new UnsupportedOperationException("Array or 3D textures are not yet supported");
 			}
 
-			GlStateManager.clearGlErrors();
-			int n = GlStateManager._genTexture();
+			CommandContext ctx = commandContext();
+			while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
+			}
+			int n = net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
 			if (string == null) {
 				string = String.valueOf(n);
 			}
 
-			int o;
+			VulkanicTextureTarget textureTarget;
+			int glTarget;
 			if (bl) {
-				net.vulkanic.VulkanicAPI.bindTexture(net.vulkanic.VulkanicAPI.getImmediateContext(), 34067, n); // GL_TEXTURE_CUBE_MAP
-				o = 34067;
+				net.vulkanic.VulkanicAPI.bindCubemapTexture(ctx, n);
+				textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
 			} else {
-				GlStateManager._bindTexture(n);
-				o = 3553;
+				VulkanicAPI.bindTexture2D(ctx, n);
+				textureTarget = VulkanicTextureTarget.TEXTURE_2D;
 			}
+			glTarget = textureTarget.toLegacyGlTarget();
 
-			GlStateManager._texParameter(o, 33085, m - 1);
-			GlStateManager._texParameter(o, 33082, 0);
-			GlStateManager._texParameter(o, 33083, m - 1);
+			net.vulkanic.VulkanicAPI.setTextureMaxLevel(ctx, textureTarget, m - 1);
+			net.vulkanic.VulkanicAPI.setTextureMinLod(ctx, textureTarget, 0);
+			net.vulkanic.VulkanicAPI.setTextureMaxLod(ctx, textureTarget, m - 1);
 			if (textureFormat.hasDepthAspect()) {
-				GlStateManager._texParameter(o, 34892, 0);
+				net.vulkanic.VulkanicAPI.disableTextureCompareMode(ctx, textureTarget);
 			}
 
 			if (bl) {
 				for (int p : GlConst.CUBEMAP_TARGETS) {
 					for (int q = 0; q < m; q++) {
-						GlStateManager._texImage2D(
-							p, q, GlConst.toGlInternalId(textureFormat), j >> q, k >> q, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
+						uploadTexture2DAndTrack(
+							ctx,
+							p,
+							q,
+							GlConst.toGlInternalId(textureFormat),
+							j >> q,
+							k >> q,
+							0,
+							GlConst.toGlExternalId(textureFormat),
+							GlConst.toGlType(textureFormat),
+							null
 						);
 					}
 				}
 			} else {
 				for (int r = 0; r < m; r++) {
-					GlStateManager._texImage2D(
-						o, r, GlConst.toGlInternalId(textureFormat), j >> r, k >> r, 0, GlConst.toGlExternalId(textureFormat), GlConst.toGlType(textureFormat), null
+					uploadTexture2DAndTrack(
+						ctx,
+						glTarget,
+						r,
+						GlConst.toGlInternalId(textureFormat),
+						j >> r,
+						k >> r,
+						0,
+						GlConst.toGlExternalId(textureFormat),
+						GlConst.toGlType(textureFormat),
+						null
 					);
 				}
 			}
 
-			int r = GlStateManager._getError();
+			int r = net.vulkanic.VulkanicAPI.getError(ctx);
 			if (r == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate texture of " + j + "x" + k + " for " + string);
 			} else if (r != 0) {
@@ -192,9 +228,11 @@ public class GlDevice implements GpuDevice {
 		if (j <= 0) {
 			throw new IllegalArgumentException("Buffer size must be greater than zero");
 		} else {
-			GlStateManager.clearGlErrors();
+			CommandContext ctx = commandContext();
+			while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
+			}
 			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, j);
-			int k = GlStateManager._getError();
+			int k = net.vulkanic.VulkanicAPI.getError(ctx);
 			if (k == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + j + " for " + supplier);
 			} else if (k != 0) {
@@ -211,10 +249,12 @@ public class GlDevice implements GpuDevice {
 		if (!byteBuffer.hasRemaining()) {
 			throw new IllegalArgumentException("Buffer source must not be empty");
 		} else {
-			GlStateManager.clearGlErrors();
+			CommandContext ctx = commandContext();
+			while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
+			}
 			long l = byteBuffer.remaining();
 			GlBuffer glBuffer = this.bufferStorage.createBuffer(this.directStateAccess, supplier, i, byteBuffer);
-			int j = GlStateManager._getError();
+			int j = net.vulkanic.VulkanicAPI.getError(ctx);
 			if (j == 1285) {
 				throw new GpuOutOfMemoryException("Could not allocate buffer of " + l + " for " + supplier);
 			} else if (j != 0) {
@@ -228,9 +268,14 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getImplementationInformation() {
+		CommandContext ctx = commandContext();
 		return GLFW.glfwGetCurrentContext() == 0L
 			? "NO CONTEXT"
-			: GlStateManager._getString(7937) + " GL version " + GlStateManager._getString(7938) + ", " + GlStateManager._getString(7936);
+			: net.vulkanic.VulkanicAPI.getString(ctx, net.vulkanic.VulkanicAPI.GL_RENDERER)
+				+ " GL version "
+				+ net.vulkanic.VulkanicAPI.getString(ctx, net.vulkanic.VulkanicAPI.GL_VERSION)
+				+ ", "
+				+ net.vulkanic.VulkanicAPI.getString(ctx, net.vulkanic.VulkanicAPI.GL_VENDOR);
 	}
 
 	@Override
@@ -245,12 +290,12 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getRenderer() {
-		return GlStateManager._getString(7937);
+		return net.vulkanic.VulkanicAPI.getString(commandContext(), net.vulkanic.VulkanicAPI.GL_RENDERER);
 	}
 
 	@Override
 	public String getVendor() {
-		return GlStateManager._getString(7936);
+		return net.vulkanic.VulkanicAPI.getString(commandContext(), net.vulkanic.VulkanicAPI.GL_VENDOR);
 	}
 
 	@Override
@@ -260,15 +305,32 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public String getVersion() {
-		return GlStateManager._getString(7938);
+		return net.vulkanic.VulkanicAPI.getString(commandContext(), net.vulkanic.VulkanicAPI.GL_VERSION);
 	}
 
 	private static int getMaxSupportedTextureSize() {
-		int i = GlStateManager._getInteger(3379);
+		CommandContext ctx = commandContext();
+		int i = net.vulkanic.VulkanicAPI.getInteger(ctx, net.vulkanic.VulkanicIntegerQuery.MAX_TEXTURE_SIZE);
 
 		for (int j = Math.max(32768, i); j >= 1024; j >>= 1) {
-			GlStateManager._texImage2D(32868, 0, 6408, j, j, 0, 6408, 5121, null);
-			int k = GlStateManager._getTexLevelParameter(32868, 0, 4096);
+			uploadTexture2DAndTrack(
+				ctx,
+				net.vulkanic.VulkanicAPI.GL_PROXY_TEXTURE_2D,
+				0,
+				net.vulkanic.VulkanicAPI.GL_RGBA,
+				j,
+				j,
+				0,
+				net.vulkanic.VulkanicAPI.GL_RGBA,
+				net.vulkanic.VulkanicAPI.GL_UNSIGNED_BYTE,
+				null
+			);
+			int k = net.vulkanic.VulkanicAPI.getTextureLevelParameter(
+				ctx,
+				net.vulkanic.VulkanicAPI.GL_PROXY_TEXTURE_2D,
+				0,
+				net.vulkanic.VulkanicAPI.GL_TEXTURE_WIDTH
+			);
 			if (k != 0) {
 				return j;
 			}
@@ -277,6 +339,11 @@ public class GlDevice implements GpuDevice {
 		int jx = Math.max(i, 1024);
 		LOGGER.info("Failed to determine maximum texture size by probing, trying GL_MAX_TEXTURE_SIZE = {}", jx);
 		return jx;
+	}
+
+	private static void uploadTexture2DAndTrack(CommandContext ctx, int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
+		net.vulkanic.VulkanicAPI.uploadTexture2D(ctx, i, j, k, l, m, n, o, p, byteBuffer);
+		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
 	}
 
 	@Override
@@ -306,18 +373,22 @@ public class GlDevice implements GpuDevice {
 		}
 
 		this.shaderCache.clear();
-		String string = GlStateManager._getString(7937);
+		String string = net.vulkanic.VulkanicAPI.getString(commandContext(), net.vulkanic.VulkanicAPI.GL_RENDERER);
 		if (string.contains("AMD")) {
 			sacrificeShaderToOpenGlAndAmd();
 		}
 	}
 
 	private static void sacrificeShaderToOpenGlAndAmd() {
-		int i = GlStateManager.glCreateShader(35633);
-		int j = GlStateManager.glCreateProgram();
-		GlStateManager.glAttachShader(j, i);
-		GlStateManager.glDeleteShader(i);
-		GlStateManager.glDeleteProgram(j);
+		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
+		net.vulkanic.VulkanicShaderHandle shader = net.vulkanic.VulkanicAPI.createShaderHandle(
+			ctx,
+			net.vulkanic.VulkanicShaderStage.VERTEX
+		);
+		net.vulkanic.VulkanicProgramHandle program = net.vulkanic.VulkanicAPI.createShaderProgramHandle(ctx);
+		net.vulkanic.VulkanicAPI.attachShader(ctx, program, shader);
+		net.vulkanic.VulkanicAPI.deleteShader(ctx, shader);
+		net.vulkanic.VulkanicAPI.deleteProgram(ctx, program);
 	}
 
 	@Override
@@ -346,7 +417,7 @@ public class GlDevice implements GpuDevice {
 				GlProgram program = overrideIrisProgram(irisPipeline, renderPipeline);
 
 				if (program != null) {
-					return new GlRenderPipeline(renderPipeline, program);
+					return this.createCompiledRenderPipeline(renderPipeline, program);
 				} else if (missingShaders.add(renderPipeline)) {
 					if (renderPipeline.getLocation().getNamespace().equals("minecraft")) {
 						LOGGER.error("Missing program " + renderPipeline.getLocation() + " in Iris override list. This is likely an Iris bug!!!", new Throwable());
@@ -360,6 +431,14 @@ public class GlDevice implements GpuDevice {
 		// Default vanilla behavior
 		return (GlRenderPipeline)this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
+	}
+
+	private GlRenderPipeline createCompiledRenderPipeline(RenderPipeline renderPipeline, GlProgram program) {
+		PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(renderPipeline);
+		if (program != GlProgram.INVALID_PROGRAM) {
+			descriptor = VulkanicAPI.withReflectedResourceLayout(commandContext(), descriptor, program.getProgramId());
+		}
+		return new GlRenderPipeline(renderPipeline, program, descriptor);
 	}
 
 	// Iris: Override Iris program (merged from MixinShaderManager_Overrides)
@@ -381,25 +460,104 @@ public class GlDevice implements GpuDevice {
 	}
 
 	private GlShaderModule compileShader(GlDevice.ShaderCompilationKey shaderCompilationKey, BiFunction<ResourceLocation, ShaderType, String> biFunction) {
-		String string = (String)biFunction.apply(shaderCompilationKey.id, shaderCompilationKey.type);
+		String string = this.resolveShaderSource(shaderCompilationKey, biFunction);
 		if (string == null) {
 			LOGGER.error("Couldn't find source for {} shader ({})", shaderCompilationKey.type, shaderCompilationKey.id);
 			return GlShaderModule.INVALID_SHADER;
 		} else {
 			String string2 = GlslPreprocessor.injectDefines(string, shaderCompilationKey.defines);
-			int i = GlStateManager.glCreateShader(GlConst.toGl(shaderCompilationKey.type));
-			GlStateManager.glShaderSource(i, string2);
-			GlStateManager.glCompileShader(i);
-			if (GlStateManager.glGetShaderi(i, 35713) == 0) {
-				String string3 = StringUtils.trim(GlStateManager.glGetShaderInfoLog(i, 32768));
+			net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getCommandContext();
+			net.vulkanic.VulkanicShaderHandle shader = net.vulkanic.VulkanicAPI.createShaderHandle(ctx, toVulkanicShaderStage(shaderCompilationKey.type));
+			net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader, string2);
+			net.vulkanic.VulkanicAPI.compileShader(ctx, shader);
+			if (!net.vulkanic.VulkanicAPI.isShaderCompileSuccessful(ctx, shader)) {
+				String string3 = StringUtils.trim(net.vulkanic.VulkanicAPI.getShaderInfoLog(ctx, shader));
 				LOGGER.error("Couldn't compile {} shader ({}): {}", shaderCompilationKey.type.getName(), shaderCompilationKey.id, string3);
 				return GlShaderModule.INVALID_SHADER;
 			} else {
-				GlShaderModule glShaderModule = new GlShaderModule(i, shaderCompilationKey.id, shaderCompilationKey.type);
+				GlShaderModule glShaderModule = new GlShaderModule(shader.value(), shaderCompilationKey.id, shaderCompilationKey.type);
 				this.debugLabels.applyLabel(glShaderModule);
 				return glShaderModule;
 			}
 		}
+	}
+
+	@Nullable
+	private String resolveShaderSource(GlDevice.ShaderCompilationKey shaderCompilationKey, BiFunction<ResourceLocation, ShaderType, String> biFunction) {
+		String string = (String)biFunction.apply(shaderCompilationKey.id, shaderCompilationKey.type);
+		if (string != null) {
+			ResourceLocation sourceFileLocation = shaderCompilationKey.type.idConverter().idToFile(shaderCompilationKey.id);
+			return preprocessBundledShaderSource(sourceFileLocation, string);
+		}
+
+		return loadBundledShaderSource(shaderCompilationKey.id, shaderCompilationKey.type);
+	}
+
+	@Nullable
+	static String loadBundledShaderSource(ResourceLocation resourceLocation, ShaderType shaderType) {
+		ResourceLocation resourceLocation2 = shaderType.idConverter().idToFile(resourceLocation);
+		String string = "/assets/" + resourceLocation2.getNamespace() + "/" + resourceLocation2.getPath();
+
+		try (InputStream inputStream = GlDevice.class.getResourceAsStream(string)) {
+			if (inputStream == null) {
+				return null;
+			}
+
+			String rawSource = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+			return preprocessBundledShaderSource(resourceLocation2, rawSource);
+		} catch (IOException var5) {
+			throw new UncheckedIOException("Failed to read bundled shader source " + resourceLocation + " (" + shaderType.getName() + ")", var5);
+		}
+	}
+
+	private static String preprocessBundledShaderSource(ResourceLocation sourceFileLocation, String sourceText) {
+		ResourceLocation baseLocation = sourceFileLocation.withPath(FileUtil::getFullResourcePath);
+		GlslPreprocessor preprocessor = new GlslPreprocessor() {
+			private final Set<ResourceLocation> importedLocations = new HashSet<>();
+
+			@Override
+			public String applyImport(boolean quotedImport, String importPath) {
+				ResourceLocation importLocation;
+				try {
+					if (quotedImport) {
+						importLocation = baseLocation.withPath(path -> FileUtil.normalizeResourcePath(path + importPath));
+					} else {
+						importLocation = ResourceLocation.parse(importPath).withPrefix("shaders/include/");
+					}
+				} catch (ResourceLocationException exception) {
+					LOGGER.error("Malformed bundled GLSL import {}: {}", importPath, exception.getMessage());
+					return "#error " + exception.getMessage();
+				}
+
+				if (!this.importedLocations.add(importLocation)) {
+					return null;
+				}
+
+				String includePath = "/assets/" + importLocation.getNamespace() + "/" + importLocation.getPath();
+				try (InputStream includeStream = GlDevice.class.getResourceAsStream(includePath)) {
+					if (includeStream == null) {
+						String message = "Missing bundled GLSL include " + importLocation;
+						LOGGER.error(message);
+						return "#error " + message;
+					}
+
+					return new String(includeStream.readAllBytes(), StandardCharsets.UTF_8);
+				} catch (IOException exception) {
+					LOGGER.error("Could not read bundled GLSL import {}: {}", importLocation, exception.getMessage());
+					return "#error " + exception.getMessage();
+				}
+			}
+		};
+
+		List<String> processed = preprocessor.process(sourceText);
+		return String.join("", processed);
+	}
+
+	private static net.vulkanic.VulkanicShaderStage toVulkanicShaderStage(ShaderType shaderType) {
+		return switch (shaderType) {
+			case VERTEX -> net.vulkanic.VulkanicShaderStage.VERTEX;
+			case FRAGMENT -> net.vulkanic.VulkanicShaderStage.FRAGMENT;
+		};
 	}
 
 	private GlRenderPipeline compilePipeline(RenderPipeline renderPipeline, BiFunction<ResourceLocation, ShaderType, String> biFunction) {
@@ -409,22 +567,22 @@ public class GlDevice implements GpuDevice {
 		);
 		if (glShaderModule == GlShaderModule.INVALID_SHADER) {
 			LOGGER.error("Couldn't compile pipeline {}: vertex shader {} was invalid", renderPipeline.getLocation(), renderPipeline.getVertexShader());
-			return new GlRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
+			return this.createCompiledRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
 		} else if (glShaderModule2 == GlShaderModule.INVALID_SHADER) {
 			LOGGER.error("Couldn't compile pipeline {}: fragment shader {} was invalid", renderPipeline.getLocation(), renderPipeline.getFragmentShader());
-			return new GlRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
+			return this.createCompiledRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
 		} else {
 			GlProgram glProgram;
 			try {
 				glProgram = GlProgram.link(glShaderModule, glShaderModule2, renderPipeline.getVertexFormat(), renderPipeline.getLocation().toString());
 			} catch (ShaderManager.CompilationException var7) {
 				LOGGER.error("Couldn't compile program for pipeline {}: {}", renderPipeline.getLocation(), var7);
-				return new GlRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
+				return this.createCompiledRenderPipeline(renderPipeline, GlProgram.INVALID_PROGRAM);
 			}
 
 			glProgram.setupUniforms(renderPipeline.getUniforms(), renderPipeline.getSamplers());
 			this.debugLabels.applyLabel(glProgram);
-			return new GlRenderPipeline(renderPipeline, glProgram);
+			return this.createCompiledRenderPipeline(renderPipeline, glProgram);
 		}
 	}
 

@@ -8,7 +8,7 @@
 in vec3 Position;
 in vec4 Color;
 in vec2 UV0;
-in vec2 UV1;
+in ivec2 UV1;
 in ivec2 UV2;
 in vec3 Normal;
 
@@ -27,8 +27,9 @@ void main() {
 
     sphericalVertexDistance = fog_spherical_distance(Position);
     cylindricalVertexDistance = fog_cylindrical_distance(Position);
-    vertexColor = minecraft_mix_light(Light0_Direction, Light1_Direction, Normal, Color) * texelFetch(Sampler2, UV2 / 16, 0);
+    vec4 lightColor = texelFetch(Sampler2, UV2 / 16, 0);
+    vertexColor = minecraft_mix_light(Light0_Direction, Light1_Direction, Normal, Color) * vec4(lightColor.rgb, 1.0);
     texCoord0 = UV0;
-    texCoord1 = UV1;
-    texCoord2 = UV2;
+    texCoord1 = vec2(UV1);
+    texCoord2 = vec2(UV2);
 }

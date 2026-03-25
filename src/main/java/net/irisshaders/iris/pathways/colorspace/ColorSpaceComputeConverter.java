@@ -1,7 +1,7 @@
 package net.irisshaders.iris.pathways.colorspace;
 
 import com.google.common.collect.ImmutableSet;
-import net.blaze3d.opengl.GlTexture;
+import net.blaze3d.textures.GpuTexture;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.program.ComputeProgram;
 import net.irisshaders.iris.gl.program.ProgramBuilder;
@@ -23,7 +23,7 @@ public class ColorSpaceComputeConverter implements ColorSpaceConverter {
 	private ColorSpace colorSpace;
 	private ComputeProgram program;
 
-	private GlTexture target;
+	private GpuTexture target;
 
 	public ColorSpaceComputeConverter(int width, int height, ColorSpace colorSpace) {
 		rebuildProgram(width, height, colorSpace);
@@ -56,17 +56,17 @@ public class ColorSpaceComputeConverter implements ColorSpaceConverter {
 		source = JcppProcessor.glslPreprocessSource(source, defineList);
 
 		ProgramBuilder builder = ProgramBuilder.beginCompute("colorSpaceCompute", source, ImmutableSet.of());
-		builder.addTextureImage(() -> target.glId(), InternalTextureFormat.RGBA8, "readImage");
+		builder.addTextureImage(() -> net.vulkanic.VulkanicCoreAPI.textureId(target), InternalTextureFormat.RGBA8, "readImage");
 		this.program = builder.buildCompute();
 	}
 
-	public void process(GlTexture targetImage) {
+	public void process(GpuTexture targetImage) {
 		if (colorSpace == ColorSpace.SRGB) return;
 
 		this.target = targetImage;
 		program.use();
 		IrisRenderSystem.dispatchCompute(width / 8, height / 8, 1);
-		IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT);
+		IrisRenderSystem.memoryBarrierImageWritesVisibleToTextureSampling();
 		ComputeProgram.unbind();
 	}
 }

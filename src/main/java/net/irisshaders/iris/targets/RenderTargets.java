@@ -1,8 +1,6 @@
 package net.irisshaders.iris.targets;
 
 import com.google.common.collect.ImmutableSet;
-import net.blaze3d.opengl.GlStateManager;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.AddressMode;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
@@ -15,6 +13,7 @@ import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.properties.PackDirectives;
 import net.irisshaders.iris.shaderpack.properties.PackRenderTargetDirectives;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 import org.joml.Vector2i;
 
 import java.util.ArrayList;
@@ -68,8 +67,8 @@ public class RenderTargets {
 
 		TextureFormat mojangDepthFormat = IrisPlatformHelpers.getInstance().mojangDepthFormat(depthFormat);
 
-		this.noTranslucents = RenderSystem.getDevice().createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, mojangDepthFormat, width, height, 1, 1);
-		this.noHand = RenderSystem.getDevice().createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, mojangDepthFormat, width, height, 1, 1);
+		this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, mojangDepthFormat, width, height, 1, 1);
+		this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, mojangDepthFormat, width, height, 1, 1);
 
 		this.noTranslucents.setTextureFilter(FilterMode.NEAREST, false);
 		this.noHand.setTextureFilter(FilterMode.NEAREST, false);
@@ -177,8 +176,8 @@ public class RenderTargets {
 			noTranslucents.close();
 			noHand.close();
 
-			this.noTranslucents = RenderSystem.getDevice().createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, newDepthTextureId.getFormat(), newWidth, newHeight, 1, 1);
-			this.noHand = RenderSystem.getDevice().createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, newDepthTextureId.getFormat(), newWidth, newHeight, 1, 1);
+			this.noTranslucents = VulkanicAPI.createTexture("Depth / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, newDepthTextureId.getFormat(), newWidth, newHeight, 1, 1);
+			this.noHand = VulkanicAPI.createTexture("Depth / Before Hand", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, newDepthTextureId.getFormat(), newWidth, newHeight, 1, 1);
 			this.noTranslucents.setTextureFilter(FilterMode.NEAREST, false);
 			this.noHand.setTextureFilter(FilterMode.NEAREST, false);
 			this.noTranslucents.setAddressMode(AddressMode.CLAMP_TO_EDGE);
@@ -226,11 +225,12 @@ public class RenderTargets {
 	public void copyPreTranslucentDepth() {
 		if (translucentDepthDirty) {
 			translucentDepthDirty = false;
-			GlStateManager._bindTexture(noTranslucents.iris$getGlId());
+			var ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(noTranslucents));
 			depthSourceFb.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
+			IrisRenderSystem.copyTexImage2D(0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
 		} else {
-			copyStrategy.copy(depthSourceFb, getDepthTexture().iris$getGlId(), noTranslucentsDestFb, noTranslucents.iris$getGlId(),
+			copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noTranslucentsDestFb, VulkanicCoreAPI.textureId(noTranslucents),
 				getCurrentWidth(), getCurrentHeight());
 		}
 	}
@@ -238,11 +238,12 @@ public class RenderTargets {
 	public void copyPreHandDepth() {
 		if (handDepthDirty) {
 			handDepthDirty = false;
-			GlStateManager._bindTexture(noHand.iris$getGlId());
+			var ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(noHand));
 			depthSourceFb.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
+			IrisRenderSystem.copyTexImage2D(0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
 		} else {
-			copyStrategy.copy(depthSourceFb, getDepthTexture().iris$getGlId(), noHandDestFb, noHand.iris$getGlId(),
+			copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noHandDestFb, VulkanicCoreAPI.textureId(noHand),
 				getCurrentWidth(), getCurrentHeight());
 		}
 	}
@@ -379,7 +380,7 @@ public class RenderTargets {
 
 
 		int status = framebuffer.getStatus();
-		if (status != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE) {
+		if (!VulkanicAPI.isFramebufferComplete(status)) {
 			throw new IllegalStateException("Unexpected error while creating framebuffer: Draw buffers " + Arrays.toString(actualDrawBuffers) + " Status: " + status);
 		}
 

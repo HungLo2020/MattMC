@@ -417,10 +417,9 @@ public class RenderPipelines {
 	public static final RenderPipeline GUI_TEXT = register(
 		RenderPipeline.builder(GUI_TEXT_SNIPPET, FOG_SNIPPET)
 			.withLocation("pipeline/gui_text")
-			.withVertexShader("core/rendertype_text")
-			.withFragmentShader("core/rendertype_text")
+			.withVertexShader("core/rendertype_text_see_through")
+			.withFragmentShader("core/rendertype_text_see_through")
 			.withSampler("Sampler0")
-			.withSampler("Sampler2")
 			.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 			.build()
 	);
@@ -446,10 +445,9 @@ public class RenderPipelines {
 	public static final RenderPipeline GUI_TEXT_INTENSITY = register(
 		RenderPipeline.builder(GUI_TEXT_SNIPPET, FOG_SNIPPET)
 			.withLocation("pipeline/gui_text_intensity")
-			.withVertexShader("core/rendertype_text_intensity")
-			.withFragmentShader("core/rendertype_text_intensity")
+			.withVertexShader("core/rendertype_text_intensity_see_through")
+			.withFragmentShader("core/rendertype_text_intensity_see_through")
 			.withSampler("Sampler0")
-			.withSampler("Sampler2")
 			.build()
 	);
 	public static final RenderPipeline TEXT_POLYGON_OFFSET = register(
@@ -686,7 +684,7 @@ public class RenderPipelines {
 	public static final RenderPipeline MOJANG_LOGO = register(
 		RenderPipeline.builder(GUI_TEXTURED_SNIPPET)
 			.withLocation("pipeline/mojang_logo")
-			.withBlend(new BlendFunction(SourceFactor.SRC_ALPHA, DestFactor.ONE))
+			.withBlend(BlendFunction.TRANSLUCENT)
 			.build()
 	);
 	public static final RenderPipeline ENTITY_OUTLINE_BLIT = register(
@@ -719,9 +717,11 @@ public class RenderPipelines {
 			.withVertexShader("core/panorama")
 			.withFragmentShader("core/panorama")
 			.withSampler("Sampler0")
+			.withCull(false)
+			.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 			.withDepthWrite(false)
 			.withColorWrite(true, false)
-			.withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.QUADS)
+			.withVertexFormat(DefaultVertexFormat.EMPTY, VertexFormat.Mode.TRIANGLES)
 			.build()
 	);
 	public static final RenderPipeline OUTLINE_CULL = register(RenderPipeline.builder(OUTLINE_SNIPPET).withLocation("pipeline/outline_cull").build());

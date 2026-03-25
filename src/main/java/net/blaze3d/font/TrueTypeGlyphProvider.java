@@ -193,7 +193,7 @@ public class TrueTypeGlyphProvider implements GlyphProvider {
 
 					try (NativeImage nativeImage = new NativeImage(NativeImage.Format.LUMINANCE, Glyph.this.width, Glyph.this.height, false)) {
 						if (nativeImage.copyFromFont(fT_Face, Glyph.this.index)) {
-							RenderSystem.getDevice().createCommandEncoder().writeToTexture(gpuTexture, nativeImage, 0, 0, i, j, Glyph.this.width, Glyph.this.height, 0, 0);
+							net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(gpuTexture, nativeImage, 0, 0, i, j, Glyph.this.width, Glyph.this.height, 0, 0);
 						}
 					}
 				}

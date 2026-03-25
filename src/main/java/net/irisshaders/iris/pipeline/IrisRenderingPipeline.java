@@ -4,9 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.opengl.GlConst;
 import net.blaze3d.opengl.GlProgram;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
@@ -105,6 +103,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
 import org.joml.Vector4f;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -238,7 +237,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 			}
 		} else {
 			for (int i = 0; i < Math.min(16, SamplerLimits.get().getMaxShaderStorageUnits()); i++) {
-				IrisRenderSystem.bindBufferBase(VulkanicAPI.GL_SHADER_STORAGE_BUFFER, i, 0);
+				IrisRenderSystem.bindBufferBase(net.vulkanic.VulkanicBufferTarget.SHADER_STORAGE, i, 0);
 			}
 		}
 
@@ -287,16 +286,16 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		);
 
 		// Don't clobber anything in texture unit 0. It probably won't cause issues, but we're just being cautious here.
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE2);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(2);
 
 		customTextureManager = new CustomTextureManager(programSet.getPackDirectives(), programSet.getPack().getCustomTextureDataMap(), programSet.getPack().getIrisCustomTextureDataMap(), programSet.getPack().getCustomNoiseTexture());
 		whitePixel = new NativeImageBackedSingleColorTexture(255, 255, 255, 255);
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 		BufferFlipper flipper = new BufferFlipper();
 
-		this.centerDepthSampler = new CenterDepthSampler(() -> renderTargets.getDepthTexture().iris$getGlId(), programSet.getPackDirectives().getCenterDepthHalfLife());
+		this.centerDepthSampler = new CenterDepthSampler(() -> VulkanicCoreAPI.textureId(renderTargets.getDepthTexture()), programSet.getPackDirectives().getCenterDepthHalfLife());
 
 		this.shadowMapResolution = programSet.getPackDirectives().getShadowDirectives().getResolution();
 
@@ -506,7 +505,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 				}
 
 				@Override
-				public void process(GlTexture target) {
+				public void process(GpuTexture target) {
 
 				}
 			};
@@ -825,18 +824,19 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	@Override
 	public void onSetShaderTexture(GpuTextureView id) {
 		if (shouldBindPBR && isRenderingWorld && id != null) {
-			PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(id.texture().iris$getGlId());
+			PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(VulkanicCoreAPI.textureId(id));
 			id.texture().iris$copyStateTo(pbrHolder.normalTexture().getTexture());
 			id.texture().iris$copyStateTo(pbrHolder.specularTexture().getTexture());
-			currentNormalTexture = pbrHolder.normalTexture().getTexture().iris$getGlId();
-			currentSpecularTexture = pbrHolder.specularTexture().getTexture().iris$getGlId();
+			currentNormalTexture = VulkanicCoreAPI.textureId(pbrHolder.normalTexture().getTexture());
+			currentSpecularTexture = VulkanicCoreAPI.textureId(pbrHolder.specularTexture().getTexture());
 
 			TextureFormat textureFormat = TextureFormatLoader.getFormat();
 			if (textureFormat != null) {
-				int previousBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
+				var ctx = VulkanicAPI.getCommandContext();
+				int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
 				textureFormat.setupTextureParameters(PBRType.NORMAL, pbrHolder.normalTexture());
 				textureFormat.setupTextureParameters(PBRType.SPECULAR, pbrHolder.specularTexture());
-				GlStateManager._bindTexture(previousBinding);
+				VulkanicAPI.bindTexture2D(ctx, previousBinding);
 			}
 
 			PBRTextureManager.notifyPBRTexturesChanged();
@@ -856,7 +856,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		}
 
 		// Make sure we're using texture unit 0 for this.
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 		Vector4f emptyClearColor = new Vector4f(1.0F);
 
 		GLDebug.pushGroup(100, "Clear textures");
@@ -876,8 +876,8 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 			} else {
 				// Clear depth first, regardless of any color clearing.
 				shadowRenderTargets.getDepthSourceFb().bind();
-				GlStateManager._depthMask(true);
-				GlStateManager._clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
+				VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext());
 
 				ImmutableList<ClearPass> passes;
 
@@ -1064,7 +1064,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 	@Override
 	public void finalizeGameRendering() {
-		colorSpaceConverter.process((GlTexture) Minecraft.getInstance().getMainRenderTarget().getColorTexture());
+		colorSpaceConverter.process(Minecraft.getInstance().getMainRenderTarget().getColorTexture());
 	}
 
 	@Override
@@ -1179,19 +1179,18 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 		//
 		// Without this code, there will be weird issues when reloading certain shaderpacks.
 		for (int i = 0; i < 16; i++) {
-			GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
+			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
 			IrisRenderSystem.unbindAllSamplers();
-			GlStateManager._bindTexture(0);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 		}
 
 		// Set the active texture unit to unit 0
 		//
 		// This seems to be what most code expects. It's a sane default in any case.
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 
 		for (int i = 0; i < 12; i++) {
-			// Clear all shader textures
-			RenderSystem.setShaderTexture(i, null);
+			IrisRenderSystem.setTextureBinding(i, 0);
 		}
 
 		if (shadowCompositeRenderer != null) {
@@ -1208,9 +1207,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 		horizonRenderer.destroy();
 
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, 0);
-		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
+		VulkanicAPI.bindDefaultFramebuffer(VulkanicAPI.getCommandContext());
 
 		renderTargets.destroy();
 		dhCompat.clearPipeline();

@@ -98,6 +98,14 @@ public class Phase3RenderPassTest {
             OptionalDouble.class));
     }
 
+    @Test
+    public void testGraphicsBackendHasBeginRenderPassDescriptorOverload() throws NoSuchMethodException {
+        assertNotNull(GraphicsBackend.class.getMethod(
+            "beginRenderPass",
+            CommandContext.class,
+            VulkanicRenderPassDescriptor.class));
+    }
+
     // ---- VulkanicAPI has beginRenderPass static dispatch --------------------
 
     @Test
@@ -120,6 +128,87 @@ public class Phase3RenderPassTest {
             OptionalInt.class,
             VulkanicTextureView.class,
             OptionalDouble.class));
+    }
+
+    @Test
+    public void testVulkanicAPIHasBeginRenderPassDescriptorOverload() throws NoSuchMethodException {
+        assertNotNull(VulkanicAPI.class.getMethod(
+            "beginRenderPass",
+            CommandContext.class,
+            VulkanicRenderPassDescriptor.class));
+    }
+
+    @Test
+    public void testRenderPassDescriptorColorClearValidation() {
+        OpenGLTexture colorTexture = OpenGLTexture.nonOwning(
+            11, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.RGBA8, 16, 16, 1, 1, "color");
+        OpenGLTextureView colorView = new OpenGLTextureView(colorTexture, 0, 1);
+
+        assertThrows(IllegalArgumentException.class,
+            () -> new VulkanicRenderPassDescriptor.ColorAttachment(
+                colorView,
+                VulkanicRenderPassDescriptor.LoadOp.CLEAR,
+                VulkanicRenderPassDescriptor.StoreOp.STORE,
+                OptionalInt.empty()));
+
+        assertThrows(IllegalArgumentException.class,
+            () -> new VulkanicRenderPassDescriptor.ColorAttachment(
+                colorView,
+                VulkanicRenderPassDescriptor.LoadOp.LOAD,
+                VulkanicRenderPassDescriptor.StoreOp.STORE,
+                OptionalInt.of(0xFF000000)));
+    }
+
+    @Test
+    public void testRenderPassDescriptorDepthClearValidation() {
+        OpenGLTexture depthTexture = OpenGLTexture.nonOwning(
+            12, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.DEPTH32, 16, 16, 1, 1, "depth");
+        OpenGLTextureView depthView = new OpenGLTextureView(depthTexture, 0, 1);
+
+        assertThrows(IllegalArgumentException.class,
+            () -> new VulkanicRenderPassDescriptor.DepthAttachment(
+                depthView,
+                VulkanicRenderPassDescriptor.LoadOp.CLEAR,
+                VulkanicRenderPassDescriptor.StoreOp.STORE,
+                OptionalDouble.empty()));
+
+        assertThrows(IllegalArgumentException.class,
+            () -> new VulkanicRenderPassDescriptor.DepthAttachment(
+                depthView,
+                VulkanicRenderPassDescriptor.LoadOp.LOAD,
+                VulkanicRenderPassDescriptor.StoreOp.STORE,
+                OptionalDouble.of(1.0)));
+    }
+
+    @Test
+    public void testRenderPassDescriptorConvenienceFactories() {
+        OpenGLTexture colorTexture = OpenGLTexture.nonOwning(
+            13, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.RGBA8, 32, 32, 1, 1, "color2");
+        OpenGLTexture depthTexture = OpenGLTexture.nonOwning(
+            14, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.DEPTH32, 32, 32, 1, 1, "depth2");
+        OpenGLTextureView colorView = new OpenGLTextureView(colorTexture, 0, 1);
+        OpenGLTextureView depthView = new OpenGLTextureView(depthTexture, 0, 1);
+
+        VulkanicRenderPassDescriptor colorOnly = VulkanicRenderPassDescriptor.color(
+            () -> "pass-color", colorView, OptionalInt.of(0xFF336699));
+        assertEquals(VulkanicRenderPassDescriptor.LoadOp.CLEAR, colorOnly.colorAttachment().loadOp());
+        assertTrue(colorOnly.colorAttachment().clearColor().isPresent());
+        assertNull(colorOnly.depthAttachment());
+
+        VulkanicRenderPassDescriptor colorAndDepth = VulkanicRenderPassDescriptor.colorAndDepth(
+            () -> "pass-color-depth",
+            colorView,
+            OptionalInt.empty(),
+            depthView,
+            OptionalDouble.of(1.0));
+        assertEquals(VulkanicRenderPassDescriptor.LoadOp.LOAD, colorAndDepth.colorAttachment().loadOp());
+        assertNotNull(colorAndDepth.depthAttachment());
+        assertEquals(VulkanicRenderPassDescriptor.LoadOp.CLEAR,
+            colorAndDepth.depthAttachment().loadOp());
     }
 
     // ---- OpenGLRenderPass basic structural tests ----------------------------

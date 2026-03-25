@@ -2,13 +2,12 @@ package com.seibel.distanthorizons.core.render.glObject.buffer;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.lang.ref.PhantomReference;
@@ -26,8 +25,6 @@ public class GLBuffer implements AutoCloseable
 			.chatLevelConfig(Config.Common.Logging.logRendererGLEventToChat)
 			.build();
 	
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
-	
 	
 	public static final double BUFFER_EXPANSION_MULTIPLIER = 1.3;
 	public static final double BUFFER_SHRINK_TRIGGER = BUFFER_EXPANSION_MULTIPLIER * BUFFER_EXPANSION_MULTIPLIER;
@@ -40,6 +37,11 @@ public class GLBuffer implements AutoCloseable
 	private static final ReferenceQueue<GLBuffer> PHANTOM_REFERENCE_QUEUE = new ReferenceQueue<>();
 	/** TODO we should make a global cleanup thread that handles all phantom references */
 	private static final ThreadPoolExecutor CLEANUP_THREAD = ThreadUtil.makeSingleDaemonThreadPool("GLBuffer Cleanup");
+
+	private static CommandContext commandContext()
+	{
+		return VulkanicAPI.getCommandContext();
+	}
 	
 	
 	protected int id;
@@ -59,6 +61,18 @@ public class GLBuffer implements AutoCloseable
 	static { CLEANUP_THREAD.execute(() -> runPhantomReferenceCleanupLoop()); }
 	
 	public GLBuffer(boolean isBufferStorage) { this.create(isBufferStorage); }
+
+	private static int createTrackedBufferId()
+	{
+		net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+		return VulkanicAPI.createBuffer(commandContext());
+	}
+
+	private static void deleteTrackedBufferId(int id)
+	{
+		net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
+		VulkanicAPI.deleteBuffer(commandContext(), id);
+	}
 	
 	
 	
@@ -69,8 +83,10 @@ public class GLBuffer implements AutoCloseable
 	// Should be override by subclasses
 	public int getBufferBindingTarget() { return VulkanicAPI.GL_COPY_READ_BUFFER; }
 	
-	public void bind() { VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id); }
-	public void unbind() { VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), 0); }
+	public void bind() { this.bind(commandContext()); }
+	public void bind(CommandContext ctx) { VulkanicAPI.bindBuffer(ctx, this.getBufferBindingTarget(), this.id); }
+	public void unbind() { this.unbind(commandContext()); }
+	public void unbind(CommandContext ctx) { VulkanicAPI.bindBuffer(ctx, this.getBufferBindingTarget(), 0); }
 	
 	
 	
@@ -92,7 +108,7 @@ public class GLBuffer implements AutoCloseable
 			destroyBufferIdAsync(this.id);
 		}
 		
-		this.id = GLMC.glGenBuffers();
+		this.id = createTrackedBufferId();
 		this.bufferStorage = asBufferStorage;
 		bufferCount.getAndIncrement();
 		
@@ -133,11 +149,12 @@ public class GLBuffer implements AutoCloseable
 		
 		GLProxy.queueRunningOnRenderThread(() -> 
 		{
+			CommandContext ctx = commandContext();
 			// destroy the buffer if it exists,
 			// the buffer may not exist if the destroy method is called twice
-			if (VulkanicAPI.isBuffer(VulkanicAPI.getImmediateContext(), id))
+			if (VulkanicAPI.isBuffer(ctx, id))
 			{
-				GLMC.glDeleteBuffers(id);
+				deleteTrackedBufferId(id);
 				bufferCount.decrementAndGet();
 				
 				if (Config.Client.Advanced.Debugging.logBufferGarbageCollection.get())
@@ -204,7 +221,7 @@ public class GLBuffer implements AutoCloseable
 		this.destroyAsync();
 		this.create(true);
 		this.bind();
-		VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), bb, 0);
+		VulkanicAPI.bufferStorage(commandContext(), this.getBufferBindingTarget(), bb, 0);
 		this.size = bbSize;
 	}
 	/** Requires the buffer to be bound */
@@ -213,7 +230,7 @@ public class GLBuffer implements AutoCloseable
 		LodUtil.assertTrue(!this.bufferStorage, "Buffer is bufferStorage but its trying to use bufferData upload method!");
 		
 		int bbSize = bb.limit() - bb.position();
-		VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), bb, bufferDataHint);
+		VulkanicAPI.bufferData(commandContext(), this.getBufferBindingTarget(), bb, bufferDataHint);
 		this.size = bbSize;
 	}
 	/** Requires the buffer to be bound */
@@ -226,10 +243,10 @@ public class GLBuffer implements AutoCloseable
 		{
 			int newSize = (int) (bbSize * BUFFER_EXPANSION_MULTIPLIER);
 			if (newSize > maxExpansionSize) newSize = maxExpansionSize;
-			VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), newSize, bufferDataHint);
+			VulkanicAPI.bufferData(commandContext(), this.getBufferBindingTarget(), newSize, bufferDataHint);
 			this.size = newSize;
 		}
-		VulkanicAPI.bufferSubData(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), 0, bb);
+		VulkanicAPI.bufferSubData(commandContext(), this.getBufferBindingTarget(), 0, bb);
 	}
 	
 	
@@ -254,21 +271,22 @@ public class GLBuffer implements AutoCloseable
 			int newSize = (int) (targetSize * BUFFER_EXPANSION_MULTIPLIER);
 			if (newSize > maxExpansionSize) newSize = maxExpansionSize;
 			this.size = newSize;
+			CommandContext ctx = commandContext();
 			if (this.bufferStorage)
 			{
-				GLMC.glDeleteBuffers(this.id);
-				this.id = GLMC.glGenBuffers();
-				VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id);
-				VulkanicAPI.bindBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), this.id);
-				VulkanicAPI.bufferStorage(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget(), newSize, bufferHint);
+				deleteTrackedBufferId(this.id);
+				this.id = createTrackedBufferId();
+				VulkanicAPI.bindBuffer(ctx, this.getBufferBindingTarget(), this.id);
+				VulkanicAPI.bindBuffer(ctx, this.getBufferBindingTarget(), this.id);
+				VulkanicAPI.bufferStorage(ctx, this.getBufferBindingTarget(), newSize, bufferHint);
 			}
 			else
 			{
-				VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, newSize, bufferHint);
+				VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, newSize, bufferHint);
 			}
 		}
 		
-		vboBuffer = VulkanicAPI.mapBuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_ARRAY_BUFFER, 0, targetSize, mapFlags);
+		vboBuffer = VulkanicAPI.mapBuffer(commandContext(), VulkanicAPI.GL_ARRAY_BUFFER, 0, targetSize, mapFlags);
 		this.isMapped = true;
 		return vboBuffer;
 	}
@@ -278,7 +296,7 @@ public class GLBuffer implements AutoCloseable
 	{
 		LodUtil.assertTrue(this.isMapped, "Buffer is not mapped");
 		this.bind();
-		VulkanicAPI.unmapBuffer(VulkanicAPI.getImmediateContext(), this.getBufferBindingTarget());
+		VulkanicAPI.unmapBuffer(commandContext(), this.getBufferBindingTarget());
 		this.isMapped = false;
 	}
 	

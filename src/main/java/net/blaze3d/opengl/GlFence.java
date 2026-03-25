@@ -3,15 +3,16 @@ package net.blaze3d.opengl;
 import net.blaze3d.buffers.GpuFence;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 
 @Environment(EnvType.CLIENT)
 public class GlFence implements GpuFence {
-	private long handle = GlStateManager._glFenceSync(37143, 0);
+	private long handle = VulkanicAPI.createGpuCompletionFence(VulkanicAPI.getCommandContext());
 
 	@Override
 	public void close() {
 		if (this.handle != 0L) {
-			GlStateManager._glDeleteSync(this.handle);
+			VulkanicAPI.destroySync(VulkanicAPI.getCommandContext(), this.handle);
 			this.handle = 0L;
 		}
 	}
@@ -21,10 +22,10 @@ public class GlFence implements GpuFence {
 		if (this.handle == 0L) {
 			return true;
 		} else {
-			int i = GlStateManager._glClientWaitSync(this.handle, 0, l);
-			if (i == 37147) {
+			int i = VulkanicAPI.waitForSync(VulkanicAPI.getCommandContext(), this.handle, 0, l);
+			if (VulkanicAPI.isSyncWaitTimeout(i)) {
 				return false;
-			} else if (i == 37149) {
+			} else if (VulkanicAPI.isSyncWaitFailed(i)) {
 				throw new IllegalStateException("Failed to complete gpu fence");
 			} else {
 				return true;

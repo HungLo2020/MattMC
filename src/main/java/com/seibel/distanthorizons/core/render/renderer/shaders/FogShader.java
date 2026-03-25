@@ -5,13 +5,14 @@ import com.seibel.distanthorizons.api.enums.rendering.EDhApiHeightFogDirection;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiHeightFogMixMode;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
@@ -23,12 +24,13 @@ public class FogShader extends AbstractShaderRenderer
 	public static final FogShader INSTANCE = new FogShader();
 	
 	private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
 	
 	
-	public int frameBuffer;
+	public DhFramebuffer frameBuffer;
+	private DhFramebuffer activeFrameBuffer;
+	private int activeDepthTextureId = -1;
 	
 	private Mat4f inverseMvmProjMatrix; 
 	
@@ -133,7 +135,7 @@ public class FogShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
 	{
 		int lodDrawDistance = Config.Client.Advanced.Graphics.Quality.lodChunkRenderDistanceRadius.get() * LodUtil.CHUNK_WIDTH;
 		
@@ -141,16 +143,16 @@ public class FogShader extends AbstractShaderRenderer
 		
 		if (this.inverseMvmProjMatrix != null)
 		{
-			this.shader.setUniform(this.uInvMvmProj, this.inverseMvmProjMatrix);
+			this.shader.setUniform(ctx, this.uInvMvmProj, this.inverseMvmProjMatrix);
 		}
 		
 		
 		// Fog uniforms
-		this.shader.setUniform(this.uFogColor, this.getFogColor(partialTicks));
-		this.shader.setUniform(this.uFogScale, 1.f / lodDrawDistance);
-		this.shader.setUniform(this.uFogVerticalScale, 1.f / MC.getWrappedClientLevel().getMaxHeight());
+		this.shader.setUniform(ctx, this.uFogColor, this.getFogColor(partialTicks));
+		this.shader.setUniform(ctx, this.uFogScale, 1.f / lodDrawDistance);
+		this.shader.setUniform(ctx, this.uFogVerticalScale, 1.f / MC.getWrappedClientLevel().getMaxHeight());
 		// only used for debugging
-		this.shader.setUniform(this.uFullFogMode, 0); // 1 = render everything with fog color // 7 = use debug rendering
+		this.shader.setUniform(ctx, this.uFullFogMode, 0); // 1 = render everything with fog color // 7 = use debug rendering
 		
 		
 		// fog config
@@ -168,11 +170,11 @@ public class FogShader extends AbstractShaderRenderer
 			farFogEnd = 0.0f;
 		}
 		
-		this.shader.setUniform(this.uFarFogStart, farFogStart);
-		this.shader.setUniform(this.uFarFogLength, farFogEnd - farFogStart);
-		this.shader.setUniform(this.uFarFogMin, farFogMin);
-		this.shader.setUniform(this.uFarFogRange, farFogMax - farFogMin);
-		this.shader.setUniform(this.uFarFogDensity, farFogDensity);
+		this.shader.setUniform(ctx, this.uFarFogStart, farFogStart);
+		this.shader.setUniform(ctx, this.uFarFogLength, farFogEnd - farFogStart);
+		this.shader.setUniform(ctx, this.uFarFogMin, farFogMin);
+		this.shader.setUniform(ctx, this.uFarFogRange, farFogMax - farFogMin);
+		this.shader.setUniform(ctx, this.uFarFogDensity, farFogDensity);
 		
 		
 		// height config
@@ -187,22 +189,22 @@ public class FogShader extends AbstractShaderRenderer
 		float heightFogMax = Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogMax.get().floatValue();
 		float heightFogDensity = Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogDensity.get().floatValue();
 		
-		this.shader.setUniform(this.uHeightFogStart, heightFogStart);
-		this.shader.setUniform(this.uHeightFogLength, heightFogEnd - heightFogStart);
-		this.shader.setUniform(this.uHeightFogMin, heightFogMin);
-		this.shader.setUniform(this.uHeightFogRange, heightFogMax - heightFogMin);
-		this.shader.setUniform(this.uHeightFogDensity, heightFogDensity);
+		this.shader.setUniform(ctx, this.uHeightFogStart, heightFogStart);
+		this.shader.setUniform(ctx, this.uHeightFogLength, heightFogEnd - heightFogStart);
+		this.shader.setUniform(ctx, this.uHeightFogMin, heightFogMin);
+		this.shader.setUniform(ctx, this.uHeightFogRange, heightFogMax - heightFogMin);
+		this.shader.setUniform(ctx, this.uHeightFogDensity, heightFogDensity);
 		
 		
-		this.shader.setUniform(this.uHeightFogEnabled, heightFogEnabled);
-		this.shader.setUniform(this.uHeightFogFalloffType, Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogFalloff.get().value);
-		this.shader.setUniform(this.uHeightFogBaseHeight, Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogBaseHeight.get().floatValue());
-		this.shader.setUniform(this.uHeightBasedOnCamera, heightFogCameraDirection.basedOnCamera);
-		this.shader.setUniform(this.uHeightFogAppliesUp, heightFogCameraDirection.fogAppliesUp);
-		this.shader.setUniform(this.uHeightFogAppliesDown, heightFogCameraDirection.fogAppliesDown);
-		this.shader.setUniform(this.uUseSphericalFog, useSphericalFog);
-		this.shader.setUniform(this.uHeightFogMixingMode, heightFogMixingMode.value);
-		this.shader.setUniform(this.uCameraBlockYPos, (float)MC_RENDER.getCameraExactPosition().y);
+		this.shader.setUniform(ctx, this.uHeightFogEnabled, heightFogEnabled);
+		this.shader.setUniform(ctx, this.uHeightFogFalloffType, Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogFalloff.get().value);
+		this.shader.setUniform(ctx, this.uHeightFogBaseHeight, Config.Client.Advanced.Graphics.Fog.HeightFog.heightFogBaseHeight.get().floatValue());
+		this.shader.setUniform(ctx, this.uHeightBasedOnCamera, heightFogCameraDirection.basedOnCamera);
+		this.shader.setUniform(ctx, this.uHeightFogAppliesUp, heightFogCameraDirection.fogAppliesUp);
+		this.shader.setUniform(ctx, this.uHeightFogAppliesDown, heightFogCameraDirection.fogAppliesDown);
+		this.shader.setUniform(ctx, this.uUseSphericalFog, useSphericalFog);
+		this.shader.setUniform(ctx, this.uHeightFogMixingMode, heightFogMixingMode.value);
+		this.shader.setUniform(ctx, this.uCameraBlockYPos, (float)MC_RENDER.getCameraExactPosition().y);
 		
 	}
 	private Color getFogColor(float partialTicks)
@@ -232,18 +234,34 @@ public class FogShader extends AbstractShaderRenderer
 	//========//
 	// render //
 	//========//
+
+	@Override
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
+	{
+		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		if (this.frameBuffer == null || depthTextureId == -1)
+		{
+			this.activeFrameBuffer = null;
+			this.activeDepthTextureId = -1;
+			return false;
+		}
+
+		this.activeFrameBuffer = this.frameBuffer;
+		this.activeDepthTextureId = depthTextureId;
+		return true;
+	}
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.frameBuffer);
-		GLMC.disableScissorTest();
-		GLMC.disableDepthTest();
-		GLMC.disableBlend();
+		this.activeFrameBuffer.bind(ctx);
+		VulkanicAPI.setScissorTestEnabled(ctx, false);
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setBlendEnabled(ctx, false);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.uDepthMap, 0);
+		DhTextureState.setActiveTextureUnitIndex(0);
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
+		VulkanicAPI.setUniform1i(ctx, this.uDepthMap, 0);
 		
 		// this is necessary for Legacy OpenGL support
 		// otherwise the framebuffer isn't cleared correctly and the fog smears across the screen
@@ -251,11 +269,10 @@ public class FogShader extends AbstractShaderRenderer
 		{
 			// in another part of the DH code we set the fog color to opaque, here it needs to be transparent
 			float[] clearColorValues = new float[4];
-			VulkanicAPI.getFloatv(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
-			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), clearColorValues[0], clearColorValues[1], clearColorValues[2], 0.0f);
-			
-			CommandContext ctx = VulkanicAPI.getImmediateContext();
-			VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+			VulkanicAPI.getClearColor(ctx, clearColorValues);
+			VulkanicAPI.setClearColor(ctx, clearColorValues[0], clearColorValues[1], clearColorValues[2], 0.0f);
+
+			VulkanicAPI.clearColorAndDepthBuffers(ctx);
 		}
 		
 		

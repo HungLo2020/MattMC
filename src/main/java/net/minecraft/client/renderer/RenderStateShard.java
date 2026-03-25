@@ -2,12 +2,12 @@ package net.minecraft.client.renderer;
 
 import com.google.common.collect.ImmutableList;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.systems.RenderSystem;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.function.Supplier;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
@@ -16,6 +16,7 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
@@ -30,13 +31,13 @@ public abstract class RenderStateShard {
 	public static final RenderStateShard.EmptyTextureStateShard NO_TEXTURE = new RenderStateShard.EmptyTextureStateShard();
 	public static final RenderStateShard.TexturingStateShard DEFAULT_TEXTURING = new RenderStateShard.TexturingStateShard("default_texturing", () -> {}, () -> {});
 	public static final RenderStateShard.TexturingStateShard GLINT_TEXTURING = new RenderStateShard.TexturingStateShard(
-		"glint_texturing", () -> setupGlintTexturing(8.0F), RenderSystem::resetTextureMatrix
+		"glint_texturing", () -> setupGlintTexturing(8.0F), VulkanicAPI::resetTextureMatrix
 	);
 	public static final RenderStateShard.TexturingStateShard ENTITY_GLINT_TEXTURING = new RenderStateShard.TexturingStateShard(
-		"entity_glint_texturing", () -> setupGlintTexturing(0.5F), RenderSystem::resetTextureMatrix
+		"entity_glint_texturing", () -> setupGlintTexturing(0.5F), VulkanicAPI::resetTextureMatrix
 	);
 	public static final RenderStateShard.TexturingStateShard ARMOR_ENTITY_GLINT_TEXTURING = new RenderStateShard.TexturingStateShard(
-		"armor_entity_glint_texturing", () -> setupGlintTexturing(0.16F), RenderSystem::resetTextureMatrix
+		"armor_entity_glint_texturing", () -> setupGlintTexturing(0.16F), VulkanicAPI::resetTextureMatrix
 	);
 	public static final RenderStateShard.LightmapStateShard LIGHTMAP = new RenderStateShard.LightmapStateShard(true);
 	public static final RenderStateShard.LightmapStateShard NO_LIGHTMAP = new RenderStateShard.LightmapStateShard(false);
@@ -44,20 +45,20 @@ public abstract class RenderStateShard {
 	public static final RenderStateShard.OverlayStateShard NO_OVERLAY = new RenderStateShard.OverlayStateShard(false);
 	public static final RenderStateShard.LayeringStateShard NO_LAYERING = new RenderStateShard.LayeringStateShard("no_layering", () -> {}, () -> {});
 	public static final RenderStateShard.LayeringStateShard VIEW_OFFSET_Z_LAYERING = new RenderStateShard.LayeringStateShard("view_offset_z_layering", () -> {
-		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
-		RenderSystem.getProjectionType().applyLayeringTransform(matrix4fStack, 1.0F);
+		net.vulkanic.VulkanicAPI.getProjectionType().applyLayeringTransform(matrix4fStack, 1.0F);
 	}, () -> {
-		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.popMatrix();
 	});
 	public static final RenderStateShard.LayeringStateShard VIEW_OFFSET_Z_LAYERING_FORWARD = new RenderStateShard.LayeringStateShard(
 		"view_offset_z_layering_forward", () -> {
-			Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 			matrix4fStack.pushMatrix();
-			RenderSystem.getProjectionType().applyLayeringTransform(matrix4fStack, -1.0F);
+			net.vulkanic.VulkanicAPI.getProjectionType().applyLayeringTransform(matrix4fStack, -1.0F);
 		}, () -> {
-			Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+			Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 			matrix4fStack.popMatrix();
 		}
 	);
@@ -106,7 +107,7 @@ public abstract class RenderStateShard {
 		float h = (float)(l % 30000L) / 30000.0F;
 		Matrix4f matrix4f = new Matrix4f().translation(-g, h, 0.0F);
 		matrix4f.rotateZ((float) (Math.PI / 18)).scale(f);
-		RenderSystem.setTextureMatrix(matrix4f);
+		VulkanicAPI.setTextureMatrix(matrix4f);
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -169,14 +170,14 @@ public abstract class RenderStateShard {
 			super("line_width", () -> {
 				if (!Objects.equals(optionalDouble, OptionalDouble.of(1.0))) {
 					if (optionalDouble.isPresent()) {
-						RenderSystem.lineWidth((float)optionalDouble.getAsDouble());
+						VulkanicAPI.lineWidth((float)optionalDouble.getAsDouble());
 					} else {
-						RenderSystem.lineWidth(Math.max(2.5F, Minecraft.getInstance().getWindow().getWidth() / 1920.0F * 2.5F));
+						VulkanicAPI.lineWidth(Math.max(2.5F, Minecraft.getInstance().getWindow().getWidth() / 1920.0F * 2.5F));
 					}
 				}
 			}, () -> {
 				if (!Objects.equals(optionalDouble, OptionalDouble.of(1.0))) {
-					RenderSystem.lineWidth(1.0F);
+					VulkanicAPI.lineWidth(1.0F);
 				}
 			});
 			this.width = optionalDouble;
@@ -199,7 +200,9 @@ public abstract class RenderStateShard {
 					TextureManager textureManager = Minecraft.getInstance().getTextureManager();
 					AbstractTexture abstractTexture = textureManager.getTexture(entry.id);
 					abstractTexture.setUseMipmaps(entry.mipmap);
-					RenderSystem.setShaderTexture(i, abstractTexture.getTextureView());
+					var textureView = abstractTexture.getTextureView();
+					VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), i, textureView);
+					TextureTracker.INSTANCE.onSetShaderTexture(i, textureView);
 				}
 			}, () -> {});
 			this.cutoutTexture = list.isEmpty() ? Optional.empty() : Optional.of(((RenderStateShard.MultiTextureStateShard.Entry)list.getFirst()).id);
@@ -236,7 +239,7 @@ public abstract class RenderStateShard {
 	@Environment(EnvType.CLIENT)
 	public static final class OffsetTexturingStateShard extends RenderStateShard.TexturingStateShard {
 		public OffsetTexturingStateShard(float f, float g) {
-			super("offset_texturing", () -> RenderSystem.setTextureMatrix(new Matrix4f().translation(f, g, 0.0F)), () -> RenderSystem.resetTextureMatrix());
+			super("offset_texturing", () -> VulkanicAPI.setTextureMatrix(new Matrix4f().translation(f, g, 0.0F)), () -> VulkanicAPI.resetTextureMatrix());
 		}
 	}
 
@@ -279,7 +282,9 @@ public abstract class RenderStateShard {
 				TextureManager textureManager = Minecraft.getInstance().getTextureManager();
 				AbstractTexture abstractTexture = textureManager.getTexture(resourceLocation);
 				abstractTexture.setUseMipmaps(bl);
-				RenderSystem.setShaderTexture(0, abstractTexture.getTextureView());
+				var textureView = abstractTexture.getTextureView();
+				VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 0, textureView);
+				TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 			}, () -> {});
 			this.texture = Optional.of(resourceLocation);
 			this.mipmap = bl;

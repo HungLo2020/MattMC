@@ -1,9 +1,24 @@
 package net.vulkanic;
 
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.vulkanic.VulkanicBuffer;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.CommandEncoder;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderPass;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
+
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 /**
@@ -19,6 +34,255 @@ public interface GraphicsBackend {
      * Returns 0 or NULL if no context is current.
      */
     long getGraphicsContext();
+
+    /**
+     * Gets the current command context for recording/submitting rendering commands.
+     *
+     * In OpenGL: Returns the singleton immediate command context.
+     * In Vulkan: Returns the backend-managed command-buffer context for the current scope.
+     *
+     * @return Current command context
+     */
+    CommandContext getCurrentCommandContext();
+
+    /**
+     * Returns the high-level backend identity currently serving the graphics API.
+     */
+    GraphicsBackendType getBackendType();
+
+    /**
+     * Returns true only when a native Vulkan command/pipeline backend is active.
+     *
+     * <p>During bootstrap/fallback phases this should return false even if Vulkan
+     * backend selection is active but delegated to OpenGL behavior.</p>
+     */
+    boolean isNativeVulkanReady();
+
+    /**
+     * Returns a snapshot of Vulkan-native execution-context ownership for the
+     * active backend.
+     *
+     * <p>OpenGL backends should return an unavailable snapshot. Vulkan backends
+     * should populate logical-device/queue/command-buffer handles when ready.</p>
+     */
+    default VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
+        return VulkanExecutionContextInfo.unavailable(
+            getBackendType(),
+            isNativeVulkanReady(),
+            "Native Vulkan execution context is unavailable for backend " + getBackendType() + "."
+        );
+    }
+
+    /**
+     * Returns a snapshot of Vulkan surface/swapchain ownership for the active
+     * backend.
+     *
+     * <p>OpenGL backends should return an unavailable snapshot. Vulkan backends
+     * should report native surface/swapchain handles and metadata when ready.</p>
+     */
+    default VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
+        return VulkanSwapchainSurfaceInfo.unavailable(
+            getBackendType(),
+            isNativeVulkanReady(),
+            "Vulkan swapchain/surface is unavailable for backend " + getBackendType() + "."
+        );
+    }
+
+    /**
+     * Recreates Vulkan swapchain-dependent state for the active backend.
+     *
+     * <p>Non-Vulkan backends should treat this as a no-op.</p>
+     */
+    default void recreateVulkanSwapchain() {
+        // no-op for non-Vulkan backends
+    }
+
+    /**
+     * Recreates Vulkan swapchain-dependent state only when a resize mismatch is
+     * detected for the active surface.
+     *
+     * @return true when a recreation was performed, false when no recreation was required
+     */
+    default boolean recreateVulkanSwapchainIfNeeded() {
+        return false;
+    }
+
+    /**
+     * Attempts native Vulkan runtime initialization for the active backend and
+     * returns structured diagnostics about the result.
+     *
+     * <p>Non-Vulkan backends should return an unsupported result.</p>
+     */
+    default VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
+        return VulkanNativeInitializationInfo.unsupported(
+            getBackendType(),
+            "Backend " + getBackendType() + " does not support native Vulkan runtime initialization."
+        );
+    }
+
+    /**
+     * Resolves the window handle that should back renderer bootstrap for this
+     * backend.
+     *
+     * <p>OpenGL backends typically return the main window unchanged. Vulkan
+     * backends may return an auxiliary compatibility window when legacy
+     * bootstrap services still require one.</p>
+     */
+    default long prepareRendererBootstrapWindow(long mainWindowHandle) {
+        return mainWindowHandle;
+    }
+
+    /**
+     * Creates the backend-owned {@link net.blaze3d.systems.GpuDevice} used by
+     * shared renderer startup code.
+     */
+    default net.blaze3d.systems.GpuDevice createRendererDevice(
+        long rendererBootstrapWindowHandle,
+        int debugVerbosity,
+        boolean debugEnabled,
+        java.util.function.BiFunction<net.minecraft.resources.ResourceLocation, net.blaze3d.shaders.ShaderType, String> defaultShaderSource,
+        boolean debugLabelsEnabled
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide renderer device creation."
+        );
+    }
+
+    /**
+     * Runs backend-specific renderer startup work after the device has been
+     * created and registered.
+     */
+    default void onRendererDeviceInitialized(long mainWindowHandle, net.blaze3d.systems.GpuDevice gpuDevice) {
+    }
+
+    /**
+     * Cleans up backend-owned renderer bootstrap resources.
+     */
+    default void cleanupRendererBootstrapResources() {
+    }
+
+    /**
+     * Precompiles a render pipeline using backend-owned compilation and caching.
+     *
+     * <p>This seam lets shared/game code pre-warm shader/pipeline state without
+     * routing through a concrete {@code GpuDevice} implementation.</p>
+     */
+    default CompiledRenderPipeline precompileRenderPipeline(
+        RenderPipeline renderPipeline,
+        @Nullable BiFunction<ResourceLocation, ShaderType, String> sourceProvider
+    ) {
+        return () -> false;
+    }
+
+    /**
+     * Clears backend-owned precompiled pipeline caches.
+     */
+    default void clearPrecompiledPipelineCache() {
+    }
+
+    /**
+     * Creates (or retrieves) the backend-owned command encoder used by shared
+     * rendering callsites.
+     */
+    default CommandEncoder createCommandEncoder() {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide command encoder creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned render pass targeting a color attachment.
+     */
+    default RenderPass createRenderPass(
+        Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        OptionalInt clearColor
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);
+    }
+
+    /**
+     * Creates a backend-owned render pass targeting color and optional depth attachments.
+     */
+    default RenderPass createRenderPass(
+        Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        OptionalInt clearColor,
+        @Nullable GpuTextureView depthTextureView,
+        OptionalDouble clearDepth
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    /**
+     * Creates a backend-owned GPU texture with supplier-based debug labeling.
+     */
+    default GpuTexture createTexture(
+        @Nullable Supplier<String> supplier,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide texture creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned GPU texture with string debug labeling.
+     */
+    default GpuTexture createTexture(
+        @Nullable String label,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide texture creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned GPU buffer with size allocation.
+     */
+    default GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int usage, int size) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide buffer creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned GPU buffer initialized from byte data.
+     */
+    default GpuBuffer createBuffer(@Nullable Supplier<String> supplier, int usage, ByteBuffer data) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide buffer creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned texture view for a full texture range.
+     */
+    default GpuTextureView createTextureView(GpuTexture texture) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide texture-view creation."
+        );
+    }
+
+    /**
+     * Creates a backend-owned texture view for an explicit mip range.
+     */
+    default GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not provide texture-view creation."
+        );
+    }
     
     /**
      * Sets the dynamic viewport state for rendering.
@@ -66,6 +330,13 @@ public interface GraphicsBackend {
      * @param mask Bitwise OR of masks indicating which buffers to clear
      */
     void clearBuffers(CommandContext ctx, int mask);
+
+    /**
+     * Clears buffers using backend-neutral clear-buffer bits.
+     */
+    default void clearBuffers(CommandContext ctx, VulkanicClearBuffer... buffers) {
+        clearBuffers(ctx, VulkanicClearBuffer.toLegacyGlMask(buffers));
+    }
     
     /**
      * Sets blending enabled or disabled.
@@ -90,6 +361,13 @@ public interface GraphicsBackend {
      * @param enabled True to enable, false to disable
      */
     void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled);
+
+    /**
+     * Enables or disables a capability for a specific buffer using backend-neutral semantics.
+     */
+    default void setIndexedEnabled(CommandContext ctx, VulkanicCapability capability, int index, boolean enabled) {
+        setIndexedEnabled(ctx, capability.toLegacyGlConstant(), index, enabled);
+    }
     
     /**
      * Sets the face culling mode.
@@ -101,6 +379,11 @@ public interface GraphicsBackend {
      * @param mode The face culling mode (GL_FRONT, GL_BACK, GL_FRONT_AND_BACK)
      */
     void setCullFaceMode(CommandContext ctx, int mode);
+
+    /**
+     * Sets the face culling mode using backend-neutral cull semantics.
+     */
+    void setCullFaceMode(CommandContext ctx, VulkanicCullFaceMode mode);
     
     /**
      * Binds a shader program for use.
@@ -124,6 +407,11 @@ public interface GraphicsBackend {
      * @param enabled True to enable, false to disable
      */
     void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled);
+
+    /**
+     * Sets a state capability using backend-neutral capability semantics.
+     */
+    void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled);
     
     /**
      * Binds a 2D texture to the current texture unit.
@@ -147,6 +435,11 @@ public interface GraphicsBackend {
      * @param textureId The texture ID to bind
      */
     void bindTexture(CommandContext ctx, int target, int textureId);
+
+    /**
+     * Binds a texture using backend-neutral target semantics.
+     */
+    void bindTexture(CommandContext ctx, VulkanicTextureTarget target, int textureId);
     
     /**
      * Binds a level of a texture to an image unit.
@@ -223,6 +516,20 @@ public interface GraphicsBackend {
      * @param param The parameter value
      */
     void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param);
+
+    /**
+     * Sets an integer sampler parameter using backend-neutral parameter semantics.
+     */
+    default void setSamplerParameteri(CommandContext ctx, int sampler, VulkanicTextureParameterName pname, int param) {
+        setSamplerParameteri(ctx, sampler, pname.toLegacyGlPName(), param);
+    }
+
+    /**
+     * Sets an integer sampler parameter using backend-neutral parameter/value semantics.
+     */
+    default void setSamplerParameteri(CommandContext ctx, int sampler, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
+        setSamplerParameteri(ctx, sampler, pname.toLegacyGlPName(), param.toLegacyGlConstant());
+    }
     
     /**
      * Sets a float sampler parameter.
@@ -260,6 +567,11 @@ public interface GraphicsBackend {
      * @param func The depth comparison function
      */
     void setDepthTest(CommandContext ctx, int func);
+
+    /**
+     * Sets the depth test comparison operation using backend-neutral semantics.
+     */
+    void setDepthTest(CommandContext ctx, VulkanicDepthCompareOp func);
     
     /**
      * Sets the depth write mask.
@@ -383,6 +695,21 @@ public interface GraphicsBackend {
      * @param fbo The framebuffer object ID
      */
     void bindFramebuffer(CommandContext ctx, int target, int fbo);
+
+    /**
+     * Binds a render target described by its color/depth textures.
+     *
+     * <p>In OpenGL this typically resolves a cached FBO for the texture pair and binds it.
+     * In backends without user-visible FBO identity this should bind whatever backend-owned
+     * render-target state best represents those attachments.</p>
+     *
+     * @param ctx Command context for recording this command
+     * @param colorTexture Color target texture (required)
+     * @param depthTexture Optional depth target texture (nullable)
+     */
+    default void bindRenderTarget(CommandContext ctx, VulkanicTexture colorTexture, VulkanicTexture depthTexture) {
+        bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, resolveFramebufferForTextures(ctx, colorTexture, depthTexture));
+    }
     
     /**
      * Sets the read buffer for a named framebuffer using Direct State Access.
@@ -475,6 +802,11 @@ public interface GraphicsBackend {
      * @param buffer The buffer object ID
      */
     void bindBuffer(CommandContext ctx, int target, int buffer);
+
+    /**
+     * Binds a buffer using backend-neutral target semantics.
+     */
+    void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer);
     
     /**
      * Binds a buffer to an indexed buffer target.
@@ -488,6 +820,13 @@ public interface GraphicsBackend {
      * @param buffer The buffer object ID to bind
      */
     void bindBufferBase(CommandContext ctx, int target, int index, int buffer);
+
+    /**
+     * Binds a buffer to an indexed buffer target using backend-neutral target semantics.
+     */
+    default void bindBufferBase(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer) {
+        bindBufferBase(ctx, target.toLegacyGlTarget(), index, buffer);
+    }
     
     /**
      * Sets the active texture unit.
@@ -512,6 +851,30 @@ public interface GraphicsBackend {
      * @param param The parameter value
      */
     void setTextureParameter(CommandContext ctx, int target, int pname, int param);
+
+    /**
+     * Sets a texture parameter using backend-neutral target/parameter semantics.
+     */
+    default void setTextureParameter(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        int param
+    ) {
+        setTextureParameter(ctx, target.toLegacyGlTarget(), pname.toLegacyGlPName(), param);
+    }
+
+    /**
+     * Sets a texture parameter using backend-neutral target/parameter/value semantics.
+     */
+    default void setTextureParameter(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        VulkanicTextureParameterName pname,
+        VulkanicTextureParameterValue param
+    ) {
+        setTextureParameter(ctx, target.toLegacyGlTarget(), pname.toLegacyGlPName(), param.toLegacyGlConstant());
+    }
     
     /**
      * Copies a region from the framebuffer to a texture subregion.
@@ -702,6 +1065,17 @@ public interface GraphicsBackend {
      * @param dstAlpha Destination alpha blend factor
      */
     void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
+
+    /**
+     * Sets blend factors using backend-neutral blend-factor semantics.
+     */
+    void setBlendFunction(
+        CommandContext ctx,
+        VulkanicBlendFactor srcRgb,
+        VulkanicBlendFactor dstRgb,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    );
     
     /**
      * Sets the blend equation for both RGB and alpha components.
@@ -716,6 +1090,11 @@ public interface GraphicsBackend {
      * @param mode The blend equation mode
      */
     void setBlendEquation(CommandContext ctx, int mode);
+
+    /**
+     * Sets the blend equation using backend-neutral semantics.
+     */
+    void setBlendEquation(CommandContext ctx, VulkanicBlendEquation mode);
     
     /**
      * Sets the depth comparison function.
@@ -730,6 +1109,11 @@ public interface GraphicsBackend {
      * @param func The depth comparison function
      */
     void setDepthFunc(CommandContext ctx, int func);
+
+    /**
+     * Sets the depth comparison operation using backend-neutral semantics.
+     */
+    void setDepthFunc(CommandContext ctx, VulkanicDepthCompareOp func);
     
     /**
      * Specifies which color buffer to read from for read operations.
@@ -809,6 +1193,11 @@ public interface GraphicsBackend {
      * @param dfactor Destination blend factor
      */
     void blendFunc(CommandContext ctx, int sfactor, int dfactor);
+
+    /**
+     * Sets source/destination blend factors using backend-neutral semantics.
+     */
+    void blendFunc(CommandContext ctx, VulkanicBlendFactor sfactor, VulkanicBlendFactor dfactor);
     
     /**
      * Sets the blend function for a specific draw buffer.
@@ -824,6 +1213,18 @@ public interface GraphicsBackend {
      * @param dstAlpha Destination alpha blend factor
      */
     void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
+
+    /**
+     * Sets per-buffer blend factors using backend-neutral semantics.
+     */
+    void blendFuncSeparatei(
+        CommandContext ctx,
+        int buffer,
+        VulkanicBlendFactor srcRGB,
+        VulkanicBlendFactor dstRGB,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    );
     
     /**
      * Queries an integer state variable.
@@ -836,6 +1237,11 @@ public interface GraphicsBackend {
      * @return The queried integer value
      */
     int getInteger(CommandContext ctx, int pname);
+
+    /**
+     * Queries an integer state value using a backend-neutral key.
+     */
+    int getInteger(CommandContext ctx, VulkanicIntegerQuery query);
     
     /**
      * Sets uniform values for a vec3 shader variable.
@@ -924,6 +1330,13 @@ public interface GraphicsBackend {
      * @param opcode The logical operation (e.g., GL_COPY, GL_AND, GL_XOR)
      */
     void setLogicOp(CommandContext ctx, int opcode);
+
+    /**
+     * Sets the logical operation using backend-neutral logic-op semantics.
+     */
+    default void setLogicOp(CommandContext ctx, VulkanicLogicOp opcode) {
+        setLogicOp(ctx, opcode.toLegacyGlConstant());
+    }
     
     /**
      * Creates a new framebuffer object.
@@ -971,6 +1384,56 @@ public interface GraphicsBackend {
      */
     void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
                          int border, int format, int type, java.nio.ByteBuffer pixels);
+
+    /**
+     * Uploads pixel data to a 2D texture using backend-neutral upload-format semantics.
+     */
+    default void uploadTexture2D(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        if (target == null) {
+            throw new IllegalArgumentException("target must not be null");
+        }
+        if (uploadFormat == null) {
+            throw new IllegalArgumentException("uploadFormat must not be null");
+        }
+
+        uploadTexture2D(
+            ctx,
+            target.toLegacyGlTarget(),
+            level,
+            uploadFormat.legacyInternalFormat(),
+            width,
+            height,
+            border,
+            uploadFormat.legacyFormat(),
+            uploadFormat.legacyType(),
+            pixels
+        );
+    }
+
+    /**
+     * Uploads pixel data to the currently bound GL_TEXTURE_2D target using
+     * backend-neutral upload-format semantics.
+     */
+    default void uploadTexture2D(
+        CommandContext ctx,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        uploadTexture2D(ctx, VulkanicTextureTarget.TEXTURE_2D, level, uploadFormat, width, height, border, pixels);
+    }
     
     /**
      * Uploads pixel data to a subregion of a 2D texture.
@@ -1264,6 +1727,68 @@ public interface GraphicsBackend {
      * @return The shader object ID
      */
     int createShader(CommandContext ctx, int shaderType);
+
+    /**
+     * Creates a shader using backend-neutral shader stage semantics.
+     */
+    default int createShader(CommandContext ctx, VulkanicShaderStage shaderStage) {
+        return createShader(ctx, shaderStage.toLegacyGlShaderType());
+    }
+
+    /**
+     * Creates a shader and wraps its handle in a backend-neutral value object.
+     */
+    default VulkanicShaderHandle createShaderHandle(CommandContext ctx, int shaderType) {
+        return VulkanicShaderHandle.of(createShader(ctx, shaderType));
+    }
+
+    /**
+     * Creates a shader using a typed stage and returns a typed handle.
+     */
+    default VulkanicShaderHandle createShaderHandle(CommandContext ctx, VulkanicShaderStage shaderStage) {
+        return VulkanicShaderHandle.of(createShader(ctx, shaderStage));
+    }
+
+    /**
+     * Compiles GLSL shader source to SPIR-V bytecode using backend-owned tooling.
+     */
+    default VulkanicSpirvModule compileSpirvModule(
+        CommandContext ctx,
+        VulkanicShaderStage shaderStage,
+        CharSequence glslSource,
+        String sourceName,
+        String entryPoint
+    ) {
+        throw new UnsupportedOperationException(
+            "SPIR-V module compilation is not supported by backend " + getBackendType()
+        );
+    }
+
+    /**
+     * Compiles GLSL shader source to SPIR-V bytecode using entry point {@code main}.
+     */
+    default VulkanicSpirvModule compileSpirvModule(
+        CommandContext ctx,
+        VulkanicShaderStage shaderStage,
+        CharSequence glslSource,
+        String sourceName
+    ) {
+        return compileSpirvModule(ctx, shaderStage, glslSource, sourceName, "main");
+    }
+
+    /**
+     * Returns compiled SPIR-V for a backend shader handle when available.
+     */
+    default java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, int shader) {
+        return java.util.Optional.empty();
+    }
+
+    /**
+     * Returns compiled SPIR-V for a typed shader handle when available.
+     */
+    default java.util.Optional<VulkanicSpirvModule> getCompiledSpirvModule(CommandContext ctx, VulkanicShaderHandle shader) {
+        return getCompiledSpirvModule(ctx, shader.value());
+    }
     
     /**
      * Compiles a shader object.
@@ -1275,6 +1800,13 @@ public interface GraphicsBackend {
      * @param shader The shader object ID to compile
      */
     void compileShader(CommandContext ctx, int shader);
+
+    /**
+     * Compiles a shader identified by a backend-neutral shader handle.
+     */
+    default void compileShader(CommandContext ctx, VulkanicShaderHandle shader) {
+        compileShader(ctx, shader.value());
+    }
     
     /**
      * Creates a new shader program object.
@@ -1286,6 +1818,13 @@ public interface GraphicsBackend {
      * @return The shader program object ID
      */
     int createShaderProgram(CommandContext ctx);
+
+    /**
+     * Creates a shader program and wraps its handle in a backend-neutral value object.
+     */
+    default VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx) {
+        return VulkanicProgramHandle.of(createShaderProgram(ctx));
+    }
     
     /**
      * Attaches a shader to a program object.
@@ -1298,6 +1837,13 @@ public interface GraphicsBackend {
      * @param shader The shader object ID to attach
      */
     void attachShader(CommandContext ctx, int program, int shader);
+
+    /**
+     * Attaches a shader using backend-neutral shader/program handle wrappers.
+     */
+    default void attachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader) {
+        attachShader(ctx, program.value(), shader.value());
+    }
     
     /**
      * Detaches a shader from a program object.
@@ -1310,6 +1856,13 @@ public interface GraphicsBackend {
      * @param shader The shader object ID to detach
      */
     void detachShader(CommandContext ctx, int program, int shader);
+
+    /**
+     * Detaches a shader using backend-neutral shader/program handle wrappers.
+     */
+    default void detachShader(CommandContext ctx, VulkanicProgramHandle program, VulkanicShaderHandle shader) {
+        detachShader(ctx, program.value(), shader.value());
+    }
     
     /**
      * Links a shader program.
@@ -1321,6 +1874,13 @@ public interface GraphicsBackend {
      * @param program The program object ID to link
      */
     void linkProgram(CommandContext ctx, int program);
+
+    /**
+     * Links a shader program identified by a backend-neutral program handle.
+     */
+    default void linkProgram(CommandContext ctx, VulkanicProgramHandle program) {
+        linkProgram(ctx, program.value());
+    }
     
     /**
      * Queries a program parameter.
@@ -1334,6 +1894,20 @@ public interface GraphicsBackend {
      * @return The parameter value
      */
     int getProgramParameter(CommandContext ctx, int program, int pname);
+
+    /**
+     * Queries a program parameter using a backend-neutral program handle.
+     */
+    default int getProgramParameter(CommandContext ctx, VulkanicProgramHandle program, int pname) {
+        return getProgramParameter(ctx, program.value(), pname);
+    }
+
+    /**
+     * Queries a typed program parameter using a backend-neutral program handle.
+     */
+    default int getProgramParameter(CommandContext ctx, VulkanicProgramHandle program, VulkanicProgramParameterName pname) {
+        return getProgramParameter(ctx, program.value(), pname.toLegacyGlPName());
+    }
     
     /**
      * Queries multiple program parameters into an array.
@@ -1360,6 +1934,20 @@ public interface GraphicsBackend {
      * @return The parameter value
      */
     int getShaderParameter(CommandContext ctx, int shader, int pname);
+
+    /**
+     * Queries a shader parameter using a backend-neutral shader handle.
+     */
+    default int getShaderParameter(CommandContext ctx, VulkanicShaderHandle shader, int pname) {
+        return getShaderParameter(ctx, shader.value(), pname);
+    }
+
+    /**
+     * Queries a typed shader parameter using a backend-neutral shader handle.
+     */
+    default int getShaderParameter(CommandContext ctx, VulkanicShaderHandle shader, VulkanicShaderParameterName pname) {
+        return getShaderParameter(ctx, shader.value(), pname.toLegacyGlPName());
+    }
     
     /**
      * Retrieves the information log for a program.
@@ -1372,6 +1960,13 @@ public interface GraphicsBackend {
      * @return The information log string
      */
     String getProgramInfoLog(CommandContext ctx, int program);
+
+    /**
+     * Retrieves a program information log for a backend-neutral program handle.
+     */
+    default String getProgramInfoLog(CommandContext ctx, VulkanicProgramHandle program) {
+        return getProgramInfoLog(ctx, program.value());
+    }
     
     /**
      * Retrieves the information log for a shader.
@@ -1384,6 +1979,13 @@ public interface GraphicsBackend {
      * @return The information log string
      */
     String getShaderInfoLog(CommandContext ctx, int shader);
+
+    /**
+     * Retrieves a shader information log for a backend-neutral shader handle.
+     */
+    default String getShaderInfoLog(CommandContext ctx, VulkanicShaderHandle shader) {
+        return getShaderInfoLog(ctx, shader.value());
+    }
     
     /**
      * Retrieves information about an active uniform variable.
@@ -1413,6 +2015,13 @@ public interface GraphicsBackend {
      * @return The location of the uniform variable
      */
     int getUniformLocation(CommandContext ctx, int program, CharSequence name);
+
+    /**
+     * Resolves a uniform binding slot using a backend-neutral wrapper value object.
+     */
+    default VulkanicUniformLocation resolveUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        return VulkanicUniformLocation.of(getUniformLocation(ctx, program, name));
+    }
     
     /**
      * Locates an attribute variable in a program.
@@ -1572,6 +2181,76 @@ public interface GraphicsBackend {
      * @param matrix The matrix data array
      */
     void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix);
+
+    /**
+     * Sets an integer uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform1i(CommandContext ctx, VulkanicUniformLocation location, int value) {
+        setUniform1i(ctx, location.value(), value);
+    }
+
+    /**
+     * Sets a float uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform1f(CommandContext ctx, VulkanicUniformLocation location, float value) {
+        setUniform1f(ctx, location.value(), value);
+    }
+
+    /**
+     * Sets a 2-component float vector uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform2f(CommandContext ctx, VulkanicUniformLocation location, float v0, float v1) {
+        setUniform2f(ctx, location.value(), v0, v1);
+    }
+
+    /**
+     * Sets a 3-component integer vector uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform3i(CommandContext ctx, VulkanicUniformLocation location, int v0, int v1, int v2) {
+        setUniform3i(ctx, location.value(), v0, v1, v2);
+    }
+
+    /**
+     * Sets a 4-component float vector uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform4f(CommandContext ctx, VulkanicUniformLocation location, float v0, float v1, float v2, float v3) {
+        setUniform4f(ctx, location.value(), v0, v1, v2, v3);
+    }
+
+    /**
+     * Sets a 4-component integer vector uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniform4i(CommandContext ctx, VulkanicUniformLocation location, int v0, int v1, int v2, int v3) {
+        setUniform4i(ctx, location.value(), v0, v1, v2, v3);
+    }
+
+    /**
+     * Sets a 3x3 matrix uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniformMatrix3fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, java.nio.FloatBuffer matrix) {
+        setUniformMatrix3fv(ctx, location.value(), transpose, matrix);
+    }
+
+    /**
+     * Sets a 3x3 matrix uniform value from a float array using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniformMatrix3fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, float[] matrix) {
+        setUniformMatrix3fv(ctx, location.value(), transpose, matrix);
+    }
+
+    /**
+     * Sets a 4x4 matrix uniform value using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniformMatrix4fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, java.nio.FloatBuffer matrix) {
+        setUniformMatrix4fv(ctx, location.value(), transpose, matrix);
+    }
+
+    /**
+     * Sets a 4x4 matrix uniform value from a float array using a backend-neutral uniform-location wrapper.
+     */
+    default void setUniformMatrix4fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, float[] matrix) {
+        setUniformMatrix4fv(ctx, location.value(), transpose, matrix);
+    }
     
     /**
      * Configures a vertex attribute pointer.
@@ -1677,6 +2356,13 @@ public interface GraphicsBackend {
      * @param program The program object ID to delete
      */
     void deleteProgram(CommandContext ctx, int program);
+
+    /**
+     * Deletes a shader program identified by a backend-neutral program handle.
+     */
+    default void deleteProgram(CommandContext ctx, VulkanicProgramHandle program) {
+        deleteProgram(ctx, program.value());
+    }
     
     /**
      * Deletes a shader object.
@@ -1688,6 +2374,13 @@ public interface GraphicsBackend {
      * @param shader The shader object ID to delete
      */
     void deleteShader(CommandContext ctx, int shader);
+
+    /**
+     * Deletes a shader identified by a backend-neutral shader handle.
+     */
+    default void deleteShader(CommandContext ctx, VulkanicShaderHandle shader) {
+        deleteShader(ctx, shader.value());
+    }
     
     /**
      * Binds an attribute location in a shader program.
@@ -1715,6 +2408,17 @@ public interface GraphicsBackend {
      * @param barriers Bitfield of memory barrier flags
      */
     void memoryBarrier(CommandContext ctx, int barriers);
+
+    /**
+     * Applies backend-agnostic resource barrier metadata.
+     *
+     * <p>In OpenGL: translates to {@code glMemoryBarrier()} bitfields.
+     * In Vulkan: translates to explicit pipeline/resource barrier commands.</p>
+     *
+     * @param ctx command context for recording this command
+     * @param barriers typed barrier metadata descriptor
+     */
+    void applyResourceBarriers(CommandContext ctx, VulkanicResourceBarriers barriers);
     
     // Synchronization
     /**
@@ -1783,6 +2487,27 @@ public interface GraphicsBackend {
     int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname);
     
     // Shader source (native)
+    /**
+     * Uploads GLSL source code to a shader object using a backend-neutral source string.
+     *
+     * <p>Default implementation bridges to the pointer-based upload path.</p>
+     */
+    default void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
+        final org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackGet();
+        final int stackPointer = stack.getPointer();
+
+        try {
+            final java.nio.ByteBuffer sourceBuffer = org.lwjgl.system.MemoryUtil.memUTF8(source, true);
+            final org.lwjgl.PointerBuffer pointers = stack.mallocPointer(1);
+            pointers.put(sourceBuffer);
+
+            uploadShaderSource(ctx, shader, pointers.address0(), 1, 0L);
+            org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
+        } finally {
+            stack.setPointer(stackPointer);
+        }
+    }
+
     /**
      * Uploads GLSL source code to a shader object using native pointer addresses.
      * 
@@ -2069,6 +2794,13 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      */
     void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size);
+
+    /**
+     * Binds a range of a buffer object using backend-neutral buffer-target semantics.
+     */
+    default void bindUniformBufferRange(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer, long offset, long size) {
+        bindUniformBufferRange(ctx, target.toLegacyGlTarget(), index, buffer, offset, size);
+    }
     
     // Texture buffer operations
     /**
@@ -2078,6 +2810,13 @@ public interface GraphicsBackend {
      * @param ctx Command context for recording this command
      */
     void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer);
+
+    /**
+     * Attaches a buffer object to a texture buffer object using backend-neutral texture-target semantics.
+     */
+    default void texBuffer(CommandContext ctx, VulkanicTextureTarget target, int internalFormat, int buffer) {
+        texBuffer(ctx, target.toLegacyGlTarget(), internalFormat, buffer);
+    }
     
     // Uniform operations (additional, all with CommandContext)
     void setUniform2fv(CommandContext ctx, int location, float[] value);
@@ -2092,7 +2831,6 @@ public interface GraphicsBackend {
     int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length);
     
     // Graphics Capabilities
-    GraphicsCapabilities obtainGraphicsCapabilities();
     GraphicsCapabilities initializeGraphicsCapabilities();
     boolean checkFunctionAvailable(String functionName);
     
@@ -2126,6 +2864,100 @@ public interface GraphicsBackend {
     
     // Capabilities
     GraphicsCapabilities getGraphicsCapabilities();
+
+    /**
+     * Returns the backend-owned GPU vendor name used for shader macro and diagnostics.
+     */
+    default String getBackendVendorName() {
+        return getString(getCurrentCommandContext(), VulkanicAPI.GL_VENDOR);
+    }
+
+    /**
+     * Returns the backend-owned GPU renderer name used for shader macro and diagnostics.
+     */
+    default String getBackendRendererName() {
+        return getString(getCurrentCommandContext(), VulkanicAPI.GL_RENDERER);
+    }
+
+    /**
+     * Returns the backend-owned GPU/driver version descriptor used for diagnostics.
+     */
+    default String getBackendVersionName() {
+        return getString(getCurrentCommandContext(), VulkanicAPI.GL_VERSION);
+    }
+
+    /**
+     * Returns backend-owned extension identifiers when the backend exposes them.
+     */
+    default java.util.List<String> getBackendEnabledExtensions() {
+        return java.util.List.of();
+    }
+
+    /**
+     * Returns backend-owned optional feature names for diagnostics/reporting.
+     */
+    default java.util.List<String> getBackendOptionalFeatureNames() {
+        return java.util.List.of();
+    }
+
+    /**
+     * Returns backend-owned max texture size capability.
+     */
+    default int getBackendMaxTextureSize() {
+        return getInteger(getCurrentCommandContext(), VulkanicAPI.GL_MAX_TEXTURE_SIZE);
+    }
+
+    /**
+     * Returns backend-owned uniform-buffer offset alignment capability.
+     */
+    default int getBackendUniformOffsetAlignment() {
+        return getInteger(getCurrentCommandContext(), VulkanicAPI.GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT);
+    }
+
+    /**
+     * Returns backend-owned device info snapshot for diagnostics and warnlist checks.
+     */
+    default GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
+        String backendName = getBackendType() == GraphicsBackendType.OPENGL ? "OpenGL" : "Vulkan";
+        return new GpuDevice.GpuDeviceInfo(
+            backendName,
+            backendName,
+            getBackendVendorName(),
+            getBackendRendererName(),
+            getBackendVersionName(),
+            getBackendType() == GraphicsBackendType.OPENGL,
+            getBackendOptionalFeatureNames()
+        );
+    }
+
+    /**
+     * Resolves a backend-native texture handle for transitional integrations.
+     *
+     * <p>In OpenGL this corresponds to the GL texture object name.
+     * In Vulkan this may return a backend-managed token while texture-id shims remain.</p>
+     *
+     * @param ctx Command context for recording this command
+     * @param texture Texture target to resolve
+     * @return Backend-native texture handle, or {@code 0} when not applicable
+     */
+    default int resolveTextureHandle(CommandContext ctx, VulkanicTexture texture) {
+        return 0;
+    }
+
+    /**
+     * Resolves a backend-native framebuffer handle for the given color/depth textures.
+     *
+     * <p>In OpenGL this may return a cached FBO name associated with the texture pair.
+     * In backends without explicit FBO objects, this may return {@code 0}.</p>
+     *
+     * @param ctx Command context for recording this command
+     * @param colorTexture Color target texture (required)
+     * @param depthTexture Optional depth target texture (nullable)
+     * @return Backend-native framebuffer handle, or {@code 0} when not applicable
+     */
+    default int resolveFramebufferForTextures(CommandContext ctx, VulkanicTexture colorTexture, VulkanicTexture depthTexture) {
+        return 0;
+    }
     
     // Debug object labeling
     
@@ -2333,6 +3165,29 @@ public interface GraphicsBackend {
      * @param texture The texture object to bind
      */
     void bindTextureUnit(CommandContext ctx, int unit, int texture);
+
+    /**
+     * Binds a backend-managed texture view to a specified texture unit.
+     *
+     * <p>This is the preferred frontend seam for shared/game callsites that
+     * should avoid extracting raw backend texture handles directly.</p>
+     */
+    default void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView) {
+        if (textureView == null) {
+            throw new IllegalArgumentException("textureView must not be null");
+        }
+        if (textureView.isClosed()) {
+            throw new IllegalStateException("Cannot bind closed texture view");
+        }
+
+        int textureHandle = resolveTextureHandle(ctx, textureView.texture());
+        if (textureHandle <= 0) {
+            throw new IllegalStateException(
+                "Unable to resolve backend texture handle for view texture: " + textureView.texture().getLabel());
+        }
+
+        bindTextureUnit(ctx, unit, textureHandle);
+    }
     
     /**
      * Creates a new buffer object using Direct State Access.
@@ -2453,6 +3308,11 @@ public interface GraphicsBackend {
      * @param param The integer parameter value
      */
     void texParameteri(CommandContext ctx, int target, int pname, int param);
+
+    /**
+     * Sets an integer texture parameter using backend-neutral keys.
+     */
+    void texParameteri(CommandContext ctx, VulkanicTextureTarget target, VulkanicTextureParameterName pname, int param);
     
     
     // Additional rendering operations
@@ -2462,7 +3322,7 @@ public interface GraphicsBackend {
     // High-level debug callback wrapper methods
     void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallback callback);
     void setupDebugMessageCallbackKHR(VulkanicAPI.DebugMessageCallback callback);
-    void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallbackARB callback);
+    void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallback callback);
     void setupDebugMessageCallbackAMD(VulkanicAPI.DebugMessageCallbackAMD callback);
     void clearDebugMessageCallback();
     void clearDebugMessageCallbackKHR();
@@ -2577,6 +3437,11 @@ public interface GraphicsBackend {
      * @param modeAlpha Blend equation for the alpha component
      */
     void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha);
+
+    /**
+     * Sets RGB/alpha blend equations using backend-neutral semantics.
+     */
+    void setBlendEquationSeparate(CommandContext ctx, VulkanicBlendEquation modeRGB, VulkanicBlendEquation modeAlpha);
     
     /**
      * Sets the stencil test function and reference value.
@@ -2590,6 +3455,82 @@ public interface GraphicsBackend {
      * @param mask Mask ANDed with both the reference and the stored stencil value
      */
     void setStencilFunc(CommandContext ctx, int func, int ref, int mask);
+
+    /**
+     * Sets the stencil test function using backend-neutral stencil compare semantics.
+     */
+    void setStencilFunc(CommandContext ctx, VulkanicStencilCompareOp func, int ref, int mask);
+
+    /**
+     * Sets the stencil test function for a specific face.
+     *
+     * In OpenGL: Maps to glStencilFuncSeparate()
+     * In Vulkan: Maps to per-face compare mask/reference dynamic state
+     */
+    void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask);
+
+    /**
+     * Sets the stencil test function for a specific face using backend-neutral semantics.
+     */
+    void setStencilFuncSeparate(CommandContext ctx, VulkanicStencilFace face, VulkanicStencilCompareOp func, int ref, int mask);
+
+    /**
+     * Sets stencil operations for stencil-fail, depth-fail, and depth-pass outcomes.
+     *
+     * In OpenGL: Maps to glStencilOp()
+     * In Vulkan: Maps to VkStencilOpState failOp/passOp/depthFailOp
+     */
+    void setStencilOp(CommandContext ctx, int stencilFailOp, int depthFailOp, int depthPassOp);
+
+    /**
+     * Sets stencil operations using backend-neutral semantics.
+     */
+    void setStencilOp(
+        CommandContext ctx,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    );
+
+    /**
+     * Sets stencil operations for a specific face.
+     *
+     * In OpenGL: Maps to glStencilOpSeparate()
+     * In Vulkan: Maps to VkStencilOpState for front/back face
+     */
+    void setStencilOpSeparate(CommandContext ctx, int face, int stencilFailOp, int depthFailOp, int depthPassOp);
+
+    /**
+     * Sets stencil operations for a specific face using backend-neutral semantics.
+     */
+    void setStencilOpSeparate(
+        CommandContext ctx,
+        VulkanicStencilFace face,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    );
+
+    /**
+     * Sets the stencil write mask.
+     *
+     * In OpenGL: Maps to glStencilMask()
+     * In Vulkan: Maps to VkStencilOpState.writeMask
+     */
+    void setStencilWriteMask(CommandContext ctx, int mask);
+
+    /**
+     * Sets the stencil write mask for a specific face.
+     *
+     * In OpenGL: Maps to glStencilMaskSeparate()
+     * In Vulkan: Maps to per-face stencil write-mask dynamic state
+     */
+    void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask);
+
+    /**
+     * Sets the stencil write mask for a specific face using backend-neutral semantics.
+     */
+    void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask);
     
     // Additional texture methods
     
@@ -2640,6 +3581,11 @@ public interface GraphicsBackend {
      * @return true if the capability is enabled
      */
     boolean isEnabled(CommandContext ctx, int cap);
+
+    /**
+     * Tests whether a capability is enabled using a backend-neutral key.
+     */
+    boolean isEnabled(CommandContext ctx, VulkanicCapability capability);
     
     /**
      * Sets texture parameters using an array of integers.
@@ -2831,6 +3777,151 @@ public interface GraphicsBackend {
      */
     PipelineHandle createPipeline(PipelineDescriptor descriptor);
 
+    /**
+     * Resolves a {@link GpuBuffer} to the backend-specific {@link VulkanicBuffer} that
+     * backs it at the native (GPU) level.
+     *
+     * <p>In OpenGL: wraps the GL buffer object name in an {@code OpenGLBuffer}.
+     * In Vulkan: returns the underlying {@code VulkanBuffer} mapped from the
+     * legacy buffer ID stored in the {@code GlBuffer.handle} field.
+     *
+     * <p>This method is the canonical way for shared render-encoder code to obtain
+     * a backend-neutral buffer reference for descriptor binding — removing the need
+     * for callers to cast or branch on the active backend.
+     *
+     * @param gpuBuffer the GPU buffer to resolve
+     * @return the native backend buffer
+     * @throws IllegalArgumentException if the buffer type is not supported by this backend
+     * @throws IllegalStateException    if the backend state prevents resolution (e.g., not yet
+     *                                  uploaded for Vulkan)
+     */
+    VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer);
+
+    /**
+     * Returns the compiled {@link PipelineHandle} for the given pipeline identity and descriptor,
+     * or {@code null} if no compiled handle is available for this backend at this time.
+     *
+     * <p>In OpenGL: always returns {@code null} — pipeline handles are
+     * managed externally via {@link #createPipeline}.
+     * In Vulkan: looks up the precompile cache keyed by {@code renderPipeline} and
+     * returns the associated {@link net.vulkanic.backends.vulkan.VulkanBackend.VulkanPipelineHandle}
+     * when one has been compiled, otherwise {@code null}.
+     *
+     * <p>Callers that hold a backend-specific handle (e.g., {@code OpenGLPipelineHandle} from
+     * the GL command encoder) should still pass that handle directly; this method is intended
+     * for code that does not hold a handle and needs to resolve one at draw-setup time.
+     *
+     * @param renderPipeline the render pipeline identity
+     * @param descriptor     the pipeline descriptor used to compile the handle
+     * @return the compiled pipeline handle, or {@code null} if unavailable
+     */
+    default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                          PipelineDescriptor descriptor) {
+        return null;
+    }
+
+    /**
+     * Creates a descriptor-pool-style allocation domain for pipeline resource sets.
+     *
+     * <p>In OpenGL: provides lifecycle/accounting semantics over descriptor-style bindings.
+     * In Vulkan: maps to {@code vkCreateDescriptorPool}.
+     */
+    DescriptorPoolHandle createDescriptorPool(DescriptorPoolDescriptor descriptor);
+
+    /**
+     * Allocates a descriptor-style resource set from the given pool for a pipeline layout.
+     *
+     * <p>In OpenGL: allocates a validated binding container tied to descriptor layout identity.
+     * In Vulkan: maps to {@code vkAllocateDescriptorSets}.
+     */
+    DescriptorSetHandle allocateDescriptorSet(DescriptorPoolHandle pool, PipelineDescriptor descriptor);
+
+    /**
+     * Updates resource bindings for a previously allocated descriptor set.
+     *
+     * <p>In OpenGL: validates and stores bindings for later bind-time application.
+     * In Vulkan: maps to {@code vkUpdateDescriptorSets}.</p>
+     */
+    void updateDescriptorSet(DescriptorSetHandle descriptorSet, PipelineResourceBindings bindings);
+
+    /**
+     * Binds a descriptor set for use with a compiled pipeline.
+     *
+     * <p>In OpenGL: applies stored bindings to the active program according to descriptor layout.
+     * In Vulkan: maps to {@code vkCmdBindDescriptorSets}.</p>
+     */
+    void bindDescriptorSet(CommandContext ctx,
+                           PipelineHandle pipeline,
+                           PipelineDescriptor descriptor,
+                           DescriptorSetHandle descriptorSet);
+
+    /**
+     * Resets/recycles all descriptor-set allocations in the given pool.
+     *
+     * <p>In OpenGL: invalidates currently allocated logical descriptor sets.
+     * In Vulkan: maps to descriptor pool reset semantics.</p>
+     */
+    void resetDescriptorPool(DescriptorPoolHandle pool);
+
+    /**
+     * Binds descriptor-style pipeline resources for a compiled pipeline.
+     *
+     * <p>In OpenGL: applies sampler/uniform-buffer/texel-buffer bindings to the active
+     * shader program using the descriptor-derived resource layout.
+     * In Vulkan: maps to descriptor set writes + {@code vkCmdBindDescriptorSets}.
+     *
+     * @param ctx command context
+     * @param pipeline compiled pipeline handle
+     * @param descriptor pipeline descriptor used to derive resource layout metadata
+     * @param bindings bound resources keyed by descriptor resource names
+     */
+    void bindPipelineResources(CommandContext ctx,
+                               PipelineHandle pipeline,
+                               PipelineDescriptor descriptor,
+                               PipelineResourceBindings bindings);
+
+    // =========================================================================
+    // Phase 3e: Frame Lifecycle + Presentation
+    // =========================================================================
+
+    /**
+     * Begins a new frame lifecycle scope.
+     *
+     * <p>In OpenGL: no-op, returns {@code -1}.
+     * In Vulkan: acquires the next swapchain image (typically via
+     * {@code vkAcquireNextImageKHR}) and returns its image index.
+     *
+     * @return acquired swapchain image index for Vulkan, or {@code -1} for backends
+     *         without explicit frame acquisition
+     */
+    default int beginFrame() {
+        return -1;
+    }
+
+    /**
+     * Ends the current frame lifecycle scope.
+     *
+     * <p>In OpenGL: no-op.
+     * In Vulkan: presents the acquired swapchain image (typically via
+     * {@code vkQueuePresentKHR}).
+     */
+    default void endFrame() {
+        // no-op for backends without explicit present lifecycle
+    }
+
+    /**
+     * Presents a color render target view to the backend-owned screen/swapchain.
+     *
+     * <p>OpenGL backends should blit/copy the view to the default framebuffer.
+     * Vulkan backends should stage this as the source image for swapchain
+     * composition during frame presentation.</p>
+     */
+    default void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not implement presentTextureToScreen."
+        );
+    }
+
     // =========================================================================
     // Phase 3d: Command Buffer Lifecycle
     // =========================================================================
@@ -2898,4 +3989,12 @@ public interface GraphicsBackend {
                                         VulkanicTextureView colorTarget, OptionalInt clearColor,
                                         @org.jetbrains.annotations.Nullable VulkanicTextureView depthTarget,
                                         OptionalDouble clearDepth);
+
+    /**
+     * Begins a render pass from a backend-agnostic pass descriptor.
+     *
+     * <p>In OpenGL: maps descriptor load/clear metadata to framebuffer setup + optional clears.
+     * In Vulkan: maps descriptor attachment metadata to render-pass begin info.
+     */
+    VulkanicRenderPass beginRenderPass(CommandContext ctx, VulkanicRenderPassDescriptor descriptor);
 }

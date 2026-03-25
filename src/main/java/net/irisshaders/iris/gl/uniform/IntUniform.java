@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.uniform;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.function.IntSupplier;
 
@@ -34,7 +34,7 @@ public class IntUniform extends Uniform {
 
 		if (cachedValue != newValue) {
 			cachedValue = newValue;
-			GlStateManager._glUniform1i(location, newValue);
+			VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), location, newValue);
 		}
 	}
 }

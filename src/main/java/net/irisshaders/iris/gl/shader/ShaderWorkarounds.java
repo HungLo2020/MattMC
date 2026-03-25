@@ -1,11 +1,7 @@
 package net.irisshaders.iris.gl.shader;
 
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
-
-import java.nio.ByteBuffer;
+import net.vulkanic.VulkanicShaderHandle;
 
 /**
  * Contains a workaround for a crash in nglShaderSource on some AMD drivers. Copied from
@@ -22,18 +18,10 @@ public class ShaderWorkarounds {
 	 * <p>Hat tip to fewizz for the find and the fix.
 	 */
 	public static void safeShaderSource(int glId, CharSequence source) {
-		final MemoryStack stack = MemoryStack.stackGet();
-		final int stackPointer = stack.getPointer();
+		VulkanicAPI.uploadShaderSource(VulkanicAPI.getCommandContext(), glId, source);
+	}
 
-		try {
-			final ByteBuffer sourceBuffer = MemoryUtil.memUTF8(source, true);
-			final PointerBuffer pointers = stack.mallocPointer(1);
-			pointers.put(sourceBuffer);
-
-			VulkanicAPI.uploadShaderSource(VulkanicAPI.getImmediateContext(), glId, pointers.address0(), 1, 0);
-			org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
-		} finally {
-			stack.setPointer(stackPointer);
-		}
+	public static void safeShaderSource(VulkanicShaderHandle shader, CharSequence source) {
+		VulkanicAPI.uploadShaderSource(VulkanicAPI.getCommandContext(), shader, source);
 	}
 }

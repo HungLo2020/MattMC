@@ -10,6 +10,7 @@ import net.sodium.client.gl.util.EnumBitField;
 import net.sodium.client.util.NativeBuffer;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
@@ -77,6 +78,7 @@ public class SharedQuadIndexBuffer {
         SHORT(GlIndexType.UNSIGNED_SHORT, 64 * 1024) {
             @Override
             public void createIndexBuffer(ByteBuffer byteBuffer, int primitiveCount) {
+                byteBuffer.order(ByteOrder.nativeOrder());
                 ShortBuffer shortBuffer = byteBuffer.asShortBuffer();
 
                 for (int primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex++) {
@@ -96,6 +98,7 @@ public class SharedQuadIndexBuffer {
         INTEGER(GlIndexType.UNSIGNED_INT, Integer.MAX_VALUE) {
             @Override
             public void createIndexBuffer(ByteBuffer byteBuffer, int primitiveCount) {
+                byteBuffer.order(ByteOrder.nativeOrder());
                 IntBuffer intBuffer = byteBuffer.asIntBuffer();
 
                 for (int primitiveIndex = 0; primitiveIndex < primitiveCount; primitiveIndex++) {

@@ -3,7 +3,7 @@ package com.seibel.distanthorizons.core.render.glObject.vertexAttribute;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -35,7 +35,12 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	/** This will bind the {@link AbstractVertexAttribute} */
 	public VertexAttributePostGL43()
 	{
-		super(); // also bind AbstractVertexAttribute
+		this(VulkanicAPI.getCommandContext());
+	}
+
+	public VertexAttributePostGL43(CommandContext ctx)
+	{
+		super(ctx); // also bind AbstractVertexAttribute
 	}
 	
 	
@@ -48,9 +53,10 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void bindBufferToAllBindingPoints(int buffer)
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		for (int i = 0; i < this.numberOfBindingPoints; i++)
 		{
-			VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), i, buffer, 0, this.strideSize);
+			VulkanicAPI.bindVertexBuffer(ctx, i, buffer, 0, this.strideSize);
 		}
 	}
 	
@@ -58,7 +64,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void bindBufferToBindingPoint(int buffer, int bindingPoint)
 	{
-		VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), bindingPoint, buffer, 0, this.strideSize);
+		VulkanicAPI.bindVertexBuffer(VulkanicAPI.getCommandContext(), bindingPoint, buffer, 0, this.strideSize);
 	}
 	
 	
@@ -71,9 +77,10 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void unbindBuffersFromAllBindingPoint()
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		for (int i = 0; i < this.numberOfBindingPoints; i++)
 		{
-			VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), i, 0, 0, 0);
+			VulkanicAPI.bindVertexBuffer(ctx, i, 0, 0, 0);
 		}
 	}
 	
@@ -81,7 +88,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void unbindBuffersFromBindingPoint(int bindingPoint)
 	{
-		VulkanicAPI.bindVertexBuffer(VulkanicAPI.getImmediateContext(), bindingPoint, 0, 0, 0);
+		VulkanicAPI.bindVertexBuffer(VulkanicAPI.getCommandContext(), bindingPoint, 0, 0, 0);
 	}
 	
 	
@@ -94,13 +101,14 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void setVertexAttribute(int bindingPoint, int attributeIndex, VertexPointer attribute)
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		if (attribute.useInteger)
 		{
-			VulkanicAPI.setVertexAttribIFormat(VulkanicAPI.getImmediateContext(), attributeIndex, attribute.elementCount, attribute.glType, this.strideSize);
+			VulkanicAPI.setVertexAttribIFormat(ctx, attributeIndex, attribute.elementCount, attribute.glType, this.strideSize);
 		}
 		else
 		{
-			VulkanicAPI.setVertexAttribFormat(VulkanicAPI.getImmediateContext(), attributeIndex, attribute.elementCount, attribute.glType,
+			VulkanicAPI.setVertexAttribFormat(ctx, attributeIndex, attribute.elementCount, attribute.glType,
 					attribute.normalized, this.strideSize); // strideSize used as relative offset here
 		}
 		
@@ -109,8 +117,8 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 		{
 			this.numberOfBindingPoints = bindingPoint + 1;
 		}
-		VulkanicAPI.setVertexAttribBinding(VulkanicAPI.getImmediateContext(), attributeIndex, bindingPoint);
-		VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), attributeIndex);
+		VulkanicAPI.setVertexAttribBinding(ctx, attributeIndex, bindingPoint);
+		VulkanicAPI.enableVertexAttribArray(ctx, attributeIndex);
 	}
 	
 	

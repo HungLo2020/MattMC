@@ -1,13 +1,18 @@
 package com.seibel.distanthorizons.core.render.renderer;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.GLState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.renderer.shaders.SSAOApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.SSAOShader;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicTextureTarget;
 
 import java.nio.ByteBuffer;
 
@@ -22,14 +27,13 @@ public class SSAORenderer
 	public static SSAORenderer INSTANCE = new SSAORenderer();
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	private boolean init = false;
 	
 	private int width = -1;
 	private int height = -1;
-	private int ssaoFramebuffer = -1;
+	private DhFramebuffer ssaoFramebuffer;
 	
 	private int ssaoTexture = -1;
 	
@@ -50,36 +54,35 @@ public class SSAORenderer
 		SSAOApplyShader.INSTANCE.init();
 	}
 	
-	private void createFramebuffer(int width, int height)
+	private void createFramebuffer(CommandContext ctx, int width, int height)
 	{
-		if (this.ssaoFramebuffer != -1)
+		if (this.ssaoFramebuffer != null)
 		{
-			VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.ssaoFramebuffer);
-			this.ssaoFramebuffer = -1;
+			this.ssaoFramebuffer.destroy(ctx);
+			this.ssaoFramebuffer = null;
 		}
 		
 		if (this.ssaoTexture != -1)
 		{
-			GLMC.glDeleteTextures(this.ssaoTexture);
+			VulkanicAPI.deleteTexture(ctx, this.ssaoTexture);
 			this.ssaoTexture = -1;
 		}
 		
-		this.ssaoFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.ssaoFramebuffer);
+		this.ssaoFramebuffer = new DhFramebuffer();
 		
-		this.ssaoTexture = GLMC.glGenTextures();
+		this.ssaoTexture = VulkanicAPI.createTexture2D(ctx);
 		{
-			GLMC.glBindTexture(this.ssaoTexture);
-			VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_R16F, width, height, 0, VulkanicAPI.GL_RED, VulkanicAPI.GL_HALF_FLOAT, (ByteBuffer) null);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			DhTextureState.bindTexture2D(this.ssaoTexture);
+			VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_R16F, width, height, 0, VulkanicAPI.GL_RED, VulkanicAPI.GL_HALF_FLOAT, (ByteBuffer) null);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
 			
 			// disable mip-mapping since DH is just going to draw straight to the screen
-			VulkanicAPI.texParameteri(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
-			VulkanicAPI.texParameteri(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, 0);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, 0);
 		}
 		
-		VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.ssaoTexture, 0);
+		this.ssaoFramebuffer.addColorAttachment(ctx, 0, this.ssaoTexture);
 	}
 	
 	
@@ -90,18 +93,31 @@ public class SSAORenderer
 	
 	public void render(Mat4f projectionMatrix, float partialTicks)
 	{
-		GLState state = new GLState();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		GLState state = new GLState(ctx);
 		
 		this.init();
 		
 		// resize the framebuffer if necessary
 		int width = MC_RENDER.getTargetFramebufferViewportWidth();
 		int height = MC_RENDER.getTargetFramebufferViewportHeight();
+		if (width <= 0 || height <= 0)
+		{
+			this.width = -1;
+			this.height = -1;
+			return;
+		}
+
 		if (this.width != width || this.height != height)
 		{
 			this.width = width;
 			this.height = height;
-			this.createFramebuffer(width, height);
+			this.createFramebuffer(ctx, width, height);
+		}
+
+		if (this.ssaoFramebuffer == null || this.ssaoTexture == -1)
+		{
+			return;
 		}
 		
 		SSAOShader.INSTANCE.frameBuffer = this.ssaoFramebuffer;
@@ -111,7 +127,7 @@ public class SSAORenderer
 		SSAOApplyShader.INSTANCE.ssaoTexture = this.ssaoTexture;
 		SSAOApplyShader.INSTANCE.render(partialTicks);
 		
-		state.restore();
+		state.restore(ctx);
 	}
 	
 	public void free()

@@ -25,7 +25,7 @@ public record GlyphRenderState(Matrix3x2f pose, TextRenderable renderable, @Null
 
 	@Override
 	public TextureSetup textureSetup() {
-		return TextureSetup.singleTextureWithLightmap(this.renderable.textureView());
+		return TextureSetup.singleTexture(this.renderable.textureView());
 	}
 
 	@Nullable

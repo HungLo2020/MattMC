@@ -76,6 +76,7 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix3x2fStack;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -240,8 +241,8 @@ public class Map implements Runnable, IChangeObserver {
         this.setZoomScale();
 
         final int fboTextureSize = 512;
-        this.fboTexture = RenderSystem.getDevice().createTexture("voxelmap-fbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
-        this.fboTextureView = RenderSystem.getDevice().createTextureView(this.fboTexture);
+        this.fboTexture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-fbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
+        this.fboTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboTexture);
         // DynamicTexture fboTexture = new DynamicTexture("voxelmap-fbotexture", fboTextureSize, fboTextureSize, true);
         // minecraft.getTextureManager().register(resourceFboTexture, fboTexture);
         // this.fboTexture = fboTexture.getTexture();
@@ -1603,19 +1604,19 @@ public class Map implements Runnable, IChangeObserver {
         guiGraphics.pose().transform(-256, -256, 1, vector3f);
         bufferBuilder.addVertex(vector3f.x, vector3f.y, -2500).setUv(0, 1).setColor(255, 255, 255, 255);
 
-        ProjectionType originalProjectionType = RenderSystem.getProjectionType();
-        GpuBufferSlice originalProjectionMatrix = RenderSystem.getProjectionMatrixBuffer();
-        RenderSystem.setProjectionMatrix(projection.getBuffer(), ProjectionType.ORTHOGRAPHIC);
-        RenderSystem.getModelViewStack().pushMatrix();
-        RenderSystem.getModelViewStack().identity();
+        ProjectionType originalProjectionType = net.vulkanic.VulkanicAPI.getProjectionType();
+        GpuBufferSlice originalProjectionMatrix = net.vulkanic.VulkanicAPI.getProjectionMatrixBuffer();
+        net.vulkanic.VulkanicAPI.setProjectionMatrix(projection.getBuffer(), ProjectionType.ORTHOGRAPHIC);
+        VulkanicAPI.getModelViewStack().pushMatrix();
+        VulkanicAPI.getModelViewStack().identity();
 
-        GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+        GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
                 .writeTransform(
-                        RenderSystem.getModelViewMatrix(),
+                        VulkanicAPI.getModelViewMatrix(),
                         new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
                         new Vector3f(),
-                        RenderSystem.getTextureMatrix(),
-                        RenderSystem.getShaderLineWidth());
+                net.vulkanic.VulkanicAPI.getTextureMatrix(),
+                net.vulkanic.VulkanicAPI.getShaderLineWidth());
 
         RenderPipeline renderPipeline = VoxelMapPipelines.GUI_TEXTURED_ANY_DEPTH_PIPELINE;
         try (MeshData meshData = bufferBuilder.build()) {
@@ -1623,7 +1624,7 @@ public class Map implements Runnable, IChangeObserver {
             GpuBuffer indexBuffer;
             VertexFormat.IndexType indexType;
             if (meshData.indexBuffer() == null) {
-                RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(meshData.drawState().mode());
+                VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(meshData.drawState().mode());
                 indexBuffer = autoStorageIndexBuffer.getBuffer(meshData.drawState().indexCount());
                 indexType = autoStorageIndexBuffer.type();
             } else {
@@ -1638,9 +1639,9 @@ public class Map implements Runnable, IChangeObserver {
                 stencilTexture = Minecraft.getInstance().getTextureManager().getTexture(circleStencil).getTextureView();
             }
 
-            try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Voxelmap: Map to screen", fboTextureView, OptionalInt.of(0x00000000))) {
+            try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createCommandEncoder().createRenderPass(() -> "Voxelmap: Map to screen", fboTextureView, OptionalInt.of(0x00000000))) {
                 renderPass.setPipeline(renderPipeline);
-                RenderSystem.bindDefaultUniforms(renderPass);
+                net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
                 renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
                 renderPass.setVertexBuffer(0, vertexBuffer);
                 renderPass.setIndexBuffer(indexBuffer, indexType);
@@ -1653,8 +1654,8 @@ public class Map implements Runnable, IChangeObserver {
                 renderPass.drawIndexed(0, meshData.drawState().indexCount() / 2, meshData.drawState().indexCount() / 2, 1);
             }
         }
-        RenderSystem.getModelViewStack().popMatrix();
-        RenderSystem.setProjectionMatrix(originalProjectionMatrix, originalProjectionType);
+        VulkanicAPI.getModelViewStack().popMatrix();
+        net.vulkanic.VulkanicAPI.setProjectionMatrix(originalProjectionMatrix, originalProjectionType);
         fboTessellator.clear();
         // if (((saved++) % 1000) == 0)
         // ImageUtils.saveImage("minimap_" + saved, fboTexture);

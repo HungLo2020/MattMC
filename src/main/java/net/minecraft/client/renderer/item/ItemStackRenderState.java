@@ -269,7 +269,9 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 					);
 			} else if (this.renderType != null) {
 				// Fabric Rendering API support (from ItemLayerRenderStateMixin redirect)
-				if (this.mutableMesh.size() > 0 && submitNodeCollector instanceof OrderedSubmitNodeCollectorExtension access) {
+				if (ItemStackRenderState.this.displayContext != ItemDisplayContext.GUI
+					&& this.mutableMesh.size() > 0
+					&& submitNodeCollector instanceof OrderedSubmitNodeCollectorExtension access) {
 					// We don't have to copy the mesh here because vanilla doesn't copy the tint array or quad list either.
 					access.fabric_submitItem(poseStack, ItemStackRenderState.this.displayContext, i, j, k, this.tintLayers, this.quads, this.renderType, this.foilType, this.mutableMesh);
 				} else {

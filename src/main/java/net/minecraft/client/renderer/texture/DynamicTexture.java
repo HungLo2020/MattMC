@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.TextureFormat;
@@ -38,22 +37,20 @@ public class DynamicTexture extends AbstractTexture implements Dumpable {
 	}
 
 	private void createTexture(Supplier<String> supplier) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		this.texture = gpuDevice.createTexture(supplier, 5, TextureFormat.RGBA8, this.pixels.getWidth(), this.pixels.getHeight(), 1, 1);
+		this.texture = net.vulkanic.VulkanicAPI.createTexture(supplier, 5, TextureFormat.RGBA8, this.pixels.getWidth(), this.pixels.getHeight(), 1, 1);
 		this.texture.setTextureFilter(FilterMode.NEAREST, false);
-		this.textureView = gpuDevice.createTextureView(this.texture);
+		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 	}
 
 	private void createTexture(String string) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		this.texture = gpuDevice.createTexture(string, 5, TextureFormat.RGBA8, this.pixels.getWidth(), this.pixels.getHeight(), 1, 1);
+		this.texture = net.vulkanic.VulkanicAPI.createTexture(string, 5, TextureFormat.RGBA8, this.pixels.getWidth(), this.pixels.getHeight(), 1, 1);
 		this.texture.setTextureFilter(FilterMode.NEAREST, false);
-		this.textureView = gpuDevice.createTextureView(this.texture);
+		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 	}
 
 	public void upload() {
 		if (this.pixels != null && this.texture != null) {
-			RenderSystem.getDevice().createCommandEncoder().writeToTexture(this.texture, this.pixels);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, this.pixels);
 		} else {
 			LOGGER.warn("Trying to upload disposed texture {}", this.getTexture().getLabel());
 		}

@@ -3,7 +3,6 @@ package net.minecraft.client.gui.font;
 import net.blaze3d.font.GlyphBitmap;
 import net.blaze3d.font.GlyphInfo;
 import net.blaze3d.platform.TextureUtil;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.TextureFormat;
@@ -27,10 +26,9 @@ public class FontTexture extends AbstractTexture implements Dumpable {
 	public FontTexture(Supplier<String> supplier, GlyphRenderTypes glyphRenderTypes, boolean bl) {
 		this.colored = bl;
 		this.root = new FontTexture.Node(0, 0, 256, 256);
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		this.texture = gpuDevice.createTexture(supplier, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
+		this.texture = net.vulkanic.VulkanicAPI.createTexture(supplier, 7, bl ? TextureFormat.RGBA8 : TextureFormat.RED8, 256, 256, 1, 1);
 		this.texture.setTextureFilter(FilterMode.NEAREST, false);
-		this.textureView = gpuDevice.createTextureView(this.texture);
+		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		this.renderTypes = glyphRenderTypes;
 	}
 

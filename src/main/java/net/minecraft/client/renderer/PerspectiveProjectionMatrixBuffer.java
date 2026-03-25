@@ -3,7 +3,6 @@ package net.minecraft.client.renderer;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
@@ -17,15 +16,14 @@ public class PerspectiveProjectionMatrixBuffer implements AutoCloseable {
 	private final GpuBufferSlice bufferSlice;
 
 	public PerspectiveProjectionMatrixBuffer(String string) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		this.buffer = gpuDevice.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
+		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 		this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 	}
 
 	public GpuBufferSlice getBuffer(Matrix4f matrix4f) {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE).putMat4f(matrix4f).get();
-			RenderSystem.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
 		}
 
 		return this.bufferSlice;

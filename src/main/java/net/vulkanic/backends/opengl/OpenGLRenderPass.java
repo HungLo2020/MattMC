@@ -4,7 +4,9 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
+import net.vulkanic.VulkanicBufferTarget;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicRenderPass;
 
 /**
@@ -77,7 +79,7 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
                 "OpenGL render pass requires an OpenGLBuffer for vertex buffer, got: " +
                 (buffer == null ? "null" : buffer.getClass().getName()));
         }
-        VulkanicAPI.bindBuffer(ctx, VulkanicAPI.GL_ARRAY_BUFFER, glBuffer.getGlHandle());
+        VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.getGlHandle());
     }
 
     @Override
@@ -98,9 +100,9 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
         // Offset in bytes = firstIndex * bytesPerIndex
         long offset = (long) firstIndex * currentIndexType.bytesPerIndex();
         if (instanceCount == 1 && baseVertex == 0) {
-            VulkanicAPI.drawElements(ctx, VulkanicAPI.GL_TRIANGLES, indexCount, currentIndexType, offset);
+            VulkanicAPI.drawElements(ctx, VulkanicPrimitiveMode.TRIANGLES, indexCount, currentIndexType, offset);
         } else {
-            VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, VulkanicAPI.GL_TRIANGLES,
+            VulkanicAPI.drawIndexedInstancedBaseVertex(ctx, VulkanicPrimitiveMode.TRIANGLES,
                 indexCount, currentIndexType, offset, instanceCount, baseVertex);
         }
     }
@@ -108,7 +110,7 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
     @Override
     public void draw(int firstVertex, int vertexCount) {
         checkNotClosed();
-        VulkanicAPI.drawArrays(ctx, VulkanicAPI.GL_TRIANGLES, firstVertex, vertexCount);
+        VulkanicAPI.drawArrays(ctx, VulkanicPrimitiveMode.TRIANGLES, firstVertex, vertexCount);
     }
 
     @Override
@@ -116,7 +118,7 @@ public class OpenGLRenderPass implements VulkanicRenderPass {
         if (!closed) {
             closed = true;
             // Unbind the FBO → restore default framebuffer
-            VulkanicAPI.bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, 0);
+            VulkanicAPI.bindDefaultFramebuffer(ctx);
             // Delete the temporary FBO we created for this render pass
             VulkanicAPI.deleteFramebuffer(ctx, fbo);
         }

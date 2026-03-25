@@ -1,7 +1,8 @@
 package net.irisshaders.iris.pipeline.programs;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderHandle;
 
 import java.util.Objects;
 
@@ -41,7 +42,7 @@ public final class PartialShader {
 	private static void detachIfValid(int i, int s) {
 		if (s >= 0) {
 			IrisRenderSystem.detachShader(i, s);
-			GlStateManager.glDeleteShader(s);
+			VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(s));
 		}
 	}
 

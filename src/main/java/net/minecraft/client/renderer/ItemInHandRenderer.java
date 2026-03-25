@@ -391,7 +391,7 @@ public class ItemInHandRenderer {
 		int j
 	) {
 		// Iris: Skip translucent hands in solid pass and vice versa
-		if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
+		if (net.irisshaders.iris.Iris.isPackInUseQuick() && net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isActive()) {
 			if (net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isRenderingSolid() && 
 				net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isHandTranslucent(interactionHand)) {
 				return;

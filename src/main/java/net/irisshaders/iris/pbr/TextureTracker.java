@@ -6,9 +6,10 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
-import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 import org.jetbrains.annotations.Nullable;
 
 public class TextureTracker {
@@ -21,6 +22,8 @@ public class TextureTracker {
 	}
 
 	private final Int2ObjectMap<AbstractTexture> textures = new Int2ObjectOpenHashMap<>();
+	private final Int2ObjectMap<GpuTextureView> textureViews = new Int2ObjectOpenHashMap<>();
+	private final GpuTextureView[] shaderTexturesByUnit = new GpuTextureView[128];
 
 	private boolean lockBindCallback;
 
@@ -29,6 +32,10 @@ public class TextureTracker {
 
 	public void trackTexture(int id, AbstractTexture texture) {
 		textures.put(id, texture);
+		try {
+			textureViews.put(id, texture.getTextureView());
+		} catch (IllegalStateException ignored) {
+		}
 	}
 
 	@Nullable
@@ -36,7 +43,31 @@ public class TextureTracker {
 		return textures.get(id);
 	}
 
+	@Nullable
+	public GpuTextureView getTextureView(int id) {
+		AbstractTexture texture = textures.get(id);
+		if (texture != null) {
+			try {
+				GpuTextureView view = texture.getTextureView();
+				textureViews.put(id, view);
+				return view;
+			} catch (IllegalStateException ignored) {
+			}
+		}
+
+		return textureViews.get(id);
+	}
+
 	public void onSetShaderTexture(int unit, GpuTextureView id) {
+		if (unit >= 0 && unit < shaderTexturesByUnit.length) {
+			shaderTexturesByUnit[unit] = id;
+		}
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			IrisRenderSystem.setTextureBinding(unit, id == null ? 0 : VulkanicCoreAPI.textureId(id));
+		}
+		if (id != null) {
+			textureViews.put(VulkanicCoreAPI.textureId(id), id);
+		}
 		if (lockBindCallback) {
 			return;
 		}
@@ -50,12 +81,28 @@ public class TextureTracker {
 				pipeline.onSetShaderTexture(id);
 			}
 			// Reset texture state
-			IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), 0, id == null ? 0 : id.texture().iris$getGlId());
+			IrisRenderSystem.bindTextureToUnit(0, id == null ? 0 : VulkanicCoreAPI.textureId(id));
 			lockBindCallback = false;
 		}
 	}
 
+	@Nullable
+	public GpuTextureView getShaderTexture(int unit) {
+		if (unit < 0 || unit >= shaderTexturesByUnit.length) {
+			return null;
+		}
+
+		return shaderTexturesByUnit[unit];
+	}
+
 	public void onDeleteTexture(int id) {
 		textures.remove(id);
+		textureViews.remove(id);
+		for (int unit = 0; unit < shaderTexturesByUnit.length; unit++) {
+			GpuTextureView view = shaderTexturesByUnit[unit];
+			if (view != null && VulkanicCoreAPI.textureId(view) == id) {
+				shaderTexturesByUnit[unit] = null;
+			}
+		}
 	}
 }

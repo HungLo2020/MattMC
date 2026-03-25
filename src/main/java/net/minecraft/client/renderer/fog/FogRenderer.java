@@ -5,7 +5,6 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -33,6 +32,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.material.FogType;
 import net.sodium.client.util.FogParameters;
 import net.sodium.client.util.FogStorage;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
 
@@ -55,16 +55,15 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	private FogParameters parameters = FogParameters.NONE;
 
 	public FogRenderer() {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
 		this.regularBuffer = new MappableRingBuffer(() -> "Fog UBO", 130, FOG_UBO_SIZE);
 
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			ByteBuffer byteBuffer = memoryStack.malloc(FOG_UBO_SIZE);
 			this.updateBuffer(byteBuffer, 0, new Vector4f(0.0F), Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
-			this.emptyBuffer = gpuDevice.createBuffer(() -> "Empty fog", 128, byteBuffer.flip());
+			this.emptyBuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Empty fog", 128, byteBuffer.flip());
 		}
 
-		RenderSystem.setShaderFog(this.getBuffer(FogRenderer.FogMode.NONE));
+		VulkanicAPI.setShaderFog(this.getBuffer(FogRenderer.FogMode.NONE));
 	}
 
 	public void close() {
@@ -220,7 +219,7 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			hook.onFogParametersCalculated(camera, i, bl, deltaTracker, f, clientLevel, fogData, vector4f);
 		}
 
-		try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
+		try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
 			this.updateBuffer(
 				mappedView.data(),
 				0,

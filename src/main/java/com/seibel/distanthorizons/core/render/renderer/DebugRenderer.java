@@ -14,12 +14,16 @@ import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPolygonMode;
+import net.vulkanic.VulkanicPrimitiveMode;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,7 +48,6 @@ public class DebugRenderer
 			.build();
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	
@@ -173,17 +176,18 @@ public class DebugRenderer
 	
 	public void render(Mat4f transform)
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		this.transformationMatrixThisFrame = transform;
 		Vec3d camPos = MC_RENDER.getCameraExactPosition();
 		this.camPosFloatThisFrame = new Vec3f((float) camPos.x, (float) camPos.y, (float) camPos.z);
 		
 		this.init();
 		
-		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
-		GLMC.enableDepthTest();
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.LINE);
+		VulkanicAPI.setDepthTestEnabled(ctx, true);
 		
-		this.basicShader.bind();
-		this.va.bind();
+		this.basicShader.bind(ctx);
+		this.va.bind(ctx);
 		this.va.bindBufferToAllBindingPoints(this.vertexBuffer.getId());
 		
 		
@@ -203,22 +207,27 @@ public class DebugRenderer
 		
 		
 		// box rendering
-		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 		for (BoxParticle particle : this.particles)
 		{
-			this.renderBox(particle.getBox());
+			this.renderBox(particle.getBox(), ctx);
 		}
 	}
 	
 	public void renderBox(Box box)
 	{
+		this.renderBox(box, VulkanicAPI.getCommandContext());
+	}
+
+	private void renderBox(Box box, CommandContext ctx)
+	{
 		Mat4f boxTransform = Mat4f.createTranslateMatrix(box.minPos.x - this.camPosFloatThisFrame.x, box.minPos.y - this.camPosFloatThisFrame.y, box.minPos.z - this.camPosFloatThisFrame.z);
 		boxTransform.multiply(Mat4f.createScaleMatrix(box.maxPos.x - box.minPos.x, box.maxPos.y - box.minPos.y, box.maxPos.z - box.minPos.z));
 		Mat4f t = this.transformationMatrixThisFrame.copy();
 		t.multiply(boxTransform);
-		this.basicShader.setUniform(this.basicShader.getUniformLocation("uTransform"), t);
-		this.basicShader.setUniform(this.basicShader.getUniformLocation("uColor"), box.color);
-		VulkanicAPI.drawElements(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_LINES, BOX_OUTLINE_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
+		this.basicShader.setUniform(ctx, this.basicShader.getUniformLocation(ctx, "uTransform"), t);
+		this.basicShader.setUniform(ctx, this.basicShader.getUniformLocation(ctx, "uColor"), box.color);
+		VulkanicAPI.drawElements(ctx, VulkanicPrimitiveMode.LINES, BOX_OUTLINE_INDICES.length, VulkanicIndexType.INT, 0);
 	}
 	
 	

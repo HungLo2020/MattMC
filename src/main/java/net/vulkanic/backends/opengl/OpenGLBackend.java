@@ -1,13 +1,45 @@
 package net.vulkanic.backends.opengl;
 
-import net.blaze3d.opengl.GlStateManager;
+import net.blaze3d.opengl.GlDevice;
+import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.systems.CommandEncoder;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.TextureFormat;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
+import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
+import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicCapability;
+import net.vulkanic.VulkanicClearBuffer;
+import net.vulkanic.VulkanicCullFaceMode;
+import net.vulkanic.VulkanicDepthCompareOp;
+import net.vulkanic.VulkanicIntegerQuery;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
+import net.vulkanic.VulkanicStencilCompareOp;
+import net.vulkanic.VulkanicStencilFace;
+import net.vulkanic.VulkanicStencilOperation;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureTarget;
+import net.vulkanic.VulkanicTextureUploadFormat;
+import net.vulkanic.VulkanExecutionContextInfo;
+import net.vulkanic.VulkanNativeInitializationInfo;
+import net.vulkanic.VulkanSwapchainSurfaceInfo;
+import net.minecraft.Util;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.*;
-import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
+
+import java.util.function.BiFunction;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
@@ -15,12 +47,20 @@ import java.nio.FloatBuffer;
  */
 public class OpenGLBackend implements GraphicsBackend {
 
+    private static final int TEXTURE_UNIT_COUNT = 128;
+    private final int[] texture2DBindings = new int[TEXTURE_UNIT_COUNT];
+    private int activeTextureUnitIndex = 0;
+    private volatile int presentScratchReadFbo;
+
     /**
      * Reference to the GlDevice, set after device initialization.
      * Used for delegating device-level operations (pipeline compilation, etc.)
      * that require access to the device's shader cache and DirectStateAccess.
      */
     private volatile net.blaze3d.opengl.GlDevice glDevice;
+    private volatile String backendVendorName = "unknown";
+    private volatile String backendRendererName = "unknown";
+    private volatile String backendVersionName = "unknown";
 
     /**
      * Registers the GlDevice with this backend.
@@ -30,6 +70,11 @@ public class OpenGLBackend implements GraphicsBackend {
      */
     public void setGlDevice(net.blaze3d.opengl.GlDevice device) {
         this.glDevice = device;
+        if (device != null) {
+            this.backendVendorName = normalizeDeviceIdentity(device.getVendor());
+            this.backendRendererName = normalizeDeviceIdentity(device.getRenderer());
+            this.backendVersionName = normalizeDeviceIdentity(device.getVersion());
+        }
     }
 
     /**
@@ -49,6 +94,223 @@ public class OpenGLBackend implements GraphicsBackend {
             // WGL native library not available - occurs on non-Windows platforms
             // or when the native library fails to load
             return 0L;
+        }
+    }
+
+    @Override
+    public CommandContext getCurrentCommandContext() {
+        return OpenGLCommandContext.IMMEDIATE;
+    }
+
+    @Override
+    public GraphicsBackendType getBackendType() {
+        return GraphicsBackendType.OPENGL;
+    }
+
+    @Override
+    public boolean isNativeVulkanReady() {
+        return false;
+    }
+
+    @Override
+    public VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
+        return VulkanExecutionContextInfo.unavailable(
+            GraphicsBackendType.OPENGL,
+            false,
+            "OpenGL backend does not own a native Vulkan logical device or graphics queue."
+        );
+    }
+
+    @Override
+    public VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
+        return VulkanSwapchainSurfaceInfo.unavailable(
+            GraphicsBackendType.OPENGL,
+            false,
+            "OpenGL backend does not own a Vulkan surface or swapchain."
+        );
+    }
+
+    @Override
+    public VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
+        return VulkanNativeInitializationInfo.unsupported(
+            GraphicsBackendType.OPENGL,
+            "OpenGL backend does not support native Vulkan runtime initialization."
+        );
+    }
+
+    @Override
+    public GpuDevice createRendererDevice(
+        long rendererBootstrapWindowHandle,
+        int debugVerbosity,
+        boolean debugEnabled,
+        BiFunction<ResourceLocation, ShaderType, String> defaultShaderSource,
+        boolean debugLabelsEnabled
+    ) {
+        return new GlDevice(rendererBootstrapWindowHandle, debugVerbosity, debugEnabled, defaultShaderSource, debugLabelsEnabled);
+    }
+
+    @Override
+    public CommandEncoder createCommandEncoder() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+
+        return device.createCommandEncoder();
+    }
+
+    @Override
+    public net.blaze3d.systems.RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        java.util.OptionalInt clearColor
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);
+    }
+
+    @Override
+    public net.blaze3d.systems.RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        java.util.OptionalInt clearColor,
+        @Nullable GpuTextureView depthTextureView,
+        java.util.OptionalDouble clearDepth
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    @Override
+    public GpuTexture createTexture(
+        @Nullable java.util.function.Supplier<String> supplier,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTexture(supplier, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+    }
+
+    @Override
+    public GpuTexture createTexture(
+        @Nullable String label,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTexture(label, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+    }
+
+    @Override
+    public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createBuffer(supplier, usage, size);
+    }
+
+    @Override
+    public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, java.nio.ByteBuffer data) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createBuffer(supplier, usage, data);
+    }
+
+    @Override
+    public GpuTextureView createTextureView(GpuTexture texture) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTextureView(texture);
+    }
+
+    @Override
+    public GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
+    @Override
+    public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
+        net.sodium.client.compatibility.environment.GlContextInfo context = net.sodium.client.compatibility.environment.GlContextInfo.create();
+        org.slf4j.Logger logger = net.logging.LogUtils.getLogger();
+        logger.info("OpenGL Vendor: {}", context.vendor());
+        logger.info("OpenGL Renderer: {}", context.renderer());
+        logger.info("OpenGL Version: {}", context.version());
+
+        // Cache stable identity strings while a valid context is known to exist.
+        this.backendVendorName = normalizeDeviceIdentity(context.vendor());
+        this.backendRendererName = normalizeDeviceIdentity(context.renderer());
+        this.backendVersionName = normalizeDeviceIdentity(context.version());
+
+        net.sodium.client.platform.NativeWindowHandle handle = () -> org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window(mainWindowHandle);
+        net.sodium.client.compatibility.checks.PostLaunchChecks.onContextInitialized(handle, context);
+        net.sodium.client.compatibility.checks.ModuleScanner.checkModules(handle);
+
+        net.irisshaders.iris.Iris.duringRenderSystemInit();
+        net.irisshaders.iris.gl.GLDebug.reloadDebugState();
+        net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
+        net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
+        net.irisshaders.iris.Iris.onRenderSystemInit();
+    }
+
+    @Override
+    public CompiledRenderPipeline precompileRenderPipeline(
+        RenderPipeline renderPipeline,
+        @Nullable BiFunction<ResourceLocation, ShaderType, String> sourceProvider
+    ) {
+        if (renderPipeline == null) {
+            throw new IllegalArgumentException("renderPipeline must not be null");
+        }
+
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+
+        return device.precompilePipeline(renderPipeline, sourceProvider);
+    }
+
+    @Override
+    public void clearPrecompiledPipelineCache() {
+        GlDevice device = this.glDevice;
+        if (device != null) {
+            device.clearPipelineCache();
         }
     }
     
@@ -110,6 +372,11 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL11.glCullFace(mode);
     }
+
+    @Override
+    public void setCullFaceMode(CommandContext ctx, VulkanicCullFaceMode mode) {
+        setCullFaceMode(ctx, toOpenGLCullFaceMode(mode));
+    }
     
     @Override
     public void bindShaderProgram(CommandContext ctx, int programId) {
@@ -130,16 +397,25 @@ public class OpenGLBackend implements GraphicsBackend {
             GL11.glDisable(cap);
         }
     }
+
+    @Override
+    public void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled) {
+        setCapabilityEnabled(ctx, toOpenGLCapability(capability), enabled);
+    }
     
     @Override
     public void bindTexture2D(CommandContext ctx, int textureId) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        
-        int activeTexUnit = GlStateManager.activeTexture;
-        if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
-            GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
+
+        if (activeTextureUnitIndex < 0 || activeTextureUnitIndex >= texture2DBindings.length) {
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+            return;
+        }
+
+        if (textureId != texture2DBindings[activeTextureUnitIndex]) {
+            texture2DBindings[activeTextureUnitIndex] = textureId;
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
         }
     }
@@ -150,6 +426,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glBindTexture(target, textureId);
+    }
+
+    @Override
+    public void bindTexture(CommandContext ctx, VulkanicTextureTarget target, int textureId) {
+        bindTexture(ctx, toOpenGLTextureTarget(target), textureId);
     }
     
     @Override
@@ -166,6 +447,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glDepthFunc(func);
+    }
+
+    @Override
+    public void setDepthTest(CommandContext ctx, VulkanicDepthCompareOp func) {
+        setDepthTest(ctx, toOpenGLDepthCompareOp(func));
     }
     
     @Override
@@ -207,6 +493,12 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL30.glBindFramebuffer(target, fbo);
     }
+
+    @Override
+    public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
+        int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);
+        bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+    }
     
     @Override
     public void bindBuffer(CommandContext ctx, int target, int buffer) {
@@ -214,6 +506,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL15.glBindBuffer(target, buffer);
+    }
+
+    @Override
+    public void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
+        bindBuffer(ctx, toOpenGLBufferTarget(target), buffer);
     }
     
     @Override
@@ -228,6 +525,11 @@ public class OpenGLBackend implements GraphicsBackend {
     public void setActiveTextureUnit(CommandContext ctx, int unit) {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        int textureUnitIndex = unit - GL13.GL_TEXTURE0;
+        if (textureUnitIndex >= 0 && textureUnitIndex < texture2DBindings.length) {
+            activeTextureUnitIndex = textureUnitIndex;
         }
         GL13.glActiveTexture(unit);
     }
@@ -416,6 +718,23 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
+
+    @Override
+    public void setBlendFunction(
+        CommandContext ctx,
+        VulkanicBlendFactor srcRgb,
+        VulkanicBlendFactor dstRgb,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
+        setBlendFunction(
+            ctx,
+            toOpenGLBlendFactor(srcRgb),
+            toOpenGLBlendFactor(dstRgb),
+            toOpenGLBlendFactor(srcAlpha),
+            toOpenGLBlendFactor(dstAlpha)
+        );
+    }
     
     @Override
     public void setBlendEquation(CommandContext ctx, int mode) {
@@ -424,6 +743,11 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL14.glBlendEquation(mode);
     }
+
+    @Override
+    public void setBlendEquation(CommandContext ctx, VulkanicBlendEquation mode) {
+        setBlendEquation(ctx, toOpenGLBlendEquation(mode));
+    }
     
     @Override
     public void setDepthFunc(CommandContext ctx, int func) {
@@ -431,6 +755,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glDepthFunc(func);
+    }
+
+    @Override
+    public void setDepthFunc(CommandContext ctx, VulkanicDepthCompareOp func) {
+        setDepthFunc(ctx, toOpenGLDepthCompareOp(func));
     }
     
     @Override
@@ -472,6 +801,11 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL11.glBlendFunc(sfactor, dfactor);
     }
+
+    @Override
+    public void blendFunc(CommandContext ctx, VulkanicBlendFactor sfactor, VulkanicBlendFactor dfactor) {
+        blendFunc(ctx, toOpenGLBlendFactor(sfactor), toOpenGLBlendFactor(dfactor));
+    }
     
     @Override
     public int getInteger(CommandContext ctx, int pname) {
@@ -479,6 +813,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return GL11.glGetInteger(pname);
+    }
+
+    @Override
+    public int getInteger(CommandContext ctx, VulkanicIntegerQuery query) {
+        return getInteger(ctx, toOpenGLIntegerQuery(query));
     }
     
     @Override
@@ -561,6 +900,38 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL11.glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);
+    }
+
+    @Override
+    public void uploadTexture2D(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        if (target == null) {
+            throw new IllegalArgumentException("target must not be null");
+        }
+        if (uploadFormat == null) {
+            throw new IllegalArgumentException("uploadFormat must not be null");
+        }
+
+        uploadTexture2D(
+            ctx,
+            target.toLegacyGlTarget(),
+            level,
+            uploadFormat.legacyInternalFormat(),
+            width,
+            height,
+            border,
+            uploadFormat.legacyFormat(),
+            uploadFormat.legacyType(),
+            pixels
+        );
     }
     
     @Override
@@ -729,6 +1100,87 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
+
+    @Override
+    public void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (textureView == null) {
+            throw new IllegalArgumentException("textureView must not be null");
+        }
+
+        int textureHandle = resolveTextureHandle(ctx, textureView.texture());
+        if (textureHandle == 0) {
+            throw new IllegalStateException("OpenGL present requires a valid texture handle");
+        }
+
+        int width = textureView.getWidth(0);
+        int height = textureView.getHeight(0);
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("OpenGL present requires a non-zero texture extent");
+        }
+
+        int readFbo = ensurePresentScratchReadFramebuffer();
+        int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int previousDrawFramebuffer = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+
+        try {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFbo);
+            GL32.glFramebufferTexture(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, textureHandle, textureView.baseMipLevel());
+
+            int framebufferStatus = GL30.glCheckFramebufferStatus(GL30.GL_READ_FRAMEBUFFER);
+            if (framebufferStatus != GL30.GL_FRAMEBUFFER_COMPLETE) {
+                throw new IllegalStateException(
+                    "OpenGL present read framebuffer is incomplete (status=0x" + Integer.toHexString(framebufferStatus) + ")"
+                );
+            }
+
+            GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0);
+
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
+
+            GL30.glBlitFramebuffer(
+                0,
+                0,
+                width,
+                height,
+                0,
+                0,
+                width,
+                height,
+                GL11.GL_COLOR_BUFFER_BIT,
+                GL11.GL_NEAREST
+            );
+        } finally {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+            GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+        }
+    }
+
+    private int ensurePresentScratchReadFramebuffer() {
+        int readFbo = presentScratchReadFbo;
+        if (readFbo != 0 && GL30.glIsFramebuffer(readFbo)) {
+            return readFbo;
+        }
+
+        readFbo = GL30.glGenFramebuffers();
+        if (readFbo == 0) {
+            throw new IllegalStateException("Failed to allocate OpenGL framebuffer for presentTextureToScreen");
+        }
+
+        int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        try {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFbo);
+        } finally {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        }
+
+        presentScratchReadFbo = readFbo;
+        return readFbo;
+    }
     
     
     
@@ -738,6 +1190,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return GL20.glCreateShader(shaderType);
+    }
+
+    @Override
+    public VulkanicShaderHandle createShaderHandle(CommandContext ctx, int shaderType) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return VulkanicShaderHandle.of(GL20.glCreateShader(shaderType));
     }
     
     @Override
@@ -754,6 +1214,14 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return GL20.glCreateProgram();
+    }
+
+    @Override
+    public VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return VulkanicProgramHandle.of(GL20.glCreateProgram());
     }
     
     
@@ -1038,6 +1506,27 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return GL11.glGetTexLevelParameteri(target, level, pname);
+    }
+
+    @Override
+    public void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        final org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackGet();
+        final int stackPointer = stack.getPointer();
+
+        try {
+            final java.nio.ByteBuffer sourceBuffer = org.lwjgl.system.MemoryUtil.memUTF8(source, true);
+            final org.lwjgl.PointerBuffer pointers = stack.mallocPointer(1);
+            pointers.put(sourceBuffer);
+
+            org.lwjgl.opengl.GL20C.nglShaderSource(shader, 1, pointers.address0(), 0L);
+            org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
+        } finally {
+            stack.setPointer(stackPointer);
+        }
     }
     
     @Override
@@ -1357,11 +1846,6 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public GraphicsCapabilities obtainGraphicsCapabilities() {
-        return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
-    }
-    
-    @Override
     public GraphicsCapabilities initializeGraphicsCapabilities() {
         return convertCapabilities(org.lwjgl.opengl.GL.createCapabilities());
     }
@@ -1398,6 +1882,139 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public GraphicsCapabilities getGraphicsCapabilities() {
         return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
+    }
+
+    @Override
+    public String getBackendVendorName() {
+        String cached = this.backendVendorName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_VENDOR);
+        return normalizeDeviceIdentity(value);
+    }
+
+    @Override
+    public String getBackendRendererName() {
+        String cached = this.backendRendererName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_RENDERER);
+        return normalizeDeviceIdentity(value);
+    }
+
+    @Override
+    public String getBackendVersionName() {
+        String cached = this.backendVersionName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_VERSION);
+        return normalizeDeviceIdentity(value);
+    }
+
+    private static String normalizeDeviceIdentity(String value) {
+        return value == null || value.isBlank() ? "unknown" : value;
+    }
+
+    @Override
+    public java.util.List<String> getBackendEnabledExtensions() {
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getEnabledExtensions();
+        }
+        return java.util.List.of();
+    }
+
+    @Override
+    public java.util.List<String> getBackendOptionalFeatureNames() {
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getOptionalFeatureNames();
+        }
+        return java.util.List.of();
+    }
+
+    @Override
+    public int getBackendMaxTextureSize() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.getMaxTextureSize();
+    }
+
+    @Override
+    public int getBackendUniformOffsetAlignment() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.getUniformOffsetAlignment();
+    }
+
+    @Override
+    public GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
+        GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getDeviceInfo();
+        }
+
+        return new GpuDevice.GpuDeviceInfo(
+            "OpenGL",
+            "OpenGL",
+            getBackendVendorName(),
+            getBackendRendererName(),
+            getBackendVersionName(),
+            true,
+            getBackendOptionalFeatureNames()
+        );
+    }
+
+    @Override
+    public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (texture instanceof net.vulkanic.backends.opengl.OpenGLTexture openGLTexture) {
+            return openGLTexture.getGlHandle();
+        }
+
+        if (texture instanceof net.blaze3d.opengl.GlTexture glTexture) {
+            return glTexture.getGlHandle();
+        }
+
+        return 0;
+    }
+
+    @Override
+    public int resolveFramebufferForTextures(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (!(colorTexture instanceof net.blaze3d.opengl.GlTexture glColorTexture)) {
+            return 0;
+        }
+
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device == null) {
+            return 0;
+        }
+
+        net.blaze3d.textures.GpuTexture depthGpuTexture = depthTexture instanceof net.blaze3d.textures.GpuTexture gpuTexture
+            ? gpuTexture
+            : null;
+        return glColorTexture.getFbo(device.directStateAccess(), depthGpuTexture);
     }
     
     
@@ -1476,6 +2093,190 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL11.glTexParameteri(target, pname, param);
+    }
+
+    @Override
+    public void texParameteri(CommandContext ctx, VulkanicTextureTarget target, VulkanicTextureParameterName pname, int param) {
+        texParameteri(ctx, toOpenGLTextureTarget(target), toOpenGLTextureParameterName(pname), param);
+    }
+
+    private static int toOpenGLTextureTarget(VulkanicTextureTarget target) {
+        return switch (target) {
+            case TEXTURE_2D -> VulkanicAPI.GL_TEXTURE_2D;
+            case TEXTURE_3D -> VulkanicAPI.GL_TEXTURE_3D;
+            case TEXTURE_BUFFER -> VulkanicAPI.GL_TEXTURE_BUFFER;
+            case TEXTURE_CUBE_MAP -> VulkanicAPI.GL_TEXTURE_CUBE_MAP;
+            case TEXTURE_RECTANGLE -> VulkanicAPI.GL_TEXTURE_RECTANGLE;
+        };
+    }
+
+    private static int toOpenGLBufferTarget(VulkanicBufferTarget target) {
+        return switch (target) {
+            case VERTEX -> VulkanicAPI.GL_ARRAY_BUFFER;
+            case INDEX -> VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER;
+            case COPY_READ -> VulkanicAPI.GL_COPY_READ_BUFFER;
+            case COPY_WRITE -> VulkanicAPI.GL_COPY_WRITE_BUFFER;
+            case PIXEL_PACK -> VulkanicAPI.GL_PIXEL_PACK_BUFFER;
+            case SHADER_STORAGE -> VulkanicAPI.GL_SHADER_STORAGE_BUFFER;
+            case UNIFORM -> VulkanicAPI.GL_UNIFORM_BUFFER;
+        };
+    }
+
+    private static int toOpenGLIntegerQuery(VulkanicIntegerQuery query) {
+        return switch (query) {
+            case CONTEXT_FLAGS -> VulkanicAPI.GL_CONTEXT_FLAGS;
+            case CURRENT_PROGRAM -> VulkanicAPI.GL_CURRENT_PROGRAM;
+            case VERTEX_ARRAY_BINDING -> VulkanicAPI.GL_VERTEX_ARRAY_BINDING;
+            case ARRAY_BUFFER_BINDING -> VulkanicAPI.GL_ARRAY_BUFFER_BINDING;
+            case ELEMENT_ARRAY_BUFFER_BINDING -> VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER_BINDING;
+            case ACTIVE_TEXTURE -> VulkanicAPI.GL_ACTIVE_TEXTURE;
+            case BLEND_EQUATION_RGB -> VulkanicAPI.GL_BLEND_EQUATION_RGB;
+            case BLEND_EQUATION_ALPHA -> VulkanicAPI.GL_BLEND_EQUATION_ALPHA;
+            case BLEND_SRC_RGB -> VulkanicAPI.GL_BLEND_SRC_RGB;
+            case BLEND_SRC_ALPHA -> VulkanicAPI.GL_BLEND_SRC_ALPHA;
+            case BLEND_DST_RGB -> VulkanicAPI.GL_BLEND_DST_RGB;
+            case BLEND_DST_ALPHA -> VulkanicAPI.GL_BLEND_DST_ALPHA;
+            case DEPTH_WRITEMASK -> VulkanicAPI.GL_DEPTH_WRITEMASK;
+            case DEPTH_FUNC -> VulkanicAPI.GL_DEPTH_FUNC;
+            case STENCIL_FUNC -> VulkanicAPI.GL_STENCIL_FUNC;
+            case STENCIL_REF -> VulkanicAPI.GL_STENCIL_REF;
+            case STENCIL_VALUE_MASK -> VulkanicAPI.GL_STENCIL_VALUE_MASK;
+            case STENCIL_FAIL -> VulkanicAPI.GL_STENCIL_FAIL;
+            case STENCIL_PASS_DEPTH_FAIL -> VulkanicAPI.GL_STENCIL_PASS_DEPTH_FAIL;
+            case STENCIL_PASS_DEPTH_PASS -> VulkanicAPI.GL_STENCIL_PASS_DEPTH_PASS;
+            case STENCIL_WRITEMASK -> VulkanicAPI.GL_STENCIL_WRITEMASK;
+            case CULL_FACE_MODE -> VulkanicAPI.GL_CULL_FACE_MODE;
+            case POLYGON_MODE -> VulkanicAPI.GL_POLYGON_MODE;
+            case MAX_TEXTURE_SIZE -> VulkanicAPI.GL_MAX_TEXTURE_SIZE;
+            case MAX_TEXTURE_IMAGE_UNITS -> VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS;
+            case MAX_DRAW_BUFFERS -> VulkanicAPI.GL_MAX_DRAW_BUFFERS;
+            case MAX_SHADER_STORAGE_BUFFER_BINDINGS -> VulkanicAPI.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS;
+            case UNIFORM_BUFFER_OFFSET_ALIGNMENT -> VulkanicAPI.GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT;
+            case TEXTURE_BINDING_2D -> VulkanicAPI.GL_TEXTURE_BINDING_2D;
+            case FRAMEBUFFER_BINDING -> VulkanicAPI.GL_FRAMEBUFFER_BINDING;
+            case MAX_COLOR_ATTACHMENTS -> VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS;
+            case NUM_EXTENSIONS -> VulkanicAPI.GL_NUM_EXTENSIONS;
+            case MAX_LABEL_LENGTH -> VulkanicAPI.GL_MAX_LABEL_LENGTH;
+            case TEXTURE_MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
+            case GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX -> VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX;
+        };
+    }
+
+    private static int toOpenGLTextureParameterName(VulkanicTextureParameterName pname) {
+        return switch (pname) {
+            case MIN_FILTER -> VulkanicAPI.GL_TEXTURE_MIN_FILTER;
+            case MAG_FILTER -> VulkanicAPI.GL_TEXTURE_MAG_FILTER;
+            case WRAP_S -> VulkanicAPI.GL_TEXTURE_WRAP_S;
+            case WRAP_T -> VulkanicAPI.GL_TEXTURE_WRAP_T;
+            case WRAP_R -> VulkanicAPI.GL_TEXTURE_WRAP_R;
+            case MIN_LOD -> VulkanicAPI.GL_TEXTURE_MIN_LOD;
+            case MAX_LOD -> VulkanicAPI.GL_TEXTURE_MAX_LOD;
+            case LOD_BIAS -> VulkanicAPI.GL_TEXTURE_LOD_BIAS;
+            case BASE_LEVEL -> VulkanicAPI.GL_TEXTURE_BASE_LEVEL;
+            case MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
+            case COMPARE_MODE -> VulkanicAPI.GL_TEXTURE_COMPARE_MODE;
+            case SWIZZLE_RGBA -> VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA;
+        };
+    }
+
+    private static int toOpenGLCapability(VulkanicCapability capability) {
+        return switch (capability) {
+            case BLEND -> VulkanicAPI.GL_BLEND;
+            case CULL_FACE -> VulkanicAPI.GL_CULL_FACE;
+            case DEPTH_TEST -> VulkanicAPI.GL_DEPTH_TEST;
+            case SCISSOR_TEST -> VulkanicAPI.GL_SCISSOR_TEST;
+            case POLYGON_OFFSET_FILL -> VulkanicAPI.GL_POLYGON_OFFSET_FILL;
+            case COLOR_LOGIC_OP -> VulkanicAPI.GL_COLOR_LOGIC_OP;
+            case PROGRAM_POINT_SIZE -> VulkanicAPI.GL_PROGRAM_POINT_SIZE;
+            case DEBUG_OUTPUT -> VulkanicAPI.GL_DEBUG_OUTPUT;
+            case DEBUG_OUTPUT_SYNCHRONOUS -> VulkanicAPI.GL_DEBUG_OUTPUT_SYNCHRONOUS;
+            case STENCIL_TEST -> VulkanicAPI.GL_STENCIL_TEST;
+        };
+    }
+
+    private static int toOpenGLCullFaceMode(VulkanicCullFaceMode mode) {
+        return switch (mode) {
+            case FRONT -> VulkanicAPI.GL_FRONT;
+            case BACK -> VulkanicAPI.GL_BACK;
+            case FRONT_AND_BACK -> VulkanicAPI.GL_FRONT_AND_BACK;
+        };
+    }
+
+    private static int toOpenGLDepthCompareOp(VulkanicDepthCompareOp op) {
+        return switch (op) {
+            case NEVER -> VulkanicAPI.GL_NEVER;
+            case LESS -> VulkanicAPI.GL_LESS;
+            case EQUAL -> VulkanicAPI.GL_EQUAL;
+            case LEQUAL -> VulkanicAPI.GL_LEQUAL;
+            case GREATER -> VulkanicAPI.GL_GREATER;
+            case NOTEQUAL -> VulkanicAPI.GL_NOTEQUAL;
+            case GEQUAL -> VulkanicAPI.GL_GEQUAL;
+            case ALWAYS -> VulkanicAPI.GL_ALWAYS;
+        };
+    }
+
+    private static int toOpenGLStencilCompareOp(VulkanicStencilCompareOp op) {
+        return switch (op) {
+            case NEVER -> VulkanicAPI.GL_NEVER;
+            case LESS -> VulkanicAPI.GL_LESS;
+            case EQUAL -> VulkanicAPI.GL_EQUAL;
+            case LEQUAL -> VulkanicAPI.GL_LEQUAL;
+            case GREATER -> VulkanicAPI.GL_GREATER;
+            case NOTEQUAL -> VulkanicAPI.GL_NOTEQUAL;
+            case GEQUAL -> VulkanicAPI.GL_GEQUAL;
+            case ALWAYS -> VulkanicAPI.GL_ALWAYS;
+        };
+    }
+
+    private static int toOpenGLStencilFace(VulkanicStencilFace face) {
+        return switch (face) {
+            case FRONT -> VulkanicAPI.GL_FRONT;
+            case BACK -> VulkanicAPI.GL_BACK;
+            case FRONT_AND_BACK -> VulkanicAPI.GL_FRONT_AND_BACK;
+        };
+    }
+
+    private static int toOpenGLStencilOp(VulkanicStencilOperation op) {
+        return switch (op) {
+            case KEEP -> VulkanicAPI.GL_KEEP;
+            case ZERO -> VulkanicAPI.GL_ZERO;
+            case REPLACE -> VulkanicAPI.GL_REPLACE;
+            case INCREMENT_CLAMP -> VulkanicAPI.GL_INCR;
+            case DECREMENT_CLAMP -> VulkanicAPI.GL_DECR;
+            case INVERT -> VulkanicAPI.GL_INVERT;
+            case INCREMENT_WRAP -> VulkanicAPI.GL_INCR_WRAP;
+            case DECREMENT_WRAP -> VulkanicAPI.GL_DECR_WRAP;
+        };
+    }
+
+    private static int toOpenGLBlendFactor(VulkanicBlendFactor factor) {
+        return switch (factor) {
+            case ZERO -> VulkanicAPI.GL_ZERO;
+            case ONE -> VulkanicAPI.GL_ONE;
+            case SRC_COLOR -> VulkanicAPI.GL_SRC_COLOR;
+            case ONE_MINUS_SRC_COLOR -> VulkanicAPI.GL_ONE_MINUS_SRC_COLOR;
+            case DST_COLOR -> VulkanicAPI.GL_DST_COLOR;
+            case ONE_MINUS_DST_COLOR -> VulkanicAPI.GL_ONE_MINUS_DST_COLOR;
+            case SRC_ALPHA -> VulkanicAPI.GL_SRC_ALPHA;
+            case ONE_MINUS_SRC_ALPHA -> VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA;
+            case DST_ALPHA -> VulkanicAPI.GL_DST_ALPHA;
+            case ONE_MINUS_DST_ALPHA -> VulkanicAPI.GL_ONE_MINUS_DST_ALPHA;
+            case SRC_ALPHA_SATURATE -> VulkanicAPI.GL_SRC_ALPHA_SATURATE;
+            case CONSTANT_COLOR -> VulkanicAPI.GL_CONSTANT_COLOR;
+            case ONE_MINUS_CONSTANT_COLOR -> VulkanicAPI.GL_ONE_MINUS_CONSTANT_COLOR;
+            case CONSTANT_ALPHA -> VulkanicAPI.GL_CONSTANT_ALPHA;
+            case ONE_MINUS_CONSTANT_ALPHA -> VulkanicAPI.GL_ONE_MINUS_CONSTANT_ALPHA;
+        };
+    }
+
+    private static int toOpenGLBlendEquation(VulkanicBlendEquation equation) {
+        return switch (equation) {
+            case ADD -> VulkanicAPI.GL_FUNC_ADD;
+            case SUBTRACT -> VulkanicAPI.GL_FUNC_SUBTRACT;
+            case REVERSE_SUBTRACT -> VulkanicAPI.GL_FUNC_REVERSE_SUBTRACT;
+            case MIN -> VulkanicAPI.GL_MIN;
+            case MAX -> VulkanicAPI.GL_MAX;
+        };
     }
     
     
@@ -1578,6 +2379,13 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         org.lwjgl.opengl.GL45C.glMemoryBarrier(barriers);
     }
+
+    @Override
+    public void applyResourceBarriers(CommandContext ctx, net.vulkanic.VulkanicResourceBarriers barriers) {
+        net.vulkanic.VulkanicResourceBarriers safeBarriers =
+            java.util.Objects.requireNonNull(barriers, "barriers must not be null");
+        memoryBarrier(ctx, safeBarriers.toOpenGLBarrierBits());
+    }
     
     
     
@@ -1589,6 +2397,25 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.ARBDrawBuffersBlend.glBlendFuncSeparateiARB(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+    }
+
+    @Override
+    public void blendFuncSeparatei(
+        CommandContext ctx,
+        int buffer,
+        VulkanicBlendFactor srcRGB,
+        VulkanicBlendFactor dstRGB,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
+        blendFuncSeparatei(
+            ctx,
+            buffer,
+            toOpenGLBlendFactor(srcRGB),
+            toOpenGLBlendFactor(dstRGB),
+            toOpenGLBlendFactor(srcAlpha),
+            toOpenGLBlendFactor(dstAlpha)
+        );
     }
     
     
@@ -1921,7 +2748,7 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallbackARB callback) {
+    public void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallback callback) {
         org.lwjgl.opengl.GLDebugMessageARBCallback proc = org.lwjgl.opengl.GLDebugMessageARBCallback.create(
             (source, type, id, severity, length, message, userParam) -> {
                 String messageStr = org.lwjgl.opengl.GLDebugMessageARBCallback.getMessage(length, message);
@@ -2082,6 +2909,11 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         org.lwjgl.opengl.GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
     }
+
+    @Override
+    public void setBlendEquationSeparate(CommandContext ctx, VulkanicBlendEquation modeRGB, VulkanicBlendEquation modeAlpha) {
+        setBlendEquationSeparate(ctx, toOpenGLBlendEquation(modeRGB), toOpenGLBlendEquation(modeAlpha));
+    }
     
     @Override
     public void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
@@ -2089,6 +2921,93 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
+    }
+
+    @Override
+    public void setStencilFunc(CommandContext ctx, VulkanicStencilCompareOp func, int ref, int mask) {
+        setStencilFunc(ctx, toOpenGLStencilCompareOp(func), ref, mask);
+    }
+
+    @Override
+    public void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilFuncSeparate(face, func, ref, mask);
+    }
+
+    @Override
+    public void setStencilFuncSeparate(CommandContext ctx, VulkanicStencilFace face, VulkanicStencilCompareOp func, int ref, int mask) {
+        setStencilFuncSeparate(ctx, toOpenGLStencilFace(face), toOpenGLStencilCompareOp(func), ref, mask);
+    }
+
+    @Override
+    public void setStencilOp(CommandContext ctx, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glStencilOp(stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    @Override
+    public void setStencilOp(
+        CommandContext ctx,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        setStencilOp(
+            ctx,
+            toOpenGLStencilOp(stencilFailOp),
+            toOpenGLStencilOp(depthFailOp),
+            toOpenGLStencilOp(depthPassOp)
+        );
+    }
+
+    @Override
+    public void setStencilOpSeparate(CommandContext ctx, int face, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilOpSeparate(face, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    @Override
+    public void setStencilOpSeparate(
+        CommandContext ctx,
+        VulkanicStencilFace face,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        setStencilOpSeparate(
+            ctx,
+            toOpenGLStencilFace(face),
+            toOpenGLStencilOp(stencilFailOp),
+            toOpenGLStencilOp(depthFailOp),
+            toOpenGLStencilOp(depthPassOp)
+        );
+    }
+
+    @Override
+    public void setStencilWriteMask(CommandContext ctx, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glStencilMask(mask);
+    }
+
+    @Override
+    public void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilMaskSeparate(face, mask);
+    }
+
+    @Override
+    public void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask) {
+        setStencilWriteMaskSeparate(ctx, toOpenGLStencilFace(face), mask);
     }
     
     
@@ -2117,6 +3036,11 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         return org.lwjgl.opengl.GL11.glIsEnabled(cap);
+    }
+
+    @Override
+    public boolean isEnabled(CommandContext ctx, VulkanicCapability capability) {
+        return isEnabled(ctx, toOpenGLCapability(capability));
     }
     
     @Override
@@ -2192,7 +3116,8 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("Buffer size must be greater than zero, got: " + size);
         }
         CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
-        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
         int handle = GL15.glGenBuffers();
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, handle);
         if (hasBufferStorageExtension()) {
@@ -2204,7 +3129,7 @@ public class OpenGLBackend implements GraphicsBackend {
             bufferData(ctx, GL15.GL_ARRAY_BUFFER, (long) size, GL15.GL_DYNAMIC_DRAW);
         }
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-        int error = net.blaze3d.opengl.GlStateManager._getError();
+        int error = GL11.glGetError();
         if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
             throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate buffer of size " + size);
         } else if (error != 0) {
@@ -2220,7 +3145,8 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         int size = initialData.remaining();
         CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
-        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
         int handle = GL15.glGenBuffers();
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, handle);
         if (hasBufferStorageExtension()) {
@@ -2232,7 +3158,7 @@ public class OpenGLBackend implements GraphicsBackend {
             bufferData(ctx, GL15.GL_ARRAY_BUFFER, initialData, GL15.GL_DYNAMIC_DRAW);
         }
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-        int error = net.blaze3d.opengl.GlStateManager._getError();
+        int error = GL11.glGetError();
         if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
             throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate buffer of size " + size);
         } else if (error != 0) {
@@ -2255,14 +3181,14 @@ public class OpenGLBackend implements GraphicsBackend {
         if (accessFlags == 0) {
             throw new IllegalArgumentException("At least one of read or write must be true");
         }
-        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, openGLBuffer.getGlHandle());
         java.nio.ByteBuffer mapped = org.lwjgl.opengl.GL30.glMapBufferRange(
             GL15.GL_ARRAY_BUFFER, 0, openGLBuffer.size(), accessFlags);
         if (mapped == null) {
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-            throw new IllegalStateException("glMapBufferRange returned null, GL error: " +
-                net.blaze3d.opengl.GlStateManager._getError());
+            throw new IllegalStateException("glMapBufferRange returned null, GL error: " + GL11.glGetError());
         }
         int glHandle = openGLBuffer.getGlHandle();
         return new OpenGLBuffer.OpenGLMappedView(
@@ -2285,7 +3211,8 @@ public class OpenGLBackend implements GraphicsBackend {
         if (mipLevels < 1) throw new IllegalArgumentException("mipLevels must be at least 1");
         if (depthOrLayers < 1) throw new IllegalArgumentException("depthOrLayers must be at least 1");
         if (depthOrLayers > 1) throw new UnsupportedOperationException("Array/3D textures not yet supported in managed API");
-        net.blaze3d.opengl.GlStateManager.clearGlErrors();
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
         int handle = GL11.glGenTextures();
         if (label == null) label = String.valueOf(handle);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, handle);
@@ -2299,7 +3226,7 @@ public class OpenGLBackend implements GraphicsBackend {
                 Math.max(1, height >> mip), 0, externalFmt, glType, (java.nio.ByteBuffer) null);
         }
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-        int error = net.blaze3d.opengl.GlStateManager._getError();
+        int error = GL11.glGetError();
         if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
             throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate texture " + width + "x" + height);
         } else if (error != 0) {
@@ -2316,13 +3243,13 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public net.vulkanic.VulkanicTextureView createManagedTextureView(net.vulkanic.VulkanicTexture texture,
             int baseMipLevel, int mipLevelCount) {
-        if (!(texture instanceof OpenGLTexture openGLTexture)) {
-            throw new IllegalArgumentException("Expected OpenGLTexture, got: " + texture.getClass());
+        if (!(texture instanceof OpenGLTexture) && !(texture instanceof net.blaze3d.opengl.GlTexture)) {
+            throw new IllegalArgumentException("Expected OpenGLTexture or GlTexture, got: " + texture.getClass());
         }
         if (texture.isClosed()) {
             throw new IllegalArgumentException("Cannot create a view of a closed texture");
         }
-        return new OpenGLTextureView(openGLTexture, baseMipLevel, mipLevelCount);
+        return new OpenGLTextureView(texture, baseMipLevel, mipLevelCount);
     }
 
     private static int[] toGlInternalFormat(net.vulkanic.VulkanicTextureFormat format) {
@@ -2355,20 +3282,229 @@ public class OpenGLBackend implements GraphicsBackend {
     // =========================================================================
 
     @Override
+    public net.vulkanic.VulkanicBuffer resolveVulkanicBuffer(net.blaze3d.buffers.GpuBuffer gpuBuffer) {
+        if (!(gpuBuffer instanceof net.blaze3d.opengl.GlBuffer glBuffer)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend resolveVulkanicBuffer requires GlBuffer, got: "
+                    + gpuBuffer.getClass().getName());
+        }
+        return new OpenGLBuffer(glBuffer.getHandle(), glBuffer.usage(), glBuffer.size());
+    }
+
+    @Override
     public net.vulkanic.PipelineHandle createPipeline(net.vulkanic.PipelineDescriptor descriptor) {
         if (glDevice == null) {
             throw new IllegalStateException(
                 "GlDevice has not been registered with OpenGLBackend. " +
                 "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
         }
-        Object native_ = descriptor.getNativeDescriptor();
-        if (!(native_ instanceof net.blaze3d.pipeline.RenderPipeline renderPipeline)) {
-            throw new IllegalArgumentException(
-                "OpenGL backend expects a RenderPipeline in PipelineDescriptor, got: " +
-                (native_ == null ? "null" : native_.getClass().getName()));
-        }
+        net.blaze3d.pipeline.RenderPipeline renderPipeline = descriptor.requireRenderPipeline();
         net.blaze3d.opengl.GlRenderPipeline glPipeline = glDevice.precompilePipeline(renderPipeline, null);
         return new OpenGLPipelineHandle(glPipeline);
+    }
+
+    @Override
+    public net.vulkanic.DescriptorPoolHandle createDescriptorPool(
+        net.vulkanic.DescriptorPoolDescriptor descriptor
+    ) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+        return new OpenGLDescriptorPoolHandle(descriptor.maxSets());
+    }
+
+    @Override
+    public net.vulkanic.DescriptorSetHandle allocateDescriptorSet(
+        net.vulkanic.DescriptorPoolHandle pool,
+        net.vulkanic.PipelineDescriptor descriptor
+    ) {
+        if (!(pool instanceof OpenGLDescriptorPoolHandle openGLPool)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorPoolHandle, got: " +
+                    (pool == null ? "null" : pool.getClass().getName()));
+        }
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        return openGLPool.allocate(descriptor.getStableCacheKey(), descriptor.getResourceLayout());
+    }
+
+    @Override
+    public void updateDescriptorSet(
+        net.vulkanic.DescriptorSetHandle descriptorSet,
+        net.vulkanic.PipelineResourceBindings bindings
+    ) {
+        if (!(descriptorSet instanceof OpenGLDescriptorSetHandle openGLDescriptorSet)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorSetHandle, got: " +
+                    (descriptorSet == null ? "null" : descriptorSet.getClass().getName()));
+        }
+
+        openGLDescriptorSet.updateBindings(bindings);
+    }
+
+    @Override
+    public void bindDescriptorSet(
+        CommandContext ctx,
+        net.vulkanic.PipelineHandle pipeline,
+        net.vulkanic.PipelineDescriptor descriptor,
+        net.vulkanic.DescriptorSetHandle descriptorSet
+    ) {
+        if (!(descriptorSet instanceof OpenGLDescriptorSetHandle openGLDescriptorSet)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorSetHandle, got: " +
+                    (descriptorSet == null ? "null" : descriptorSet.getClass().getName()));
+        }
+
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        String expectedLayoutKey = descriptor.getStableCacheKey();
+        if (!expectedLayoutKey.equals(openGLDescriptorSet.layoutKey())) {
+            throw new IllegalArgumentException(
+                "Descriptor set layout key mismatch. Expected " + expectedLayoutKey +
+                    " but got " + openGLDescriptorSet.layoutKey());
+        }
+
+        bindPipelineResources(ctx, pipeline, descriptor, openGLDescriptorSet.requireBindings());
+    }
+
+    @Override
+    public void resetDescriptorPool(net.vulkanic.DescriptorPoolHandle pool) {
+        if (!(pool instanceof OpenGLDescriptorPoolHandle openGLPool)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorPoolHandle, got: " +
+                    (pool == null ? "null" : pool.getClass().getName()));
+        }
+        openGLPool.reset();
+    }
+
+    @Override
+    public void bindPipelineResources(
+        CommandContext ctx,
+        net.vulkanic.PipelineHandle pipeline,
+        net.vulkanic.PipelineDescriptor descriptor,
+        net.vulkanic.PipelineResourceBindings bindings
+    ) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (!(pipeline instanceof OpenGLPipelineHandle glPipelineHandle)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLPipelineHandle, got: " +
+                    (pipeline == null ? "null" : pipeline.getClass().getName()));
+        }
+
+        if (!glPipelineHandle.isValid()) {
+            throw new IllegalArgumentException("Cannot bind resources for an invalid pipeline handle");
+        }
+
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        if (bindings == null) {
+            throw new IllegalArgumentException("bindings must not be null");
+        }
+
+        net.vulkanic.PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+        bindings.validateAgainst(layout);
+
+        int program = glPipelineHandle.getGlRenderPipeline().program().getProgramId();
+
+        for (net.vulkanic.PipelineDescriptor.ResourceBinding resource : layout.bindings()) {
+            switch (resource.type()) {
+                case SAMPLER -> {
+                    net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
+                        bindings.getSamplerBinding(resource.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing sampler binding for '" + resource.name() + "' after validation"));
+
+                    int location = getUniformLocation(ctx, program, resource.name());
+                    if (location >= 0) {
+                        setUniform1i(ctx, location, samplerBinding.textureUnit());
+                    }
+
+                    net.vulkanic.VulkanicTextureView textureView = samplerBinding.textureView();
+                    if (textureView != null) {
+                        if (!(textureView instanceof OpenGLTextureView openGLTextureView)) {
+                            throw new IllegalArgumentException(
+                                "Sampler binding '" + resource.name() + "' must use OpenGLTextureView in OpenGL backend");
+                        }
+                        if (openGLTextureView.isClosed()) {
+                            throw new IllegalStateException(
+                                "Sampler binding '" + resource.name() + "' uses a closed OpenGLTextureView");
+                        }
+
+                        VulkanicAPI.setActiveTextureUnitIndex(ctx, samplerBinding.textureUnit());
+                        int textureHandle = openGLTextureView.glHandle();
+                        net.vulkanic.VulkanicTexture texture = openGLTextureView.texture();
+                        net.vulkanic.VulkanicTextureTarget textureTarget =
+                            (texture.usage() & net.vulkanic.VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE) != 0
+                                ? net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP
+                                : net.vulkanic.VulkanicTextureTarget.TEXTURE_2D;
+
+                        if (textureTarget == net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP) {
+                            bindTexture(ctx, net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP, textureHandle);
+                        } else {
+                            bindTexture2D(ctx, textureHandle);
+                        }
+
+                        setTextureParameter(ctx, textureTarget,
+                            net.vulkanic.VulkanicTextureParameterName.BASE_LEVEL,
+                            openGLTextureView.getBaseMipLevel());
+                        setTextureParameter(ctx, textureTarget,
+                            net.vulkanic.VulkanicTextureParameterName.MAX_LEVEL,
+                            openGLTextureView.getBaseMipLevel() + openGLTextureView.getMipLevelCount() - 1);
+
+                        if (texture instanceof net.blaze3d.textures.GpuTexture gpuTexture) {
+                            gpuTexture.flushModeChanges(textureTarget);
+                        }
+                    }
+
+                    if (samplerBinding.samplerObject() != null) {
+                        bindSampler(ctx, samplerBinding.textureUnit(), samplerBinding.samplerObject());
+                    }
+                }
+                case UNIFORM_BUFFER -> {
+                    net.vulkanic.VulkanicBufferSlice slice = bindings.getUniformBufferBinding(resource.name())
+                        .orElseThrow(() -> new IllegalStateException(
+                            "Missing uniform-buffer binding for '" + resource.name() + "' after validation"));
+
+                    if (!(slice.buffer() instanceof OpenGLBuffer glBuffer)) {
+                        throw new IllegalArgumentException(
+                            "Uniform-buffer binding '" + resource.name() + "' must use OpenGLBuffer in OpenGL backend");
+                    }
+
+                    int uniformBlockIndex = getUniformBlockIndex(ctx, program, resource.name());
+                    if (uniformBlockIndex >= 0) {
+                        uniformBlockBinding(ctx, program, uniformBlockIndex, resource.binding());
+                    }
+
+                    bindUniformBufferRange(
+                        ctx,
+                        VulkanicAPI.GL_UNIFORM_BUFFER,
+                        resource.binding(),
+                        glBuffer.getGlHandle(),
+                        slice.offset(),
+                        slice.length());
+                }
+                case TEXEL_BUFFER -> {
+                    net.vulkanic.PipelineResourceBindings.TexelBufferBinding texelBufferBinding =
+                        bindings.getTexelBufferBinding(resource.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing texel-buffer binding for '" + resource.name() + "' after validation"));
+
+                    int location = getUniformLocation(ctx, program, resource.name());
+                    if (location >= 0) {
+                        setUniform1i(ctx, location, texelBufferBinding.textureUnit());
+                    }
+                }
+            }
+        }
     }
 
     // =========================================================================
@@ -2429,7 +3565,7 @@ public class OpenGLBackend implements GraphicsBackend {
         int fbo = net.vulkanic.VulkanicAPI.createFramebuffer(ctx);
 
         // 2. Bind the FBO
-        net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER, fbo);
+        net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, fbo);
 
         // 3. Attach the color texture at mip level 0 of the view's base mip
         int colorHandle = colorView.glHandle();
@@ -2453,7 +3589,7 @@ public class OpenGLBackend implements GraphicsBackend {
         }
 
         // 5. Optionally clear color
-        int clearMask = 0;
+        boolean shouldClearColor = false;
         if (clearColor.isPresent()) {
             int argb = clearColor.getAsInt();
             float a = ((argb >> 24) & 0xFF) / 255.0f;
@@ -2461,17 +3597,22 @@ public class OpenGLBackend implements GraphicsBackend {
             float g = ((argb >>  8) & 0xFF) / 255.0f;
             float b = ( argb        & 0xFF) / 255.0f;
             net.vulkanic.VulkanicAPI.setClearColor(ctx, r, g, b, a);
-            clearMask |= net.vulkanic.VulkanicAPI.GL_COLOR_BUFFER_BIT;
+            shouldClearColor = true;
         }
 
         // 6. Optionally clear depth
+        boolean shouldClearDepth = false;
         if (depthTarget != null && clearDepth.isPresent()) {
             net.vulkanic.VulkanicAPI.setClearDepth(ctx, clearDepth.getAsDouble());
-            clearMask |= net.vulkanic.VulkanicAPI.GL_DEPTH_BUFFER_BIT;
+            shouldClearDepth = true;
         }
 
-        if (clearMask != 0) {
-            net.vulkanic.VulkanicAPI.clearBuffers(ctx, clearMask);
+        if (shouldClearColor && shouldClearDepth) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.COLOR, VulkanicClearBuffer.DEPTH);
+        } else if (shouldClearColor) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.COLOR);
+        } else if (shouldClearDepth) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.DEPTH);
         }
 
         // 7. Set the viewport to the color attachment's dimensions
@@ -2480,5 +3621,41 @@ public class OpenGLBackend implements GraphicsBackend {
         net.vulkanic.VulkanicAPI.setDynamicViewport(ctx, 0, 0, width, height);
 
         return new OpenGLRenderPass(fbo, ctx);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        net.vulkanic.VulkanicRenderPassDescriptor descriptor
+    ) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        net.vulkanic.VulkanicRenderPassDescriptor.ColorAttachment color = descriptor.colorAttachment();
+        net.vulkanic.VulkanicRenderPassDescriptor.DepthAttachment depth = descriptor.depthAttachment();
+
+        java.util.OptionalInt clearColor =
+            color.loadOp() == net.vulkanic.VulkanicRenderPassDescriptor.LoadOp.CLEAR
+                ? color.clearColor()
+                : java.util.OptionalInt.empty();
+
+        net.vulkanic.VulkanicTextureView depthTarget = null;
+        java.util.OptionalDouble clearDepth = java.util.OptionalDouble.empty();
+        if (depth != null) {
+            depthTarget = depth.target();
+            if (depth.loadOp() == net.vulkanic.VulkanicRenderPassDescriptor.LoadOp.CLEAR) {
+                clearDepth = depth.clearDepth();
+            }
+        }
+
+        return beginRenderPass(
+            ctx,
+            descriptor.label(),
+            color.target(),
+            clearColor,
+            depthTarget,
+            clearDepth
+        );
     }
 }

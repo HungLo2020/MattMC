@@ -12,6 +12,7 @@ import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.util.EnumBitField;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 import java.nio.ByteBuffer;
 
 public class GLRenderDevice implements RenderDevice {
@@ -53,7 +54,7 @@ public class GLRenderDevice implements RenderDevice {
 
     @Override
     public net.vulkanic.GraphicsCapabilities getCapabilities() {
-        return VulkanicAPI.obtainGraphicsCapabilities();
+        return VulkanicAPI.getGraphicsCapabilities();
     }
 
     @Override
@@ -76,7 +77,7 @@ public class GLRenderDevice implements RenderDevice {
 
     @Override
     public int getMaxTextureLodBias() {
-        return VulkanicAPI.getInteger(VulkanicAPI.getImmediateContext(), 33085); // GL_MAX_TEXTURE_LOD_BIAS
+        return VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.TEXTURE_MAX_LEVEL);
     }
 
     private void checkDeviceActive() {
@@ -95,7 +96,7 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void bindVertexArray(GlVertexArray array) {
             if (this.stateTracker.makeVertexArrayActive(array)) {
-                CommandContext ctx = VulkanicAPI.getImmediateContext();
+                CommandContext ctx = VulkanicAPI.getCommandContext();
                 VulkanicAPI.bindVertexArray(ctx, array.handle());
             }
         }
@@ -104,7 +105,7 @@ public class GLRenderDevice implements RenderDevice {
         public void uploadData(GlMutableBuffer glBuffer, ByteBuffer byteBuffer, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, glBuffer);
 
-            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            CommandContext ctx = VulkanicAPI.getCommandContext();
             VulkanicAPI.bufferData(ctx, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
             glBuffer.setSize(byteBuffer.remaining());
         }
@@ -114,21 +115,21 @@ public class GLRenderDevice implements RenderDevice {
             this.bindBuffer(GlBufferTarget.COPY_READ_BUFFER, src);
             this.bindBuffer(GlBufferTarget.COPY_WRITE_BUFFER, dst);
 
-            VulkanicAPI.copyBufferSubData(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COPY_READ_BUFFER, VulkanicAPI.GL_COPY_WRITE_BUFFER, readOffset, writeOffset, bytes);
+            VulkanicAPI.copyBufferSubDataBetweenCopyTargets(VulkanicAPI.getCommandContext(), readOffset, writeOffset, bytes);
         }
 
         @Override
         public void bindBuffer(GlBufferTarget target, GlBuffer buffer) {
             if (this.stateTracker.makeBufferActive(target, buffer)) {
-                CommandContext ctx = VulkanicAPI.getImmediateContext();
-                VulkanicAPI.bindBuffer(ctx, target.getTargetParameter(), buffer.handle());
+                CommandContext ctx = VulkanicAPI.getCommandContext();
+                VulkanicAPI.bindBuffer(ctx, target.toVulkanicBufferTarget(), buffer.handle());
             }
         }
 
         @Override
         public void unbindVertexArray() {
             if (this.stateTracker.makeVertexArrayActive(null)) {
-                CommandContext ctx = VulkanicAPI.getImmediateContext();
+                CommandContext ctx = VulkanicAPI.getCommandContext();
                 VulkanicAPI.bindVertexArray(ctx, GlVertexArray.NULL_ARRAY_ID);
             }
         }
@@ -137,7 +138,7 @@ public class GLRenderDevice implements RenderDevice {
         public void allocateStorage(GlMutableBuffer buffer, long bufferSize, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            VulkanicAPI.bufferData(VulkanicAPI.getImmediateContext(), GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
+            VulkanicAPI.bufferData(VulkanicAPI.getCommandContext(), GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
             buffer.setSize(bufferSize);
         }
 
@@ -152,7 +153,7 @@ public class GLRenderDevice implements RenderDevice {
             int handle = buffer.handle();
             buffer.invalidateHandle();
 
-            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            CommandContext ctx = VulkanicAPI.getCommandContext();
             VulkanicAPI.deleteBuffer(ctx, handle);
         }
 
@@ -163,7 +164,7 @@ public class GLRenderDevice implements RenderDevice {
             int handle = vertexArray.handle();
             vertexArray.invalidateHandle();
 
-            VulkanicAPI.deleteVertexArrays(VulkanicAPI.getImmediateContext(), handle);
+            VulkanicAPI.deleteVertexArrays(VulkanicAPI.getCommandContext(), handle);
         }
 
         @Override
@@ -213,7 +214,7 @@ public class GLRenderDevice implements RenderDevice {
 
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            ByteBuffer buf = VulkanicAPI.mapBuffer(VulkanicAPI.getImmediateContext(), GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), offset, length, flags.getBitField());
+            ByteBuffer buf = VulkanicAPI.mapBuffer(VulkanicAPI.getCommandContext(), GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), offset, length, flags.getBitField());
 
             if (buf == null) {
                 throw new RuntimeException("Failed to map buffer");
@@ -233,7 +234,7 @@ public class GLRenderDevice implements RenderDevice {
             GlBuffer buffer = map.getBufferObject();
 
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
-            VulkanicAPI.unmapBuffer(VulkanicAPI.getImmediateContext(), GlBufferTarget.ARRAY_BUFFER.getTargetParameter());
+            VulkanicAPI.unmapBuffer(VulkanicAPI.getCommandContext(), GlBufferTarget.ARRAY_BUFFER.getTargetParameter());
 
             buffer.setActiveMapping(null);
             map.dispose();
@@ -246,12 +247,12 @@ public class GLRenderDevice implements RenderDevice {
             GlBuffer buffer = map.getBufferObject();
 
             this.bindBuffer(GlBufferTarget.COPY_READ_BUFFER, buffer);
-            VulkanicAPI.flushMappedBufferRange(VulkanicAPI.getImmediateContext(), GlBufferTarget.COPY_READ_BUFFER.getTargetParameter(), offset, length);
+            VulkanicAPI.flushMappedBufferRange(VulkanicAPI.getCommandContext(), GlBufferTarget.COPY_READ_BUFFER.getTargetParameter(), offset, length);
         }
 
         @Override
         public GlFence createFence() {
-            return new GlFence(VulkanicAPI.createFenceSync(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
+            return new GlFence(VulkanicAPI.createGpuCompletionFence(VulkanicAPI.getCommandContext()));
         }
 
         private void checkMapDisposed(GlBufferMapping map) {
@@ -299,7 +300,7 @@ public class GLRenderDevice implements RenderDevice {
                 ? VulkanicAPI.GL_PATCHES
                 : primitiveType.getId();
 
-            VulkanicAPI.multiDrawElementsBaseVertex(VulkanicAPI.getImmediateContext(), primitiveId,
+            VulkanicAPI.multiDrawElementsBaseVertex(VulkanicAPI.getCommandContext(), primitiveId,
                     batch.pElementCount,
                     indexType.getFormatId(),
                     batch.pElementPointer,

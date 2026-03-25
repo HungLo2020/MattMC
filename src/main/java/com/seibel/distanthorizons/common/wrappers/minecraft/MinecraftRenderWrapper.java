@@ -11,7 +11,6 @@ import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
 import com.seibel.distanthorizons.core.config.Config;
 
 import com.seibel.distanthorizons.core.enums.EDhDirection;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 
 import net.minecraft.client.renderer.fog.FogRenderer;
@@ -31,13 +30,13 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.effect.MobEffects;
 
 import net.minecraft.world.phys.Vec3;
-import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector4f;
 
 import net.minecraft.world.level.material.FogType;
 
-import net.blaze3d.opengl.GlTexture;
+import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicAPI;
 
 
 /**
@@ -48,7 +47,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 {
 	public static final MinecraftRenderWrapper INSTANCE = new MinecraftRenderWrapper();
 	
-	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	private static final Minecraft MC = Minecraft.getInstance();
 	
 	/** 
@@ -62,9 +60,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	 * This is used for Optifine shader support so we can render directly to Optifine's level frame buffer.
 	 */
 	public int finalLevelFrameBufferId = -1;
-	
-	public boolean colorTextureCastFailLogged = false;
-	public boolean depthTextureCastFailLogged = false;
 	
 	private static FogRenderer mcFogRenderer = null;
 	
@@ -181,80 +176,109 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	{
 		return false;
 	}
+
+	@Override
+	public boolean hasTargetRenderTarget()
+	{
+		return this.resolveTargetFramebufferId(this.getRenderTarget()) != -1;
+	}
+
+	@Override
+	public boolean bindTargetRenderTarget(CommandContext ctx)
+	{
+		RenderTarget renderTarget = this.getRenderTarget();
+		int framebufferId = this.resolveTargetFramebufferId(renderTarget);
+		if (framebufferId == -1 || renderTarget == null)
+		{
+			return false;
+		}
+
+		this.finalLevelFrameBufferId = framebufferId;
+		VulkanicAPI.bindRenderTarget(ctx, renderTarget.getColorTexture(), renderTarget.getDepthTexture());
+		return true;
+	}
 	
 	@Override
 	public int getTargetFramebuffer()
 	{
-		// MC renders to a texture and then directly to the default FBO now
-		// we need to draw to their texture instead of the FBO
-		return 0; // 0 is the ID for the default frame buffer
+		RenderTarget renderTarget = this.getRenderTarget();
+		this.finalLevelFrameBufferId = this.resolveTargetFramebufferId(renderTarget);
+		return this.finalLevelFrameBufferId;
 	}
 	
 	@Override
 	public void clearTargetFrameBuffer() { this.finalLevelFrameBufferId = -1; }
+
+	private int resolveTargetFramebufferId(RenderTarget renderTarget)
+	{
+		if (renderTarget == null)
+		{
+			return -1;
+		}
+
+		int framebufferId = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
+		return framebufferId == 0 ? -1 : framebufferId;
+	}
 	
 	@Override
 	public int getDepthTextureId()
 	{
-		try
-		{		
-			GlTexture glTexture = (GlTexture) this.getRenderTarget().getDepthTexture();
-			if (glTexture == null)
-			{
-				// shouldn't happen, but just in case
-				return 0;
-			}
-
-			return glTexture.glId();
-			
-		}
-		catch (Exception e)
+		RenderTarget renderTarget = this.getRenderTarget();
+		if (renderTarget == null)
 		{
-			// only log this error once per session
-			if (!this.depthTextureCastFailLogged)
-			{
-				this.depthTextureCastFailLogged = true;
-				LOGGER.error("Unable to cast render Target depth texture to GlTexture. MC or a rendering mod may have changed the object type.", e);
-			}
-			return 0;
+			return -1;
 		}
+
+		net.blaze3d.textures.GpuTexture depthTexture = renderTarget.getDepthTexture();
+		if (depthTexture == null)
+		{
+			return -1;
+		}
+
+		int textureId = net.vulkanic.VulkanicCoreAPI.textureId(depthTexture);
+		if (textureId <= 0)
+		{
+			return -1;
+		}
+
+		return textureId;
 	}
 	@Override
 	public int getColorTextureId() 
 	{
-		try
+		RenderTarget renderTarget = this.getRenderTarget();
+		if (renderTarget == null)
 		{
-			GlTexture glTexture = (GlTexture) this.getRenderTarget().getColorTexture();
-			if (glTexture == null)
-			{
-				// shouldn't happen, but just in case
-				return 0;
-			}
-			
-			return glTexture.glId();
+			return -1;
 		}
-		catch (Exception e)
+
+		net.blaze3d.textures.GpuTexture colorTexture = renderTarget.getColorTexture();
+		if (colorTexture == null)
 		{
-			// only log this error once per session
-			if (!this.colorTextureCastFailLogged)
-			{
-				this.colorTextureCastFailLogged = true;
-				LOGGER.error("Unable to cast render Target color texture to GlTexture. MC or a rendering mod may have changed the object type.", e);
-			}
-			return 0;
+			return -1;
 		}
+
+		int textureId = net.vulkanic.VulkanicCoreAPI.textureId(colorTexture);
+		if (textureId <= 0)
+		{
+			return -1;
+		}
+		
+		return textureId;
 	}
 	
 	@Override
 	public int getTargetFramebufferViewportWidth()
 	{
-		return this.getRenderTarget().width;
+		RenderTarget renderTarget = this.getRenderTarget();
+		return renderTarget == null ? 0 : renderTarget.width;
 	}
 	
 	@Override
 	public int getTargetFramebufferViewportHeight()
 	{
-		return this.getRenderTarget().height;
+		RenderTarget renderTarget = this.getRenderTarget();
+		return renderTarget == null ? 0 : renderTarget.height;
 	}
 	
 	@Override

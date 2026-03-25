@@ -2,28 +2,23 @@ package net.irisshaders.iris.pathways;
 
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
+import net.irisshaders.iris.gl.blending.BlendModeStorage;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.gl.program.Program;
 import net.irisshaders.iris.gl.program.ProgramBuilder;
 import net.irisshaders.iris.gl.program.ProgramSamplers;
 import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
-import net.irisshaders.iris.gl.texture.InternalTextureFormat;
-import net.irisshaders.iris.gl.texture.PixelType;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pipeline.CompositeRenderer;
-import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureUploadFormat;
 import org.apache.commons.io.IOUtils;
-import org.joml.Matrix4f;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +27,6 @@ import java.util.OptionalInt;
 import java.util.function.IntSupplier;
 
 public class CenterDepthSampler {
-	private static final double LN2 = Math.log(2);
 	private static final CustomPass EMPTY_STATE = new CustomPass() {
 		@Override
 		public void setupState() {
@@ -43,21 +37,32 @@ public class CenterDepthSampler {
 	private final GlFramebuffer framebuffer;
 	private final int texture;
 	private final int altTexture;
+	private final boolean smoothingProgramAvailable;
 	private boolean hasFirstSample;
 	private boolean everRetrieved;
 	private boolean destroyed;
 
 	public CenterDepthSampler(IntSupplier depthSupplier, float halfLife) {
-		this.texture = GlStateManager._genTexture();
-		this.altTexture = GlStateManager._genTexture();
+		this.texture = IrisRenderSystem.createTextureId();
+		this.altTexture = IrisRenderSystem.createTextureId();
 		this.framebuffer = new GlFramebuffer();
 
-		InternalTextureFormat format = InternalTextureFormat.R32F;
-		setupColorTexture(texture, format);
-		setupColorTexture(altTexture, format);
-		GlStateManager._bindTexture(0);
+		setupColorTexture(texture);
+		setupColorTexture(altTexture);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 
 		this.framebuffer.addColorAttachment(0, texture);
+
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			// This pass relies on legacy standalone-uniform program plumbing that is still
+			// being migrated for Vulkan GLSL rules. Keep the center-depth textures alive
+			// but skip program creation/use on Vulkan to avoid startup crashes.
+			this.program = null;
+			this.smoothingProgramAvailable = false;
+			return;
+		}
+
+		this.smoothingProgramAvailable = true;
 		ProgramBuilder builder;
 
 		try {
@@ -71,14 +76,14 @@ public class CenterDepthSampler {
 
 		builder.addDynamicSampler(depthSupplier, "depth");
 		builder.addDynamicSampler(() -> altTexture, "altDepth");
-		builder.uniform1f(UniformUpdateFrequency.PER_FRAME, "lastFrameTime", SystemTimeUniforms.TIMER::getLastFrameTime);
-		builder.uniform1f(UniformUpdateFrequency.ONCE, "decay", () -> (1.0f / ((halfLife * 0.1) / LN2)));
-		// TODO: can we just do this for all composites?
-		builder.uniformMatrix(UniformUpdateFrequency.ONCE, "projection", () -> new Matrix4f(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, -1, -1, 0, 1));
 		this.program = builder.build();
 	}
 
 	public void sampleCenterDepth() {
+		if (!smoothingProgramAvailable) {
+			return;
+		}
+
 		if ((hasFirstSample && (!everRetrieved)) || destroyed) {
 			// If the shaderpack isn't reading center depth values, don't bother sampling it
 			// This improves performance with most shaderpacks
@@ -87,12 +92,12 @@ public class CenterDepthSampler {
 
 		hasFirstSample = true;
 
-		GpuBuffer indices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
-		VertexFormat.IndexType type = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
+		GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
+		VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 		BlendModeOverride.restore();
 
-		GlStateManager._disableBlend();
-		try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "centerDepthSmooth sampler", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
+		BlendModeStorage.setBlendEnabled(false);
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "centerDepthSmooth sampler", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
 			renderPass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
 			renderPass.setIndexBuffer(indices, type);
 			renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
@@ -102,7 +107,7 @@ public class CenterDepthSampler {
 			this.framebuffer.bind();
 			this.program.use();
 
-			GlStateManager._viewport(0, 0, 1, 1);
+			VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, 1, 1);
 
 			renderPass.drawIndexed(0, 0, 6, 1);
 
@@ -117,13 +122,11 @@ public class CenterDepthSampler {
 
 	}
 
-	public void setupColorTexture(int texture, InternalTextureFormat format) {
-		IrisRenderSystem.texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, 0, format.getGlFormat(), 1, 1, 0, format.getPixelFormat().getGlFormat(), PixelType.FLOAT.getGlFormat(), null);
+	public void setupColorTexture(int texture) {
+		IrisRenderSystem.texImage2D(texture, 0, VulkanicTextureUploadFormat.RED32_SFLOAT, 1, 1, 0, null);
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		IrisRenderSystem.setTextureLinearFiltering(texture);
+		IrisRenderSystem.setTextureWrapMode2D(texture, true);
 	}
 
 	public int getCenterDepthTexture() {
@@ -135,10 +138,12 @@ public class CenterDepthSampler {
 	}
 
 	public void destroy() {
-		GlStateManager._deleteTexture(texture);
-		GlStateManager._deleteTexture(altTexture);
+		IrisRenderSystem.deleteTextureId(texture);
+		IrisRenderSystem.deleteTextureId(altTexture);
 		framebuffer.destroy();
-		program.destroy();
+		if (program != null) {
+			program.destroy();
+		}
 		destroyed = true;
 	}
 }

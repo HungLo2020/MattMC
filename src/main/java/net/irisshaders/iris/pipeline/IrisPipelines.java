@@ -181,7 +181,7 @@ public class IrisPipelines {
 		IrisRenderingPipeline pipeline = (IrisRenderingPipeline) p;
 
 		if (HandRenderer.INSTANCE.isActive()) {
-			return (HandRenderer.INSTANCE.isRenderingSolid() ? ShaderKey.HAND_CUTOUT_DIFFUSE : ShaderKey.HAND_WATER_DIFFUSE);
+			return ShaderKey.HAND_CUTOUT_DIFFUSE;
 		} else if (isBlockEntities(pipeline)) {
 			return (ShaderKey.BLOCK_ENTITY_DIFFUSE);
 		} else {
@@ -193,7 +193,7 @@ public class IrisPipelines {
 		IrisRenderingPipeline pipeline = (IrisRenderingPipeline) p;
 
 		if (HandRenderer.INSTANCE.isActive()) {
-			return (HandRenderer.INSTANCE.isRenderingSolid() ? ShaderKey.HAND_CUTOUT : ShaderKey.HAND_TRANSLUCENT);
+			return ShaderKey.HAND_CUTOUT;
 		} else if (isBlockEntities(pipeline)) {
 			return (ShaderKey.BLOCK_ENTITY);
 		} else {

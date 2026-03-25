@@ -17,17 +17,18 @@ public class GlFence {
         this.checkDisposed();
 
         int result;
+        var ctx = VulkanicAPI.getCommandContext();
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer length = stack.callocInt(1);
-            result = VulkanicAPI.getSynci(VulkanicAPI.getImmediateContext(), this.id, 37140, length); // GL_SYNC_STATUS = 0x9114
+            result = VulkanicAPI.getSyncStatus(ctx, this.id, length);
             
             // The length buffer should contain the number of values written (should be 1)
             // However, some drivers may not write to this buffer at all, so we'll just
             // trust the return value instead of checking the length
         }
 
-        return result == 37889; // GL_SIGNALED
+        return result == VulkanicAPI.GL_SIGNALED;
     }
 
     public void sync() {
@@ -37,11 +38,11 @@ public class GlFence {
 
     public void sync(long timeout) {
         this.checkDisposed();
-        VulkanicAPI.waitForSync(VulkanicAPI.getImmediateContext(), this.id, 1, timeout); // GL_SYNC_FLUSH_COMMANDS_BIT
+        VulkanicAPI.waitForSyncWithFlush(VulkanicAPI.getCommandContext(), this.id, timeout);
     }
 
     public void delete() {
-        VulkanicAPI.destroySync(VulkanicAPI.getImmediateContext(), this.id);
+        VulkanicAPI.destroySync(VulkanicAPI.getCommandContext(), this.id);
         this.disposed = true;
     }
 

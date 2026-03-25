@@ -1,13 +1,15 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
 import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.SSAORenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.RenderUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -21,10 +23,8 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 {
 	public static SSAOApplyShader INSTANCE = new SSAOApplyShader();
 	
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
-	
-	public int ssaoTexture;
+	public int ssaoTexture = -1;
 	
 	// uniforms
 	public int gSSAOMapUniform;
@@ -33,6 +33,8 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	public int gBlurRadiusUniform;
 	public int gNearUniform;
 	public int gFarUniform;
+
+	private int activeDepthTextureId = -1;
 	
 	
 	
@@ -65,35 +67,45 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gDepthMapUniform, 0);
+		this.activeDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		return this.ssaoTexture != -1
+			&& this.activeDepthTextureId != -1
+			&& SSAOShader.INSTANCE.frameBuffer != null
+			&& LodRenderer.INSTANCE.hasActiveRenderTarget();
+	}
+
+	@Override
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
+	{
+		DhTextureState.setActiveTextureUnitIndex(0);
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
+		VulkanicAPI.setUniform1i(ctx, this.gDepthMapUniform, 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(this.ssaoTexture);
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gSSAOMapUniform, 1);
+		DhTextureState.setActiveTextureUnitIndex(1);
+		DhTextureState.bindTexture2D(this.ssaoTexture);
+		VulkanicAPI.setUniform1i(ctx, this.gSSAOMapUniform, 1);
 		
-		VulkanicAPI.setUniform1i(VulkanicAPI.getImmediateContext(), this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
+		VulkanicAPI.setUniform1i(ctx, this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
 		
 		if (this.gViewSizeUniform >= 0)
 		{
-			VulkanicAPI.setUniform2f(VulkanicAPI.getImmediateContext(), this.gViewSizeUniform,
+			VulkanicAPI.setUniform2f(ctx, this.gViewSizeUniform,
 					MC_RENDER.getTargetFramebufferViewportWidth(),
 					MC_RENDER.getTargetFramebufferViewportHeight());
 		}
 		
 		if (this.gNearUniform >= 0)
 		{
-			VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), this.gNearUniform,
+			VulkanicAPI.setUniform1f(ctx, this.gNearUniform,
 					RenderUtil.getNearClipPlaneDistanceInBlocks(partialTicks));
 		}
 		
 		if (this.gFarUniform >= 0)
 		{
 			float farClipPlane = RenderUtil.getFarClipPlaneDistanceInBlocks();
-			VulkanicAPI.setUniform1f(VulkanicAPI.getImmediateContext(), this.gFarUniform, farClipPlane);
+			VulkanicAPI.setUniform1f(ctx, this.gFarUniform, farClipPlane);
 		}
 	}
 	
@@ -104,20 +116,30 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	//========//
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
-		GLMC.enableBlend();
-		VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_ZERO, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_ONE);
+		VulkanicAPI.setBlendEnabled(ctx, true);
+		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
+		VulkanicAPI.setBlendFunction(
+			ctx,
+			VulkanicBlendFactor.ZERO,
+			VulkanicBlendFactor.SRC_ALPHA,
+			VulkanicBlendFactor.ZERO,
+			VulkanicBlendFactor.ONE
+		);
 
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
 		// it should be automatically restored after rendering is complete.
-		GLMC.disableDepthTest();
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		
 		// apply the rendered SSAO to the LODs 
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, SSAOShader.INSTANCE.frameBuffer);
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, LodRenderer.INSTANCE.getActiveFramebufferId());
+		SSAOShader.INSTANCE.frameBuffer.bindAsReadBuffer(ctx);
+		if (!LodRenderer.INSTANCE.bindActiveRenderTarget())
+		{
+			VulkanicAPI.bindReadFramebuffer(ctx, 0);
+			return;
+		}
 		
 		
 		ScreenQuad.INSTANCE.render();

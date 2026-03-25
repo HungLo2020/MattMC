@@ -24,7 +24,6 @@ import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.util.objects.SortedArraySet;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
@@ -34,6 +33,13 @@ import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
+import net.vulkanic.VulkanicCapability;
+import net.vulkanic.VulkanicDepthCompareOp;
+import net.vulkanic.VulkanicPolygonFace;
+import net.vulkanic.VulkanicPolygonMode;
+import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
@@ -54,7 +60,6 @@ public class LodRenderer
 	
 	private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	private static final IIrisAccessor IRIS_ACCESSOR = ModAccessorInjector.INSTANCE.get(IIrisAccessor.class);
 	
 	public static final LodRenderer INSTANCE = new LodRenderer();
@@ -65,6 +70,7 @@ public class LodRenderer
 	private int activeFramebufferId = -1;
 	private int activeColorTextureId = -1;
 	private int activeDepthTextureId = -1;
+	private IDhApiFramebuffer activeFramebuffer;
 	private int textureWidth;
 	private int textureHeight;
 	
@@ -283,8 +289,8 @@ public class LodRenderer
 			{
 				// If MC's framebuffer is being used the depth needs to be cleared to prevent rendering on top of MC.
 				// This should only happen when Optifine shaders are being used.
-				CommandContext ctx = VulkanicAPI.getImmediateContext();
-				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				CommandContext ctx = VulkanicAPI.getCommandContext();
+				VulkanicAPI.clearDepthBuffer(ctx);
 			}
 			
 			
@@ -365,6 +371,7 @@ public class LodRenderer
 		{
 			framebuffer = framebufferOverride;
 		}
+		this.activeFramebuffer = framebuffer;
 		this.activeFramebufferId = framebuffer.getId();
 		framebuffer.bind();
 		
@@ -373,21 +380,27 @@ public class LodRenderer
 		//==========//
 		// bindings //
 		//==========//
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		
 		// by default draw everything as triangles
-		VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-		GLMC.enableFaceCulling();
+		VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
+		VulkanicAPI.setCullFaceEnabled(ctx, true);
 		
-		GLMC.glBlendFunc(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
-		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
+		VulkanicAPI.blendFunc(ctx, VulkanicBlendFactor.SRC_ALPHA, VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendFunction(
+			ctx,
+			VulkanicBlendFactor.SRC_ALPHA,
+			VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+			VulkanicBlendFactor.ONE,
+			VulkanicBlendFactor.ZERO
+		);
 		
-		CommandContext ctx = VulkanicAPI.getImmediateContext();
-		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicAPI.GL_SCISSOR_TEST, false);
+		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.SCISSOR_TEST, false);
 		
 		// Enable depth test and depth mask
-		GLMC.enableDepthTest();
-		GLMC.glDepthFunc(VulkanicAPI.GL_LESS);
-		GLMC.enableDepthMask();
+		VulkanicAPI.setDepthTestEnabled(ctx, true);
+		VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);
+		VulkanicAPI.setDepthWriteMask(ctx, true);
 		
 		// This is required for MC versions 1.21.5+
 		// due to MC updating the lightmap by changing the viewport size
@@ -436,7 +449,7 @@ public class LodRenderer
 		else
 		{
 			// get MC's color texture
-			this.activeColorTextureId = VulkanicAPI.getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+			this.activeColorTextureId = VulkanicAPI.getFramebufferColorAttachment0ObjectName(ctx);
 		}
 		
 		
@@ -444,11 +457,11 @@ public class LodRenderer
 		boolean clearTextures = !ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeTextureClearEvent.class, renderEventParam);
 		if (clearTextures)
 		{
-			VulkanicAPI.setClearDepth(VulkanicAPI.getImmediateContext(), 1.0);
+			VulkanicAPI.setClearDepth(ctx, 1.0);
 			
 			float[] clearColorValues = new float[4];
-			VulkanicAPI.getFloatv(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
-			VulkanicAPI.setClearColor(VulkanicAPI.getImmediateContext(), clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
+			VulkanicAPI.getClearColor(ctx, clearColorValues);
+			VulkanicAPI.setClearColor(ctx, clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
 			
 			if (this.usingMcFramebuffer && framebufferOverride == null)
 			{
@@ -458,11 +471,11 @@ public class LodRenderer
 				
 				
 				// don't clear the color texture, that removes the sky
-				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearDepthBuffer(ctx);
 			}
 			else if (firstPass)
 			{
-				VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearColorAndDepthBuffers(ctx);
 			}
 		}
 		
@@ -497,7 +510,7 @@ public class LodRenderer
 		// create and bind the necessary textures
 		this.createAndBindTextures();
 		
-		if(this.framebuffer.getStatus() != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE)
+		if(!VulkanicAPI.isFramebufferComplete(this.framebuffer.getStatus()))
 		{
 			// This generally means something wasn't bound, IE missing either the color or depth texture
 			LOGGER.warn("Framebuffer ["+this.framebuffer.getId()+"] isn't complete.");
@@ -572,6 +585,7 @@ public class LodRenderer
 	
 	private void renderLodPass(IDhApiShaderProgram shaderProgram, RenderBufferHandler lodBufferHandler, RenderParams renderEventParam, boolean opaquePass)
 	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		//=======================//
 		// debug wireframe setup //
 		//=======================//
@@ -579,25 +593,31 @@ public class LodRenderer
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
 		{
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
-			GLMC.disableFaceCulling();
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.LINE);
+			VulkanicAPI.setCullFaceEnabled(ctx, false);
 		}
 		else
 		{
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
+			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
 		if (!opaquePass)
 		{
-			GLMC.enableBlend();
-			GLMC.enableDepthTest();
-			VulkanicAPI.setBlendEquation(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FUNC_ADD);
-			GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+			VulkanicAPI.setBlendEnabled(ctx, true);
+			VulkanicAPI.setDepthTestEnabled(ctx, true);
+			VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
+			VulkanicAPI.setBlendFunction(
+				ctx,
+				VulkanicBlendFactor.SRC_ALPHA,
+				VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+				VulkanicBlendFactor.ONE,
+				VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA
+			);
 		}
 		else
 		{
-			GLMC.disableBlend();
+			VulkanicAPI.setBlendEnabled(ctx, false);
 		}
 		
 		
@@ -615,7 +635,7 @@ public class LodRenderer
 			// which causes Sodium to render some water chunks with their normal inverted
 			// https://github.com/IrisShaders/Iris/issues/2582
 			// https://github.com/IrisShaders/Iris/blob/1.21.9/common/src/main/java/net/irisshaders/iris/compat/dh/LodRendererEvents.java#L346
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
 		
@@ -644,8 +664,8 @@ public class LodRenderer
 					vbo.bind();
 					shaderProgram.bindVertexBuffer(vbo.getId());
 					VulkanicAPI.drawElements(
-							VulkanicAPI.getImmediateContext(),
-							VulkanicAPI.GL_TRIANGLES,
+							ctx,
+							VulkanicPrimitiveMode.TRIANGLES,
 							(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
 							this.quadIBO.getType(), 0);
 					vbo.unbind();
@@ -662,8 +682,8 @@ public class LodRenderer
 		if (renderWireframe)
 		{
 			// default back to GL_FILL since all other rendering uses it 
-			VulkanicAPI.setPolygonMode(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
-			GLMC.enableFaceCulling();
+			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
+			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
 		
 	}
@@ -694,6 +714,19 @@ public class LodRenderer
 	
 	/** @return -1 if no frame buffer has been bound yet */
 	public int getActiveFramebufferId() { return this.activeFramebufferId; }
+
+	public boolean hasActiveRenderTarget() { return this.activeFramebuffer != null && this.activeFramebufferId != -1; }
+
+	public boolean bindActiveRenderTarget()
+	{
+		if (!this.hasActiveRenderTarget())
+		{
+			return false;
+		}
+
+		this.activeFramebuffer.bind();
+		return true;
+	}
 	
 	/** @return -1 if no texture has been bound yet */
 	public int getActiveColorTextureId() { return this.activeColorTextureId; }

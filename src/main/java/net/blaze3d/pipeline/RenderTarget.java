@@ -1,10 +1,5 @@
 package net.blaze3d.pipeline;
 
-import net.blaze3d.opengl.GlConst;
-import net.blaze3d.opengl.GlDevice;
-import net.blaze3d.opengl.GlStateManager;
-import net.blaze3d.opengl.GlTexture;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.AddressMode;
@@ -16,6 +11,7 @@ import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -83,26 +79,25 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		} else if (renderTarget.depthTexture == null) {
 			throw new IllegalStateException("Trying to copy depth texture from a RenderTarget without a depth texture");
 		} else {
-			RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(renderTarget.depthTexture, this.depthTexture, 0, 0, 0, 0, 0, this.width, this.height);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().copyTextureToTexture(renderTarget.depthTexture, this.depthTexture, 0, 0, 0, 0, 0, this.width, this.height);
 		}
 	}
 
 	public void createBuffers(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		int k = gpuDevice.getMaxTextureSize();
+		int k = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
 		if (i > 0 && i <= k && j > 0 && j <= k) {
 			this.width = i;
 			this.height = j;
 			if (this.useDepth) {
-				this.depthTexture = gpuDevice.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, i, j, 1, 1);
-				this.depthTextureView = gpuDevice.createTextureView(this.depthTexture);
+				this.depthTexture = net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, i, j, 1, 1);
+				this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
 				this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);
 				this.depthTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 			}
 
-			this.colorTexture = gpuDevice.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, i, j, 1, 1);
-			this.colorTextureView = gpuDevice.createTextureView(this.colorTexture);
+			this.colorTexture = net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, i, j, 1, 1);
+			this.colorTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.colorTexture);
 			this.colorTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 			this.setFilterMode(FilterMode.NEAREST, true);
 		} else {
@@ -129,18 +124,17 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 		if (this.colorTexture == null) {
 			throw new IllegalStateException("Can't blit to screen, color texture doesn't exist yet");
 		} else {
-			RenderSystem.getDevice().createCommandEncoder().presentTexture(this.colorTextureView);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().presentTexture(this.colorTextureView);
 		}
 	}
 
 	public void blitAndBlendToTexture(GpuTextureView gpuTextureView) {
 		RenderSystem.assertOnRenderThread();
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "Blit render target", gpuTextureView, OptionalInt.empty())) {
+		try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(
+				() -> "Blit render target", gpuTextureView, OptionalInt.empty())) {
 			renderPass.setPipeline(RenderPipelines.ENTITY_OUTLINE_BLIT);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.bindSampler("InSampler", this.colorTextureView);
 			renderPass.draw(0, 3);
 		}
@@ -180,9 +174,6 @@ public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze
 	// Iris: RenderTargetInterface implementation
 	@Override
 	public void iris$bindFramebuffer() {
-		GlStateManager._glBindFramebuffer(GlConst.GL_FRAMEBUFFER,
-			((GlTexture) this.colorTexture).getFbo(
-				((GlDevice) RenderSystem.getDevice()).directStateAccess(),
-				this.depthTexture));
+		VulkanicAPI.bindRenderTarget(VulkanicAPI.getCommandContext(), this.colorTexture, this.depthTexture);
 	}
 }

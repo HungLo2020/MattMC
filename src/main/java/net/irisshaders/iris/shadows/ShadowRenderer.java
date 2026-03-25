@@ -1,7 +1,6 @@
 package net.irisshaders.iris.shadows;
 
 import com.google.common.collect.ImmutableList;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -63,6 +62,9 @@ import org.joml.Vector3d;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicTextureSwizzleComponent;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -224,11 +226,11 @@ public class ShadowRenderer {
 		final Int2ObjectMap<PackShadowDirectives.SamplingSettings> colorSamplingSettings =
 			shadowDirectives.getColorSamplingSettings();
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE4);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(4);
 
-		configureDepthSampler(targets.getDepthTexture().iris$getGlId(), depthSamplingSettings.get(0));
+		configureDepthSampler(net.vulkanic.VulkanicCoreAPI.textureId(targets.getDepthTexture()), depthSamplingSettings.get(0));
 
-		configureDepthSampler(targets.getDepthTextureNoTranslucents().iris$getGlId(), depthSamplingSettings.get(1));
+		configureDepthSampler(net.vulkanic.VulkanicCoreAPI.textureId(targets.getDepthTextureNoTranslucents()), depthSamplingSettings.get(1));
 
 		for (int i = 0; i < targets.getNumColorTextures(); i++) {
 			if (targets.get(i) != null) {
@@ -238,53 +240,58 @@ public class ShadowRenderer {
 			}
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
 	private void configureDepthSampler(int glTextureId, PackShadowDirectives.DepthSamplingSettings settings) {
 		if (settings.getHardwareFiltering() && !separateHardwareSamplers) {
 			// We have to do this or else shadow hardware filtering breaks entirely!
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_COMPARE_MODE, VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE);
+			IrisRenderSystem.texParameteri(glTextureId, VulkanicTextureParameterName.COMPARE_MODE, VulkanicTextureParameterValue.COMPARE_REF_TO_TEXTURE);
 		}
 
 		// Workaround for issues with old shader packs like Chocapic v4.
 		// They expected the driver to put the depth value in z, but it's supposed to only
 		// be available in r. So we set up the swizzle to fix that.
-		IrisRenderSystem.texParameteriv(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
-			new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_ONE});
+		IrisRenderSystem.setTextureSwizzleRgba(
+			glTextureId,
+			VulkanicTextureSwizzleComponent.RED,
+			VulkanicTextureSwizzleComponent.RED,
+			VulkanicTextureSwizzleComponent.RED,
+			VulkanicTextureSwizzleComponent.ONE
+		);
 
 		configureSampler(glTextureId, settings);
 	}
 
 	private void configureSampler(int glTextureId, PackShadowDirectives.SamplingSettings settings) {
 		if (settings.getMipmap()) {
-			int filteringMode = settings.getNearest() ? VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST : VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
+			VulkanicTextureParameterValue filteringMode = settings.getNearest()
+				? VulkanicTextureParameterValue.NEAREST_MIPMAP_NEAREST
+				: VulkanicTextureParameterValue.LINEAR_MIPMAP_LINEAR;
 			mipmapPasses.add(new MipmapPass(glTextureId, filteringMode));
 		}
 
 		if (!settings.getNearest()) {
 			// Make sure that things are smoothed
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			IrisRenderSystem.setTextureLinearFiltering(glTextureId);
 		} else {
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST);
-			IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_NEAREST);
+			IrisRenderSystem.setTextureNearestFiltering(glTextureId);
 		}
 	}
 
 	private void generateMipmaps() {
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE4);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(4);
 
 		for (MipmapPass mipmapPass : mipmapPasses) {
 			setupMipmappingForTexture(mipmapPass.texture(), mipmapPass.targetFilteringMode());
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
-	private void setupMipmappingForTexture(int texture, int filteringMode) {
-		IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filteringMode);
+	private void setupMipmappingForTexture(int texture, VulkanicTextureParameterValue filteringMode) {
+		IrisRenderSystem.generateMipmaps(texture);
+		IrisRenderSystem.texParameteri(texture, VulkanicTextureParameterName.MIN_FILTER, filteringMode);
 	}
 
 	private FrustumHolder createShadowFrustum(float renderMultiplier, FrustumHolder holder) {
@@ -370,7 +377,7 @@ public class ShadowRenderer {
 
 	public void setupShadowViewport() {
 		// Set up the viewport
-		GlStateManager._viewport(0, 0, resolution, resolution);
+		VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, resolution, resolution);
 	}
 
 	public void renderShadows(LevelRenderer levelRenderer, Camera playerCamera, CameraRenderState renderState) {
@@ -411,8 +418,8 @@ public class ShadowRenderer {
 		PoseStack modelView = createShadowModelView(this.sunPathRotation, this.intervalSize, nearPlane, farPlane);
 		MODELVIEW = new Matrix4f(modelView.last().pose());
 
-		RenderSystem.getModelViewStack().pushMatrix();
-		RenderSystem.getModelViewStack().set(MODELVIEW);
+		VulkanicAPI.getModelViewStack().pushMatrix();
+		VulkanicAPI.getModelViewStack().set(MODELVIEW);
 
 		// Set up our orthographic projection matrix and load it into RenderSystem
 		Matrix4f shadowProjection;
@@ -488,7 +495,7 @@ public class ShadowRenderer {
 		// However, it only partially resolves issues of light leaking into caves.
 		//
 		// TODO: Better way of preventing light from leaking into places where it shouldn't
-		GlStateManager._disableCull();
+		VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getCommandContext(), false);
 
 		ChunkSectionsToRender sections = new ChunkSectionsToRender(null, 0, null);
 		((SodiumChunkSection) (Object) sections).sodium$setRendering(((LevelRendererExtension) levelRenderer).sodium$getWorldRenderer(),
@@ -503,7 +510,7 @@ public class ShadowRenderer {
 		pipeline.setPhase(WorldRenderingPhase.ENTITIES);
 
 		// Reset our viewport in case Sodium overrode it
-		GlStateManager._viewport(0, 0, resolution, resolution);
+		VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, resolution, resolution);
 
 		profiler.popPush("entities");
 
@@ -547,7 +554,7 @@ public class ShadowRenderer {
 
 		MultiBufferSource.BufferSource bufferSource = buffers.bufferSource();
 		EntityRenderDispatcher dispatcher = levelRenderer.entityRenderDispatcher;
-		RenderSystem.getModelViewStack().identity();
+		VulkanicAPI.getModelViewStack().identity();
 
 		renderedShadowEntities = renderEntities(levelRenderer, dispatcher, bufferSource, modelView, tickDelta, entityShadowFrustum, cameraX, cameraY, cameraZ);
 
@@ -567,7 +574,7 @@ public class ShadowRenderer {
 
 		copyPreTranslucentDepth(levelRenderer);
 
-		RenderSystem.getModelViewStack().set(MODELVIEW);
+		VulkanicAPI.getModelViewStack().set(MODELVIEW);
 
 		profiler.popPush("translucent terrain");
 		pipeline.setPhase(WorldRenderingPhase.NONE);
@@ -592,11 +599,11 @@ public class ShadowRenderer {
 		profiler.popPush("restore gl state");
 
 		// Restore backface culling
-		GlStateManager._enableCull();
+		VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getCommandContext(), true);
 		((LevelRendererExtension) levelRenderer).sodium$setMatrices(playerMatrices);
 
 		// Restore the old viewport
-		GlStateManager._viewport(0, 0, client.getMainRenderTarget().width, client.getMainRenderTarget().height);
+		VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, client.getMainRenderTarget().width, client.getMainRenderTarget().height);
 
 		if (levelRenderer instanceof CullingDataCache) {
 			((CullingDataCache) levelRenderer).restoreState();
@@ -613,7 +620,7 @@ public class ShadowRenderer {
 		visibleBlockEntities = null;
 		ACTIVE = false;
 
-		RenderSystem.getModelViewStack().popMatrix();
+		VulkanicAPI.getModelViewStack().popMatrix();
 
 		profiler.pop();
 		profiler.popPush("updatechunks");
@@ -773,7 +780,7 @@ public class ShadowRenderer {
 
 	}
 
-	private record MipmapPass(int texture, int targetFilteringMode) {
+	private record MipmapPass(int texture, VulkanicTextureParameterValue targetFilteringMode) {
 
 
 	}

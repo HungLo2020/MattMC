@@ -79,7 +79,7 @@ public class TextureAtlas extends AbstractTexture {
         this.mapRegisteredSprites.clear();
         this.mapUploadedSprites.clear();
         this.initMissingImage();
-        int glMaxTextureSize = RenderSystem.getDevice().getMaxTextureSize();
+        int glMaxTextureSize = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
         this.stitcher = new Stitcher(glMaxTextureSize, glMaxTextureSize, 0);
     }
 
@@ -101,8 +101,8 @@ public class TextureAtlas extends AbstractTexture {
 
         VoxelConstants.getLogger().info("Created: {}x{} {}-atlas", new Object[] { this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), this.basePath });
 
-        texture = RenderSystem.getDevice().createTexture("voxelmap-atlas", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), 1, 1);
-        textureView = RenderSystem.getDevice().createTextureView(texture);
+        texture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-atlas", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), 1, 1);
+        textureView = net.vulkanic.VulkanicAPI.createTextureView(texture);
         super.setFilter(linearFilter, mipmap);
         HashMap<Object, Sprite> tempMapRegisteredSprites = Maps.newHashMap(this.mapRegisteredSprites);
         for (Sprite icon : this.stitcher.getStitchSlots()) {
@@ -113,7 +113,7 @@ public class TextureAtlas extends AbstractTexture {
 
             try {
                 if (icon.getTextureData() != null) {
-                    RenderSystem.getDevice().createCommandEncoder().writeToTexture(texture, icon.getTextureData(), 0, 0, icon.getOriginX(), icon.getOriginY(), icon.getIconWidth(), icon.getIconHeight(), 0, 0);
+                    net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(texture, icon.getTextureData(), 0, 0, icon.getOriginX(), icon.getOriginY(), icon.getIconWidth(), icon.getIconHeight(), 0, 0);
                 }
             } catch (Throwable var10) {
                 CrashReport crashReport = CrashReport.forThrowable(var10, "Stitching texture atlas");
@@ -157,8 +157,8 @@ public class TextureAtlas extends AbstractTexture {
                 texture = null;
             }
             VoxelConstants.getLogger().info("Resized to: {}x{} {}-atlas", new Object[] { this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), this.basePath });
-            texture = RenderSystem.getDevice().createTexture("voxelmap-atlas", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), 1, 1);
-            textureView = RenderSystem.getDevice().createTextureView(texture);
+            texture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-atlas", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.RGBA8, this.stitcher.getCurrentImageWidth(), this.stitcher.getCurrentImageHeight(), 1, 1);
+            textureView = net.vulkanic.VulkanicAPI.createTextureView(texture);
             super.setFilter(linearFilter, mipmap);
         }
 
@@ -171,7 +171,7 @@ public class TextureAtlas extends AbstractTexture {
 
             try {
                 if (icon.getTextureData() != null) {
-                    RenderSystem.getDevice().createCommandEncoder().writeToTexture(texture, icon.getTextureData(), 0, 0, icon.getOriginX(), icon.getOriginY(), icon.getIconWidth(), icon.getIconHeight(), 0, 0);
+                    net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(texture, icon.getTextureData(), 0, 0, icon.getOriginX(), icon.getOriginY(), icon.getIconWidth(), icon.getIconHeight(), 0, 0);
                 }
             } catch (Throwable var11) {
                 CrashReport crashReport = CrashReport.forThrowable(var11, "Stitching texture atlas");

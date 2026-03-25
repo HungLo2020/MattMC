@@ -1,21 +1,16 @@
 package net.sodium.client.render.chunk;
 
-import net.blaze3d.opengl.GlDevice;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.systems.CommandEncoder;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sodium.client.gl.attribute.GlVertexFormat;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.RenderDevice;
-import net.sodium.client.render.chunk.shader.*;
 import net.sodium.client.gl.shader.*;
-import net.sodium.client.render.chunk.shader.*;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.sodium.client.render.chunk.shader.*;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
-import net.sodium.client.gl.shader.*;
 import net.sodium.client.util.FogParameters;
-import net.blaze3d.opengl.GlCommandEncoder;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
@@ -94,15 +89,16 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
         // Iris: From MixinShaderChunkRenderer - viewport redirect (skip if in shadow pass)
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            CommandContext ctx = VulkanicAPI.getCommandContext();
             VulkanicAPI.setDynamicViewport(ctx, 0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
         }
         
         // Iris: From MixinShaderChunkRenderer - framebuffer binding is delayed/redirected
         // The framebuffer binding is handled below in the compileProgram redirect
-        
-        ((GlCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).applyPipelineState(pass.getPipeline());
-        ((GlCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).lastProgram = null; // Direct field access - lastProgram is now public
+
+        CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
+        commandEncoder.applyPipelineState(pass.getPipeline());
+        commandEncoder.invalidateCachedProgramBinding();
 
         ChunkShaderOptions options = new ChunkShaderOptions(ChunkFogMode.SMOOTH, pass, this.vertexType);
 
@@ -117,8 +113,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         }
 
         if (program == null) {
-            CommandContext ctx = VulkanicAPI.getImmediateContext();
-            VulkanicAPI.bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
+            target.iris$bindFramebuffer();
             program = this.compileProgram(options);
         }
 

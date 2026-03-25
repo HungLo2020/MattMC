@@ -2,6 +2,7 @@ package net.sodium.client.gl.tessellation;
 
 import net.sodium.client.gl.attribute.GlVertexAttributeBinding;
 import net.sodium.client.gl.device.CommandList;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public abstract class GlAbstractTessellation implements GlTessellation {
@@ -19,18 +20,19 @@ public abstract class GlAbstractTessellation implements GlTessellation {
     }
 
     protected void bindAttributes(CommandList commandList) {
+        CommandContext ctx = VulkanicAPI.getCommandContext();
         for (TessellationBinding binding : this.bindings) {
             commandList.bindBuffer(binding.target(), binding.buffer());
 
             for (GlVertexAttributeBinding attrib : binding.attributeBindings()) {
                 if (attrib.isIntType()) {
-                    VulkanicAPI.setVertexAttribIPointer(VulkanicAPI.getImmediateContext(), attrib.getIndex(), attrib.getCount(), attrib.getFormat(),
+                    VulkanicAPI.setVertexAttribIPointer(ctx, attrib.getIndex(), attrib.getCount(), attrib.getFormat(),
                             attrib.getStride(), attrib.getPointer());
                 } else {
-                    VulkanicAPI.setVertexAttribPointer(VulkanicAPI.getImmediateContext(), attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
+                    VulkanicAPI.setVertexAttribPointer(ctx, attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
                             attrib.getStride(), attrib.getPointer());
                 }
-                VulkanicAPI.enableVertexAttribArray(VulkanicAPI.getImmediateContext(), attrib.getIndex());
+                VulkanicAPI.enableVertexAttribArray(ctx, attrib.getIndex());
             }
         }
     }

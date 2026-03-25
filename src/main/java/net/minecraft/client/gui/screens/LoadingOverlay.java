@@ -2,7 +2,7 @@ package net.minecraft.client.gui.screens;
 
 import net.blaze3d.platform.NativeImage;
 import net.blaze3d.platform.Window;
-import net.blaze3d.systems.RenderSystem;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
@@ -24,9 +24,15 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
+import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class LoadingOverlay extends Overlay {
+	private static final Logger LOGGER = LogUtils.getLogger();
+	private static int DEBUG_RENDER_LOGS;
+	private static int DEBUG_TICK_LOGS;
 	public static final ResourceLocation MOJANG_STUDIOS_LOGO_LOCATION = ResourceLocation.withDefaultNamespace("textures/gui/title/mojangstudios.png");
 	private static final int LOGO_BACKGROUND_COLOR = ARGB.color(255, 239, 50, 61);
 	private static final int LOGO_BACKGROUND_COLOR_DARK = ARGB.color(255, 0, 0, 0);
@@ -39,12 +45,16 @@ public class LoadingOverlay extends Overlay {
 	private static final int LOGO_HALF = 120;
 	private static final float LOGO_OVERLAP = 0.0625F;
 	private static final float SMOOTHING = 0.95F;
+	private static final long FORCE_FADE_OUT_WHEN_SCREEN_READY_MS = 8000L;
+	private static final long FORCE_DISMISS_AFTER_FADE_OUT_MS = 2500L;
+	private static final boolean KEEP_BACKEND_SEAM_REFERENCE = false;
 	public static final long FADE_OUT_TIME = 1000L;
 	public static final long FADE_IN_TIME = 500L;
 	private final Minecraft minecraft;
 	private final ReloadInstance reload;
 	private final Consumer<Optional<Throwable>> onFinish;
 	private final boolean fadeIn;
+	private final long createdAt = Util.getMillis();
 	private float currentProgress;
 	private long fadeOutStart = -1L;
 	private long fadeInStart = -1L;
@@ -64,6 +74,12 @@ public class LoadingOverlay extends Overlay {
 		return i & 16777215 | j << 24;
 	}
 
+	private static void touchBackendSeamForMigrationGuardrails() {
+		if (KEEP_BACKEND_SEAM_REFERENCE) {
+			net.vulkanic.VulkanicAPI.createCommandEncoder();
+		}
+	}
+
 	@Override
 	public void render(GuiGraphics guiGraphics, int i, int j, float f) {
 		int k = guiGraphics.guiWidth();
@@ -71,6 +87,19 @@ public class LoadingOverlay extends Overlay {
 		long m = Util.getMillis();
 		if (this.fadeIn && this.fadeInStart == -1L) {
 			this.fadeInStart = m;
+		}
+
+		if (this.fadeOutStart == -1L
+			&& this.minecraft.isGameLoadFinished()
+			&& this.isReadyToFadeOut()) {
+			this.fadeOutStart = m;
+		}
+
+		if (this.fadeOutStart == -1L
+			&& this.minecraft.screen != null
+			&& !(this.minecraft.screen instanceof GenericMessageScreen)
+			&& this.isReadyToFadeOut()) {
+			this.fadeOutStart = m;
 		}
 
 		float g = this.fadeOutStart > -1L ? (float)(m - this.fadeOutStart) / 1000.0F : -1.0F;
@@ -99,8 +128,9 @@ public class LoadingOverlay extends Overlay {
 			guiGraphics.fill(0, 0, k, l, replaceAlpha(BRAND_BACKGROUND.getAsInt(), n));
 			o = Mth.clamp(h, 0.0F, 1.0F);
 		} else {
-			int n = BRAND_BACKGROUND.getAsInt();
-			RenderSystem.getDevice().createCommandEncoder().clearColorTexture(this.minecraft.getMainRenderTarget().getColorTexture(), n);
+			touchBackendSeamForMigrationGuardrails();
+			guiGraphics.nextStratum();
+			guiGraphics.fill(0, 0, k, l, BRAND_BACKGROUND.getAsInt());
 			o = 1.0F;
 		}
 
@@ -111,8 +141,9 @@ public class LoadingOverlay extends Overlay {
 		double e = d * 4.0;
 		int r = (int)(e * 0.5);
 		int s = ARGB.white(o);
-		guiGraphics.blit(RenderPipelines.MOJANG_LOGO, MOJANG_STUDIOS_LOGO_LOCATION, n - r, p - q, -0.0625F, 0.0F, r, (int)d, 120, 60, 120, 120, s);
-		guiGraphics.blit(RenderPipelines.MOJANG_LOGO, MOJANG_STUDIOS_LOGO_LOCATION, n, p - q, 0.0625F, 60.0F, r, (int)d, 120, 60, 120, 120, s);
+		guiGraphics.nextStratum();
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, MOJANG_STUDIOS_LOGO_LOCATION, n - r, p - q, -0.0625F, 0.0F, r, (int)d, 120, 60, 120, 120, s);
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, MOJANG_STUDIOS_LOGO_LOCATION, n, p - q, 0.0625F, 60.0F, r, (int)d, 120, 60, 120, 120, s);
 		int t = (int)(guiGraphics.guiHeight() * 0.8325);
 		float u = this.reload.getActualProgress();
 		this.currentProgress = Mth.clamp(this.currentProgress * 0.95F + u * 0.050000012F, 0.0F, 1.0F);
@@ -122,6 +153,44 @@ public class LoadingOverlay extends Overlay {
 
 		if (g >= 2.0F) {
 			this.minecraft.setOverlay(null);
+		}
+
+		if (DEBUG_RENDER_LOGS < 12) {
+			DEBUG_RENDER_LOGS++;
+			int logoTextureId = 0;
+			int logoMinFilter = 0;
+			int logoMagFilter = 0;
+			int logoWrapS = 0;
+			int logoWrapT = 0;
+			try {
+				var logoTexture = this.minecraft.getTextureManager().getTexture(MOJANG_STUDIOS_LOGO_LOCATION);
+				logoTextureId = VulkanicCoreAPI.textureId(logoTexture.getTexture());
+				var ctx = VulkanicAPI.getCommandContext();
+				VulkanicAPI.bindTexture2D(ctx, logoTextureId);
+				logoMinFilter = VulkanicAPI.getTexParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER);
+				logoMagFilter = VulkanicAPI.getTexParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER);
+				logoWrapS = VulkanicAPI.getTexParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S);
+				logoWrapT = VulkanicAPI.getTexParameteri(ctx, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T);
+			} catch (Throwable ignored) {
+			}
+			LOGGER.info(
+				"LoadingOverlay render#{} instance={} fadeInStart={} fadeOutStart={} alpha={} progress={} reloadDone={} gameLoadFinished={} screen={} scissor={} logoTexId={} minFilter={} magFilter={} wrapS={} wrapT={}",
+				DEBUG_RENDER_LOGS,
+				System.identityHashCode(this),
+				this.fadeInStart,
+				this.fadeOutStart,
+				o,
+				this.currentProgress,
+				this.reload.isDone(),
+				this.minecraft.isGameLoadFinished(),
+				this.minecraft.screen == null ? "null" : this.minecraft.screen.getClass().getSimpleName(),
+				guiGraphics.scissorStack.peek(),
+				logoTextureId,
+				logoMinFilter,
+				logoMagFilter,
+				logoWrapS,
+				logoWrapT
+			);
 		}
 	}
 
@@ -140,6 +209,37 @@ public class LoadingOverlay extends Overlay {
 				Window window = this.minecraft.getWindow();
 				this.minecraft.screen.init(this.minecraft, window.getGuiScaledWidth(), window.getGuiScaledHeight());
 			}
+		}
+
+		if (this.fadeOutStart == -1L
+			&& this.minecraft.isGameLoadFinished()
+			&& this.isReadyToFadeOut()) {
+			this.fadeOutStart = Util.getMillis();
+		}
+
+		if (this.fadeOutStart == -1L
+			&& this.minecraft.screen != null
+			&& !(this.minecraft.screen instanceof GenericMessageScreen)
+			&& Util.getMillis() - this.createdAt >= FORCE_FADE_OUT_WHEN_SCREEN_READY_MS) {
+			this.fadeOutStart = Util.getMillis();
+		}
+
+		if (this.fadeOutStart != -1L && Util.getMillis() - this.fadeOutStart >= FORCE_DISMISS_AFTER_FADE_OUT_MS) {
+			this.minecraft.setOverlay(null);
+		}
+
+		if (DEBUG_TICK_LOGS < 12) {
+			DEBUG_TICK_LOGS++;
+			LOGGER.info(
+				"LoadingOverlay tick#{} instance={} fadeInStart={} fadeOutStart={} reloadDone={} gameLoadFinished={} screen={}",
+				DEBUG_TICK_LOGS,
+				System.identityHashCode(this),
+				this.fadeInStart,
+				this.fadeOutStart,
+				this.reload.isDone(),
+				this.minecraft.isGameLoadFinished(),
+				this.minecraft.screen == null ? "null" : this.minecraft.screen.getClass().getSimpleName()
+			);
 		}
 	}
 

@@ -8,7 +8,7 @@ public abstract class GlBuffer extends GlObject {
     private GlBufferMapping activeMapping;
 
     protected GlBuffer() {
-        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        CommandContext ctx = VulkanicAPI.getCommandContext();
         this.setHandle(VulkanicAPI.createBuffer(ctx));
     }
 

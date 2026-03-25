@@ -1,13 +1,18 @@
 package com.seibel.distanthorizons.core.render.renderer;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.GLState;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FogApplyShader;
 import com.seibel.distanthorizons.core.render.renderer.shaders.FogShader;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicTextureTarget;
 
 import java.nio.ByteBuffer;
 
@@ -22,14 +27,13 @@ public class FogRenderer
 	public static FogRenderer INSTANCE = new FogRenderer();
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
 	
 	private boolean init = false;
 	
 	private int width = -1;
 	private int height = -1;
-	private int fogFramebuffer = -1;
+	private DhFramebuffer fogFramebuffer;
 	
 	private int fogTexture = -1;
 	
@@ -50,34 +54,33 @@ public class FogRenderer
 		FogApplyShader.INSTANCE.init();
 	}
 	
-	private void createFramebuffer(int width, int height)
+	private void createFramebuffer(CommandContext ctx, int width, int height)
 	{
-		if (this.fogFramebuffer != -1)
+		if (this.fogFramebuffer != null)
 		{
-			VulkanicAPI.deleteFramebuffer(VulkanicAPI.getImmediateContext(), this.fogFramebuffer);
-			this.fogFramebuffer = -1;
+			this.fogFramebuffer.destroy(ctx);
+			this.fogFramebuffer = null;
 		}
 		
 		if (this.fogTexture != -1)
 		{
-			GLMC.glDeleteTextures(this.fogTexture);
+			VulkanicAPI.deleteTexture(ctx, this.fogTexture);
 			this.fogTexture = -1;
 		}
 		
-		this.fogFramebuffer = VulkanicAPI.createFramebuffer(VulkanicAPI.getImmediateContext());
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fogFramebuffer);
+		this.fogFramebuffer = new DhFramebuffer();
 		
-		this.fogTexture = GLMC.glGenTextures();
+		this.fogTexture = VulkanicAPI.createTexture2D(ctx);
 		{
-			GLMC.glBindTexture(this.fogTexture);
-			VulkanicAPI.uploadTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.setTextureParameter(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.framebufferTexture2D(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fogTexture, 0);
+			DhTextureState.bindTexture2D(this.fogTexture);
+			VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
+			this.fogFramebuffer.addColorAttachment(ctx, 0, this.fogTexture);
 			
 			// disable mip-mapping since DH is just going to draw straight to the screen
-			VulkanicAPI.texParameteri(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
-			VulkanicAPI.texParameteri(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.BASE_LEVEL, 0);
+			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAX_LEVEL, 0);
 		}
 	}
 	
@@ -90,18 +93,31 @@ public class FogRenderer
 	public void render(Mat4f modelViewProjectionMatrix, float partialTicks)
 	{
 		// needed to preserve GL state - MC may not manually set each GL state before the next rendering step
-		GLState state = new GLState();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		GLState state = new GLState(ctx);
 		
 		this.init();
 		
 		// resize the framebuffer if necessary
 		int width = MC_RENDER.getTargetFramebufferViewportWidth();
 		int height = MC_RENDER.getTargetFramebufferViewportHeight();
+		if (width <= 0 || height <= 0)
+		{
+			this.width = -1;
+			this.height = -1;
+			return;
+		}
+
 		if (this.width != width || this.height != height)
 		{
 			this.width = width;
 			this.height = height;
-			this.createFramebuffer(width, height);
+			this.createFramebuffer(ctx, width, height);
+		}
+
+		if (this.fogFramebuffer == null || this.fogTexture == -1)
+		{
+			return;
 		}
 		
 		FogShader.INSTANCE.frameBuffer = this.fogFramebuffer;
@@ -111,7 +127,7 @@ public class FogRenderer
 		FogApplyShader.INSTANCE.fogTexture = this.fogTexture;
 		FogApplyShader.INSTANCE.render(partialTicks);
 		
-		state.restore();
+		state.restore(ctx);
 	}
 	
 	public void free()

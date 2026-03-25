@@ -15,6 +15,7 @@ import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
+import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -33,6 +34,7 @@ public class GlRenderPass implements RenderPass {
 	private final ScissorState scissorState = new ScissorState();
 	protected final HashMap<String, GpuBufferSlice> uniforms = new HashMap();
 	public final HashMap<String, GpuTextureView> samplers = new HashMap();
+	private final HashMap<String, VulkanicTextureView> samplerResourceViews = new HashMap();
 	protected final Set<String> dirtyUniforms = new HashSet();
 	protected int pushedDebugGroups;
 
@@ -79,13 +81,39 @@ public class GlRenderPass implements RenderPass {
 
 	@Override
 	public void bindSampler(String string, @Nullable GpuTextureView gpuTextureView) {
+		this.closeSamplerResourceView(string);
 		if (gpuTextureView == null) {
 			this.samplers.remove(string);
 		} else {
+			if (!(gpuTextureView instanceof GlTextureView glTextureView)) {
+				throw new IllegalArgumentException(
+					"Render pass sampler binding requires GlTextureView, got: " + gpuTextureView.getClass().getName()
+				);
+			}
 			this.samplers.put(string, gpuTextureView);
+			this.samplerResourceViews.put(string, this.encoder.createSamplerResourceView(glTextureView));
 		}
 
 		this.dirtyUniforms.add(string);
+	}
+
+	@Nullable
+	VulkanicTextureView getSamplerResourceView(String string) {
+		return this.samplerResourceViews.get(string);
+	}
+
+	private void closeSamplerResourceView(String name) {
+		VulkanicTextureView previousView = this.samplerResourceViews.remove(name);
+		if (previousView != null) {
+			previousView.close();
+		}
+	}
+
+	private void closeSamplerResourceViews() {
+		for (VulkanicTextureView view : this.samplerResourceViews.values()) {
+			view.close();
+		}
+		this.samplerResourceViews.clear();
 	}
 
 	@Override
@@ -191,7 +219,11 @@ public class GlRenderPass implements RenderPass {
 			}
 
 			this.closed = true;
-			this.encoder.finishRenderPass();
+			try {
+				this.encoder.finishRenderPass();
+			} finally {
+				this.closeSamplerResourceViews();
+			}
 		}
 	}
 	

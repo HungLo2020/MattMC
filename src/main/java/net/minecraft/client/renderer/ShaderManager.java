@@ -9,7 +9,6 @@ import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.preprocessor.GlslPreprocessor;
 import net.blaze3d.shaders.ShaderType;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.logging.LogUtils;
 import com.mojang.serialization.JsonOps;
@@ -207,18 +206,20 @@ public class ShaderManager extends SimplePreparableReloadListener<ShaderManager.
 		ShaderManager.CompilationCache compilationCache = new ShaderManager.CompilationCache(configs);
 		Set<RenderPipeline> set = new HashSet(RenderPipelines.getStaticPipelines());
 		List<ResourceLocation> list = new ArrayList();
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		gpuDevice.clearPipelineCache();
+		net.vulkanic.VulkanicAPI.clearBackendPipelineCache();
 
 		for (RenderPipeline renderPipeline : set) {
-			CompiledRenderPipeline compiledRenderPipeline = gpuDevice.precompilePipeline(renderPipeline, compilationCache::getShaderSource);
+			CompiledRenderPipeline compiledRenderPipeline = net.vulkanic.VulkanicAPI.precompileRenderPipeline(
+				renderPipeline,
+				compilationCache::getShaderSource
+			);
 			if (!compiledRenderPipeline.isValid()) {
 				list.add(renderPipeline.getLocation());
 			}
 		}
 
 		if (!list.isEmpty()) {
-			gpuDevice.clearPipelineCache();
+			net.vulkanic.VulkanicAPI.clearBackendPipelineCache();
 			throw new RuntimeException(
 				"Failed to load required shader programs:\n" + (String)list.stream().map(resourceLocation -> " - " + resourceLocation).collect(Collectors.joining("\n"))
 			);

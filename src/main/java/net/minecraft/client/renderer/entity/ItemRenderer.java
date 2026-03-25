@@ -57,7 +57,7 @@ public class ItemRenderer {
 			vertexConsumer = getFoilBuffer(multiBufferSource, renderType, true, foilType != ItemStackRenderState.FoilType.NONE);
 		}
 
-		renderQuadList(poseStack, vertexConsumer, list, is, i, j);
+		renderQuadList(poseStack, vertexConsumer, list, is, i, j, itemDisplayContext != ItemDisplayContext.GUI);
 	}
 
 	public static VertexConsumer getSpecialFoilBuffer(MultiBufferSource multiBufferSource, RenderType renderType, PoseStack.Pose pose) { // Made public for Sodium FRAPI integration
@@ -97,11 +97,11 @@ public class ItemRenderer {
 		return i >= 0 && i < is.length ? is[i] : -1;
 	}
 
-	private static void renderQuadList(PoseStack poseStack, VertexConsumer vertexConsumer, List<BakedQuad> list, int[] is, int i, int j) {
+	private static void renderQuadList(PoseStack poseStack, VertexConsumer vertexConsumer, List<BakedQuad> list, int[] is, int i, int j, boolean allowSodiumFastPath) {
 		// Sodium: Use fast rendering path if available (merged from ItemRendererMixin)
 		var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 
-		if (writer != null && !list.isEmpty()) {
+		if (allowSodiumFastPath && writer != null && !list.isEmpty()) {
 			sodium$renderBakedItemQuads(poseStack.last(), writer, list, is, i, j);
 			return;
 		}

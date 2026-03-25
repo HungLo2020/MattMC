@@ -11,10 +11,13 @@ import it.unimi.dsi.fastutil.ints.IntIterator;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicTextureTarget;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixinterface.GpuTextureInterface {
+public class GlTexture extends GpuTexture {
 	protected final int id;
 	private final Int2IntMap fboCache = new Int2IntOpenHashMap();
 	protected boolean closed;
@@ -40,12 +43,21 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	}
 
 	private void destroyImmediately() {
-		GlStateManager._deleteTexture(this.id);
+		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(this.id);
 		IntIterator var1 = this.fboCache.values().iterator();
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		while (var1.hasNext()) {
 			int i = (Integer)var1.next();
-			GlStateManager._glDeleteFramebuffers(i);
+			if (VulkanicAPI.getReadFramebufferBinding() == i) {
+				VulkanicAPI.bindReadFramebuffer(ctx, 0);
+			}
+
+			if (VulkanicAPI.getDrawFramebufferBinding() == i) {
+				VulkanicAPI.bindDrawFramebuffer(ctx, 0);
+			}
+
+			VulkanicAPI.deleteFramebuffer(ctx, i);
 		}
 	}
 
@@ -66,49 +78,87 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	public void flushModeChanges(int i) {
 		if (this.modesDirty) {
 			// Iris: From MixinGpuTexture - use IrisRenderSystem.texParameteri instead of GlStateManager._texParameter
-			iris$texParameterDSA(i, 10242, GlConst.toGl(this.addressModeU));
-			iris$texParameterDSA(i, 10243, GlConst.toGl(this.addressModeV));
+			iris$texParameterDSA(i, VulkanicTextureParameterName.WRAP_S, toVulkanicTextureParameterValue(this.addressModeU));
+			iris$texParameterDSA(i, VulkanicTextureParameterName.WRAP_T, toVulkanicTextureParameterValue(this.addressModeV));
 			switch (this.minFilter) {
 				case NEAREST:
-					iris$texParameterDSA(i, 10241, this.useMipmaps ? 9986 : 9728);
+					iris$texParameterDSA(
+						i,
+						VulkanicTextureParameterName.MIN_FILTER,
+						this.useMipmaps ? VulkanicTextureParameterValue.NEAREST_MIPMAP_LINEAR : VulkanicTextureParameterValue.NEAREST
+					);
 					break;
 				case LINEAR:
-					iris$texParameterDSA(i, 10241, this.useMipmaps ? 9987 : 9729);
+					iris$texParameterDSA(
+						i,
+						VulkanicTextureParameterName.MIN_FILTER,
+						this.useMipmaps ? VulkanicTextureParameterValue.LINEAR_MIPMAP_LINEAR : VulkanicTextureParameterValue.LINEAR
+					);
 			}
 
 			switch (this.magFilter) {
 				case NEAREST:
-					iris$texParameterDSA(i, 10240, 9728);
+					iris$texParameterDSA(i, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.NEAREST);
 					break;
 				case LINEAR:
-					iris$texParameterDSA(i, 10240, 9729);
+					iris$texParameterDSA(i, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
 			}
 
 			this.modesDirty = false;
 		}
 	}
-	
-	// Iris: From MixinGpuTexture - helper method for DSA texture parameter setting with mipmap non-linear handling
-	private void iris$texParameterDSA(int target, int pname, int param) {
-		int newId = param;
 
-		// Handle mipmap non-linear flag
-		if (this.iris$mipmapNonLinear && (param == 9987 || param == 9986)) { // GL_LINEAR_MIPMAP_LINEAR or GL_NEAREST_MIPMAP_LINEAR
-			newId = (param == 9987 ? 9985 : 9984); // GL_LINEAR_MIPMAP_NEAREST or GL_NEAREST_MIPMAP_NEAREST
-		}
-
-		net.irisshaders.iris.gl.IrisRenderSystem.texParameteri(this.id, target, pname, newId);
+	public void flushModeChanges(VulkanicTextureTarget target) {
+		this.flushModeChanges(target.toLegacyGlTarget());
 	}
 
+	public void flushModeChanges2D() {
+		this.flushModeChanges(VulkanicTextureTarget.TEXTURE_2D);
+	}
+	
+	// Iris: From MixinGpuTexture - helper method for DSA texture parameter setting with mipmap non-linear handling
+	private void iris$texParameterDSA(int target, VulkanicTextureParameterName pname, VulkanicTextureParameterValue param) {
+		VulkanicTextureParameterValue effectiveParam = param;
+
+		if (this.iris$mipmapNonLinear) {
+			if (param == VulkanicTextureParameterValue.LINEAR_MIPMAP_LINEAR) {
+				effectiveParam = VulkanicTextureParameterValue.LINEAR_MIPMAP_NEAREST;
+			} else if (param == VulkanicTextureParameterValue.NEAREST_MIPMAP_LINEAR) {
+				effectiveParam = VulkanicTextureParameterValue.NEAREST_MIPMAP_NEAREST;
+			}
+		}
+
+		net.irisshaders.iris.gl.IrisRenderSystem.texParameteri(this.id, target, pname, effectiveParam);
+	}
+
+	private static VulkanicTextureParameterValue toVulkanicTextureParameterValue(AddressMode addressMode) {
+		return switch (addressMode) {
+			case REPEAT -> VulkanicTextureParameterValue.REPEAT;
+			case CLAMP_TO_EDGE -> VulkanicTextureParameterValue.CLAMP_TO_EDGE;
+		};
+	}
+
+	@Deprecated
 	public int glId() {
+		return this.id;
+	}
+
+	/**
+	 * Returns the raw OpenGL texture object name for backend seam extraction.
+	 *
+	 * <p>Prefer backend-neutral handle resolution at callsites. This accessor exists
+	 * so OpenGL backend bridge code can extract a concrete GL handle when required.</p>
+	 */
+	public int getGlHandle() {
 		return this.id;
 	}
 
 	// Iris: From MixinGpuTexture - GpuTextureInterface implementation
 	@Override
+	@Deprecated
 	public int iris$getGlId() {
-		this.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
-		return this.glId();
+		this.flushModeChanges2D();
+		return this.id;
 	}
 	
 	@Override

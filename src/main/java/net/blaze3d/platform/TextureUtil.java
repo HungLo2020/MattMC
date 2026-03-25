@@ -57,8 +57,8 @@ public class TextureUtil {
 			j += gpuTexture.getFormat().pixelSize() * gpuTexture.getWidth(k) * gpuTexture.getHeight(k);
 		}
 
-		GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(() -> "Texture output buffer", 9, j);
-		CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+		GpuBuffer gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Texture output buffer", 9, j);
+		CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.createCommandEncoder();
 		Runnable runnable = () -> {
 			try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(gpuBuffer, true, false)) {
 				int jx = 0;

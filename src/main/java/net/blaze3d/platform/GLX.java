@@ -52,6 +52,10 @@ public class GLX {
 			String stringx = l == 0L ? "" : MemoryUtil.memUTF8(l);
 			list.add(String.format(Locale.ROOT, "GLFW error during init: [0x%X]%s", i, stringx));
 		});
+		if (net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+			// This line is removed to allow the updated NVIDIA driver to use the default X11 WSI route.
+			// GLFW.glfwInitHint(GLFW.GLFW_X11_XCB_VULKAN_SURFACE, GLFW.GLFW_FALSE);
+		}
 		if (!GLFW.glfwInit()) {
 			throw new IllegalStateException("Failed to initialize GLFW, errors: " + Joiner.on(",").join(list));
 		} else {
@@ -61,7 +65,7 @@ public class GLX {
 				LOGGER.error("GLFW error collected during initialization: {}", string);
 			}
 
-			RenderSystem.setErrorCallback(gLFWErrorCallback);
+			net.vulkanic.VulkanicAPI.setErrorCallback(gLFWErrorCallback);
 			return longSupplier;
 		}
 	}
