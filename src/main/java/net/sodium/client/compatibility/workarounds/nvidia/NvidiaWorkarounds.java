@@ -11,6 +11,8 @@ import net.sodium.client.platform.windows.WindowsCommandLine;
 import net.sodium.client.platform.windows.WindowsFileVersion;
 import net.sodium.client.platform.windows.api.d3dkmt.D3DKMT;
 import org.jetbrains.annotations.Nullable;
+import net.vulkanic.CommandContext;
+import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,12 +125,13 @@ public class NvidiaWorkarounds {
         // On Windows, the NVIDIA drivers do not have any environment variable to control whether
         // "Threaded Optimizations" are enabled. But we can enable the "GL_DEBUG_OUTPUT_SYNCHRONOUS" option to
         // achieve the same effect.
-        var capabilities = VulkanicAPI.obtainGraphicsCapabilities();
+        var capabilities = VulkanicAPI.getGraphicsCapabilities();
 
-        if (capabilities.GL_KHR_debug) {
+        if (capabilities.supports(GraphicsFeature.DEBUG_OUTPUT_CONTROL)) {
             LOGGER.info("Enabling GL_DEBUG_OUTPUT_SYNCHRONOUS to force the NVIDIA driver to disable threaded " +
                     "command submission");
-            VulkanicAPI.enable(33346); // GL_DEBUG_OUTPUT_SYNCHRONOUS (KHRDebug.GL_DEBUG_OUTPUT_SYNCHRONOUS)
+            CommandContext ctx = VulkanicAPI.getCommandContext();
+            VulkanicAPI.setDebugOutputSynchronousEnabled(ctx, true);
         } else {
             LOGGER.error("GL_KHR_debug does not appear to be supported, unable to disable threaded " +
                     "command submission!");

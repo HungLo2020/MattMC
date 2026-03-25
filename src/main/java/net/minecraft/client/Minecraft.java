@@ -28,6 +28,7 @@ import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.systems.TimerQuery;
 import net.blaze3d.vertex.Tesselator;
+import net.vulkanic.VulkanicAPI;
 import com.mojang.datafixers.DataFixer;
 import com.mojang.jtracy.DiscontinuousFrame;
 import com.mojang.jtracy.TracyClient;
@@ -263,6 +264,7 @@ import org.slf4j.Logger;
 public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements WindowEventHandler {
 	static Minecraft instance;
 	private static final Logger LOGGER = LogUtils.getLogger();
+	private static int DEBUG_FPS_LIMIT_LOGS = 0;
 	private static final int MAX_TICKS_PER_UPDATE = 10;
 	public static final ResourceLocation DEFAULT_FONT = ResourceLocation.withDefaultNamespace("default");
 	public static final ResourceLocation UNIFORM_FONT = ResourceLocation.withDefaultNamespace("uniform");
@@ -457,7 +459,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.running = true;
 		this.tutorial = new Tutorial(this, this.options);
 		this.hotbarManager = new HotbarManager(path, this.fixerUpper);
-		LOGGER.info("Backend library: {}", RenderSystem.getBackendDescription());
+		LOGGER.info("Backend library: {}", VulkanicAPI.getBackendDescription());
 		DisplayData displayData = gameConfig.display;
 		if (this.options.overrideHeight > 0 && this.options.overrideWidth > 0) {
 			displayData = gameConfig.display.withSize(this.options.overrideWidth, this.options.overrideHeight);
@@ -469,7 +471,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			LOGGER.warn("Detected unexpected shutdown during last game startup: resetting fullscreen mode");
 		}
 
-		Util.timeSource = RenderSystem.initBackendSystem();
+		Util.timeSource = VulkanicAPI.initBackendSystem();
 		this.virtualScreen = new VirtualScreen(this);
 		this.window = this.virtualScreen.newWindow(displayData, this.options.fullscreenVideoModeString, this.createTitle());
 		this.setWindowActive(true);
@@ -501,7 +503,12 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			(resourceLocation, shaderType) -> this.getShaderManager().getShader(resourceLocation, shaderType),
 			gameConfig.game.renderDebugLabels
 		);
-		LOGGER.info("Using optional rendering extensions: {}", String.join(", ", RenderSystem.getDevice().getEnabledExtensions()));
+		List<String> optionalFeatureNames = VulkanicAPI.getBackendOptionalFeatureNames();
+		if (optionalFeatureNames.isEmpty()) {
+			LOGGER.info("No optional rendering features reported by the active backend device");
+		} else {
+			LOGGER.info("Using optional rendering features: {}", String.join(", ", optionalFeatureNames));
+		}
 		this.mainRenderTarget = new MainTarget(this.window.getWidth(), this.window.getHeight());
 		this.resourceManager = new ReloadableResourceManager(PackType.CLIENT_RESOURCES);
 		this.resourcePackRepository.reload();
@@ -542,7 +549,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.resourceManager.registerReloadListener(new FoliageColorReloadListener());
 		this.resourceManager.registerReloadListener(new DryFoliageColorReloadListener());
 		this.window.setErrorSection("Startup");
-		RenderSystem.setupDefaultState();
+		VulkanicAPI.setupDefaultState();
 		this.window.setErrorSection("Post startup");
 		this.blockColors = BlockColors.createDefault();
 		this.modelManager = new ModelManager(this.blockColors, this.atlasManager, this.playerSkinRenderCache);
@@ -622,7 +629,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.resourceManager.registerReloadListener(this.gpuWarnlistManager);
 		this.resourceManager.registerReloadListener(this.regionalCompliancies);
 		this.gui = new Gui(this);
-		RenderSystem.setErrorCallback(this::onFullscreenError);
+		VulkanicAPI.setErrorCallback(this::onFullscreenError);
 		if (this.mainRenderTarget.width != this.window.getWidth() || this.mainRenderTarget.height != this.window.getHeight()) {
 			StringBuilder stringBuilder = new StringBuilder(
 				"Recovering from unsupported resolution ("
@@ -633,7 +640,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			);
 
 			try {
-				GpuDevice gpuDevice = RenderSystem.getDevice();
+				GpuDevice gpuDevice = VulkanicAPI.getDevice();
 				List<String> list = gpuDevice.getLastDebugMessages();
 				if (!list.isEmpty()) {
 					stringBuilder.append("\n\nReported GL debug messages:\n").append(String.join("\n", list));
@@ -1299,11 +1306,12 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 			FreeTypeUtil.destroy();
 			Util.shutdownExecutors();
-			RenderSystem.getDevice().close();
+			VulkanicAPI.getDevice().close();
 		} catch (Throwable var5) {
 			LOGGER.error("Shutdown failure!", var5);
 			throw var5;
 		} finally {
+			RenderSystem.cleanupRendererBootstrapResources();
 			this.virtualScreen.close();
 			this.window.close();
 		}
@@ -1352,7 +1360,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		this.window.setErrorSection("Render");
 		profilerFiller.push("gpuAsync");
-		RenderSystem.executePendingTasks();
+		VulkanicAPI.executePendingFenceTasks();
 		profilerFiller.popPush("sound");
 		this.soundManager.updateSource(this.gameRenderer.getMainCamera());
 		profilerFiller.popPush("toasts");
@@ -1373,7 +1381,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		RenderTarget renderTarget = this.getMainRenderTarget();
-		RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
+		VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 		profilerFiller.push("gameRenderer");
 		startTime = Util.getNanos();
 		if (!this.noRender) {
@@ -1401,8 +1409,27 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		this.window.updateDisplay(this.tracyFrameCapture);
 		int k = this.framerateLimitTracker.getFramerateLimit();
+		if (DEBUG_FPS_LIMIT_LOGS < 20) {
+			DEBUG_FPS_LIMIT_LOGS++;
+			net.blaze3d.textures.GpuTexture mainColorTexture = renderTarget.getColorTexture();
+			int mainColorTextureId = mainColorTexture == null ? 0 : net.vulkanic.VulkanicCoreAPI.textureId(mainColorTexture);
+			String mainColorTextureLabel = mainColorTexture == null ? "null" : mainColorTexture.getLabel();
+			LOGGER.info(
+				"FPS limit debug#{}: limit={} reason={} iconified={} minimized={} levelPresent={} screen={} overlay={} mainColorTexId={} mainColorTexLabel={}",
+				DEBUG_FPS_LIMIT_LOGS,
+				k,
+				this.framerateLimitTracker.getThrottleReason(),
+				this.window.isIconified(),
+				this.window.isMinimized(),
+				this.level != null,
+				this.screen == null ? "null" : this.screen.getClass().getSimpleName(),
+				this.overlay == null ? "null" : this.overlay.getClass().getSimpleName(),
+				mainColorTextureId,
+				mainColorTextureLabel
+			);
+		}
 		if (k < 260) {
-			RenderSystem.limitDisplayFPS(k);
+			VulkanicAPI.limitDisplayFPS(k);
 		}
 
 		profilerFiller.pop();
@@ -2478,13 +2505,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			systemReport.setDetail("Launcher name", string2);
 		}
 
-		systemReport.setDetail("Backend library", RenderSystem::getBackendDescription);
-		systemReport.setDetail("Backend API", RenderSystem::getApiDescription);
+		systemReport.setDetail("Backend library", VulkanicAPI::getBackendDescription);
+		systemReport.setDetail("Backend API", VulkanicAPI::getApiDescription);
 		systemReport.setDetail("Window size", () -> minecraft != null ? minecraft.window.getWidth() + "x" + minecraft.window.getHeight() : "<not initialized>");
 		systemReport.setDetail("GFLW Platform", Window::getPlatform);
-		systemReport.setDetail("Render Extensions", () -> String.join(", ", RenderSystem.getDevice().getEnabledExtensions()));
+		systemReport.setDetail("Render Features", () -> String.join(", ", VulkanicAPI.getBackendOptionalFeatureNames()));
 		systemReport.setDetail("GL debug messages", () -> {
-			GpuDevice gpuDevice = RenderSystem.tryGetDevice();
+			GpuDevice gpuDevice = VulkanicAPI.tryGetDevice();
 			if (gpuDevice == null) {
 				return "<no renderer available>";
 			} else {

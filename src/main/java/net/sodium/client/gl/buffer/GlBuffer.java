@@ -1,13 +1,15 @@
 package net.sodium.client.gl.buffer;
 
 import net.sodium.client.gl.GlObject;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public abstract class GlBuffer extends GlObject {
     private GlBufferMapping activeMapping;
 
     protected GlBuffer() {
-        this.setHandle(VulkanicAPI.allocateBufferObject());
+        CommandContext ctx = VulkanicAPI.getCommandContext();
+        this.setHandle(VulkanicAPI.createBuffer(ctx));
     }
 
     public GlBufferMapping getActiveMapping() {

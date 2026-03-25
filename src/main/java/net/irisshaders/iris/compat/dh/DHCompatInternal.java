@@ -1,6 +1,5 @@
 package net.irisshaders.iris.compat.dh;
 
-import net.blaze3d.opengl.GlStateManager;
 import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiFramebuffer;
 import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiGenericObjectShaderProgram;
@@ -270,9 +269,9 @@ public class DHCompatInternal {
 	public void copyTranslucents(int width, int height) {
 		if (translucentDepthDirty) {
 			translucentDepthDirty = false;
-			GlStateManager._bindTexture(depthTexNoTranslucent.getTextureId());
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), depthTexNoTranslucent.getTextureId());
 			dhTerrainFramebuffer.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, DepthBufferFormat.DEPTH32F.getGlInternalFormat(), 0, 0, width, height, 0);
+			IrisRenderSystem.copyTexImage2D(0, DepthBufferFormat.DEPTH32F.getGlInternalFormat(), 0, 0, width, height, 0);
 		} else {
 			DepthCopyStrategy.fastest(false).copy(dhTerrainFramebuffer, storedDepthTex, null, depthTexNoTranslucent.getTextureId(), width, height);
 		}

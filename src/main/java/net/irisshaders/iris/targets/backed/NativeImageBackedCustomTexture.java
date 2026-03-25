@@ -1,7 +1,6 @@
 package net.irisshaders.iris.targets.backed;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
@@ -21,18 +20,16 @@ public class NativeImageBackedCustomTexture extends DynamicTexture implements Te
 		// By default, images are unblurred and not clamped.
 
 		if (textureData.getFilteringData().shouldBlur()) {
-			IrisRenderSystem.texParameteri(getId(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			IrisRenderSystem.texParameteri(getId(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			IrisRenderSystem.setTextureLinearFiltering(getId());
 		}
 
 		if (textureData.getFilteringData().shouldClamp()) {
-			IrisRenderSystem.texParameteri(getId(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
-			IrisRenderSystem.texParameteri(getId(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
+			IrisRenderSystem.setTextureWrapMode2D(getId(), true);
 		}
 	}
 
 	private int getId() {
-		return this.texture.iris$getGlId();
+		return net.vulkanic.VulkanicCoreAPI.textureId(this.texture);
 	}
 
 	private static NativeImage create(byte[] content) throws IOException {
@@ -47,7 +44,7 @@ public class NativeImageBackedCustomTexture extends DynamicTexture implements Te
 	public void upload() {
 		NativeImage image = Objects.requireNonNull(getPixels());
 
-		RenderSystem.getDevice().createCommandEncoder().writeToTexture(this.texture, image);
+		VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, image);
 	}
 
 	@Override

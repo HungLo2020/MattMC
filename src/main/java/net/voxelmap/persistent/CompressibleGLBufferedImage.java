@@ -2,10 +2,8 @@ package net.voxelmap.persistent;
 
 import net.voxelmap.VoxelConstants;
 import net.voxelmap.util.CompressionUtils;
-import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.platform.NativeImage;
 import net.blaze3d.platform.NativeImage.Format;
-import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -60,7 +58,7 @@ public class CompressibleGLBufferedImage {
     }
 
     public void deleteTexture() {
-        if (!RenderSystem.isOnRenderThread()) {
+        if (!VulkanicAPI.isOnRenderThread()) {
             VoxelConstants.getLogger().log(Level.WARN, "Texture unload call from wrong thread", new Exception());
             return;
         }
@@ -71,7 +69,7 @@ public class CompressibleGLBufferedImage {
     }
 
     public void uploadToTexture() {
-        if (!RenderSystem.isOnRenderThread()) {
+        if (!VulkanicAPI.isOnRenderThread()) {
             VoxelConstants.getLogger().log(Level.WARN, "Texture upload call from wrong thread", new Exception());
             return;
         }
@@ -101,8 +99,9 @@ public class CompressibleGLBufferedImage {
         ByteBuffer outBuffer = MemoryUtil.memByteBuffer(this.texture.getPixels().getPointer(), imageBytes);
         MemoryUtil.memCopy(buffer, outBuffer);
         this.texture.upload();
-        VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, ((GlTexture) this.texture.getTexture()).glId());
-        VulkanicAPI.generateMipmap(VulkanicAPI.GL_TEXTURE_2D);
+        // Use DSA mipmap generation — avoids mutating the global GL texture bind state
+        // and requires only a single VulkanicAPI call instead of a bind + generate pair.
+        VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicCoreAPI.textureId(this.texture.getTexture()));
         this.compress();
     }
 

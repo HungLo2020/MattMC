@@ -25,7 +25,7 @@ fi
 cd "$PROJECT_ROOT"
 
 # Destination directory (override with: DEST_DIR=/path ./ExportJar.sh)
-DEST_DIR="${DEST_DIR:-/home/matt/Documents/MattMC/lib}"
+DEST_DIR="${DEST_DIR:-/home/matt/Games/MattMC/lib}"
 
 echo "========================================="
 echo "  MattMC Jar Export Script"

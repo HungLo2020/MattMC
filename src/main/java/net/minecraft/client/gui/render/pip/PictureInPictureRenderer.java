@@ -1,7 +1,6 @@
 package net.minecraft.client.gui.render.pip;
 
 import net.blaze3d.ProjectionType;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
@@ -46,16 +45,16 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 			this.blitTexture(pictureInPictureRenderState, guiRenderState);
 		} else {
 			this.prepareTexturesAndProjection(bl, j, k);
-			RenderSystem.outputColorTextureOverride = this.textureView;
-			RenderSystem.outputDepthTextureOverride = this.depthTextureView;
+			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(this.textureView);
+			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(this.depthTextureView);
 			PoseStack poseStack = new PoseStack();
 			poseStack.translate(j / 2.0F, this.getTranslateY(k, i), 0.0F);
 			float f = i * pictureInPictureRenderState.scale();
 			poseStack.scale(f, f, -f);
 			this.renderToTexture(pictureInPictureRenderState, poseStack);
 			this.bufferSource.endBatch();
-			RenderSystem.outputColorTextureOverride = null;
-			RenderSystem.outputDepthTextureOverride = null;
+			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(null);
+			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(null);
 			this.blitTexture(pictureInPictureRenderState, guiRenderState);
 		}
 	}
@@ -93,17 +92,16 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 			this.depthTextureView = null;
 		}
 
-		GpuDevice gpuDevice = RenderSystem.getDevice();
 		if (this.texture == null) {
-			this.texture = gpuDevice.createTexture(() -> "UI " + this.getTextureLabel() + " texture", 12, TextureFormat.RGBA8, i, j, 1, 1);
+			this.texture = net.vulkanic.VulkanicAPI.createTexture(() -> "UI " + this.getTextureLabel() + " texture", 12, TextureFormat.RGBA8, i, j, 1, 1);
 			this.texture.setTextureFilter(FilterMode.NEAREST, false);
-			this.textureView = gpuDevice.createTextureView(this.texture);
-			this.depthTexture = gpuDevice.createTexture(() -> "UI " + this.getTextureLabel() + " depth texture", 8, TextureFormat.DEPTH32, i, j, 1, 1);
-			this.depthTextureView = gpuDevice.createTextureView(this.depthTexture);
+			this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
+			this.depthTexture = net.vulkanic.VulkanicAPI.createTexture(() -> "UI " + this.getTextureLabel() + " depth texture", 8, TextureFormat.DEPTH32, i, j, 1, 1);
+			this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
 		}
 
-		gpuDevice.createCommandEncoder().clearColorAndDepthTextures(this.texture, 0, this.depthTexture, 1.0);
-		RenderSystem.setProjectionMatrix(this.projectionMatrixBuffer.getBuffer(i, j), ProjectionType.ORTHOGRAPHIC);
+		net.vulkanic.VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.texture, 0, this.depthTexture, 1.0);
+		net.vulkanic.VulkanicAPI.setProjectionMatrix(this.projectionMatrixBuffer.getBuffer(i, j), ProjectionType.ORTHOGRAPHIC);
 	}
 
 	protected boolean textureIsReadyToBlit(T pictureInPictureRenderState) {

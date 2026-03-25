@@ -5,7 +5,6 @@ import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.platform.Monitor;
 import net.blaze3d.platform.VideoMode;
 import net.blaze3d.platform.Window;
-import net.blaze3d.systems.RenderSystem;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.compatibility.environment.OsUtils;
 import net.sodium.client.compatibility.workarounds.Workarounds;
@@ -25,6 +24,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.client.PanoramaTheme;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.GraphicsFeature;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -253,7 +253,7 @@ public class SodiumGameOptionPages {
                             if (Minecraft.useShaderTransparency()) {
                                 RenderTarget framebuffer = Minecraft.getInstance().levelRenderer.getCloudsTarget();
                                 if (framebuffer != null) {
-                                    RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorTexture(), 0xFFFFFFFF, framebuffer.getDepthTexture(), 1.0f);
+                                                                        VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorTexture(), 0xFFFFFFFF, framebuffer.getDepthTexture(), 1.0f);
                                 }
                             }
                         }, opts -> opts.cloudStatus().get())
@@ -439,8 +439,8 @@ public class SodiumGameOptionPages {
     }
 
     private static boolean supportsNoErrorContext() {
-        var capabilities = VulkanicAPI.obtainGraphicsCapabilities();
-        return (capabilities.OpenGL46 || capabilities.GL_KHR_no_error)
+        var capabilities = VulkanicAPI.getGraphicsCapabilities();
+                return capabilities.supports(GraphicsFeature.NO_ERROR_CONTEXT)
                 && !Workarounds.isWorkaroundEnabled(Workarounds.Reference.NO_ERROR_CONTEXT_UNSUPPORTED);
     }
 

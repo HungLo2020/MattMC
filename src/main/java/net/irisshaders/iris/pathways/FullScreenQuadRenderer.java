@@ -1,12 +1,12 @@
 package net.irisshaders.iris.pathways;
 
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.vertex.BufferBuilder;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.MeshData;
 import net.blaze3d.vertex.Tesselator;
 import net.blaze3d.vertex.VertexFormat;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Renders a full-screen textured quad to the screen. Used in composite / deferred rendering.
@@ -24,7 +24,7 @@ public class FullScreenQuadRenderer {
 		bufferBuilder.addVertex(0.0F, 1.0F, 0.0F).setUv(0.0F, 1.0F);
 		MeshData meshData = bufferBuilder.build();
 
-		quad = RenderSystem.getDevice().createBuffer(() -> "Quad", GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_VERTEX, meshData.vertexBuffer());
+		quad = VulkanicAPI.createBuffer(() -> "Quad", GpuBuffer.USAGE_COPY_DST | GpuBuffer.USAGE_VERTEX, meshData.vertexBuffer());
 		meshData.close();
 		Tesselator.getInstance().clear();
 

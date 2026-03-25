@@ -1,6 +1,5 @@
 package net.irisshaders.iris.gl.program;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
@@ -21,12 +20,12 @@ public final class Program extends GlResource {
 	public static void unbind() {
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
-		GlStateManager._glUseProgram(0);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(0);
 	}
 
 	public void use() {
-		IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
-		GlStateManager._glUseProgram(getGlId());
+		IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getGlId());
 
 		uniforms.update();
 		samplers.update();
@@ -34,7 +33,7 @@ public final class Program extends GlResource {
 	}
 
 	public void destroyInternal() {
-		GlStateManager.glDeleteProgram(getGlId());
+		VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), getGlId());
 	}
 
 	/**

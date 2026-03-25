@@ -68,6 +68,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.BlockDestructionProgress;
+import net.vulkanic.VulkanicAPI;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.util.ARGB;
@@ -471,7 +472,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.irisshaders.iris.gl.IrisRenderSystem.backupAndDisableCullingState(this.pipeline.shouldDisableOcclusionCulling());
 		
 		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
-			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicAPI.GL_LINE);
+			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicPolygonMode.LINE);
 		}
 		
 		// Iris: Begin level render immediate state (from MixinLevelRenderer vertices.immediate)
@@ -530,7 +531,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			.extract(this.level.getWorldBorder(), vec3, this.minecraft.options.getEffectiveRenderDistance() * 16, this.levelRenderState.worldBorderRenderState);
 		profilerFiller.pop();
 		profilerFiller.popPush("setupFrameGraph");
-		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.mul(matrix4f);
 		FrameGraphBuilder frameGraphBuilder = new FrameGraphBuilder();
@@ -556,8 +557,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		framePass.executes(
 			() -> {
 				RenderTarget renderTarget = this.minecraft.getMainRenderTarget();
-				RenderSystem.getDevice()
-					.createCommandEncoder()
+				VulkanicAPI.createCommandEncoder()
 					.clearColorAndDepthTextures(
 						renderTarget.getColorTexture(), ARGB.colorFromFloat(0.0F, vector4f.x, vector4f.y, vector4f.z), renderTarget.getDepthTexture(), 1.0
 					);
@@ -569,9 +569,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		this.targets.main = irisSetupPass.readsAndWrites(this.targets.main);
 		irisSetupPass.requires(framePass);
 		irisSetupPass.executes(() -> {
-			GpuBufferSlice params = RenderSystem.getShaderFog();
+			GpuBufferSlice params = VulkanicAPI.getShaderFog();
 			this.pipeline.onBeginClear();
-			RenderSystem.setShaderFog(params);
+			VulkanicAPI.setShaderFog(params);
 		});
 		
 		if (bl2) {
@@ -627,7 +627,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.minecraft.util.profiling.Profiler.get().popPush("iris_final");
 		
 		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
-			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicAPI.GL_FILL);
+			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicPolygonMode.FILL);
 		}
 		this.pipeline.finalizeLevelRendering();
 		
@@ -708,7 +708,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		ResourceHandle<RenderTarget> resourceHandle4 = this.targets.entityOutline;
 		framePass.executes(() -> {
 			iris$renderMainPassBody();
-			RenderSystem.setShaderFog(gpuBufferSlice);
+			VulkanicAPI.setShaderFog(gpuBufferSlice);
 			Vec3 vec3 = levelRenderState.cameraRenderState.pos;
 			double d = vec3.x();
 			double e = vec3.y();
@@ -723,7 +723,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 			if (this.shouldShowEntityOutlines() && resourceHandle4 != null) {
 				RenderTarget renderTarget = resourceHandle4.get();
-				RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
+				VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 			}
 
 			PoseStack poseStack = new PoseStack();
@@ -814,7 +814,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		ResourceHandle<RenderTarget> resourceHandle2 = this.targets.particles;
 		framePass.executes(() -> {
 			iris$renderParticlesPassBody();
-			RenderSystem.setShaderFog(gpuBufferSlice);
+			VulkanicAPI.setShaderFog(gpuBufferSlice);
 			if (resourceHandle2 != null) {
 				resourceHandle2.get().copyDepthFrom(resourceHandle.get());
 			}
@@ -855,7 +855,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		framePass.executes(() -> {
 			iris$renderWeatherPassBody();
-			RenderSystem.setShaderFog(gpuBufferSlice);
+			VulkanicAPI.setShaderFog(gpuBufferSlice);
 			MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
 			this.weatherEffectRenderer.render(bufferSource, vec3, this.levelRenderState.weatherRenderState);
 			// Iris: Reset phase after weather, before world border
@@ -881,15 +881,15 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 		ResourceHandle<RenderTarget> resourceHandle = this.targets.main;
 		framePass.executes(() -> {
-			RenderSystem.setShaderFog(gpuBufferSlice);
+			VulkanicAPI.setShaderFog(gpuBufferSlice);
 			PoseStack poseStack = new PoseStack();
 			MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
-			RenderSystem.outputColorTextureOverride = resourceHandle.get().getColorTextureView();
-			RenderSystem.outputDepthTextureOverride = resourceHandle.get().getDepthTextureView();
+			VulkanicAPI.setOutputColorTextureOverride(resourceHandle.get().getColorTextureView());
+			VulkanicAPI.setOutputDepthTextureOverride(resourceHandle.get().getDepthTextureView());
 			this.debugRenderer.render(poseStack, frustum, bufferSource, vec3.x, vec3.y, vec3.z, true);
 			bufferSource.endLastBatch();
-			RenderSystem.outputColorTextureOverride = null;
-			RenderSystem.outputDepthTextureOverride = null;
+			VulkanicAPI.setOutputColorTextureOverride(null);
+			VulkanicAPI.setOutputDepthTextureOverride(null);
 			this.checkPoseStack(poseStack);
 		});
 	}
@@ -1128,6 +1128,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	public void endFrame() {
 		this.cloudRenderer.endFrame();
+		if (this.renderer != null) {
+			this.renderer.endFrame();
+		}
 	}
 
 	public void captureFrustum() {
@@ -1181,7 +1184,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 				framePass.executes(
 					() -> {
 						iris$renderSkyPassBody();
-						RenderSystem.setShaderFog(gpuBufferSlice);
+						VulkanicAPI.setShaderFog(gpuBufferSlice);
 						if (skyRenderState.skyType == DimensionSpecialEffects.SkyType.END) {
 							this.skyRenderer.renderEndSky();
 							if (skyRenderState.endFlashIntensity > 1.0E-5F) {

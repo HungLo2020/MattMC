@@ -1,7 +1,6 @@
 package net.irisshaders.iris.compat.dh;
 
 import com.google.common.primitives.Ints;
-import net.blaze3d.systems.RenderSystem;
 import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
 import net.irisshaders.iris.gl.IrisRenderSystem;
@@ -13,7 +12,6 @@ import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.shader.GlShader;
 import net.irisshaders.iris.gl.shader.ShaderType;
 import net.irisshaders.iris.gl.state.FogMode;
-import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.pipeline.transform.PatchShaderType;
 import net.irisshaders.iris.pipeline.transform.ShaderPrinter;
@@ -27,7 +25,10 @@ import net.minecraft.client.Minecraft;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.FloatBuffer;
@@ -60,46 +61,47 @@ public class IrisLodRenderProgram {
 
 	// This will bind  AbstractVertexAttribute
 	private IrisLodRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
-		id = VulkanicAPI.constructProgramObject();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicProgramHandle program = VulkanicAPI.createShaderProgramHandle(ctx);
+		id = program.value();
 
-		VulkanicAPI.bindAttributeLocation(this.id, 0, "vPosition");
-		VulkanicAPI.bindAttributeLocation(this.id, 1, "iris_color");
-		VulkanicAPI.bindAttributeLocation(this.id, 2, "irisExtra");
+		VulkanicAPI.setAttributeLocation(ctx, this.id, 0, "vPosition");
+		VulkanicAPI.setAttributeLocation(ctx, this.id, 1, "iris_color");
+		VulkanicAPI.setAttributeLocation(ctx, this.id, 2, "irisExtra");
 
 		this.bufferBlendOverrides = bufferBlendOverrides;
 
 		GlShader vert = new GlShader(ShaderType.VERTEX, name + ".vsh", vertex);
-		VulkanicAPI.attachShaderToProgram(id, vert.getHandle());
+		VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(vert.getHandle()));
 
 		GlShader tessCont = null;
 		if (tessControl != null) {
 			tessCont = new GlShader(ShaderType.TESSELATION_CONTROL, name + ".tcs", tessControl);
-			VulkanicAPI.attachShaderToProgram(id, tessCont.getHandle());
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(tessCont.getHandle()));
 		}
 
 		GlShader tessE = null;
 		if (tessEval != null) {
 			tessE = new GlShader(ShaderType.TESSELATION_EVAL, name + ".tes", tessEval);
-			VulkanicAPI.attachShaderToProgram(id, tessE.getHandle());
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(tessE.getHandle()));
 		}
 
 		GlShader geom = null;
 		if (geometry != null) {
 			geom = new GlShader(ShaderType.GEOMETRY, name + ".gsh", geometry);
-			VulkanicAPI.attachShaderToProgram(id, geom.getHandle());
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(geom.getHandle()));
 		}
 
 		GlShader frag = new GlShader(ShaderType.FRAGMENT, name + ".fsh", fragment);
-		VulkanicAPI.attachShaderToProgram(id, frag.getHandle());
+		VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(frag.getHandle()));
 
-		VulkanicAPI.linkProgramBinary(this.id);
-		int status = VulkanicAPI.queryProgramParameter(this.id, VulkanicAPI.GL_LINK_STATUS);
-		if (status != 1) {
-			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.retrieveProgramInfoLog(this.id);
+		VulkanicAPI.linkProgram(ctx, program);
+		if (!VulkanicAPI.isProgramLinkSuccessful(ctx, program)) {
+			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.getProgramInfoLog(ctx, program);
 			this.free();
 			throw new RuntimeException(message);
 		} else {
-			VulkanicAPI.useProgram(this.id);
+			VulkanicAPI.bindShaderProgram(ctx, this.id);
 		}
 
 		vert.destroy();
@@ -181,18 +183,19 @@ public class IrisLodRenderProgram {
 	// Noise Uniforms
 
 	public int tryGetUniformLocation2(CharSequence name) {
-		return VulkanicAPI.locateUniformVariable(this.id, name);
+		return VulkanicAPI.getUniformLocation(VulkanicAPI.getCommandContext(), this.id, name);
 	}
 
 	public void setUniform(int index, Matrix4fc matrix) {
 		if (index == -1 || matrix == null) return;
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 			FloatBuffer buffer = stack.callocFloat(16);
 			matrix.get(buffer);
 			buffer.rewind();
 
-			VulkanicAPI.glUniformMatrix4fv(index, false, buffer);
+			VulkanicAPI.setUniformMatrix4fv(ctx, index, false, buffer);
 		}
 	}
 
@@ -210,7 +213,8 @@ public class IrisLodRenderProgram {
 
 	// Override ShaderProgram.bind()
 	public void bind() {
-		VulkanicAPI.useProgram(id);
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindShaderProgram(ctx, id);
 		if (blend != null) blend.apply();
 
 		for (BufferBlendOverride override : bufferBlendOverrides) {
@@ -219,21 +223,24 @@ public class IrisLodRenderProgram {
 	}
 
 	public void unbind() {
-		VulkanicAPI.useProgram(0);
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindShaderProgram(ctx, 0);
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
 		BlendModeOverride.restore();
 	}
 
 	public void free() {
-		VulkanicAPI.disposeProgramObject(id);
+		VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(id));
 	}
 
 	public void fillUniformData(Matrix4fc projection, Matrix4fc modelView, int worldYOffset, float partialTicks) {
-		VulkanicAPI.useProgram(id);
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindShaderProgram(ctx, id);
 
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
-		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, RenderSystem.getShaderTexture(2).texture().iris$getGlId());
+		int lightmapTextureId = IrisRenderSystem.getTextureBinding(2);
+		IrisRenderSystem.bindTextureToUnit(IrisSamplers.LIGHTMAP_TEXTURE_UNIT, lightmapTextureId);
 		setUniform(modelViewUniform, modelView);
 		setUniform(modelViewInverseUniform, modelView.invert(new Matrix4f()));
 		setUniform(projectionUniform, projection);
@@ -263,7 +270,7 @@ public class IrisLodRenderProgram {
 	}
 
 	private void setUniform(int index, float value) {
-		VulkanicAPI.glUniform1f(index, value);
+		VulkanicAPI.setUniform1f(VulkanicAPI.getCommandContext(), index, value);
 	}
 
 	public void setModelPos(DhApiVec3f modelPos) {
@@ -271,7 +278,7 @@ public class IrisLodRenderProgram {
 	}
 
 	private void setUniform(int index, DhApiVec3f pos) {
-		VulkanicAPI.glUniform3f(index, pos.x, pos.y, pos.z);
+		VulkanicAPI.setUniform3f(VulkanicAPI.getCommandContext(), index, pos.x, pos.y, pos.z);
 	}
 
 }

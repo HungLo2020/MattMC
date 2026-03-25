@@ -8,11 +8,15 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
+import net.vulkanic.VulkanicShaderStage;
+import net.vulkanic.VulkanicUniformLocation;
 import org.lwjgl.system.MemoryStack;
 
 import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 
 
@@ -29,6 +33,16 @@ public class ShaderProgram
 {
 	/** Stores the handle of the program. */
 	public final int id;
+
+	private static CommandContext commandContext()
+	{
+		return VulkanicAPI.getCommandContext();
+	}
+
+	private static VulkanicUniformLocation uniformLocation(int location)
+	{
+		return VulkanicUniformLocation.of(location);
+	}
 	
 	
 	
@@ -39,7 +53,13 @@ public class ShaderProgram
 	 */
 	public ShaderProgram(String vert, String frag, String fragDataOutputName, String[] attributes)
 	{
+		this(commandContext(), vert, frag, fragDataOutputName, attributes);
+	}
+
+	public ShaderProgram(CommandContext ctx, String vert, String frag, String fragDataOutputName, String[] attributes)
+	{
 		this(
+				ctx,
 				() -> Shader.loadFile(vert, false, new StringBuilder()).toString(),
 				() -> Shader.loadFile(frag, false, new StringBuilder()).toString(),
 				fragDataOutputName, attributes
@@ -48,7 +68,13 @@ public class ShaderProgram
 	
 	public ShaderProgram(Supplier<String> vert, Supplier<String> frag, String fragDataOutputName, String[] attributes)
 	{
+		this(commandContext(), vert, frag, fragDataOutputName, attributes);
+	}
+
+	public ShaderProgram(CommandContext ctx, Supplier<String> vert, Supplier<String> frag, String fragDataOutputName, String[] attributes)
+	{
 		this(
+				ctx,
 				new ArrayList<>(Arrays.asList(vert)),
 				new ArrayList<>(Arrays.asList(frag)),
 				attributes
@@ -58,45 +84,53 @@ public class ShaderProgram
 	
 	public ShaderProgram(List<Supplier<String>> vertSupplierList, List<Supplier<String>> fragSupplierList, String[] attributes)
 	{
-		this.id = VulkanicAPI.glCreateProgram();
+		this(commandContext(), vertSupplierList, fragSupplierList, attributes);
+	}
+
+	public ShaderProgram(CommandContext ctx, List<Supplier<String>> vertSupplierList, List<Supplier<String>> fragSupplierList, String[] attributes)
+	{
+		VulkanicProgramHandle program = VulkanicAPI.createShaderProgramHandle(ctx);
+		this.id = program.value();
 		
 		for (Supplier<String> vertSupplier : vertSupplierList)
 		{
-			Shader vertShader = new Shader(VulkanicAPI.GL_VERTEX_SHADER, vertSupplier.get());
-			VulkanicAPI.glAttachShader(this.id, vertShader.id);
-			vertShader.free(); // important!
+			Shader vertShader = new Shader(ctx, VulkanicShaderStage.VERTEX, vertSupplier.get());
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(vertShader.id));
+			vertShader.free(ctx); // important!
 		}
 		
 		for (Supplier<String> fragSupplier : fragSupplierList)
 		{
-			Shader fragShader = new Shader(VulkanicAPI.GL_FRAGMENT_SHADER, fragSupplier.get());
-			VulkanicAPI.glAttachShader(this.id, fragShader.id);
-			fragShader.free(); // important!
+			Shader fragShader = new Shader(ctx, VulkanicShaderStage.FRAGMENT, fragSupplier.get());
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(fragShader.id));
+			fragShader.free(ctx); // important!
 		}
 		
 		for (int i = 0; i < attributes.length; i++)
 		{
-			VulkanicAPI.glBindAttribLocation(this.id, i, attributes[i]);
+			VulkanicAPI.setAttributeLocation(ctx, this.id, i, attributes[i]);
 		}
-		VulkanicAPI.glLinkProgram(this.id);
+		VulkanicAPI.linkProgram(ctx, program);
 		
-		int status = VulkanicAPI.glGetProgrami(this.id, VulkanicAPI.GL_LINK_STATUS);
-		if (status != VulkanicAPI.GL_TRUE)
+		if (!VulkanicAPI.isProgramLinkSuccessful(ctx, program))
 		{
-			String message = "Shader Link Error. Details: " + VulkanicAPI.glGetProgramInfoLog(this.id);
-			this.free(); // important!
+			String message = "Shader Link Error. Details: " + VulkanicAPI.getProgramInfoLog(ctx, program);
+			this.free(ctx); // important!
 			throw new RuntimeException(message);
 		}
-		VulkanicAPI.glUseProgram(this.id); // This HAVE to be a direct call to prevent calling the overloaded version
+		VulkanicAPI.bindShaderProgram(ctx, this.id); // This HAVE to be a direct call to prevent calling the overloaded version
 	}
 	
 	
 	
 	
-	public void bind() { VulkanicAPI.glUseProgram(this.id); }
-	public void unbind() { VulkanicAPI.glUseProgram(0); }
+	public void bind() { this.bind(commandContext()); }
+	public void bind(CommandContext ctx) { VulkanicAPI.bindShaderProgram(ctx, this.id); }
+	public void unbind() { this.unbind(commandContext()); }
+	public void unbind(CommandContext ctx) { VulkanicAPI.bindShaderProgram(ctx, 0); }
 	
-	public void free() { VulkanicAPI.glDeleteProgram(this.id); }
+	public void free() { this.free(commandContext()); }
+	public void free(CommandContext ctx) { VulkanicAPI.deleteProgram(ctx, VulkanicProgramHandle.of(this.id)); }
 	
 	
 	
@@ -111,8 +145,11 @@ public class ShaderProgram
 	 * @throws RuntimeException if attribute not found
 	 */
 	public int getAttributeLocation(CharSequence name)
+	{ return this.getAttributeLocation(commandContext(), name); }
+
+	public int getAttributeLocation(CommandContext ctx, CharSequence name)
 	{
-		int i = VulkanicAPI.glGetAttribLocation(id, name);
+		int i = VulkanicAPI.getAttributeLocation(ctx, id, name);
 		if (i == -1) throw new RuntimeException("Attribute name not found: " + name);
 		return i;
 	}
@@ -121,7 +158,10 @@ public class ShaderProgram
 	 * Returns -1 if the attribute doesn't exist or has been optimized out.
 	 */
 	public int tryGetAttributeLocation(CharSequence name)
-	{ return VulkanicAPI.glGetAttribLocation(this.id, name); }
+	{ return this.tryGetAttributeLocation(commandContext(), name); }
+
+	public int tryGetAttributeLocation(CommandContext ctx, CharSequence name)
+	{ return VulkanicAPI.getAttributeLocation(ctx, this.id, name); }
 	
 	/**
 	 * WARNING: Slow native call! Cache it if possible!
@@ -133,8 +173,11 @@ public class ShaderProgram
 	 * @throws RuntimeException if uniform not found
 	 */
 	public int getUniformLocation(CharSequence name) throws RuntimeException
+	{ return this.getUniformLocation(commandContext(), name); }
+
+	public int getUniformLocation(CommandContext ctx, CharSequence name) throws RuntimeException
 	{
-		int i = VulkanicAPI.glGetUniformLocation(id, name);
+		int i = VulkanicAPI.resolveUniformLocation(ctx, id, name).value();
 		if (i == -1)
 		{
 			throw new RuntimeException("Uniform name not found: " + name);
@@ -145,53 +188,73 @@ public class ShaderProgram
 	// Same as above but without throwing errors.
 	// Return -1 if uniform doesn't exist or has been optimized out
 	public int tryGetUniformLocation(CharSequence name)
-	{ return VulkanicAPI.glGetUniformLocation(this.id, name); }
+	{ return this.tryGetUniformLocation(commandContext(), name); }
+
+	public int tryGetUniformLocation(CommandContext ctx, CharSequence name)
+	{ return VulkanicAPI.resolveUniformLocation(ctx, this.id, name).value(); }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, boolean value) { VulkanicAPI.glUniform1i(location, value ? 1 : 0); }
+	public void setUniform(int location, boolean value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, boolean value) { VulkanicAPI.setUniform1i(ctx, uniformLocation(location), value ? 1 : 0); }
 	/** @see ShaderProgram#setUniform(int, boolean) */
 	public void trySetUniform(int location, boolean value) { if (location != -1) { this.setUniform(location, value); } }
+	public void trySetUniform(CommandContext ctx, int location, boolean value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, int value) { VulkanicAPI.glUniform1i(location, value); }
+	public void setUniform(int location, int value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, int value) { VulkanicAPI.setUniform1i(ctx, uniformLocation(location), value); }
 	/** @see ShaderProgram#setUniform(int, int) */
 	public void trySetUniform(int location, int value) { if (location != -1) { this.setUniform(location, value); } }
+	public void trySetUniform(CommandContext ctx, int location, int value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, float value) { VulkanicAPI.glUniform1f(location, value); }
+	public void setUniform(int location, float value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, float value) { VulkanicAPI.setUniform1f(ctx, uniformLocation(location), value); }
 	/** @see ShaderProgram#setUniform(int, float) */
 	public void trySetUniform(int location, float value) { if (location != -1) { this.setUniform(location, value); } }
+	public void trySetUniform(CommandContext ctx, int location, float value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, Vec3f value) { VulkanicAPI.glUniform3f(location, value.x, value.y, value.z); }
+	public void setUniform(int location, Vec3f value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, Vec3f value) { VulkanicAPI.setUniform3f(ctx, uniformLocation(location).value(), value.x, value.y, value.z); }
 	/** @see ShaderProgram#setUniform(int, Vec3f) */
 	public void trySetUniform(int location, Vec3f value) { if (location != -1) { this.setUniform(location, value); } }
+	public void trySetUniform(CommandContext ctx, int location, Vec3f value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, DhApiVec3i value) { VulkanicAPI.glUniform3i(location, value.x, value.y, value.z); }
+	public void setUniform(int location, DhApiVec3i value) { this.setUniform(commandContext(), location, value); }
+	public void setUniform(CommandContext ctx, int location, DhApiVec3i value) { VulkanicAPI.setUniform3i(ctx, uniformLocation(location), value.x, value.y, value.z); }
 	/** @see ShaderProgram#setUniform(int, Mat4f) */
 	public void trySetUniform(int location, DhApiVec3i value) { if (location != -1) { this.setUniform(location, value); } }
+	public void trySetUniform(CommandContext ctx, int location, DhApiVec3i value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
 	public void setUniform(int location, Mat4f value)
+	{ this.setUniform(commandContext(), location, value); }
+
+	public void setUniform(CommandContext ctx, int location, Mat4f value)
 	{
 		try (MemoryStack stack = MemoryStack.stackPush())
 		{
 			FloatBuffer buffer = stack.mallocFloat(4 * 4);
 			value.store(buffer);
-			VulkanicAPI.glUniformMatrix4fv(location, false, buffer);
+			VulkanicAPI.setUniformMatrix4fv(ctx, uniformLocation(location), false, buffer);
 		}
 	}
 	/** @see ShaderProgram#setUniform(int, Mat4f) */
 	public void trySetUniform(int location, Mat4f value) { if (location != -1) { this.setUniform(location, value); } }
+	public void trySetUniform(CommandContext ctx, int location, Mat4f value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 	/**
 	 * Converts the color's RGBA values into values between 0 and 1. <br>
 	 * Requires a bound ShaderProgram.
 	 */
 	public void setUniform(int location, Color value)
+	{ this.setUniform(commandContext(), location, value); }
+
+	public void setUniform(CommandContext ctx, int location, Color value)
 	{
-		VulkanicAPI.glUniform4f(location, 
+		VulkanicAPI.setUniform4f(ctx, uniformLocation(location), 
 				value.getRed()   / 256.0f, 
 				value.getGreen() / 256.0f, 
 				value.getBlue()  / 256.0f, 
@@ -199,5 +262,6 @@ public class ShaderProgram
 	}
 	/** @see ShaderProgram#setUniform(int, Color) */
 	public void trySetUniform(int location, Color value) { if (location != -1) { this.setUniform(location, value); } }
+	public void trySetUniform(CommandContext ctx, int location, Color value) { if (location != -1) { this.setUniform(ctx, location, value); } }
 	
 }

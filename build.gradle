@@ -33,17 +33,24 @@ def useBundledDeps = bundledDepsDir.exists() && bundledDepsDir.isDirectory()
 
 if (useBundledDeps) {
     println "✓ Using bundled dependencies from libraries/deps/"
-    println "  Run './libraries/download-dependencies.sh' to update bundled dependencies"
+    println "  Run './Install.sh' to provision local runtime tooling (SPIR-V compiler)"
 }
 
 repositories {
-    // Always include Maven Central (for most dependencies)
+    // Add bundled dependencies as a flat directory repository (offline mode)
+    if (useBundledDeps) {
+        flatDir {
+            dirs bundledDepsDir
+        }
+    }
+    
+    // Maven Central (for most dependencies not in bundled set)
     mavenCentral()
     
-    // Only add remote repositories if bundled dependencies are NOT available
+    // Only add specialized remote repositories if bundled dependencies are NOT available
     if (!useBundledDeps) {
         println "⚠ Bundled dependencies not found. Using remote repositories."
-        println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
+        println "  Run './Install.sh' to provision local runtime tooling (SPIR-V compiler)."
         
         // Fabric Maven repository (for Fabric Loader dependencies)
         maven {
@@ -67,13 +74,6 @@ repositories {
             }
         }
     }
-    
-    // Add bundled dependencies as a flat directory repository
-    if (useBundledDeps) {
-        flatDir {
-            dirs bundledDepsDir
-        }
-    }
 }
 
 configurations.all {
@@ -88,10 +88,13 @@ configurations.all {
     }
 }
 
-// Exclude transitive ASM from dependencies that bring in older versions
-// This prevents conflicts with Fabric Loader's ASM 9.9 requirement
-configurations.runtimeClasspath {
-    exclude group: 'org.ow2.asm'
+// Exclude transitive ASM from dependencies ONLY when using bundled JARs
+// When useBundledDeps=true: Prevents conflicts between bundled ASM 9.9 JARs and transitive ASM 9.3
+// When useBundledDeps=false: ASM is provided via Maven dependencies and should NOT be excluded
+if (useBundledDeps) {
+    configurations.runtimeClasspath {
+        exclude group: 'org.ow2.asm'
+    }
 }
 
 // Minecraft 1.21.10 dependencies
@@ -147,9 +150,6 @@ dependencies {
     // JetBrains annotations
     implementation 'org.jetbrains:annotations:24.1.0'
     
-    // LZMA SDK for compression
-    implementation 'org.lz4:lz4-java:1.8.0'
-    
     // OSHI for system info
     implementation 'com.github.oshi:oshi-core:6.4.10'
     
@@ -168,6 +168,7 @@ dependencies {
     implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
     implementation 'org.lwjgl:lwjgl'
     implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-vulkan'
     implementation 'org.lwjgl:lwjgl-opengl'
     implementation 'org.lwjgl:lwjgl-openal'
     implementation 'org.lwjgl:lwjgl-stb'
@@ -427,6 +428,37 @@ if (isMacOS) {
 // Add macOS-specific JVM arguments for LWJGL/GLFW
 if (isMacOS) {
     clientJvmArgs += '-XstartOnFirstThread'
+}
+
+def resolveBundledSpirvCompilerPath() {
+    def osName = System.getProperty('os.name').toLowerCase()
+    def candidates = []
+
+    if (osName.contains('windows') || osName.contains('win')) {
+        candidates += 'libraries/deps/glslangValidator.exe'
+    } else {
+        candidates += 'libraries/deps/glslangValidator'
+    }
+
+    candidates += 'libraries/deps/bin/glslangValidator'
+    candidates += 'libraries/deps/bin/glslangValidator.exe'
+
+    for (def candidatePath : candidates) {
+        def candidate = file(candidatePath)
+        if (candidate.exists() && candidate.isFile()) {
+            return candidate.absolutePath
+        }
+    }
+
+    return null
+}
+
+def bundledSpirvCompilerPath = resolveBundledSpirvCompilerPath()
+if (bundledSpirvCompilerPath != null) {
+    clientJvmArgs += "-Dvulkanic.spirv.compiler=${bundledSpirvCompilerPath}"
+    println "✓ Using bundled SPIR-V compiler: ${bundledSpirvCompilerPath}"
+} else {
+    println "⚠ SPIR-V compiler not bundled. Run './Install.sh' to add glslangValidator in libraries/deps/."
 }
 
 // Helper method to configure JavaExec tasks to use bundled JDK (if available) or toolchain
@@ -947,6 +979,17 @@ tasks.register('clientDist') {
             }
             println "✅ JDK copied to distribution"
         }
+
+        // Copy bundled SPIR-V compiler if available
+        def bundledCompiler = file(resolveBundledSpirvCompilerPath() ?: '')
+        if (bundledCompiler.exists() && bundledCompiler.isFile()) {
+            copy {
+                from bundledCompiler
+                into "${distDir}/libraries/deps"
+            }
+            file("${distDir}/libraries/deps/${bundledCompiler.name}").setExecutable(true)
+            println "✅ Bundled SPIR-V compiler copied to ${distDir}/libraries/deps/${bundledCompiler.name}"
+        }
         
         // Assets are now loaded directly from the JAR - no filesystem copy needed!
         // This eliminates 407MB of duplication
@@ -1123,6 +1166,21 @@ tasks.register('performanceTest', Test) {
     // More memory for performance tests
     maxHeapSize = "4g"
     outputs.upToDateWhen { false }  // Always run performance tests to get fresh results
+}
+
+// ===== ARCHITECTURAL BOUNDARY ENFORCEMENT =====
+// Enforce architectural boundaries by running tests during compilation
+// This ensures that architectural violations (e.g., direct OpenGL/Vulkan imports
+// outside of backends/) will FAIL the build process, not just fail when tests are
+// manually run. See src/main/java/net/vulkanic/README.md for architectural principles.
+tasks.named('compileJava') {
+    finalizedBy test
+}
+
+// Also enforce boundaries before launching the game client so `runClient`
+// cannot execute with architectural violations.
+tasks.named('runClient') {
+    dependsOn test
 }
 
 // Task to run all tests (both misc and performance)

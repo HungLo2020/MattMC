@@ -1,9 +1,9 @@
 package net.irisshaders.iris.uniforms.custom.cached;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.stareval.function.FunctionReturn;
 import net.stareval.function.Type;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.function.BooleanSupplier;
 
@@ -26,7 +26,7 @@ public class BooleanCachedUniform extends CachedUniform {
 
 	@Override
 	public void push(int location) {
-		GlStateManager._glUniform1i(location, this.cached ? 1 : 0);
+		VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), location, this.cached ? 1 : 0);
 	}
 
 	@Override

@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.TextureUtil;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.TextureFormat;
 import net.logging.LogUtils;
@@ -24,6 +23,9 @@ import net.minecraft.hooks.TextureAtlasHooks;
 import net.minecraft.ReportedException;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -51,18 +53,25 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 	public TextureAtlas(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
-		this.maxSupportedTextureSize = RenderSystem.getDevice().getMaxTextureSize();
+		this.maxSupportedTextureSize = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
 	}
 
 	private void createTexture(int i, int j, int k) {
 		LOGGER.info("Created: {}x{}x{} {}-atlas", i, j, k, this.location);
-		GpuDevice gpuDevice = RenderSystem.getDevice();
 		this.close();
-		this.texture = gpuDevice.createTexture(this.location::toString, 7, TextureFormat.RGBA8, i, j, 1, k + 1);
-		this.textureView = gpuDevice.createTextureView(this.texture);
+		this.texture = net.vulkanic.VulkanicAPI.createTexture(this.location::toString, 7, TextureFormat.RGBA8, i, j, 1, k + 1);
+		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		this.width = i;
 		this.height = j;
 		this.mipLevel = k;
+	}
+
+	private void refreshVulkanMipmaps() {
+		if (this.texture == null || this.texture.getMipLevels() <= 1 || !VulkanicAPI.isVulkanBackendSelected()) {
+			return;
+		}
+
+		IrisRenderSystem.generateMipmaps(VulkanicCoreAPI.textureId(this.texture));
 	}
 
 	public void upload(SpriteLoader.Preparations preparations) {
@@ -98,6 +107,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 
 			this.sprites = List.copyOf(list);
 			this.animatedTextures = List.copyOf(list2);
+			this.refreshVulkanMipmaps();
 			if (SharedConstants.DEBUG_DUMP_TEXTURE_ATLAS) {
 				Path path = TextureUtil.getDebugTexturePath();
 
@@ -116,7 +126,7 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		}
 		
 		// Iris PBR: From texture.pbr.MixinTextureAtlas - track texture after upload
-		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(texture.iris$getGlId(), this);
+		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(texture), this);
 	}
 
 	@Override
@@ -171,6 +181,9 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable,
 		if (this.texture != null) {
 			for (TextureAtlasSprite.Ticker ticker : this.animatedTextures) {
 				ticker.tickAndUpload(this.texture);
+			}
+			if (!this.animatedTextures.isEmpty()) {
+				this.refreshVulkanMipmaps();
 			}
 		}
 		// Iris PBR: From texture.pbr.MixinTextureAtlas - cycle PBR animation frames

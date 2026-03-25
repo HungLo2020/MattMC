@@ -1,6 +1,5 @@
 package net.irisshaders.iris.targets;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
@@ -35,8 +34,8 @@ public class RenderTarget {
 		this.height = builder.height;
 
 
-		this.mainTexture = GlStateManager._genTexture();
-		this.altTexture = GlStateManager._genTexture();
+		this.mainTexture = net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
+		this.altTexture = net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
 
 		boolean isPixelFormatInteger = builder.internalFormat.getPixelFormat().isInteger();
 		setupTexture(mainTexture, builder.width, builder.height, !isPixelFormatInteger, false);
@@ -44,7 +43,7 @@ public class RenderTarget {
 
 		// Clean up after ourselves
 		// This is strictly defensive to ensure that other buggy code doesn't tamper with our textures
-		GlStateManager._bindTexture(0);
+		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
 	}
 
 	public static Builder builder() {
@@ -54,14 +53,16 @@ public class RenderTarget {
 	private void setupTexture(int texture, int width, int height, boolean allowsLinear, boolean alt) {
 		resizeTexture(texture, width, height, alt);
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		if (allowsLinear) {
+			IrisRenderSystem.setTextureLinearFiltering(texture);
+		} else {
+			IrisRenderSystem.setTextureNearestFiltering(texture);
+		}
+		IrisRenderSystem.setTextureWrapMode2D(texture, true);
 	}
 
 	private void resizeTexture(int texture, int width, int height, boolean alt) {
-		IrisRenderSystem.texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, 0, internalFormat.getGlFormat(), width, height, 0, format.getGlFormat(), type.getGlFormat(), NULL_BUFFER);
+		IrisRenderSystem.texImage2D(texture, 0, internalFormat.getGlFormat(), width, height, 0, format.getGlFormat(), type.getGlFormat(), NULL_BUFFER);
 
 		if (name != null) {
 			GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, name + " " + (alt ? "alt" : "main"));
@@ -112,8 +113,8 @@ public class RenderTarget {
 		requireValid();
 		isValid = false;
 
-		GlStateManager._deleteTexture(mainTexture);
-		GlStateManager._deleteTexture(altTexture);
+		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(mainTexture);
+		net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(altTexture);
 	}
 
 	private void requireValid() {

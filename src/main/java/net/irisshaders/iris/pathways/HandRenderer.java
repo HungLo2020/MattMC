@@ -47,7 +47,7 @@ public class HandRenderer {
 		// We need to scale the matrix by 0.125 so the hand doesn't clip through blocks.
 		Matrix4f scaleMatrix = new Matrix4f().scale(1F, 1F, DEPTH);
 		scaleMatrix.mul(gameRenderer.getProjectionMatrix(gameRenderer.getFov(camera, tickDelta, false))); // Direct method call - getFov is now public
-		RenderSystem.setProjectionMatrix(cachedProjectionMatrixBuffer.getBuffer(scaleMatrix), ProjectionType.PERSPECTIVE);
+		net.vulkanic.VulkanicAPI.setProjectionMatrix(cachedProjectionMatrixBuffer.getBuffer(scaleMatrix), ProjectionType.PERSPECTIVE);
 
 		poseStack.setIdentity();
 
@@ -88,7 +88,7 @@ public class HandRenderer {
 			return;
 		}
 
-		RenderSystem.backupProjectionMatrix();
+		net.vulkanic.VulkanicAPI.backupProjectionMatrix();
 
 		ACTIVE = true;
 
@@ -102,8 +102,8 @@ public class HandRenderer {
 
 		renderingSolid = true;
 
-		RenderSystem.getModelViewStack().pushMatrix();
-		RenderSystem.getModelViewStack().set(poseStack.last().pose());
+		net.vulkanic.VulkanicAPI.getModelViewStack().pushMatrix();
+		net.vulkanic.VulkanicAPI.getModelViewStack().set(poseStack.last().pose());
 
 		gameRenderer.itemInHandRenderer.renderHandsWithItems(tickDelta, new PoseStack(), this.submitNodeCollector, Minecraft.getInstance().player, Minecraft.getInstance().getEntityRenderDispatcher().getPackedLightCoords(camera.getEntity(), tickDelta));
 
@@ -112,10 +112,10 @@ public class HandRenderer {
 		featureRenderDispatcher.renderAllFeatures();
 		bufferSource.bufferSource().endBatch();
 
-		RenderSystem.restoreProjectionMatrix();
+		net.vulkanic.VulkanicAPI.restoreProjectionMatrix();
 
 		poseStack.popPose();
-		RenderSystem.getModelViewStack().popMatrix();
+		net.vulkanic.VulkanicAPI.getModelViewStack().popMatrix();
 
 		renderingSolid = false;
 
@@ -129,7 +129,7 @@ public class HandRenderer {
 			return;
 		}
 
-		RenderSystem.backupProjectionMatrix();
+		net.vulkanic.VulkanicAPI.backupProjectionMatrix();
 
 		ACTIVE = true;
 
@@ -141,8 +141,8 @@ public class HandRenderer {
 
 		Profiler.get().push("iris_hand_translucent");
 
-		RenderSystem.getModelViewStack().pushMatrix();
-		RenderSystem.getModelViewStack().set(poseStack.last().pose());
+		net.vulkanic.VulkanicAPI.getModelViewStack().pushMatrix();
+		net.vulkanic.VulkanicAPI.getModelViewStack().set(poseStack.last().pose());
 
 		gameRenderer.itemInHandRenderer.renderHandsWithItems(tickDelta, new PoseStack(), submitNodeCollector, Minecraft.getInstance().player, Minecraft.getInstance().getEntityRenderDispatcher().getPackedLightCoords(camera.getEntity(), tickDelta));
 
@@ -152,9 +152,9 @@ public class HandRenderer {
 		featureRenderDispatcher.renderAllFeatures();
 		bufferSource.bufferSource().endBatch();
 
-		RenderSystem.restoreProjectionMatrix();
+		net.vulkanic.VulkanicAPI.restoreProjectionMatrix();
 
-		RenderSystem.getModelViewStack().popMatrix();
+		net.vulkanic.VulkanicAPI.getModelViewStack().popMatrix();
 
 		pipeline.setPhase(WorldRenderingPhase.NONE);
 

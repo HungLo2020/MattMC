@@ -10,6 +10,7 @@ import com.seibel.distanthorizons.core.util.math.Vec3f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import net.vulkanic.CommandContext;
 
 /**
  * Contains everything related to
@@ -40,11 +41,15 @@ public interface IMinecraftRenderWrapper extends IBindable
 	
 	boolean mcRendersToFrameBuffer();
 	boolean runningLegacyOpenGL();
+	boolean hasTargetRenderTarget();
+	boolean bindTargetRenderTarget(CommandContext ctx);
 	
 	/** @return -1 if no valid framebuffer is available yet */
 	int getTargetFramebuffer(); // Note: Iris is now hooking onto this for DH + Iris compat, try not to change (unless we wanna deal with some annoyances)
 								//          Iris commit: https://github.com/IrisShaders/Iris/commit/a76a240527e93780bbcba57c09bef377419d47a7#diff-7b9ded0c79bbcdb130010373387756a28ee8d3640d522c0a5b7acd0abbfc20aeR16
+	/** @return -1 if no valid depth texture handle is available yet */
 	int getDepthTextureId();
+	/** @return -1 if no valid color texture handle is available yet */
 	int getColorTextureId();
 	int getTargetFramebufferViewportWidth();
 	int getTargetFramebufferViewportHeight();

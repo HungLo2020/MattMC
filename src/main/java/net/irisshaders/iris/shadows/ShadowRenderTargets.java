@@ -1,7 +1,6 @@
 package net.irisshaders.iris.shadows;
 
 import com.google.common.collect.ImmutableSet;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.TextureFormat;
@@ -62,8 +61,8 @@ public class ShadowRenderTargets {
 			this.linearFiltered[i] = !shadowDirectives.getDepthSamplingSettings().get(i).getNearest();
 		}
 
-		this.mainDepth = RenderSystem.getDevice().createTexture("Shadow Map", GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.DEPTH32, resolution, resolution, 1, this.mipped[0] ? log2(resolution) : 1);
-		this.noTranslucents = RenderSystem.getDevice().createTexture("Shadow Map / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.DEPTH32, resolution, resolution, 1, this.mipped[1] ? log2(resolution) : 1);
+		this.mainDepth = VulkanicAPI.createTexture("Shadow Map", GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.DEPTH32, resolution, resolution, 1, this.mipped[0] ? log2(resolution) : 1);
+		this.noTranslucents = VulkanicAPI.createTexture("Shadow Map / Opaque", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING, TextureFormat.DEPTH32, resolution, resolution, 1, this.mipped[1] ? log2(resolution) : 1);
 
 		this.noTranslucents.setTextureFilter(linearFiltered[1] ? FilterMode.LINEAR : FilterMode.NEAREST, this.mipped[1]);
 		this.mainDepth.setTextureFilter(linearFiltered[0] ? FilterMode.LINEAR : FilterMode.NEAREST, this.mipped[0]);
@@ -183,12 +182,10 @@ public class ShadowRenderTargets {
 	public void copyPreTranslucentDepth() {
 		if (translucentDepthDirty) {
 			translucentDepthDirty = false;
-			IrisRenderSystem.blitFramebuffer(depthSourceFb.getId(), noTranslucentsDestFb.getId(), 0, 0, resolution, resolution,
-				0, 0, resolution, resolution,
-				VulkanicAPI.GL_DEPTH_BUFFER_BIT,
-				VulkanicAPI.GL_NEAREST);
+			IrisRenderSystem.blitDepthBufferNearest(depthSourceFb.getId(), noTranslucentsDestFb.getId(), 0, 0, resolution, resolution,
+				0, 0, resolution, resolution);
 		} else {
-			DepthCopyStrategy.fastest(false).copy(depthSourceFb, mainDepth.iris$getGlId(), noTranslucentsDestFb, noTranslucents.iris$getGlId(),
+			DepthCopyStrategy.fastest(false).copy(depthSourceFb, net.vulkanic.VulkanicCoreAPI.textureId(mainDepth), noTranslucentsDestFb, net.vulkanic.VulkanicCoreAPI.textureId(noTranslucents),
 				resolution, resolution);
 		}
 	}
@@ -318,7 +315,7 @@ public class ShadowRenderTargets {
 		framebuffer.readBuffer(0);
 
 		int status = framebuffer.getStatus();
-		if (status != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE) {
+		if (!VulkanicAPI.isFramebufferComplete(status)) {
 			throw new IllegalStateException("Unexpected error while creating framebuffer");
 		}
 

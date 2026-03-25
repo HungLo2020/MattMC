@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.feature.ParticleFeatureRenderer;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.sodium.client.render.vertex.VertexConsumerUtils;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -73,14 +74,14 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 			MeshData meshData = bufferBuilder.build();
 			if (meshData != null) {
 				particleBufferCache.write(meshData.vertexBuffer());
-				RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(meshData.drawState().indexCount());
-				GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+				VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(meshData.drawState().indexCount());
+				GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 					.writeTransform(
-						RenderSystem.getModelViewMatrix(),
+						VulkanicAPI.getModelViewMatrix(),
 						new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
 						new Vector3f(),
-						RenderSystem.getTextureMatrix(),
-						RenderSystem.getShaderLineWidth()
+						VulkanicAPI.getTextureMatrix(),
+						VulkanicAPI.getShaderLineWidth()
 					);
 				return new QuadParticleRenderState.PreparedBuffers(meshData.drawState().indexCount(), gpuBufferSlice, map);
 			}
@@ -99,7 +100,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		TextureManager textureManager,
 		boolean bl
 	) {
-		RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		renderPass.setVertexBuffer(0, particleBufferCache.get());
 		renderPass.setIndexBuffer(autoStorageIndexBuffer.getBuffer(preparedBuffers.indexCount), autoStorageIndexBuffer.type());
 		renderPass.setUniform("DynamicTransforms", preparedBuffers.dynamicTransforms);

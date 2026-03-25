@@ -5,12 +5,12 @@ import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhAp
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3d;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import org.jetbrains.annotations.Nullable;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 
 import java.awt.*;
 import java.io.Closeable;
@@ -27,9 +27,19 @@ public class RenderableBoxGroup
 			extends AbstractList<DhApiRenderableBox> 
 			implements IDhApiRenderableBoxGroup, Closeable
 	{
-		private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
-		
 		public static final AtomicInteger NEXT_ID_ATOMIC_INT = new AtomicInteger(0);
+
+		private static int createTrackedBufferId()
+		{
+			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+			return VulkanicAPI.createBuffer(VulkanicAPI.getCommandContext());
+		}
+
+		private static void deleteTrackedBufferId(int bufferId)
+		{
+			net.irisshaders.iris.gl.IrisRenderSystem.decrementTrackedBuffers();
+			VulkanicAPI.deleteBuffer(VulkanicAPI.getCommandContext(), bufferId);
+		}
 		
 		
 		
@@ -246,11 +256,11 @@ public class RenderableBoxGroup
 			
 			if (this.instanceChunkPosVbo == 0)
 			{
-				this.instanceChunkPosVbo = GLMC.glGenBuffers();
-				this.instanceSubChunkPosVbo = GLMC.glGenBuffers();
-				this.instanceScaleVbo = GLMC.glGenBuffers();
-				this.instanceColorVbo = GLMC.glGenBuffers();
-				this.instanceMaterialVbo = GLMC.glGenBuffers();
+				this.instanceChunkPosVbo = createTrackedBufferId();
+				this.instanceSubChunkPosVbo = createTrackedBufferId();
+				this.instanceScaleVbo = createTrackedBufferId();
+				this.instanceColorVbo = createTrackedBufferId();
+				this.instanceMaterialVbo = createTrackedBufferId();
 			}
 			
 			// copy over the box list so we can upload without concurrent modification issues
@@ -309,20 +319,21 @@ public class RenderableBoxGroup
 			
 			
 			// Upload transformation matrices
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceChunkPosVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceSubChunkPosVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceScaleVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			CommandContext ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceChunkPosVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceSubChunkPosVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceScaleVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload colors
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceColorVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceColorVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload materials
-			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceMaterialVbo);
-			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, this.instanceMaterialVbo);
+			VulkanicAPI.bufferData(ctx, VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
 		}
 		
 		
@@ -341,31 +352,31 @@ public class RenderableBoxGroup
 			{
 				if (this.instanceChunkPosVbo != 0)
 				{
-					GLMC.glDeleteBuffers(this.instanceChunkPosVbo);
+					deleteTrackedBufferId(this.instanceChunkPosVbo);
 					this.instanceChunkPosVbo = 0;
 				}
 				
 				if (this.instanceSubChunkPosVbo != 0)
 				{
-					GLMC.glDeleteBuffers(this.instanceSubChunkPosVbo);
+					deleteTrackedBufferId(this.instanceSubChunkPosVbo);
 					this.instanceSubChunkPosVbo = 0;
 				}
 				
 				if (this.instanceScaleVbo != 0)
 				{
-					GLMC.glDeleteBuffers(this.instanceScaleVbo);
+					deleteTrackedBufferId(this.instanceScaleVbo);
 					this.instanceScaleVbo = 0;
 				}
 				
 				if (this.instanceColorVbo != 0)
 				{
-					GLMC.glDeleteBuffers(this.instanceColorVbo);
+					deleteTrackedBufferId(this.instanceColorVbo);
 					this.instanceColorVbo = 0;
 				}
 				
 				if (this.instanceMaterialVbo != 0)
 				{
-					GLMC.glDeleteBuffers(this.instanceMaterialVbo);
+					deleteTrackedBufferId(this.instanceMaterialVbo);
 					this.instanceMaterialVbo = 0;
 				}
 			});

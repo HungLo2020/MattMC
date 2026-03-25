@@ -8,12 +8,13 @@ import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.DeltaTracker;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
 public class GlobalSettingsUniform implements AutoCloseable {
 	public static final int UBO_SIZE = new Std140SizeCalculator().putVec2().putFloat().putFloat().putInt().get();
-	private final GpuBuffer buffer = RenderSystem.getDevice().createBuffer(() -> "Global Settings UBO", 136, UBO_SIZE);
+	private final GpuBuffer buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Global Settings UBO", 136, UBO_SIZE);
 
 	public void update(int i, int j, double d, long l, DeltaTracker deltaTracker, int k) {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
@@ -23,10 +24,10 @@ public class GlobalSettingsUniform implements AutoCloseable {
 				.putFloat(((float)(l % 24000L) + deltaTracker.getGameTimeDeltaPartialTick(false)) / 24000.0F)
 				.putInt(k)
 				.get();
-			RenderSystem.getDevice().createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().writeToBuffer(this.buffer.slice(), byteBuffer);
 		}
 
-		RenderSystem.setGlobalSettingsUniform(this.buffer);
+		VulkanicAPI.setGlobalSettingsUniform(this.buffer);
 	}
 
 	public void close() {

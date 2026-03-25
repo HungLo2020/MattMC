@@ -1,6 +1,7 @@
 package com.seibel.distanthorizons.core.render.glObject;
 
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicShaderStage;
 
 // Turns GL int enums back to readable strings
 public class GLEnums
@@ -43,15 +44,24 @@ public class GLEnums
 		}
 		
 		// shader stuff
-		switch (glEnum)
+		java.util.Optional<VulkanicShaderStage> shaderStage = VulkanicShaderStage.fromLegacyGlShaderType(glEnum);
+		if (shaderStage.isPresent())
 		{
-			case VulkanicAPI.GL_VERTEX_SHADER:
-				return "GL_VERTEX_SHADER";
-			case VulkanicAPI.GL_GEOMETRY_SHADER:
-				return "GL_GEOMETRY_SHADER";
-			case VulkanicAPI.GL_FRAGMENT_SHADER:
-				return "GL_FRAGMENT_SHADER";
-			default:
+			switch (shaderStage.get())
+			{
+				case VERTEX:
+					return "GL_VERTEX_SHADER";
+				case FRAGMENT:
+					return "GL_FRAGMENT_SHADER";
+				case GEOMETRY:
+					return "GL_GEOMETRY_SHADER";
+				case COMPUTE:
+					return "GL_COMPUTE_SHADER";
+				case TESSELLATION_CONTROL:
+					return "GL_TESS_CONTROL_SHADER";
+				case TESSELLATION_EVALUATION:
+					return "GL_TESS_EVALUATION_SHADER";
+			}
 		}
 		
 		// stencil stuff
@@ -99,73 +109,9 @@ public class GLEnums
 		}
 		
 		// Texture binding points
-		switch (glEnum)
+		if (glEnum >= VulkanicAPI.GL_TEXTURE0 && glEnum <= VulkanicAPI.GL_TEXTURE31)
 		{
-			case VulkanicAPI.GL_TEXTURE0:
-				return "GL_TEXTURE0";
-			case VulkanicAPI.GL_TEXTURE1:
-				return "GL_TEXTURE1";
-			case VulkanicAPI.GL_TEXTURE2:
-				return "GL_TEXTURE2";
-			case VulkanicAPI.GL_TEXTURE3:
-				return "GL_TEXTURE3";
-			case VulkanicAPI.GL_TEXTURE4:
-				return "GL_TEXTURE4";
-			case VulkanicAPI.GL_TEXTURE5:
-				return "GL_TEXTURE5";
-			case VulkanicAPI.GL_TEXTURE6:
-				return "GL_TEXTURE6";
-			case VulkanicAPI.GL_TEXTURE7:
-				return "GL_TEXTURE7";
-			case VulkanicAPI.GL_TEXTURE8:
-				return "GL_TEXTURE8";
-			case VulkanicAPI.GL_TEXTURE9:
-				return "GL_TEXTURE9";
-			case VulkanicAPI.GL_TEXTURE10:
-				return "GL_TEXTURE10";
-			case VulkanicAPI.GL_TEXTURE11:
-				return "GL_TEXTURE11";
-			case VulkanicAPI.GL_TEXTURE12:
-				return "GL_TEXTURE12";
-			case VulkanicAPI.GL_TEXTURE13:
-				return "GL_TEXTURE13";
-			case VulkanicAPI.GL_TEXTURE14:
-				return "GL_TEXTURE14";
-			case VulkanicAPI.GL_TEXTURE15:
-				return "GL_TEXTURE15";
-			case VulkanicAPI.GL_TEXTURE16:
-				return "GL_TEXTURE16";
-			case VulkanicAPI.GL_TEXTURE17:
-				return "GL_TEXTURE17";
-			case VulkanicAPI.GL_TEXTURE18:
-				return "GL_TEXTURE18";
-			case VulkanicAPI.GL_TEXTURE19:
-				return "GL_TEXTURE19";
-			case VulkanicAPI.GL_TEXTURE20:
-				return "GL_TEXTURE20";
-			case VulkanicAPI.GL_TEXTURE21:
-				return "GL_TEXTURE21";
-			case VulkanicAPI.GL_TEXTURE22:
-				return "GL_TEXTURE22";
-			case VulkanicAPI.GL_TEXTURE23:
-				return "GL_TEXTURE23";
-			case VulkanicAPI.GL_TEXTURE24:
-				return "GL_TEXTURE24";
-			case VulkanicAPI.GL_TEXTURE25:
-				return "GL_TEXTURE25";
-			case VulkanicAPI.GL_TEXTURE26:
-				return "GL_TEXTURE26";
-			case VulkanicAPI.GL_TEXTURE27:
-				return "GL_TEXTURE27";
-			case VulkanicAPI.GL_TEXTURE28:
-				return "GL_TEXTURE28";
-			case VulkanicAPI.GL_TEXTURE29:
-				return "GL_TEXTURE29";
-			case VulkanicAPI.GL_TEXTURE30:
-				return "GL_TEXTURE30";
-			case VulkanicAPI.GL_TEXTURE31:
-				return "GL_TEXTURE31";
-			default:
+			return "GL_TEXTURE" + VulkanicAPI.textureUnitToIndex(glEnum);
 		}
 		
 		// Polygon modes

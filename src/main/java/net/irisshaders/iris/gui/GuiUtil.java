@@ -1,7 +1,9 @@
 package net.irisshaders.iris.gui;
 
-import net.blaze3d.opengl.GlStateManager;
-import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.GpuTextureView;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.blending.BlendModeStorage;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -12,6 +14,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Class serving as abstraction and
@@ -38,7 +41,9 @@ public final class GuiUtil {
 	 * used for succeeding draw calls.
 	 */
 	public static void bindIrisWidgetsTexture() {
-		RenderSystem.setShaderTexture(0, Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView());
+		GpuTextureView textureView = Minecraft.getInstance().getTextureManager().getTexture(IRIS_WIDGETS_TEX).getTextureView();
+		IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(textureView));
+		TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 	}
 
 	/**
@@ -63,7 +68,7 @@ public final class GuiUtil {
 		int vOffset = disabled ? 46 : hovered ? 86 : 66;
 
 		// Sets RenderSystem to use solid white as the tint color for blend mode, and enables blend mode
-		GlStateManager._enableBlend();
+		BlendModeStorage.setBlendEnabled(true);
 
 		// Top left section
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, IRIS_WIDGETS_TEX, x, y, 0, vOffset, halfWidth, halfHeight, 256, 256);
@@ -191,7 +196,7 @@ public final class GuiUtil {
 		 */
 		public void draw(GuiGraphics guiGraphics, int x, int y) {
 			// Sets RenderSystem to use solid white as the tint color for blend mode (1.16), and enables blend mode
-			GlStateManager._enableBlend();
+			BlendModeStorage.setBlendEnabled(true);
 
 			// Draw the texture to the screen
 			guiGraphics.blit(RenderPipelines.GUI_TEXTURED, IRIS_WIDGETS_TEX, x, y, u, v, width, height, 256, 256);

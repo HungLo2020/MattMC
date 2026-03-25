@@ -1,11 +1,13 @@
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.FogRenderer;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -19,14 +21,14 @@ public class FogApplyShader extends AbstractShaderRenderer
 {
 	public static FogApplyShader INSTANCE = new FogApplyShader();
 	
-	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	
-	
-	public int fogTexture;
+	public int fogTexture = -1;
 	
 	// uniforms
 	public int colorTextureUniform;
 	public int depthTextureUniform;
+
+	private int activeDepthTextureId = -1;
 	
 	
 	
@@ -56,15 +58,25 @@ public class FogApplyShader extends AbstractShaderRenderer
 	//=============//
 	
 	@Override
-	protected void onApplyUniforms(float partialTicks)
+	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(this.fogTexture);
-		VulkanicAPI.glUniform1i(this.colorTextureUniform, 0);
+		this.activeDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		return this.fogTexture != -1
+			&& this.activeDepthTextureId != -1
+			&& FogShader.INSTANCE.frameBuffer != null
+			&& LodRenderer.INSTANCE.hasActiveRenderTarget();
+	}
+
+	@Override
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks)
+	{
+		DhTextureState.setActiveTextureUnitIndex(0);
+		DhTextureState.bindTexture2D(this.fogTexture);
+		VulkanicAPI.setUniform1i(ctx, this.colorTextureUniform, 0);
 		
-		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		VulkanicAPI.glUniform1i(this.depthTextureUniform, 1);
+		DhTextureState.setActiveTextureUnitIndex(1);
+		DhTextureState.bindTexture2D(this.activeDepthTextureId);
+		VulkanicAPI.setUniform1i(ctx, this.depthTextureUniform, 1);
 		
 	}
 	
@@ -75,25 +87,35 @@ public class FogApplyShader extends AbstractShaderRenderer
 	//========//
 	
 	@Override
-	protected void onRender()
+	protected void onRender(CommandContext ctx)
 	{
-		GLMC.enableBlend();
-		VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
-		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.setBlendEnabled(ctx, true);
+		VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
+		VulkanicAPI.setBlendFunction(
+			ctx,
+			VulkanicBlendFactor.SRC_ALPHA,
+			VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+			VulkanicBlendFactor.ONE,
+			VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA
+		);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
 		// it should be automatically restored after rendering is complete.
-		GLMC.disableDepthTest();
+		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		
 		
 		// apply the rendered Fog to DH's framebuffer
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, FogShader.INSTANCE.frameBuffer);
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, LodRenderer.INSTANCE.getActiveFramebufferId());
+		FogShader.INSTANCE.frameBuffer.bindAsReadBuffer(ctx);
+		if (!LodRenderer.INSTANCE.bindActiveRenderTarget())
+		{
+			VulkanicAPI.bindReadFramebuffer(ctx, 0);
+			return;
+		}
 		
 		ScreenQuad.INSTANCE.render();
 		
-		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		VulkanicAPI.bindReadFramebuffer(ctx, 0);
 	}
 	
 }

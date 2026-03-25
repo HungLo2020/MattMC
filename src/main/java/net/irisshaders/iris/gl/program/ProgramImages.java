@@ -1,11 +1,11 @@
 package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableList;
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.image.ImageBinding;
 import net.irisshaders.iris.gl.image.ImageHolder;
 import net.irisshaders.iris.gl.image.ImageLimits;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +27,7 @@ public class ProgramImages {
 	public void update() {
 		if (initializer != null) {
 			for (GlUniform1iCall call : initializer) {
-				GlStateManager._glUniform1i(call.location(), call.value());
+				VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), call.location(), call.value());
 			}
 
 			initializer = null;
@@ -59,12 +59,12 @@ public class ProgramImages {
 
 		@Override
 		public boolean hasImage(String name) {
-			return GlStateManager._glGetUniformLocation(program, name) != -1;
+			return VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name) != -1;
 		}
 
 		@Override
 		public void addTextureImage(IntSupplier textureID, InternalTextureFormat internalFormat, String name) {
-			int location = GlStateManager._glGetUniformLocation(program, name);
+			int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
 
 			if (location == -1) {
 				return;

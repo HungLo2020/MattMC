@@ -30,6 +30,7 @@ import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.phys.Vec3;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -61,7 +62,7 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	@Nullable
 	private CloudRenderer.TextureData texture;
 	private int quadCount = 0;
-	private final RenderSystem.AutoStorageIndexBuffer indices = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+	private final VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 	private final MappableRingBuffer ubo = new MappableRingBuffer(() -> "Cloud UBO", 130, UBO_SIZE);
 	@Nullable
 	private MappableRingBuffer utb;
@@ -195,25 +196,25 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 				this.prevType = cloudStatus;
 				this.utb.rotate();
 
-				try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.utb.currentBuffer(), false, true)) {
+				try (GpuBuffer.MappedView mappedView = VulkanicAPI.createCommandEncoder().mapBuffer(this.utb.currentBuffer(), false, true)) {
 					this.buildMesh(relativeCameraPos, mappedView.data(), p, q, bl, k);
 					this.quadCount = mappedView.data().position() / 3;
 				}
 			}
 
 			if (this.quadCount != 0) {
-				try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.ubo.currentBuffer(), false, true)) {
+				try (GpuBuffer.MappedView mappedView = VulkanicAPI.createCommandEncoder().mapBuffer(this.ubo.currentBuffer(), false, true)) {
 					Std140Builder.intoBuffer(mappedView.data())
 						.putVec4(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), 1.0F)
 						.putVec3(-r, h, -s)
 						.putVec3(12.0F, 4.0F, 12.0F);
 				}
 
-				GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
-					.writeTransform(RenderSystem.getModelViewMatrix(), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
+				GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
+					.writeTransform(VulkanicAPI.getModelViewMatrix(), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 				RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
 				RenderTarget renderTarget2 = Minecraft.getInstance().levelRenderer.getCloudsTarget();
-				RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+				VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 				GpuBuffer gpuBuffer = autoStorageIndexBuffer.getBuffer(6 * this.quadCount);
 				GpuTextureView gpuTextureView;
 				GpuTextureView gpuTextureView2;
@@ -225,11 +226,9 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 					gpuTextureView2 = renderTarget.getDepthTextureView();
 				}
 
-				try (RenderPass renderPass = RenderSystem.getDevice()
-						.createCommandEncoder()
-						.createRenderPass(() -> "Clouds", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+				try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Clouds", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 					renderPass.setPipeline(renderPipeline);
-					RenderSystem.bindDefaultUniforms(renderPass);
+					net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 					renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 					renderPass.setIndexBuffer(gpuBuffer, autoStorageIndexBuffer.type());
 					renderPass.setUniform("CloudInfo", this.ubo.currentBuffer());

@@ -2,7 +2,6 @@ package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import net.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.sampler.GlSampler;
@@ -61,7 +60,7 @@ public class ProgramSamplers {
 
 		if (initializer != null) {
 			for (GlUniform1iCall call : initializer) {
-				GlStateManager._glUniform1i(call.location(), call.value());
+				VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), call.location(), call.value());
 			}
 
 			initializer = null;
@@ -69,13 +68,13 @@ public class ProgramSamplers {
 
 		// We need to keep the active texture intact, since if we mess it up
 		// in the middle of RenderType setup, bad things will happen.
-		int activeTexture = GlStateManager.activeTexture;
+		int activeTexture = IrisRenderSystem.getActiveTextureUnitIndex();
 
 		for (SamplerBinding samplerBinding : samplerBindings) {
 			samplerBinding.update();
 		}
 
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + activeTexture);
+		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(activeTexture);
 	}
 
 	public void removeListeners() {
@@ -130,7 +129,7 @@ public class ProgramSamplers {
 			}
 
 			for (String name : names) {
-				int location = GlStateManager._glGetUniformLocation(program, name);
+				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
 
 				if (location == -1) {
 					// There's no active sampler with this particular name in the program.
@@ -145,7 +144,7 @@ public class ProgramSamplers {
 
 		@Override
 		public boolean hasSampler(String name) {
-			return GlStateManager._glGetUniformLocation(program, name) != -1;
+			return VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name) != -1;
 		}
 
 		@Override
@@ -184,7 +183,7 @@ public class ProgramSamplers {
 			}
 
 			for (String name : names) {
-				int location = GlStateManager._glGetUniformLocation(program, name);
+				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
 
 				if (location == -1) {
 					// There's no active sampler with this particular name in the program.

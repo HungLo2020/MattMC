@@ -1,11 +1,16 @@
 package net.irisshaders.iris.gl.blending;
 
-import net.blaze3d.opengl.GlStateManager;
+import net.vulkanic.VulkanicAPI;
 
 public class DepthColorStorage {
 	private static boolean originalDepthEnable;
 	private static ColorMask originalColor;
 	private static boolean depthColorLocked;
+	private static boolean currentDepthEnable = true;
+	private static boolean currentRedMask = true;
+	private static boolean currentGreenMask = true;
+	private static boolean currentBlueMask = true;
+	private static boolean currentAlphaMask = true;
 
 	public static boolean isDepthColorLocked() {
 		return depthColorLocked;
@@ -14,19 +19,43 @@ public class DepthColorStorage {
 	public static void disableDepthColor() {
 		if (!depthColorLocked) {
 			// Only save the previous state if the depth and color mask wasn't already locked
-			GlStateManager.ColorMask colorMask = GlStateManager.COLOR_MASK;
-			GlStateManager.DepthState depthState = GlStateManager.DEPTH;
-
-			originalDepthEnable = depthState.mask;
-			originalColor = new ColorMask(colorMask.red, colorMask.green, colorMask.blue, colorMask.alpha);
+			originalDepthEnable = currentDepthEnable;
+			originalColor = new ColorMask(currentRedMask, currentGreenMask, currentBlueMask, currentAlphaMask);
 		}
 
 		depthColorLocked = false;
 
-		GlStateManager._depthMask(false);
-		GlStateManager._colorMask(false, false, false, false);
+		setDepthMask(false);
+		setColorMask(false, false, false, false);
 
 		depthColorLocked = true;
+	}
+
+	public static void setDepthMask(boolean enabled) {
+		if (depthColorLocked) {
+			deferDepthEnable(enabled);
+			return;
+		}
+
+		if (enabled != currentDepthEnable) {
+			currentDepthEnable = enabled;
+			VulkanicAPI.setDepthWriteMask(VulkanicAPI.getCommandContext(), enabled);
+		}
+	}
+
+	public static void setColorMask(boolean red, boolean green, boolean blue, boolean alpha) {
+		if (depthColorLocked) {
+			deferColorMask(red, green, blue, alpha);
+			return;
+		}
+
+		if (red != currentRedMask || green != currentGreenMask || blue != currentBlueMask || alpha != currentAlphaMask) {
+			currentRedMask = red;
+			currentGreenMask = green;
+			currentBlueMask = blue;
+			currentAlphaMask = alpha;
+			VulkanicAPI.setColorMask(VulkanicAPI.getCommandContext(), red, green, blue, alpha);
+		}
 	}
 
 	public static void deferDepthEnable(boolean enabled) {
@@ -44,8 +73,8 @@ public class DepthColorStorage {
 
 		depthColorLocked = false;
 
-		GlStateManager._depthMask(originalDepthEnable);
+		setDepthMask(originalDepthEnable);
 
-		GlStateManager._colorMask(originalColor.isRedMasked(), originalColor.isGreenMasked(), originalColor.isBlueMasked(), originalColor.isAlphaMasked());
+		setColorMask(originalColor.isRedMasked(), originalColor.isGreenMasked(), originalColor.isBlueMasked(), originalColor.isAlphaMasked());
 	}
 }

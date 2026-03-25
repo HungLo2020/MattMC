@@ -14,11 +14,10 @@ public record RenderTargetDescriptor(int width, int height, boolean useDepth, in
 
 	public void prepare(RenderTarget renderTarget) {
 		if (this.useDepth) {
-			RenderSystem.getDevice()
-				.createCommandEncoder()
+			net.vulkanic.VulkanicAPI.createCommandEncoder()
 				.clearColorAndDepthTextures(renderTarget.getColorTexture(), this.clearColor, renderTarget.getDepthTexture(), 1.0);
 		} else {
-			RenderSystem.getDevice().createCommandEncoder().clearColorTexture(renderTarget.getColorTexture(), this.clearColor);
+			net.vulkanic.VulkanicAPI.createCommandEncoder().clearColorTexture(renderTarget.getColorTexture(), this.clearColor);
 		}
 	}
 

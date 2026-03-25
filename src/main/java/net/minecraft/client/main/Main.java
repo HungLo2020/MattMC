@@ -2,7 +2,7 @@ package net.minecraft.client.main;
 
 import net.blaze3d.TracyBootstrap;
 import net.blaze3d.platform.DisplayData;
-import net.blaze3d.systems.RenderSystem;
+import net.vulkanic.VulkanicAPI;
 import com.mojang.jtracy.TracyClient;
 import net.logging.LogUtils;
 import net.minecraft.util.UndashedUuid;
@@ -73,6 +73,23 @@ import org.slf4j.Logger;
  */
 @Environment(EnvType.CLIENT)
 public class Main {
+	private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
+	private static final int MINIMUM_LWJGL_STACK_SIZE_KB = 512;
+
+	private static void ensureMinimumLwjglStackSize() {
+		String configuredValue = System.getProperty(LWJGL_STACK_SIZE_PROPERTY);
+		if (configuredValue != null) {
+			try {
+				if (Integer.parseInt(configuredValue.trim()) >= MINIMUM_LWJGL_STACK_SIZE_KB) {
+					return;
+				}
+			} catch (NumberFormatException ignored) {
+			}
+		}
+
+		System.setProperty(LWJGL_STACK_SIZE_PROPERTY, Integer.toString(MINIMUM_LWJGL_STACK_SIZE_KB));
+	}
+
 	/**
 	 * Main entry point for the Minecraft client.
 	 * <p>
@@ -90,6 +107,8 @@ public class Main {
 	 * @param strings Command-line arguments passed to the application
 	 */
 	public static void main(String[] strings) {
+		ensureMinimumLwjglStackSize();
+
 		OptionParser optionParser = new OptionParser();
 		optionParser.allowsUnrecognizedOptions();
 		optionParser.accepts("demo");
@@ -239,7 +258,7 @@ public class Main {
 
 		try {
 			Thread.currentThread().setName("Render thread");
-			RenderSystem.initRenderThread();
+			VulkanicAPI.initRenderThread();
 			minecraft = new Minecraft(gameConfig);
 		} catch (SilentInitException var72) {
 			Util.shutdownExecutors();

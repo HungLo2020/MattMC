@@ -3,7 +3,6 @@ package net.minecraft.client.gui.font.glyphs;
 import net.blaze3d.font.GlyphBitmap;
 import net.blaze3d.font.GlyphInfo;
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
@@ -34,7 +33,6 @@ public enum SpecialGlyphs implements GlyphInfo {
 			}
 		}
 
-		nativeImage.untrack();
 		return nativeImage;
 	}
 
@@ -69,8 +67,7 @@ public enum SpecialGlyphs implements GlyphInfo {
 
 				@Override
 				public void upload(int i, int j, GpuTexture gpuTexture) {
-					RenderSystem.getDevice()
-						.createCommandEncoder()
+					net.vulkanic.VulkanicAPI.createCommandEncoder()
 						.writeToTexture(gpuTexture, SpecialGlyphs.this.image, 0, 0, i, j, SpecialGlyphs.this.image.getWidth(), SpecialGlyphs.this.image.getHeight(), 0, 0);
 				}
 

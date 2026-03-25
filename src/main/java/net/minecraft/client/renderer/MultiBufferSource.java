@@ -101,7 +101,7 @@ public interface MultiBufferSource {
 					ByteBufferBuilder byteBufferBuilder = (ByteBufferBuilder)this.fixedBuffers.getOrDefault(renderType, this.sharedBuffer);
 					
 					// Sodium: Use accelerated sorting if available (merged from MultiBufferSourceMixin)
-					VertexSorting sorting = RenderSystem.getProjectionType().vertexSorting();
+					VertexSorting sorting = net.vulkanic.VulkanicAPI.getProjectionType().vertexSorting();
 					if (sorting instanceof VertexSortingExtended sortingExtended) {
 						sodium$acceleratedSort(meshData, byteBufferBuilder, sortingExtended);
 					} else {

@@ -46,6 +46,7 @@ import net.minecraft.Util.OS;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.renderer.GpuWarnlistManager;
+import net.vulkanic.VulkanicAPI;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.MusicManager;
 import net.minecraft.client.sounds.SoundEngine;
@@ -86,6 +87,7 @@ public class Options {
 	public static final int RENDER_DISTANCE_REALLY_FAR = 16;
 	public static final int RENDER_DISTANCE_EXTREME = 32;
 	private static final Splitter OPTION_SPLITTER = Splitter.on(':').limit(2);
+	private static final String GRAPHICS_BACKEND_OPTION_KEY = "graphics_backend";
 	public static final String DEFAULT_SOUND_DEVICE = "";
 	private static final Component ACCESSIBILITY_TOOLTIP_DARK_MOJANG_BACKGROUND = Component.translatable("options.darkMojangStudiosBackgroundColor.tooltip");
 	private final OptionInstance<Boolean> darkMojangStudiosBackground = OptionInstance.createBoolean(
@@ -615,6 +617,7 @@ public class Options {
 	);
 	protected Minecraft minecraft;
 	private final File optionsFile;
+	private String graphicsBackendOptionValue = "opengl";
 	public boolean hideGui;
 	private CameraType cameraType = CameraType.FIRST_PERSON;
 	public String lastMpIp = "";
@@ -1338,6 +1341,7 @@ public class Options {
 	public void load() {
 		try {
 			if (!this.optionsFile.exists()) {
+				this.selectGraphicsBackend(null);
 				return;
 			}
 
@@ -1347,6 +1351,11 @@ public class Options {
 			try {
 				bufferedReader.lines().forEach(string -> {
 					try {
+						if (string.startsWith(GRAPHICS_BACKEND_OPTION_KEY + "=")) {
+							compoundTag.putString(GRAPHICS_BACKEND_OPTION_KEY, string.substring((GRAPHICS_BACKEND_OPTION_KEY + "=").length()));
+							return;
+						}
+
 						Iterator<String> iterator = OPTION_SPLITTER.split(string).iterator();
 						compoundTag.putString((String)iterator.next(), (String)iterator.next());
 					} catch (Exception var3x) {
@@ -1370,6 +1379,7 @@ public class Options {
 			}
 
 			final CompoundTag compoundTag2 = this.dataFix(compoundTag);
+			this.selectGraphicsBackend((String)compoundTag2.getString(GRAPHICS_BACKEND_OPTION_KEY).orElse(null));
 			Optional<String> optional = compoundTag2.getString("fancyGraphics");
 			if (optional.isPresent() && !compoundTag2.contains("graphicsMode")) {
 				this.graphicsMode.set(isTrue((String)optional.get()) ? GraphicsStatus.FANCY : GraphicsStatus.FAST);
@@ -1465,7 +1475,13 @@ public class Options {
 			KeyMapping.resetMapping();
 		} catch (Exception var7) {
 			LOGGER.error("Failed to load options", (Throwable)var7);
+			this.selectGraphicsBackend(null);
 		}
+	}
+
+	private void selectGraphicsBackend(@Nullable String configuredBackendValue) {
+		this.graphicsBackendOptionValue = VulkanicAPI.normalizeBackendOptionValue(configuredBackendValue);
+		VulkanicAPI.initializeFromOptionsValue(this.graphicsBackendOptionValue);
 	}
 
 	static boolean isTrue(String string) {
@@ -1492,6 +1508,7 @@ public class Options {
 			final PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(new FileOutputStream(this.optionsFile), StandardCharsets.UTF_8));
 
 			try {
+				printWriter.println(GRAPHICS_BACKEND_OPTION_KEY + "=" + this.graphicsBackendOptionValue);
 				printWriter.println("version:" + SharedConstants.getCurrentVersion().dataVersion().version());
 				this.processOptions(
 					new Options.FieldAccess() {

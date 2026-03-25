@@ -21,6 +21,7 @@ import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.render.SodiumWorldRenderer;
 import net.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.sodium.client.util.SodiumChunkSection;
+import net.vulkanic.VulkanicAPI;
 
 @Environment(EnvType.CLIENT)
 public record ChunkSectionsToRender(
@@ -53,7 +54,7 @@ public record ChunkSectionsToRender(
 		// NOTE: Hook calls are in Sodium's ChunkSectionsToRenderMixin
 		// Sodium cancels this method when active, so hooks must run before cancellation
 		
-		RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+		VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer gpuBuffer = this.maxIndicesRequired == 0 ? null : autoStorageIndexBuffer.getBuffer(this.maxIndicesRequired);
 		VertexFormat.IndexType indexType = this.maxIndicesRequired == 0 ? null : autoStorageIndexBuffer.type();
 		ChunkSectionLayer[] chunkSectionLayers = chunkSectionLayerGroup.layers();
@@ -61,16 +62,14 @@ public record ChunkSectionsToRender(
 		boolean bl = SharedConstants.DEBUG_HOTKEYS && minecraft.wireframe;
 		RenderTarget renderTarget = chunkSectionLayerGroup.outputTarget();
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(
 					() -> "Section layers for " + chunkSectionLayerGroup.label(),
 					renderTarget.getColorTextureView(),
 					OptionalInt.empty(),
 					renderTarget.getDepthTextureView(),
 					OptionalDouble.empty()
 				)) {
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.bindSampler("Sampler2", minecraft.gameRenderer.lightTexture().getTextureView());
 
 			for (ChunkSectionLayer chunkSectionLayer : chunkSectionLayers) {

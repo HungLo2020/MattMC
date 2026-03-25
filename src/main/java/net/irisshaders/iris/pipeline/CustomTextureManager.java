@@ -1,6 +1,5 @@
 package net.irisshaders.iris.pipeline;
 
-import net.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -28,6 +27,7 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.IOException;
@@ -99,8 +99,7 @@ public class CustomTextureManager {
 		} else if (textureData instanceof CustomTextureData.LightmapMarker) {
 			// Special code path for the light texture. While shader packs hardcode the primary light texture, it's
 			// possible that a mod will create a different light texture, so this code path is robust to that.
-			return new TextureWrapper(() -> Minecraft.getInstance().gameRenderer.lightTexture().texture
-				.iris$getGlId(), TextureType.TEXTURE_2D);
+			return new TextureWrapper(() -> VulkanicCoreAPI.textureId(Minecraft.getInstance().gameRenderer.lightTexture().texture), TextureType.TEXTURE_2D);
 		} else if (textureData instanceof CustomTextureData.RawData1D rawData1D) {
 			GlTexture texture = new GlTexture(TextureType.TEXTURE_1D, rawData1D.getSizeX(), 0, 0, rawData1D.getInternalFormat().getGlFormat(), rawData1D.getPixelFormat().getGlFormat(), rawData1D.getPixelType().getGlFormat(), rawData1D.getContent(), rawData1D.getFilteringData());
 			ownedRawTextures.add(texture);
@@ -147,13 +146,16 @@ public class CustomTextureManager {
 				return new TextureWrapper(() -> {
 					AbstractTexture texture = textureManager.getTexture(textureLocation);
 					if (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture) {
-						int tex = GlStateManager.activeTexture;
-						int binding = GlStateManager.TEXTURES[tex].binding;
+						int tex = net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex();
+						int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
 						texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
-						GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + tex);
-						GlStateManager._bindTexture(binding);
+						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(tex);
+						var ctx = VulkanicAPI.getCommandContext();
+						VulkanicAPI.bindTexture2D(ctx, binding);
 					}
-					return texture != null ? texture.getTexture().iris$getGlId() : textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture().iris$getGlId();
+					return texture != null
+						? VulkanicCoreAPI.textureId(texture.getTexture())
+						: VulkanicCoreAPI.textureId(textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture());
 				}, TextureType.TEXTURE_2D);
 			} else {
 				location = location.substring(0, extensionIndex - pbrType.getSuffix().length()) + location.substring(extensionIndex);
@@ -163,14 +165,15 @@ public class CustomTextureManager {
 					AbstractTexture texture = textureManager.getTexture(textureLocation);
 
 					if (texture != null) {
+						var ctx = VulkanicAPI.getCommandContext();
 						if (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture) {
-							int tex = GlStateManager.activeTexture;
-							int binding = GlStateManager.TEXTURES[tex].binding;
+							int tex = net.irisshaders.iris.gl.IrisRenderSystem.getActiveTextureUnitIndex();
+							int binding = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(tex);
 							texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
-							GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + tex);
-							GlStateManager._bindTexture(binding);
+							net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(tex);
+							VulkanicAPI.bindTexture2D(ctx, binding);
 						}
-						int id = texture.getTexture().iris$getGlId();
+						int id = VulkanicCoreAPI.textureId(texture.getTexture());
 						PBRTextureHolder pbrHolder = PBRTextureManager.INSTANCE.getOrLoadHolder(id);
 						AbstractTexture pbrTexture = switch (pbrType) {
 							case NORMAL -> pbrHolder.normalTexture();
@@ -179,16 +182,16 @@ public class CustomTextureManager {
 
 						TextureFormat textureFormat = TextureFormatLoader.getFormat();
 						if (textureFormat != null) {
-							int previousBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
-							GlStateManager._bindTexture(pbrTexture.getTexture().iris$getGlId());
+							int previousBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
+							VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(pbrTexture.getTexture()));
 							textureFormat.setupTextureParameters(pbrType, pbrTexture);
-							GlStateManager._bindTexture(previousBinding);
+							VulkanicAPI.bindTexture2D(ctx, previousBinding);
 						}
 
-						return pbrTexture.getTexture().iris$getGlId();
+						return VulkanicCoreAPI.textureId(pbrTexture.getTexture());
 					}
 
-					return textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture().iris$getGlId();
+					return VulkanicCoreAPI.textureId(textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture());
 				}, TextureType.TEXTURE_2D);
 			}
 		}

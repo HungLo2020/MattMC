@@ -5,14 +5,18 @@ import java.nio.ByteBuffer;
 import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsCapabilities;
+import net.vulkanic.GraphicsFeature;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicCoreAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public abstract class DirectStateAccess {
 	public static DirectStateAccess create(GraphicsCapabilities gLCapabilities, Set<String> set, GraphicsWorkarounds graphicsWorkarounds) {
-		if (gLCapabilities.GL_ARB_direct_state_access && GlDevice.USE_GL_ARB_direct_state_access && !graphicsWorkarounds.isGlOnDx12()) {
+		if (gLCapabilities.supports(GraphicsFeature.DIRECT_STATE_ACCESS) && GlDevice.USE_GL_ARB_direct_state_access && !graphicsWorkarounds.isGlOnDx12()) {
 			set.add("GL_ARB_direct_state_access");
 			return new DirectStateAccess.Core();
 		} else {
@@ -47,198 +51,223 @@ public abstract class DirectStateAccess {
 
 	abstract void copyBufferSubData(int i, int j, int k, int l, int m);
 
+	private static CommandContext commandContext() {
+		return VulkanicAPI.getCommandContext();
+	}
+
 	@Environment(EnvType.CLIENT)
 	static class Core extends DirectStateAccess {
 		@Override
 		int createBuffer() {
-			GlStateManager.incrementTrackedBuffers();
-			return net.vulkanic.VulkanicAPI.createBufferDSA();
+			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.createBufferDSA(ctx);
 		}
 
 		@Override
 		void bufferData(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, l, GlConst.bufferUsageToGlEnum(j));
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferDataDSA(ctx, i, l, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferDataDSA(ctx, i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
-			net.vulkanic.VulkanicAPI.namedBufferSubDataDSA(i, (long)j, byteBuffer);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferSubDataDSA(ctx, i, (long)j, byteBuffer);
 		}
 
 		@Override
 		void bufferStorage(int i, long l, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(i, l, GlConst.bufferUsageToGlFlag(j));
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferStorageDSA(ctx, i, l, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Override
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
-			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedBufferStorageDSA(ctx, i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
-			return net.vulkanic.VulkanicAPI.mapNamedBufferRangeDSA(i, j, k, l);
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.mapNamedBufferRangeDSA(ctx, i, j, k, l);
 		}
 
 		@Override
 		void unmapBuffer(int i, int j) {
-			net.vulkanic.VulkanicAPI.unmapNamedBufferDSA(i);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.unmapNamedBufferDSA(ctx, i);
 		}
 
 		@Override
 		public int createFrameBufferObject() {
-			return net.vulkanic.VulkanicAPI.createFramebufferDSA();
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.createFramebuffer(ctx);
 		}
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(i, 36064, j, l); // GL_COLOR_ATTACHMENT0
-			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(i, 36096, k, l); // GL_DEPTH_ATTACHMENT
+			CommandContext ctx = commandContext();
+			VulkanicAPI.namedFramebufferColorAttachment0DSA(ctx, i, j, l);
+			VulkanicAPI.namedFramebufferDepthAttachmentDSA(ctx, i, k, l);
 			if (m != 0) {
-				GlStateManager._glBindFramebuffer(m, i);
+				VulkanicAPI.bindFramebuffer(ctx, m, i);
 			}
 		}
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			net.vulkanic.VulkanicAPI.blitNamedFramebufferDSA(i, j, k, l, m, n, o, p, q, r, s, t);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.blitNamedFramebufferDSA(ctx, i, j, k, l, m, n, o, p, q, r, s, t);
 		}
 
 		@Override
 		void flushMappedBufferRange(int i, int j, int k, int l) {
-			net.vulkanic.VulkanicAPI.flushMappedNamedBufferRangeDSA(i, j, k);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.flushMappedNamedBufferRangeDSA(ctx, i, j, k);
 		}
 
 		@Override
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
-			net.vulkanic.VulkanicAPI.copyNamedBufferSubDataDSA(i, j, k, l, m);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.copyNamedBufferSubDataDSA(ctx, i, j, k, l, m);
 		}
 	}
 
 	@Environment(EnvType.CLIENT)
 	static class Emulated extends DirectStateAccess {
-		private int selectBufferBindTarget(int i) {
+		private VulkanicBufferTarget selectBufferBindTarget(int i) {
 			if ((i & 32) != 0) {
-				return 34962;
+				return VulkanicBufferTarget.VERTEX;
 			} else if ((i & 64) != 0) {
-				return 34963;
+				return VulkanicBufferTarget.INDEX;
 			} else {
-				return (i & 128) != 0 ? 35345 : 36663;
+				return (i & 128) != 0 ? VulkanicBufferTarget.UNIFORM : VulkanicBufferTarget.COPY_WRITE;
 			}
 		}
 
 		@Override
 		int createBuffer() {
-			return GlStateManager._glGenBuffers();
+			net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.createBuffer(ctx);
 		}
 
 		@Override
 		void bufferData(int i, long l, int j) {
-			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
-			GlStateManager._glBufferData(k, l, GlConst.bufferUsageToGlEnum(j));
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferData(ctx, bindTarget, l, GlConst.bufferUsageToGlEnum(j));
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
-			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
-			GlStateManager._glBufferData(k, byteBuffer, GlConst.bufferUsageToGlEnum(j));
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferData(ctx, bindTarget, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
-			int l = this.selectBufferBindTarget(k);
-			GlStateManager._glBindBuffer(l, i);
-			GlStateManager._glBufferSubData(l, j, byteBuffer);
-			GlStateManager._glBindBuffer(l, 0);
+			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(k);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferSubData(ctx, bindTarget, (long)j, byteBuffer);
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void bufferStorage(int i, long l, int j) {
-			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
-			VulkanicAPI.createBufferStorage(k, l, GlConst.bufferUsageToGlFlag(j));
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferStorage(ctx, bindTarget, l, GlConst.bufferUsageToGlFlag(j));
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
-			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
-			VulkanicAPI.createBufferStorage(k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.bufferStorage(ctx, bindTarget, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
-			int n = this.selectBufferBindTarget(m);
-			GlStateManager._glBindBuffer(n, i);
-			ByteBuffer byteBuffer = GlStateManager._glMapBufferRange(n, j, k, l);
-			GlStateManager._glBindBuffer(n, 0);
+			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(m);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			ByteBuffer byteBuffer = VulkanicCoreAPI.mapBufferRange(ctx, bindTarget, j, k, l);
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 			return byteBuffer;
 		}
 
 		@Override
 		void unmapBuffer(int i, int j) {
-			int k = this.selectBufferBindTarget(j);
-			GlStateManager._glBindBuffer(k, i);
-			GlStateManager._glUnmapBuffer(k);
-			GlStateManager._glBindBuffer(k, 0);
+			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(j);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.unmapBuffer(ctx, bindTarget);
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void flushMappedBufferRange(int i, int j, int k, int l) {
-			int m = this.selectBufferBindTarget(l);
-			GlStateManager._glBindBuffer(m, i);
-			VulkanicAPI.flushMappedBufferRange(m, j, k);
-			GlStateManager._glBindBuffer(m, 0);
+			VulkanicBufferTarget bindTarget = this.selectBufferBindTarget(l);
+			CommandContext ctx = commandContext();
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, i);
+			VulkanicCoreAPI.flushMappedBufferRange(ctx, bindTarget, j, k);
+			VulkanicCoreAPI.bindBuffer(ctx, bindTarget, 0);
 		}
 
 		@Override
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
-			GlStateManager._glBindBuffer(36662, i);
-			GlStateManager._glBindBuffer(36663, j);
-			VulkanicAPI.copyBufferSubData(36662, 36663, k, l, m);
-			GlStateManager._glBindBuffer(36662, 0);
-			GlStateManager._glBindBuffer(36663, 0);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.bindCopyReadBuffer(ctx, i);
+			VulkanicAPI.bindCopyWriteBuffer(ctx, j);
+			VulkanicAPI.copyBufferSubDataBetweenCopyTargets(ctx, k, l, m);
+			VulkanicAPI.bindCopyReadBuffer(ctx, 0);
+			VulkanicAPI.bindCopyWriteBuffer(ctx, 0);
 		}
 
 		@Override
 		public int createFrameBufferObject() {
-			return GlStateManager.glGenFramebuffers();
+			CommandContext ctx = commandContext();
+			return VulkanicAPI.createFramebuffer(ctx);
 		}
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			int n = m == 0 ? '販' : m;
-			int o = GlStateManager.getFrameBuffer(n);
-			GlStateManager._glBindFramebuffer(n, i);
-			GlStateManager._glFramebufferTexture2D(n, 36064, 3553, j, l);
-			GlStateManager._glFramebufferTexture2D(n, 36096, 3553, k, l);
+			int n = m == 0 ? VulkanicAPI.GL_FRAMEBUFFER : m;
+			CommandContext ctx = commandContext();
+			int o = VulkanicAPI.getFramebufferBinding(n);
+			VulkanicAPI.bindFramebuffer(ctx, n, i);
+			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, n, j, l);
+			VulkanicAPI.framebufferDepthAttachmentTexture2D(ctx, n, k, l);
 			if (m == 0) {
-				GlStateManager._glBindFramebuffer(n, o);
+				VulkanicAPI.bindFramebuffer(ctx, n, o);
 			}
 		}
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			int u = GlStateManager.getFrameBuffer(36008);
-			int v = GlStateManager.getFrameBuffer(36009);
-			GlStateManager._glBindFramebuffer(36008, i);
-			GlStateManager._glBindFramebuffer(36009, j);
-			GlStateManager._glBlitFrameBuffer(k, l, m, n, o, p, q, r, s, t);
-			GlStateManager._glBindFramebuffer(36008, u);
-			GlStateManager._glBindFramebuffer(36009, v);
+			CommandContext ctx = commandContext();
+			VulkanicAPI.blitNamedFramebuffer(ctx, i, j, k, l, m, n, o, p, q, r, s, t);
 		}
 	}
 }

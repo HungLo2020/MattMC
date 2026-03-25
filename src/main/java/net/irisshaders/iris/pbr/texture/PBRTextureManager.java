@@ -1,6 +1,5 @@
 package net.irisshaders.iris.pbr.texture;
 
-import net.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.irisshaders.iris.Iris;
@@ -14,6 +13,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.Dumpable;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -107,7 +107,7 @@ public class PBRTextureManager {
 			Class<? extends AbstractTexture> clazz = texture.getClass();
 			PBRTextureLoader loader = PBRTextureLoaderRegistry.INSTANCE.getLoader(clazz);
 			if (loader != null) {
-				int previousTextureBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
+				int previousTextureBinding = net.irisshaders.iris.gl.IrisRenderSystem.getBoundTextureOnActiveUnit();
 				consumer.clear();
 				try {
 					loader.load(texture, Minecraft.getInstance().getResourceManager(), consumer);
@@ -115,7 +115,7 @@ public class PBRTextureManager {
 				} catch (Exception e) {
 					Iris.logger.warn("Failed to load PBR textures for texture " + id, e);
 				} finally {
-					GlStateManager._bindTexture(previousTextureBinding);
+					VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousTextureBinding);
 				}
 			}
 		}

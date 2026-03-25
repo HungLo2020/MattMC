@@ -1,26 +1,18 @@
 package net.irisshaders.iris.gl.texture;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.system.MemoryUtil;
 
 public interface DepthCopyStrategy {
-	// GL constants (from GL20C, GL30C, GL43C)
-	int GL_TEXTURE_2D = 0x0DE1;
-	int GL_DEPTH_BUFFER_BIT = 0x00000100;
-	int GL_STENCIL_BUFFER_BIT = 0x00000400;
-	int GL_NEAREST = 0x2600;
-	
 	static DepthCopyStrategy fastest(boolean combinedStencilRequired) {
 		// Check whether glCopyImageSubData is available by checking the function directly...
-		// Gl.getCapabilities().OpenGL43 can be false even if OpenGL 4.3 functions are supported,
-		// because Minecraft requests an OpenGL 3.2 forward compatible function.
+		// Capability version flags can be false even when specific functions are available,
+		// because Minecraft requests an OpenGL 3.2 forward compatible context.
 		//
 		// Perhaps calling GL43.isAvailable would be a different option, but we only need one
 		// function, so we just check for that function.
-		if (VulkanicAPI.obtainGraphicsCapabilities().OpenGL43 && VulkanicAPI.checkFunctionAvailable("glCopyImageSubData")) {
+		if (VulkanicAPI.checkFunctionAvailable("glCopyImageSubData")) {
 			return new Gl43CopyImage();
 		}
 
@@ -58,12 +50,10 @@ public interface DepthCopyStrategy {
 		public void copy(GlFramebuffer sourceFb, int sourceTexture, GlFramebuffer destFb, int destTexture, int width, int height) {
 			sourceFb.bindAsReadBuffer();
 
-			int previousTexture = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
+			int previousTexture = IrisRenderSystem.getBoundTextureOnActiveUnit();
 
 			IrisRenderSystem.copyTexSubImage2D(
 				destTexture,
-				// target
-				GL_TEXTURE_2D,
 				// level
 				0,
 				// xoffset, yoffset
@@ -75,7 +65,7 @@ public interface DepthCopyStrategy {
 				// height
 				height);
 
-			GlStateManager._bindTexture(previousTexture);
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousTexture);
 		}
 	}
 
@@ -92,10 +82,8 @@ public interface DepthCopyStrategy {
 
 		@Override
 		public void copy(GlFramebuffer sourceFb, int sourceTexture, GlFramebuffer destFb, int destTexture, int width, int height) {
-			IrisRenderSystem.blitFramebuffer(sourceFb.getId(), destFb.getId(), 0, 0, width, height,
-				0, 0, width, height,
-				GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT,
-				GL_NEAREST);
+			IrisRenderSystem.blitDepthAndStencilBuffersNearest(sourceFb.getId(), destFb.getId(), 0, 0, width, height,
+				0, 0, width, height);
 		}
 	}
 
@@ -113,15 +101,13 @@ public interface DepthCopyStrategy {
 
 		@Override
 		public void copy(GlFramebuffer sourceFb, int sourceTexture, GlFramebuffer destFb, int destTexture, int width, int height) {
-			IrisRenderSystem.copyImageSubData(
+			IrisRenderSystem.copyImageSubData2D(
 				sourceTexture,
-				GL_TEXTURE_2D,
 				0,
 				0,
 				0,
 				0,
 				destTexture,
-				GL_TEXTURE_2D,
 				0,
 				0,
 				0,

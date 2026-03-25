@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.TextureFormat;
 import java.io.IOException;
@@ -32,16 +31,15 @@ public abstract class ReloadableTexture extends AbstractTexture {
 	}
 
 	protected void doLoad(NativeImage nativeImage, boolean bl, boolean bl2) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
 		this.close();
-		this.texture = gpuDevice.createTexture(this.resourceId::toString, 5, TextureFormat.RGBA8, nativeImage.getWidth(), nativeImage.getHeight(), 1, 1);
-		this.textureView = gpuDevice.createTextureView(this.texture);
+		this.texture = net.vulkanic.VulkanicAPI.createTexture(this.resourceId::toString, 5, TextureFormat.RGBA8, nativeImage.getWidth(), nativeImage.getHeight(), 1, 1);
+		this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 		this.setFilter(bl, false);
 		this.setClamp(bl2);
-		gpuDevice.createCommandEncoder().writeToTexture(this.texture, nativeImage);
+		net.vulkanic.VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, nativeImage);
 		
 		// Iris: Track texture for PBR system
-		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(this.texture.iris$getGlId(), this);
+		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(this.texture), this);
 	}
 
 	public abstract TextureContents loadContents(ResourceManager resourceManager) throws IOException;

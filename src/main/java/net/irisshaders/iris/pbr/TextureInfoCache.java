@@ -1,9 +1,10 @@
 package net.irisshaders.iris.pbr;
 
-import net.blaze3d.opengl.GlStateManager;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIntegerQuery;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
@@ -28,7 +29,7 @@ public class TextureInfoCache {
 	public void onTexImage2D(int target, int level, int internalformat, int width, int height, int border,
 							 int format, int type, @Nullable ByteBuffer pixels) {
 		if (level == 0) {
-			int id = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
+			int id = IrisRenderSystem.getBoundTextureOnActiveUnit();
 			TextureInfo info = getInfo(id);
 			info.internalFormat = internalformat;
 			info.width = width;
@@ -76,15 +77,16 @@ public class TextureInfoCache {
 		}
 
 		private int fetchLevelParameter(int pname) {
+			var ctx = VulkanicAPI.getCommandContext();
 			// Keep track of what texture was bound before
-			int previousTextureBinding = GlStateManager._getInteger(VulkanicAPI.GL_TEXTURE_BINDING_2D);
+			int previousTextureBinding = VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.TEXTURE_BINDING_2D);
 
 			// Bind this texture and grab the parameter from it.
-			GlStateManager._bindTexture(id);
-			int parameter = GlStateManager._getTexLevelParameter(VulkanicAPI.GL_TEXTURE_2D, 0, pname);
+			VulkanicAPI.bindTexture2D(ctx, id);
+			int parameter = VulkanicAPI.getTexture2DLevelParameter(ctx, 0, pname);
 
 			// Make sure to re-bind the previous texture to avoid issues.
-			GlStateManager._bindTexture(previousTextureBinding);
+			VulkanicAPI.bindTexture2D(ctx, previousTextureBinding);
 
 			return parameter;
 		}

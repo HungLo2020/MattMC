@@ -59,6 +59,7 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
@@ -97,13 +98,13 @@ public class EntityMapImageManager {
         this.textureAtlas.setFilter(true, false);
 
         final int fboTextureSize = 512;
-        this.fboTexture = RenderSystem.getDevice().createTexture("voxelmap-radarfbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
-        this.fboDepthTexture = RenderSystem.getDevice().createTexture("voxelmap-radarfbodepth", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.DEPTH32, fboTextureSize, fboTextureSize, 1, 1);
+        this.fboTexture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-radarfbotexture", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, fboTextureSize, fboTextureSize, 1, 1);
+        this.fboDepthTexture = net.vulkanic.VulkanicAPI.createTexture("voxelmap-radarfbodepth", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.DEPTH32, fboTextureSize, fboTextureSize, 1, 1);
         Minecraft.getInstance().getTextureManager().register(resourceFboTexture, new AllocatedTexture(fboTexture));
 
         // this.fboTexture = fboTexture.getTexture();
-        fboTextureView = RenderSystem.getDevice().createTextureView(this.fboTexture);
-        fboDepthTextureView = RenderSystem.getDevice().createTextureView(this.fboDepthTexture);
+        fboTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboTexture);
+        fboDepthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboDepthTexture);
 
         projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Entity Map Image Proj", 256.0F, -256.0F, -256.0F, 256.0F, 1000.0F, 21000.0F);
 
@@ -287,15 +288,15 @@ public class EntityMapImageManager {
         AbstractTexture texture = minecraft.getTextureManager().getTexture(resourceLocation);
         AbstractTexture texture2 = resourceLocation2 == null ? null : minecraft.getTextureManager().getTexture(resourceLocation2);
 
-        RenderSystem.getModelViewStack().pushMatrix();
-        RenderSystem.getModelViewStack().identity();
-        GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+        VulkanicAPI.getModelViewStack().pushMatrix();
+        VulkanicAPI.getModelViewStack().identity();
+        GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
                 .writeTransform(
-                        RenderSystem.getModelViewMatrix(),
+                        VulkanicAPI.getModelViewMatrix(),
                         new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
                         new Vector3f(),
-                        RenderSystem.getTextureMatrix(),
-                        RenderSystem.getShaderLineWidth());
+                net.vulkanic.VulkanicAPI.getTextureMatrix(),
+                net.vulkanic.VulkanicAPI.getShaderLineWidth());
 
         try (MeshData meshData = bufferBuilder.build()) {
             // no mesh? might happen with some mods
@@ -306,7 +307,7 @@ public class EntityMapImageManager {
             GpuBuffer indexBuffer;
             VertexFormat.IndexType indexType;
             if (meshData.indexBuffer() == null) {
-                RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(meshData.drawState().mode());
+                VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(meshData.drawState().mode());
                 indexBuffer = autoStorageIndexBuffer.getBuffer(meshData.drawState().indexCount());
                 indexType = autoStorageIndexBuffer.type();
             } else {
@@ -317,13 +318,13 @@ public class EntityMapImageManager {
             // float size = 64.0F * scale;
             // int width = fboTexture.getWidth(0);
             // int height = fboTexture.getHeight(0);
-            ProjectionType originalProjectionType = RenderSystem.getProjectionType();
-            GpuBufferSlice originalProjectionMatrix = RenderSystem.getProjectionMatrixBuffer();
-            RenderSystem.setProjectionMatrix(projection.getBuffer(), ProjectionType.ORTHOGRAPHIC);
+            ProjectionType originalProjectionType = net.vulkanic.VulkanicAPI.getProjectionType();
+            GpuBufferSlice originalProjectionMatrix = net.vulkanic.VulkanicAPI.getProjectionMatrixBuffer();
+            net.vulkanic.VulkanicAPI.setProjectionMatrix(projection.getBuffer(), ProjectionType.ORTHOGRAPHIC);
 
-            try (RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "VoxelMap entity image renderer", fboTextureView, OptionalInt.of(0x00000000), fboDepthTextureView, OptionalDouble.of(1.0))) {
+            try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createCommandEncoder().createRenderPass(() -> "VoxelMap entity image renderer", fboTextureView, OptionalInt.of(0x00000000), fboDepthTextureView, OptionalDouble.of(1.0))) {
                 renderPass.setPipeline(renderPipeline);
-                RenderSystem.bindDefaultUniforms(renderPass);
+                net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
                 renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
                 renderPass.bindSampler("Sampler0", texture.getTextureView());
                 // renderPass.bindSampler("Sampler1", texture.getTexture()); // overlay
@@ -339,8 +340,8 @@ public class EntityMapImageManager {
                     renderPass.drawIndexed(0, 0, meshData.drawState().indexCount(), 1);
                 }
             }
-            RenderSystem.getModelViewStack().popMatrix();
-            RenderSystem.setProjectionMatrix(originalProjectionMatrix, originalProjectionType);
+            VulkanicAPI.getModelViewStack().popMatrix();
+            net.vulkanic.VulkanicAPI.setProjectionMatrix(originalProjectionMatrix, originalProjectionType);
 
         }
         // if (VoxelConstants.DEBUG) {

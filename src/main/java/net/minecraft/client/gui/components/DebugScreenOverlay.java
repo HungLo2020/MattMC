@@ -59,6 +59,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
@@ -76,7 +77,7 @@ public class DebugScreenOverlay {
 	private final Minecraft minecraft;
 	private final Font font;
 	private final GpuBuffer crosshairBuffer;
-	private final RenderSystem.AutoStorageIndexBuffer crosshairIndicies = RenderSystem.getSequentialBuffer(VertexFormat.Mode.LINES);
+	private final VulkanicAPI.AutoStorageIndexBuffer crosshairIndicies = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.LINES);
 	@Nullable
 	private ChunkPos lastPos;
 	@Nullable
@@ -118,7 +119,7 @@ public class DebugScreenOverlay {
 			bufferBuilder.addVertex(0.0F, 0.0F, 1.0F).setColor(-8421377).setNormal(0.0F, 0.0F, 1.0F);
 
 			try (MeshData meshData = bufferBuilder.buildOrThrow()) {
-				this.crosshairBuffer = RenderSystem.getDevice().createBuffer(() -> "Crosshair vertex buffer", 32, meshData.vertexBuffer());
+				this.crosshairBuffer = VulkanicAPI.createBuffer(() -> "Crosshair vertex buffer", 32, meshData.vertexBuffer());
 			}
 		}
 	}
@@ -458,7 +459,7 @@ public class DebugScreenOverlay {
 	}
 
 	public void render3dCrosshair(Camera camera) {
-		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
+		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.translate(0.0F, 0.0F, -1.0F);
 		matrix4fStack.rotateX(camera.getXRot() * (float) (Math.PI / 180.0));
@@ -470,17 +471,15 @@ public class DebugScreenOverlay {
 		GpuTextureView gpuTextureView = renderTarget.getColorTextureView();
 		GpuTextureView gpuTextureView2 = renderTarget.getDepthTextureView();
 		GpuBuffer gpuBuffer = this.crosshairIndicies.getBuffer(18);
-		GpuBufferSlice[] gpuBufferSlices = RenderSystem.getDynamicUniforms()
+		GpuBufferSlice[] gpuBufferSlices = VulkanicAPI.getDynamicUniforms()
 			.writeTransforms(
 				new DynamicUniforms.Transform(new Matrix4f(matrix4fStack), new Vector4f(0.0F, 0.0F, 0.0F, 1.0F), new Vector3f(), new Matrix4f(), 4.0F),
 				new DynamicUniforms.Transform(new Matrix4f(matrix4fStack), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 2.0F)
 			);
 
-		try (RenderPass renderPass = RenderSystem.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "3d crosshair", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "3d crosshair", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 			renderPass.setPipeline(renderPipeline);
-			RenderSystem.bindDefaultUniforms(renderPass);
+			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setVertexBuffer(0, this.crosshairBuffer);
 			renderPass.setIndexBuffer(gpuBuffer, this.crosshairIndicies.type());
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlices[0]);

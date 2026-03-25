@@ -1,7 +1,6 @@
 package net.irisshaders.iris.pipeline.programs;
 
 import net.blaze3d.opengl.GlProgram;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.Uniform;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.UniformType;
@@ -23,7 +22,6 @@ import net.irisshaders.iris.gl.program.ProgramImages;
 import net.irisshaders.iris.gl.program.ProgramSamplers;
 import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.sampler.SamplerHolder;
-import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.gl.uniform.DynamicLocationalUniformHolder;
 import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
@@ -36,7 +34,9 @@ import net.irisshaders.iris.vertices.ImmediateState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicTextureSwizzleComponent;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -119,10 +119,11 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 		super.setupUniforms(uniformList, samplerList);
 
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		ProgramUniforms.Builder uniformBuilder = ProgramUniforms.builder(string, programId);
 		ProgramSamplers.Builder samplerBuilder = ProgramSamplers.builder(programId, IrisSamplers.WORLD_RESERVED_TEXTURE_UNITS);
 		uniformCreator.accept(uniformBuilder);
-		this.normalMat = GlStateManager._glGetUniformLocation(programId, "iris_NormalMat");
+		this.normalMat = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "iris_NormalMat");
 		ProgramImages.Builder builder = ProgramImages.builder(programId);
 		samplerCreator.accept(samplerBuilder, builder);
 		customUniforms.mapholderToPass(uniformBuilder, this);
@@ -140,8 +141,8 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		this.alphaTest = alphaTest.reference();
 		this.parent = parent;
 
-		this.modelViewInverse = GlStateManager._glGetUniformLocation(programId, "iris_ModelViewMatInverse");
-		this.projectionInverse = GlStateManager._glGetUniformLocation(programId, "iris_ProjMatInverse");
+		this.modelViewInverse = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "iris_ModelViewMatInverse");
+		this.projectionInverse = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "iris_ProjMatInverse");
 
 		this.intensitySwizzle = isIntensity;
 	}
@@ -170,19 +171,19 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		DepthColorStorage.unlockDepthColor();
 
 		if (!hasUV) {
-			IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0, pipeline.getWhitePixel().getTexture().iris$getGlId());
+			IrisRenderSystem.bindTextureToUnit(0, net.vulkanic.VulkanicCoreAPI.textureId(pipeline.getWhitePixel().getTexture()));
 		}
 
 		CapturedRenderingState.INSTANCE.setCurrentAlphaTest(alphaTest);
-		GlStateManager._glUseProgram(getProgramId());
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getProgramId());
 
 		if (modelViewInverse > -1) {
-			IrisRenderSystem.uniformMatrix4fv(modelViewInverse, false, RenderSystem.getModelViewMatrix().invert(tempMatrix4f).get(tempFloats));
+			IrisRenderSystem.uniformMatrix4fv(modelViewInverse, false, VulkanicAPI.getModelViewMatrix().invert(tempMatrix4f).get(tempFloats));
 		}
 
 
 		if (normalMat > -1) {
-			tempF = RenderSystem.getModelViewMatrix().invert(tempMatrix4f).transpose3x3(normalMatrix).get(tempF);
+			tempF = VulkanicAPI.getModelViewMatrix().invert(tempMatrix4f).transpose3x3(normalMatrix).get(tempF);
 
 			IrisRenderSystem.uniformMatrix3fv(normalMat, false, tempF);
 		}
@@ -193,9 +194,17 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		}
 
 		if (intensitySwizzle) {
-			IrisRenderSystem.addUnswizzle(RenderSystem.getShaderTexture(0).texture().iris$getGlId());
-			IrisRenderSystem.texParameteriv(RenderSystem.getShaderTexture(0).texture().iris$getGlId(), TextureType.TEXTURE_2D.getGlType(), VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
-				new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED});
+			int shaderTextureId = IrisRenderSystem.getTextureBinding(0);
+			if (shaderTextureId > 0) {
+				IrisRenderSystem.addUnswizzle(shaderTextureId);
+				IrisRenderSystem.setTextureSwizzleRgba(
+					shaderTextureId,
+					VulkanicTextureSwizzleComponent.RED,
+					VulkanicTextureSwizzleComponent.RED,
+					VulkanicTextureSwizzleComponent.RED,
+					VulkanicTextureSwizzleComponent.RED
+				);
+			}
 		}
 
 		ImmediateState.usingTessellation = usesTessellation;
@@ -207,7 +216,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 		images.update();
 
-		//GL46C.glUniform1i(GlStateManager._glGetUniformLocation(getProgramId(), "iris_overlay"), 1);
+		//GL46C.glUniform1i(VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), getProgramId(), "iris_overlay"), 1);
 		BlendModeOverride.restore();
 
 		if (this.blendModeOverride != null) {
@@ -236,7 +245,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 	@Override
 	public int iris$getBlockIndex(int program, CharSequence uniformBlockName) {
-		return VulkanicAPI.glGetUniformBlockIndex(program, "iris_" + uniformBlockName);
+		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getCommandContext(), program, "iris_" + uniformBlockName);
 	}
 
 	@Override

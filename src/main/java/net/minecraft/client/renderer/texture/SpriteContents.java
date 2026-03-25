@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTexture;
 import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -29,6 +28,7 @@ import net.sodium.client.SodiumClientMod;
 import net.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension;
 import net.sodium.client.util.NativeImageHelper;
 import net.sodium.client.util.color.ColorSRGB;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -176,8 +176,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteCont
 
 	public void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
 		for (int m = 0; m < this.byMipLevel.length; m++) {
-			RenderSystem.getDevice()
-				.createCommandEncoder()
+			VulkanicAPI.createCommandEncoder()
 				.writeToTexture(gpuTexture, nativeImages[m], m, 0, i >> m, j >> m, this.width >> m, this.height >> m, k >> m, l >> m);
 		}
 	}

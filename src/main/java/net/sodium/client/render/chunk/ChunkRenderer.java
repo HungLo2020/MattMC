@@ -25,6 +25,12 @@ public interface ChunkRenderer {
     void render(ChunkRenderMatrices matrices, CommandList commandList, ChunkRenderListIterable renderLists, TerrainRenderPass pass, CameraTransform camera, FogParameters parameters, boolean indexedRenderingEnabled);
 
     /**
+     * Called once per rendered frame to rotate any frame-scoped GPU resources.
+     */
+    default void endFrame() {
+    }
+
+    /**
      * Deletes this render backend and any resources attached to it.
      */
     void delete(CommandList commandList);

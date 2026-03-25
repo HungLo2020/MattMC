@@ -11,6 +11,6 @@ public class GlUniformBlock {
     }
 
     public void bindBuffer(GlBuffer buffer) {
-        VulkanicAPI.bindUniformBufferBase(this.binding, buffer.handle());
+        VulkanicAPI.bindUniformBufferBase(VulkanicAPI.getCommandContext(), this.binding, buffer.handle());
     }
 }

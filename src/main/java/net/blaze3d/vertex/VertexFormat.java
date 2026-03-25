@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import net.blaze3d.GraphicsWorkarounds;
 import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderSystem;
@@ -16,6 +15,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -107,21 +107,20 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 	}
 
 	private static GpuBuffer uploadToBuffer(@Nullable GpuBuffer gpuBuffer, ByteBuffer byteBuffer, int i, Supplier<String> supplier) {
-		GpuDevice gpuDevice = RenderSystem.getDevice();
-		if (GraphicsWorkarounds.get(gpuDevice).alwaysCreateFreshImmediateBuffer()) {
+		if (GraphicsWorkarounds.get(net.vulkanic.VulkanicAPI.getDevice()).alwaysCreateFreshImmediateBuffer()) {
 			if (gpuBuffer != null) {
 				gpuBuffer.close();
 			}
 
-			return gpuDevice.createBuffer(supplier, i, byteBuffer);
+			return net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
 		} else {
 			if (gpuBuffer == null) {
-				gpuBuffer = gpuDevice.createBuffer(supplier, i, byteBuffer);
+				gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
 			} else {
-				CommandEncoder commandEncoder = gpuDevice.createCommandEncoder();
+				CommandEncoder commandEncoder = net.vulkanic.VulkanicAPI.createCommandEncoder();
 				if (gpuBuffer.size() < byteBuffer.remaining()) {
 					gpuBuffer.close();
-					gpuBuffer = gpuDevice.createBuffer(supplier, i, byteBuffer);
+					gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(supplier, i, byteBuffer);
 				} else {
 					commandEncoder.writeToBuffer(gpuBuffer.slice(), byteBuffer);
 				}
@@ -145,10 +144,11 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 	@Override
 	public void bindAttributesIris(boolean isFallback, int programId) {
 		com.google.common.collect.ImmutableSet<String> ATTRIBUTE_LIST = com.google.common.collect.ImmutableSet.of("Position", "Color", "Normal", "UV0", "UV1", "UV2");
+		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		int j = 0;
 
 		for (String string : this.getElementAttributeNames()) {
-			GlStateManager._glBindAttribLocation(programId, j, ATTRIBUTE_LIST.contains(string) && !isFallback ? "iris_" + string : string);
+			VulkanicAPI.setAttributeLocation(ctx, programId, j, ATTRIBUTE_LIST.contains(string) && !isFallback ? "iris_" + string : string);
 			j++;
 		}
 	}

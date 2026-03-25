@@ -1,24 +1,89 @@
 package net.vulkanic.backends.opengl;
 
-import net.blaze3d.opengl.GlStateManager;
+import net.blaze3d.opengl.GlDevice;
+import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.systems.CommandEncoder;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.TextureFormat;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
+import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL20;
-import org.lwjgl.opengl.GL30;
-import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
+import net.vulkanic.VulkanicBlendEquation;
+import net.vulkanic.VulkanicBlendFactor;
+import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicCapability;
+import net.vulkanic.VulkanicClearBuffer;
+import net.vulkanic.VulkanicCullFaceMode;
+import net.vulkanic.VulkanicDepthCompareOp;
+import net.vulkanic.VulkanicIntegerQuery;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
+import net.vulkanic.VulkanicStencilCompareOp;
+import net.vulkanic.VulkanicStencilFace;
+import net.vulkanic.VulkanicStencilOperation;
+import net.vulkanic.VulkanicTextureParameterName;
+import net.vulkanic.VulkanicTextureTarget;
+import net.vulkanic.VulkanicTextureUploadFormat;
+import net.vulkanic.VulkanExecutionContextInfo;
+import net.vulkanic.VulkanNativeInitializationInfo;
+import net.vulkanic.VulkanSwapchainSurfaceInfo;
+import net.minecraft.Util;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
+import org.lwjgl.opengl.*;
+
+import java.util.function.BiFunction;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
  * This is the ONLY place where direct OpenGL calls should be made.
  */
 public class OpenGLBackend implements GraphicsBackend {
+
+    private static final int TEXTURE_UNIT_COUNT = 128;
+    private final int[] texture2DBindings = new int[TEXTURE_UNIT_COUNT];
+    private int activeTextureUnitIndex = 0;
+    private volatile int presentScratchReadFbo;
+
+    /**
+     * Reference to the GlDevice, set after device initialization.
+     * Used for delegating device-level operations (pipeline compilation, etc.)
+     * that require access to the device's shader cache and DirectStateAccess.
+     */
+    private volatile net.blaze3d.opengl.GlDevice glDevice;
+    private volatile String backendVendorName = "unknown";
+    private volatile String backendRendererName = "unknown";
+    private volatile String backendVersionName = "unknown";
+
+    /**
+     * Registers the GlDevice with this backend.
+     * Called from GlDevice's constructor after the device is fully initialized.
+     *
+     * @param device the newly created GlDevice
+     */
+    public void setGlDevice(net.blaze3d.opengl.GlDevice device) {
+        this.glDevice = device;
+        if (device != null) {
+            this.backendVendorName = normalizeDeviceIdentity(device.getVendor());
+            this.backendRendererName = normalizeDeviceIdentity(device.getRenderer());
+            this.backendVersionName = normalizeDeviceIdentity(device.getVersion());
+        }
+    }
+
+    /**
+     * Returns the registered GlDevice, or null if not yet initialized.
+     */
+    public net.blaze3d.opengl.GlDevice getGlDevice() {
+        return glDevice;
+    }
     
-    @Deprecated
     @Override
     public long getGraphicsContext() {
         // Platform-specific: On Windows, return the WGL context handle
@@ -31,27 +96,222 @@ public class OpenGLBackend implements GraphicsBackend {
             return 0L;
         }
     }
-    
-    @Deprecated
+
     @Override
-    public void bindTexture(int textureId) {
-        int activeTexUnit = GlStateManager.activeTexture;
-        if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
-            GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+    public CommandContext getCurrentCommandContext() {
+        return OpenGLCommandContext.IMMEDIATE;
+    }
+
+    @Override
+    public GraphicsBackendType getBackendType() {
+        return GraphicsBackendType.OPENGL;
+    }
+
+    @Override
+    public boolean isNativeVulkanReady() {
+        return false;
+    }
+
+    @Override
+    public VulkanExecutionContextInfo getVulkanExecutionContextInfo() {
+        return VulkanExecutionContextInfo.unavailable(
+            GraphicsBackendType.OPENGL,
+            false,
+            "OpenGL backend does not own a native Vulkan logical device or graphics queue."
+        );
+    }
+
+    @Override
+    public VulkanSwapchainSurfaceInfo getVulkanSwapchainSurfaceInfo() {
+        return VulkanSwapchainSurfaceInfo.unavailable(
+            GraphicsBackendType.OPENGL,
+            false,
+            "OpenGL backend does not own a Vulkan surface or swapchain."
+        );
+    }
+
+    @Override
+    public VulkanNativeInitializationInfo initializeNativeVulkanRuntime() {
+        return VulkanNativeInitializationInfo.unsupported(
+            GraphicsBackendType.OPENGL,
+            "OpenGL backend does not support native Vulkan runtime initialization."
+        );
+    }
+
+    @Override
+    public GpuDevice createRendererDevice(
+        long rendererBootstrapWindowHandle,
+        int debugVerbosity,
+        boolean debugEnabled,
+        BiFunction<ResourceLocation, ShaderType, String> defaultShaderSource,
+        boolean debugLabelsEnabled
+    ) {
+        return new GlDevice(rendererBootstrapWindowHandle, debugVerbosity, debugEnabled, defaultShaderSource, debugLabelsEnabled);
+    }
+
+    @Override
+    public CommandEncoder createCommandEncoder() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
         }
+
+        return device.createCommandEncoder();
     }
-    
-    @Deprecated
+
     @Override
-    public void bindTexture(int target, int textureId) {
-        GL11.glBindTexture(target, textureId);
+    public net.blaze3d.systems.RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        java.util.OptionalInt clearColor
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);
     }
-    
-    @Deprecated
+
     @Override
-    public void generateMipmap(int target) {
-        GL30.glGenerateMipmap(target);
+    public net.blaze3d.systems.RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        GpuTextureView colorTextureView,
+        java.util.OptionalInt clearColor,
+        @Nullable GpuTextureView depthTextureView,
+        java.util.OptionalDouble clearDepth
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    @Override
+    public GpuTexture createTexture(
+        @Nullable java.util.function.Supplier<String> supplier,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTexture(supplier, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+    }
+
+    @Override
+    public GpuTexture createTexture(
+        @Nullable String label,
+        int usage,
+        TextureFormat textureFormat,
+        int width,
+        int height,
+        int depthOrLayers,
+        int mipLevels
+    ) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTexture(label, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+    }
+
+    @Override
+    public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createBuffer(supplier, usage, size);
+    }
+
+    @Override
+    public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, java.nio.ByteBuffer data) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createBuffer(supplier, usage, data);
+    }
+
+    @Override
+    public GpuTextureView createTextureView(GpuTexture texture) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTextureView(texture);
+    }
+
+    @Override
+    public GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.createTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
+    @Override
+    public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
+        net.sodium.client.compatibility.environment.GlContextInfo context = net.sodium.client.compatibility.environment.GlContextInfo.create();
+        org.slf4j.Logger logger = net.logging.LogUtils.getLogger();
+        logger.info("OpenGL Vendor: {}", context.vendor());
+        logger.info("OpenGL Renderer: {}", context.renderer());
+        logger.info("OpenGL Version: {}", context.version());
+
+        // Cache stable identity strings while a valid context is known to exist.
+        this.backendVendorName = normalizeDeviceIdentity(context.vendor());
+        this.backendRendererName = normalizeDeviceIdentity(context.renderer());
+        this.backendVersionName = normalizeDeviceIdentity(context.version());
+
+        net.sodium.client.platform.NativeWindowHandle handle = () -> org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window(mainWindowHandle);
+        net.sodium.client.compatibility.checks.PostLaunchChecks.onContextInitialized(handle, context);
+        net.sodium.client.compatibility.checks.ModuleScanner.checkModules(handle);
+
+        net.irisshaders.iris.Iris.duringRenderSystemInit();
+        net.irisshaders.iris.gl.GLDebug.reloadDebugState();
+        net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
+        net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
+        net.irisshaders.iris.Iris.onRenderSystemInit();
+    }
+
+    @Override
+    public CompiledRenderPipeline precompileRenderPipeline(
+        RenderPipeline renderPipeline,
+        @Nullable BiFunction<ResourceLocation, ShaderType, String> sourceProvider
+    ) {
+        if (renderPipeline == null) {
+            throw new IllegalArgumentException("renderPipeline must not be null");
+        }
+
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+
+        return device.precompilePipeline(renderPipeline, sourceProvider);
+    }
+
+    @Override
+    public void clearPrecompiledPipelineCache() {
+        GlDevice device = this.glDevice;
+        if (device != null) {
+            device.clearPipelineCache();
+        }
     }
     
     /**
@@ -73,58 +333,229 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glViewport(x, y, width, height);
     }
     
-    @Deprecated
     @Override
-    public void clear(int mask) {
+    public void clearBuffers(CommandContext ctx, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glClear(mask);
     }
     
-    @Deprecated
     @Override
-    public void enableBlend() {
-        GL11.glEnable(GL11.GL_BLEND);
+    public void setBlendEnabled(CommandContext ctx, boolean enabled) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (enabled) {
+            GL11.glEnable(GL11.GL_BLEND);
+        } else {
+            GL11.glDisable(GL11.GL_BLEND);
+        }
     }
     
-    @Deprecated
     @Override
-    public void disableBlend() {
-        GL11.glDisable(GL11.GL_BLEND);
+    public void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (enabled) {
+            GL30.glEnablei(capability, index);
+        } else {
+            GL30.glDisablei(capability, index);
+        }
     }
     
-    @Deprecated
     @Override
-    public void useProgram(int programId) {
+    public void setCullFaceMode(CommandContext ctx, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glCullFace(mode);
+    }
+
+    @Override
+    public void setCullFaceMode(CommandContext ctx, VulkanicCullFaceMode mode) {
+        setCullFaceMode(ctx, toOpenGLCullFaceMode(mode));
+    }
+    
+    @Override
+    public void bindShaderProgram(CommandContext ctx, int programId) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glUseProgram(programId);
     }
     
-    @Deprecated
     @Override
-    public void enable(int cap) {
-        GL11.glEnable(cap);
+    public void setCapabilityEnabled(CommandContext ctx, int cap, boolean enabled) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (enabled) {
+            GL11.glEnable(cap);
+        } else {
+            GL11.glDisable(cap);
+        }
+    }
+
+    @Override
+    public void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled) {
+        setCapabilityEnabled(ctx, toOpenGLCapability(capability), enabled);
     }
     
-    @Deprecated
     @Override
-    public void disable(int cap) {
-        GL11.glDisable(cap);
+    public void bindTexture2D(CommandContext ctx, int textureId) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (activeTextureUnitIndex < 0 || activeTextureUnitIndex >= texture2DBindings.length) {
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+            return;
+        }
+
+        if (textureId != texture2DBindings[activeTextureUnitIndex]) {
+            texture2DBindings[activeTextureUnitIndex] = textureId;
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        }
     }
     
-    @Deprecated
     @Override
-    public void setDepthTestFunction(int func) {
+    public void bindTexture(CommandContext ctx, int target, int textureId) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glBindTexture(target, textureId);
+    }
+
+    @Override
+    public void bindTexture(CommandContext ctx, VulkanicTextureTarget target, int textureId) {
+        bindTexture(ctx, toOpenGLTextureTarget(target), textureId);
+    }
+    
+    @Override
+    public void bindSampler(CommandContext ctx, int unit, int sampler) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL33.glBindSampler(unit, sampler);
+    }
+    
+    @Override
+    public void setDepthTest(CommandContext ctx, int func) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glDepthFunc(func);
     }
-    
-    @Deprecated
+
     @Override
-    public void setDepthWriteEnabled(boolean enabled) {
+    public void setDepthTest(CommandContext ctx, VulkanicDepthCompareOp func) {
+        setDepthTest(ctx, toOpenGLDepthCompareOp(func));
+    }
+    
+    @Override
+    public void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glDepthMask(enabled);
     }
     
-    @Deprecated
     @Override
-    public void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+    public void setColorMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glColorMask(r, g, b, a);
+    }
+    
+    @Override
+    public void generateTextureMipmap(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glGenerateMipmap(target);
+    }
+    
+    @Override
+    public void setPixelStore(CommandContext ctx, int pname, int value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glPixelStorei(pname, value);
+    }
+    
+    @Override
+    public void bindFramebuffer(CommandContext ctx, int target, int fbo) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glBindFramebuffer(target, fbo);
+    }
+
+    @Override
+    public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
+        int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);
+        bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+    }
+    
+    @Override
+    public void bindBuffer(CommandContext ctx, int target, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBindBuffer(target, buffer);
+    }
+
+    @Override
+    public void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
+        bindBuffer(ctx, toOpenGLBufferTarget(target), buffer);
+    }
+    
+    @Override
+    public void bindBufferBase(CommandContext ctx, int target, int index, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glBindBufferBase(target, index, buffer);
+    }
+    
+    @Override
+    public void setActiveTextureUnit(CommandContext ctx, int unit) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        int textureUnitIndex = unit - GL13.GL_TEXTURE0;
+        if (textureUnitIndex >= 0 && textureUnitIndex < texture2DBindings.length) {
+            activeTextureUnitIndex = textureUnitIndex;
+        }
+        GL13.glActiveTexture(unit);
+    }
+    
+    @Override
+    public void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexParameteri(target, pname, param);
+    }
+    
+    @Override
+    public void copyTexSubImage2D(CommandContext ctx, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    @Override
+    public int getTexParameteri(CommandContext ctx, int target, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL11.glGetTexParameteri(target, pname);
     }
     
     /**
@@ -146,527 +577,1083 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glScissor(x, y, width, height);
     }
     
-    @Deprecated
+    // CommandContext versions of DSA buffer operations
     @Override
-    public void setPixelStoreMode(int pname, int value) {
-        GL11.glPixelStorei(pname, value);
+    public int createBufferDSA(CommandContext ctx) {
+        return createBuffer(ctx);
     }
     
-    @Deprecated
     @Override
-    public void attachFramebuffer(int target, int fbo) {
-        GL30.glBindFramebuffer(target, fbo);
+    public void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferData(ctx, GL15.GL_ARRAY_BUFFER, size, usage);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
-    @Deprecated
     @Override
-    public void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
-        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    public void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferData(ctx, GL15.GL_ARRAY_BUFFER, data, usage);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
-    @Deprecated
     @Override
-    public void attachBuffer(int target, int buffer) {
-        GL15.glBindBuffer(target, buffer);
+    public void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferSubData(ctx, GL15.GL_ARRAY_BUFFER, offset, data);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
-    // Direct State Access buffer operations
-    @Deprecated
     @Override
-    public int createBufferDSA() {
-        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateBuffers();
+    public void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferStorage(ctx, GL15.GL_ARRAY_BUFFER, size, flags);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
-    @Deprecated
     @Override
-    public void namedBufferDataDSA(int buffer, long size, int usage) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, size, usage);
+    public void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        // DSA methods work on named buffers, not targets. For migration, we bind then use the target-based API
+        int prevBinding = GL15.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
+        bufferStorage(ctx, GL15.GL_ARRAY_BUFFER, data, flags);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevBinding);
     }
     
-    @Deprecated
     @Override
-    public void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, data, usage);
+    public java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL45.glMapNamedBufferRange(buffer, offset, length, access);
     }
     
-    @Deprecated
+    // CommandContext versions of DSA buffer operations
     @Override
-    public void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferSubData(buffer, offset, data);
+    public void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glUnmapNamedBuffer(buffer);
     }
     
-    @Deprecated
     @Override
-    public void namedBufferStorageDSA(int buffer, long size, int flags) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, size, flags);
+    public void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glFlushMappedNamedBufferRange(buffer, offset, length);
     }
     
-    @Deprecated
     @Override
-    public void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, data, flags);
+    public void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glCopyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size);
     }
     
-    @Deprecated
     @Override
-    public java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
-        return org.lwjgl.opengl.ARBDirectStateAccess.glMapNamedBufferRange(buffer, offset, length, access);
+    public void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
     }
     
-    @Deprecated
     @Override
-    public void unmapNamedBufferDSA(int buffer) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glUnmapNamedBuffer(buffer);
-    }
-    
-    @Deprecated
-    @Override
-    public void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glFlushMappedNamedBufferRange(buffer, offset, length);
-    }
-    
-    @Deprecated
-    @Override
-    public void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size);
-    }
-    
-    // Direct State Access framebuffer operations
-    @Deprecated
-    @Override
-    public int createFramebufferDSA() {
-        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
-    }
-    
-    @Deprecated
-    @Override
-    public void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
-    }
-    
-    @Deprecated
-    @Override
-    public void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
+    public void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
                                         int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        org.lwjgl.opengl.ARBDirectStateAccess.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
-                                                                      dstX0, dstY0, dstX1, dstY1, mask, filter);
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL45.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+                                                     dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
     @Override
-    public void activateTextureUnit(int unit) {
-        org.lwjgl.opengl.GL13.glActiveTexture(unit);
-    }
-    
-    @Deprecated
-    @Override
-    public void configureTextureParameter(int target, int pname, int param) {
-        GL11.glTexParameteri(target, pname, param);
-    }
-    
-    @Deprecated
-    @Override
-    public int createTexture() {
+    public int createTexture2D(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL11.glGenTextures();
     }
     
-    @Deprecated
     @Override
-    public void removeTexture(int texture) {
+    public void deleteTexture(CommandContext ctx, int texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glDeleteTextures(texture);
     }
     
-    @Deprecated
     @Override
-    public void configurePolygonMode(int face, int mode) {
-        GL11.glPolygonMode(face, mode);
-    }
-    
-    @Deprecated
-    @Override
-    public void configurePolygonOffset(float factor, float units) {
-        GL11.glPolygonOffset(factor, units);
-    }
-    
-    @Deprecated
-    @Override
-    public void configureLogicOp(int opcode) {
-        GL11.glLogicOp(opcode);
-    }
-    
-    @Deprecated
-    @Override
-    public void drawPrimitiveArrays(int mode, int first, int count) {
+    public void drawArrays(CommandContext ctx, int mode, int first, int count) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glDrawArrays(mode, first, count);
     }
-
-    @Deprecated
+    
     @Override
-    public void drawIndexedElements(int mode, int count, int type, long indices) {
+    public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL11.glDrawElements(mode, count, type, indices);
     }
     
-    @Deprecated
     @Override
-    public void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        org.lwjgl.opengl.GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
+    public void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+
+    @Override
+    public void setBlendFunction(
+        CommandContext ctx,
+        VulkanicBlendFactor srcRgb,
+        VulkanicBlendFactor dstRgb,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
+        setBlendFunction(
+            ctx,
+            toOpenGLBlendFactor(srcRgb),
+            toOpenGLBlendFactor(dstRgb),
+            toOpenGLBlendFactor(srcAlpha),
+            toOpenGLBlendFactor(dstAlpha)
+        );
     }
     
-    @Deprecated
     @Override
-    public int checkForErrors() {
+    public void setBlendEquation(CommandContext ctx, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL14.glBlendEquation(mode);
+    }
+
+    @Override
+    public void setBlendEquation(CommandContext ctx, VulkanicBlendEquation mode) {
+        setBlendEquation(ctx, toOpenGLBlendEquation(mode));
+    }
+    
+    @Override
+    public void setDepthFunc(CommandContext ctx, int func) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glDepthFunc(func);
+    }
+
+    @Override
+    public void setDepthFunc(CommandContext ctx, VulkanicDepthCompareOp func) {
+        setDepthFunc(ctx, toOpenGLDepthCompareOp(func));
+    }
+    
+    @Override
+    public void setReadBuffer(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glReadBuffer(buffer);
+    }
+    
+    @Override
+    public void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    @Override
+    public void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    @Override
+    public void drawBuffers(CommandContext ctx, int[] buffers) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glDrawBuffers(buffers);
+    }
+    
+    @Override
+    public void blendFunc(CommandContext ctx, int sfactor, int dfactor) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glBlendFunc(sfactor, dfactor);
+    }
+
+    @Override
+    public void blendFunc(CommandContext ctx, VulkanicBlendFactor sfactor, VulkanicBlendFactor dfactor) {
+        blendFunc(ctx, toOpenGLBlendFactor(sfactor), toOpenGLBlendFactor(dfactor));
+    }
+    
+    @Override
+    public int getInteger(CommandContext ctx, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL11.glGetInteger(pname);
+    }
+
+    @Override
+    public int getInteger(CommandContext ctx, VulkanicIntegerQuery query) {
+        return getInteger(ctx, toOpenGLIntegerQuery(query));
+    }
+    
+    @Override
+    public void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform3f(location, v0, v1, v2);
+    }
+    
+    @Override
+    public void setClearColor(CommandContext ctx, float r, float g, float b, float a) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glClearColor(r, g, b, a);
+    }
+    
+    @Override
+    public void setClearDepth(CommandContext ctx, double depth) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glClearDepth(depth);
+    }
+    
+    @Override
+    public void setViewport(CommandContext ctx, int x, int y, int width, int height) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glViewport(x, y, width, height);
+    }
+    
+    @Override
+    public void setPolygonMode(CommandContext ctx, int face, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glPolygonMode(face, mode);
+    }
+    
+    @Override
+    public void setPolygonOffset(CommandContext ctx, float factor, float units) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glPolygonOffset(factor, units);
+    }
+    
+    @Override
+    public void setLogicOp(CommandContext ctx, int opcode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glLogicOp(opcode);
+    }
+    
+    @Override
+    public int createFramebuffer(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
+    }
+    
+    @Override
+    public int getError(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL11.glGetError();
     }
     
-    @Deprecated
+    
     @Override
-    public void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
-        GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+    public void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
+                                 int border, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);
+    }
+
+    @Override
+    public void uploadTexture2D(
+        CommandContext ctx,
+        VulkanicTextureTarget target,
+        int level,
+        VulkanicTextureUploadFormat uploadFormat,
+        int width,
+        int height,
+        int border,
+        java.nio.ByteBuffer pixels
+    ) {
+        if (target == null) {
+            throw new IllegalArgumentException("target must not be null");
+        }
+        if (uploadFormat == null) {
+            throw new IllegalArgumentException("uploadFormat must not be null");
+        }
+
+        uploadTexture2D(
+            ctx,
+            target.toLegacyGlTarget(),
+            level,
+            uploadFormat.legacyInternalFormat(),
+            width,
+            height,
+            border,
+            uploadFormat.legacyFormat(),
+            uploadFormat.legacyType(),
+            pixels
+        );
     }
     
-    @Deprecated
     @Override
-    public void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    public void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                         int width, int height, int format, int type, long pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexSubImage2D(target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
-    @Deprecated
     @Override
-    public void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    public void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
+                                         int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL11.glTexSubImage2D(target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
-    @Deprecated
+    
+    
+    
     @Override
-    public int allocateBufferObject() {
+    public int createBuffer(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL15.glGenBuffers();
     }
     
-    @Deprecated
     @Override
-    public void releaseBufferObject(int buf) {
-        GL15.glDeleteBuffers(buf);
+    public void deleteBuffer(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glDeleteBuffers(buffer);
     }
     
-    @Deprecated
     @Override
-    public void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        GL15.glBufferData(tgt, dat, usg);
+    public void bufferData(CommandContext ctx, int target, java.nio.ByteBuffer data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferData(target, data, usage);
     }
     
-    @Deprecated
     @Override
-    public void fillBufferWithSize(int tgt, long sz, int usg) {
-        GL15.glBufferData(tgt, sz, usg);
+    public void bufferData(CommandContext ctx, int target, long size, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferData(target, size, usage);
     }
     
-    @Deprecated
     @Override
-    public void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        GL15.glBufferSubData(tgt, off, dat);
+    public void bufferData(CommandContext ctx, int target, float[] data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferData(target, data, usage);
     }
     
-    @Deprecated
     @Override
-    public int createVertexArrayObject() {
+    public void bufferData(CommandContext ctx, int target, int[] data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferData(target, data, usage);
+    }
+    
+    
+    
+    
+    
+    @Override
+    public void bufferSubData(CommandContext ctx, int target, long offset, java.nio.ByteBuffer data) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBufferSubData(target, offset, data);
+    }
+    
+    @Override
+    public void bufferStorage(CommandContext ctx, int target, long size, int flags) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL44.glBufferStorage(target, size, flags);
+    }
+    
+    @Override
+    public void bufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL44.glBufferStorage(target, data, flags);
+    }
+    
+    @Override
+    public void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL31.glCopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+    
+    @Override
+    public void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL30.glFlushMappedBufferRange(target, offset, length);
+    }
+    
+    
+    @Override
+    public int createVertexArray(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL30.glGenVertexArrays();
     }
     
-    @Deprecated
     @Override
-    public void selectVertexArray(int vao) {
+    public void bindVertexArray(CommandContext ctx, int vao) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL30.glBindVertexArray(vao);
     }
     
-    @Deprecated
+    
+    
     @Override
-    public java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return GL30.glMapBufferRange(tgt, off, len, acc);
+    public java.nio.ByteBuffer mapBuffer(CommandContext ctx, int target, long offset, long length, int access) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL30.glMapBufferRange(target, offset, length, access);
     }
     
-    @Deprecated
     @Override
-    public void unmapBufferData(int tgt) {
-        GL15.glUnmapBuffer(tgt);
+    public void unmapBuffer(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glUnmapBuffer(target);
     }
     
-    @Deprecated
-    @Override
-    public int generateFramebufferObject() {
-        return GL30.glGenFramebuffers();
-    }
     
-    @Deprecated
+    
     @Override
-    public void destroyFramebufferObject(int fbo) {
+    public void deleteFramebuffer(CommandContext ctx, int fbo) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL30.glDeleteFramebuffers(fbo);
     }
     
-    @Deprecated
     @Override
-    public void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+    public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+
+    @Override
+    public void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (textureView == null) {
+            throw new IllegalArgumentException("textureView must not be null");
+        }
+
+        int textureHandle = resolveTextureHandle(ctx, textureView.texture());
+        if (textureHandle == 0) {
+            throw new IllegalStateException("OpenGL present requires a valid texture handle");
+        }
+
+        int width = textureView.getWidth(0);
+        int height = textureView.getHeight(0);
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("OpenGL present requires a non-zero texture extent");
+        }
+
+        int readFbo = ensurePresentScratchReadFramebuffer();
+        int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int previousDrawFramebuffer = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+
+        try {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFbo);
+            GL32.glFramebufferTexture(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, textureHandle, textureView.baseMipLevel());
+
+            int framebufferStatus = GL30.glCheckFramebufferStatus(GL30.GL_READ_FRAMEBUFFER);
+            if (framebufferStatus != GL30.GL_FRAMEBUFFER_COMPLETE) {
+                throw new IllegalStateException(
+                    "OpenGL present read framebuffer is incomplete (status=0x" + Integer.toHexString(framebufferStatus) + ")"
+                );
+            }
+
+            GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0);
+
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
+
+            GL30.glBlitFramebuffer(
+                0,
+                0,
+                width,
+                height,
+                0,
+                0,
+                width,
+                height,
+                GL11.GL_COLOR_BUFFER_BIT,
+                GL11.GL_NEAREST
+            );
+        } finally {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+            GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+        }
+    }
+
+    private int ensurePresentScratchReadFramebuffer() {
+        int readFbo = presentScratchReadFbo;
+        if (readFbo != 0 && GL30.glIsFramebuffer(readFbo)) {
+            return readFbo;
+        }
+
+        readFbo = GL30.glGenFramebuffers();
+        if (readFbo == 0) {
+            throw new IllegalStateException("Failed to allocate OpenGL framebuffer for presentTextureToScreen");
+        }
+
+        int previousReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        try {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFbo);
+        } finally {
+            GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        }
+
+        presentScratchReadFbo = readFbo;
+        return readFbo;
     }
     
-    @Deprecated
+    
+    
     @Override
-    public int constructShaderObject(int shaderType) {
+    public int createShader(CommandContext ctx, int shaderType) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glCreateShader(shaderType);
     }
-    
-    @Deprecated
+
     @Override
-    public void disposeShaderObject(int shader) {
-        GL20.glDeleteShader(shader);
+    public VulkanicShaderHandle createShaderHandle(CommandContext ctx, int shaderType) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return VulkanicShaderHandle.of(GL20.glCreateShader(shaderType));
     }
     
-    @Deprecated
     @Override
-    public void compileShaderSource(int shader) {
+    public void compileShader(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glCompileShader(shader);
     }
     
-    @Deprecated
     @Override
-    public int constructProgramObject() {
+    public int createShaderProgram(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glCreateProgram();
     }
-    
-    @Deprecated
+
     @Override
-    public void disposeProgramObject(int program) {
+    public VulkanicProgramHandle createShaderProgramHandle(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return VulkanicProgramHandle.of(GL20.glCreateProgram());
+    }
+    
+    
+    @Override
+    public void deleteShader(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glDeleteShader(shader);
+    }
+    
+    
+    
+    
+    @Override
+    public void deleteProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glDeleteProgram(program);
     }
     
-    @Deprecated
-    @Override
-    public void linkProgramBinary(int program) {
-        GL20.glLinkProgram(program);
-    }
     
-    @Deprecated
     @Override
-    public void attachShaderToProgram(int program, int shader) {
+    public void attachShader(CommandContext ctx, int program, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glAttachShader(program, shader);
     }
     
-    @Deprecated
     @Override
-    public int queryProgramParameter(int program, int pname) {
+    public void detachShader(CommandContext ctx, int program, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glDetachShader(program, shader);
+    }
+    
+    @Override
+    public void linkProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glLinkProgram(program);
+    }
+    
+    @Override
+    public int getProgramParameter(CommandContext ctx, int program, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glGetProgrami(program, pname);
     }
     
-    @Deprecated
     @Override
-    public int queryShaderParameter(int shader, int pname) {
+    public int getShaderParameter(CommandContext ctx, int shader, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glGetShaderi(shader, pname);
     }
     
-    @Deprecated
     @Override
-    public void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
-    }
-    
-    @Deprecated
-    @Override
-    public void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
-        org.lwjgl.opengl.GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
-    }
-    
-    @Deprecated
-    @Override
-    public void activateVertexAttribute(int index) {
-        GL20.glEnableVertexAttribArray(index);
-    }
-    
-    @Deprecated
-    @Override
-    public void deactivateVertexAttribute(int index) {
-        GL20.glDisableVertexAttribArray(index);
-    }
-    
-    @Deprecated
-    @Override
-    public void setVertexAttribDivisor(int index, int divisor) {
-        org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
-    }
-    
-    @Deprecated
-    @Override
-    public String retrieveProgramInfoLog(int program) {
+    public String getProgramInfoLog(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glGetProgramInfoLog(program);
     }
     
-    @Deprecated
+    
+    
+    
+    
+    
     @Override
-    public String retrieveShaderInfoLog(int shader) {
+    public String getShaderInfoLog(CommandContext ctx, int shader) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glGetShaderInfoLog(shader);
     }
     
-    @Deprecated
     @Override
-    public int locateUniformVariable(int program, CharSequence name) {
+    public int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL20.glGetUniformLocation(program, name);
     }
     
-    @Deprecated
     @Override
-    public void assignUniformInteger(int location, int value) {
+    public int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL20.glGetAttribLocation(program, name);
+    }
+    
+    @Override
+    public void setUniform1i(CommandContext ctx, int location, int value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glUniform1i(location, value);
     }
     
-    @Deprecated
     @Override
-    public void bindAttributeLocation(int program, int index, CharSequence name) {
+    public void setUniform1f(CommandContext ctx, int location, float value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform1f(location, value);
+    }
+    
+    @Override
+    public void setUniform2f(CommandContext ctx, int location, float v0, float v1) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform2f(location, v0, v1);
+    }
+    
+    @Override
+    public void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform2i(location, v0, v1);
+    }
+    
+    @Override
+    public void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform3i(location, v0, v1, v2);
+    }
+    
+    @Override
+    public void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform4f(location, v0, v1, v2, v3);
+    }
+    
+    @Override
+    public void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniform4i(location, v0, v1, v2, v3);
+    }
+    
+    @Override
+    public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniformMatrix3fv(location, transpose, matrix);
+    }
+    
+    @Override
+    public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniformMatrix3fv(location, transpose, matrix);
+    }
+    
+    @Override
+    public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniformMatrix4fv(location, transpose, matrix);
+    }
+    
+    @Override
+    public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glUniformMatrix4fv(location, transpose, matrix);
+    }
+    
+    @Override
+    public void setVertexAttribPointer(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    }
+    
+    @Override
+    public void enableVertexAttribArray(CommandContext ctx, int index) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glEnableVertexAttribArray(index);
+    }
+    
+    @Override
+    public void bindVertexBuffer(CommandContext ctx, int bindingindex, int buffer, long offset, int stride) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL43.glBindVertexBuffer(bindingindex, buffer, offset, stride);
+    }
+    
+    
+    @Override
+    public void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
+    }
+    
+    
+    
+    @Override
+    public void disableVertexAttribArray(CommandContext ctx, int index) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL20.glDisableVertexAttribArray(index);
+    }
+    
+    
+    @Override
+    public void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
+    }
+    
+    
+    
+    
+    @Override
+    public void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         GL20.glBindAttribLocation(program, index, name);
     }
     
-    @Deprecated
+    
     @Override
-    public long createFenceSync(int condition, int flags) {
+    public long createFenceSync(CommandContext ctx, int condition, int flags) {
         return org.lwjgl.opengl.GL32.glFenceSync(condition, flags);
     }
     
-    @Deprecated
     @Override
-    public int waitForSync(long sync, int flags, long timeout) {
-        return org.lwjgl.opengl.GL32.glClientWaitSync(sync, flags, timeout);
-    }
-    
-    @Deprecated
-    @Override
-    public void destroySync(long sync) {
+    public void destroySync(CommandContext ctx, long sync) {
         org.lwjgl.opengl.GL32.glDeleteSync(sync);
     }
     
-    @Deprecated
     @Override
-    public int queryIntegerState(int pname) {
-        return GL11.glGetInteger(pname);
+    public int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL32.glClientWaitSync(sync, flags, timeout);
     }
     
-    @Deprecated
     @Override
-    public String queryStringInfo(int name) {
-        return GL11.glGetString(name);
+    public boolean isTexture(CommandContext ctx, int texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL11.glIsTexture(texture);
     }
     
-    @Deprecated
     @Override
-    public int pollErrorCode() {
-        return GL11.glGetError();
-    }
-    
-    @Deprecated
-    @Override
-    public void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
-        GL11.glReadPixels(x, y, width, height, format, type, pixels);
-    }
-    
-    @Deprecated
-    @Override
-    public int queryTextureLevelParameter(int target, int level, int pname) {
+    public int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return GL11.glGetTexLevelParameteri(target, level, pname);
     }
-    
-    @Deprecated
+
     @Override
-    public void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+    public void uploadShaderSource(CommandContext ctx, int shader, CharSequence source) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        final org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackGet();
+        final int stackPointer = stack.getPointer();
+
+        try {
+            final java.nio.ByteBuffer sourceBuffer = org.lwjgl.system.MemoryUtil.memUTF8(source, true);
+            final org.lwjgl.PointerBuffer pointers = stack.mallocPointer(1);
+            pointers.put(sourceBuffer);
+
+            org.lwjgl.opengl.GL20C.nglShaderSource(shader, 1, pointers.address0(), 0L);
+            org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
+        } finally {
+            stack.setPointer(stackPointer);
+        }
+    }
+    
+    @Override
+    public void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL20C.nglShaderSource(shader, stringCount, pointerBufferAddress, lengthsPointer);
     }
     
-    @Deprecated
     @Override
-    public int locateUniformBlock(int program, String uniformBlockName) {
-        return org.lwjgl.opengl.GL31.glGetUniformBlockIndex(program, uniformBlockName);
+    public void uniformBlockBinding(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
     }
     
-    @Deprecated
     @Override
-    public void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        org.lwjgl.opengl.GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
-    }
-    
-    @Deprecated
-    @Override
-    public String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
+    public String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL31.glGetActiveUniformBlockName(program, uniformBlockIndex);
     }
     
-    @Deprecated
     @Override
-    public int generateQueryObject() {
+    public int generateQueryObject(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL32C.glGenQueries();
     }
     
-    @Deprecated
     @Override
-    public void initiateQuery(int target, int id) {
+    public void initiateQuery(CommandContext ctx, int target, int id) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glBeginQuery(target, id);
     }
     
-    @Deprecated
     @Override
-    public void concludeQuery(int target) {
+    public void concludeQuery(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glEndQuery(target);
     }
     
-    @Deprecated
     @Override
-    public void disposeQueryObject(int id) {
+    public void disposeQueryObject(CommandContext ctx, int id) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glDeleteQueries(id);
     }
     
-    @Deprecated
     @Override
-    public int retrieveQueryObjectInt(int id, int pname) {
+    public int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL32C.glGetQueryObjecti(id, pname);
     }
     
-    @Deprecated
     @Override
-    public long retrieveQueryObjectInt64(int id, int pname) {
+    public long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBTimerQuery.glGetQueryObjecti64(id, pname);
     }
     
-    @Deprecated
     @Override
-    public void labelDebugObject(int identifier, int name, String label) {
+    public void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
         org.lwjgl.opengl.KHRDebug.glObjectLabel(identifier, name, label);
     }
     
-    @Deprecated
     @Override
-    public void enterDebugGroup(int source, int id, CharSequence message) {
+    public void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
         org.lwjgl.opengl.KHRDebug.glPushDebugGroup(source, id, message);
     }
     
-    @Deprecated
     @Override
-    public void exitDebugGroup() {
+    public void exitDebugGroup(CommandContext ctx) {
         org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
     }
     
-    @Deprecated
     @Override
-    public void labelObjectExt(int type, int object, String label) {
+    public void debugMessageControl(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.GL43C.glDebugMessageControl(source, type, severity, ids, enabled);
+    }
+    
+    @Override
+    public void debugMessageControlKHR(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.KHRDebug.glDebugMessageControl(source, type, severity, ids, enabled);
+    }
+    
+    @Override
+    public void debugMessageControlARB(CommandContext ctx, int source, int type, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageControlARB(source, type, severity, ids, enabled);
+    }
+    
+    @Override
+    public void debugMessageEnableAMD(CommandContext ctx, int category, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.AMDDebugOutput.glDebugMessageEnableAMD(category, severity, ids, enabled);
+    }
+    
+    @Override
+    public void labelObjectExt(CommandContext ctx, int type, int object, String label) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.EXTDebugLabel.glLabelObjectEXT(type, object, label);
     }
     
-    @Deprecated
     @Override
     public boolean supportsKhrDebug() {
         return org.lwjgl.opengl.GL.getCapabilities().GL_KHR_debug;
     }
     
-    @Deprecated
     @Override
     public boolean supportsArbDebugOutput() {
         return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_debug_output;
     }
     
-    @Deprecated
     @Override
     public void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         org.lwjgl.opengl.GL11.glEnable(37600); // GL_DEBUG_OUTPUT
@@ -694,7 +1681,6 @@ public class OpenGLBackend implements GraphicsBackend {
         );
     }
     
-    @Deprecated
     @Override
     public void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         if (synchronous) {
@@ -721,162 +1707,119 @@ public class OpenGLBackend implements GraphicsBackend {
         );
     }
     
-    @Deprecated
     @Override
     public boolean hasBufferStorageExtension() {
         return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_buffer_storage;
     }
     
-    @Deprecated
     @Override
     public boolean hasVertexAttribBindingExtension() {
         return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_vertex_attrib_binding;
     }
     
-    @Deprecated
     @Override
-    public void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glBindVertexBuffer(bindingIndex, buffer, offset, stride);
-    }
-    
-    @Deprecated
-    @Override
-    public void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
-    }
-    
-    @Deprecated
-    @Override
-    public void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    @Override
-    public void associateVertexAttrib(int attribIndex, int bindingIndex) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribBinding(attribIndex, bindingIndex);
-    }
-    
-    @Deprecated
-    @Override
-    public void setClearDepthValue(double depth) {
-        org.lwjgl.opengl.GL11.glClearDepth(depth);
-    }
-    
-    @Deprecated
-    @Override
-    public void setClearColorValue(float red, float green, float blue, float alpha) {
-        org.lwjgl.opengl.GL11.glClearColor(red, green, blue, alpha);
-    }
-    
-    @Deprecated
-    @Override
-    public void selectDrawBuffer(int mode) {
+    public void setDrawBuffer(CommandContext ctx, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL11.glDrawBuffer(mode);
     }
     
-    @Deprecated
     @Override
-    public void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+    public void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
     }
     
-    @Deprecated
     @Override
-    public void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
+    public void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
     }
     
-    @Deprecated
     @Override
-    public void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
+    public void drawIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
     }
     
-    @Deprecated
     @Override
-    public void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
+    public void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
     }
     
-    @Deprecated
     @Override
-    public void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
+    public void bindUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32.glBindBufferRange(target, index, buffer, offset, size);
     }
     
-    @Deprecated
     @Override
-    public void attachBufferToTexture(int target, int internalFormat, int buffer) {
+    public void texBuffer(CommandContext ctx, int target, int internalFormat, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL31.glTexBuffer(target, internalFormat, buffer);
     }
     
-    @Deprecated
+    
     @Override
-    public void assignUniformFloat(int location, float value) {
-        org.lwjgl.opengl.GL30C.glUniform1f(location, value);
+    public void setUniform2fv(CommandContext ctx, int location, float[] value) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL20C.glUniform2fv(location, value);
     }
     
-    @Deprecated
     @Override
-    public void assignUniformFloat2(int location, float x, float y) {
-        org.lwjgl.opengl.GL30C.glUniform2f(location, x, y);
+    public void setUniform3fv(CommandContext ctx, int location, float[] value) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL20C.glUniform3fv(location, value);
     }
     
-    @Deprecated
     @Override
-    public void assignUniformFloat2v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform2fv(location, value);
+    public void setUniform4fv(CommandContext ctx, int location, float[] value) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL20C.glUniform4fv(location, value);
     }
     
-    @Deprecated
     @Override
-    public void assignUniformFloat3(int location, float x, float y, float z) {
-        org.lwjgl.opengl.GL30C.glUniform3f(location, x, y, z);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformFloat3v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform3fv(location, value);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformFloat4(int location, float x, float y, float z, float w) {
-        org.lwjgl.opengl.GL30C.glUniform4f(location, x, y, z, w);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformFloat4v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform4fv(location, value);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
-        org.lwjgl.opengl.GL30C.glUniformMatrix4fv(location, false, matrix);
-    }
-    
-    @Deprecated
-    @Override
-    public void bindUniformBufferBase(int bindingPoint, int bufferId) {
+    public void bindUniformBufferBase(CommandContext ctx, int bindingPoint, int bufferId) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         org.lwjgl.opengl.GL32C.glBindBufferBase(org.lwjgl.opengl.GL32C.GL_UNIFORM_BUFFER, bindingPoint, bufferId);
     }
     
-    @Deprecated
     @Override
-    public void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
+    public void bindFragDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         org.lwjgl.opengl.GL30C.glBindFragDataLocation(program, colorNumber, name);
     }
     
-    @Deprecated
     @Override
-    public int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
-        // glGetSynci returns the sync value and writes to length buffer
-        // the number of values returned (should be 1 for single integer queries)
+    public int getSynci(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         return org.lwjgl.opengl.GL32C.glGetSynci(sync, pname, length);
+    }
+    
+    @Override
+    public void deleteVertexArrays(CommandContext ctx, int vertexArray) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL30C.glDeleteVertexArrays(vertexArray);
+    }
+    
+    @Override
+    public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+        if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
     
     /**
@@ -902,19 +1845,11 @@ public class OpenGLBackend implements GraphicsBackend {
         );
     }
     
-    @Deprecated
-    @Override
-    public GraphicsCapabilities obtainGraphicsCapabilities() {
-        return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
-    }
-    
-    @Deprecated
     @Override
     public GraphicsCapabilities initializeGraphicsCapabilities() {
         return convertCapabilities(org.lwjgl.opengl.GL.createCapabilities());
     }
     
-    @Deprecated
     @Override
     public boolean checkFunctionAvailable(String functionName) {
         org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
@@ -927,95 +1862,13 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
     
-    @Deprecated
-    @Override
-    public void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
-        org.lwjgl.opengl.GL31.glCopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
-    }
     
-    @Deprecated
     @Override
-    public void deleteVertexArray(int vertexArray) {
-        org.lwjgl.opengl.GL30.glDeleteVertexArrays(vertexArray);
-    }
-    
-    @Deprecated
-    @Override
-    public void flushMappedBufferRange(int target, long offset, long length) {
-        org.lwjgl.opengl.GL30.glFlushMappedBufferRange(target, offset, length);
-    }
-    
-    @Deprecated
-    @Override
-    public void createBufferStorage(int target, long size, int flags) {
-        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
-        
-        if (capabilities.OpenGL44) {
-            org.lwjgl.opengl.GL44C.glBufferStorage(target, size, flags);
-        } else if (capabilities.GL_ARB_buffer_storage) {
-            org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, size, flags);
-        } else {
-            throw new UnsupportedOperationException("Buffer storage is not supported");
-        }
-    }
-    
-    @Deprecated
-    @Override
-    public void createBufferStorage(int target, ByteBuffer data, int flags) {
-        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
-        
-        if (capabilities.OpenGL44) {
-            org.lwjgl.opengl.GL44C.glBufferStorage(target, data, flags);
-        } else if (capabilities.GL_ARB_buffer_storage) {
-            org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, data, flags);
-        } else {
-            throw new UnsupportedOperationException("Buffer storage is not supported");
-        }
-    }
-    
-    @Deprecated
-    @Override
-    public void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
-        org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformMatrix4fv(int location, boolean transpose, FloatBuffer value) {
-        org.lwjgl.opengl.GL20C.glUniformMatrix4fv(location, transpose, value);
-    }
-    
-    @Deprecated
-    @Override
-    public String queryString(int name) {
-        return org.lwjgl.opengl.GL11C.glGetString(name);
-    }
-    
-    @Deprecated
-    @Override
-    public String queryStringIndexed(int name, int index) {
-        return org.lwjgl.opengl.GL30C.glGetStringi(name, index);
-    }
-    
-    @Deprecated
-    @Override
-    public void uploadShaderSourceNative(int shader, int count, long strings, long length) {
-        org.lwjgl.opengl.GL20C.nglShaderSource(shader, count, strings, length);
-    }
-    
-    @Deprecated
-    @Override
-    public void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        org.lwjgl.opengl.GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
-    }
-    
-    @Deprecated
-    @Override
-    public void clearTexImage(int texture, int level, int format, int type, int[] data) {
+    public void clearTexImage(CommandContext ctx, int texture, int level, int format, int type, int[] data) {
         org.lwjgl.opengl.ARBClearTexture.glClearTexImage(texture, level, format, type, data);
     }
     
-    @Deprecated
+    
     @Override
     public void setMaxShaderCompilerThreads(int count) {
         org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
@@ -1026,293 +1879,469 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
     
-    @Deprecated
     @Override
     public GraphicsCapabilities getGraphicsCapabilities() {
         return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
     }
-    
-    @Deprecated
+
     @Override
-    public void labelObject(int identifier, int name, String label) {
-        org.lwjgl.opengl.KHRDebug.glObjectLabel(identifier, name, label);
+    public String getBackendVendorName() {
+        String cached = this.backendVendorName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_VENDOR);
+        return normalizeDeviceIdentity(value);
+    }
+
+    @Override
+    public String getBackendRendererName() {
+        String cached = this.backendRendererName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_RENDERER);
+        return normalizeDeviceIdentity(value);
+    }
+
+    @Override
+    public String getBackendVersionName() {
+        String cached = this.backendVersionName;
+        if (!"unknown".equals(cached)) {
+            return cached;
+        }
+
+        String value = org.lwjgl.opengl.GL11C.glGetString(VulkanicAPI.GL_VERSION);
+        return normalizeDeviceIdentity(value);
+    }
+
+    private static String normalizeDeviceIdentity(String value) {
+        return value == null || value.isBlank() ? "unknown" : value;
+    }
+
+    @Override
+    public java.util.List<String> getBackendEnabledExtensions() {
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getEnabledExtensions();
+        }
+        return java.util.List.of();
+    }
+
+    @Override
+    public java.util.List<String> getBackendOptionalFeatureNames() {
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getOptionalFeatureNames();
+        }
+        return java.util.List.of();
+    }
+
+    @Override
+    public int getBackendMaxTextureSize() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.getMaxTextureSize();
+    }
+
+    @Override
+    public int getBackendUniformOffsetAlignment() {
+        GlDevice device = this.glDevice;
+        if (device == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. "
+                    + "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        return device.getUniformOffsetAlignment();
+    }
+
+    @Override
+    public GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
+        GlDevice device = this.glDevice;
+        if (device != null) {
+            return device.getDeviceInfo();
+        }
+
+        return new GpuDevice.GpuDeviceInfo(
+            "OpenGL",
+            "OpenGL",
+            getBackendVendorName(),
+            getBackendRendererName(),
+            getBackendVersionName(),
+            true,
+            getBackendOptionalFeatureNames()
+        );
+    }
+
+    @Override
+    public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (texture instanceof net.vulkanic.backends.opengl.OpenGLTexture openGLTexture) {
+            return openGLTexture.getGlHandle();
+        }
+
+        if (texture instanceof net.blaze3d.opengl.GlTexture glTexture) {
+            return glTexture.getGlHandle();
+        }
+
+        return 0;
+    }
+
+    @Override
+    public int resolveFramebufferForTextures(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (!(colorTexture instanceof net.blaze3d.opengl.GlTexture glColorTexture)) {
+            return 0;
+        }
+
+        net.blaze3d.opengl.GlDevice device = this.glDevice;
+        if (device == null) {
+            return 0;
+        }
+
+        net.blaze3d.textures.GpuTexture depthGpuTexture = depthTexture instanceof net.blaze3d.textures.GpuTexture gpuTexture
+            ? gpuTexture
+            : null;
+        return glColorTexture.getFbo(device.directStateAccess(), depthGpuTexture);
     }
     
-    @Deprecated
-    @Override
-    public void pushDebugGroup(int source, int id, String message) {
-        org.lwjgl.opengl.KHRDebug.glPushDebugGroup(source, id, message);
-    }
     
-    @Deprecated
-    @Override
-    public void popDebugGroup() {
-        org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
-    }
+    
     
     // Additional methods for IrisRenderSystem
     
-    @Deprecated
     @Override
-    public void glGetIntegerv(int pname, int[] params) {
+    public void getIntegerv(CommandContext ctx, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glGetIntegerv(pname, params);
     }
     
-    @Deprecated
+    
     @Override
-    public void glGetFloatv(int pname, float[] params) {
+    public void getFloatv(CommandContext ctx, int pname, float[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glGetFloatv(pname, params);
     }
     
-    @Deprecated
+    
     @Override
-    public void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+    public void uploadTexture1D(CommandContext ctx, int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL30C.glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
     }
     
-    @Deprecated
-    @Override
-    public void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        org.lwjgl.opengl.GL32C.glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
-    }
     
-    @Deprecated
+    
     @Override
-    public void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
+    public void uploadTexture3D(CommandContext ctx, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL30C.glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
     }
     
-    @Deprecated
-    @Override
-    public void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix) {
-        org.lwjgl.opengl.GL32C.glUniformMatrix4fv(location, transpose, matrix);
-    }
     
-    @Deprecated
-    @Override
-    public void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
-        org.lwjgl.opengl.GL32C.glUniformMatrix4fv(location, transpose, matrix);
-    }
     
-    @Deprecated
+    
     @Override
-    public void glCopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
+    public void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
     }
     
-    @Deprecated
-    @Override
-    public void glUniform1f(int location, float v0) {
-        org.lwjgl.opengl.GL32C.glUniform1f(location, v0);
-    }
     
-    @Deprecated
-    @Override
-    public void glUniform2f(int location, float v0, float v1) {
-        org.lwjgl.opengl.GL32C.glUniform2f(location, v0, v1);
-    }
     
-    @Deprecated
-    @Override
-    public void glUniform2i(int location, int v0, int v1) {
-        org.lwjgl.opengl.GL32C.glUniform2i(location, v0, v1);
-    }
     
-    @Deprecated
-    @Override
-    public void glUniform3f(int location, float v0, float v1, float v2) {
-        org.lwjgl.opengl.GL32C.glUniform3f(location, v0, v1, v2);
-    }
     
-    @Deprecated
-    @Override
-    public void glUniform3i(int location, int v0, int v1, int v2) {
-        org.lwjgl.opengl.GL32C.glUniform3i(location, v0, v1, v2);
-    }
     
-    @Deprecated
-    @Override
-    public void glUniform4f(int location, float v0, float v1, float v2, float v3) {
-        org.lwjgl.opengl.GL32C.glUniform4f(location, v0, v1, v2, v3);
-    }
     
-    @Deprecated
-    @Override
-    public void glUniform4i(int location, int v0, int v1, int v2, int v3) {
-        org.lwjgl.opengl.GL32C.glUniform4i(location, v0, v1, v2, v3);
-    }
     
-    @Deprecated
-    @Override
-    public void glTexParameteriv(int target, int pname, int[] params) {
-        org.lwjgl.opengl.GL32C.glTexParameteriv(target, pname, params);
-    }
     
-    @Deprecated
-    @Override
-    public void glTexParameteri(int target, int pname, int param) {
-        org.lwjgl.opengl.GL32C.glTexParameteri(target, pname, param);
-    }
     
-    @Deprecated
+    
     @Override
-    public void glTexParameterf(int target, int pname, float param) {
+    public void texParameterf(CommandContext ctx, int target, int pname, float param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glTexParameterf(target, pname, param);
     }
     
-    @Deprecated
     @Override
-    public String glGetProgramInfoLog(int program) {
-        return org.lwjgl.opengl.GL32C.glGetProgramInfoLog(program);
+    public void texParameteri(CommandContext ctx, int target, int pname, int param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glTexParameteri(target, pname, param);
+    }
+
+    @Override
+    public void texParameteri(CommandContext ctx, VulkanicTextureTarget target, VulkanicTextureParameterName pname, int param) {
+        texParameteri(ctx, toOpenGLTextureTarget(target), toOpenGLTextureParameterName(pname), param);
+    }
+
+    private static int toOpenGLTextureTarget(VulkanicTextureTarget target) {
+        return switch (target) {
+            case TEXTURE_2D -> VulkanicAPI.GL_TEXTURE_2D;
+            case TEXTURE_3D -> VulkanicAPI.GL_TEXTURE_3D;
+            case TEXTURE_BUFFER -> VulkanicAPI.GL_TEXTURE_BUFFER;
+            case TEXTURE_CUBE_MAP -> VulkanicAPI.GL_TEXTURE_CUBE_MAP;
+            case TEXTURE_RECTANGLE -> VulkanicAPI.GL_TEXTURE_RECTANGLE;
+        };
+    }
+
+    private static int toOpenGLBufferTarget(VulkanicBufferTarget target) {
+        return switch (target) {
+            case VERTEX -> VulkanicAPI.GL_ARRAY_BUFFER;
+            case INDEX -> VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER;
+            case COPY_READ -> VulkanicAPI.GL_COPY_READ_BUFFER;
+            case COPY_WRITE -> VulkanicAPI.GL_COPY_WRITE_BUFFER;
+            case PIXEL_PACK -> VulkanicAPI.GL_PIXEL_PACK_BUFFER;
+            case SHADER_STORAGE -> VulkanicAPI.GL_SHADER_STORAGE_BUFFER;
+            case UNIFORM -> VulkanicAPI.GL_UNIFORM_BUFFER;
+        };
+    }
+
+    private static int toOpenGLIntegerQuery(VulkanicIntegerQuery query) {
+        return switch (query) {
+            case CONTEXT_FLAGS -> VulkanicAPI.GL_CONTEXT_FLAGS;
+            case CURRENT_PROGRAM -> VulkanicAPI.GL_CURRENT_PROGRAM;
+            case VERTEX_ARRAY_BINDING -> VulkanicAPI.GL_VERTEX_ARRAY_BINDING;
+            case ARRAY_BUFFER_BINDING -> VulkanicAPI.GL_ARRAY_BUFFER_BINDING;
+            case ELEMENT_ARRAY_BUFFER_BINDING -> VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER_BINDING;
+            case ACTIVE_TEXTURE -> VulkanicAPI.GL_ACTIVE_TEXTURE;
+            case BLEND_EQUATION_RGB -> VulkanicAPI.GL_BLEND_EQUATION_RGB;
+            case BLEND_EQUATION_ALPHA -> VulkanicAPI.GL_BLEND_EQUATION_ALPHA;
+            case BLEND_SRC_RGB -> VulkanicAPI.GL_BLEND_SRC_RGB;
+            case BLEND_SRC_ALPHA -> VulkanicAPI.GL_BLEND_SRC_ALPHA;
+            case BLEND_DST_RGB -> VulkanicAPI.GL_BLEND_DST_RGB;
+            case BLEND_DST_ALPHA -> VulkanicAPI.GL_BLEND_DST_ALPHA;
+            case DEPTH_WRITEMASK -> VulkanicAPI.GL_DEPTH_WRITEMASK;
+            case DEPTH_FUNC -> VulkanicAPI.GL_DEPTH_FUNC;
+            case STENCIL_FUNC -> VulkanicAPI.GL_STENCIL_FUNC;
+            case STENCIL_REF -> VulkanicAPI.GL_STENCIL_REF;
+            case STENCIL_VALUE_MASK -> VulkanicAPI.GL_STENCIL_VALUE_MASK;
+            case STENCIL_FAIL -> VulkanicAPI.GL_STENCIL_FAIL;
+            case STENCIL_PASS_DEPTH_FAIL -> VulkanicAPI.GL_STENCIL_PASS_DEPTH_FAIL;
+            case STENCIL_PASS_DEPTH_PASS -> VulkanicAPI.GL_STENCIL_PASS_DEPTH_PASS;
+            case STENCIL_WRITEMASK -> VulkanicAPI.GL_STENCIL_WRITEMASK;
+            case CULL_FACE_MODE -> VulkanicAPI.GL_CULL_FACE_MODE;
+            case POLYGON_MODE -> VulkanicAPI.GL_POLYGON_MODE;
+            case MAX_TEXTURE_SIZE -> VulkanicAPI.GL_MAX_TEXTURE_SIZE;
+            case MAX_TEXTURE_IMAGE_UNITS -> VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS;
+            case MAX_DRAW_BUFFERS -> VulkanicAPI.GL_MAX_DRAW_BUFFERS;
+            case MAX_SHADER_STORAGE_BUFFER_BINDINGS -> VulkanicAPI.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS;
+            case UNIFORM_BUFFER_OFFSET_ALIGNMENT -> VulkanicAPI.GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT;
+            case TEXTURE_BINDING_2D -> VulkanicAPI.GL_TEXTURE_BINDING_2D;
+            case FRAMEBUFFER_BINDING -> VulkanicAPI.GL_FRAMEBUFFER_BINDING;
+            case MAX_COLOR_ATTACHMENTS -> VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS;
+            case NUM_EXTENSIONS -> VulkanicAPI.GL_NUM_EXTENSIONS;
+            case MAX_LABEL_LENGTH -> VulkanicAPI.GL_MAX_LABEL_LENGTH;
+            case TEXTURE_MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
+            case GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX -> VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX;
+        };
+    }
+
+    private static int toOpenGLTextureParameterName(VulkanicTextureParameterName pname) {
+        return switch (pname) {
+            case MIN_FILTER -> VulkanicAPI.GL_TEXTURE_MIN_FILTER;
+            case MAG_FILTER -> VulkanicAPI.GL_TEXTURE_MAG_FILTER;
+            case WRAP_S -> VulkanicAPI.GL_TEXTURE_WRAP_S;
+            case WRAP_T -> VulkanicAPI.GL_TEXTURE_WRAP_T;
+            case WRAP_R -> VulkanicAPI.GL_TEXTURE_WRAP_R;
+            case MIN_LOD -> VulkanicAPI.GL_TEXTURE_MIN_LOD;
+            case MAX_LOD -> VulkanicAPI.GL_TEXTURE_MAX_LOD;
+            case LOD_BIAS -> VulkanicAPI.GL_TEXTURE_LOD_BIAS;
+            case BASE_LEVEL -> VulkanicAPI.GL_TEXTURE_BASE_LEVEL;
+            case MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
+            case COMPARE_MODE -> VulkanicAPI.GL_TEXTURE_COMPARE_MODE;
+            case SWIZZLE_RGBA -> VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA;
+        };
+    }
+
+    private static int toOpenGLCapability(VulkanicCapability capability) {
+        return switch (capability) {
+            case BLEND -> VulkanicAPI.GL_BLEND;
+            case CULL_FACE -> VulkanicAPI.GL_CULL_FACE;
+            case DEPTH_TEST -> VulkanicAPI.GL_DEPTH_TEST;
+            case SCISSOR_TEST -> VulkanicAPI.GL_SCISSOR_TEST;
+            case POLYGON_OFFSET_FILL -> VulkanicAPI.GL_POLYGON_OFFSET_FILL;
+            case COLOR_LOGIC_OP -> VulkanicAPI.GL_COLOR_LOGIC_OP;
+            case PROGRAM_POINT_SIZE -> VulkanicAPI.GL_PROGRAM_POINT_SIZE;
+            case DEBUG_OUTPUT -> VulkanicAPI.GL_DEBUG_OUTPUT;
+            case DEBUG_OUTPUT_SYNCHRONOUS -> VulkanicAPI.GL_DEBUG_OUTPUT_SYNCHRONOUS;
+            case STENCIL_TEST -> VulkanicAPI.GL_STENCIL_TEST;
+        };
+    }
+
+    private static int toOpenGLCullFaceMode(VulkanicCullFaceMode mode) {
+        return switch (mode) {
+            case FRONT -> VulkanicAPI.GL_FRONT;
+            case BACK -> VulkanicAPI.GL_BACK;
+            case FRONT_AND_BACK -> VulkanicAPI.GL_FRONT_AND_BACK;
+        };
+    }
+
+    private static int toOpenGLDepthCompareOp(VulkanicDepthCompareOp op) {
+        return switch (op) {
+            case NEVER -> VulkanicAPI.GL_NEVER;
+            case LESS -> VulkanicAPI.GL_LESS;
+            case EQUAL -> VulkanicAPI.GL_EQUAL;
+            case LEQUAL -> VulkanicAPI.GL_LEQUAL;
+            case GREATER -> VulkanicAPI.GL_GREATER;
+            case NOTEQUAL -> VulkanicAPI.GL_NOTEQUAL;
+            case GEQUAL -> VulkanicAPI.GL_GEQUAL;
+            case ALWAYS -> VulkanicAPI.GL_ALWAYS;
+        };
+    }
+
+    private static int toOpenGLStencilCompareOp(VulkanicStencilCompareOp op) {
+        return switch (op) {
+            case NEVER -> VulkanicAPI.GL_NEVER;
+            case LESS -> VulkanicAPI.GL_LESS;
+            case EQUAL -> VulkanicAPI.GL_EQUAL;
+            case LEQUAL -> VulkanicAPI.GL_LEQUAL;
+            case GREATER -> VulkanicAPI.GL_GREATER;
+            case NOTEQUAL -> VulkanicAPI.GL_NOTEQUAL;
+            case GEQUAL -> VulkanicAPI.GL_GEQUAL;
+            case ALWAYS -> VulkanicAPI.GL_ALWAYS;
+        };
+    }
+
+    private static int toOpenGLStencilFace(VulkanicStencilFace face) {
+        return switch (face) {
+            case FRONT -> VulkanicAPI.GL_FRONT;
+            case BACK -> VulkanicAPI.GL_BACK;
+            case FRONT_AND_BACK -> VulkanicAPI.GL_FRONT_AND_BACK;
+        };
+    }
+
+    private static int toOpenGLStencilOp(VulkanicStencilOperation op) {
+        return switch (op) {
+            case KEEP -> VulkanicAPI.GL_KEEP;
+            case ZERO -> VulkanicAPI.GL_ZERO;
+            case REPLACE -> VulkanicAPI.GL_REPLACE;
+            case INCREMENT_CLAMP -> VulkanicAPI.GL_INCR;
+            case DECREMENT_CLAMP -> VulkanicAPI.GL_DECR;
+            case INVERT -> VulkanicAPI.GL_INVERT;
+            case INCREMENT_WRAP -> VulkanicAPI.GL_INCR_WRAP;
+            case DECREMENT_WRAP -> VulkanicAPI.GL_DECR_WRAP;
+        };
+    }
+
+    private static int toOpenGLBlendFactor(VulkanicBlendFactor factor) {
+        return switch (factor) {
+            case ZERO -> VulkanicAPI.GL_ZERO;
+            case ONE -> VulkanicAPI.GL_ONE;
+            case SRC_COLOR -> VulkanicAPI.GL_SRC_COLOR;
+            case ONE_MINUS_SRC_COLOR -> VulkanicAPI.GL_ONE_MINUS_SRC_COLOR;
+            case DST_COLOR -> VulkanicAPI.GL_DST_COLOR;
+            case ONE_MINUS_DST_COLOR -> VulkanicAPI.GL_ONE_MINUS_DST_COLOR;
+            case SRC_ALPHA -> VulkanicAPI.GL_SRC_ALPHA;
+            case ONE_MINUS_SRC_ALPHA -> VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA;
+            case DST_ALPHA -> VulkanicAPI.GL_DST_ALPHA;
+            case ONE_MINUS_DST_ALPHA -> VulkanicAPI.GL_ONE_MINUS_DST_ALPHA;
+            case SRC_ALPHA_SATURATE -> VulkanicAPI.GL_SRC_ALPHA_SATURATE;
+            case CONSTANT_COLOR -> VulkanicAPI.GL_CONSTANT_COLOR;
+            case ONE_MINUS_CONSTANT_COLOR -> VulkanicAPI.GL_ONE_MINUS_CONSTANT_COLOR;
+            case CONSTANT_ALPHA -> VulkanicAPI.GL_CONSTANT_ALPHA;
+            case ONE_MINUS_CONSTANT_ALPHA -> VulkanicAPI.GL_ONE_MINUS_CONSTANT_ALPHA;
+        };
+    }
+
+    private static int toOpenGLBlendEquation(VulkanicBlendEquation equation) {
+        return switch (equation) {
+            case ADD -> VulkanicAPI.GL_FUNC_ADD;
+            case SUBTRACT -> VulkanicAPI.GL_FUNC_SUBTRACT;
+            case REVERSE_SUBTRACT -> VulkanicAPI.GL_FUNC_REVERSE_SUBTRACT;
+            case MIN -> VulkanicAPI.GL_MIN;
+            case MAX -> VulkanicAPI.GL_MAX;
+        };
     }
     
-    @Deprecated
-    @Override
-    public String glGetShaderInfoLog(int shader) {
-        return org.lwjgl.opengl.GL32C.glGetShaderInfoLog(shader);
-    }
     
-    @Deprecated
-    @Override
-    public void glDrawBuffers(int[] buffers) {
-        org.lwjgl.opengl.GL32C.glDrawBuffers(buffers);
-    }
     
-    @Deprecated
-    @Override
-    public void glReadBuffer(int buffer) {
-        org.lwjgl.opengl.GL32C.glReadBuffer(buffer);
-    }
     
-    @Deprecated
-    @Override
-    public void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
-        org.lwjgl.opengl.GL32C.glClearBufferfv(buffer, drawbuffer, values);
-    }
     
-    @Deprecated
-    @Override
-    public void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
-        org.lwjgl.opengl.GL32C.glClearBufferiv(buffer, drawbuffer, values);
-    }
     
-    @Deprecated
-    @Override
-    public void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
-        org.lwjgl.opengl.GL32C.glClearBufferuiv(buffer, drawbuffer, values);
-    }
     
-    @Deprecated
+    
+    
     @Override
-    public String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
+    public String getActiveUniform(CommandContext ctx, int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL32C.glGetActiveUniform(program, index, size, type, name);
     }
     
-    @Deprecated
+    
     @Override
-    public void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
+    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glReadPixels(x, y, width, height, format, type, pixels);
     }
     
-    @Deprecated
     @Override
-    public void glBufferData(int target, float[] data, int usage) {
-        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
+    public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.nglReadPixels(x, y, width, height, format, type, pixels);
     }
     
-    @Deprecated
-    @Override
-    public void glBufferData(int target, int[] data, int usage) {
-        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
-    }
     
-    @Deprecated
-    @Override
-    public void glBufferData(int target, java.nio.ByteBuffer data, int usage) {
-        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
-    }
     
-    @Deprecated
-    @Override
-    public void glBufferData(int target, long size, int usage) {
-        org.lwjgl.opengl.GL32C.glBufferData(target, size, usage);
-    }
     
-    @Deprecated
-    @Override
-    public void glBufferSubData(int target, long offset, java.nio.ByteBuffer data) {
-        org.lwjgl.opengl.GL32C.glBufferSubData(target, offset, data);
-    }
     
-    @Deprecated
-    @Override
-    public void glBufferStorage(int target, long size, int flags) {
-        org.lwjgl.opengl.GL45C.glBufferStorage(target, size, flags);
-    }
     
-    @Deprecated
-    @Override
-    public void glBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
-        org.lwjgl.opengl.GL44C.glBufferStorage(target, data, flags);
-    }
     
-    @Deprecated
-    @Override
-    public java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
-        return org.lwjgl.opengl.GL32C.glMapBufferRange(target, offset, length, access);
-    }
     
-    @Deprecated
-    @Override
-    public boolean glUnmapBuffer(int target) {
-        return org.lwjgl.opengl.GL32C.glUnmapBuffer(target);
-    }
     
-    @Deprecated
-    @Override
-    public boolean glIsBuffer(int buffer) {
-        return org.lwjgl.opengl.GL32C.glIsBuffer(buffer);
-    }
     
-    @Deprecated
-    @Override
-    public void glBindBufferBase(int target, int index, int buffer) {
-        org.lwjgl.opengl.GL43C.glBindBufferBase(target, index, buffer);
-    }
     
-    @Deprecated
+    
+    
     @Override
-    public void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
+    public void setVertexAttrib4f(CommandContext ctx, int index, float v0, float v1, float v2, float v3) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glVertexAttrib4f(index, v0, v1, v2, v3);
     }
     
-    @Deprecated
-    @Override
-    public void glDetachShader(int program, int shader) {
-        org.lwjgl.opengl.GL32C.glDetachShader(program, shader);
-    }
     
-    @Deprecated
-    @Override
-    public void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
-        org.lwjgl.opengl.GL32C.glFramebufferTexture2D(target, attachment, textarget, texture, level);
-    }
     
-    @Deprecated
-    @Override
-    public void glFramebufferTexture(int target, int attachment, int texture, int level) {
-        org.lwjgl.opengl.GL32C.glFramebufferTexture(target, attachment, texture, level);
-    }
     
-    @Deprecated
-    @Override
-    public int glGetTexParameteri(int target, int pname) {
-        return org.lwjgl.opengl.GL32C.glGetTexParameteri(target, pname);
-    }
     
-    @Deprecated
+    
     @Override
-    public void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+    public void bindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
         if (caps.OpenGL42 || caps.GL_ARB_shader_image_load_store) {
             org.lwjgl.opengl.GL42C.glBindImageTexture(unit, texture, level, layered, layer, access, format);
@@ -1321,378 +2350,381 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
     
-    @Deprecated
+    
+    
     @Override
-    public int glGetMaxImageUnits() {
-        org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
-        if (caps.OpenGL42 || caps.GL_ARB_shader_image_load_store) {
-            return org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL42C.GL_MAX_IMAGE_UNITS);
-        } else if (caps.GL_EXT_shader_image_load_store) {
-            return org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.EXTShaderImageLoadStore.GL_MAX_IMAGE_UNITS_EXT);
-        } else {
-            return 0;
+    public void createBuffers(CommandContext ctx, int[] buffers) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        org.lwjgl.opengl.GL45C.glGenBuffers(buffers);
     }
     
-    @Deprecated
-    @Override
-    public void glGenBuffers(int[] buffers) {
-        org.lwjgl.opengl.GL43C.glGenBuffers(buffers);
-    }
     
-    @Deprecated
-    @Override
-    public void glClearBufferSubData(int target, int internalformat, long offset, long size, int format, int type, int[] data) {
-        org.lwjgl.opengl.GL43C.glClearBufferSubData(target, internalformat, offset, size, format, type, data);
-    }
     
-    @Deprecated
     @Override
-    public void glGetProgramiv(int program, int pname, int[] params) {
+    public void getProgramiv(CommandContext ctx, int program, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glGetProgramiv(program, pname, params);
     }
     
-    @Deprecated
-    @Override
-    public void glDispatchCompute(int workX, int workY, int workZ) {
-        org.lwjgl.opengl.GL45C.glDispatchCompute(workX, workY, workZ);
-    }
     
-    @Deprecated
+    
     @Override
-    public void glMemoryBarrier(int barriers) {
+    public void memoryBarrier(CommandContext ctx, int barriers) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL45C.glMemoryBarrier(barriers);
     }
-    
-    @Deprecated
+
     @Override
-    public void glDisablei(int target, int index) {
-        org.lwjgl.opengl.GL32C.glDisablei(target, index);
+    public void applyResourceBarriers(CommandContext ctx, net.vulkanic.VulkanicResourceBarriers barriers) {
+        net.vulkanic.VulkanicResourceBarriers safeBarriers =
+            java.util.Objects.requireNonNull(barriers, "barriers must not be null");
+        memoryBarrier(ctx, safeBarriers.toOpenGLBarrierBits());
     }
     
-    @Deprecated
-    @Override
-    public void glEnablei(int target, int index) {
-        org.lwjgl.opengl.GL32C.glEnablei(target, index);
-    }
     
-    @Deprecated
-    @Override
-    public void glBlendFunc(int sfactor, int dfactor) {
-        GL11.glBlendFunc(sfactor, dfactor);
-    }
     
-    @Deprecated
+    
+    
     @Override
-    public void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+    public void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDrawBuffersBlend.glBlendFuncSeparateiARB(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
-    
-    @Deprecated
+
     @Override
-    public int glGetUniformBlockIndex(int program, String uniformBlockName) {
-        return org.lwjgl.opengl.GL32C.glGetUniformBlockIndex(program, uniformBlockName);
+    public void blendFuncSeparatei(
+        CommandContext ctx,
+        int buffer,
+        VulkanicBlendFactor srcRGB,
+        VulkanicBlendFactor dstRGB,
+        VulkanicBlendFactor srcAlpha,
+        VulkanicBlendFactor dstAlpha
+    ) {
+        blendFuncSeparatei(
+            ctx,
+            buffer,
+            toOpenGLBlendFactor(srcRGB),
+            toOpenGLBlendFactor(dstRGB),
+            toOpenGLBlendFactor(srcAlpha),
+            toOpenGLBlendFactor(dstAlpha)
+        );
     }
     
-    @Deprecated
-    @Override
-    public void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        org.lwjgl.opengl.GL32C.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
-    }
     
-    @Deprecated
+    
+    
     @Override
-    public int glGenSamplers() {
+    public int createSampler(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL33C.glGenSamplers();
     }
     
-    @Deprecated
+    
     @Override
-    public void glDeleteSamplers(int sampler) {
+    public void deleteSampler(CommandContext ctx, int sampler) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL33C.glDeleteSamplers(sampler);
     }
     
-    @Deprecated
-    @Override
-    public void glBindSampler(int unit, int sampler) {
-        org.lwjgl.opengl.GL33C.glBindSampler(unit, sampler);
-    }
     
-    @Deprecated
+    
     @Override
-    public void glBindSamplers(int first, int[] samplers) {
+    public void bindSamplers(CommandContext ctx, int first, int[] samplers) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL45C.glBindSamplers(first, samplers);
     }
     
-    @Deprecated
+    
     @Override
-    public void glSamplerParameteri(int sampler, int pname, int param) {
+    public void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL33C.glSamplerParameteri(sampler, pname, param);
     }
     
-    @Deprecated
+    
     @Override
-    public void glSamplerParameterf(int sampler, int pname, float param) {
+    public void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL33C.glSamplerParameterf(sampler, pname, param);
     }
     
-    @Deprecated
+    
     @Override
-    public void glSamplerParameteriv(int sampler, int pname, int[] params) {
+    public void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL33C.glSamplerParameteriv(sampler, pname, params);
     }
     
-    @Deprecated
-    @Override
-    public int glGetInteger(int pname) {
-        return org.lwjgl.opengl.GL32C.glGetInteger(pname);
-    }
     
-    @Deprecated
-    @Override
-    public void glDeleteBuffers(int buffer) {
-        org.lwjgl.opengl.GL43C.glDeleteBuffers(buffer);
-    }
     
-    @Deprecated
-    @Override
-    public void glPolygonMode(int face, int mode) {
-        org.lwjgl.opengl.GL43C.glPolygonMode(face, mode);
-    }
     
-    @Deprecated
-    @Override
-    public void glViewport(int x, int y, int width, int height) {
-        org.lwjgl.opengl.GL11.glViewport(x, y, width, height);
-    }
     
-    @Deprecated
+    
     @Override
-    public void glDispatchComputeIndirect(long offset) {
+    public void dispatchComputeIndirect(CommandContext ctx, long offset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL43C.glDispatchComputeIndirect(offset);
     }
     
-    @Deprecated
-    @Override
-    public void glBindBuffer(int target, int buffer) {
-        org.lwjgl.opengl.GL46C.glBindBuffer(target, buffer);
-    }
     
-    @Deprecated
+    
     @Override
-    public String glGetStringi(int name, int index) {
+    public String getString(CommandContext ctx, int name, int index) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL46C.glGetStringi(name, index);
     }
     
-    @Deprecated
     @Override
-    public void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth) {
-        org.lwjgl.opengl.GL46C.glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+    public String getString(CommandContext ctx, int name) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL11C.glGetString(name);
     }
     
-    @Deprecated
+    
     @Override
-    public int glCheckFramebufferStatus(int target) {
+    public void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, 
+                                 int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, 
+                                 int width, int height, int depth) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL46C.glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, 
+                                                    dstName, dstTarget, dstLevel, dstX, dstY, dstZ, 
+                                                    width, height, depth);
+    }
+    
+    
+    @Override
+    public int checkFramebufferStatus(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL46C.glCheckFramebufferStatus(target);
     }
     
-    @Deprecated
-    @Override
-    public void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        org.lwjgl.opengl.GL46C.glUniformMatrix3fv(location, transpose, value);
-    }
     
-    @Deprecated
-    @Override
-    public void glUniformMatrix3fv(int location, boolean transpose, float[] value) {
-        org.lwjgl.opengl.GL46C.glUniformMatrix3fv(location, transpose, value);
-    }
     
-    @Deprecated
-    @Override
-    public void glClearColor(float r, float g, float b, float a) {
-        org.lwjgl.opengl.GL46C.glClearColor(r, g, b, a);
-    }
     
-    @Deprecated
-    @Override
-    public int glGetAttribLocation(int program, CharSequence name) {
-        return org.lwjgl.opengl.GL46C.glGetAttribLocation(program, name);
-    }
     
-    @Deprecated
+    
     @Override
-    public void glGenerateMipmap(int target) {
+    public void generateMipmap(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL32C.glGenerateMipmap(target);
     }
     
-    @Deprecated
-    @Override
-    public void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        org.lwjgl.opengl.GL32C.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
-    }
+    
     
     // DSA methods
     
-    @Deprecated
     @Override
-    public void glGenerateTextureMipmap(int texture) {
+    public void generateTextureMipmapDSA(CommandContext ctx, int texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glGenerateTextureMipmap(texture);
     }
     
-    @Deprecated
+    
     @Override
-    public void glTextureParameteri(int texture, int pname, int param) {
+    public void textureParameteri(CommandContext ctx, int texture, int pname, int param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri(texture, pname, param);
     }
     
-    @Deprecated
+    
     @Override
-    public void glTextureParameterf(int texture, int pname, float param) {
+    public void textureParameterf(CommandContext ctx, int texture, int pname, float param) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameterf(texture, pname, param);
     }
     
-    @Deprecated
+    
     @Override
-    public void glTextureParameteriv(int texture, int pname, int[] params) {
+    public void textureParameteriv(CommandContext ctx, int texture, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteriv(texture, pname, params);
     }
     
-    @Deprecated
+    
     @Override
-    public void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
+    public void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferReadBuffer(framebuffer, mode);
     }
     
-    @Deprecated
+    
     @Override
-    public void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
+    public void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferDrawBuffers(framebuffer, bufs);
     }
     
-    @Deprecated
+    
     @Override
-    public void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
+    public void clearNamedFramebufferfv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, float[] value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
+    
     @Override
-    public void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+    public void clearNamedFramebufferiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
+    
     @Override
-    public void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+    public void clearNamedFramebufferuiv(CommandContext ctx, int framebuffer, int buffer, int drawbuffer, int[] value) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
     }
     
-    @Deprecated
+    
     @Override
-    public int glGetTextureParameteri(int texture, int pname) {
+    public int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL30.glGetFramebufferAttachmentParameteri(target, attachment, pname);
+    }
+    
+    @Override
+    public int getTextureParameteri(CommandContext ctx, int texture, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureParameteri(texture, pname);
     }
     
-    @Deprecated
+    
     @Override
-    public void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+    public void copyTextureSubImage2D(CommandContext ctx, int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glCopyTextureSubImage2D(texture, level, xoffset, yoffset, x, y, width, height);
     }
     
-    @Deprecated
+    
     @Override
-    public void glBindTextureUnit(int unit, int texture) {
+    public void bindTextureUnit(CommandContext ctx, int unit, int texture) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glBindTextureUnit(unit, texture);
     }
     
-    @Deprecated
+    
     @Override
-    public int glCreateBuffers() {
+    public int createBuffers(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateBuffers();
     }
     
-    @Deprecated
+    
     @Override
-    public void glNamedBufferData(int buffer, float[] data, int usage) {
+    public void namedBufferData(CommandContext ctx, int buffer, float[] data, int usage) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL45C.glNamedBufferData(buffer, data, usage);
     }
     
-    @Deprecated
+    
     @Override
-    public void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+    public void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
+    
     @Override
-    public void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
+    public void namedFramebufferTexture(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
     }
     
-    @Deprecated
+    
     @Override
-    public int glCreateFramebuffers() {
+    public int createFramebuffers(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
     }
     
-    @Deprecated
+    
     @Override
-    public int glCreateTextures(int target) {
+    public int createTextures(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateTextures(target);
     }
     
+    
     // Additional rendering operations
-    @Deprecated
-    @Override
-    public void glDrawElements(int mode, int count, int type, long indices) {
-        org.lwjgl.opengl.GL32.glDrawElements(mode, count, type, indices);
-    }
     
-    @Deprecated
-    @Override
-    public void glBlendEquation(int mode) {
-        org.lwjgl.opengl.GL32.glBlendEquation(mode);
-    }
     
-    @Deprecated
-    @Override
-    public void glClearDepth(double depth) {
-        org.lwjgl.opengl.GL32.glClearDepth(depth);
-    }
     
-    @Deprecated
-    @Override
-    public int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
-        return org.lwjgl.opengl.GL32.glGetFramebufferAttachmentParameteri(target, attachment, pname);
-    }
     
-    @Deprecated
-    @Override
-    public void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
-        org.lwjgl.opengl.GL43C.glDebugMessageControl(source, type, severity, ids, enabled);
-    }
     
-    @Deprecated
-    @Override
-    public void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
-        org.lwjgl.opengl.KHRDebug.glDebugMessageControl(source, type, severity, ids, enabled);
-    }
     
-    @Deprecated
-    @Override
-    public void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
-        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageControlARB(source, type, severity, ids, enabled);
-    }
     
-    @Deprecated
-    @Override
-    public void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
-        org.lwjgl.opengl.AMDDebugOutput.glDebugMessageEnableAMD(category, severity, ids, enabled);
-    }
     
     // High-level debug callback wrapper implementations
-    @Deprecated
     @Override
     public void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallback callback) {
         org.lwjgl.opengl.GLDebugMessageCallback proc = org.lwjgl.opengl.GLDebugMessageCallback.create(
@@ -1704,7 +2736,6 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL43C.glDebugMessageCallback(proc, 0L);
     }
     
-    @Deprecated
     @Override
     public void setupDebugMessageCallbackKHR(VulkanicAPI.DebugMessageCallback callback) {
         org.lwjgl.opengl.GLDebugMessageCallback proc = org.lwjgl.opengl.GLDebugMessageCallback.create(
@@ -1716,9 +2747,8 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.KHRDebug.glDebugMessageCallback(proc, 0L);
     }
     
-    @Deprecated
     @Override
-    public void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallbackARB callback) {
+    public void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallback callback) {
         org.lwjgl.opengl.GLDebugMessageARBCallback proc = org.lwjgl.opengl.GLDebugMessageARBCallback.create(
             (source, type, id, severity, length, message, userParam) -> {
                 String messageStr = org.lwjgl.opengl.GLDebugMessageARBCallback.getMessage(length, message);
@@ -1728,7 +2758,6 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.ARBDebugOutput.glDebugMessageCallbackARB(proc, 0L);
     }
     
-    @Deprecated
     @Override
     public void setupDebugMessageCallbackAMD(VulkanicAPI.DebugMessageCallbackAMD callback) {
         org.lwjgl.opengl.GLDebugMessageAMDCallback proc = org.lwjgl.opengl.GLDebugMessageAMDCallback.create(
@@ -1740,25 +2769,21 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.AMDDebugOutput.glDebugMessageCallbackAMD(proc, 0L);
     }
     
-    @Deprecated
     @Override
     public void clearDebugMessageCallback() {
         org.lwjgl.opengl.GL43C.glDebugMessageCallback(null, 0L);
     }
     
-    @Deprecated
     @Override
     public void clearDebugMessageCallbackKHR() {
         org.lwjgl.opengl.KHRDebug.glDebugMessageCallback(null, 0L);
     }
     
-    @Deprecated
     @Override
     public void clearDebugMessageCallbackARB() {
         org.lwjgl.opengl.ARBDebugOutput.glDebugMessageCallbackARB(null, 0L);
     }
     
-    @Deprecated
     @Override
     public void clearDebugMessageCallbackAMD() {
         org.lwjgl.opengl.AMDDebugOutput.glDebugMessageCallbackAMD(null, 0L);
@@ -1766,59 +2791,43 @@ public class OpenGLBackend implements GraphicsBackend {
     
     // GL43+ vertex attribute methods
     
-    @Deprecated
-    @Override
-    public void bindVertexBuffer(int bindingindex, int buffer, long offset, int stride) {
-        org.lwjgl.opengl.GL43C.glBindVertexBuffer(bindingindex, buffer, offset, stride);
-    }
     
-    @Deprecated
     @Override
-    public void vertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+    public void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL43C.glVertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
     }
     
-    @Deprecated
     @Override
-    public void vertexAttribIFormat(int attribindex, int size, int type, int relativeoffset) {
+    public void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type, int relativeoffset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL43C.glVertexAttribIFormat(attribindex, size, type, relativeoffset);
     }
     
-    @Deprecated
     @Override
-    public void vertexAttribBinding(int attribindex, int bindingindex) {
+    public void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL43C.glVertexAttribBinding(attribindex, bindingindex);
     }
     
     // VAO methods
     
-    @Deprecated
-    @Override
-    public int genVertexArrays() {
-        return org.lwjgl.opengl.GL30.glGenVertexArrays();
-    }
     
-    @Deprecated
-    @Override
-    public void bindVertexArray(int array) {
-        org.lwjgl.opengl.GL30.glBindVertexArray(array);
-    }
     
-    @Deprecated
-    @Override
-    public void deleteVertexArrays(int array) {
-        org.lwjgl.opengl.GL30.glDeleteVertexArrays(array);
-    }
     
     // GL context capabilities
     
-    @Deprecated
     @Override
     public Object getGLCapabilities() {
         return org.lwjgl.opengl.GL.getCapabilities();
     }
     
-    @Deprecated
     @Override
     public void setupDebugMessageCallback(java.io.PrintStream stream) {
         org.lwjgl.opengl.GLUtil.setupDebugMessageCallback(stream);
@@ -1826,112 +2835,827 @@ public class OpenGLBackend implements GraphicsBackend {
     
     // Capability checking methods
     
-    @Deprecated
     @Override
     public boolean checkOpenGL32Support() {
         org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
         return caps.OpenGL32;
     }
     
-    @Deprecated
     @Override
     public boolean checkOpenGL33Support() {
         org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
         return caps.OpenGL33;
     }
     
-    @Deprecated
     @Override
     public boolean checkARBInstancedArraysSupport() {
         org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
         return caps.GL_ARB_instanced_arrays;
     }
     
-    @Deprecated
     @Override
     public long getNamedBufferDataPointer() {
         org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
         return caps.glNamedBufferData;
     }
     
-    @Deprecated
     @Override
     public long getBufferStoragePointer() {
         org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
         return caps.glBufferStorage;
     }
     
-    @Deprecated
     @Override
     public long getBindVertexBufferPointer() {
         org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
         return caps.glBindVertexBuffer;
     }
     
-    @Deprecated
-    @Override
-    public long getVertexAttribBindingPointer() {
-        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
-        return caps.glVertexAttribBinding;
-    }
     
     // Additional GL query and state methods
     
-    @Deprecated
-    @Override
-    public boolean glIsEnabled(int cap) {
-        return org.lwjgl.opengl.GL11.glIsEnabled(cap);
-    }
     
-    @Deprecated
     @Override
-    public boolean glIsFramebuffer(int framebuffer) {
+    public boolean isFramebuffer(CommandContext ctx, int framebuffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL30.glIsFramebuffer(framebuffer);
     }
     
-    @Deprecated
-    @Override
-    public boolean glIsTexture(int texture) {
-        return org.lwjgl.opengl.GL11.glIsTexture(texture);
-    }
     
-    @Deprecated
     @Override
-    public boolean glIsVertexArray(int array) {
+    public boolean isVertexArray(CommandContext ctx, int array) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL30.glIsVertexArray(array);
     }
     
-    @Deprecated
     @Override
-    public boolean glIsProgram(int program) {
+    public boolean isProgram(CommandContext ctx, int program) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         return org.lwjgl.opengl.GL20.glIsProgram(program);
     }
     
     // Additional GL state methods
     
-    @Deprecated
     @Override
-    public void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
+    public void setBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
     }
-    
-    @Deprecated
+
     @Override
-    public void glStencilFunc(int func, int ref, int mask) {
+    public void setBlendEquationSeparate(CommandContext ctx, VulkanicBlendEquation modeRGB, VulkanicBlendEquation modeAlpha) {
+        setBlendEquationSeparate(ctx, toOpenGLBlendEquation(modeRGB), toOpenGLBlendEquation(modeAlpha));
+    }
+    
+    @Override
+    public void setStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
         org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
     }
-    
-    @Deprecated
+
     @Override
-    public void glCullFace(int mode) {
-        org.lwjgl.opengl.GL11.glCullFace(mode);
+    public void setStencilFunc(CommandContext ctx, VulkanicStencilCompareOp func, int ref, int mask) {
+        setStencilFunc(ctx, toOpenGLStencilCompareOp(func), ref, mask);
     }
+
+    @Override
+    public void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilFuncSeparate(face, func, ref, mask);
+    }
+
+    @Override
+    public void setStencilFuncSeparate(CommandContext ctx, VulkanicStencilFace face, VulkanicStencilCompareOp func, int ref, int mask) {
+        setStencilFuncSeparate(ctx, toOpenGLStencilFace(face), toOpenGLStencilCompareOp(func), ref, mask);
+    }
+
+    @Override
+    public void setStencilOp(CommandContext ctx, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glStencilOp(stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    @Override
+    public void setStencilOp(
+        CommandContext ctx,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        setStencilOp(
+            ctx,
+            toOpenGLStencilOp(stencilFailOp),
+            toOpenGLStencilOp(depthFailOp),
+            toOpenGLStencilOp(depthPassOp)
+        );
+    }
+
+    @Override
+    public void setStencilOpSeparate(CommandContext ctx, int face, int stencilFailOp, int depthFailOp, int depthPassOp) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilOpSeparate(face, stencilFailOp, depthFailOp, depthPassOp);
+    }
+
+    @Override
+    public void setStencilOpSeparate(
+        CommandContext ctx,
+        VulkanicStencilFace face,
+        VulkanicStencilOperation stencilFailOp,
+        VulkanicStencilOperation depthFailOp,
+        VulkanicStencilOperation depthPassOp
+    ) {
+        setStencilOpSeparate(
+            ctx,
+            toOpenGLStencilFace(face),
+            toOpenGLStencilOp(stencilFailOp),
+            toOpenGLStencilOp(depthFailOp),
+            toOpenGLStencilOp(depthPassOp)
+        );
+    }
+
+    @Override
+    public void setStencilWriteMask(CommandContext ctx, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glStencilMask(mask);
+    }
+
+    @Override
+    public void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL20.glStencilMaskSeparate(face, mask);
+    }
+
+    @Override
+    public void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask) {
+        setStencilWriteMaskSeparate(ctx, toOpenGLStencilFace(face), mask);
+    }
+    
     
     // Additional texture methods
     
-    @Deprecated
+    
     @Override
-    public int glGenTextures() {
-        return org.lwjgl.opengl.GL11.glGenTextures();
+    public void dispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL43.glDispatchCompute(workX, workY, workZ);
+    }
+    
+    @Override
+    public boolean isBuffer(CommandContext ctx, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL15.glIsBuffer(buffer);
+    }
+    
+    @Override
+    public boolean isEnabled(CommandContext ctx, int cap) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL11.glIsEnabled(cap);
+    }
+
+    @Override
+    public boolean isEnabled(CommandContext ctx, VulkanicCapability capability) {
+        return isEnabled(ctx, toOpenGLCapability(capability));
+    }
+    
+    @Override
+    public void texParameteriv(CommandContext ctx, int target, int pname, int[] params) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glTexParameteriv(target, pname, params);
+    }
+    
+    @Override
+    public int getUniformBlockIndex(CommandContext ctx, int program, String uniformBlockName) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL31.glGetUniformBlockIndex(program, uniformBlockName);
+    }
+    
+    @Override
+    public int getMaxImageUnits(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
+        if (caps.OpenGL42 || caps.GL_ARB_shader_image_load_store) {
+            return org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL42C.GL_MAX_IMAGE_UNITS);
+        } else if (caps.GL_EXT_shader_image_load_store) {
+            return org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.EXTShaderImageLoadStore.GL_MAX_IMAGE_UNITS_EXT);
+        } else {
+            return 0;
+        }
+    }
+    
+    @Override
+    public void clearBufferSubData(CommandContext ctx, int target, int internalformat, long offset, long size, int format, int type, int[] data) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL43C.glClearBufferSubData(target, internalformat, offset, size, format, type, data);
+    }
+    
+    @Override
+    public void clearBufferfv(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glClearBufferfv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public void clearBufferiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glClearBufferiv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public void clearBufferuiv(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.glClearBufferuiv(buffer, drawbuffer, values);
+    }
+
+    // =========================================================================
+    // Phase 3a: Buffer Lifecycle
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, int size) {
+        if (size <= 0) {
+            throw new IllegalArgumentException("Buffer size must be greater than zero, got: " + size);
+        }
+        CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
+        int handle = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, handle);
+        if (hasBufferStorageExtension()) {
+            int flags = 0;
+            if ((usage & net.vulkanic.VulkanicBuffer.USAGE_MAP_READ) != 0) flags |= org.lwjgl.opengl.GL44.GL_MAP_READ_BIT;
+            if ((usage & net.vulkanic.VulkanicBuffer.USAGE_MAP_WRITE) != 0) flags |= org.lwjgl.opengl.GL44.GL_MAP_WRITE_BIT | org.lwjgl.opengl.GL44.GL_DYNAMIC_STORAGE_BIT;
+            bufferStorage(ctx, GL15.GL_ARRAY_BUFFER, (long) size, flags);
+        } else {
+            bufferData(ctx, GL15.GL_ARRAY_BUFFER, (long) size, GL15.GL_DYNAMIC_DRAW);
+        }
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        int error = GL11.glGetError();
+        if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
+            throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate buffer of size " + size);
+        } else if (error != 0) {
+            throw new IllegalStateException("OpenGL error " + error + " while creating managed buffer");
+        }
+        return new OpenGLBuffer(handle, usage, size);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicBuffer createManagedBuffer(java.util.function.Supplier<String> label, int usage, java.nio.ByteBuffer initialData) {
+        if (initialData == null || !initialData.hasRemaining()) {
+            throw new IllegalArgumentException("initialData must be non-null and have remaining bytes");
+        }
+        int size = initialData.remaining();
+        CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
+        int handle = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, handle);
+        if (hasBufferStorageExtension()) {
+            int flags = 0;
+            if ((usage & net.vulkanic.VulkanicBuffer.USAGE_MAP_READ) != 0) flags |= org.lwjgl.opengl.GL44.GL_MAP_READ_BIT;
+            if ((usage & net.vulkanic.VulkanicBuffer.USAGE_MAP_WRITE) != 0) flags |= org.lwjgl.opengl.GL44.GL_MAP_WRITE_BIT | org.lwjgl.opengl.GL44.GL_DYNAMIC_STORAGE_BIT;
+            bufferStorage(ctx, GL15.GL_ARRAY_BUFFER, initialData, flags);
+        } else {
+            bufferData(ctx, GL15.GL_ARRAY_BUFFER, initialData, GL15.GL_DYNAMIC_DRAW);
+        }
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        int error = GL11.glGetError();
+        if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
+            throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate buffer of size " + size);
+        } else if (error != 0) {
+            throw new IllegalStateException("OpenGL error " + error + " while creating managed buffer");
+        }
+        return new OpenGLBuffer(handle, usage, size);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicBuffer.MappedView mapManagedBuffer(net.vulkanic.VulkanicBuffer buffer, boolean read, boolean write) {
+        if (!(buffer instanceof OpenGLBuffer openGLBuffer)) {
+            throw new IllegalArgumentException("Expected OpenGLBuffer, got: " + buffer.getClass());
+        }
+        if (openGLBuffer.isClosed()) {
+            throw new IllegalStateException("Cannot map a closed buffer");
+        }
+        int accessFlags = 0;
+        if (read)  accessFlags |= org.lwjgl.opengl.GL30.GL_MAP_READ_BIT;
+        if (write) accessFlags |= org.lwjgl.opengl.GL30.GL_MAP_WRITE_BIT;
+        if (accessFlags == 0) {
+            throw new IllegalArgumentException("At least one of read or write must be true");
+        }
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, openGLBuffer.getGlHandle());
+        java.nio.ByteBuffer mapped = org.lwjgl.opengl.GL30.glMapBufferRange(
+            GL15.GL_ARRAY_BUFFER, 0, openGLBuffer.size(), accessFlags);
+        if (mapped == null) {
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+            throw new IllegalStateException("glMapBufferRange returned null, GL error: " + GL11.glGetError());
+        }
+        int glHandle = openGLBuffer.getGlHandle();
+        return new OpenGLBuffer.OpenGLMappedView(
+            () -> {
+                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, glHandle);
+                org.lwjgl.opengl.GL15.glUnmapBuffer(GL15.GL_ARRAY_BUFFER);
+                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+            },
+            mapped
+        );
+    }
+
+    // =========================================================================
+    // Phase 3b: Texture Lifecycle
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicTexture createManagedTexture(String label, int usage,
+            net.vulkanic.VulkanicTextureFormat format, int width, int height, int depthOrLayers, int mipLevels) {
+        if (mipLevels < 1) throw new IllegalArgumentException("mipLevels must be at least 1");
+        if (depthOrLayers < 1) throw new IllegalArgumentException("depthOrLayers must be at least 1");
+        if (depthOrLayers > 1) throw new UnsupportedOperationException("Array/3D textures not yet supported in managed API");
+        while (GL11.glGetError() != GL11.GL_NO_ERROR) {
+        }
+        int handle = GL11.glGenTextures();
+        if (label == null) label = String.valueOf(handle);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, handle);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL12.GL_TEXTURE_BASE_LEVEL, 0);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL12.GL_TEXTURE_MAX_LEVEL, mipLevels - 1);
+        int[] internalFmt = toGlInternalFormat(format);
+        int externalFmt = toGlExternalFormat(format);
+        int glType = toGlType(format);
+        for (int mip = 0; mip < mipLevels; mip++) {
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, mip, internalFmt[0], Math.max(1, width >> mip),
+                Math.max(1, height >> mip), 0, externalFmt, glType, (java.nio.ByteBuffer) null);
+        }
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        int error = GL11.glGetError();
+        if (error == org.lwjgl.opengl.GL11.GL_OUT_OF_MEMORY) {
+            throw new net.blaze3d.GpuOutOfMemoryException("Could not allocate texture " + width + "x" + height);
+        } else if (error != 0) {
+            throw new IllegalStateException("OpenGL error " + error + " while creating managed texture");
+        }
+        return new OpenGLTexture(handle, usage, format, width, height, depthOrLayers, mipLevels, label);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicTextureView createManagedTextureView(net.vulkanic.VulkanicTexture texture) {
+        return createManagedTextureView(texture, 0, texture.getMipLevels());
+    }
+
+    @Override
+    public net.vulkanic.VulkanicTextureView createManagedTextureView(net.vulkanic.VulkanicTexture texture,
+            int baseMipLevel, int mipLevelCount) {
+        if (!(texture instanceof OpenGLTexture) && !(texture instanceof net.blaze3d.opengl.GlTexture)) {
+            throw new IllegalArgumentException("Expected OpenGLTexture or GlTexture, got: " + texture.getClass());
+        }
+        if (texture.isClosed()) {
+            throw new IllegalArgumentException("Cannot create a view of a closed texture");
+        }
+        return new OpenGLTextureView(texture, baseMipLevel, mipLevelCount);
+    }
+
+    private static int[] toGlInternalFormat(net.vulkanic.VulkanicTextureFormat format) {
+        return switch (format) {
+            case RGBA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
+            case RED8   -> new int[]{org.lwjgl.opengl.GL30.GL_R8};
+            case RED8I  -> new int[]{org.lwjgl.opengl.GL30.GL_R8I};
+            case DEPTH32 -> new int[]{org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT32};
+        };
+    }
+
+    private static int toGlExternalFormat(net.vulkanic.VulkanicTextureFormat format) {
+        return switch (format) {
+            case RGBA8  -> org.lwjgl.opengl.GL11.GL_RGBA;
+            case RED8, RED8I -> org.lwjgl.opengl.GL30.GL_RED;
+            case DEPTH32 -> org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT;
+        };
+    }
+
+    private static int toGlType(net.vulkanic.VulkanicTextureFormat format) {
+        return switch (format) {
+            case RGBA8, RED8  -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+            case RED8I        -> org.lwjgl.opengl.GL11.GL_BYTE;
+            case DEPTH32      -> org.lwjgl.opengl.GL11.GL_FLOAT;
+        };
+    }
+
+    // =========================================================================
+    // Phase 3c: Pipeline Objects
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicBuffer resolveVulkanicBuffer(net.blaze3d.buffers.GpuBuffer gpuBuffer) {
+        if (!(gpuBuffer instanceof net.blaze3d.opengl.GlBuffer glBuffer)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend resolveVulkanicBuffer requires GlBuffer, got: "
+                    + gpuBuffer.getClass().getName());
+        }
+        return new OpenGLBuffer(glBuffer.getHandle(), glBuffer.usage(), glBuffer.size());
+    }
+
+    @Override
+    public net.vulkanic.PipelineHandle createPipeline(net.vulkanic.PipelineDescriptor descriptor) {
+        if (glDevice == null) {
+            throw new IllegalStateException(
+                "GlDevice has not been registered with OpenGLBackend. " +
+                "Ensure GlDevice calls VulkanicAPI.registerDevice() during initialization.");
+        }
+        net.blaze3d.pipeline.RenderPipeline renderPipeline = descriptor.requireRenderPipeline();
+        net.blaze3d.opengl.GlRenderPipeline glPipeline = glDevice.precompilePipeline(renderPipeline, null);
+        return new OpenGLPipelineHandle(glPipeline);
+    }
+
+    @Override
+    public net.vulkanic.DescriptorPoolHandle createDescriptorPool(
+        net.vulkanic.DescriptorPoolDescriptor descriptor
+    ) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+        return new OpenGLDescriptorPoolHandle(descriptor.maxSets());
+    }
+
+    @Override
+    public net.vulkanic.DescriptorSetHandle allocateDescriptorSet(
+        net.vulkanic.DescriptorPoolHandle pool,
+        net.vulkanic.PipelineDescriptor descriptor
+    ) {
+        if (!(pool instanceof OpenGLDescriptorPoolHandle openGLPool)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorPoolHandle, got: " +
+                    (pool == null ? "null" : pool.getClass().getName()));
+        }
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        return openGLPool.allocate(descriptor.getStableCacheKey(), descriptor.getResourceLayout());
+    }
+
+    @Override
+    public void updateDescriptorSet(
+        net.vulkanic.DescriptorSetHandle descriptorSet,
+        net.vulkanic.PipelineResourceBindings bindings
+    ) {
+        if (!(descriptorSet instanceof OpenGLDescriptorSetHandle openGLDescriptorSet)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorSetHandle, got: " +
+                    (descriptorSet == null ? "null" : descriptorSet.getClass().getName()));
+        }
+
+        openGLDescriptorSet.updateBindings(bindings);
+    }
+
+    @Override
+    public void bindDescriptorSet(
+        CommandContext ctx,
+        net.vulkanic.PipelineHandle pipeline,
+        net.vulkanic.PipelineDescriptor descriptor,
+        net.vulkanic.DescriptorSetHandle descriptorSet
+    ) {
+        if (!(descriptorSet instanceof OpenGLDescriptorSetHandle openGLDescriptorSet)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorSetHandle, got: " +
+                    (descriptorSet == null ? "null" : descriptorSet.getClass().getName()));
+        }
+
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        String expectedLayoutKey = descriptor.getStableCacheKey();
+        if (!expectedLayoutKey.equals(openGLDescriptorSet.layoutKey())) {
+            throw new IllegalArgumentException(
+                "Descriptor set layout key mismatch. Expected " + expectedLayoutKey +
+                    " but got " + openGLDescriptorSet.layoutKey());
+        }
+
+        bindPipelineResources(ctx, pipeline, descriptor, openGLDescriptorSet.requireBindings());
+    }
+
+    @Override
+    public void resetDescriptorPool(net.vulkanic.DescriptorPoolHandle pool) {
+        if (!(pool instanceof OpenGLDescriptorPoolHandle openGLPool)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLDescriptorPoolHandle, got: " +
+                    (pool == null ? "null" : pool.getClass().getName()));
+        }
+        openGLPool.reset();
+    }
+
+    @Override
+    public void bindPipelineResources(
+        CommandContext ctx,
+        net.vulkanic.PipelineHandle pipeline,
+        net.vulkanic.PipelineDescriptor descriptor,
+        net.vulkanic.PipelineResourceBindings bindings
+    ) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+
+        if (!(pipeline instanceof OpenGLPipelineHandle glPipelineHandle)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLPipelineHandle, got: " +
+                    (pipeline == null ? "null" : pipeline.getClass().getName()));
+        }
+
+        if (!glPipelineHandle.isValid()) {
+            throw new IllegalArgumentException("Cannot bind resources for an invalid pipeline handle");
+        }
+
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        if (bindings == null) {
+            throw new IllegalArgumentException("bindings must not be null");
+        }
+
+        net.vulkanic.PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+        bindings.validateAgainst(layout);
+
+        int program = glPipelineHandle.getGlRenderPipeline().program().getProgramId();
+
+        for (net.vulkanic.PipelineDescriptor.ResourceBinding resource : layout.bindings()) {
+            switch (resource.type()) {
+                case SAMPLER -> {
+                    net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
+                        bindings.getSamplerBinding(resource.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing sampler binding for '" + resource.name() + "' after validation"));
+
+                    int location = getUniformLocation(ctx, program, resource.name());
+                    if (location >= 0) {
+                        setUniform1i(ctx, location, samplerBinding.textureUnit());
+                    }
+
+                    net.vulkanic.VulkanicTextureView textureView = samplerBinding.textureView();
+                    if (textureView != null) {
+                        if (!(textureView instanceof OpenGLTextureView openGLTextureView)) {
+                            throw new IllegalArgumentException(
+                                "Sampler binding '" + resource.name() + "' must use OpenGLTextureView in OpenGL backend");
+                        }
+                        if (openGLTextureView.isClosed()) {
+                            throw new IllegalStateException(
+                                "Sampler binding '" + resource.name() + "' uses a closed OpenGLTextureView");
+                        }
+
+                        VulkanicAPI.setActiveTextureUnitIndex(ctx, samplerBinding.textureUnit());
+                        int textureHandle = openGLTextureView.glHandle();
+                        net.vulkanic.VulkanicTexture texture = openGLTextureView.texture();
+                        net.vulkanic.VulkanicTextureTarget textureTarget =
+                            (texture.usage() & net.vulkanic.VulkanicTexture.USAGE_CUBEMAP_COMPATIBLE) != 0
+                                ? net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP
+                                : net.vulkanic.VulkanicTextureTarget.TEXTURE_2D;
+
+                        if (textureTarget == net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP) {
+                            bindTexture(ctx, net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP, textureHandle);
+                        } else {
+                            bindTexture2D(ctx, textureHandle);
+                        }
+
+                        setTextureParameter(ctx, textureTarget,
+                            net.vulkanic.VulkanicTextureParameterName.BASE_LEVEL,
+                            openGLTextureView.getBaseMipLevel());
+                        setTextureParameter(ctx, textureTarget,
+                            net.vulkanic.VulkanicTextureParameterName.MAX_LEVEL,
+                            openGLTextureView.getBaseMipLevel() + openGLTextureView.getMipLevelCount() - 1);
+
+                        if (texture instanceof net.blaze3d.textures.GpuTexture gpuTexture) {
+                            gpuTexture.flushModeChanges(textureTarget);
+                        }
+                    }
+
+                    if (samplerBinding.samplerObject() != null) {
+                        bindSampler(ctx, samplerBinding.textureUnit(), samplerBinding.samplerObject());
+                    }
+                }
+                case UNIFORM_BUFFER -> {
+                    net.vulkanic.VulkanicBufferSlice slice = bindings.getUniformBufferBinding(resource.name())
+                        .orElseThrow(() -> new IllegalStateException(
+                            "Missing uniform-buffer binding for '" + resource.name() + "' after validation"));
+
+                    if (!(slice.buffer() instanceof OpenGLBuffer glBuffer)) {
+                        throw new IllegalArgumentException(
+                            "Uniform-buffer binding '" + resource.name() + "' must use OpenGLBuffer in OpenGL backend");
+                    }
+
+                    int uniformBlockIndex = getUniformBlockIndex(ctx, program, resource.name());
+                    if (uniformBlockIndex >= 0) {
+                        uniformBlockBinding(ctx, program, uniformBlockIndex, resource.binding());
+                    }
+
+                    bindUniformBufferRange(
+                        ctx,
+                        VulkanicAPI.GL_UNIFORM_BUFFER,
+                        resource.binding(),
+                        glBuffer.getGlHandle(),
+                        slice.offset(),
+                        slice.length());
+                }
+                case TEXEL_BUFFER -> {
+                    net.vulkanic.PipelineResourceBindings.TexelBufferBinding texelBufferBinding =
+                        bindings.getTexelBufferBinding(resource.name())
+                            .orElseThrow(() -> new IllegalStateException(
+                                "Missing texel-buffer binding for '" + resource.name() + "' after validation"));
+
+                    int location = getUniformLocation(ctx, program, resource.name());
+                    if (location >= 0) {
+                        setUniform1i(ctx, location, texelBufferBinding.textureUnit());
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // Phase 3d: Command Buffer Lifecycle
+    // =========================================================================
+
+    @Override
+    public CommandContext beginCommandBuffer() {
+        // OpenGL is immediate-mode: return the singleton immediate context.
+        return OpenGLCommandContext.IMMEDIATE;
+    }
+
+    @Override
+    public void submitCommandBuffer(CommandContext ctx) {
+        // OpenGL is immediate-mode: commands already executed; nothing to submit.
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException(
+                "OpenGL backend only supports immediate-mode contexts; got: " + ctx);
+        }
+    }
+
+    // =========================================================================
+    // Phase 3b: Render Pass
+    // =========================================================================
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor) {
+        return beginRenderPass(ctx, label, colorTarget, clearColor, null, java.util.OptionalDouble.empty());
+    }
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
+            java.util.function.Supplier<String> label,
+            net.vulkanic.VulkanicTextureView colorTarget, java.util.OptionalInt clearColor,
+            @org.jetbrains.annotations.Nullable net.vulkanic.VulkanicTextureView depthTarget,
+            java.util.OptionalDouble clearDepth) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires immediate-mode CommandContext for beginRenderPass");
+        }
+        if (colorTarget == null) {
+            throw new IllegalArgumentException("colorTarget must not be null");
+        }
+        if (!(colorTarget instanceof OpenGLTextureView colorView)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLTextureView for colorTarget, got: " +
+                colorTarget.getClass().getName());
+        }
+        if (depthTarget != null && !(depthTarget instanceof OpenGLTextureView)) {
+            throw new IllegalArgumentException(
+                "OpenGL backend requires OpenGLTextureView for depthTarget, got: " +
+                depthTarget.getClass().getName());
+        }
+
+        // 1. Create a new FBO for this render pass
+        int fbo = net.vulkanic.VulkanicAPI.createFramebuffer(ctx);
+
+        // 2. Bind the FBO
+        net.vulkanic.VulkanicAPI.bindFramebuffer(ctx, fbo);
+
+        // 3. Attach the color texture at mip level 0 of the view's base mip
+        int colorHandle = colorView.glHandle();
+        int colorMip = colorView.getBaseMipLevel();
+        net.vulkanic.VulkanicAPI.framebufferTexture(ctx,
+            net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER,
+            net.vulkanic.VulkanicAPI.GL_COLOR_ATTACHMENT0,
+            net.vulkanic.VulkanicAPI.GL_TEXTURE_2D,
+            colorHandle, colorMip);
+
+        // 4. Attach the depth texture if provided
+        if (depthTarget != null) {
+            OpenGLTextureView depthView = (OpenGLTextureView) depthTarget;
+            int depthHandle = depthView.glHandle();
+            int depthMip = depthView.getBaseMipLevel();
+            net.vulkanic.VulkanicAPI.framebufferTexture(ctx,
+                net.vulkanic.VulkanicAPI.GL_FRAMEBUFFER,
+                net.vulkanic.VulkanicAPI.GL_DEPTH_ATTACHMENT,
+                net.vulkanic.VulkanicAPI.GL_TEXTURE_2D,
+                depthHandle, depthMip);
+        }
+
+        // 5. Optionally clear color
+        boolean shouldClearColor = false;
+        if (clearColor.isPresent()) {
+            int argb = clearColor.getAsInt();
+            float a = ((argb >> 24) & 0xFF) / 255.0f;
+            float r = ((argb >> 16) & 0xFF) / 255.0f;
+            float g = ((argb >>  8) & 0xFF) / 255.0f;
+            float b = ( argb        & 0xFF) / 255.0f;
+            net.vulkanic.VulkanicAPI.setClearColor(ctx, r, g, b, a);
+            shouldClearColor = true;
+        }
+
+        // 6. Optionally clear depth
+        boolean shouldClearDepth = false;
+        if (depthTarget != null && clearDepth.isPresent()) {
+            net.vulkanic.VulkanicAPI.setClearDepth(ctx, clearDepth.getAsDouble());
+            shouldClearDepth = true;
+        }
+
+        if (shouldClearColor && shouldClearDepth) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.COLOR, VulkanicClearBuffer.DEPTH);
+        } else if (shouldClearColor) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.COLOR);
+        } else if (shouldClearDepth) {
+            net.vulkanic.VulkanicAPI.clearBuffers(ctx, VulkanicClearBuffer.DEPTH);
+        }
+
+        // 7. Set the viewport to the color attachment's dimensions
+        int width  = colorTarget.getWidth(0);
+        int height = colorTarget.getHeight(0);
+        net.vulkanic.VulkanicAPI.setDynamicViewport(ctx, 0, 0, width, height);
+
+        return new OpenGLRenderPass(fbo, ctx);
+    }
+
+    @Override
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        net.vulkanic.VulkanicRenderPassDescriptor descriptor
+    ) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        net.vulkanic.VulkanicRenderPassDescriptor.ColorAttachment color = descriptor.colorAttachment();
+        net.vulkanic.VulkanicRenderPassDescriptor.DepthAttachment depth = descriptor.depthAttachment();
+
+        java.util.OptionalInt clearColor =
+            color.loadOp() == net.vulkanic.VulkanicRenderPassDescriptor.LoadOp.CLEAR
+                ? color.clearColor()
+                : java.util.OptionalInt.empty();
+
+        net.vulkanic.VulkanicTextureView depthTarget = null;
+        java.util.OptionalDouble clearDepth = java.util.OptionalDouble.empty();
+        if (depth != null) {
+            depthTarget = depth.target();
+            if (depth.loadOp() == net.vulkanic.VulkanicRenderPassDescriptor.LoadOp.CLEAR) {
+                clearDepth = depth.clearDepth();
+            }
+        }
+
+        return beginRenderPass(
+            ctx,
+            descriptor.label(),
+            color.target(),
+            clearColor,
+            depthTarget,
+            clearDepth
+        );
     }
 }

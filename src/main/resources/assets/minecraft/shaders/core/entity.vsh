@@ -43,7 +43,8 @@ void main() {
     vertexColor = minecraft_mix_light(Light0_Direction, Light1_Direction, Normal, Color);
 #endif
 #ifndef EMISSIVE
-    lightMapColor = texelFetch(Sampler2, UV2 / 16, 0);
+    vec4 lightColor = texelFetch(Sampler2, UV2 / 16, 0);
+    lightMapColor = vec4(lightColor.rgb, 1.0);
 #endif
     overlayColor = texelFetch(Sampler1, UV1, 0);
 

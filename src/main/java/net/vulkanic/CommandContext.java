@@ -15,7 +15,7 @@ package net.vulkanic;
  * 
  * Example usage:
  * <pre>
- * CommandContext ctx = VulkanicAPI.getImmediateContext(); // For OpenGL
+ * CommandContext ctx = VulkanicAPI.getCommandContext(); // OpenGL singleton today
  * VulkanicAPI.setDynamicViewport(ctx, 0, 0, 1920, 1080);
  * VulkanicAPI.drawIndexed(ctx, indexCount, 1, 0, 0, 0);
  * </pre>

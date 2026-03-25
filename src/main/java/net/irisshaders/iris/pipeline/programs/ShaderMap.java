@@ -1,9 +1,10 @@
 package net.irisshaders.iris.pipeline.programs;
 
 import net.blaze3d.opengl.GlProgram;
-import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.shader.ShaderCompileException;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -24,7 +25,7 @@ public class ShaderMap {
 		loadingMap.forAllShaders((key, shader) -> {
 			if (shader != null) {
 				if (deletionFunction.apply(shader)) {
-					GlStateManager.glDeleteProgram(shader.id().program());
+					VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(shader.id().program()));
 					return;
 				}
 
@@ -38,10 +39,10 @@ public class ShaderMap {
 
 	private void checkLinkingState(ShaderKey key, ShaderSupplier shader) {
 		int i = shader.id().program();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 
-		int j = GlStateManager.glGetProgrami(i, 35714);
-		if (j == VulkanicAPI.GL_FALSE) {
-			String string = GlStateManager.glGetProgramInfoLog(i, 32768);
+		if (!VulkanicAPI.isProgramLinkSuccessful(ctx, i)) {
+			String string = VulkanicAPI.getProgramInfoLog(ctx, i);
 			throw new ShaderCompileException(
 				key.name(), string
 			);

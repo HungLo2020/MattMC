@@ -2,14 +2,13 @@ package net.irisshaders.iris.pipeline.programs;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.GLDebug;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.shader.ShaderCompileException;
 import net.irisshaders.iris.gl.shader.ShaderType;
+import net.irisshaders.iris.gl.shader.ShaderWorkarounds;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.gl.blending.AlphaTest;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
@@ -40,7 +39,10 @@ import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceProvider;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicProgramHandle;
+import net.vulkanic.VulkanicShaderHandle;
 import org.apache.commons.io.IOUtils;
 
 import java.io.ByteArrayInputStream;
@@ -161,62 +163,62 @@ public class ShaderCreator {
 
 
 	public static PartialShader link(String name, String vertex, String geometry, String tessControl, String tessEval, String fragment, VertexFormat vertexFormat, boolean isFallback) throws ShaderCompileException {
-		int i = GlStateManager.glCreateProgram();
-		if (i <= 0) {
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicProgramHandle program = VulkanicAPI.createShaderProgramHandle(ctx);
+		int i = program.value();
+		if (!program.isValid()) {
 			throw new RuntimeException("Could not create shader program (returned program ID " + i + ")");
 		} else {
-			int vertexS = createShader(name, ShaderType.VERTEX, vertex);
-			int geometryS = createShader(name, ShaderType.GEOMETRY, geometry);
-			int tessContS = createShader(name, ShaderType.TESSELATION_CONTROL, tessControl);
-			int tessEvalS = createShader(name, ShaderType.TESSELATION_EVAL, tessEval);
-			int fragS = createShader(name, ShaderType.FRAGMENT, fragment);
+			int vertexS = createShader(ctx, name, ShaderType.VERTEX, vertex);
+			int geometryS = createShader(ctx, name, ShaderType.GEOMETRY, geometry);
+			int tessContS = createShader(ctx, name, ShaderType.TESSELATION_CONTROL, tessControl);
+			int tessEvalS = createShader(ctx, name, ShaderType.TESSELATION_EVAL, tessEval);
+			int fragS = createShader(ctx, name, ShaderType.FRAGMENT, fragment);
 
-			attachIfValid(i, vertexS);
-			attachIfValid(i, geometryS);
-			attachIfValid(i, tessContS);
-			attachIfValid(i, tessEvalS);
-			attachIfValid(i, fragS);
+			attachIfValid(ctx, program, vertexS);
+			attachIfValid(ctx, program, geometryS);
+			attachIfValid(ctx, program, tessContS);
+			attachIfValid(ctx, program, tessEvalS);
+			attachIfValid(ctx, program, fragS);
 
 			((VertexFormatExtension) vertexFormat).bindAttributesIris(isFallback, i);
 
-			GlStateManager.glLinkProgram(i);
+			VulkanicAPI.linkProgram(ctx, program);
 
 			return new PartialShader(i, vertexS, fragS, geometryS, tessContS, tessEvalS);
 		}
 	}
 
-	private static void attachIfValid(int i, int s) {
+	private static void attachIfValid(CommandContext ctx, VulkanicProgramHandle program, int s) {
 		if (s >= 0) {
-			GlStateManager.glAttachShader(i, s);
+			VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(s));
 		}
 	}
 
-	private static void detachIfValid(int i, int s) {
+	private static void detachIfValid(CommandContext ctx, VulkanicProgramHandle program, int s) {
 		if (s >= 0) {
-			IrisRenderSystem.detachShader(i, s);
-			GlStateManager.glDeleteShader(s);
+			VulkanicAPI.detachShader(ctx, program, VulkanicShaderHandle.of(s));
+			VulkanicAPI.deleteShader(ctx, VulkanicShaderHandle.of(s));
 		}
 	}
 
-	private static int createShader(String name, ShaderType shaderType, String source) {
+	private static int createShader(CommandContext ctx, String name, ShaderType shaderType, String source) {
 		if (source == null) return -1;
 
-		int shader = GlStateManager.glCreateShader(shaderType.id);
-		GlStateManager.glShaderSource(shader, source);
-		GlStateManager.glCompileShader(shader);
-		String log = IrisRenderSystem.getShaderInfoLog(shader);
+		VulkanicShaderHandle shader = VulkanicAPI.createShaderHandle(ctx, shaderType.stage);
+		ShaderWorkarounds.safeShaderSource(shader, source);
+		VulkanicAPI.compileShader(ctx, shader);
+		String log = VulkanicAPI.getShaderInfoLog(ctx, shader);
 
 		if (!log.isEmpty()) {
 			Iris.logger.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = GlStateManager.glGetShaderi(shader, VulkanicAPI.GL_COMPILE_STATUS);
-
-		if (result != VulkanicAPI.GL_TRUE) {
+		if (!VulkanicAPI.isShaderCompileSuccessful(ctx, shader)) {
 			throw new ShaderCompileException(name, log);
 		}
 
-		return shader;
+		return shader.value();
 	}
 
 	public static ShaderSupplier createFallback(String name, ShaderKey shaderKey, GlFramebuffer writingToBeforeTranslucent,

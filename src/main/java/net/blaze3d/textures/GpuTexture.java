@@ -2,9 +2,12 @@ package net.blaze3d.textures;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicTexture;
+import net.vulkanic.VulkanicTextureFormat;
+import net.vulkanic.VulkanicTextureTarget;
 
 @Environment(EnvType.CLIENT)
-public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.GpuTextureInterface {
+public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.GpuTextureInterface, VulkanicTexture {
 	public static final int USAGE_COPY_DST = 1;
 	public static final int USAGE_COPY_SRC = 2;
 	public static final int USAGE_TEXTURE_BINDING = 4;
@@ -53,6 +56,26 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 		return this.format;
 	}
 
+	/**
+	 * Returns the Vulkanic equivalent of this texture's format.
+	 *
+	 * <p>Implements {@link VulkanicTexture#getVulkanicFormat()} by converting from the
+	 * Blaze3D {@link TextureFormat}. Both enums carry identical values; the two types
+	 * coexist only during the Blaze3D → Vulkanic migration period.
+	 *
+	 * <p>This default implementation is concrete so that all subclasses (including
+	 * {@code GlTexture}) inherit it without any changes.
+	 */
+	@Override
+	public VulkanicTextureFormat getVulkanicFormat() {
+		return switch (this.format) {
+			case RGBA8   -> VulkanicTextureFormat.RGBA8;
+			case RED8    -> VulkanicTextureFormat.RED8;
+			case RED8I   -> VulkanicTextureFormat.RED8I;
+			case DEPTH32 -> VulkanicTextureFormat.DEPTH32;
+		};
+	}
+
 	public int usage() {
 		return this.usage;
 	}
@@ -88,11 +111,22 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 
 	public abstract boolean isClosed();
 
-	// Iris compatibility methods
-	public int iris$getGlId() {
-		return 0; // Subclasses should override
+	@Deprecated
+	public int glId() {
+		return 0;
 	}
 
+	public void flushModeChanges(int target) {
+	}
+
+	public void flushModeChanges(VulkanicTextureTarget target) {
+		this.flushModeChanges(target.toLegacyGlTarget());
+	}
+
+	public void flushModeChanges2D() {
+	}
+
+	// Iris compatibility methods
 	public void iris$markMipmapNonLinear() {
 		// No-op by default
 	}

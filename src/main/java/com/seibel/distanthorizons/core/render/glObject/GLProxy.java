@@ -91,7 +91,7 @@ public class GLProxy
 		}
 		
 		LOGGER.info("Creating " + GLProxy.class.getSimpleName() + "... If this is the last message you see there must have been an OpenGL error.");
-		LOGGER.info("Lod Render OpenGL version [" + VulkanicAPI.queryStringInfo(VulkanicAPI.GL_VERSION) + "].");
+		LOGGER.info("Lod Render OpenGL version [" + VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VERSION) + "].");
 		
 		
 		
@@ -151,7 +151,7 @@ public class GLProxy
 		this.instancedArraysSupported = VulkanicAPI.checkARBInstancedArraysSupport();
 		
 		// get the best automatic upload method
-		String vendor = VulkanicAPI.queryStringInfo(VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
+		String vendor = VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
 		if (EPlatform.get() != EPlatform.MACOS)
 		{
 			if (vendor.contains("NVIDIA") || vendor.contains("GEFORCE"))

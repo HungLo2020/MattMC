@@ -1,7 +1,6 @@
 package net.irisshaders.iris.pipeline.programs;
 
 import net.blaze3d.opengl.GlProgram;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.shaders.UniformType;
 import net.blaze3d.vertex.VertexFormat;
@@ -12,6 +11,7 @@ import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.io.IOException;
@@ -52,21 +52,22 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 		this.blendModeOverride = blendModeOverride;
 		this.writingToBeforeTranslucent = writingToBeforeTranslucent;
 		this.writingToAfterTranslucent = writingToAfterTranslucent;
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 
-		this.FOG_DENSITY = GlStateManager._glGetUniformLocation(programId, "FogDensity");
-		this.FOG_IS_EXP2 = GlStateManager._glGetUniformLocation(programId, "FogIsExp2");
+		this.FOG_DENSITY = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "FogDensity");
+		this.FOG_IS_EXP2 = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "FogIsExp2");
 
-		this.gtexture = GlStateManager._glGetUniformLocation(programId, "gtexture");
-		this.overlay = GlStateManager._glGetUniformLocation(programId, "overlay");
-		this.lightmap = GlStateManager._glGetUniformLocation(programId, "lightmap");
+		this.gtexture = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "gtexture");
+		this.overlay = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "overlay");
+		this.lightmap = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "lightmap");
 
-		GlStateManager._glUseProgram(programId);
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(programId);
 
 
-		int ALPHA_TEST_VALUE = GlStateManager._glGetUniformLocation(programId, "AlphaTestValue");
+		int ALPHA_TEST_VALUE = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(ctx, programId, "AlphaTestValue");
 
 		if (ALPHA_TEST_VALUE > -1) {
-			VulkanicAPI.assignUniformFloat(ALPHA_TEST_VALUE, alphaValue);
+			VulkanicAPI.setUniform1f(ctx, ALPHA_TEST_VALUE, alphaValue);
 		}
 	}
 
@@ -81,7 +82,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 
 	@Override
 	public int iris$getBlockIndex(int program, CharSequence uniformBlockName) {
-		return VulkanicAPI.locateUniformBlock(program, uniformBlockName.toString());
+		return VulkanicAPI.getUniformBlockIndex(VulkanicAPI.getCommandContext(), program, uniformBlockName.toString());
 	}
 
 	@Override
@@ -93,24 +94,25 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 	public void iris$setupState() {
 		isSetUp = true;
 		DepthColorStorage.unlockDepthColor();
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 
-		GlStateManager._glUseProgram(getProgramId());
+		net.irisshaders.iris.gl.IrisRenderSystem.useProgram(getProgramId());
 
 		if (FOG_DENSITY > -1 && FOG_IS_EXP2 > -1) {
 			float fogDensity = CapturedRenderingState.INSTANCE.getFogDensity();
 
 			if (fogDensity >= 0.0) {
-				VulkanicAPI.assignUniformFloat(FOG_DENSITY, fogDensity);
-				VulkanicAPI.assignUniformInteger(FOG_IS_EXP2, 1);
+				VulkanicAPI.setUniform1f(ctx, FOG_DENSITY, fogDensity);
+				VulkanicAPI.setUniform1i(ctx, FOG_IS_EXP2, 1);
 			} else {
-				VulkanicAPI.assignUniformFloat(FOG_DENSITY, 0.0f);
-				VulkanicAPI.assignUniformInteger(FOG_IS_EXP2, 0);
+				VulkanicAPI.setUniform1f(ctx, FOG_DENSITY, 0.0f);
+				VulkanicAPI.setUniform1i(ctx, FOG_IS_EXP2, 0);
 			}
 		}
 
-		GlStateManager._glUniform1i(gtexture, 0);
-		GlStateManager._glUniform1i(overlay, 1);
-		GlStateManager._glUniform1i(lightmap, 2);
+		VulkanicAPI.setUniform1i(ctx, gtexture, 0);
+		VulkanicAPI.setUniform1i(ctx, overlay, 1);
+		VulkanicAPI.setUniform1i(ctx, lightmap, 2);
 
 		if (this.blendModeOverride != null) {
 			this.blendModeOverride.apply();

@@ -14,6 +14,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -81,14 +82,13 @@ public class CompiledSectionMesh implements SectionMesh {
 	}
 
 	public void uploadMeshLayer(ChunkSectionLayer chunkSectionLayer, MeshData meshData, long l) {
-		CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+		CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 		SectionBuffers sectionBuffers = this.getBuffers(chunkSectionLayer);
 		if (sectionBuffers != null) {
 			if (sectionBuffers.getVertexBuffer().size() < meshData.vertexBuffer().remaining()) {
 				sectionBuffers.getVertexBuffer().close();
 				sectionBuffers.setVertexBuffer(
-					RenderSystem.getDevice()
-						.createBuffer(
+					VulkanicAPI.createBuffer(
 							() -> "Section vertex buffer - layer: " + chunkSectionLayer.label() + "; cords: " + SectionPos.x(l) + ", " + SectionPos.y(l) + ", " + SectionPos.z(l),
 							40,
 							meshData.vertexBuffer()
@@ -110,8 +110,7 @@ public class CompiledSectionMesh implements SectionMesh {
 					}
 
 					sectionBuffers.setIndexBuffer(
-						RenderSystem.getDevice()
-							.createBuffer(
+						VulkanicAPI.createBuffer(
 								() -> "Section index buffer - layer: " + chunkSectionLayer.label() + "; cords: " + SectionPos.x(l) + ", " + SectionPos.y(l) + ", " + SectionPos.z(l),
 								72,
 								byteBuffer
@@ -126,16 +125,14 @@ public class CompiledSectionMesh implements SectionMesh {
 			sectionBuffers.setIndexCount(meshData.drawState().indexCount());
 			sectionBuffers.setIndexType(meshData.drawState().indexType());
 		} else {
-			GpuBuffer gpuBuffer = RenderSystem.getDevice()
-				.createBuffer(
+			GpuBuffer gpuBuffer = VulkanicAPI.createBuffer(
 					() -> "Section vertex buffer - layer: " + chunkSectionLayer.label() + "; cords: " + SectionPos.x(l) + ", " + SectionPos.y(l) + ", " + SectionPos.z(l),
 					40,
 					meshData.vertexBuffer()
 				);
 			ByteBuffer byteBuffer2 = meshData.indexBuffer();
 			GpuBuffer gpuBuffer2 = byteBuffer2 != null
-				? RenderSystem.getDevice()
-					.createBuffer(
+				? VulkanicAPI.createBuffer(
 						() -> "Section index buffer - layer: " + chunkSectionLayer.label() + "; cords: " + SectionPos.x(l) + ", " + SectionPos.y(l) + ", " + SectionPos.z(l),
 						72,
 						byteBuffer2
@@ -151,15 +148,14 @@ public class CompiledSectionMesh implements SectionMesh {
 		if (sectionBuffers != null) {
 			if (sectionBuffers.getIndexBuffer() == null) {
 				sectionBuffers.setIndexBuffer(
-					RenderSystem.getDevice()
-						.createBuffer(
+					VulkanicAPI.createBuffer(
 							() -> "Section index buffer - layer: " + chunkSectionLayer.label() + "; cords: " + SectionPos.x(l) + ", " + SectionPos.y(l) + ", " + SectionPos.z(l),
 							72,
 							result.byteBuffer()
 						)
 				);
 			} else {
-				CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
+				CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
 				if (!sectionBuffers.getIndexBuffer().isClosed()) {
 					commandEncoder.writeToBuffer(sectionBuffers.getIndexBuffer().slice(), result.byteBuffer());
 				}

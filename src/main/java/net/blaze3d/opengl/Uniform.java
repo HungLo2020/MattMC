@@ -20,12 +20,12 @@ public sealed interface Uniform extends AutoCloseable permits Uniform.Ubo, Unifo
 	@Environment(EnvType.CLIENT)
 	public record Utb(int location, int samplerIndex, TextureFormat format, int texture) implements Uniform {
 		public Utb(int i, int j, TextureFormat textureFormat) {
-			this(i, j, textureFormat, GlStateManager._genTexture());
+			this(i, j, textureFormat, net.irisshaders.iris.gl.IrisRenderSystem.createTextureId());
 		}
 
 		@Override
 		public void close() {
-			GlStateManager._deleteTexture(this.texture);
+			net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(this.texture);
 		}
 	}
 }

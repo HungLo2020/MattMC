@@ -16,12 +16,16 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.blockentity.AbstractEndPortalRenderer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
@@ -934,13 +938,13 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 		@Override
 		public void draw(MeshData meshData) {
 			this.setupRenderState();
-			GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
+			GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
 				.writeTransform(
-					RenderSystem.getModelViewMatrix(),
+					VulkanicAPI.getModelViewMatrix(),
 					new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
 					new Vector3f(),
-					RenderSystem.getTextureMatrix(),
-					RenderSystem.getShaderLineWidth()
+					VulkanicAPI.getTextureMatrix(),
+					VulkanicAPI.getShaderLineWidth()
 				);
 			MeshData var3 = meshData;
 
@@ -949,7 +953,7 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 				GpuBuffer gpuBuffer2;
 				VertexFormat.IndexType indexType;
 				if (meshData.indexBuffer() == null) {
-					RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(meshData.drawState().mode());
+					VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(meshData.drawState().mode());
 					gpuBuffer2 = autoStorageIndexBuffer.getBuffer(meshData.drawState().indexCount());
 					indexType = autoStorageIndexBuffer.type();
 				} else {
@@ -958,30 +962,41 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 				}
 
 				RenderTarget renderTarget = this.state.outputState.getRenderTarget();
-				GpuTextureView gpuTextureView = RenderSystem.outputColorTextureOverride != null
-					? RenderSystem.outputColorTextureOverride
+				GpuTextureView gpuTextureView = VulkanicAPI.getOutputColorTextureOverride() != null
+					? VulkanicAPI.getOutputColorTextureOverride()
 					: renderTarget.getColorTextureView();
 				GpuTextureView gpuTextureView2 = renderTarget.useDepth
-					? (RenderSystem.outputDepthTextureOverride != null ? RenderSystem.outputDepthTextureOverride : renderTarget.getDepthTextureView())
+					? (VulkanicAPI.getOutputDepthTextureOverride() != null ? VulkanicAPI.getOutputDepthTextureOverride() : renderTarget.getDepthTextureView())
 					: null;
 
-				try (RenderPass renderPass = RenderSystem.getDevice()
-						.createCommandEncoder()
-						.createRenderPass(() -> "Immediate draw for " + this.getName(), gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+				try (RenderPass renderPass = VulkanicAPI.createRenderPass(
+						() -> "Immediate draw for " + this.getName(), gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
 					renderPass.setPipeline(this.renderPipeline);
-					ScissorState scissorState = RenderSystem.getScissorStateForRenderTypeDraws();
+					ScissorState scissorState = VulkanicAPI.getScissorStateForRenderTypeDraws();
 					if (scissorState.enabled()) {
 						renderPass.enableScissor(scissorState.x(), scissorState.y(), scissorState.width(), scissorState.height());
 					}
 
-					RenderSystem.bindDefaultUniforms(renderPass);
+					VulkanicAPI.bindDefaultUniforms(renderPass);
 					renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 					renderPass.setVertexBuffer(0, gpuBuffer);
 
 					for (int i = 0; i < 12; i++) {
-						GpuTextureView gpuTextureView3 = RenderSystem.getShaderTexture(i);
-						if (gpuTextureView3 != null) {
-							renderPass.bindSampler("Sampler" + i, gpuTextureView3);
+						GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(i);
+						int textureId = IrisRenderSystem.getTextureBinding(i);
+						if (textureView != null && textureId > 0 && net.vulkanic.VulkanicCoreAPI.textureId(textureView) != textureId) {
+							textureView = null;
+						}
+						if (textureView == null) {
+							if (textureId > 0) {
+								textureView = TextureTracker.INSTANCE.getTextureView(textureId);
+							}
+							if (textureView == null && i == 2) {
+								textureView = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
+							}
+						}
+						if (textureView != null) {
+							renderPass.bindSampler("Sampler" + i, textureView);
 						}
 					}
 

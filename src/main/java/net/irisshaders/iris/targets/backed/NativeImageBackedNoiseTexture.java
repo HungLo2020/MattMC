@@ -1,11 +1,11 @@
 package net.irisshaders.iris.targets.backed;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.Objects;
 import java.util.Random;
@@ -36,7 +36,7 @@ public class NativeImageBackedNoiseTexture extends DynamicTexture implements Tex
 	public void upload() {
 		NativeImage image = Objects.requireNonNull(getPixels());
 
-		RenderSystem.getDevice().createCommandEncoder().writeToTexture(this.texture, image);
+		VulkanicAPI.createCommandEncoder().writeToTexture(this.texture, image);
 	}
 
 	@Override

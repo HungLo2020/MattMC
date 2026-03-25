@@ -2,7 +2,6 @@ package net.minecraft.client.renderer.feature;
 
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.RenderTarget;
-import net.blaze3d.systems.GpuDevice;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
@@ -20,6 +19,7 @@ import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import net.minecraft.client.renderer.texture.TextureManager;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -44,7 +44,6 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 		});
 		
 		if (!submitNodeCollection.getParticleGroupRenderers().isEmpty()) {
-			GpuDevice gpuDevice = RenderSystem.getDevice();
 			Minecraft minecraft = Minecraft.getInstance();
 			TextureManager textureManager = minecraft.getTextureManager();
 			RenderTarget renderTarget = minecraft.getMainRenderTarget();
@@ -61,7 +60,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 				// Iris: Override particle rendering code (merged from MixinParticleFeatureRenderer)
 				QuadParticleRenderState.PreparedBuffers preparedBuffers = particleGroupRenderer.prepare(particleBufferCache);
 				if (preparedBuffers != null) {
-					try (RenderPass renderPass = gpuDevice.createCommandEncoder().createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
+					try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
 						this.prepareRenderPass(renderPass);
 						if (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE) {
 							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, false);
@@ -72,7 +71,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 					}
 
 					if (renderTarget2 != null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
-						try (RenderPass renderPass = gpuDevice.createCommandEncoder().createRenderPass(() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty())) {
+						try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty())) {
 							this.prepareRenderPass(renderPass);
 							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
 						}
@@ -95,8 +94,8 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 	}
 
 	private void prepareRenderPass(RenderPass renderPass) {
-		renderPass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
-		renderPass.setUniform("Fog", RenderSystem.getShaderFog());
+		renderPass.setUniform("Projection", VulkanicAPI.getProjectionMatrixBuffer());
+		renderPass.setUniform("Fog", VulkanicAPI.getShaderFog());
 		renderPass.bindSampler("Sampler2", Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 	}
 
@@ -118,7 +117,7 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 				this.ringBuffer = new MappableRingBuffer(() -> "Particle Vertices", 34, byteBuffer.remaining());
 			}
 
-			try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.ringBuffer.currentBuffer().slice(), false, true)) {
+			try (GpuBuffer.MappedView mappedView = net.vulkanic.VulkanicAPI.createCommandEncoder().mapBuffer(this.ringBuffer.currentBuffer().slice(), false, true)) {
 				mappedView.data().put(byteBuffer);
 			}
 		}

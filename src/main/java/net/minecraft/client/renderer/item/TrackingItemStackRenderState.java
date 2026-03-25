@@ -10,11 +10,17 @@ public class TrackingItemStackRenderState extends ItemStackRenderState {
 	private final List<Object> modelIdentityElements = new ArrayList();
 
 	@Override
+	public void clear() {
+		super.clear();
+		this.modelIdentityElements.clear();
+	}
+
+	@Override
 	public void appendModelIdentityElement(Object object) {
 		this.modelIdentityElements.add(object);
 	}
 
 	public Object getModelIdentity() {
-		return this.modelIdentityElements;
+		return List.copyOf(this.modelIdentityElements);
 	}
 }

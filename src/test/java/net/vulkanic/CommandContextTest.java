@@ -52,6 +52,67 @@ public class CommandContextTest {
         assertSame(OpenGLCommandContext.IMMEDIATE, ctx, 
             "getImmediateContext() should return OpenGL immediate context");
     }
+
+    @Test
+    public void testGetCommandContext() {
+        VulkanicAPI.initialize();
+
+        CommandContext ctx = VulkanicAPI.getCommandContext();
+
+        assertNotNull(ctx, "getCommandContext() should return a context");
+        assertTrue(ctx.isImmediate(), "OpenGL backend should provide immediate command context");
+        assertSame(OpenGLCommandContext.IMMEDIATE, ctx,
+            "getCommandContext() should return OpenGL immediate context on OpenGL backend");
+    }
+
+    @Test
+    public void testWithCommandContextScopesAndRestores() throws Exception {
+        VulkanicAPI.initialize();
+
+        CommandContext baseline = VulkanicAPI.getCommandContext();
+        CommandContext scoped = createDeferredTestContext("Scoped-Test");
+
+        try (AutoCloseable ignored = VulkanicAPI.withCommandContext(scoped)) {
+            assertSame(scoped, VulkanicAPI.getCommandContext(),
+                "withCommandContext should override getCommandContext() within scope");
+        }
+
+        assertSame(baseline, VulkanicAPI.getCommandContext(),
+            "withCommandContext should restore previous context after close");
+    }
+
+    @Test
+    public void testWithCommandContextCloseIsIdempotent() throws Exception {
+        VulkanicAPI.initialize();
+
+        CommandContext baseline = VulkanicAPI.getCommandContext();
+        CommandContext scoped = createDeferredTestContext("Scoped-Idempotent");
+
+        AutoCloseable scope = VulkanicAPI.withCommandContext(scoped);
+        assertSame(scoped, VulkanicAPI.getCommandContext(),
+            "Scope should be active immediately after withCommandContext");
+
+        scope.close();
+        assertSame(baseline, VulkanicAPI.getCommandContext(),
+            "First close should restore previous context");
+
+        assertDoesNotThrow(scope::close,
+            "Closing the scope a second time should be a safe no-op");
+        assertSame(baseline, VulkanicAPI.getCommandContext(),
+            "Context should remain restored after repeated close");
+    }
+
+    @Test
+    public void testDefaultBackendReadinessMetadata() {
+        VulkanicAPI.initialize();
+
+        assertEquals(GraphicsBackendType.OPENGL, VulkanicAPI.getActiveBackendType(),
+            "Default backend should report OPENGL backend identity");
+        assertFalse(VulkanicAPI.isVulkanBackendSelected(),
+            "Default backend should not report Vulkan-selected state");
+        assertFalse(VulkanicAPI.isNativeVulkanBackendReady(),
+            "Default backend should not report native Vulkan readiness");
+    }
     
     @Test
     public void testSetDynamicViewportWithContext() {
@@ -96,5 +157,24 @@ public class CommandContextTest {
         
         assertNotNull(str, "toString() should not return null");
         assertTrue(str.contains("OpenGL"), "toString() should mention OpenGL");
+    }
+
+    private static CommandContext createDeferredTestContext(String name) {
+        return new CommandContext() {
+            @Override
+            public boolean isImmediate() {
+                return false;
+            }
+
+            @Override
+            public long getHandle() {
+                return 42L;
+            }
+
+            @Override
+            public String getDebugName() {
+                return name;
+            }
+        };
     }
 }

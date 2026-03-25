@@ -61,7 +61,7 @@ public abstract class AbstractTexture implements AutoCloseable, net.irisshaders.
 			// Iris: From MixinAbstractTexture - track texture changes
 			if (lastChecked != this.texture) {
 				lastChecked = this.texture;
-				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(lastChecked.iris$getGlId(), this);
+				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(lastChecked), this);
 			}
 			
 			return this.texture;
@@ -72,6 +72,10 @@ public abstract class AbstractTexture implements AutoCloseable, net.irisshaders.
 		if (this.textureView == null) {
 			throw new IllegalStateException("Texture view does not exist, can't get it before something initializes it");
 		} else {
+			if (this.texture != null && lastChecked != this.texture) {
+				lastChecked = this.texture;
+				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(lastChecked), this);
+			}
 			return this.textureView;
 		}
 	}

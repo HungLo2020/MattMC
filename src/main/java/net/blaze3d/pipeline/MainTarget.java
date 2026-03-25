@@ -65,8 +65,8 @@ public class MainTarget extends RenderTarget {
 			this.colorTexture = this.allocateColorAttachment(dimension);
 			this.depthTexture = this.allocateDepthAttachment(dimension);
 			if (this.colorTexture != null && this.depthTexture != null) {
-				this.colorTextureView = RenderSystem.getDevice().createTextureView(this.colorTexture);
-				this.depthTextureView = RenderSystem.getDevice().createTextureView(this.depthTexture);
+				this.colorTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.colorTexture);
+				this.depthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.depthTexture);
 				return dimension;
 			}
 		}
@@ -83,7 +83,7 @@ public class MainTarget extends RenderTarget {
 	@Nullable
 	private GpuTexture allocateColorAttachment(MainTarget.Dimension dimension) {
 		try {
-			return RenderSystem.getDevice().createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, dimension.width, dimension.height, 1, 1);
+			return net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, dimension.width, dimension.height, 1, 1);
 		} catch (GpuOutOfMemoryException var3) {
 			return null;
 		}
@@ -92,7 +92,7 @@ public class MainTarget extends RenderTarget {
 	@Nullable
 	private GpuTexture allocateDepthAttachment(MainTarget.Dimension dimension) {
 		try {
-			return RenderSystem.getDevice().createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, dimension.width, dimension.height, 1, 1);
+			return net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Depth", 15, TextureFormat.DEPTH32, dimension.width, dimension.height, 1, 1);
 		} catch (GpuOutOfMemoryException var3) {
 			return null;
 		}
@@ -110,7 +110,7 @@ public class MainTarget extends RenderTarget {
 
 		static List<MainTarget.Dimension> listWithFallback(int i, int j) {
 			RenderSystem.assertOnRenderThread();
-			int k = RenderSystem.getDevice().getMaxTextureSize();
+			int k = net.vulkanic.VulkanicAPI.getBackendMaxTextureSize();
 			return i > 0 && i <= k && j > 0 && j <= k
 				? ImmutableList.of(new MainTarget.Dimension(i, j), MainTarget.DEFAULT_DIMENSIONS)
 				: ImmutableList.of(MainTarget.DEFAULT_DIMENSIONS);

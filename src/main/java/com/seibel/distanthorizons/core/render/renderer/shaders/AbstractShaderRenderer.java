@@ -3,6 +3,7 @@ package com.seibel.distanthorizons.core.render.renderer.shaders;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public abstract class AbstractShaderRenderer
@@ -28,18 +29,31 @@ public abstract class AbstractShaderRenderer
 	public void render(float partialTicks)
 	{
 		this.init();
-		
-		this.shader.bind();
-		
-		this.onApplyUniforms(partialTicks);
-		
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+
 		int width = MC_RENDER.getTargetFramebufferViewportWidth();
 		int height = MC_RENDER.getTargetFramebufferViewportHeight();
-		VulkanicAPI.glViewport(0, 0, width, height);
+		if (width <= 0 || height <= 0)
+		{
+			return;
+		}
+
+		if (!this.onPreRender(ctx, partialTicks))
+		{
+			return;
+		}
 		
-		this.onRender();
-		
-		this.shader.unbind();
+		this.shader.bind(ctx);
+		try
+		{
+			this.onApplyUniforms(ctx, partialTicks);
+			VulkanicAPI.setViewport(ctx, 0, 0, width, height);
+			this.onRender(ctx);
+		}
+		finally
+		{
+			this.shader.unbind(ctx);
+		}
 	}
 	
 	public void free()
@@ -51,8 +65,10 @@ public abstract class AbstractShaderRenderer
 	}
 	
 	protected void onInit() {}
+
+	protected boolean onPreRender(CommandContext ctx, float partialTicks) { return true; }
 	
-	protected void onApplyUniforms(float partialTicks) {}
+	protected void onApplyUniforms(CommandContext ctx, float partialTicks) {}
 	
-	protected void onRender() {}
+	protected void onRender(CommandContext ctx) {}
 }

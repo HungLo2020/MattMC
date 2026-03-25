@@ -9,6 +9,7 @@ import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -35,12 +36,13 @@ public abstract class VertexArrayCache {
 
 		@Override
 		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GlBuffer glBuffer) {
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			VertexArrayCache.VertexArray vertexArray = (VertexArrayCache.VertexArray)this.cache.get(vertexFormat);
 			if (vertexArray == null) {
-				int i = GlStateManager._glGenVertexArrays();
-				GlStateManager._glBindVertexArray(i);
+				int i = VulkanicAPI.createVertexArray(ctx);
+				VulkanicAPI.bindVertexArray(ctx, i);
 				if (glBuffer != null) {
-					GlStateManager._glBindBuffer(34962, glBuffer.handle);
+					VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle);
 					setupCombinedAttributes(vertexFormat, true);
 				}
 
@@ -48,9 +50,9 @@ public abstract class VertexArrayCache {
 				this.debugLabels.applyLabel(vertexArray2);
 				this.cache.put(vertexFormat, vertexArray2);
 			} else {
-				GlStateManager._glBindVertexArray(vertexArray.id);
+				VulkanicAPI.bindVertexArray(ctx, vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
-					GlStateManager._glBindBuffer(34962, glBuffer.handle);
+					VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle);
 					vertexArray.lastVertexBuffer = glBuffer;
 					setupCombinedAttributes(vertexFormat, false);
 				}
@@ -58,13 +60,14 @@ public abstract class VertexArrayCache {
 		}
 
 		private static void setupCombinedAttributes(VertexFormat vertexFormat, boolean bl) {
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			int i = vertexFormat.getVertexSize();
 			List<VertexFormatElement> list = vertexFormat.getElements();
 
 			for (int j = 0; j < list.size(); j++) {
 				VertexFormatElement vertexFormatElement = (VertexFormatElement)list.get(j);
 				if (bl) {
-					GlStateManager._enableVertexAttribArray(j);
+					VulkanicAPI.enableVertexAttribArray(ctx, j);
 				}
 
 				switch (vertexFormatElement.usage()) {
@@ -72,20 +75,14 @@ public abstract class VertexArrayCache {
 					case GENERIC:
 					case UV:
 						if (vertexFormatElement.type() == VertexFormatElement.Type.FLOAT) {
-							GlStateManager._vertexAttribPointer(
-								j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, i, vertexFormat.getOffset(vertexFormatElement)
-							);
+							VulkanicAPI.setVertexAttribPointer(ctx, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, i, vertexFormat.getOffset(vertexFormatElement));
 						} else {
-							GlStateManager._vertexAttribIPointer(
-								j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), i, vertexFormat.getOffset(vertexFormatElement)
-							);
+							VulkanicAPI.setVertexAttribIPointer(ctx, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), i, vertexFormat.getOffset(vertexFormatElement));
 						}
 						break;
 					case NORMAL:
 					case COLOR:
-						GlStateManager._vertexAttribPointer(
-							j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, i, vertexFormat.getOffset(vertexFormatElement)
-						);
+						VulkanicAPI.setVertexAttribPointer(ctx, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, i, vertexFormat.getOffset(vertexFormatElement));
 				}
 			}
 		}
@@ -99,8 +96,8 @@ public abstract class VertexArrayCache {
 
 		public Separate(GlDebugLabel glDebugLabel) {
 			this.debugLabels = glDebugLabel;
-			if ("Mesa".equals(GlStateManager._getString(7936))) {
-				String string = GlStateManager._getString(7938);
+			if ("Mesa".equals(VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR))) {
+				String string = VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VERSION);
 				this.needsMesaWorkaround = string.contains("25.0.0") || string.contains("25.0.1") || string.contains("25.0.2");
 			} else {
 				this.needsMesaWorkaround = false;
@@ -109,53 +106,54 @@ public abstract class VertexArrayCache {
 
 		@Override
 		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GlBuffer glBuffer) {
+			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			VertexArrayCache.VertexArray vertexArray = (VertexArrayCache.VertexArray)this.cache.get(vertexFormat);
 			if (vertexArray != null) {
-				GlStateManager._glBindVertexArray(vertexArray.id);
+				VulkanicAPI.bindVertexArray(ctx, vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
 					if (this.needsMesaWorkaround && vertexArray.lastVertexBuffer != null && vertexArray.lastVertexBuffer.handle == glBuffer.handle) {
-						VulkanicAPI.attachVertexBuffer(0, 0, 0L, 0);
+						VulkanicAPI.bindVertexBuffer(ctx, 0, 0, 0L, 0);
 					}
 
-					VulkanicAPI.attachVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+					VulkanicAPI.bindVertexBuffer(ctx, 0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
 					vertexArray.lastVertexBuffer = glBuffer;
 				}
 			} else {
-				int i = GlStateManager._glGenVertexArrays();
-				GlStateManager._glBindVertexArray(i);
+				int i = VulkanicAPI.createVertexArray(ctx);
+				VulkanicAPI.bindVertexArray(ctx, i);
 				if (glBuffer != null) {
 					List<VertexFormatElement> list = vertexFormat.getElements();
 
 					for (int j = 0; j < list.size(); j++) {
 						VertexFormatElement vertexFormatElement = (VertexFormatElement)list.get(j);
-						GlStateManager._enableVertexAttribArray(j);
+						VulkanicAPI.enableVertexAttribArray(ctx, j);
 						switch (vertexFormatElement.usage()) {
 							case POSITION:
 							case GENERIC:
 							case UV:
 								if (vertexFormatElement.type() == VertexFormatElement.Type.FLOAT) {
-									VulkanicAPI.specifyVertexAttribFormat(
-										j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, vertexFormat.getOffset(vertexFormatElement)
+									VulkanicAPI.setVertexAttribFormat(
+										ctx, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, vertexFormat.getOffset(vertexFormatElement)
 									);
 								} else {
-									VulkanicAPI.specifyVertexAttribIFormat(
-										j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), vertexFormat.getOffset(vertexFormatElement)
+									VulkanicAPI.setVertexAttribIFormat(
+										ctx, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), vertexFormat.getOffset(vertexFormatElement)
 									);
 								}
 								break;
 							case NORMAL:
 							case COLOR:
-								VulkanicAPI.specifyVertexAttribFormat(
-									j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, vertexFormat.getOffset(vertexFormatElement)
+								VulkanicAPI.setVertexAttribFormat(
+									ctx, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, vertexFormat.getOffset(vertexFormatElement)
 								);
 						}
 
-						VulkanicAPI.associateVertexAttrib(j, 0);
+						VulkanicAPI.setVertexAttribBinding(ctx, j, 0);
 					}
 				}
 
 				if (glBuffer != null) {
-					VulkanicAPI.attachVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+					VulkanicAPI.bindVertexBuffer(ctx, 0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
 				}
 
 				VertexArrayCache.VertexArray vertexArray2 = new VertexArrayCache.VertexArray(i, vertexFormat, glBuffer);
