@@ -166,6 +166,20 @@ public class VulkanBackend {
     private static final Pattern GLSL_STANDALONE_UNIFORM_PATTERN = Pattern.compile(
         "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;"
     );
+    private static final int GL_FRAMEBUFFER = 0x8D40;
+    private static final int GL_READ_FRAMEBUFFER = 0x8CA8;
+    private static final int GL_DRAW_FRAMEBUFFER = 0x8CA9;
+    private static final int GL_COLOR_ATTACHMENT0 = 0x8CE0;
+    private static final int GL_DEPTH_ATTACHMENT = 0x8D00;
+    private static final int GL_DEPTH_STENCIL_ATTACHMENT = 0x821A;
+    private static final int GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE = 0x8CD0;
+    private static final int GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME = 0x8CD1;
+    private static final int GL_NONE = 0;
+    private static final int GL_TEXTURE = 0x1702;
+    private static final int GL_COLOR_BUFFER_BIT = 0x00004000;
+    private static final int GL_DEPTH_BUFFER_BIT = 0x00000100;
+    private static final int GL_STENCIL_BUFFER_BIT = 0x00000400;
+    private static final int GL_NEAREST = 0x2600;
 
     private final Object nativeInitLock = new Object();
     private volatile NativeSpine nativeSpine;
@@ -228,6 +242,7 @@ public class VulkanBackend {
     // Virtual FBO tracking (mirrors legacy-buffer pattern for GL compat calls)
     private final AtomicInteger nextVirtualFboId = new AtomicInteger(1);
     private final Set<Integer>  virtualFbos      = ConcurrentHashMap.newKeySet();
+    private final Map<Integer, VirtualFramebufferState> virtualFramebufferStates = new ConcurrentHashMap<>();
     private volatile int        boundReadFbo     = 0;
     private volatile int        boundDrawFbo     = 0;
 
@@ -318,6 +333,24 @@ public class VulkanBackend {
             if (pipelineHandle != null) {
                 pipelineHandle.close();
             }
+        }
+    }
+
+    private static final class VirtualFramebufferState {
+        private final Map<Integer, Integer> attachments = new ConcurrentHashMap<>();
+        private volatile int readBuffer = GL_COLOR_ATTACHMENT0;
+        private volatile int drawBuffer = GL_COLOR_ATTACHMENT0;
+
+        void setAttachment(int attachment, int texture) {
+            if (texture == 0) {
+                attachments.remove(attachment);
+            } else {
+                attachments.put(attachment, texture);
+            }
+        }
+
+        int getAttachment(int attachment) {
+            return attachments.getOrDefault(attachment, 0);
         }
     }
 
@@ -3498,6 +3531,7 @@ public class VulkanBackend {
         requireVulkanCommandBufferHandle("createFramebuffer", ctx);
         int id = nextVirtualFboId.getAndIncrement();
         virtualFbos.add(id);
+        virtualFramebufferStates.put(id, new VirtualFramebufferState());
         return id;
     }
 
@@ -3513,16 +3547,17 @@ public class VulkanBackend {
      */
     public void bindFramebuffer(CommandContext ctx, int target, int fbo) {
         requireVulkanCommandBufferHandle("bindFramebuffer", ctx);
-        final int GL_READ_FRAMEBUFFER = 0x8CA8;
-        final int GL_DRAW_FRAMEBUFFER = 0x8CA9;
-        final int GL_FRAMEBUFFER      = 0x8D40;
         if (target == GL_READ_FRAMEBUFFER) {
             this.boundReadFbo = fbo;
+            applyFramebufferReadState(fbo);
         } else if (target == GL_DRAW_FRAMEBUFFER) {
             this.boundDrawFbo = fbo;
+            applyFramebufferDrawState(fbo);
         } else if (target == GL_FRAMEBUFFER) {
             this.boundReadFbo = fbo;
             this.boundDrawFbo = fbo;
+            applyFramebufferReadState(fbo);
+            applyFramebufferDrawState(fbo);
         }
     }
 
@@ -3539,6 +3574,7 @@ public class VulkanBackend {
     public void deleteFramebuffer(CommandContext ctx, int fbo) {
         requireVulkanCommandBufferHandle("deleteFramebuffer", ctx);
         virtualFbos.remove(fbo);
+        virtualFramebufferStates.remove(fbo);
         if (boundReadFbo == fbo) boundReadFbo = 0;
         if (boundDrawFbo == fbo) boundDrawFbo = 0;
     }
@@ -3675,14 +3711,81 @@ public class VulkanBackend {
 
     public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        requireVulkanCommandBufferHandle("blitFramebuffer", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("blitFramebuffer", ctx);
+        if (filter != GL_NEAREST) {
+            return;
+        }
+
+        Integer sourceTexture = resolveFramebufferTextureForBlit(boundReadFbo, mask, pendingReadBuffer);
+        Integer destTexture = resolveFramebufferTextureForBlit(boundDrawFbo, mask, pendingDrawBuffer);
+        if (sourceTexture == null || destTexture == null) {
+            return;
+        }
+
+        ensureNativeReady("blitFramebuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.blitLegacyTextureRegion(
+            commandBufferHandle,
+            "blitFramebuffer",
+            sourceTexture,
+            0,
+            srcX0,
+            srcY0,
+            srcX1,
+            srcY1,
+            destTexture,
+            0,
+            dstX0,
+            dstY0,
+            dstX1,
+            dstY1,
+            mask,
+            filter
+        );
     }
 
     public void blitNamedFramebuffer(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
                                      int srcX0, int srcY0, int srcX1, int srcY1,
                                      int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        requireVulkanCommandBufferHandle("blitNamedFramebuffer", ctx);
-        blitFramebuffer(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("blitNamedFramebuffer", ctx);
+        if (filter != GL_NEAREST) {
+            return;
+        }
+
+        Integer sourceTexture = resolveFramebufferTextureForBlit(readFramebuffer, mask, framebufferReadBuffer(readFramebuffer));
+        Integer destTexture = resolveFramebufferTextureForBlit(drawFramebuffer, mask, framebufferDrawBuffer(drawFramebuffer));
+        if (sourceTexture == null || destTexture == null) {
+            return;
+        }
+
+        ensureNativeReady("blitNamedFramebuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.blitLegacyTextureRegion(
+            commandBufferHandle,
+            "blitNamedFramebuffer",
+            sourceTexture,
+            0,
+            srcX0,
+            srcY0,
+            srcX1,
+            srcY1,
+            destTexture,
+            0,
+            dstX0,
+            dstY0,
+            dstX1,
+            dstY1,
+            mask,
+            filter
+        );
     }
 
     public void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer,
@@ -3761,22 +3864,124 @@ public class VulkanBackend {
     public void copyImageSubData(CommandContext ctx, int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ,
                                  int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ,
                                  int width, int height, int depth) {
-        requireVulkanCommandBufferHandle("copyImageSubData", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("copyImageSubData", ctx);
+        ensureNativeReady("copyImageSubData");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.copyLegacyTextureRegion(
+            commandBufferHandle,
+            "copyImageSubData",
+            srcName,
+            srcLevel,
+            srcX,
+            srcY,
+            srcZ,
+            dstName,
+            dstLevel,
+            dstX,
+            dstY,
+            dstZ,
+            width,
+            height,
+            depth
+        );
     }
 
     public void copyTexImage2D(CommandContext ctx, int target, int level, int internalFormat,
                                int x, int y, int width, int height, int border) {
-        requireVulkanCommandBufferHandle("copyTexImage2D", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("copyTexImage2D", ctx);
+        if (border != 0) {
+            throw new IllegalArgumentException("copyTexImage2D does not support non-zero border on Vulkan backend");
+        }
+
+        Integer sourceTexture = resolveFramebufferTextureForCopy(boundReadFbo, pendingReadBuffer);
+        if (sourceTexture == null) {
+            return;
+        }
+
+        ensureNativeReady("copyTexImage2D");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.copyToBoundLegacyTexture2D(
+            commandBufferHandle,
+            "copyTexImage2D",
+            target,
+            level,
+            internalFormat,
+            sourceTexture,
+            x,
+            y,
+            width,
+            height
+        );
     }
 
     public void copyTexSubImage2D(CommandContext ctx, int target, int level,
                                   int xoffset, int yoffset, int x, int y, int width, int height) {
-        requireVulkanCommandBufferHandle("copyTexSubImage2D", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("copyTexSubImage2D", ctx);
+        Integer sourceTexture = resolveFramebufferTextureForCopy(boundReadFbo, pendingReadBuffer);
+        if (sourceTexture == null) {
+            return;
+        }
+
+        ensureNativeReady("copyTexSubImage2D");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.copyToBoundLegacyTextureSubImage2D(
+            commandBufferHandle,
+            "copyTexSubImage2D",
+            target,
+            level,
+            xoffset,
+            yoffset,
+            sourceTexture,
+            x,
+            y,
+            width,
+            height
+        );
     }
 
     public void copyTextureSubImage2D(CommandContext ctx, int texture, int level,
                                       int xoffset, int yoffset, int x, int y, int width, int height) {
-        requireVulkanCommandBufferHandle("copyTextureSubImage2D", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("copyTextureSubImage2D", ctx);
+        Integer sourceTexture = resolveFramebufferTextureForCopy(boundReadFbo, pendingReadBuffer);
+        if (sourceTexture == null || texture == 0) {
+            return;
+        }
+
+        ensureNativeReady("copyTextureSubImage2D");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.copyLegacyTextureRegion(
+            commandBufferHandle,
+            "copyTextureSubImage2D",
+            sourceTexture,
+            0,
+            x,
+            y,
+            0,
+            texture,
+            level,
+            xoffset,
+            yoffset,
+            0,
+            width,
+            height,
+            1
+        );
     }
 
     public long createFenceSync(CommandContext ctx, int condition, int flags) {
@@ -3845,10 +4050,18 @@ public class VulkanBackend {
 
     public void framebufferTexture(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
         requireVulkanCommandBufferHandle("framebufferTexture", ctx);
+        int framebuffer = resolveFramebufferBinding(target);
+        if (framebuffer != 0) {
+            recordFramebufferAttachment(framebuffer, attachment, texture);
+        }
     }
 
     public void framebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
         requireVulkanCommandBufferHandle("framebufferTexture2D", ctx);
+        int framebuffer = resolveFramebufferBinding(target);
+        if (framebuffer != 0) {
+            recordFramebufferAttachment(framebuffer, attachment, texture);
+        }
     }
 
     public void generateMipmap(CommandContext ctx, int target) {
@@ -3902,7 +4115,18 @@ public class VulkanBackend {
 
     public int getFramebufferAttachmentParameteri(CommandContext ctx, int target, int attachment, int pname) {
         requireVulkanCommandBufferHandle("getFramebufferAttachmentParameteri", ctx);
-        return 0;
+        int framebuffer = resolveFramebufferBinding(target);
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        if (state == null) {
+            return 0;
+        }
+
+        int texture = state.getAttachment(attachment);
+        return switch (pname) {
+            case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME -> texture;
+            case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE -> texture == 0 ? GL_NONE : GL_TEXTURE;
+            default -> 0;
+        };
     }
 
     public Object getGLCapabilities() {
@@ -4205,22 +4429,34 @@ public class VulkanBackend {
 
     public void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
         requireVulkanCommandBufferHandle("namedFramebufferDrawBuffers", ctx);
-        if (bufs != null && bufs.length > 0) {
-            pendingDrawBuffer = bufs[0];
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        if (state != null && bufs != null && bufs.length > 0) {
+            state.drawBuffer = bufs[0];
+            if (framebuffer == boundDrawFbo) {
+                pendingDrawBuffer = bufs[0];
+            }
         }
     }
 
     public void namedFramebufferReadBuffer(CommandContext ctx, int framebuffer, int mode) {
         requireVulkanCommandBufferHandle("namedFramebufferReadBuffer", ctx);
-        pendingReadBuffer = mode;
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        if (state != null) {
+            state.readBuffer = mode;
+        }
+        if (framebuffer == boundReadFbo) {
+            pendingReadBuffer = mode;
+        }
     }
 
     public void namedFramebufferTexture(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
         requireVulkanCommandBufferHandle("namedFramebufferTexture", ctx);
+        recordFramebufferAttachment(framebuffer, attachment, texture);
     }
 
     public void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
         requireVulkanCommandBufferHandle("namedFramebufferTextureDSA", ctx);
+        recordFramebufferAttachment(framebuffer, attachment, texture);
     }
 
     public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, float[] pixels) {
@@ -4765,6 +5001,75 @@ public class VulkanBackend {
             throw new IllegalArgumentException("Unknown Vulkan virtual program handle: " + programId);
         }
         return virtualProgram;
+    }
+
+    private void applyFramebufferReadState(int framebuffer) {
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        if (state != null) {
+            pendingReadBuffer = state.readBuffer;
+        }
+    }
+
+    private void applyFramebufferDrawState(int framebuffer) {
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        if (state != null) {
+            pendingDrawBuffer = state.drawBuffer;
+        }
+    }
+
+    private int resolveFramebufferBinding(int target) {
+        if (target == GL_READ_FRAMEBUFFER) {
+            return boundReadFbo;
+        }
+        if (target == GL_DRAW_FRAMEBUFFER || target == GL_FRAMEBUFFER) {
+            return boundDrawFbo;
+        }
+        return 0;
+    }
+
+    private void recordFramebufferAttachment(int framebuffer, int attachment, int texture) {
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        if (state == null) {
+            return;
+        }
+
+        state.setAttachment(attachment, texture);
+        if (attachment == GL_DEPTH_STENCIL_ATTACHMENT) {
+            state.setAttachment(GL_DEPTH_ATTACHMENT, texture);
+        }
+    }
+
+    private int framebufferReadBuffer(int framebuffer) {
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        return state != null ? state.readBuffer : pendingReadBuffer;
+    }
+
+    private int framebufferDrawBuffer(int framebuffer) {
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        return state != null ? state.drawBuffer : pendingDrawBuffer;
+    }
+
+    private Integer resolveFramebufferTextureForCopy(int framebuffer, int selectedBuffer) {
+        return resolveFramebufferTextureForBlit(framebuffer, GL_COLOR_BUFFER_BIT, selectedBuffer);
+    }
+
+    private Integer resolveFramebufferTextureForBlit(int framebuffer, int mask, int selectedBuffer) {
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        if (state == null) {
+            return null;
+        }
+
+        if ((mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)) != 0) {
+            int depthTexture = state.getAttachment(GL_DEPTH_ATTACHMENT);
+            if (depthTexture == 0) {
+                depthTexture = state.getAttachment(GL_DEPTH_STENCIL_ATTACHMENT);
+            }
+            return depthTexture == 0 ? null : depthTexture;
+        }
+
+        int attachment = selectedBuffer == GL_NONE ? GL_COLOR_ATTACHMENT0 : selectedBuffer;
+        int colorTexture = state.getAttachment(attachment);
+        return colorTexture == 0 ? null : colorTexture;
     }
 
     private static net.vulkanic.GraphicsCapabilities createVulkanGraphicsCapabilities() {
@@ -7058,6 +7363,325 @@ public class VulkanBackend {
             } finally {
                 deferStagingBufferDestroy(stagingBuffer);
             }
+        }
+
+        private int preferredIdleLayout(LegacyTextureObject texture) {
+            return texture.aspectMask == VK10.VK_IMAGE_ASPECT_COLOR_BIT
+                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        }
+
+        private void copyLegacyTextureRegion(long commandBufferHandle,
+                                             String operation,
+                                             int sourceTextureId,
+                                             int sourceLevel,
+                                             int sourceX,
+                                             int sourceY,
+                                             int sourceZ,
+                                             int destTextureId,
+                                             int destLevel,
+                                             int destX,
+                                             int destY,
+                                             int destZ,
+                                             int width,
+                                             int height,
+                                             int depth) {
+            ensureRecordingCommandBuffer(commandBufferHandle, operation);
+            if (renderPassRecording) {
+                throw new IllegalStateException(operation + " requires command recording outside an active render pass");
+            }
+            if (width <= 0 || height <= 0 || depth <= 0) {
+                return;
+            }
+
+            LegacyTextureObject sourceTexture = requireLegacyTexture(sourceTextureId);
+            LegacyTextureObject destTexture = requireLegacyTexture(destTextureId);
+            if (sourceTexture.imageHandle == VK10.VK_NULL_HANDLE || destTexture.imageHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+            if (sourceTexture.aspectMask != destTexture.aspectMask) {
+                throw new IllegalArgumentException(operation + " requires matching source and destination texture aspects");
+            }
+
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
+            int layerCount = Math.min(legacyTextureLayerCount(sourceTexture), legacyTextureLayerCount(destTexture));
+
+            int sourceOriginalLayout = trackedLayoutForLevel(sourceTexture, sourceLevel);
+            if (sourceOriginalLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
+                sourceOriginalLayout = preferredIdleLayout(sourceTexture);
+            }
+            if (sourceOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    sourceTexture.aspectMask,
+                    sourceOriginalLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    sourceLevel,
+                    1,
+                    layerCount
+                );
+            }
+
+            int destOriginalLayout = trackedLayoutForLevel(destTexture, destLevel);
+            if (destOriginalLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
+                destOriginalLayout = preferredIdleLayout(destTexture);
+            }
+            if (destOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    destTexture.imageHandle,
+                    destTexture.aspectMask,
+                    destOriginalLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    destLevel,
+                    1,
+                    layerCount
+                );
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                VkImageCopy.Buffer region = VkImageCopy.calloc(1, stack);
+                region.get(0).srcSubresource()
+                    .aspectMask(sourceTexture.aspectMask)
+                    .mipLevel(sourceLevel)
+                    .baseArrayLayer(0)
+                    .layerCount(layerCount);
+                region.get(0).srcOffset().set(sourceX, sourceY, sourceZ);
+                region.get(0).dstSubresource()
+                    .aspectMask(destTexture.aspectMask)
+                    .mipLevel(destLevel)
+                    .baseArrayLayer(0)
+                    .layerCount(layerCount);
+                region.get(0).dstOffset().set(destX, destY, destZ);
+                region.get(0).extent().set(width, height, depth);
+
+                VK10.vkCmdCopyImage(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    destTexture.imageHandle,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    region
+                );
+            }
+
+            if (sourceOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    sourceTexture.aspectMask,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    sourceOriginalLayout,
+                    sourceLevel,
+                    1,
+                    layerCount
+                );
+            }
+            if (destOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    destTexture.imageHandle,
+                    destTexture.aspectMask,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    destOriginalLayout,
+                    destLevel,
+                    1,
+                    layerCount
+                );
+            }
+
+            trackLayoutForLevel(sourceTexture, sourceLevel, sourceOriginalLayout);
+            trackLayoutForLevel(destTexture, destLevel, destOriginalLayout);
+        }
+
+        private void copyToBoundLegacyTexture2D(long commandBufferHandle,
+                                                String operation,
+                                                int target,
+                                                int level,
+                                                int internalFormat,
+                                                int sourceTextureId,
+                                                int sourceX,
+                                                int sourceY,
+                                                int width,
+                                                int height) {
+            LegacyTextureObject destinationTexture = requireBoundLegacyTexture2D(target, operation);
+            destinationTexture.levels.put(level, new TextureLevelInfo(width, height, internalFormat));
+            copyLegacyTextureRegion(
+                commandBufferHandle,
+                operation,
+                sourceTextureId,
+                0,
+                sourceX,
+                sourceY,
+                0,
+                destinationTexture.id,
+                level,
+                0,
+                0,
+                0,
+                width,
+                height,
+                1
+            );
+        }
+
+        private void copyToBoundLegacyTextureSubImage2D(long commandBufferHandle,
+                                                        String operation,
+                                                        int target,
+                                                        int level,
+                                                        int xOffset,
+                                                        int yOffset,
+                                                        int sourceTextureId,
+                                                        int sourceX,
+                                                        int sourceY,
+                                                        int width,
+                                                        int height) {
+            LegacyTextureObject destinationTexture = requireBoundLegacyTexture2D(target, operation);
+            copyLegacyTextureRegion(
+                commandBufferHandle,
+                operation,
+                sourceTextureId,
+                0,
+                sourceX,
+                sourceY,
+                0,
+                destinationTexture.id,
+                level,
+                xOffset,
+                yOffset,
+                0,
+                width,
+                height,
+                1
+            );
+        }
+
+        private void blitLegacyTextureRegion(long commandBufferHandle,
+                                             String operation,
+                                             int sourceTextureId,
+                                             int sourceLevel,
+                                             int srcX0,
+                                             int srcY0,
+                                             int srcX1,
+                                             int srcY1,
+                                             int destTextureId,
+                                             int destLevel,
+                                             int dstX0,
+                                             int dstY0,
+                                             int dstX1,
+                                             int dstY1,
+                                             int mask,
+                                             int filter) {
+            ensureRecordingCommandBuffer(commandBufferHandle, operation);
+            if (renderPassRecording) {
+                throw new IllegalStateException(operation + " requires command recording outside an active render pass");
+            }
+            if (filter != GL_NEAREST) {
+                return;
+            }
+
+            LegacyTextureObject sourceTexture = requireLegacyTexture(sourceTextureId);
+            LegacyTextureObject destTexture = requireLegacyTexture(destTextureId);
+            if (sourceTexture.imageHandle == VK10.VK_NULL_HANDLE || destTexture.imageHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+            if (sourceTexture.aspectMask != destTexture.aspectMask) {
+                throw new IllegalArgumentException(operation + " requires matching source and destination texture aspects");
+            }
+
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
+            int layerCount = Math.min(legacyTextureLayerCount(sourceTexture), legacyTextureLayerCount(destTexture));
+
+            int sourceOriginalLayout = trackedLayoutForLevel(sourceTexture, sourceLevel);
+            if (sourceOriginalLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
+                sourceOriginalLayout = preferredIdleLayout(sourceTexture);
+            }
+            if (sourceOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    sourceTexture.aspectMask,
+                    sourceOriginalLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    sourceLevel,
+                    1,
+                    layerCount
+                );
+            }
+
+            int destOriginalLayout = trackedLayoutForLevel(destTexture, destLevel);
+            if (destOriginalLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
+                destOriginalLayout = preferredIdleLayout(destTexture);
+            }
+            if (destOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    destTexture.imageHandle,
+                    destTexture.aspectMask,
+                    destOriginalLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    destLevel,
+                    1,
+                    layerCount
+                );
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                VkImageBlit.Buffer blit = VkImageBlit.calloc(1, stack);
+                blit.get(0).srcSubresource()
+                    .aspectMask(sourceTexture.aspectMask)
+                    .mipLevel(sourceLevel)
+                    .baseArrayLayer(0)
+                    .layerCount(layerCount);
+                blit.get(0).srcOffsets(0).set(srcX0, srcY0, 0);
+                blit.get(0).srcOffsets(1).set(srcX1, srcY1, 1);
+                blit.get(0).dstSubresource()
+                    .aspectMask(destTexture.aspectMask)
+                    .mipLevel(destLevel)
+                    .baseArrayLayer(0)
+                    .layerCount(layerCount);
+                blit.get(0).dstOffsets(0).set(dstX0, dstY0, 0);
+                blit.get(0).dstOffsets(1).set(dstX1, dstY1, 1);
+
+                VK10.vkCmdBlitImage(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    destTexture.imageHandle,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    blit,
+                    VK10.VK_FILTER_NEAREST
+                );
+            }
+
+            if (sourceOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    sourceTexture.aspectMask,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    sourceOriginalLayout,
+                    sourceLevel,
+                    1,
+                    layerCount
+                );
+            }
+            if (destOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    destTexture.imageHandle,
+                    destTexture.aspectMask,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    destOriginalLayout,
+                    destLevel,
+                    1,
+                    layerCount
+                );
+            }
+
+            trackLayoutForLevel(sourceTexture, sourceLevel, sourceOriginalLayout);
+            trackLayoutForLevel(destTexture, destLevel, destOriginalLayout);
         }
 
         private void generateLegacyTextureMipmap(long commandBufferHandle, int target) {

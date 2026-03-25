@@ -141,10 +141,15 @@ public class VulkanFullContractCoverageTest {
     }
 
     @Test
-    public void testCompatibilityNoOpMethodsAcceptStubContext() {
+    public void testCompatibilityCompatibilityMethodsRespectStubAndReadinessContracts() {
         assertDoesNotThrow(() -> vulkanBackend.blitNamedFramebuffer(stubCtx, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
         assertDoesNotThrow(() -> vulkanBackend.blitNamedFramebufferDSA(stubCtx, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0));
-        assertDoesNotThrow(() -> vulkanBackend.copyImageSubData(stubCtx, 1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 1, 1));
+
+        IllegalStateException copyException = assertThrows(IllegalStateException.class,
+            () -> vulkanBackend.copyImageSubData(stubCtx, 1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 1, 1));
+        assertTrue(copyException.getMessage().contains("copyImageSubData"),
+            "Implemented native-backed copy paths should fail fast with operation context when Vulkan is not ready");
+
         assertDoesNotThrow(() -> vulkanBackend.dispatchCompute(stubCtx, 1, 1, 1));
         assertDoesNotThrow(() -> vulkanBackend.dispatchComputeIndirect(stubCtx, 0L));
         assertDoesNotThrow(() -> vulkanBackend.memoryBarrier(stubCtx, 0));
