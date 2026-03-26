@@ -5246,4 +5246,19 @@ public class Phase3DrawPathTest {
         assertTrue(turnOffIndex > mainLoopIndex,
             "ParticleFeatureRenderer should disable the light layer after particle group rendering completes");
     }
+
+    @Test
+    public void testIrisFallbackTextureRestoreSkipsUnknownBindingSentinels() throws IOException {
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String source = Files.readString(irisRenderSystemFile);
+
+        assertTrue(source.contains("private static void restoreKnownTextureBinding(int textureId)"),
+            "IrisRenderSystem should centralize legacy texture restore guards for fallback paths");
+        assertTrue(source.contains("if (textureId >= 0) {"),
+            "IrisRenderSystem should treat negative cached texture bindings as unknown sentinels instead of rebinding them");
+        assertTrue(source.contains("restoreKnownTextureBinding(previous);"),
+            "Iris fallback DSA paths should restore prior texture bindings only through the guarded helper");
+        assertFalse(source.contains("VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previous);"),
+            "Iris fallback DSA paths should not blindly rebind cached previous texture ids");
+    }
 }
