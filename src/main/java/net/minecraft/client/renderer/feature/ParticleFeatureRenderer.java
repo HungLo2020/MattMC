@@ -18,11 +18,15 @@ import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import net.minecraft.client.renderer.texture.TextureManager;
+import net.logging.LogUtils;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.iris.fantastic.PhasedParticleEngine {
+	private static final Logger LOGGER = LogUtils.getLogger();
+	private static int debugParticleFeatureLogCount;
 	private final Queue<ParticleFeatureRenderer.ParticleBufferCache> availableBuffers = new ArrayDeque();
 	private final List<ParticleFeatureRenderer.ParticleBufferCache> usedBuffers = new ArrayList();
 	// Iris: Track particle rendering phase (from MixinParticleEngine)
@@ -44,6 +48,16 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 
 		try {
 			if (!submitNodeCollection.getParticleGroupRenderers().isEmpty()) {
+				if (debugParticleFeatureLogCount < 24) {
+					debugParticleFeatureLogCount++;
+					LOGGER.info(
+						"ParticleFeatureRenderer batch#{} groupRenderers={} phase={}",
+						debugParticleFeatureLogCount,
+						submitNodeCollection.getParticleGroupRenderers().size(),
+						this.phase
+					);
+				}
+
 				Minecraft minecraft = Minecraft.getInstance();
 				TextureManager textureManager = minecraft.getTextureManager();
 				RenderTarget renderTarget = minecraft.getMainRenderTarget();

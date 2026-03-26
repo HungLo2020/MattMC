@@ -233,6 +233,63 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testSingleQuadParticlesShrinkAtlasUvsBeforeSampling() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/particle/SingleQuadParticle.java"));
+
+        assertTrue(source.contains("return this.shrinkU(this.sprite.getU0(), this.sprite.getU1());"),
+            "SingleQuadParticle should shrink the leading U edge inward before sampling atlas sprites");
+        assertTrue(source.contains("return this.shrinkU(this.sprite.getU1(), this.sprite.getU0());"),
+            "SingleQuadParticle should shrink the trailing U edge inward before sampling atlas sprites");
+        assertTrue(source.contains("return this.shrinkV(this.sprite.getV0(), this.sprite.getV1());"),
+            "SingleQuadParticle should shrink the leading V edge inward before sampling atlas sprites");
+        assertTrue(source.contains("return this.shrinkV(this.sprite.getV1(), this.sprite.getV0());"),
+            "SingleQuadParticle should shrink the trailing V edge inward before sampling atlas sprites");
+        assertTrue(source.contains("return Mth.lerp(this.particleAtlasShrinkRatio(), f, h);"),
+            "SingleQuadParticle should contract atlas UVs with its particle-local shrink ratio");
+        assertTrue(source.contains("private float particleAtlasShrinkRatio()"),
+            "SingleQuadParticle should define a particle-local atlas shrink ratio helper");
+        assertTrue(source.contains("this.sprite.contents().width() / (this.sprite.getU1() - this.sprite.getU0())"),
+            "Particle atlas shrink ratio should be derived from sprite width relative to atlas UV span");
+    }
+
+    @Test
+    public void testQuadParticleRenderStateFlushesSamplerTextureModesBeforeBinding() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java"));
+
+        assertTrue(source.contains("particleTexture.setFilter(false, false);"),
+            "QuadParticleRenderState should restore the particle atlas to nearest non-mip sampling before binding Sampler0");
+        assertTrue(source.contains("lightTextureView.texture().flushModeChanges2D();"),
+            "QuadParticleRenderState should flush lightmap texture modes before binding Sampler2");
+        assertTrue(source.contains("particleTextureView.texture().flushModeChanges2D();"),
+            "QuadParticleRenderState should flush atlas texture modes before binding Sampler0");
+        assertTrue(source.contains("renderPass.bindSampler(\"Sampler2\", lightTextureView);"),
+            "QuadParticleRenderState should bind the flushed lightmap view to Sampler2");
+        assertTrue(source.contains("renderPass.bindSampler(\"Sampler0\", particleTextureView);"),
+            "QuadParticleRenderState should bind the flushed particle atlas view to Sampler0");
+    }
+
+    @Test
+    public void testVulkanDescriptorSamplerKeysUseLiveGpuTextureState() throws IOException {
+        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String textureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
+
+        assertTrue(textureSource.contains("public FilterMode getMinFilter()"),
+            "GpuTexture should expose its live min filter so Vulkan descriptor samplers can follow current texture state");
+        assertTrue(textureSource.contains("public FilterMode getMagFilter()"),
+            "GpuTexture should expose its live mag filter so Vulkan descriptor samplers can follow current texture state");
+        assertTrue(textureSource.contains("public boolean usesMipmaps()"),
+            "GpuTexture should expose whether mipmaps are live-enabled for descriptor sampler selection");
+        assertTrue(backendSource.contains("GpuTexture gpuTexture = boundTexture instanceof GpuTexture blazeTexture ? blazeTexture : null;"),
+            "Vulkan descriptor sampler keys should bridge the backend-neutral bound texture to live GpuTexture state when available");
+        assertTrue(backendSource.contains("toLegacyMinFilter(gpuTexture.getMinFilter(), gpuTexture.usesMipmaps())"),
+            "Vulkan descriptor samplers should derive minification mode from live GpuTexture state");
+        assertTrue(backendSource.contains("toLegacyMagFilter(gpuTexture.getMagFilter())"),
+            "Vulkan descriptor samplers should derive magnification mode from live GpuTexture state");
+        assertTrue(backendSource.contains("toLegacyWrapMode(gpuTexture.getAddressModeU())"),
+            "Vulkan descriptor samplers should derive wrap state from live GpuTexture state");
+    }
+
+    @Test
     public void testCompositeMipmappingRunsBeforePerPassRenderPassCreation() throws IOException {
         String compositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
         String shadowCompositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
@@ -5216,8 +5273,8 @@ public class Phase3DrawPathTest {
         int pipelineIndex = particleSource.indexOf("renderPass.setPipeline(((SingleQuadParticle.Layer)entry.getKey()).pipeline());");
         int defaultUniformsIndex = particleSource.indexOf("VulkanicAPI.bindDefaultUniforms(renderPass);", pipelineIndex);
         int dynamicTransformsIndex = particleSource.indexOf("renderPass.setUniform(\"DynamicTransforms\", preparedBuffers.dynamicTransforms);", pipelineIndex);
-        int lightmapIndex = particleSource.indexOf("renderPass.bindSampler(\"Sampler2\", net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());", pipelineIndex);
-        int atlasIndex = particleSource.indexOf("renderPass.bindSampler(\"Sampler0\", textureManager.getTexture(((SingleQuadParticle.Layer)entry.getKey()).textureAtlasLocation()).getTextureView());", pipelineIndex);
+        int lightmapIndex = particleSource.indexOf("renderPass.bindSampler(\"Sampler2\", lightTextureView);", pipelineIndex);
+        int atlasIndex = particleSource.indexOf("renderPass.bindSampler(\"Sampler0\", particleTextureView);", pipelineIndex);
         int drawIndex = particleSource.indexOf("renderPass.drawIndexed(", pipelineIndex);
 
         assertTrue(pipelineIndex >= 0, "Particle draw path must set a pipeline before drawing");

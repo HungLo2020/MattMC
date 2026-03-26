@@ -101,6 +101,13 @@ public class LightTexture implements AutoCloseable {
 		return this.textureView;
 	}
 
+	public String debugDescribePackedLight(int packedLight) {
+		int blockLight = packedLight & 0xF;
+		int skyLight = packedLight >> 20 & 0xF;
+		int sample = this.cpuLightmapPixels.getPixel(blockLight, skyLight);
+		return "packed=0x%08X block=%d sky=%d sample=0x%08X".formatted(packedLight, blockLight, skyLight, sample);
+	}
+
 	public void close() {
 		if (this.probeLightmapDebugTexture != null) {
 			this.probeLightmapDebugTexture.close();

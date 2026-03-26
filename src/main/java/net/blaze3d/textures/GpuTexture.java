@@ -103,6 +103,26 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 		this.useMipmaps = bl;
 	}
 
+	public AddressMode getAddressModeU() {
+		return this.addressModeU;
+	}
+
+	public AddressMode getAddressModeV() {
+		return this.addressModeV;
+	}
+
+	public FilterMode getMinFilter() {
+		return this.minFilter;
+	}
+
+	public FilterMode getMagFilter() {
+		return this.magFilter;
+	}
+
+	public boolean usesMipmaps() {
+		return this.useMipmaps;
+	}
+
 	public String getLabel() {
 		return this.label;
 	}

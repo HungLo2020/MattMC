@@ -118,19 +118,35 @@ public abstract class SingleQuadParticle extends Particle {
 	}
 
 	protected float getU0() {
-		return this.sprite.getU0();
+		return this.shrinkU(this.sprite.getU0(), this.sprite.getU1());
 	}
 
 	protected float getU1() {
-		return this.sprite.getU1();
+		return this.shrinkU(this.sprite.getU1(), this.sprite.getU0());
 	}
 
 	protected float getV0() {
-		return this.sprite.getV0();
+		return this.shrinkV(this.sprite.getV0(), this.sprite.getV1());
 	}
 
 	protected float getV1() {
-		return this.sprite.getV1();
+		return this.shrinkV(this.sprite.getV1(), this.sprite.getV0());
+	}
+
+	private float shrinkU(float f, float g) {
+		float h = (f + g) * 0.5F;
+		return Mth.lerp(this.particleAtlasShrinkRatio(), f, h);
+	}
+
+	private float shrinkV(float f, float g) {
+		float h = (f + g) * 0.5F;
+		return Mth.lerp(this.particleAtlasShrinkRatio(), f, h);
+	}
+
+	private float particleAtlasShrinkRatio() {
+		float f = this.sprite.contents().width() / (this.sprite.getU1() - this.sprite.getU0());
+		float g = this.sprite.contents().height() / (this.sprite.getV1() - this.sprite.getV0());
+		return 4.0F / Math.max(g, f);
 	}
 
 	protected abstract SingleQuadParticle.Layer getLayer();

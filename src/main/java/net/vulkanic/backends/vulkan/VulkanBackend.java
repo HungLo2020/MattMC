@@ -354,6 +354,84 @@ public class VulkanBackend {
         }
     }
 
+    private static final boolean DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT = Boolean.getBoolean("mattmc.vulkan.debugParticleSolidColor");
+    private static final boolean DEBUG_VULKAN_PARTICLE_COLOR_ONLY = Boolean.getBoolean("mattmc.vulkan.debugParticleColorOnly");
+    private static final boolean DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE = Boolean.getBoolean("mattmc.vulkan.debugParticleTexturedAlphaOne");
+    private static final boolean DEBUG_VULKAN_PARTICLE_ALPHA_MASK = Boolean.getBoolean("mattmc.vulkan.debugParticleAlphaMask");
+    private static final String DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT_SOURCE = """
+#version 150
+
+layout(location = 0) out vec4 fragColor;
+
+void main() {
+    fragColor = vec4(1.0, 0.0, 1.0, 1.0);
+}
+""";
+    private static final String DEBUG_VULKAN_PARTICLE_COLOR_ONLY_SOURCE = """
+#version 330
+
+#moj_import <minecraft:fog.glsl>
+#moj_import <minecraft:dynamictransforms.glsl>
+
+in float sphericalVertexDistance;
+in float cylindricalVertexDistance;
+in vec2 texCoord0;
+in vec4 vertexColor;
+
+out vec4 fragColor;
+
+void main() {
+    vec4 color = vertexColor * ColorModulator;
+    fragColor = apply_fog(color, sphericalVertexDistance, cylindricalVertexDistance, FogEnvironmentalStart, FogEnvironmentalEnd, FogRenderDistanceStart, FogRenderDistanceEnd, FogColor);
+}
+""";
+    private static final String DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE_SOURCE = """
+#version 330
+
+#moj_import <minecraft:fog.glsl>
+#moj_import <minecraft:dynamictransforms.glsl>
+
+uniform sampler2D Sampler0;
+
+in float sphericalVertexDistance;
+in float cylindricalVertexDistance;
+in vec2 texCoord0;
+in vec4 vertexColor;
+
+out vec4 fragColor;
+
+void main() {
+    vec4 color = texture(Sampler0, texCoord0) * vertexColor * ColorModulator;
+    fragColor = apply_fog(vec4(color.rgb, 1.0), sphericalVertexDistance, cylindricalVertexDistance, FogEnvironmentalStart, FogEnvironmentalEnd, FogRenderDistanceStart, FogRenderDistanceEnd, FogColor);
+}
+""";
+    private static final String DEBUG_VULKAN_PARTICLE_ALPHA_MASK_SOURCE = """
+#version 330
+
+#moj_import <minecraft:fog.glsl>
+#moj_import <minecraft:dynamictransforms.glsl>
+
+uniform sampler2D Sampler0;
+
+in float sphericalVertexDistance;
+in float cylindricalVertexDistance;
+in vec2 texCoord0;
+in vec4 vertexColor;
+
+out vec4 fragColor;
+
+void main() {
+    float alpha = (texture(Sampler0, texCoord0) * vertexColor * ColorModulator).a;
+    fragColor = alpha < 0.1 ? vec4(0.0, 1.0, 0.0, 1.0) : vec4(1.0, 0.0, 1.0, 1.0);
+}
+""";
+
+    private static boolean isParticlePipeline(RenderPipeline renderPipeline) {
+        String pipelineLocation = renderPipeline.getLocation().toString();
+        return "minecraft:pipeline/opaque_particle".equals(pipelineLocation)
+            || "minecraft:pipeline/translucent_particle".equals(pipelineLocation);
+    }
+
     public CompiledRenderPipeline precompileRenderPipeline(
         RenderPipeline renderPipeline,
         @Nullable BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> sourceProvider
@@ -401,12 +479,30 @@ public class VulkanBackend {
 
             String vertexWithDefines = injectExplicitVulkanBindings(
                 renderPipeline,
+                ShaderType.VERTEX,
                 GlslPreprocessor.injectDefines(vertexSource, renderPipeline.getShaderDefines())
             );
             String fragmentWithDefines = injectExplicitVulkanBindings(
                 renderPipeline,
+                ShaderType.FRAGMENT,
                 GlslPreprocessor.injectDefines(fragmentSource, renderPipeline.getShaderDefines())
             );
+
+            if (isParticlePipeline(renderPipeline)) {
+                if (DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT) {
+                    LOGGER.info("Vulkan particle debug fragment override enabled for {}", renderPipeline.getLocation());
+                    fragmentWithDefines = DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT_SOURCE;
+                } else if (DEBUG_VULKAN_PARTICLE_COLOR_ONLY) {
+                    LOGGER.info("Vulkan particle color-only debug override enabled for {}", renderPipeline.getLocation());
+                    fragmentWithDefines = DEBUG_VULKAN_PARTICLE_COLOR_ONLY_SOURCE;
+                } else if (DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE) {
+                    LOGGER.info("Vulkan particle textured-alpha-one debug override enabled for {}", renderPipeline.getLocation());
+                    fragmentWithDefines = DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE_SOURCE;
+                } else if (DEBUG_VULKAN_PARTICLE_ALPHA_MASK) {
+                    LOGGER.info("Vulkan particle alpha-mask debug override enabled for {}", renderPipeline.getLocation());
+                    fragmentWithDefines = DEBUG_VULKAN_PARTICLE_ALPHA_MASK_SOURCE;
+                }
+            }
 
             VulkanicSpirvModule vertexModule = compileSpirvModuleForBackend(
                 VulkanicShaderStage.VERTEX,
@@ -446,8 +542,14 @@ public class VulkanBackend {
         }
     }
 
-    private static String injectExplicitVulkanBindings(RenderPipeline renderPipeline, String shaderSource) {
+    private static String injectExplicitVulkanBindings(RenderPipeline renderPipeline, ShaderType shaderType, String shaderSource) {
         String reboundSource = shaderSource;
+        if (shaderType == ShaderType.VERTEX) {
+            reboundSource = injectExplicitVertexInputLocations(renderPipeline, reboundSource);
+        }
+        if (isParticlePipeline(renderPipeline)) {
+            reboundSource = injectExplicitParticleStageLocations(shaderType, reboundSource);
+        }
         int bindingIndex = 0;
 
         for (String samplerName : renderPipeline.getSamplers()) {
@@ -462,6 +564,149 @@ public class VulkanBackend {
         }
 
         return reboundSource;
+    }
+
+    private static String injectExplicitParticleStageLocations(ShaderType shaderType, String shaderSource) {
+        if (shaderType == ShaderType.VERTEX) {
+            String reboundSource = shaderSource;
+            reboundSource = injectExplicitInterfaceLocation(reboundSource, "out", "sphericalVertexDistance", 0);
+            reboundSource = injectExplicitInterfaceLocation(reboundSource, "out", "cylindricalVertexDistance", 1);
+            reboundSource = injectExplicitInterfaceLocation(reboundSource, "out", "texCoord0", 2);
+            reboundSource = injectExplicitInterfaceLocation(reboundSource, "out", "vertexColor", 3);
+            return reboundSource;
+        }
+
+        if (shaderType == ShaderType.FRAGMENT) {
+            String reboundSource = shaderSource;
+            reboundSource = injectExplicitInterfaceLocation(reboundSource, "in", "sphericalVertexDistance", 0);
+            reboundSource = injectExplicitInterfaceLocation(reboundSource, "in", "cylindricalVertexDistance", 1);
+            reboundSource = injectExplicitInterfaceLocation(reboundSource, "in", "texCoord0", 2);
+            reboundSource = injectExplicitInterfaceLocation(reboundSource, "in", "vertexColor", 3);
+            return reboundSource;
+        }
+
+        return shaderSource;
+    }
+
+    private static String injectExplicitInterfaceLocation(String shaderSource, String storageQualifier, String variableName, int location) {
+        Pattern layoutPattern = Pattern.compile(
+            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*((?:flat\\s+|noperspective\\s+|smooth\\s+|centroid\\s+|sample\\s+)*)"
+                + Pattern.quote(storageQualifier)
+                + "\\s+([A-Za-z0-9_]+)\\s+"
+                + Pattern.quote(variableName)
+                + "(\\s*\\[[^]]+\\])?\\s*;"
+        );
+        Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
+        if (layoutMatcher.find()) {
+            String layoutBody = layoutMatcher.group(2);
+            if (layoutBody.contains("location")) {
+                return shaderSource;
+            }
+
+            return layoutMatcher.replaceFirst(
+                Matcher.quoteReplacement(
+                    layoutMatcher.group(1)
+                        + "layout(" + layoutBody + ", location = " + location + ") "
+                        + layoutMatcher.group(3)
+                        + storageQualifier
+                        + " "
+                        + layoutMatcher.group(4)
+                        + " "
+                        + variableName
+                        + (layoutMatcher.group(5) == null ? "" : layoutMatcher.group(5))
+                        + ";"
+                )
+            );
+        }
+
+        Pattern plainPattern = Pattern.compile(
+            "(?m)(^\\s*)((?:flat\\s+|noperspective\\s+|smooth\\s+|centroid\\s+|sample\\s+)*)"
+                + Pattern.quote(storageQualifier)
+                + "\\s+([A-Za-z0-9_]+)\\s+"
+                + Pattern.quote(variableName)
+                + "(\\s*\\[[^]]+\\])?\\s*;"
+        );
+        Matcher plainMatcher = plainPattern.matcher(shaderSource);
+        if (!plainMatcher.find()) {
+            return shaderSource;
+        }
+
+        return plainMatcher.replaceFirst(
+            Matcher.quoteReplacement(
+                plainMatcher.group(1)
+                    + "layout(location = " + location + ") "
+                    + plainMatcher.group(2)
+                    + storageQualifier
+                    + " "
+                    + plainMatcher.group(3)
+                    + " "
+                    + variableName
+                    + (plainMatcher.group(4) == null ? "" : plainMatcher.group(4))
+                    + ";"
+            )
+        );
+    }
+
+    private static String injectExplicitVertexInputLocations(RenderPipeline renderPipeline, String shaderSource) {
+        String reboundSource = shaderSource;
+        List<String> attributeNames = renderPipeline.getVertexFormat().getElementAttributeNames();
+        for (int location = 0; location < attributeNames.size(); location++) {
+            reboundSource = injectExplicitVertexInputLocation(reboundSource, attributeNames.get(location), location);
+        }
+        return reboundSource;
+    }
+
+    private static String injectExplicitVertexInputLocation(String shaderSource, String attributeName, int location) {
+        Pattern layoutPattern = Pattern.compile(
+            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*((?:[A-Za-z0-9_]+\\s+)*)in\\s+([A-Za-z0-9_]+)\\s+"
+                + Pattern.quote(attributeName)
+                + "(\\s*\\[[^]]+\\])?\\s*;"
+        );
+        Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
+        if (layoutMatcher.find()) {
+            String layoutBody = layoutMatcher.group(2);
+            if (layoutBody.contains("location")) {
+                return shaderSource;
+            }
+
+            return layoutMatcher.replaceFirst(
+                Matcher.quoteReplacement(
+                    layoutMatcher.group(1)
+                        + "layout(" + layoutBody + ", location = " + location + ") "
+                        + layoutMatcher.group(3)
+                        + "in "
+                        + layoutMatcher.group(4)
+                        + " "
+                        + attributeName
+                        + (layoutMatcher.group(5) == null ? "" : layoutMatcher.group(5))
+                        + ";"
+                )
+            );
+        }
+
+        Pattern plainPattern = Pattern.compile(
+            "(?m)(^\\s*)((?:[A-Za-z0-9_]+\\s+)*)in\\s+([A-Za-z0-9_]+)\\s+"
+                + Pattern.quote(attributeName)
+                + "(\\s*\\[[^]]+\\])?\\s*;"
+        );
+        Matcher plainMatcher = plainPattern.matcher(shaderSource);
+        if (!plainMatcher.find()) {
+            return shaderSource;
+        }
+
+        return plainMatcher.replaceFirst(
+            Matcher.quoteReplacement(
+                plainMatcher.group(1)
+                    + "layout(location = " + location + ") "
+                    + plainMatcher.group(2)
+                    + "in "
+                    + plainMatcher.group(3)
+                    + " "
+                    + attributeName
+                    + (plainMatcher.group(4) == null ? "" : plainMatcher.group(4))
+                    + ";"
+            )
+        );
     }
 
     private static String injectExplicitUniformBlockBinding(String shaderSource, String blockName, int bindingIndex) {
@@ -5315,6 +5560,7 @@ public class VulkanBackend {
         private int debugDescriptorSamplerLogCount;
         private int debugDescriptorSamplerViewMismatchLogCount;
         private int debugSodiumChunkDescriptorSamplerLogCount;
+        private int debugParticleDescriptorSamplerLogCount;
         private int debugDescriptorUboLogCount;
 
         private final PixelStoreState pixelStoreState = new PixelStoreState();
@@ -5894,6 +6140,9 @@ public class VulkanBackend {
             List<PipelineDescriptor.ResourceBinding> layoutBindings = descriptor.getResourceLayout().bindings();
             boolean sodiumChunkDescriptor = layoutBindings.stream()
                 .anyMatch(layoutBinding -> "SodiumChunkParams".contentEquals(layoutBinding.name()));
+            String pipelineLocation = descriptor.getPortableState().location().toString();
+            boolean particleDescriptor = "minecraft:pipeline/opaque_particle".equals(pipelineLocation)
+                || "minecraft:pipeline/translucent_particle".equals(pipelineLocation);
 
             // If the pipeline has no descriptors at all, nothing more to do.
             if (pipeline.getResourceBindingCount() == 0) {
@@ -6007,12 +6256,13 @@ public class VulkanBackend {
                                 int sampledLayerCount = sampledLegacyTexture != null ? legacyTextureLayerCount(sampledLegacyTexture) : 0;
                                 boolean sampledCubemap = sampledLegacyTexture != null && isLegacyCubemapTarget(sampledLegacyTexture.target);
                                 LOGGER.info(
-                                    "Vulkan samplerDescriptor#{} binding={} texId={} label={} usage=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} target=0x{} layers={} cubemap={}",
+                                    "Vulkan samplerDescriptor#{} binding={} texId={} label={} usage=0x{} sampler=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} target=0x{} layers={} cubemap={}",
                                     debugDescriptorSamplerLogCount,
                                     binding.name(),
                                     sampledLegacyId,
                                     sampledTextureLabel,
                                     Integer.toHexString(sampledUsage),
+                                    Long.toHexString(samplerHandle),
                                     Long.toHexString(descriptorImageViewHandle),
                                     Long.toHexString(sampledImageHandle),
                                     sampledWidth,
@@ -6057,6 +6307,54 @@ public class VulkanBackend {
                                     Integer.toHexString(sampledLayout),
                                     Long.toHexString(requestedImageViewHandle),
                                     requestedImageViewHandle != descriptorImageViewHandle,
+                                    Long.toHexString(pipeline.getVkPipelineHandle())
+                                );
+                            }
+
+                            if (particleDescriptor
+                                && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name()))
+                                && debugParticleDescriptorSamplerLogCount < 120) {
+                                debugParticleDescriptorSamplerLogCount++;
+                                int sampledLegacyId = sampledLegacyTexture != null ? sampledLegacyTexture.id : 0;
+                                int sampledLayout = sampledLegacyTexture != null
+                                    ? trackedLayoutForLevel(sampledLegacyTexture, vulkanTextureView.getBaseMipLevel())
+                                    : VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+                                int sampledWidth = sampledLegacyTexture != null ? sampledLegacyTexture.width : 0;
+                                int sampledHeight = sampledLegacyTexture != null ? sampledLegacyTexture.height : 0;
+                                int sampledVkFormat = sampledLegacyTexture != null ? sampledLegacyTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED;
+                                long sampledImageHandle = sampledLegacyTexture != null ? sampledLegacyTexture.imageHandle : VK10.VK_NULL_HANDLE;
+                                int sampledSourceFormat = sampledLegacyTexture != null ? sampledLegacyTexture.sourceFormat : 0;
+                                int sampledSourceType = sampledLegacyTexture != null ? sampledLegacyTexture.sourceType : 0;
+                                int sampledInternalFormat = sampledLegacyTexture != null
+                                    ? sampledLegacyTexture.levels.getOrDefault(0, new TextureLevelInfo(0, 0, 0)).internalFormat
+                                    : 0;
+                                int sampledMaxLevel = sampledLegacyTexture != null
+                                    ? sampledLegacyTexture.integerParameters.getOrDefault(VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0)
+                                    : 0;
+                                LOGGER.info(
+                                    "Particle Vulkan descriptor write#{} pipeline={} binding={} texId={} label={} usage=0x{} sampler=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} sourceFormat=0x{} sourceType=0x{} internalFormat0=0x{} maxLevel={} baseMip={} mipCount={} trackedLayout=0x{} requestedView=0x{} remappedDefaultView={} legacyResolved={} pipelineHandle=0x{}",
+                                    debugParticleDescriptorSamplerLogCount,
+                                    pipelineLocation,
+                                    binding.name(),
+                                    sampledLegacyId,
+                                    sampledTextureLabel,
+                                    Integer.toHexString(sampledUsage),
+                                    Long.toHexString(samplerHandle),
+                                    Long.toHexString(descriptorImageViewHandle),
+                                    Long.toHexString(sampledImageHandle),
+                                    sampledWidth,
+                                    sampledHeight,
+                                    Integer.toHexString(sampledVkFormat),
+                                    Integer.toHexString(sampledSourceFormat),
+                                    Integer.toHexString(sampledSourceType),
+                                    Integer.toHexString(sampledInternalFormat),
+                                    sampledMaxLevel,
+                                    vulkanTextureView.getBaseMipLevel(),
+                                    vulkanTextureView.getMipLevelCount(),
+                                    Integer.toHexString(sampledLayout),
+                                    Long.toHexString(requestedImageViewHandle),
+                                    requestedImageViewHandle != descriptorImageViewHandle,
+                                    sampledLegacyTexture != null,
                                     Long.toHexString(pipeline.getVkPipelineHandle())
                                 );
                             }
@@ -6225,31 +6523,62 @@ public class VulkanBackend {
                 return null;
             }
 
-            int minFilter = legacyTexture.integerParameters.getOrDefault(
-                VulkanicAPI.GL_TEXTURE_MIN_FILTER,
-                VulkanicAPI.GL_NEAREST
-            );
-            int magFilter = legacyTexture.integerParameters.getOrDefault(
-                VulkanicAPI.GL_TEXTURE_MAG_FILTER,
-                VulkanicAPI.GL_LINEAR
-            );
-            int wrapS = legacyTexture.integerParameters.getOrDefault(
-                VulkanicAPI.GL_TEXTURE_WRAP_S,
-                VulkanicAPI.GL_REPEAT
-            );
-            int wrapT = legacyTexture.integerParameters.getOrDefault(
-                VulkanicAPI.GL_TEXTURE_WRAP_T,
-                VulkanicAPI.GL_REPEAT
-            );
+            net.vulkanic.VulkanicTexture boundTexture = textureView.texture();
+            GpuTexture gpuTexture = boundTexture instanceof GpuTexture blazeTexture ? blazeTexture : null;
+            int minFilter = gpuTexture != null
+                ? toLegacyMinFilter(gpuTexture.getMinFilter(), gpuTexture.usesMipmaps())
+                : legacyTexture.integerParameters.getOrDefault(
+                    VulkanicAPI.GL_TEXTURE_MIN_FILTER,
+                    VulkanicAPI.GL_NEAREST
+                );
+            int magFilter = gpuTexture != null
+                ? toLegacyMagFilter(gpuTexture.getMagFilter())
+                : legacyTexture.integerParameters.getOrDefault(
+                    VulkanicAPI.GL_TEXTURE_MAG_FILTER,
+                    VulkanicAPI.GL_LINEAR
+                );
+            int wrapS = gpuTexture != null
+                ? toLegacyWrapMode(gpuTexture.getAddressModeU())
+                : legacyTexture.integerParameters.getOrDefault(
+                    VulkanicAPI.GL_TEXTURE_WRAP_S,
+                    VulkanicAPI.GL_REPEAT
+                );
+            int wrapT = gpuTexture != null
+                ? toLegacyWrapMode(gpuTexture.getAddressModeV())
+                : legacyTexture.integerParameters.getOrDefault(
+                    VulkanicAPI.GL_TEXTURE_WRAP_T,
+                    VulkanicAPI.GL_REPEAT
+                );
             int wrapR = legacyTexture.integerParameters.getOrDefault(
                 VulkanicAPI.GL_TEXTURE_WRAP_R,
-                VulkanicAPI.GL_REPEAT
+                wrapT
             );
             int maxLod = usesMipmappedMinFilter(minFilter)
                 ? Math.max(0, textureView.getMipLevelCount() - 1)
                 : 0;
 
             return new DescriptorSamplerKey(minFilter, magFilter, wrapS, wrapT, wrapR, maxLod);
+        }
+
+        private static int toLegacyMinFilter(net.blaze3d.textures.FilterMode minFilter, boolean useMipmaps) {
+            return switch (minFilter) {
+                case NEAREST -> useMipmaps ? VulkanicAPI.GL_NEAREST_MIPMAP_LINEAR : VulkanicAPI.GL_NEAREST;
+                case LINEAR -> useMipmaps ? VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR : VulkanicAPI.GL_LINEAR;
+            };
+        }
+
+        private static int toLegacyMagFilter(net.blaze3d.textures.FilterMode magFilter) {
+            return switch (magFilter) {
+                case NEAREST -> VulkanicAPI.GL_NEAREST;
+                case LINEAR -> VulkanicAPI.GL_LINEAR;
+            };
+        }
+
+        private static int toLegacyWrapMode(net.blaze3d.textures.AddressMode addressMode) {
+            return switch (addressMode) {
+                case REPEAT -> VulkanicAPI.GL_REPEAT;
+                case CLAMP_TO_EDGE -> VulkanicAPI.GL_CLAMP_TO_EDGE;
+            };
         }
 
         private long createDescriptorSampler(DescriptorSamplerKey key) {
