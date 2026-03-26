@@ -3,7 +3,6 @@ package net.minecraft.client.renderer.feature;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.RenderPass;
-import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -42,46 +41,53 @@ public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.i
 			lastPhase = pipeline.getPhase();
 			pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.PARTICLES);
 		});
-		
-		if (!submitNodeCollection.getParticleGroupRenderers().isEmpty()) {
-			Minecraft minecraft = Minecraft.getInstance();
-			TextureManager textureManager = minecraft.getTextureManager();
-			RenderTarget renderTarget = minecraft.getMainRenderTarget();
-			// Iris: Prevent fabulous crash (merged from MixinParticleFeatureRenderer)
-			RenderTarget renderTarget2 = phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE ? null : minecraft.levelRenderer.getParticlesTarget();
 
-			for (SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer : submitNodeCollection.getParticleGroupRenderers()) {
-				ParticleFeatureRenderer.ParticleBufferCache particleBufferCache = (ParticleFeatureRenderer.ParticleBufferCache)this.availableBuffers.poll();
-				if (particleBufferCache == null) {
-					particleBufferCache = new ParticleFeatureRenderer.ParticleBufferCache();
-				}
+		try {
+			if (!submitNodeCollection.getParticleGroupRenderers().isEmpty()) {
+				Minecraft minecraft = Minecraft.getInstance();
+				TextureManager textureManager = minecraft.getTextureManager();
+				RenderTarget renderTarget = minecraft.getMainRenderTarget();
+				// Iris: Prevent fabulous crash (merged from MixinParticleFeatureRenderer)
+				RenderTarget renderTarget2 = phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE ? null : minecraft.levelRenderer.getParticlesTarget();
+				minecraft.gameRenderer.lightTexture().turnOnLightLayer();
 
-				this.usedBuffers.add(particleBufferCache);
-				// Iris: Override particle rendering code (merged from MixinParticleFeatureRenderer)
-				QuadParticleRenderState.PreparedBuffers preparedBuffers = particleGroupRenderer.prepare(particleBufferCache);
-				if (preparedBuffers != null) {
-					try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
-						this.prepareRenderPass(renderPass);
-						if (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE) {
-							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, false);
+				try {
+					for (SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer : submitNodeCollection.getParticleGroupRenderers()) {
+						ParticleFeatureRenderer.ParticleBufferCache particleBufferCache = (ParticleFeatureRenderer.ParticleBufferCache)this.availableBuffers.poll();
+						if (particleBufferCache == null) {
+							particleBufferCache = new ParticleFeatureRenderer.ParticleBufferCache();
 						}
-						if (renderTarget2 == null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
-							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
+
+						this.usedBuffers.add(particleBufferCache);
+						// Iris: Override particle rendering code (merged from MixinParticleFeatureRenderer)
+						QuadParticleRenderState.PreparedBuffers preparedBuffers = particleGroupRenderer.prepare(particleBufferCache);
+						if (preparedBuffers != null) {
+							try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
+								this.prepareRenderPass(renderPass);
+								if (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE) {
+									particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, false);
+								}
+								if (renderTarget2 == null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
+									particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
+								}
+							}
+
+							if (renderTarget2 != null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
+								try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty())) {
+									this.prepareRenderPass(renderPass);
+									particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
+								}
+							}
 						}
 					}
-
-					if (renderTarget2 != null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
-						try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createRenderPass(() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty())) {
-							this.prepareRenderPass(renderPass);
-							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
-						}
-					}
+				} finally {
+					minecraft.gameRenderer.lightTexture().turnOffLightLayer();
 				}
 			}
+		} finally {
+			// Iris: Restore previous rendering phase (from MixinParticleEngine)
+			net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(pipeline -> pipeline.setPhase(lastPhase));
 		}
-		
-		// Iris: Restore previous rendering phase (from MixinParticleEngine)
-		net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(pipeline -> pipeline.setPhase(lastPhase));
 	}
 
 	public void endFrame() {

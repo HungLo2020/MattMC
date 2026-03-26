@@ -327,6 +327,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(samplerIndex);
 			GpuTexture texture = glTextureView.texture();
 			int textureHandle = VulkanicCoreAPI.textureId(texture);
+			net.irisshaders.iris.gl.IrisRenderSystem.setTextureBinding(samplerIndex, textureHandle);
 			VulkanicTextureTarget textureTarget;
 			if ((texture.usage() & 16) != 0) {
 				textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;
@@ -1341,6 +1342,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var46);
 					GpuTexture texture = glTextureView2x.texture();
 					int textureHandle = VulkanicCoreAPI.textureId(texture);
+					net.irisshaders.iris.gl.IrisRenderSystem.setTextureBinding(var46, textureHandle);
 					VulkanicTextureTarget textureTarget;
 					if ((texture.usage() & 16) != 0) {
 						textureTarget = VulkanicTextureTarget.TEXTURE_CUBE_MAP;

@@ -103,11 +103,13 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		renderPass.setVertexBuffer(0, particleBufferCache.get());
 		renderPass.setIndexBuffer(autoStorageIndexBuffer.getBuffer(preparedBuffers.indexCount), autoStorageIndexBuffer.type());
-		renderPass.setUniform("DynamicTransforms", preparedBuffers.dynamicTransforms);
 
 		for (Entry<SingleQuadParticle.Layer, QuadParticleRenderState.PreparedLayer> entry : preparedBuffers.layers.entrySet()) {
 			if (bl == ((SingleQuadParticle.Layer)entry.getKey()).translucent()) {
 				renderPass.setPipeline(((SingleQuadParticle.Layer)entry.getKey()).pipeline());
+				VulkanicAPI.bindDefaultUniforms(renderPass);
+				renderPass.setUniform("DynamicTransforms", preparedBuffers.dynamicTransforms);
+				renderPass.bindSampler("Sampler2", net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 				renderPass.bindSampler("Sampler0", textureManager.getTexture(((SingleQuadParticle.Layer)entry.getKey()).textureAtlasLocation()).getTextureView());
 				renderPass.drawIndexed(
 					((QuadParticleRenderState.PreparedLayer)entry.getValue()).vertexOffset, 0, ((QuadParticleRenderState.PreparedLayer)entry.getValue()).indexCount, 1
@@ -123,16 +125,6 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 	protected void renderRotatedQuad(
 		VertexConsumer vertexConsumer, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p, float q, int r, int s
 	) {
-		// Sodium: Use optimized rendering if available (merged from QuadParticleRenderStateMixin)
-		final var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
-
-		if (writer != null) {
-			TEMP_QUAT.set(i, j, k, l);
-			sodium$emitVertices(writer, f, g, h, m, n, o, p, q, net.sodium.api.util.ColorARGB.toABGR(r), s, TEMP_QUAT);
-			return;
-		}
-
-		// Fallback to vanilla rendering
 		Quaternionf quaternionf = new Quaternionf(i, j, k, l);
 		this.renderVertex(vertexConsumer, quaternionf, f, g, h, 1.0F, -1.0F, m, o, q, r, s);
 		this.renderVertex(vertexConsumer, quaternionf, f, g, h, 1.0F, 1.0F, m, o, p, r, s);

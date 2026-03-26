@@ -1901,6 +1901,13 @@ public class Phase3DrawPathTest {
         String vulkanicApiSource = Files.readString(vulkanicApiFile);
         assertTrue(vulkanicApiSource.contains("getUniformLocationWithLegacySamplerFallback"),
             "VulkanicAPI should expose getUniformLocationWithLegacySamplerFallback for legacy Sampler0/1/2 compatibility");
+
+        Path glProgramSamplerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
+        String glProgramSamplerSource = Files.readString(glProgramSamplerFile);
+        assertTrue(glProgramSamplerSource.contains("private static int legacySamplerUnit(String samplerName)"),
+            "GlProgram should define legacy sampler unit routing for fixed-function sampler names");
+        assertTrue(glProgramSamplerSource.contains("case \"Sampler2\" -> 2;"),
+            "GlProgram should preserve Sampler2 as legacy lightmap unit 2 instead of renumbering it sequentially");
     }
 
     @Test
@@ -3244,6 +3251,10 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should not bridge Sampler0 through RenderSystem.setShaderTexture in Iris setup path");
         assertTrue(encoderSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, sam)"),
             "GlCommandEncoder should notify Iris texture tracking directly for Sampler0 setup");
+		assertTrue(encoderSource.contains("IrisRenderSystem.setTextureBinding(samplerIndex, textureHandle);"),
+			"GlCommandEncoder should mirror pipeline sampler binds into the Iris texture-binding cache");
+		assertTrue(encoderSource.contains("IrisRenderSystem.setTextureBinding(var46, textureHandle);"),
+			"GlCommandEncoder should mirror draw-time sampler binds into the Iris texture-binding cache");
 
         Path commonUniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/CommonUniforms.java");
         String commonUniformsSource = Files.readString(commonUniformsFile);
@@ -5195,5 +5206,44 @@ public class Phase3DrawPathTest {
             "BaseVertex indexed draw must still be present in drawFromBuffers");
         assertTrue(source.contains("VulkanicAPI.drawArraysInstanced("),
             "Instanced non-indexed draw must still be present in drawFromBuffers");
+    }
+
+    @Test
+    public void testParticleDrawPathRebindsPipelineScopedStateAfterSetPipeline() throws IOException {
+        Path particleFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java");
+        String particleSource = Files.readString(particleFile);
+
+        int pipelineIndex = particleSource.indexOf("renderPass.setPipeline(((SingleQuadParticle.Layer)entry.getKey()).pipeline());");
+        int defaultUniformsIndex = particleSource.indexOf("VulkanicAPI.bindDefaultUniforms(renderPass);", pipelineIndex);
+        int dynamicTransformsIndex = particleSource.indexOf("renderPass.setUniform(\"DynamicTransforms\", preparedBuffers.dynamicTransforms);", pipelineIndex);
+        int lightmapIndex = particleSource.indexOf("renderPass.bindSampler(\"Sampler2\", net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());", pipelineIndex);
+        int atlasIndex = particleSource.indexOf("renderPass.bindSampler(\"Sampler0\", textureManager.getTexture(((SingleQuadParticle.Layer)entry.getKey()).textureAtlasLocation()).getTextureView());", pipelineIndex);
+        int drawIndex = particleSource.indexOf("renderPass.drawIndexed(", pipelineIndex);
+
+        assertTrue(pipelineIndex >= 0, "Particle draw path must set a pipeline before drawing");
+        assertTrue(defaultUniformsIndex > pipelineIndex, "Particle draw path must rebind default uniforms after setPipeline");
+        assertTrue(dynamicTransformsIndex > defaultUniformsIndex, "Particle draw path must rebind DynamicTransforms after default uniforms");
+        assertTrue(lightmapIndex > dynamicTransformsIndex, "Particle draw path must rebind the lightmap after setPipeline");
+        assertTrue(atlasIndex > lightmapIndex, "Particle draw path must bind the particle atlas after the lightmap");
+        assertTrue(drawIndex > atlasIndex, "Particle draw path must draw only after rebinding pipeline-scoped resources");
+    }
+
+    @Test
+    public void testParticleFeatureRendererExplicitlyScopesLightLayerAroundParticlePasses() throws IOException {
+        Path particleFeatureRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java");
+        String source = Files.readString(particleFeatureRendererFile);
+
+        int turnOnIndex = source.indexOf("minecraft.gameRenderer.lightTexture().turnOnLightLayer();");
+        int mainLoopIndex = source.indexOf("for (SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer : submitNodeCollection.getParticleGroupRenderers())");
+        int turnOffIndex = source.indexOf("minecraft.gameRenderer.lightTexture().turnOffLightLayer();");
+
+        assertTrue(turnOnIndex >= 0,
+            "ParticleFeatureRenderer should explicitly enable the light layer before particle pass submission");
+        assertTrue(turnOffIndex >= 0,
+            "ParticleFeatureRenderer should explicitly disable the light layer after particle pass submission");
+        assertTrue(mainLoopIndex > turnOnIndex,
+            "ParticleFeatureRenderer should enable the light layer before iterating particle group renderers");
+        assertTrue(turnOffIndex > mainLoopIndex,
+            "ParticleFeatureRenderer should disable the light layer after particle group rendering completes");
     }
 }
