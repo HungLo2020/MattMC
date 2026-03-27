@@ -99,6 +99,12 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should dedicate separate command buffers to swapchain frame submission");
         assertTrue(vulkanBackendSource.contains("ensureCurrentFrameCommandBufferRecording"),
             "Vulkan backend should begin frame-presentation command recording on a dedicated frame buffer path");
+        assertTrue(vulkanBackendSource.contains("if (spine.isFrameInProgress())"),
+            "Vulkan beginCommandBuffer should route in-frame work to the frame command buffer lifecycle");
+        assertTrue(vulkanBackendSource.contains("commandBufferHandle = spine.currentFrameCommandBufferHandle();"),
+            "Vulkan beginCommandBuffer should reuse the frame command buffer during an active frame");
+        assertTrue(vulkanBackendSource.contains("if (spine.isCurrentFrameCommandBufferHandle(commandBufferHandle))"),
+            "Vulkan submitCommandBuffer should avoid force-submitting the active frame command buffer per render pass");
         assertTrue(
             vulkanBackendSource.contains("vkCmdBlitImage") || vulkanBackendSource.contains("vkCmdCopyImage"),
             "Vulkan backend should blit/copy queued present textures into swapchain images before queue present"

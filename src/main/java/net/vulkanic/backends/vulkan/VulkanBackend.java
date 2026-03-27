@@ -3182,7 +3182,12 @@ void main() {
         spine.recreateSwapchainIfFramebufferSizeChanged();
 
         long commandBufferHandle;
-        if (spine.isPrimaryCommandBufferRecording()) {
+        if (spine.isFrameInProgress()) {
+            if (spine.isRenderPassRecording()) {
+                throw new IllegalStateException("Cannot begin a new Vulkan command buffer while a render pass is active.");
+            }
+            commandBufferHandle = spine.currentFrameCommandBufferHandle();
+        } else if (spine.isPrimaryCommandBufferRecording()) {
             if (spine.isRenderPassRecording()) {
                 throw new IllegalStateException("Cannot begin a new Vulkan command buffer while a render pass is active.");
             }
@@ -3210,6 +3215,11 @@ void main() {
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        if (spine.isCurrentFrameCommandBufferHandle(commandBufferHandle)) {
+            currentCommandContext = null;
+            return;
         }
 
         spine.submitPrimaryCommandBuffer(commandBufferHandle);
@@ -10860,6 +10870,18 @@ void main() {
             return commandBuffer;
         }
 
+        private long currentFrameCommandBufferHandle() {
+            return currentFrameCommandBuffer().address();
+        }
+
+        private boolean isFrameInProgress() {
+            return frameInProgress;
+        }
+
+        private boolean isCurrentFrameCommandBufferHandle(long commandBufferHandle) {
+            return frameInProgress && currentFrameCommandBufferHandle() == commandBufferHandle;
+        }
+
         private boolean isCurrentFrameCommandBufferRecording() {
             return frameCommandBufferRecording[currentFrameSyncIndex];
         }
@@ -10997,11 +11019,12 @@ void main() {
 
                 frameCommandBufferRecording[currentFrameSyncIndex] = false;
                 clearTrackedCommandBufferState(frameCommandBuffer.address());
+                backend.boundPipelineResourcesByCommandBuffer.remove(frameCommandBuffer.address());
             }
         }
 
         private void applyResourceBarriers(long commandBufferHandle, VulkanicResourceBarriers barriers) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "applyResourceBarriers");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "applyResourceBarriers");
 
             BarrierMasks masks = toVkBarrierMasks(barriers);
             try (MemoryStack stack = stackPush()) {
@@ -11012,7 +11035,7 @@ void main() {
                     .dstAccessMask(masks.dstAccessMask());
 
                 VK10.vkCmdPipelineBarrier(
-                    primaryCommandBuffer,
+                    activeCommandBuffer,
                     masks.srcStageMask(),
                     masks.dstStageMask(),
                     0,
@@ -12250,7 +12273,7 @@ void main() {
         }
 
         private void cmdSetScissor(long commandBufferHandle, int x, int y, int width, int height) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "cmdSetScissor");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "cmdSetScissor");
             cachedScissorX = x;
             cachedScissorY = y;
             cachedScissorWidth = width;
@@ -12258,7 +12281,7 @@ void main() {
             hasCachedScissorRect = true;
 
             if (renderPassRecording && activeRenderPassTargetsSwapchain) {
-                applyFullRenderAreaScissor();
+                applyFullRenderAreaScissor(activeCommandBuffer);
                 return;
             }
 
@@ -12266,29 +12289,29 @@ void main() {
                 return;
             }
 
-            applyScissorRect(x, y, width, height);
+            applyScissorRect(activeCommandBuffer, x, y, width, height);
         }
 
         private void setScissorTestEnabled(long commandBufferHandle, boolean enabled) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "setScissorTestEnabled");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "setScissorTestEnabled");
             scissorTestEnabled = enabled;
             if (!renderPassRecording) {
                 return;
             }
 
             if (!enabled) {
-                applyFullRenderAreaScissor();
+                applyFullRenderAreaScissor(activeCommandBuffer);
                 return;
             }
 
             if (hasCachedScissorRect) {
-                applyScissorRect(cachedScissorX, cachedScissorY, cachedScissorWidth, cachedScissorHeight);
+                applyScissorRect(activeCommandBuffer, cachedScissorX, cachedScissorY, cachedScissorWidth, cachedScissorHeight);
             } else {
-                applyFullRenderAreaScissor();
+                applyFullRenderAreaScissor(activeCommandBuffer);
             }
         }
 
-        private void applyScissorRect(int x, int y, int width, int height) {
+        private void applyScissorRect(VkCommandBuffer activeCommandBuffer, int x, int y, int width, int height) {
             int scissorWidth = Math.max(width, 0);
             int scissorHeight = Math.max(height, 0);
             int framebufferWidth = activeRenderPassWidth > 0
@@ -12308,33 +12331,33 @@ void main() {
                 org.lwjgl.vulkan.VkRect2D.Buffer scissor = org.lwjgl.vulkan.VkRect2D.calloc(1, stack);
                 scissor.get(0).offset().x(clampedX).y(clampedY);
                 scissor.get(0).extent().width(clampedWidth).height(clampedHeight);
-                VK10.vkCmdSetScissor(primaryCommandBuffer, 0, scissor);
+                VK10.vkCmdSetScissor(activeCommandBuffer, 0, scissor);
             }
         }
 
         private void resetScissorToRenderArea(long commandBufferHandle) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "resetScissorToRenderArea");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "resetScissorToRenderArea");
             if (!renderPassRecording) {
                 return;
             }
 
-            applyFullRenderAreaScissor();
+            applyFullRenderAreaScissor(activeCommandBuffer);
         }
 
-        private void applyFullRenderAreaScissor() {
+        private void applyFullRenderAreaScissor(VkCommandBuffer activeCommandBuffer) {
             int fullWidth = activeRenderPassWidth > 0 ? activeRenderPassWidth : swapchainWidth;
             int fullHeight = activeRenderPassHeight > 0 ? activeRenderPassHeight : swapchainHeight;
             if (fullWidth <= 0 || fullHeight <= 0) {
                 return;
             }
-            applyScissorRect(0, 0, fullWidth, fullHeight);
+            applyScissorRect(activeCommandBuffer, 0, 0, fullWidth, fullHeight);
         }
 
         private void cmdClearAttachments(long commandBufferHandle,
                                          boolean clearColor,
                                          float cr, float cg, float cb, float ca,
                                          boolean clearDepth, float depth) {
-            ensureRecordingCommandBuffer(commandBufferHandle, "cmdClearAttachments");
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "cmdClearAttachments");
             if (!renderPassRecording) {
                 // Cannot issue ClearAttachments outside a render pass; silently defer.
                 return;
@@ -12370,7 +12393,7 @@ void main() {
                     .baseArrayLayer(0)
                     .layerCount(1);
 
-                VK10.vkCmdClearAttachments(primaryCommandBuffer, attachments, rects);
+                VK10.vkCmdClearAttachments(activeCommandBuffer, attachments, rects);
             }
         }
 
