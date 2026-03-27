@@ -16,6 +16,7 @@ import java.util.OptionalInt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanicTypedApiRoutingTest {
@@ -359,6 +360,30 @@ public class VulkanicTypedApiRoutingTest {
         assertEquals(VulkanicTextureParameterName.class, invocation.method.getParameterTypes()[2]);
         assertEquals(VulkanicTextureTarget.TEXTURE_2D, invocation.args[1]);
         assertEquals(VulkanicTextureParameterName.MIN_FILTER, invocation.args[2]);
+    }
+
+    @Test
+    public void testTypedTextureParameterRoutingBypassesProxyWhenRawVulkanBackendIsAvailable() throws Exception {
+        RecordingVulkanBackend recordingVulkanBackend = new RecordingVulkanBackend();
+
+        Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
+        rawVulkanBackendField.setAccessible(true);
+        rawVulkanBackendField.set(null, recordingVulkanBackend);
+
+        invocationHandler.lastInvocation = null;
+
+        VulkanicAPI.setTextureParameter(
+            TEST_CONTEXT,
+            VulkanicTextureTarget.TEXTURE_2D,
+            VulkanicTextureParameterName.MIN_FILTER,
+            VulkanicTextureParameterValue.LINEAR
+        );
+
+        assertNull(invocationHandler.lastInvocation,
+            "Typed Vulkan texture-parameter routing should bypass the proxy backend when raw Vulkan backend is available");
+        assertEquals(VulkanicAPI.GL_TEXTURE_2D, recordingVulkanBackend.lastTarget);
+        assertEquals(VulkanicAPI.GL_TEXTURE_MIN_FILTER, recordingVulkanBackend.lastPName);
+        assertEquals(VulkanicAPI.GL_LINEAR, recordingVulkanBackend.lastParam);
     }
 
     @Test
@@ -1064,6 +1089,19 @@ public class VulkanicTypedApiRoutingTest {
         }
 
         private record ReflectedUniform(String name, int arraySize, int legacyType) {
+        }
+    }
+
+    private static final class RecordingVulkanBackend extends net.vulkanic.backends.vulkan.VulkanBackend {
+        private int lastTarget = Integer.MIN_VALUE;
+        private int lastPName = Integer.MIN_VALUE;
+        private int lastParam = Integer.MIN_VALUE;
+
+        @Override
+        public void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+            this.lastTarget = target;
+            this.lastPName = pname;
+            this.lastParam = param;
         }
     }
 }

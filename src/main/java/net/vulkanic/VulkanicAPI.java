@@ -1686,9 +1686,9 @@ public class VulkanicAPI {
                 typedTarget -> VulkanicTextureParameterName.fromLegacyGlPName(pname)
                     .ifPresentOrElse(
                         typedParameterName -> setTextureParameter(ctx, typedTarget, typedParameterName, param),
-                        () -> getBackend().setTextureParameter(ctx, target, pname, param)
+                        () -> setTextureParameterRaw(ctx, target, pname, param)
                     ),
-                () -> getBackend().setTextureParameter(ctx, target, pname, param)
+                () -> setTextureParameterRaw(ctx, target, pname, param)
             );
     }
 
@@ -1701,7 +1701,7 @@ public class VulkanicAPI {
         VulkanicTextureTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> setTextureParameter(ctx, typedTarget, pname, param),
-                () -> getBackend().setTextureParameter(ctx, target, pname.toLegacyGlPName(), param)
+                () -> setTextureParameterRaw(ctx, target, pname.toLegacyGlPName(), param)
             );
     }
 
@@ -1720,6 +1720,11 @@ public class VulkanicAPI {
         VulkanicTextureParameterName pname,
         int param
     ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setTextureParameter(ctx, target.toLegacyGlTarget(), pname.toLegacyGlPName(), param);
+            return;
+        }
         getBackend().setTextureParameter(ctx, target, pname, param);
     }
 
@@ -1729,6 +1734,25 @@ public class VulkanicAPI {
         VulkanicTextureParameterName pname,
         VulkanicTextureParameterValue param
     ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setTextureParameter(
+                ctx,
+                target.toLegacyGlTarget(),
+                pname.toLegacyGlPName(),
+                param.toLegacyGlConstant()
+            );
+            return;
+        }
+        getBackend().setTextureParameter(ctx, target, pname, param);
+    }
+
+    private static void setTextureParameterRaw(CommandContext ctx, int target, int pname, int param) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setTextureParameter(ctx, target, pname, param);
+            return;
+        }
         getBackend().setTextureParameter(ctx, target, pname, param);
     }
 
