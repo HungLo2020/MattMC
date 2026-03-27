@@ -320,6 +320,8 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should construct VulkanBackend for GraphicsBackendType.VULKAN routing");
         assertTrue(apiSource.contains("backend = createFailFastVulkanProxy(rawVulkanBackend);"),
             "VulkanicAPI should route Vulkan backend calls through fail-fast proxy protection");
+        assertTrue(apiSource.contains("directVulkanBackendForImplementedMethods()"),
+            "VulkanicAPI should expose a direct-dispatch helper for hot implemented Vulkan methods");
         assertFalse(apiSource.contains("methodCache.computeIfAbsent(method"),
             "Vulkan fail-fast proxy should precompute backend method routing instead of paying per-call computeIfAbsent overhead on the render thread");
         assertFalse(apiSource.contains("throw new UnsupportedOperationException(\"Vulkan backend not yet implemented\")"),
@@ -352,6 +354,8 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder trySetup legacy fallback should no longer force Vulkan contexts onto GL-shaped uniform/texture calls when descriptor seam coverage is complete");
         assertTrue(glCommandEncoderSource.contains("VulkanicAPI.resolveVulkanicBuffer(slice.buffer())"),
             "GlCommandEncoder should resolve uniform-buffer bindings through a backend-neutral VulkanicAPI buffer seam");
+        assertTrue(glCommandEncoderSource.contains("PipelineResourceBindings.ofResolvedBindings("),
+            "GlCommandEncoder should build resolved descriptor bindings without builder duplicate-check churn on the hot path");
         assertTrue(openGLBackendSource.contains("samplerBinding.textureView()"),
             "OpenGLBackend should consume sampler texture views from the pipeline resource seam");
     }

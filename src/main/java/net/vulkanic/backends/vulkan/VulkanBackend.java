@@ -359,6 +359,7 @@ public class VulkanBackend {
     private static final boolean DEBUG_VULKAN_PARTICLE_COLOR_ONLY = Boolean.getBoolean("mattmc.vulkan.debugParticleColorOnly");
     private static final boolean DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE = Boolean.getBoolean("mattmc.vulkan.debugParticleTexturedAlphaOne");
     private static final boolean DEBUG_VULKAN_PARTICLE_ALPHA_MASK = Boolean.getBoolean("mattmc.vulkan.debugParticleAlphaMask");
+    private static final boolean DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS = Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
     private static final String DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT_SOURCE = """
 #version 150
 
@@ -6490,7 +6491,8 @@ void main() {
                 );
             }
 
-            if (particleDescriptor
+            if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS
+                && particleDescriptor
                 && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name()))
                 && debugParticleDescriptorSamplerLogCount < 120) {
                 debugParticleDescriptorSamplerLogCount++;

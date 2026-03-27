@@ -63,8 +63,10 @@ public class ApiNeutralityCallsiteTest {
             "GraphicsBackend should expose backend-owned buffer creation seams");
         assertTrue(vulkanicApiSource.contains("public static CommandEncoder createCommandEncoder()"),
             "VulkanicAPI should expose backend-owned command-encoder wrapper");
-        assertTrue(vulkanicApiSource.contains("return getBackend().createCommandEncoder();"),
-            "VulkanicAPI command-encoder wrapper should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();"),
+            "VulkanicAPI should bind a direct Vulkan backend target for hot implemented methods");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createCommandEncoder()"),
+            "VulkanicAPI command-encoder wrapper should use direct dispatch for hot implemented Vulkan methods while staying backend-neutral");
         assertTrue(graphicsBackendSource.contains("default RenderPass createRenderPass("),
             "GraphicsBackend should expose backend-owned render-pass creation seams");
         assertTrue(vulkanicApiSource.contains("public static RenderPass createRenderPass("),
@@ -89,12 +91,12 @@ public class ApiNeutralityCallsiteTest {
             "VulkanicAPI should expose backend-owned texture-view creation wrappers");
         assertTrue(vulkanicApiSource.contains("public static VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer)"),
             "VulkanicAPI should expose backend-neutral buffer resolution wrapper");
-        assertTrue(vulkanicApiSource.contains("return getBackend().resolveVulkanicBuffer(gpuBuffer);"),
-            "VulkanicAPI buffer-resolution wrapper should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.resolveVulkanicBuffer(gpuBuffer)"),
+            "VulkanicAPI buffer-resolution wrapper should use direct dispatch for hot implemented Vulkan methods while staying backend-neutral");
         assertTrue(vulkanicApiSource.contains("public static PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,"),
             "VulkanicAPI should expose backend-neutral pipeline-handle lookup wrapper");
-        assertTrue(vulkanicApiSource.contains("return getBackend().resolvePipelineHandle(renderPipeline, descriptor);"),
-            "VulkanicAPI pipeline-handle lookup wrapper should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.resolvePipelineHandle(renderPipeline, descriptor)"),
+            "VulkanicAPI pipeline-handle lookup wrapper should use direct dispatch for hot implemented Vulkan methods while staying backend-neutral");
         assertTrue(vulkanicApiSource.contains("return getBackend().createTextureView("),
             "VulkanicAPI texture-view wrappers should route through backend seam");
         assertTrue(graphicsBackendSource.contains("default int getBackendMaxTextureSize()"),

@@ -68,6 +68,7 @@ public class GlCommandEncoder implements CommandEncoder {
 	private net.vulkanic.VulkanicRenderPass activeVulkanicRenderPass;
 	@Nullable
 	private net.vulkanic.CommandContext activeRenderPassContext;
+	private static final boolean DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS = Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
 	private static int DEBUG_PIPELINE_BIND_LOGS = 0;
 	private static int DEBUG_SODIUM_SAMPLER_BIND_LOGS = 0;
 	private static int DEBUG_PARTICLE_VULKAN_BIND_LOGS = 0;
@@ -230,11 +231,15 @@ public class GlCommandEncoder implements CommandEncoder {
 		GlRenderPipeline glRenderPipeline = glRenderPass.pipeline;
 		RenderPipeline pipelineInfo = glRenderPipeline.info();
 		PipelineDescriptor.ResourceLayout layout = glRenderPipeline.descriptor().getResourceLayout();
-		PipelineResourceBindings.Builder builder = PipelineResourceBindings.builder();
-		java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>();
-		boolean logSodiumChunkSamplers = DEBUG_SODIUM_SAMPLER_BIND_LOGS < 24
+		java.util.List<PipelineDescriptor.ResourceBinding> layoutBindings = layout.bindings();
+		int layoutBindingCount = layoutBindings.size();
+		java.util.Map<String, PipelineResourceBindings.SamplerBinding> samplerBindings = new java.util.HashMap<>(layoutBindingCount);
+		java.util.Map<String, net.vulkanic.VulkanicBufferSlice> uniformBufferBindings = new java.util.HashMap<>(layoutBindingCount);
+		java.util.Map<String, PipelineResourceBindings.TexelBufferBinding> texelBufferBindings = new java.util.HashMap<>(layoutBindingCount);
+		java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>(layoutBindingCount);
+		boolean logSodiumChunkSamplers = DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_SODIUM_SAMPLER_BIND_LOGS < 24
 			&& pipelineInfo.getLocation().toString().contains("sodium:pipeline/vulkan_chunk_");
-		boolean logParticleSamplers = DEBUG_PARTICLE_VULKAN_BIND_LOGS < 80
+		boolean logParticleSamplers = DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PARTICLE_VULKAN_BIND_LOGS < 80
 			&& pipelineInfo.getLocation().toString().contains("pipeline/")
 			&& pipelineInfo.getLocation().toString().contains("particle");
 
@@ -246,7 +251,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				pipelineInfo.getLocation(),
 				pipelineInfo.getSamplers(),
 				glRenderPass.samplers.keySet(),
-				layout.bindings().stream().map(PipelineDescriptor.ResourceBinding::name).toList()
+				layoutBindings.stream().map(PipelineDescriptor.ResourceBinding::name).toList()
 			);
 		}
 
@@ -258,11 +263,11 @@ public class GlCommandEncoder implements CommandEncoder {
 				pipelineInfo.getLocation(),
 				pipelineInfo.getSamplers(),
 				glRenderPass.samplers.keySet(),
-				layout.bindings().stream().map(PipelineDescriptor.ResourceBinding::name).toList()
+				layoutBindings.stream().map(PipelineDescriptor.ResourceBinding::name).toList()
 			);
 		}
 
-		for (PipelineDescriptor.ResourceBinding resourceBinding : layout.bindings()) {
+		for (PipelineDescriptor.ResourceBinding resourceBinding : layoutBindings) {
 			switch (resourceBinding.type()) {
 				case SAMPLER -> {
 					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
@@ -275,7 +280,7 @@ public class GlCommandEncoder implements CommandEncoder {
 							uniform instanceof Uniform.Sampler,
 							textureView != null,
 							glRenderPass.samplers.keySet(),
-							layout.bindings().stream()
+							layoutBindings.stream()
 								.filter(binding -> binding.type() == PipelineDescriptor.ResourceType.SAMPLER)
 								.map(PipelineDescriptor.ResourceBinding::name)
 								.toList()
@@ -303,14 +308,14 @@ public class GlCommandEncoder implements CommandEncoder {
 						int samplerIndex = uniform instanceof Uniform.Sampler(int location, int reflectedSamplerIndex)
 							? reflectedSamplerIndex
 							: resourceBinding.binding();
-						builder.bindSampler(resourceBinding.name(), textureView, samplerIndex);
+						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerIndex, textureView));
 						boundResources.add(resourceBinding);
 					}
 				}
 				case UNIFORM_BUFFER -> {
 					GpuBufferSlice slice = glRenderPass.uniforms.get(resourceBinding.name());
 					if (slice != null) {
-						builder.bindUniformBuffer(
+						uniformBufferBindings.put(
 							resourceBinding.name(),
 							new net.vulkanic.VulkanicBufferSlice(
 								VulkanicAPI.resolveVulkanicBuffer(slice.buffer()),
@@ -324,7 +329,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				case TEXEL_BUFFER -> {
 					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
 					if (uniform instanceof Uniform.Utb(int location, int samplerIndex, TextureFormat format, int texture)) {
-						builder.bindTexelBuffer(resourceBinding.name(), samplerIndex);
+						texelBufferBindings.put(resourceBinding.name(), new PipelineResourceBindings.TexelBufferBinding(samplerIndex));
 						boundResources.add(resourceBinding);
 					}
 				}
@@ -336,22 +341,22 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		boolean completeCoverage = boundResources.size() == layout.bindings().size();
+		PipelineDescriptor submissionDescriptor = completeCoverage
+			? glRenderPipeline.descriptor()
+			: glRenderPipeline.descriptor().withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
 		if (logParticleSamplers) {
 			LOGGER.info(
 				"Particle Vulkan sampler submission pipeline={} boundResources={} totalBindings={} completeCoverage={}",
 				pipelineInfo.getLocation(),
 				boundResources.stream().map(PipelineDescriptor.ResourceBinding::name).toList(),
-				layout.bindings().size(),
+				layoutBindingCount,
 				completeCoverage
 			);
 		}
 
-		PipelineDescriptor filteredDescriptor = glRenderPipeline.descriptor()
-			.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
-
 		return new PipelineResourceBindingSubmission(
-			filteredDescriptor,
-			builder.build(),
+			submissionDescriptor,
+			PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBufferBindings, texelBufferBindings),
 			completeCoverage
 		);
 	}
@@ -1286,7 +1291,7 @@ public class GlCommandEncoder implements CommandEncoder {
 
 		RenderPipeline renderPipeline = glRenderPass.pipeline.info();
 		GlProgram glProgram = glRenderPass.pipeline.program();
-		boolean logParticlePipeline = DEBUG_PARTICLE_VULKAN_BIND_LOGS < 80
+		boolean logParticlePipeline = DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PARTICLE_VULKAN_BIND_LOGS < 80
 			&& renderPipeline.getLocation().toString().contains("pipeline/")
 			&& renderPipeline.getLocation().toString().contains("particle");
 		this.applyPipelineState(renderPipeline);
@@ -1303,7 +1308,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.prepareSamplerBindingsForVulkanDescriptors(glRenderPass, ctx);
 		}
 		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass);
-		if (!ctx.isImmediate() && DEBUG_PIPELINE_BIND_LOGS < 80) {
+		if (!ctx.isImmediate() && DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PIPELINE_BIND_LOGS < 80) {
 			DEBUG_PIPELINE_BIND_LOGS++;
 			LOGGER.info(
 				"Vulkan trySetup bind#{} pipeline={} submissionPresent={} layoutBindings={} writeColor={} writeDepth={} depthTest={} cull={} blend={}",
@@ -1325,7 +1330,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			} else {
 				pipelineHandle = VulkanicAPI.resolvePipelineHandle(
 						glRenderPass.pipeline.info(), glRenderPass.pipeline.descriptor());
-				if (DEBUG_PIPELINE_BIND_LOGS < 80) {
+				if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PIPELINE_BIND_LOGS < 80) {
 					DEBUG_PIPELINE_BIND_LOGS++;
 					LOGGER.info(
 						"Vulkan trySetup bind#{} pipeline={} resolvedPipelineHandle={} completeCoverage={}",

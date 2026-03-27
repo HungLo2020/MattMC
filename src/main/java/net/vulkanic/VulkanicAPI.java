@@ -744,6 +744,14 @@ public class VulkanicAPI {
         return backend;
     }
 
+    @Nullable
+    private static VulkanBackend directVulkanBackendForImplementedMethods() {
+        if (backend == null) {
+            initialize();
+        }
+        return rawVulkanBackend;
+    }
+
     /**
      * Gets the currently active backend identity.
      */
@@ -1063,7 +1071,10 @@ public class VulkanicAPI {
         if (stack != null && !stack.isEmpty()) {
             return stack.peek();
         }
-        return getBackend().getCurrentCommandContext();
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.getCurrentCommandContext()
+            : getBackend().getCurrentCommandContext();
     }
 
     /**
@@ -1154,6 +1165,11 @@ public class VulkanicAPI {
      * @param height The height of the viewport in pixels
      */
     public static void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setDynamicViewport(ctx, x, y, width, height);
+            return;
+        }
         getBackend().setDynamicViewport(ctx, x, y, width, height);
     }
     
@@ -1290,6 +1306,11 @@ public class VulkanicAPI {
      * @param programId The shader program ID
      */
     public static void bindShaderProgram(CommandContext ctx, int programId) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.bindShaderProgram(ctx, programId);
+            return;
+        }
         getBackend().bindShaderProgram(ctx, programId);
     }
     
@@ -1309,6 +1330,11 @@ public class VulkanicAPI {
     }
 
     public static void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setCapabilityEnabled(ctx, capability, enabled);
+            return;
+        }
         getBackend().setCapabilityEnabled(ctx, capability, enabled);
     }
 
@@ -3242,7 +3268,10 @@ public class VulkanicAPI {
      * callsites.
      */
     public static CommandEncoder createCommandEncoder() {
-        return getBackend().createCommandEncoder();
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createCommandEncoder()
+            : getBackend().createCommandEncoder();
     }
 
     /**
@@ -6009,6 +6038,11 @@ public class VulkanicAPI {
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
             PipelineResourceBindings bindings) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.bindPipelineResources(ctx, pipeline, descriptor, bindings);
+            return;
+        }
         getBackend().bindPipelineResources(ctx, pipeline, descriptor, bindings);
     }
 
@@ -6026,7 +6060,10 @@ public class VulkanicAPI {
      * @return the backend-native buffer representation
      */
     public static VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer) {
-        return getBackend().resolveVulkanicBuffer(gpuBuffer);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolveVulkanicBuffer(gpuBuffer)
+            : getBackend().resolveVulkanicBuffer(gpuBuffer);
     }
 
     /**
@@ -6046,7 +6083,10 @@ public class VulkanicAPI {
     @Nullable
     public static PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
                                                        PipelineDescriptor descriptor) {
-        return getBackend().resolvePipelineHandle(renderPipeline, descriptor);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolvePipelineHandle(renderPipeline, descriptor)
+            : getBackend().resolvePipelineHandle(renderPipeline, descriptor);
     }
 
     // =========================================================================
