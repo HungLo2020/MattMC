@@ -38,7 +38,6 @@ import java.lang.invoke.MethodType;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
@@ -970,7 +969,23 @@ public class VulkanicAPI {
     }
 
     private static GraphicsBackend createFailFastVulkanProxy(VulkanBackend vulkanBackend) {
-        java.util.Map<Method, java.util.Optional<Method>> methodCache = new ConcurrentHashMap<>();
+        java.util.Map<Method, Method> implementedMethods = new java.util.HashMap<>();
+        java.util.Set<Method> missingMethods = new java.util.HashSet<>();
+
+        for (Method interfaceMethod : GraphicsBackend.class.getMethods()) {
+            if (interfaceMethod.getDeclaringClass() == Object.class) {
+                continue;
+            }
+
+            try {
+                implementedMethods.put(
+                    interfaceMethod,
+                    VulkanBackend.class.getMethod(interfaceMethod.getName(), interfaceMethod.getParameterTypes())
+                );
+            } catch (NoSuchMethodException ignored) {
+                missingMethods.add(interfaceMethod);
+            }
+        }
 
         return (GraphicsBackend) Proxy.newProxyInstance(
             GraphicsBackend.class.getClassLoader(),
@@ -980,15 +995,8 @@ public class VulkanicAPI {
                     return method.invoke(vulkanBackend, args);
                 }
 
-                java.util.Optional<Method> backendMethod = methodCache.computeIfAbsent(method, key -> {
-                    try {
-                        return java.util.Optional.of(VulkanBackend.class.getMethod(key.getName(), key.getParameterTypes()));
-                    } catch (NoSuchMethodException ignored) {
-                        return java.util.Optional.empty();
-                    }
-                });
-
-                if (backendMethod.isEmpty()) {
+                Method backendMethod = implementedMethods.get(method);
+                if (backendMethod == null && missingMethods.contains(method)) {
                     if (method.isDefault()) {
                         return invokeDefaultInterfaceMethod(proxy, method, args);
                     }
@@ -998,7 +1006,7 @@ public class VulkanicAPI {
                 }
 
                 try {
-                    return backendMethod.get().invoke(vulkanBackend, args);
+                    return backendMethod.invoke(vulkanBackend, args);
                 } catch (InvocationTargetException exception) {
                     throw exception.getTargetException();
                 }

@@ -320,6 +320,8 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should construct VulkanBackend for GraphicsBackendType.VULKAN routing");
         assertTrue(apiSource.contains("backend = createFailFastVulkanProxy(rawVulkanBackend);"),
             "VulkanicAPI should route Vulkan backend calls through fail-fast proxy protection");
+        assertFalse(apiSource.contains("methodCache.computeIfAbsent(method"),
+            "Vulkan fail-fast proxy should precompute backend method routing instead of paying per-call computeIfAbsent overhead on the render thread");
         assertFalse(apiSource.contains("throw new UnsupportedOperationException(\"Vulkan backend not yet implemented\")"),
             "VulkanicAPI should no longer hard-fail backend selection for GraphicsBackendType.VULKAN");
     }
