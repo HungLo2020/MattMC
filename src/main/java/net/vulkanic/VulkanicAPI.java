@@ -366,6 +366,7 @@ public class VulkanicAPI {
     public static final int GL_TEXTURE_MIN_LOD = 0x813A;
     public static final int GL_TEXTURE_MAX_LOD = 0x813B;
     public static final int GL_TEXTURE_LOD_BIAS = 0x8501;
+    public static final int GL_MAX_TEXTURE_LOD_BIAS = 0x84FD;
     public static final int GL_LINEAR = 0x2601;
     public static final int GL_NEAREST = 0x2600;
     public static final int GL_NEAREST_MIPMAP_NEAREST = 0x2700;

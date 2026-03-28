@@ -5391,6 +5391,7 @@ void main() {
             case FRAMEBUFFER_BINDING -> boundDrawFbo;
             case NUM_EXTENSIONS -> 0;
             case MAX_LABEL_LENGTH -> 256;
+            case MAX_TEXTURE_LOD_BIAS -> 0;
             case TEXTURE_MAX_LEVEL -> 0;
             case GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX -> 0;
         };

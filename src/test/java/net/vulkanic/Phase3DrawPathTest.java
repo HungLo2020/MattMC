@@ -1338,8 +1338,8 @@ public class Phase3DrawPathTest {
         assertFalse(source.contains("createFenceSync(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0)"),
             "GLRenderDevice should not create completion fences via raw createFenceSync parameters");
 
-        assertTrue(source.contains("getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.TEXTURE_MAX_LEVEL)"),
-            "GLRenderDevice should use typed VulkanicIntegerQuery instead of raw texture query constants");
+        assertTrue(source.contains("getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_TEXTURE_LOD_BIAS)"),
+            "GLRenderDevice should use typed VulkanicIntegerQuery.MAX_TEXTURE_LOD_BIAS instead of raw texture query constants");
         assertFalse(source.contains("VulkanicAPI.bindBuffer(ctx, target.getTargetParameter(), buffer.handle())"),
             "GLRenderDevice should no longer bind buffers through raw GlBufferTarget integer targets where typed targets are available");
         assertTrue(source.contains("VulkanicAPI.bindBuffer(ctx, target.toVulkanicBufferTarget(), buffer.handle())"),

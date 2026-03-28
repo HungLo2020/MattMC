@@ -2157,6 +2157,7 @@ public class OpenGLBackend implements GraphicsBackend {
             case MAX_COLOR_ATTACHMENTS -> VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS;
             case NUM_EXTENSIONS -> VulkanicAPI.GL_NUM_EXTENSIONS;
             case MAX_LABEL_LENGTH -> VulkanicAPI.GL_MAX_LABEL_LENGTH;
+            case MAX_TEXTURE_LOD_BIAS -> VulkanicAPI.GL_MAX_TEXTURE_LOD_BIAS;
             case TEXTURE_MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
             case GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX -> VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX;
         };
