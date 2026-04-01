@@ -313,16 +313,9 @@ public class GlCommandEncoder implements CommandEncoder {
 					}
 				}
 				case UNIFORM_BUFFER -> {
-					GpuBufferSlice slice = glRenderPass.uniforms.get(resourceBinding.name());
+					net.vulkanic.VulkanicBufferSlice slice = glRenderPass.getUniformResourceSlice(resourceBinding.name());
 					if (slice != null) {
-						uniformBufferBindings.put(
-							resourceBinding.name(),
-							new net.vulkanic.VulkanicBufferSlice(
-								VulkanicAPI.resolveVulkanicBuffer(slice.buffer()),
-								slice.offset(),
-								slice.length()
-							)
-						);
+						uniformBufferBindings.put(resourceBinding.name(), slice);
 						boundResources.add(resourceBinding);
 					}
 				}

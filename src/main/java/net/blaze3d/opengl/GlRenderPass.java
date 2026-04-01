@@ -15,6 +15,7 @@ import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
+import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,9 +33,10 @@ public class GlRenderPass implements RenderPass {
 	protected GpuBuffer indexBuffer;
 	protected VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
 	private final ScissorState scissorState = new ScissorState();
-	protected final HashMap<String, GpuBufferSlice> uniforms = new HashMap();
-	public final HashMap<String, GpuTextureView> samplers = new HashMap();
-	private final HashMap<String, VulkanicTextureView> samplerResourceViews = new HashMap();
+	protected final HashMap<String, GpuBufferSlice> uniforms = new HashMap<>();
+	private final HashMap<String, net.vulkanic.VulkanicBufferSlice> uniformResourceSlices = new HashMap<>();
+	public final HashMap<String, GpuTextureView> samplers = new HashMap<>();
+	private final HashMap<String, VulkanicTextureView> samplerResourceViews = new HashMap<>();
 	protected final Set<String> dirtyUniforms = new HashSet();
 	protected int pushedDebugGroups;
 
@@ -118,8 +120,7 @@ public class GlRenderPass implements RenderPass {
 
 	@Override
 	public void setUniform(String string, GpuBuffer gpuBuffer) {
-		this.uniforms.put(string, gpuBuffer.slice());
-		this.dirtyUniforms.add(string);
+		this.setUniform(string, gpuBuffer.slice());
 	}
 
 	@Override
@@ -129,8 +130,21 @@ public class GlRenderPass implements RenderPass {
 			throw new IllegalArgumentException("Uniform buffer offset must be aligned to " + i);
 		} else {
 			this.uniforms.put(string, gpuBufferSlice);
+			this.uniformResourceSlices.put(
+				string,
+				new net.vulkanic.VulkanicBufferSlice(
+					VulkanicAPI.resolveVulkanicBuffer(gpuBufferSlice.buffer()),
+					gpuBufferSlice.offset(),
+					gpuBufferSlice.length()
+				)
+			);
 			this.dirtyUniforms.add(string);
 		}
+	}
+
+	@Nullable
+	net.vulkanic.VulkanicBufferSlice getUniformResourceSlice(String string) {
+		return this.uniformResourceSlices.get(string);
 	}
 
 	@Override

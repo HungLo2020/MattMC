@@ -352,8 +352,11 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder trySetup should keep an explicit compatibility fallback path when immediate seam coverage is incomplete during migration");
         assertFalse(trySetupSource.contains("(!ctx.isImmediate() || !immediateSeamHasCompleteCoverage)"),
             "GlCommandEncoder trySetup legacy fallback should no longer force Vulkan contexts onto GL-shaped uniform/texture calls when descriptor seam coverage is complete");
-        assertTrue(glCommandEncoderSource.contains("VulkanicAPI.resolveVulkanicBuffer(slice.buffer())"),
-            "GlCommandEncoder should resolve uniform-buffer bindings through a backend-neutral VulkanicAPI buffer seam");
+        String glRenderPassSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlRenderPass.java"));
+        assertTrue(glRenderPassSource.contains("VulkanicAPI.resolveVulkanicBuffer(gpuBufferSlice.buffer())"),
+            "GlRenderPass should resolve uniform-buffer bindings through a backend-neutral VulkanicAPI buffer seam at bind time");
+        assertTrue(glCommandEncoderSource.contains("glRenderPass.getUniformResourceSlice(resourceBinding.name())"),
+            "GlCommandEncoder should consume pre-resolved uniform-buffer slices from GlRenderPass during descriptor assembly");
         assertTrue(glCommandEncoderSource.contains("PipelineResourceBindings.ofResolvedBindings("),
             "GlCommandEncoder should build resolved descriptor bindings without builder duplicate-check churn on the hot path");
         assertTrue(openGLBackendSource.contains("samplerBinding.textureView()"),

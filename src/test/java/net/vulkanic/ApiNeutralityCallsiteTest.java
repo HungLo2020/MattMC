@@ -26,6 +26,7 @@ public class ApiNeutralityCallsiteTest {
         String vulkanicApiSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
         String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/CommandEncoder.java"));
         String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String glRenderPassSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlRenderPass.java"));
         String gpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/GpuDevice.java"));
         String renderTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/RenderTarget.java"));
         String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
@@ -71,16 +72,22 @@ public class ApiNeutralityCallsiteTest {
             "GraphicsBackend should expose backend-owned render-pass creation seams");
         assertTrue(vulkanicApiSource.contains("public static RenderPass createRenderPass("),
             "VulkanicAPI should expose backend-owned render-pass wrappers");
-        assertTrue(vulkanicApiSource.contains("return getBackend().createRenderPass("),
-            "VulkanicAPI render-pass wrappers should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createRenderPass(supplier, colorTextureView, clearColor)"),
+            "VulkanicAPI render-pass wrappers should use direct dispatch for implemented Vulkan methods while staying backend-neutral");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth)"),
+            "VulkanicAPI color-depth render-pass wrappers should use direct dispatch for implemented Vulkan methods while staying backend-neutral");
         assertTrue(vulkanicApiSource.contains("public static GpuTexture createTexture("),
             "VulkanicAPI should expose backend-owned texture creation wrappers");
         assertTrue(vulkanicApiSource.contains("public static GpuBuffer createBuffer("),
             "VulkanicAPI should expose backend-owned buffer creation wrappers");
-        assertTrue(vulkanicApiSource.contains("return getBackend().createTexture("),
-            "VulkanicAPI texture wrappers should route through backend seam");
-        assertTrue(vulkanicApiSource.contains("return getBackend().createBuffer("),
-            "VulkanicAPI buffer wrappers should route through backend seam");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels)"),
+            "VulkanicAPI supplier-labeled texture wrapper should use direct dispatch for implemented Vulkan methods while staying backend-neutral");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createTexture(label, usage, format, width, height, depthOrLayers, mipLevels)"),
+            "VulkanicAPI string-labeled texture wrapper should use direct dispatch for implemented Vulkan methods while staying backend-neutral");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createBuffer(supplier, usage, size)"),
+            "VulkanicAPI sized buffer wrapper should use direct dispatch for implemented Vulkan methods while staying backend-neutral");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createBuffer(supplier, usage, data)"),
+            "VulkanicAPI initialized buffer wrapper should use direct dispatch for implemented Vulkan methods while staying backend-neutral");
         assertTrue(graphicsBackendSource.contains("default GpuTextureView createTextureView("),
             "GraphicsBackend should expose backend-owned texture-view creation seams");
         assertTrue(graphicsBackendSource.contains("VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer);"),
@@ -89,6 +96,10 @@ public class ApiNeutralityCallsiteTest {
             "GraphicsBackend should expose optional backend-neutral pipeline-handle lookup seam");
         assertTrue(vulkanicApiSource.contains("public static GpuTextureView createTextureView("),
             "VulkanicAPI should expose backend-owned texture-view creation wrappers");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createTextureView(texture)"),
+            "VulkanicAPI texture-view wrappers should use direct dispatch for implemented Vulkan methods while staying backend-neutral");
+        assertTrue(vulkanicApiSource.contains("? directVulkanBackend.createTextureView(texture, baseMipLevel, mipLevelCount)"),
+            "VulkanicAPI mip-ranged texture-view wrappers should use direct dispatch for implemented Vulkan methods while staying backend-neutral");
         assertTrue(vulkanicApiSource.contains("public static VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer)"),
             "VulkanicAPI should expose backend-neutral buffer resolution wrapper");
         assertTrue(vulkanicApiSource.contains("? directVulkanBackend.resolveVulkanicBuffer(gpuBuffer)"),
@@ -97,8 +108,10 @@ public class ApiNeutralityCallsiteTest {
             "VulkanicAPI should expose backend-neutral pipeline-handle lookup wrapper");
         assertTrue(vulkanicApiSource.contains("? directVulkanBackend.resolvePipelineHandle(renderPipeline, descriptor)"),
             "VulkanicAPI pipeline-handle lookup wrapper should use direct dispatch for hot implemented Vulkan methods while staying backend-neutral");
-        assertTrue(vulkanicApiSource.contains("return getBackend().createTextureView("),
-            "VulkanicAPI texture-view wrappers should route through backend seam");
+        assertTrue(vulkanicApiSource.contains(": getBackend().createTextureView(texture);"),
+            "VulkanicAPI texture-view wrappers should still retain backend fallback when direct Vulkan dispatch is unavailable");
+        assertTrue(vulkanicApiSource.contains(": getBackend().createTextureView(texture, baseMipLevel, mipLevelCount);"),
+            "VulkanicAPI mip-ranged texture-view wrappers should still retain backend fallback when direct Vulkan dispatch is unavailable");
         assertTrue(graphicsBackendSource.contains("default int getBackendMaxTextureSize()"),
             "GraphicsBackend should expose backend-owned max texture size seam");
         assertTrue(graphicsBackendSource.contains("default int getBackendUniformOffsetAlignment()"),
@@ -126,8 +139,12 @@ public class ApiNeutralityCallsiteTest {
             "GlCommandEncoder should implement backend-neutral pipeline-state application through the interface seam");
         assertTrue(glCommandEncoderSource.contains("public void invalidateCachedProgramBinding()"),
             "GlCommandEncoder should implement backend-neutral cached-program invalidation through the interface seam");
-        assertTrue(glCommandEncoderSource.contains("VulkanicAPI.resolveVulkanicBuffer(slice.buffer())"),
-            "GlCommandEncoder should resolve descriptor uniform buffers through VulkanicAPI backend-neutral buffer seam");
+        assertTrue(glRenderPassSource.contains("private final HashMap<String, net.vulkanic.VulkanicBufferSlice> uniformResourceSlices = new HashMap<>();"),
+            "GlRenderPass should cache backend-neutral uniform buffer slices alongside Blaze3D buffer slices");
+        assertTrue(glRenderPassSource.contains("VulkanicAPI.resolveVulkanicBuffer(gpuBufferSlice.buffer())"),
+            "GlRenderPass should resolve uniform buffers through VulkanicAPI when the binding is set, not during per-batch descriptor assembly");
+        assertTrue(glCommandEncoderSource.contains("glRenderPass.getUniformResourceSlice(resourceBinding.name())"),
+            "GlCommandEncoder should consume pre-resolved uniform buffer slices from GlRenderPass during descriptor assembly");
         assertFalse(glCommandEncoderSource.contains("new net.vulkanic.backends.opengl.OpenGLBuffer("),
             "GlCommandEncoder should not construct OpenGLBuffer directly in shared draw setup logic");
         assertFalse(glCommandEncoderSource.contains("public GlProgram lastProgram"),

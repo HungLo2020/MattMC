@@ -3307,7 +3307,10 @@ public class VulkanicAPI {
         GpuTextureView colorTextureView,
         java.util.OptionalInt clearColor
     ) {
-        return getBackend().createRenderPass(supplier, colorTextureView, clearColor);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createRenderPass(supplier, colorTextureView, clearColor)
+            : getBackend().createRenderPass(supplier, colorTextureView, clearColor);
     }
 
     /**
@@ -3320,7 +3323,10 @@ public class VulkanicAPI {
         @Nullable GpuTextureView depthTextureView,
         java.util.OptionalDouble clearDepth
     ) {
-        return getBackend().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth)
+            : getBackend().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
     }
 
     /**
@@ -3335,7 +3341,10 @@ public class VulkanicAPI {
         int depthOrLayers,
         int mipLevels
     ) {
-        return getBackend().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels)
+            : getBackend().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels);
     }
 
     /**
@@ -3350,35 +3359,50 @@ public class VulkanicAPI {
         int depthOrLayers,
         int mipLevels
     ) {
-        return getBackend().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createTexture(label, usage, format, width, height, depthOrLayers, mipLevels)
+            : getBackend().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
     }
 
     /**
      * Creates a backend-owned GPU buffer with size allocation.
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
-        return getBackend().createBuffer(supplier, usage, size);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createBuffer(supplier, usage, size)
+            : getBackend().createBuffer(supplier, usage, size);
     }
 
     /**
      * Creates a backend-owned GPU buffer initialized from byte data.
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, ByteBuffer data) {
-        return getBackend().createBuffer(supplier, usage, data);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createBuffer(supplier, usage, data)
+            : getBackend().createBuffer(supplier, usage, data);
     }
 
     /**
      * Creates a backend-owned texture view for a full texture range.
      */
     public static GpuTextureView createTextureView(GpuTexture texture) {
-        return getBackend().createTextureView(texture);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createTextureView(texture)
+            : getBackend().createTextureView(texture);
     }
 
     /**
      * Creates a backend-owned texture view for an explicit mip range.
      */
     public static GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
-        return getBackend().createTextureView(texture, baseMipLevel, mipLevelCount);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createTextureView(texture, baseMipLevel, mipLevelCount)
+            : getBackend().createTextureView(texture, baseMipLevel, mipLevelCount);
     }
 
     public static String getApiDescription() {
