@@ -905,6 +905,12 @@ void main() {
         return device.createCommandEncoder();
     }
 
+    void releaseCompatibilityDevice(net.blaze3d.opengl.GlDevice device) {
+        if (this.compatibilityDevice == device) {
+            this.compatibilityDevice = null;
+        }
+    }
+
     public net.blaze3d.systems.RenderPass createRenderPass(
         java.util.function.Supplier<String> supplier,
         GpuTextureView colorTextureView,

@@ -201,6 +201,12 @@ public class ApiNeutralityCallsiteTest {
             "VulkanCompatibilityGpuDevice should route precompilePipeline through backend seam");
         assertFalse(vulkanCompatibilityGpuDeviceSource.contains("compatibilityDevice.precompilePipeline("),
             "VulkanCompatibilityGpuDevice should avoid direct compatibility-device precompile delegation");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("this.backend.clearPrecompiledPipelineCache();"),
+            "VulkanCompatibilityGpuDevice should clear pipeline caches through the backend-owned seam");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("this.compatibilityDevice.clearPipelineCache();"),
+            "VulkanCompatibilityGpuDevice should avoid redundant compatibility-device pipeline cache clears once backend ownership is active");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("this.backend.releaseCompatibilityDevice(this.compatibilityDevice);"),
+            "VulkanCompatibilityGpuDevice should release the backend-owned compatibility-device cache when closing");
         assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.createCommandEncoder();"),
             "VulkanCompatibilityGpuDevice should route command-encoder creation through backend seam");
         assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.createCommandEncoder();"),
@@ -867,10 +873,21 @@ public class ApiNeutralityCallsiteTest {
             "Vulkan compatibility device should source extension diagnostics from backend-owned seam: " + compatDeviceRelative);
         assertTrue(compatDeviceSource.contains("this.backend.getBackendOptionalFeatureNames()"),
             "Vulkan compatibility device should source optional feature diagnostics from backend-owned seam: " + compatDeviceRelative);
+        assertTrue(compatDeviceSource.contains("this.backend.releaseCompatibilityDevice(this.compatibilityDevice);"),
+            "Vulkan compatibility device close should release backend-owned compatibility-device state: " + compatDeviceRelative);
         assertFalse(compatDeviceSource.contains("this.compatibilityDevice.getVendor()"),
             "Vulkan compatibility device should avoid leaking compatibility-device vendor metadata: " + compatDeviceRelative);
         assertFalse(compatDeviceSource.contains("this.compatibilityDevice.getRenderer()"),
             "Vulkan compatibility device should avoid leaking compatibility-device renderer metadata: " + compatDeviceRelative);
+
+        String vulkanBackendRelative = "net/vulkanic/backends/vulkan/VulkanBackend.java";
+        String vulkanBackendSource = Files.readString(SRC_MAIN_JAVA.resolve(vulkanBackendRelative));
+        assertTrue(vulkanBackendSource.contains("void releaseCompatibilityDevice(net.blaze3d.opengl.GlDevice device)"),
+            "Vulkan backend should expose a dedicated compatibility-device release seam: " + vulkanBackendRelative);
+        assertTrue(vulkanBackendSource.contains("if (this.compatibilityDevice == device) {"),
+            "Vulkan backend should only clear its cached compatibility device when the closed device still matches: " + vulkanBackendRelative);
+        assertTrue(vulkanBackendSource.contains("this.compatibilityDevice = null;"),
+            "Vulkan backend should drop stale compatibility-device references after close: " + vulkanBackendRelative);
     }
 
     @Test

@@ -124,7 +124,6 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 	@Override
 	public void clearPipelineCache() {
 		this.backend.clearPrecompiledPipelineCache();
-		this.compatibilityDevice.clearPipelineCache();
 	}
 
 	@Override
@@ -139,6 +138,10 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public void close() {
-		this.compatibilityDevice.close();
+		try {
+			this.compatibilityDevice.close();
+		} finally {
+			this.backend.releaseCompatibilityDevice(this.compatibilityDevice);
+		}
 	}
 }
