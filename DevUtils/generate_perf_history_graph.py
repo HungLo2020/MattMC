@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 SUMMARY_PATTERN = re.compile(
-    r"^(opengl|vulkan) fps_avg=([0-9.]+) fps_1pct_low=([0-9.]+)"
+  r"^(opengl|vulkan)(?:\s+aggregate\s+runs=\d+/\d+)?\s+fps_avg=([0-9.]+)\s+fps_1pct_low=([0-9.]+)"
 )
 TIMESTAMP_PATTERN = re.compile(r"^(\d{8}_\d{6})$")
 

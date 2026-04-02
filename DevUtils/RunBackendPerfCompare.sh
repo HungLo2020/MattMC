@@ -24,8 +24,12 @@ Artifacts collected per backend:
   - custom /profile HTML/TXT reports (only if xdotool automation is available)
 
 Options:
-  --world NAME             Quick-play into a singleplayer world.
-  --client-args STRING     Extra client args passed to runClient.
+    --world NAME             Quick-play into a singleplayer world.
+                                                     Default: Origin when no quick-play target is supplied.
+    --client-args STRING     Extra client args passed to runClient.
+                                                     If no quick-play target is supplied here or via --world,
+                                                     the harness defaults to --quickPlaySingleplayer=Origin.
+    --runs-per-backend N     Number of runs per backend. Default: 3
   --warmup-secs N          Seconds to wait before starting measurement. Default: 45
   --sample-secs N          Seconds to record profiling data. Default: 30
   --shutdown-grace-secs N  Seconds to wait after stopping profiling before kill. Default: 8
@@ -43,13 +47,36 @@ Environment overrides:
   SCREENSHOT_START_DELAY_SECS=N    Default: 0
 
 Examples:
+    ./DevUtils/RunBackendPerfCompare.sh
   ./DevUtils/RunBackendPerfCompare.sh --world Origin --sample-secs 45
   PERF_MODE=record ./DevUtils/RunBackendPerfCompare.sh --client-args '--quickPlaySingleplayer=Origin'
+    ./DevUtils/RunBackendPerfCompare.sh --client-args '--quickPlayMultiplayer=127.0.0.1:25565'
 EOF
+}
+
+has_quick_play_target() {
+        local args="$1"
+        [[ "$args" == *"--quickPlaySingleplayer="* ]] \
+                || [[ "$args" == *"--quickPlayMultiplayer="* ]] \
+                || [[ "$args" == *"--quickPlayRealms="* ]]
+}
+
+ensure_quick_play_target() {
+    if has_quick_play_target "$CLIENT_ARGS"; then
+        return 0
+    fi
+
+    local default_world="${WORLD_NAME:-Origin}"
+    if [[ -n "$CLIENT_ARGS" ]]; then
+        CLIENT_ARGS="$CLIENT_ARGS --quickPlaySingleplayer=$default_world"
+    else
+        CLIENT_ARGS="--quickPlaySingleplayer=$default_world"
+    fi
 }
 
 WORLD_NAME=""
 CLIENT_ARGS="${CLIENT_ARGS:-}"
+RUNS_PER_BACKEND="${RUNS_PER_BACKEND:-3}"
 WARMUP_SECS="${WARMUP_SECS:-45}"
 SAMPLE_SECS="${SAMPLE_SECS:-30}"
 SHUTDOWN_GRACE_SECS="${SHUTDOWN_GRACE_SECS:-8}"
@@ -73,6 +100,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --client-args)
             CLIENT_ARGS="${2:-}"
+            shift 2
+            ;;
+        --runs-per-backend)
+            RUNS_PER_BACKEND="${2:-}"
             shift 2
             ;;
         --warmup-secs)
@@ -115,7 +146,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-for value_name in WARMUP_SECS SAMPLE_SECS SHUTDOWN_GRACE_SECS LAUNCH_TIMEOUT_SECS SCREENSHOT_INTERVAL_SECS SCREENSHOT_MAX_COUNT SCREENSHOT_START_DELAY_SECS; do
+for value_name in RUNS_PER_BACKEND WARMUP_SECS SAMPLE_SECS SHUTDOWN_GRACE_SECS LAUNCH_TIMEOUT_SECS SCREENSHOT_INTERVAL_SECS SCREENSHOT_MAX_COUNT SCREENSHOT_START_DELAY_SECS; do
     value="${!value_name}"
     if ! [[ "$value" =~ ^[0-9]+$ ]]; then
         echo "$value_name must be an integer, got: $value" >&2
@@ -161,6 +192,8 @@ if [[ -n "$WORLD_NAME" ]]; then
         CLIENT_ARGS="--quickPlaySingleplayer=$WORLD_NAME"
     fi
 fi
+
+ensure_quick_play_target
 
 SPIRV_COMPILER="$PROJECT_ROOT/libraries/deps/glslangValidator"
 if [[ -x "$SPIRV_COMPILER" ]]; then
@@ -265,6 +298,101 @@ generate_perf_history_graph() {
 </body>
 </html>
 EOF
+}
+
+append_backend_run_summary() {
+    local backend="$1"
+    local run_index="$2"
+    local backend_dir="$3"
+    local fps_summary_file="$4"
+
+    echo "$backend run=$run_index artifacts: $backend_dir" >> "$SUMMARY_FILE"
+    if [[ -f "$fps_summary_file" ]]; then
+        local fps_status
+        fps_status="$(awk -F= '/^status=/{print $2; exit}' "$fps_summary_file" || true)"
+        if [[ "$fps_status" == "ok" ]]; then
+            local avg_fps fps_1pct_low frame_samples sampled_seconds avg_frame_ms
+            avg_fps="$(awk -F= '/^avg_fps=/{print $2; exit}' "$fps_summary_file")"
+            fps_1pct_low="$(awk -F= '/^fps_1pct_low=/{print $2; exit}' "$fps_summary_file")"
+            frame_samples="$(awk -F= '/^frame_samples=/{print $2; exit}' "$fps_summary_file")"
+            sampled_seconds="$(awk -F= '/^sampled_seconds=/{print $2; exit}' "$fps_summary_file")"
+            avg_frame_ms="$(awk -F= '/^avg_frame_ms=/{print $2; exit}' "$fps_summary_file")"
+            echo "$backend run=$run_index fps_avg=$avg_fps fps_1pct_low=$fps_1pct_low frame_samples=$frame_samples sampled_seconds=$sampled_seconds avg_frame_ms=$avg_frame_ms" >> "$SUMMARY_FILE"
+        else
+            local fps_reason
+            fps_reason="$(awk -F= '/^reason=/{print $2; exit}' "$fps_summary_file" || true)"
+            echo "$backend run=$run_index fps_metrics=$fps_status reason=${fps_reason:-unknown}" >> "$SUMMARY_FILE"
+        fi
+    fi
+    echo "$backend.run_$run_index=$backend_dir" >> "$MANIFEST_FILE"
+}
+
+append_backend_aggregate_summary() {
+    local backend="$1"
+    local backend_root_dir="$2"
+    local aggregate_file="$backend_root_dir/fps_aggregate.txt"
+
+    python3 - "$backend_root_dir" "$RUNS_PER_BACKEND" > "$aggregate_file" <<'PY'
+import pathlib
+import sys
+
+backend_root = pathlib.Path(sys.argv[1])
+expected_runs = int(sys.argv[2])
+fps_files = sorted(backend_root.glob("run_*/fps_summary.txt"))
+ok_runs = []
+for fps_file in fps_files:
+    data = {}
+    for line in fps_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        data[key.strip()] = value.strip()
+    if data.get("status") != "ok":
+        continue
+    try:
+        ok_runs.append(
+            {
+                "avg_fps": float(data["avg_fps"]),
+                "fps_1pct_low": float(data["fps_1pct_low"]),
+                "frame_samples": float(data.get("frame_samples", "0") or "0"),
+                "sampled_seconds": float(data.get("sampled_seconds", "0") or "0"),
+                "avg_frame_ms": float(data.get("avg_frame_ms", "0") or "0"),
+            }
+        )
+    except (KeyError, ValueError):
+        continue
+
+print("status=ok" if ok_runs else "status=missing")
+print(f"expected_runs={expected_runs}")
+print(f"successful_runs={len(ok_runs)}")
+
+if ok_runs:
+    count = float(len(ok_runs))
+    print(f"avg_fps={sum(run['avg_fps'] for run in ok_runs) / count:.4f}")
+    print(f"fps_1pct_low={sum(run['fps_1pct_low'] for run in ok_runs) / count:.4f}")
+    print(f"frame_samples={sum(run['frame_samples'] for run in ok_runs) / count:.0f}")
+    print(f"sampled_seconds={sum(run['sampled_seconds'] for run in ok_runs) / count:.4f}")
+    print(f"avg_frame_ms={sum(run['avg_frame_ms'] for run in ok_runs) / count:.4f}")
+PY
+
+    local aggregate_status
+    aggregate_status="$(awk -F= '/^status=/{print $2; exit}' "$aggregate_file" || true)"
+    if [[ "$aggregate_status" == "ok" ]]; then
+        local avg_fps fps_1pct_low successful_runs frame_samples sampled_seconds avg_frame_ms
+        successful_runs="$(awk -F= '/^successful_runs=/{print $2; exit}' "$aggregate_file")"
+        avg_fps="$(awk -F= '/^avg_fps=/{print $2; exit}' "$aggregate_file")"
+        fps_1pct_low="$(awk -F= '/^fps_1pct_low=/{print $2; exit}' "$aggregate_file")"
+        frame_samples="$(awk -F= '/^frame_samples=/{print $2; exit}' "$aggregate_file")"
+        sampled_seconds="$(awk -F= '/^sampled_seconds=/{print $2; exit}' "$aggregate_file")"
+        avg_frame_ms="$(awk -F= '/^avg_frame_ms=/{print $2; exit}' "$aggregate_file")"
+        echo "$backend aggregate runs=$successful_runs/$RUNS_PER_BACKEND fps_avg=$avg_fps fps_1pct_low=$fps_1pct_low frame_samples=$frame_samples sampled_seconds=$sampled_seconds avg_frame_ms=$avg_frame_ms" >> "$SUMMARY_FILE"
+    else
+        local successful_runs
+        successful_runs="$(awk -F= '/^successful_runs=/{print $2; exit}' "$aggregate_file" || true)"
+        echo "$backend aggregate status=$aggregate_status runs=${successful_runs:-0}/$RUNS_PER_BACKEND" >> "$SUMMARY_FILE"
+    fi
+
+    echo "$backend.aggregate=$aggregate_file" >> "$MANIFEST_FILE"
 }
 
 trap final_cleanup EXIT INT TERM
@@ -737,14 +865,16 @@ wait_for_client_pid() {
 
 run_backend_capture() {
     local backend="$1"
-    local backend_dir="$ARTIFACT_DIR/$backend"
+    local run_index="$2"
+    local backend_root_dir="$ARTIFACT_DIR/$backend"
+    local backend_dir="$backend_root_dir/run_$run_index"
     local run_started_epoch="$(date +%s)"
     local run_log="$backend_dir/runClient.log"
     local meta_log="$backend_dir/meta.txt"
     local latest_tail="$backend_dir/latest.log.tail"
     local gpu_log="$backend_dir/nvidia_dmon.log"
-    local jfr_file="$backend_dir/$backend.jfr"
-    local jfr_name="MattMC_${backend}_${TIMESTAMP}"
+    local jfr_file="$backend_dir/${backend}_run_${run_index}.jfr"
+    local jfr_name="MattMC_${backend}_run_${run_index}_${TIMESTAMP}"
     local profile_report_dir="$backend_dir/profile_reports"
     local metrics_report_dir="$backend_dir/metrics_reports"
     local fps_summary_file="$backend_dir/fps_summary.txt"
@@ -765,6 +895,7 @@ run_backend_capture() {
 
     {
         echo "backend=$backend"
+        echo "run_index=$run_index"
         echo "started_epoch=$run_started_epoch"
         echo "warmup_secs=$WARMUP_SECS"
         echo "sample_secs=$SAMPLE_SECS"
@@ -780,7 +911,7 @@ run_backend_capture() {
         echo "python3=$(command -v python3 || echo missing)"
     } > "$meta_log"
 
-    echo "[$backend] launching runClient"
+    echo "[$backend run $run_index/$RUNS_PER_BACKEND] launching runClient"
     gradle_cmd=(./gradlew -x test runClient)
     if [[ -n "$CLIENT_ARGS" ]]; then
         gradle_cmd+=("--args=$CLIENT_ARGS")
@@ -792,7 +923,7 @@ run_backend_capture() {
 
     client_pid="$(wait_for_client_pid "$ACTIVE_GRADLE_PID" || true)"
     if [[ -z "$client_pid" ]]; then
-        echo "[$backend] failed to find client pid within timeout" | tee -a "$meta_log"
+        echo "[$backend run $run_index/$RUNS_PER_BACKEND] failed to find client pid within timeout" | tee -a "$meta_log"
         shutdown_active_run
         return 1
     fi
@@ -806,7 +937,7 @@ run_backend_capture() {
     collect_jcmd_snapshot "$client_pid" "$backend_dir/start"
     capture_screenshot "$backend_dir" "start" "$client_pid"
 
-    echo "[$backend] warmup ${WARMUP_SECS}s"
+    echo "[$backend run $run_index/$RUNS_PER_BACKEND] warmup ${WARMUP_SECS}s"
     sleep "$WARMUP_SECS"
 
     start_measure_epoch="$(date +%s)"
@@ -926,25 +1057,7 @@ run_backend_capture() {
         echo "exit_code=${exit_code:-unknown}"
     } >> "$meta_log"
 
-    echo "$backend artifacts: $backend_dir" >> "$SUMMARY_FILE"
-    if [[ -f "$fps_summary_file" ]]; then
-        local fps_status
-        fps_status="$(awk -F= '/^status=/{print $2; exit}' "$fps_summary_file" || true)"
-        if [[ "$fps_status" == "ok" ]]; then
-            local avg_fps fps_1pct_low frame_samples sampled_seconds avg_frame_ms
-            avg_fps="$(awk -F= '/^avg_fps=/{print $2; exit}' "$fps_summary_file")"
-            fps_1pct_low="$(awk -F= '/^fps_1pct_low=/{print $2; exit}' "$fps_summary_file")"
-            frame_samples="$(awk -F= '/^frame_samples=/{print $2; exit}' "$fps_summary_file")"
-            sampled_seconds="$(awk -F= '/^sampled_seconds=/{print $2; exit}' "$fps_summary_file")"
-            avg_frame_ms="$(awk -F= '/^avg_frame_ms=/{print $2; exit}' "$fps_summary_file")"
-            echo "$backend fps_avg=$avg_fps fps_1pct_low=$fps_1pct_low frame_samples=$frame_samples sampled_seconds=$sampled_seconds avg_frame_ms=$avg_frame_ms" >> "$SUMMARY_FILE"
-        else
-            local fps_reason
-            fps_reason="$(awk -F= '/^reason=/{print $2; exit}' "$fps_summary_file" || true)"
-            echo "$backend fps_metrics=$fps_status reason=${fps_reason:-unknown}" >> "$SUMMARY_FILE"
-        fi
-    fi
-    echo "$backend=$backend_dir" >> "$MANIFEST_FILE"
+    append_backend_run_summary "$backend" "$run_index" "$backend_dir" "$fps_summary_file"
     ACTIVE_GRADLE_PID=""
     return 0
 }
@@ -961,6 +1074,7 @@ fi
     echo "artifact_dir=$ARTIFACT_DIR"
     echo "project_root=$PROJECT_ROOT"
     echo "client_args=$CLIENT_ARGS"
+    echo "runs_per_backend=$RUNS_PER_BACKEND"
     echo "warmup_secs=$WARMUP_SECS"
     echo "sample_secs=$SAMPLE_SECS"
     echo "shutdown_grace_secs=$SHUTDOWN_GRACE_SECS"
@@ -974,7 +1088,10 @@ for backend in "${BACKENDS[@]}"; do
     backend="$(printf '%s' "$backend" | xargs)"
     case "$backend" in
         opengl|vulkan)
-            run_backend_capture "$backend"
+            for ((run_index = 1; run_index <= RUNS_PER_BACKEND; run_index++)); do
+                run_backend_capture "$backend" "$run_index"
+            done
+            append_backend_aggregate_summary "$backend" "$ARTIFACT_DIR/$backend"
             ;;
         *)
             echo "Skipping unsupported backend: $backend" | tee -a "$SUMMARY_FILE"
