@@ -753,6 +753,31 @@ public class VulkanicAPI {
         return rawVulkanBackend;
     }
 
+    private static void dispatchImplementedVoid(
+        java.util.function.Consumer<VulkanBackend> directCall,
+        java.util.function.Consumer<GraphicsBackend> fallbackCall
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directCall.accept(directVulkanBackend);
+            return;
+        }
+
+        fallbackCall.accept(getBackend());
+    }
+
+    private static <T> T dispatchImplementedValue(
+        java.util.function.Function<VulkanBackend, T> directCall,
+        java.util.function.Function<GraphicsBackend, T> fallbackCall
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directCall.apply(directVulkanBackend);
+        }
+
+        return fallbackCall.apply(getBackend());
+    }
+
     /**
      * Gets the currently active backend identity.
      */
@@ -1367,18 +1392,27 @@ public class VulkanicAPI {
      * @param textureId The texture ID to bind
      */
     public static void bindTexture2D(CommandContext ctx, int textureId) {
-        getBackend().bindTexture2D(ctx, textureId);
+        dispatchImplementedVoid(
+            direct -> direct.bindTexture2D(ctx, textureId),
+            activeBackend -> activeBackend.bindTexture2D(ctx, textureId)
+        );
     }
 
     public static void bindTexture(CommandContext ctx, VulkanicTextureTarget target, int textureId) {
-        getBackend().bindTexture(ctx, target, textureId);
+        dispatchImplementedVoid(
+            direct -> direct.bindTexture(ctx, target, textureId),
+            activeBackend -> activeBackend.bindTexture(ctx, target, textureId)
+        );
     }
     
     public static void bindTexture(CommandContext ctx, int target, int textureId) {
         VulkanicTextureTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bindTexture(ctx, typedTarget, textureId),
-                () -> getBackend().bindTexture(ctx, target, textureId)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.bindTexture(ctx, target, textureId),
+                    activeBackend -> activeBackend.bindTexture(ctx, target, textureId)
+                )
             );
     }
 
@@ -1401,7 +1435,10 @@ public class VulkanicAPI {
     }
     
     public static void bindSampler(CommandContext ctx, int unit, int sampler) {
-        getBackend().bindSampler(ctx, unit, sampler);
+        dispatchImplementedVoid(
+            direct -> direct.bindSampler(ctx, unit, sampler),
+            activeBackend -> activeBackend.bindSampler(ctx, unit, sampler)
+        );
     }
     
     /**
@@ -1476,7 +1513,10 @@ public class VulkanicAPI {
     public static void bindFramebuffer(CommandContext ctx, int target, int fbo) {
         if (target == GL_READ_FRAMEBUFFER) {
             if (readFramebufferBinding != fbo) {
-                getBackend().bindFramebuffer(ctx, target, fbo);
+                dispatchImplementedVoid(
+                    direct -> direct.bindFramebuffer(ctx, target, fbo),
+                    activeBackend -> activeBackend.bindFramebuffer(ctx, target, fbo)
+                );
                 readFramebufferBinding = fbo;
             }
             return;
@@ -1484,7 +1524,10 @@ public class VulkanicAPI {
 
         if (target == GL_DRAW_FRAMEBUFFER) {
             if (drawFramebufferBinding != fbo) {
-                getBackend().bindFramebuffer(ctx, target, fbo);
+                dispatchImplementedVoid(
+                    direct -> direct.bindFramebuffer(ctx, target, fbo),
+                    activeBackend -> activeBackend.bindFramebuffer(ctx, target, fbo)
+                );
                 drawFramebufferBinding = fbo;
             }
             return;
@@ -1492,14 +1535,20 @@ public class VulkanicAPI {
 
         if (target == GL_FRAMEBUFFER) {
             if (readFramebufferBinding != fbo || drawFramebufferBinding != fbo) {
-                getBackend().bindFramebuffer(ctx, target, fbo);
+                dispatchImplementedVoid(
+                    direct -> direct.bindFramebuffer(ctx, target, fbo),
+                    activeBackend -> activeBackend.bindFramebuffer(ctx, target, fbo)
+                );
                 readFramebufferBinding = fbo;
                 drawFramebufferBinding = fbo;
             }
             return;
         }
 
-        getBackend().bindFramebuffer(ctx, target, fbo);
+        dispatchImplementedVoid(
+            direct -> direct.bindFramebuffer(ctx, target, fbo),
+            activeBackend -> activeBackend.bindFramebuffer(ctx, target, fbo)
+        );
     }
 
     /**
@@ -1528,7 +1577,10 @@ public class VulkanicAPI {
         VulkanicTexture depthTarget = depthTexture instanceof VulkanicTexture texture ? texture : null;
         getBackend().bindRenderTarget(ctx, colorTarget, depthTarget);
 
-        int framebuffer = getBackend().resolveFramebufferForTextures(ctx, colorTarget, depthTarget);
+        int framebuffer = dispatchImplementedValue(
+            direct -> direct.resolveFramebufferForTextures(ctx, colorTarget, depthTarget),
+            activeBackend -> activeBackend.resolveFramebufferForTextures(ctx, colorTarget, depthTarget)
+        );
         readFramebufferBinding = framebuffer;
         drawFramebufferBinding = framebuffer;
     }
@@ -1583,12 +1635,18 @@ public class VulkanicAPI {
         VulkanicBufferTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bindBuffer(ctx, typedTarget, buffer),
-                () -> getBackend().bindBuffer(ctx, target, buffer)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.bindBuffer(ctx, target, buffer),
+                    activeBackend -> activeBackend.bindBuffer(ctx, target, buffer)
+                )
             );
     }
 
     public static void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
-        getBackend().bindBuffer(ctx, target, buffer);
+        dispatchImplementedVoid(
+            direct -> direct.bindBuffer(ctx, target, buffer),
+            activeBackend -> activeBackend.bindBuffer(ctx, target, buffer)
+        );
     }
 
     /**
@@ -1634,12 +1692,18 @@ public class VulkanicAPI {
         VulkanicBufferTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bindBufferBase(ctx, typedTarget, index, buffer),
-                () -> getBackend().bindBufferBase(ctx, target, index, buffer)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.bindBufferBase(ctx, target, index, buffer),
+                    activeBackend -> activeBackend.bindBufferBase(ctx, target, index, buffer)
+                )
             );
     }
 
     public static void bindBufferBase(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer) {
-        getBackend().bindBufferBase(ctx, target, index, buffer);
+        dispatchImplementedVoid(
+            direct -> direct.bindBufferBase(ctx, target.toLegacyGlTarget(), index, buffer),
+            activeBackend -> activeBackend.bindBufferBase(ctx, target, index, buffer)
+        );
     }
     
     /**
@@ -2268,19 +2332,31 @@ public class VulkanicAPI {
     // Direct State Access buffer operations
     // CommandContext versions of DSA buffer operations
     public static int createBufferDSA(CommandContext ctx) {
-        return getBackend().createBufferDSA(ctx);
+        return dispatchImplementedValue(
+            direct -> direct.createBufferDSA(ctx),
+            activeBackend -> activeBackend.createBufferDSA(ctx)
+        );
     }
     
     public static void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
-        getBackend().namedBufferDataDSA(ctx, buffer, size, usage);
+        dispatchImplementedVoid(
+            direct -> direct.namedBufferDataDSA(ctx, buffer, size, usage),
+            activeBackend -> activeBackend.namedBufferDataDSA(ctx, buffer, size, usage)
+        );
     }
     
     public static void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
-        getBackend().namedBufferDataDSA(ctx, buffer, data, usage);
+        dispatchImplementedVoid(
+            direct -> direct.namedBufferDataDSA(ctx, buffer, data, usage),
+            activeBackend -> activeBackend.namedBufferDataDSA(ctx, buffer, data, usage)
+        );
     }
     
     public static void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
-        getBackend().namedBufferSubDataDSA(ctx, buffer, offset, data);
+        dispatchImplementedVoid(
+            direct -> direct.namedBufferSubDataDSA(ctx, buffer, offset, data),
+            activeBackend -> activeBackend.namedBufferSubDataDSA(ctx, buffer, offset, data)
+        );
     }
     
     public static void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
@@ -2292,7 +2368,10 @@ public class VulkanicAPI {
     }
     
     public static java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
-        return getBackend().mapNamedBufferRangeDSA(ctx, buffer, offset, length, access);
+        return dispatchImplementedValue(
+            direct -> direct.mapNamedBufferRangeDSA(ctx, buffer, offset, length, access),
+            activeBackend -> activeBackend.mapNamedBufferRangeDSA(ctx, buffer, offset, length, access)
+        );
     }
     
     // CommandContext versions of DSA operations
@@ -2302,7 +2381,10 @@ public class VulkanicAPI {
      * @param buffer The buffer object to unmap
      */
     public static void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
-        getBackend().unmapNamedBufferDSA(ctx, buffer);
+        dispatchImplementedVoid(
+            direct -> direct.unmapNamedBufferDSA(ctx, buffer),
+            activeBackend -> activeBackend.unmapNamedBufferDSA(ctx, buffer)
+        );
     }
     
     /**
@@ -2326,7 +2408,10 @@ public class VulkanicAPI {
      * @param size Number of bytes to copy
      */
     public static void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        getBackend().copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size);
+        dispatchImplementedVoid(
+            direct -> direct.copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size),
+            activeBackend -> activeBackend.copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size)
+        );
     }
     
     /**
@@ -2393,7 +2478,10 @@ public class VulkanicAPI {
         VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
             .ifPresentOrElse(
                 typedMode -> drawArrays(ctx, typedMode, first, count),
-                () -> getBackend().drawArrays(ctx, mode, first, count)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.drawArrays(ctx, mode, first, count),
+                    activeBackend -> activeBackend.drawArrays(ctx, mode, first, count)
+                )
             );
     }
 
@@ -2401,7 +2489,10 @@ public class VulkanicAPI {
      * Draws array primitives using a backend-neutral primitive mode.
      */
     public static void drawArrays(CommandContext ctx, VulkanicPrimitiveMode mode, int first, int count) {
-        getBackend().drawArrays(ctx, mode.toGlModeConstant(), first, count);
+        dispatchImplementedVoid(
+            direct -> direct.drawArrays(ctx, mode.toGlModeConstant(), first, count),
+            activeBackend -> activeBackend.drawArrays(ctx, mode.toGlModeConstant(), first, count)
+        );
     }
     
     public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
@@ -2412,7 +2503,10 @@ public class VulkanicAPI {
             return;
         }
 
-        getBackend().drawElements(ctx, mode, count, type, indices);
+        dispatchImplementedVoid(
+            direct -> direct.drawElements(ctx, mode, count, type, indices),
+            activeBackend -> activeBackend.drawElements(ctx, mode, count, type, indices)
+        );
     }
 
     /**
@@ -2422,7 +2516,10 @@ public class VulkanicAPI {
         VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
             .ifPresentOrElse(
                 typedMode -> drawElements(ctx, typedMode, count, indexType, indices),
-                () -> getBackend().drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices),
+                    activeBackend -> activeBackend.drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices)
+                )
             );
     }
 
@@ -2433,7 +2530,10 @@ public class VulkanicAPI {
         VulkanicIndexType.fromLegacyGlConstant(type)
             .ifPresentOrElse(
                 typedIndexType -> drawElements(ctx, mode, count, typedIndexType, indices),
-                () -> getBackend().drawElements(ctx, mode.toGlModeConstant(), count, type, indices)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.drawElements(ctx, mode.toGlModeConstant(), count, type, indices),
+                    activeBackend -> activeBackend.drawElements(ctx, mode.toGlModeConstant(), count, type, indices)
+                )
             );
     }
 
@@ -2441,7 +2541,10 @@ public class VulkanicAPI {
      * Draws indexed primitives using backend-neutral primitive and index types.
      */
     public static void drawElements(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices) {
-        getBackend().drawElements(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices);
+        dispatchImplementedVoid(
+            direct -> direct.drawElements(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices),
+            activeBackend -> activeBackend.drawElements(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices)
+        );
     }
     
     public static void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
@@ -4261,14 +4364,20 @@ public class VulkanicAPI {
      * @param ctx Command context
      */
     public static void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
-        getBackend().drawArraysInstanced(ctx, mode, first, count, instanceCount);
+        dispatchImplementedVoid(
+            direct -> direct.drawArraysInstanced(ctx, mode, first, count, instanceCount),
+            activeBackend -> activeBackend.drawArraysInstanced(ctx, mode, first, count, instanceCount)
+        );
     }
 
     /**
      * Renders primitives using array data with instancing via backend-neutral primitive mode.
      */
     public static void drawArraysInstanced(CommandContext ctx, VulkanicPrimitiveMode mode, int first, int count, int instanceCount) {
-        getBackend().drawArraysInstanced(ctx, mode.toGlModeConstant(), first, count, instanceCount);
+        dispatchImplementedVoid(
+            direct -> direct.drawArraysInstanced(ctx, mode.toGlModeConstant(), first, count, instanceCount),
+            activeBackend -> activeBackend.drawArraysInstanced(ctx, mode.toGlModeConstant(), first, count, instanceCount)
+        );
     }
     
     /**
@@ -4279,7 +4388,10 @@ public class VulkanicAPI {
         VulkanicBufferTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bindUniformBufferRange(ctx, typedTarget, index, buffer, offset, size),
-                () -> getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.bindUniformBufferRange(ctx, target, index, buffer, offset, size),
+                    activeBackend -> activeBackend.bindUniformBufferRange(ctx, target, index, buffer, offset, size)
+                )
             );
     }
 
@@ -4287,14 +4399,20 @@ public class VulkanicAPI {
      * Binds a range of a buffer to a uniform buffer binding point using backend-neutral target semantics.
      */
     public static void bindUniformBufferRange(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer, long offset, long size) {
-        getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size);
+        dispatchImplementedVoid(
+            direct -> direct.bindUniformBufferRange(ctx, target.toLegacyGlTarget(), index, buffer, offset, size),
+            activeBackend -> activeBackend.bindUniformBufferRange(ctx, target, index, buffer, offset, size)
+        );
     }
 
     /**
      * Binds a range of a buffer to a uniform buffer binding point.
      */
     public static void bindUniformBufferRange(CommandContext ctx, int index, int buffer, long offset, long size) {
-        getBackend().bindUniformBufferRange(ctx, VulkanicBufferTarget.UNIFORM, index, buffer, offset, size);
+        dispatchImplementedVoid(
+            direct -> direct.bindUniformBufferRange(ctx, VulkanicBufferTarget.UNIFORM.toLegacyGlTarget(), index, buffer, offset, size),
+            activeBackend -> activeBackend.bindUniformBufferRange(ctx, VulkanicBufferTarget.UNIFORM, index, buffer, offset, size)
+        );
     }
     
     /**
@@ -5121,7 +5239,10 @@ public class VulkanicAPI {
     
     
     public static void bindSamplers(CommandContext ctx, int first, int[] samplers) {
-        getBackend().bindSamplers(ctx, first, samplers);
+        dispatchImplementedVoid(
+            direct -> direct.bindSamplers(ctx, first, samplers),
+            activeBackend -> activeBackend.bindSamplers(ctx, first, samplers)
+        );
     }
     
     

@@ -9,6 +9,9 @@ Usage: ./DevUtils/RunBackendPerfCompare.sh [options]
 Runs back-to-back MattMC client sessions on OpenGL and Vulkan and collects
 performance diagnostics for each backend.
 
+After each run, the harness regenerates the root performance-history graph at:
+    - mattmc_performance_history.html
+
 Artifacts collected per backend:
   - Gradle run log
   - latest.log tail
@@ -148,6 +151,8 @@ mkdir -p "$ARTIFACT_DIR"
 
 SUMMARY_FILE="$ARTIFACT_DIR/summary.txt"
 MANIFEST_FILE="$ARTIFACT_DIR/manifest.txt"
+PERF_HISTORY_GRAPH="$PROJECT_ROOT/mattmc_performance_history.html"
+PERF_HISTORY_GRAPH_GENERATOR="$PROJECT_ROOT/DevUtils/generate_perf_history_graph.py"
 
 if [[ -n "$WORLD_NAME" ]]; then
     if [[ -n "$CLIENT_ARGS" ]]; then
@@ -225,6 +230,41 @@ final_cleanup() {
     if [[ -n "$METRICS_ATTACH_BUILD_DIR" && -d "$METRICS_ATTACH_BUILD_DIR" ]]; then
         rm -rf "$METRICS_ATTACH_BUILD_DIR"
     fi
+}
+
+generate_perf_history_graph() {
+        local output_file="$1"
+
+        if [[ -x "$PERF_HISTORY_GRAPH_GENERATOR" || -f "$PERF_HISTORY_GRAPH_GENERATOR" ]]; then
+                if command -v python3 >/dev/null 2>&1; then
+                        python3 "$PERF_HISTORY_GRAPH_GENERATOR" \
+                                --logs-dir "$PROJECT_ROOT/logs/auto-profile" \
+                                --output "$output_file"
+                        return 0
+                fi
+        fi
+
+        cat > "$output_file" <<'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MattMC Performance History</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; line-height: 1.5; }
+        h1 { margin-top: 0; }
+        .note { padding: 1rem; background: #f4f4f4; border-left: 4px solid #666; }
+    </style>
+</head>
+<body>
+    <h1>MattMC Performance History</h1>
+    <div class="note">
+        The performance-history graph could not be regenerated because python3 was not available.
+    </div>
+</body>
+</html>
+EOF
 }
 
 trap final_cleanup EXIT INT TERM
@@ -945,5 +985,8 @@ done
 restore_backend
 trap - EXIT INT TERM
 
+generate_perf_history_graph "$PERF_HISTORY_GRAPH"
+
 echo "Complete. Artifacts saved to: $ARTIFACT_DIR"
 echo "Summary: $SUMMARY_FILE"
+echo "Graph: $PERF_HISTORY_GRAPH"

@@ -40,3 +40,4 @@ jmh-result.txt
 /Task
 *.inline_backup
 /libraries/jdk-25/
+/mattmc_performance_history.html
