@@ -3827,6 +3827,20 @@ public class VulkanicAPI {
     }
 
     /**
+     * Returns the backend-native buffer handle for transitional integrations.
+     *
+     * <p>Resolution is delegated to the active backend so callsites stay backend-neutral
+     * while GL/Vulkan-specific handle semantics remain backend-owned.</p>
+     */
+    public static int getBufferHandle(@Nullable GpuBuffer buffer) {
+        if (buffer == null) {
+            return 0;
+        }
+
+        return getBackend().resolveBufferHandle(getCommandContext(), buffer);
+    }
+
+    /**
      * Returns a backend-native framebuffer handle for a color/depth texture pair.
      */
     public static int resolveFramebufferForTextures(@Nullable GpuTexture colorTexture, @Nullable GpuTexture depthTexture) {

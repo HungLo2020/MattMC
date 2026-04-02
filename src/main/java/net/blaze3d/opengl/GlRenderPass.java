@@ -87,13 +87,8 @@ public class GlRenderPass implements RenderPass {
 		if (gpuTextureView == null) {
 			this.samplers.remove(string);
 		} else {
-			if (!(gpuTextureView instanceof GlTextureView glTextureView)) {
-				throw new IllegalArgumentException(
-					"Render pass sampler binding requires GlTextureView, got: " + gpuTextureView.getClass().getName()
-				);
-			}
 			this.samplers.put(string, gpuTextureView);
-			this.samplerResourceViews.put(string, this.encoder.createSamplerResourceView(glTextureView));
+			this.samplerResourceViews.put(string, this.encoder.createSamplerResourceView(gpuTextureView));
 		}
 
 		this.dirtyUniforms.add(string);

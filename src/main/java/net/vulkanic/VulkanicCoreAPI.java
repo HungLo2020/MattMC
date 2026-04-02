@@ -89,6 +89,10 @@ public final class VulkanicCoreAPI {
         return textureId(textureView.texture());
     }
 
+    public static int bufferId(net.blaze3d.buffers.GpuBuffer buffer) {
+        return VulkanicAPI.getBufferHandle(buffer);
+    }
+
     public static void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView) {
         VulkanicAPI.bindTextureUnit(ctx, unit, textureView);
     }

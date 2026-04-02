@@ -938,13 +938,7 @@ void main() {
         int depthOrLayers,
         int mipLevels
     ) {
-        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
-        if (device == null) {
-            throw new IllegalStateException(
-                "Vulkan compatibility device has not been created yet. "
-                    + "Ensure renderer startup calls createRendererDevice() before requesting textures.");
-        }
-        return device.createTexture(supplier, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+		return this.createOwnedGpuTexture(supplier == null ? null : supplier.get(), usage, textureFormat, width, height, depthOrLayers, mipLevels);
     }
 
     public GpuTexture createTexture(
@@ -956,53 +950,228 @@ void main() {
         int depthOrLayers,
         int mipLevels
     ) {
-        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
-        if (device == null) {
-            throw new IllegalStateException(
-                "Vulkan compatibility device has not been created yet. "
-                    + "Ensure renderer startup calls createRendererDevice() before requesting textures.");
-        }
-        return device.createTexture(label, usage, textureFormat, width, height, depthOrLayers, mipLevels);
+        return this.createOwnedGpuTexture(label, usage, textureFormat, width, height, depthOrLayers, mipLevels);
     }
 
     public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
-        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
-        if (device == null) {
-            throw new IllegalStateException(
-                "Vulkan compatibility device has not been created yet. "
-                    + "Ensure renderer startup calls createRendererDevice() before requesting buffers.");
-        }
-        return device.createBuffer(supplier, usage, size);
+        return this.createOwnedGpuBuffer(supplier, usage, size);
     }
 
     public GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, java.nio.ByteBuffer data) {
-        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
-        if (device == null) {
-            throw new IllegalStateException(
-                "Vulkan compatibility device has not been created yet. "
-                    + "Ensure renderer startup calls createRendererDevice() before requesting buffers.");
-        }
-        return device.createBuffer(supplier, usage, data);
+        return this.createOwnedGpuBuffer(supplier, usage, data);
     }
 
     public GpuTextureView createTextureView(GpuTexture texture) {
-        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
-        if (device == null) {
-            throw new IllegalStateException(
-                "Vulkan compatibility device has not been created yet. "
-                    + "Ensure renderer startup calls createRendererDevice() before requesting texture views.");
-        }
-        return device.createTextureView(texture);
+        return this.createTextureView(texture, 0, texture.getMipLevels());
     }
 
     public GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
-        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
-        if (device == null) {
-            throw new IllegalStateException(
-                "Vulkan compatibility device has not been created yet. "
-                    + "Ensure renderer startup calls createRendererDevice() before requesting texture views.");
+        if (texture.isClosed()) {
+            throw new IllegalArgumentException("Can't create texture view with closed texture");
         }
-        return device.createTextureView(texture, baseMipLevel, mipLevelCount);
+        if (baseMipLevel < 0 || baseMipLevel + mipLevelCount > texture.getMipLevels()) {
+            throw new IllegalArgumentException(
+                mipLevelCount + " mip levels starting from " + baseMipLevel + " would be out of range for texture with only " + texture.getMipLevels() + " mip levels"
+            );
+        }
+
+        Runnable closeAction = () -> {
+        };
+        if (texture instanceof VulkanGpuTexture vulkanTexture) {
+            vulkanTexture.addViews();
+            closeAction = vulkanTexture::removeViews;
+        }
+        return new VulkanGpuTextureView(texture, baseMipLevel, mipLevelCount, closeAction);
+    }
+
+    private GpuBuffer createOwnedGpuBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
+        if (size <= 0) {
+            throw new IllegalArgumentException("Buffer size must be greater than zero");
+        }
+
+        CommandContext ctx = getCurrentCommandContext();
+        while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
+        }
+
+        int handle = 0;
+        try {
+            handle = net.vulkanic.VulkanicAPI.createBuffer(ctx);
+            int target = selectLegacyBufferTarget(usage);
+            net.vulkanic.VulkanicAPI.bindBuffer(ctx, target, handle);
+            net.vulkanic.VulkanicAPI.namedBufferDataDSA(ctx, handle, size, net.blaze3d.opengl.GlConst.bufferUsageToGlEnum(usage));
+            net.vulkanic.VulkanicAPI.bindBuffer(ctx, target, 0);
+            int error = net.vulkanic.VulkanicAPI.getError(ctx);
+            if (error == 1285) {
+                throw new GpuOutOfMemoryException("Could not allocate buffer of " + size + " for " + supplier);
+            }
+            if (error != 0) {
+                throw new IllegalStateException("OpenGL error " + error);
+            }
+            net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+            return new VulkanGpuBuffer(supplier, usage, size, handle);
+        } catch (RuntimeException exception) {
+            if (handle != 0) {
+                net.vulkanic.VulkanicAPI.deleteBuffer(ctx, handle);
+            }
+            throw exception;
+        }
+    }
+
+    private GpuBuffer createOwnedGpuBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, java.nio.ByteBuffer data) {
+        if (data == null || !data.hasRemaining()) {
+            throw new IllegalArgumentException("Buffer source must not be empty");
+        }
+
+        CommandContext ctx = getCurrentCommandContext();
+        while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
+        }
+
+        int handle = 0;
+        try {
+            java.nio.ByteBuffer initialData = data.duplicate();
+            int size = initialData.remaining();
+            handle = net.vulkanic.VulkanicAPI.createBuffer(ctx);
+            int target = selectLegacyBufferTarget(usage);
+            net.vulkanic.VulkanicAPI.bindBuffer(ctx, target, handle);
+            net.vulkanic.VulkanicAPI.namedBufferDataDSA(ctx, handle, initialData, net.blaze3d.opengl.GlConst.bufferUsageToGlEnum(usage));
+            net.vulkanic.VulkanicAPI.bindBuffer(ctx, target, 0);
+            int error = net.vulkanic.VulkanicAPI.getError(ctx);
+            if (error == 1285) {
+                throw new GpuOutOfMemoryException("Could not allocate buffer of " + size + " for " + supplier);
+            }
+            if (error != 0) {
+                throw new IllegalStateException("OpenGL error " + error);
+            }
+            net.irisshaders.iris.gl.IrisRenderSystem.incrementTrackedBuffers();
+            return new VulkanGpuBuffer(supplier, usage, size, handle);
+        } catch (RuntimeException exception) {
+            if (handle != 0) {
+                net.vulkanic.VulkanicAPI.deleteBuffer(ctx, handle);
+            }
+            throw exception;
+        }
+    }
+
+    private GpuTexture createOwnedGpuTexture(@Nullable String label, int usage, TextureFormat textureFormat, int width, int height, int depthOrLayers, int mipLevels) {
+        if (width < 1) {
+            throw new IllegalArgumentException("Texture width must be at least 1");
+        }
+        if (height < 1) {
+            throw new IllegalArgumentException("Texture height must be at least 1");
+        }
+        if (depthOrLayers < 1) {
+            throw new IllegalArgumentException("Texture depth/layers must be at least 1");
+        }
+        if (mipLevels < 1) {
+            throw new IllegalArgumentException("Texture mip level count must be at least 1");
+        }
+
+        boolean cubemap = (usage & GpuTexture.USAGE_CUBEMAP_COMPATIBLE) != 0;
+        if (cubemap) {
+            if (width != height) {
+                throw new IllegalArgumentException("Cubemap compatible textures must be square, but size is " + width + "x" + height);
+            }
+            if (depthOrLayers % 6 != 0) {
+                throw new IllegalArgumentException("Cubemap compatible textures must have a layer count with a multiple of 6, was " + depthOrLayers);
+            }
+            if (depthOrLayers > 6) {
+                throw new UnsupportedOperationException("Array textures are not yet supported");
+            }
+        } else if (depthOrLayers > 1) {
+            throw new UnsupportedOperationException("Array or 3D textures are not yet supported");
+        }
+
+        CommandContext ctx = getCurrentCommandContext();
+        while (net.vulkanic.VulkanicAPI.getError(ctx) != 0) {
+        }
+
+        int textureId = net.irisshaders.iris.gl.IrisRenderSystem.createTextureId();
+        String resolvedLabel = label == null ? String.valueOf(textureId) : label;
+        try {
+            net.vulkanic.VulkanicTextureTarget textureTarget;
+            int glTarget;
+            if (cubemap) {
+                net.vulkanic.VulkanicAPI.bindCubemapTexture(ctx, textureId);
+                textureTarget = net.vulkanic.VulkanicTextureTarget.TEXTURE_CUBE_MAP;
+            } else {
+                net.vulkanic.VulkanicAPI.bindTexture2D(ctx, textureId);
+                textureTarget = net.vulkanic.VulkanicTextureTarget.TEXTURE_2D;
+            }
+            glTarget = textureTarget.toLegacyGlTarget();
+
+            net.vulkanic.VulkanicAPI.setTextureMaxLevel(ctx, textureTarget, mipLevels - 1);
+            net.vulkanic.VulkanicAPI.setTextureMinLod(ctx, textureTarget, 0);
+            net.vulkanic.VulkanicAPI.setTextureMaxLod(ctx, textureTarget, mipLevels - 1);
+            if (textureFormat.hasDepthAspect()) {
+                net.vulkanic.VulkanicAPI.disableTextureCompareMode(ctx, textureTarget);
+            }
+
+            if (cubemap) {
+                for (int target : net.blaze3d.opengl.GlConst.CUBEMAP_TARGETS) {
+                    for (int level = 0; level < mipLevels; level++) {
+                        net.vulkanic.VulkanicAPI.uploadTexture2D(
+                            ctx,
+                            target,
+                            level,
+                            net.blaze3d.opengl.GlConst.toGlInternalId(textureFormat),
+                            width >> level,
+                            height >> level,
+                            0,
+                            net.blaze3d.opengl.GlConst.toGlExternalId(textureFormat),
+                            net.blaze3d.opengl.GlConst.toGlType(textureFormat),
+                            (java.nio.ByteBuffer)null
+                        );
+                    }
+                }
+            } else {
+                for (int level = 0; level < mipLevels; level++) {
+                    net.vulkanic.VulkanicAPI.uploadTexture2D(
+                        ctx,
+                        glTarget,
+                        level,
+                        net.blaze3d.opengl.GlConst.toGlInternalId(textureFormat),
+                        width >> level,
+                        height >> level,
+                        0,
+                        net.blaze3d.opengl.GlConst.toGlExternalId(textureFormat),
+                        net.blaze3d.opengl.GlConst.toGlType(textureFormat),
+                        (java.nio.ByteBuffer)null
+                    );
+                }
+            }
+
+            int error = net.vulkanic.VulkanicAPI.getError(ctx);
+            if (error == 1285) {
+                throw new GpuOutOfMemoryException("Could not allocate texture of " + width + "x" + height + " for " + resolvedLabel);
+            }
+            if (error != 0) {
+                throw new IllegalStateException("OpenGL error " + error);
+            }
+
+            return new VulkanGpuTexture(usage, resolvedLabel, textureFormat, width, height, depthOrLayers, mipLevels, textureId);
+        } catch (RuntimeException exception) {
+            net.irisshaders.iris.gl.IrisRenderSystem.deleteTextureId(textureId);
+            throw exception;
+        }
+    }
+
+    private static int selectLegacyBufferTarget(int usage) {
+        if ((usage & GpuBuffer.USAGE_UNIFORM_TEXEL_BUFFER) != 0) {
+            return net.vulkanic.VulkanicAPI.GL_TEXTURE_BUFFER;
+        }
+        if ((usage & GpuBuffer.USAGE_UNIFORM) != 0) {
+            return net.vulkanic.VulkanicAPI.GL_UNIFORM_BUFFER;
+        }
+        if ((usage & GpuBuffer.USAGE_INDEX) != 0) {
+            return net.vulkanic.VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER;
+        }
+        if ((usage & GpuBuffer.USAGE_VERTEX) != 0) {
+            return net.vulkanic.VulkanicAPI.GL_ARRAY_BUFFER;
+        }
+        if ((usage & GpuBuffer.USAGE_COPY_SRC) != 0) {
+            return net.vulkanic.VulkanicAPI.GL_COPY_READ_BUFFER;
+        }
+        return net.vulkanic.VulkanicAPI.GL_COPY_WRITE_BUFFER;
     }
 
     public void onRendererDeviceInitialized(long mainWindowHandle, GpuDevice gpuDevice) {
@@ -2780,9 +2949,10 @@ void main() {
     }
 
     public net.vulkanic.VulkanicBuffer resolveVulkanicBuffer(net.blaze3d.buffers.GpuBuffer gpuBuffer) {
-        if (!(gpuBuffer instanceof net.blaze3d.opengl.GlBuffer glBuffer)) {
+        int handle = resolveBufferHandle(getCurrentCommandContext(), gpuBuffer);
+        if (handle == 0) {
             throw new IllegalArgumentException(
-                "Vulkan backend resolveVulkanicBuffer requires GlBuffer, got: "
+                "Vulkan backend resolveVulkanicBuffer requires a resolvable legacy buffer handle, got: "
                     + gpuBuffer.getClass().getName());
         }
         ensureNativeReady("resolveVulkanicBuffer");
@@ -2790,7 +2960,18 @@ void main() {
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
-        return spine.resolveLegacyVulkanBuffer(glBuffer.getHandle());
+        return spine.resolveLegacyVulkanBuffer(handle);
+    }
+
+    public int resolveBufferHandle(CommandContext ctx, net.blaze3d.buffers.GpuBuffer gpuBuffer) {
+        requireVulkanCommandBufferHandle("resolveBufferHandle", ctx);
+        if (gpuBuffer == null) {
+            return 0;
+        }
+        if (gpuBuffer instanceof net.blaze3d.opengl.GlBuffer glBuffer) {
+            return glBuffer.getHandle();
+        }
+        return resolveGpuBufferLegacyHandle(gpuBuffer);
     }
 
     public net.vulkanic.PipelineHandle resolvePipelineHandle(
@@ -4782,6 +4963,38 @@ void main() {
 
                 idField.setAccessible(true);
                 return idField.getInt(texture);
+            } catch (NoSuchFieldException ignored) {
+                currentType = currentType.getSuperclass();
+            } catch (IllegalAccessException | SecurityException ignored) {
+                return 0;
+            }
+        }
+
+        return 0;
+    }
+
+    private static int resolveGpuBufferLegacyHandle(net.blaze3d.buffers.GpuBuffer buffer) {
+        try {
+            java.lang.reflect.Method accessor = buffer.getClass().getMethod("getHandle");
+            if (accessor.getReturnType() == int.class) {
+                Object result = accessor.invoke(buffer);
+                if (result instanceof Integer handle) {
+                    return handle;
+                }
+            }
+        } catch (ReflectiveOperationException | SecurityException ignored) {
+        }
+
+        Class<?> currentType = buffer.getClass();
+        while (currentType != null) {
+            try {
+                java.lang.reflect.Field handleField = currentType.getDeclaredField("handle");
+                if (handleField.getType() != int.class) {
+                    return 0;
+                }
+
+                handleField.setAccessible(true);
+                return handleField.getInt(buffer);
             } catch (NoSuchFieldException ignored) {
                 currentType = currentType.getSuperclass();
             } catch (IllegalAccessException | SecurityException ignored) {

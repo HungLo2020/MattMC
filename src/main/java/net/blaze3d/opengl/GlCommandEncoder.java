@@ -167,8 +167,8 @@ public class GlCommandEncoder implements CommandEncoder {
 					CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
 					this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(
 						renderPassCtx, supplier,
-						toVulkanicTextureView((GlTextureView) gpuTextureView), optionalInt,
-						gpuTextureView2 != null ? toVulkanicTextureView((GlTextureView) gpuTextureView2) : null,
+						toVulkanicTextureView(gpuTextureView), optionalInt,
+						gpuTextureView2 != null ? toVulkanicTextureView(gpuTextureView2) : null,
 						optionalDouble
 					);
 					this.activeRenderPassContext = renderPassCtx;
@@ -181,7 +181,7 @@ public class GlCommandEncoder implements CommandEncoder {
 	}
 
 	/**
-	 * Wraps a Blaze3D {@link GlTextureView} as a {@link net.vulkanic.VulkanicTextureView}.
+	 * Wraps a Blaze3D texture view as a {@link net.vulkanic.VulkanicTextureView}.
 	 *
 	 * <p>Now that {@code GlTexture} implements {@code VulkanicTexture} (via {@code GpuTexture}),
 	 * no GL-handle bridge object is needed. An {@code OpenGLTextureView} is constructed
@@ -189,14 +189,26 @@ public class GlCommandEncoder implements CommandEncoder {
 	 * descriptor with no new GPU allocations, and {@link net.vulkanic.backends.opengl.OpenGLTextureView#close()}
 	 * does not delete the underlying texture (the caller remains the owner).
 	 */
-	net.vulkanic.VulkanicTextureView createSamplerResourceView(GlTextureView view) {
+	net.vulkanic.VulkanicTextureView createSamplerResourceView(GpuTextureView view) {
 		return toVulkanicTextureView(view);
 	}
 
 	private net.vulkanic.VulkanicTextureView toVulkanicTextureView(GlTextureView view) {
+		return toVulkanicTextureView((GpuTextureView)view);
+	}
+
+	private net.vulkanic.VulkanicTextureView toVulkanicTextureView(GpuTextureView view) {
 		return VulkanicAPI.createManagedTextureView(
 			view.texture(), view.baseMipLevel(), view.mipLevels()
 		);
+	}
+
+	private static int requireBufferHandle(GpuBuffer buffer) {
+		int handle = VulkanicAPI.getBufferHandle(buffer);
+		if (handle == 0) {
+			throw new IllegalArgumentException("Unable to resolve GPU buffer handle for " + buffer.getClass().getName());
+		}
+		return handle;
 	}
 
 	private record PipelineResourceBindingSubmission(
@@ -219,7 +231,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					VulkanicAPI.bindTextureBufferData(
 						ctx,
 						GlConst.toGlInternalId(format),
-						((GlBuffer)slice.buffer()).handle
+						requireBufferHandle(slice.buffer())
 					);
 				}
 			}
@@ -360,13 +372,13 @@ public class GlCommandEncoder implements CommandEncoder {
 				continue;
 			}
 
-			GlTextureView glTextureView = (GlTextureView)glRenderPass.samplers.get(entry.getKey());
-			if (glTextureView == null) {
+			GpuTextureView textureView = glRenderPass.samplers.get(entry.getKey());
+			if (textureView == null) {
 				continue;
 			}
 
 			net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(samplerIndex);
-			GpuTexture texture = glTextureView.texture();
+			GpuTexture texture = textureView.texture();
 			int textureHandle = VulkanicCoreAPI.textureId(texture);
 			net.irisshaders.iris.gl.IrisRenderSystem.setTextureBinding(samplerIndex, textureHandle);
 			VulkanicTextureTarget textureTarget;
@@ -378,8 +390,8 @@ public class GlCommandEncoder implements CommandEncoder {
 				VulkanicAPI.bindTexture2D(ctx, textureHandle);
 			}
 
-			VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.BASE_LEVEL, glTextureView.baseMipLevel());
-			VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, glTextureView.baseMipLevel() + glTextureView.mipLevels() - 1);
+			VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.BASE_LEVEL, textureView.baseMipLevel());
+			VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
 			texture.flushModeChanges(textureTarget);
 		}
 	}
@@ -521,10 +533,10 @@ public class GlCommandEncoder implements CommandEncoder {
 		if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass && this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
 		} else {
-			GlBuffer glBuffer = (GlBuffer)gpuBufferSlice.buffer();
-			if (glBuffer.closed) {
+			GpuBuffer gpuBuffer = gpuBufferSlice.buffer();
+			if (gpuBuffer.isClosed()) {
 				throw new IllegalStateException("Buffer already closed");
-			} else if ((glBuffer.usage() & 8) == 0) {
+			} else if ((gpuBuffer.usage() & 8) == 0) {
 				throw new IllegalStateException("Buffer needs USAGE_COPY_DST to be a destination for a copy");
 			} else {
 				int i = byteBuffer.remaining();
@@ -532,18 +544,18 @@ public class GlCommandEncoder implements CommandEncoder {
 					throw new IllegalArgumentException(
 						"Cannot write more data than the slice allows (attempting to write " + i + " bytes into a slice of length " + gpuBufferSlice.length() + ")"
 					);
-				} else if (gpuBufferSlice.length() + gpuBufferSlice.offset() > glBuffer.size()) {
+				} else if (gpuBufferSlice.length() + gpuBufferSlice.offset() > gpuBuffer.size()) {
 					throw new IllegalArgumentException(
 						"Cannot write more data than this buffer can hold (attempting to write "
 							+ i
 							+ " bytes at offset "
 							+ gpuBufferSlice.offset()
 							+ " to "
-							+ glBuffer.size()
+							+ gpuBuffer.size()
 							+ " size buffer)"
 					);
 				} else {
-					this.device.directStateAccess().bufferSubData(glBuffer.handle, gpuBufferSlice.offset(), byteBuffer, glBuffer.usage());
+					this.device.directStateAccess().bufferSubData(requireBufferHandle(gpuBuffer), gpuBufferSlice.offset(), byteBuffer, gpuBuffer.usage());
 				}
 			}
 		}
@@ -559,26 +571,27 @@ public class GlCommandEncoder implements CommandEncoder {
 		if (this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
 		} else {
-			GlBuffer glBuffer = (GlBuffer)gpuBufferSlice.buffer();
-			if (glBuffer.closed) {
+			GpuBuffer gpuBuffer = gpuBufferSlice.buffer();
+			if (gpuBuffer.isClosed()) {
 				throw new IllegalStateException("Buffer already closed");
 			} else if (!bl && !bl2) {
 				throw new IllegalArgumentException("At least read or write must be true");
-			} else if (bl && (glBuffer.usage() & 1) == 0) {
+			} else if (bl && (gpuBuffer.usage() & 1) == 0) {
 				throw new IllegalStateException("Buffer is not readable");
-			} else if (bl2 && (glBuffer.usage() & 2) == 0) {
+			} else if (bl2 && (gpuBuffer.usage() & 2) == 0) {
 				throw new IllegalStateException("Buffer is not writable");
-			} else if (gpuBufferSlice.offset() + gpuBufferSlice.length() > glBuffer.size()) {
+			} else if (gpuBufferSlice.offset() + gpuBufferSlice.length() > gpuBuffer.size()) {
 				throw new IllegalArgumentException(
 					"Cannot map more data than this buffer can hold (attempting to map "
 						+ gpuBufferSlice.length()
 						+ " bytes at offset "
 						+ gpuBufferSlice.offset()
 						+ " from "
-						+ glBuffer.size()
+						+ gpuBuffer.size()
 						+ " size buffer)"
 				);
 			} else {
+				if (gpuBuffer instanceof GlBuffer glBuffer) {
 				int i = 0;
 				if (bl) {
 					i |= 1;
@@ -588,6 +601,36 @@ public class GlCommandEncoder implements CommandEncoder {
 					i |= 34;
 				}
 				return this.device.getBufferStorage().mapBuffer(this.device.directStateAccess(), glBuffer, gpuBufferSlice.offset(), gpuBufferSlice.length(), i);
+				}
+
+				int access = 0;
+				if (bl) {
+					access |= 1;
+				}
+				if (bl2) {
+					access |= 34;
+				}
+				int bufferHandle = requireBufferHandle(gpuBuffer);
+				ByteBuffer mapped = VulkanicAPI.mapNamedBufferRangeDSA(VulkanicAPI.getCommandContext(), bufferHandle, gpuBufferSlice.offset(), gpuBufferSlice.length(), access);
+				if (mapped == null) {
+					throw new IllegalStateException("Can't map buffer, opengl error " + VulkanicAPI.getError(VulkanicAPI.getCommandContext()));
+				}
+				return new GpuBuffer.MappedView() {
+					private boolean closed;
+
+					@Override
+					public ByteBuffer data() {
+						return mapped;
+					}
+
+					@Override
+					public void close() {
+						if (!this.closed) {
+							this.closed = true;
+							VulkanicAPI.unmapNamedBufferDSA(VulkanicAPI.getCommandContext(), bufferHandle);
+						}
+					}
+				};
 			}
 		}
 	}
@@ -597,45 +640,51 @@ public class GlCommandEncoder implements CommandEncoder {
 		if (this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
 		} else {
-			GlBuffer glBuffer = (GlBuffer)gpuBufferSlice.buffer();
-			if (glBuffer.closed) {
+			GpuBuffer sourceBuffer = gpuBufferSlice.buffer();
+			if (sourceBuffer.isClosed()) {
 				throw new IllegalStateException("Source buffer already closed");
-			} else if ((glBuffer.usage() & 16) == 0) {
+			} else if ((sourceBuffer.usage() & 16) == 0) {
 				throw new IllegalStateException("Source buffer needs USAGE_COPY_SRC to be a source for a copy");
 			} else {
-				GlBuffer glBuffer2 = (GlBuffer)gpuBufferSlice2.buffer();
-				if (glBuffer2.closed) {
+				GpuBuffer targetBuffer = gpuBufferSlice2.buffer();
+				if (targetBuffer.isClosed()) {
 					throw new IllegalStateException("Target buffer already closed");
-				} else if ((glBuffer2.usage() & 8) == 0) {
+				} else if ((targetBuffer.usage() & 8) == 0) {
 					throw new IllegalStateException("Target buffer needs USAGE_COPY_DST to be a destination for a copy");
 				} else if (gpuBufferSlice.length() != gpuBufferSlice2.length()) {
 					throw new IllegalArgumentException(
 						"Cannot copy from slice of size " + gpuBufferSlice.length() + " to slice of size " + gpuBufferSlice2.length() + ", they must be equal"
 					);
-				} else if (gpuBufferSlice.offset() + gpuBufferSlice.length() > glBuffer.size()) {
+				} else if (gpuBufferSlice.offset() + gpuBufferSlice.length() > sourceBuffer.size()) {
 					throw new IllegalArgumentException(
 						"Cannot copy more data than the source buffer holds (attempting to copy "
 							+ gpuBufferSlice.length()
 							+ " bytes at offset "
 							+ gpuBufferSlice.offset()
 							+ " from "
-							+ glBuffer.size()
+							+ sourceBuffer.size()
 							+ " size buffer)"
 					);
-				} else if (gpuBufferSlice2.offset() + gpuBufferSlice2.length() > glBuffer2.size()) {
+				} else if (gpuBufferSlice2.offset() + gpuBufferSlice2.length() > targetBuffer.size()) {
 					throw new IllegalArgumentException(
 						"Cannot copy more data than the target buffer can hold (attempting to copy "
 							+ gpuBufferSlice2.length()
 							+ " bytes at offset "
 							+ gpuBufferSlice2.offset()
 							+ " to "
-							+ glBuffer2.size()
+							+ targetBuffer.size()
 							+ " size buffer)"
 					);
 				} else {
 					this.device
 						.directStateAccess()
-						.copyBufferSubData(glBuffer.handle, glBuffer2.handle, gpuBufferSlice.offset(), gpuBufferSlice2.offset(), gpuBufferSlice.length());
+						.copyBufferSubData(
+							requireBufferHandle(sourceBuffer),
+							requireBufferHandle(targetBuffer),
+							gpuBufferSlice.offset(),
+							gpuBufferSlice2.offset(),
+							gpuBufferSlice.length()
+						);
 				}
 			}
 		}
@@ -869,7 +918,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				while (VulkanicAPI.getError(ctx) != 0) {
 				}
 				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, VulkanicCoreAPI.textureId(gpuTexture), 0, j, VulkanicAPI.GL_READ_FRAMEBUFFER);
-				VulkanicAPI.bindPixelPackBuffer(ctx, ((GlBuffer)gpuBuffer).handle);
+				VulkanicAPI.bindPixelPackBuffer(ctx, requireBufferHandle(gpuBuffer));
 				VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_PACK_ROW_LENGTH, m);
 				VulkanicAPI.readPixels(ctx, k, l, m, n, GlConst.toGlExternalId(gpuTexture.getFormat()), GlConst.toGlType(gpuTexture.getFormat()), i);
 				VulkanicAPI.queueFencedTask(runnable);
@@ -1033,7 +1082,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (biConsumer != null) {
 					biConsumer.accept(object, (RenderPass.UniformUploader)(string, gpuBufferSlice) -> {
 						if (glRenderPass.pipeline.program().getUniform(string) instanceof Uniform.Ubo(int i)) {
-							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getCommandContext(), i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
+							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getCommandContext(), i, requireBufferHandle(gpuBufferSlice.buffer()), gpuBufferSlice.offset(), gpuBufferSlice.length());
 						}
 					});
 				}
@@ -1081,19 +1130,19 @@ public class GlCommandEncoder implements CommandEncoder {
 	private void drawFromBuffers(
 		GlRenderPass glRenderPass, int i, int j, int k, @Nullable VertexFormat.IndexType indexType, GlRenderPipeline glRenderPipeline, int l
 	) {
-		GlBuffer vertexBuffer = (GlBuffer)glRenderPass.vertexBuffers[0];
+		GpuBuffer vertexBuffer = glRenderPass.vertexBuffers[0];
 		this.device.vertexArrayCache().bindVertexArray(glRenderPipeline.info().getVertexFormat(), vertexBuffer);
 		// Obtain a single context for all VulkanicAPI calls in this draw — avoids repeated singleton lookups
 		// and makes explicit that every draw operation flows through VulkanicAPI → OpenGLBackend.
 		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 		if (vertexBuffer != null) {
-			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, vertexBuffer.handle);
+			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, requireBufferHandle(vertexBuffer));
 		}
 		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		java.util.Optional<VulkanicPrimitiveMode> typedPrimitiveMode = VulkanicPrimitiveMode.fromLegacyGlConstant(glPrimitiveMode);
 		if (indexType != null) {
 			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.
-			VulkanicAPI.bindIndexBuffer(ctx, ((GlBuffer)glRenderPass.indexBuffer).handle);
+			VulkanicAPI.bindIndexBuffer(ctx, requireBufferHandle(glRenderPass.indexBuffer));
 			VulkanicIndexType vkIndexType = toVulkanicIndexType(indexType);
 			long indexOffset = (long)j * indexType.bytes;
 			if (l > 1) {
@@ -1260,17 +1309,17 @@ public class GlCommandEncoder implements CommandEncoder {
 			for (Entry<String, Uniform> entry : glRenderPass.pipeline.program().getUniforms().entrySet()) {
 				if (entry.getValue() instanceof Uniform.Sampler) {
 					String string = (String)entry.getKey();
-					GlTextureView glTextureView = (GlTextureView)glRenderPass.samplers.get(string);
-					if (glTextureView == null) {
+					GpuTextureView textureView = glRenderPass.samplers.get(string);
+					if (textureView == null) {
 						throw new IllegalStateException("Missing sampler " + string);
 					}
 
-					if (glTextureView.isClosed()) {
-						throw new IllegalStateException("Sampler " + string + " (" + glTextureView.texture().getLabel() + ") has been closed!");
+					if (textureView.isClosed()) {
+						throw new IllegalStateException("Sampler " + string + " (" + textureView.texture().getLabel() + ") has been closed!");
 					}
 
-					if ((glTextureView.texture().usage() & 4) == 0) {
-						throw new IllegalStateException("Sampler " + string + " (" + glTextureView.texture().getLabel() + ") must have USAGE_TEXTURE_BINDING!");
+					if ((textureView.texture().usage() & 4) == 0) {
+						throw new IllegalStateException("Sampler " + string + " (" + textureView.texture().getLabel() + ") must have USAGE_TEXTURE_BINDING!");
 					}
 				}
 			}
@@ -1370,7 +1419,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					if (!immediateSeamHasCompleteCoverage && bl2) {
 						GpuBufferSlice gpuBufferSlice2 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
 						if (gpuBufferSlice2 != null) {
-							VulkanicAPI.bindUniformBufferRange(ctx, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
+							VulkanicAPI.bindUniformBufferRange(ctx, var39, requireBufferHandle(gpuBufferSlice2.buffer()), gpuBufferSlice2.offset(), gpuBufferSlice2.length());
 						}
 					}
 					break;
@@ -1383,12 +1432,12 @@ public class GlCommandEncoder implements CommandEncoder {
 						VulkanicAPI.bindTextureBuffer(ctx, var44);
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice3 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-							VulkanicAPI.bindTextureBufferData(ctx, GlConst.toGlInternalId(var43), ((GlBuffer)gpuBufferSlice3.buffer()).handle);
+							VulkanicAPI.bindTextureBufferData(ctx, GlConst.toGlInternalId(var43), requireBufferHandle(gpuBufferSlice3.buffer()));
 					}
 					break;
 				case Uniform.Sampler(int glTextureView2, int var51):
 					int var46 = var51;
-					GlTextureView glTextureView2x = (GlTextureView)glRenderPass.samplers.get(string2);
+					GpuTextureView glTextureView2x = glRenderPass.samplers.get(string2);
 					if (glTextureView2x == null) {
 						break;
 					}

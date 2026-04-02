@@ -2,6 +2,7 @@ package net.blaze3d.opengl;
 
 import net.blaze3d.vertex.VertexFormat;
 import net.blaze3d.vertex.VertexFormatElement;
+import net.blaze3d.buffers.GpuBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +24,15 @@ public abstract class VertexArrayCache {
 		}
 	}
 
-	public abstract void bindVertexArray(VertexFormat vertexFormat, @Nullable GlBuffer glBuffer);
+	public abstract void bindVertexArray(VertexFormat vertexFormat, @Nullable GpuBuffer gpuBuffer);
+
+	private static int requireBufferHandle(@Nullable GpuBuffer gpuBuffer) {
+		int handle = VulkanicAPI.getBufferHandle(gpuBuffer);
+		if (gpuBuffer != null && handle == 0) {
+			throw new IllegalArgumentException("Unable to resolve GPU buffer handle for " + gpuBuffer.getClass().getName());
+		}
+		return handle;
+	}
 
 	@Environment(EnvType.CLIENT)
 	static class Emulated extends VertexArrayCache {
@@ -35,25 +44,34 @@ public abstract class VertexArrayCache {
 		}
 
 		@Override
-		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GlBuffer glBuffer) {
+		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GpuBuffer gpuBuffer) {
 			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			VertexArrayCache.VertexArray vertexArray = (VertexArrayCache.VertexArray)this.cache.get(vertexFormat);
+			int bufferHandle = requireBufferHandle(gpuBuffer);
 			if (vertexArray == null) {
 				int i = VulkanicAPI.createVertexArray(ctx);
 				VulkanicAPI.bindVertexArray(ctx, i);
-				if (glBuffer != null) {
-					VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle);
+				if (gpuBuffer != null) {
+					if (gpuBuffer instanceof GlBuffer glBuffer) {
+						VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle);
+					} else {
+						VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, bufferHandle);
+					}
 					setupCombinedAttributes(vertexFormat, true);
 				}
 
-				VertexArrayCache.VertexArray vertexArray2 = new VertexArrayCache.VertexArray(i, vertexFormat, glBuffer);
+				VertexArrayCache.VertexArray vertexArray2 = new VertexArrayCache.VertexArray(i, vertexFormat, gpuBuffer);
 				this.debugLabels.applyLabel(vertexArray2);
 				this.cache.put(vertexFormat, vertexArray2);
 			} else {
 				VulkanicAPI.bindVertexArray(ctx, vertexArray.id);
-				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
-					VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle);
-					vertexArray.lastVertexBuffer = glBuffer;
+				if (gpuBuffer != null && vertexArray.lastVertexBuffer != gpuBuffer) {
+					if (gpuBuffer instanceof GlBuffer glBuffer) {
+						VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, glBuffer.handle);
+					} else {
+						VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, bufferHandle);
+					}
+					vertexArray.lastVertexBuffer = gpuBuffer;
 					setupCombinedAttributes(vertexFormat, false);
 				}
 			}
@@ -105,23 +123,24 @@ public abstract class VertexArrayCache {
 		}
 
 		@Override
-		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GlBuffer glBuffer) {
+		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GpuBuffer gpuBuffer) {
 			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
 			VertexArrayCache.VertexArray vertexArray = (VertexArrayCache.VertexArray)this.cache.get(vertexFormat);
+			int bufferHandle = requireBufferHandle(gpuBuffer);
 			if (vertexArray != null) {
 				VulkanicAPI.bindVertexArray(ctx, vertexArray.id);
-				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
-					if (this.needsMesaWorkaround && vertexArray.lastVertexBuffer != null && vertexArray.lastVertexBuffer.handle == glBuffer.handle) {
+				if (gpuBuffer != null && vertexArray.lastVertexBuffer != gpuBuffer) {
+					if (this.needsMesaWorkaround && vertexArray.lastVertexBuffer != null && requireBufferHandle(vertexArray.lastVertexBuffer) == bufferHandle) {
 						VulkanicAPI.bindVertexBuffer(ctx, 0, 0, 0L, 0);
 					}
 
-					VulkanicAPI.bindVertexBuffer(ctx, 0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
-					vertexArray.lastVertexBuffer = glBuffer;
+					VulkanicAPI.bindVertexBuffer(ctx, 0, bufferHandle, 0L, vertexFormat.getVertexSize());
+					vertexArray.lastVertexBuffer = gpuBuffer;
 				}
 			} else {
 				int i = VulkanicAPI.createVertexArray(ctx);
 				VulkanicAPI.bindVertexArray(ctx, i);
-				if (glBuffer != null) {
+				if (gpuBuffer != null) {
 					List<VertexFormatElement> list = vertexFormat.getElements();
 
 					for (int j = 0; j < list.size(); j++) {
@@ -152,11 +171,11 @@ public abstract class VertexArrayCache {
 					}
 				}
 
-				if (glBuffer != null) {
-					VulkanicAPI.bindVertexBuffer(ctx, 0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+				if (gpuBuffer != null) {
+					VulkanicAPI.bindVertexBuffer(ctx, 0, bufferHandle, 0L, vertexFormat.getVertexSize());
 				}
 
-				VertexArrayCache.VertexArray vertexArray2 = new VertexArrayCache.VertexArray(i, vertexFormat, glBuffer);
+				VertexArrayCache.VertexArray vertexArray2 = new VertexArrayCache.VertexArray(i, vertexFormat, gpuBuffer);
 				this.debugLabels.applyLabel(vertexArray2);
 				this.cache.put(vertexFormat, vertexArray2);
 			}
@@ -168,12 +187,12 @@ public abstract class VertexArrayCache {
 		final int id;
 		final VertexFormat format;
 		@Nullable
-		GlBuffer lastVertexBuffer;
+		GpuBuffer lastVertexBuffer;
 
-		VertexArray(int i, VertexFormat vertexFormat, @Nullable GlBuffer glBuffer) {
+		VertexArray(int i, VertexFormat vertexFormat, @Nullable GpuBuffer gpuBuffer) {
 			this.id = i;
 			this.format = vertexFormat;
-			this.lastVertexBuffer = glBuffer;
+			this.lastVertexBuffer = gpuBuffer;
 		}
 	}
 }

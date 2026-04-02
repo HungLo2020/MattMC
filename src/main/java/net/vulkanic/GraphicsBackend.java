@@ -2944,6 +2944,21 @@ public interface GraphicsBackend {
         return 0;
     }
 
+        /**
+         * Resolves a backend-native buffer handle for transitional integrations.
+         *
+         * <p>In OpenGL this corresponds to the GL buffer object name.
+         * In Vulkan this may return a backend-managed legacy buffer token while
+         * shared Blaze3D encoder code still issues handle-based commands.</p>
+         *
+         * @param ctx Command context for recording this command
+         * @param buffer Buffer target to resolve
+         * @return Backend-native buffer handle, or {@code 0} when not applicable
+         */
+        default int resolveBufferHandle(CommandContext ctx, GpuBuffer buffer) {
+            return 0;
+        }
+
     /**
      * Resolves a backend-native framebuffer handle for the given color/depth textures.
      *
