@@ -130,7 +130,8 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOnLightLayer() {
-		VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 2, this.textureView);
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindTextureUnit(ctx, 2, this.textureView);
 		TextureTracker.INSTANCE.onSetShaderTexture(2, this.textureView);
 	}
 

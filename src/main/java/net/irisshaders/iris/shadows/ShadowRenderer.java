@@ -377,7 +377,8 @@ public class ShadowRenderer {
 
 	public void setupShadowViewport() {
 		// Set up the viewport
-		VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, resolution, resolution);
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.setDynamicViewport(ctx, 0, 0, resolution, resolution);
 	}
 
 	public void renderShadows(LevelRenderer levelRenderer, Camera playerCamera, CameraRenderState renderState) {
@@ -495,7 +496,8 @@ public class ShadowRenderer {
 		// However, it only partially resolves issues of light leaking into caves.
 		//
 		// TODO: Better way of preventing light from leaking into places where it shouldn't
-		VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getCommandContext(), false);
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.setCullFaceEnabled(ctx, false);
 
 		ChunkSectionsToRender sections = new ChunkSectionsToRender(null, 0, null);
 		((SodiumChunkSection) (Object) sections).sodium$setRendering(((LevelRendererExtension) levelRenderer).sodium$getWorldRenderer(),
@@ -510,7 +512,7 @@ public class ShadowRenderer {
 		pipeline.setPhase(WorldRenderingPhase.ENTITIES);
 
 		// Reset our viewport in case Sodium overrode it
-		VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, resolution, resolution);
+		VulkanicAPI.setDynamicViewport(ctx, 0, 0, resolution, resolution);
 
 		profiler.popPush("entities");
 
@@ -599,11 +601,11 @@ public class ShadowRenderer {
 		profiler.popPush("restore gl state");
 
 		// Restore backface culling
-		VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getCommandContext(), true);
+		VulkanicAPI.setCullFaceEnabled(ctx, true);
 		((LevelRendererExtension) levelRenderer).sodium$setMatrices(playerMatrices);
 
 		// Restore the old viewport
-		VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, client.getMainRenderTarget().width, client.getMainRenderTarget().height);
+		VulkanicAPI.setDynamicViewport(ctx, 0, 0, client.getMainRenderTarget().width, client.getMainRenderTarget().height);
 
 		if (levelRenderer instanceof CullingDataCache) {
 			((CullingDataCache) levelRenderer).restoreState();

@@ -73,8 +73,8 @@ public class GlCommandEncoder implements CommandEncoder {
 	private static int DEBUG_SODIUM_SAMPLER_BIND_LOGS = 0;
 	private static int DEBUG_PARTICLE_VULKAN_BIND_LOGS = 0;
 
-	private static CommandContext commandContext() {
-		return VulkanicAPI.getCommandContext();
+	private CommandContext commandContext() {
+		return this.activeRenderPassContext != null ? this.activeRenderPassContext : VulkanicAPI.getCommandContext();
 	}
 
 	protected GlCommandEncoder(GlDevice glDevice) {
@@ -611,9 +611,9 @@ public class GlCommandEncoder implements CommandEncoder {
 					access |= 34;
 				}
 				int bufferHandle = requireBufferHandle(gpuBuffer);
-				ByteBuffer mapped = VulkanicAPI.mapNamedBufferRangeDSA(VulkanicAPI.getCommandContext(), bufferHandle, gpuBufferSlice.offset(), gpuBufferSlice.length(), access);
+				ByteBuffer mapped = VulkanicAPI.mapNamedBufferRangeDSA(commandContext(), bufferHandle, gpuBufferSlice.offset(), gpuBufferSlice.length(), access);
 				if (mapped == null) {
-					throw new IllegalStateException("Can't map buffer, opengl error " + VulkanicAPI.getError(VulkanicAPI.getCommandContext()));
+					throw new IllegalStateException("Can't map buffer, opengl error " + VulkanicAPI.getError(commandContext()));
 				}
 				return new GpuBuffer.MappedView() {
 					private boolean closed;
@@ -627,7 +627,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					public void close() {
 						if (!this.closed) {
 							this.closed = true;
-							VulkanicAPI.unmapNamedBufferDSA(VulkanicAPI.getCommandContext(), bufferHandle);
+							VulkanicAPI.unmapNamedBufferDSA(commandContext(), bufferHandle);
 						}
 					}
 				};
@@ -1082,7 +1082,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (biConsumer != null) {
 					biConsumer.accept(object, (RenderPass.UniformUploader)(string, gpuBufferSlice) -> {
 						if (glRenderPass.pipeline.program().getUniform(string) instanceof Uniform.Ubo(int i)) {
-							VulkanicAPI.bindUniformBufferRange(VulkanicAPI.getCommandContext(), i, requireBufferHandle(gpuBufferSlice.buffer()), gpuBufferSlice.offset(), gpuBufferSlice.length());
+							VulkanicAPI.bindUniformBufferRange(commandContext(), i, requireBufferHandle(gpuBufferSlice.buffer()), gpuBufferSlice.offset(), gpuBufferSlice.length());
 						}
 					});
 				}
@@ -1134,7 +1134,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		this.device.vertexArrayCache().bindVertexArray(glRenderPipeline.info().getVertexFormat(), vertexBuffer);
 		// Obtain a single context for all VulkanicAPI calls in this draw — avoids repeated singleton lookups
 		// and makes explicit that every draw operation flows through VulkanicAPI → OpenGLBackend.
-		net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+		net.vulkanic.CommandContext ctx = commandContext();
 		if (vertexBuffer != null) {
 			VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, requireBufferHandle(vertexBuffer));
 		}
@@ -1207,7 +1207,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		if (commandContext().isImmediate()
 			&& net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
 			&& !(glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader)) {
-			VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), iris$tempFBO);
+			VulkanicAPI.bindFramebuffer(commandContext(), iris$tempFBO);
 		}
 		
 		iris$lastPass = glRenderPass;
@@ -1215,7 +1215,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		// Handle Iris custom pass
 		if (glRenderPass.iris$getCustomPass() != null) {
 			this.lastProgram = null;
-			net.vulkanic.CommandContext ctx = VulkanicAPI.getCommandContext();
+			net.vulkanic.CommandContext ctx = commandContext();
 			
 			((net.irisshaders.iris.mixinterface.CustomPass)glRenderPass.iris$getCustomPass()).setupState();
 			

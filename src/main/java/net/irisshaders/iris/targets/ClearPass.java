@@ -22,7 +22,8 @@ public class ClearPass {
 	}
 
 	public void execute(Vector4f defaultClearColor) {
-		VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, viewportX.getAsInt(), viewportY.getAsInt());
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.setDynamicViewport(ctx, 0, 0, viewportX.getAsInt(), viewportY.getAsInt());
 		framebuffer.bind();
 
 		Vector4f color = Objects.requireNonNull(defaultClearColor);
@@ -32,7 +33,7 @@ public class ClearPass {
 		}
 
 		IrisRenderSystem.clearColor(color.x, color.y, color.z, color.w);
-		VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext());
+		VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx);
 	}
 
 	public GlFramebuffer getFramebuffer() {

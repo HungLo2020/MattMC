@@ -570,8 +570,8 @@ public class Phase3DrawPathTest {
         String source = Files.readString(file);
 
         // Verify that drawFromBuffers obtains the context once and reuses it (ctx variable),
-        // rather than calling getCommandContext() repeatedly.
-        assertTrue(source.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
+        // rather than repeatedly resolving the backend-global context.
+        assertTrue(source.contains("CommandContext ctx = commandContext();"),
             "drawFromBuffers should obtain a single CommandContext and reuse it");
     }
 
@@ -1322,10 +1322,12 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should pass explicit command-buffer context into VulkanicAPI.beginRenderPass");
         assertTrue(source.contains("VulkanicAPI.submitCommandBuffer(renderPassCtx);"),
             "GlCommandEncoder should submit command-buffer scope when finishing Vulkanic render passes");
+        assertTrue(source.contains("return this.activeRenderPassContext != null ? this.activeRenderPassContext : VulkanicAPI.getCommandContext();"),
+            "GlCommandEncoder should prefer the active render-pass command context over the backend-global current context");
         assertTrue(source.contains("ShadowRenderingState.areShadowsCurrentlyBeingRendered() && commandContext().isImmediate()"),
             "GlCommandEncoder should restrict the Iris shadow temp-FBO shortcut to immediate contexts so Vulkan shadow draws keep a real active render pass");
         assertTrue(source.contains("if (ctx.isImmediate()")
-                && source.contains("VulkanicAPI.bindFramebuffer(VulkanicAPI.getCommandContext(), iris$tempFBO);"),
+                && source.contains("VulkanicAPI.bindFramebuffer(commandContext(), iris$tempFBO);"),
             "GlCommandEncoder trySetup should only rebind the Iris shadow temp FBO on the immediate compatibility seam");
     }
 
@@ -1662,7 +1664,8 @@ public class Phase3DrawPathTest {
             "ClearPass should not track generic raw clear flag masks for color-only clear passes");
         assertFalse(clearPassSource.contains("clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), clearFlags)"),
             "ClearPass should not clear via generic raw clear mask plumbing");
-        assertTrue(clearPassSource.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(clearPassSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && clearPassSource.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx)"),
             "ClearPass should clear color through explicit VulkanicAPI clearColorBufferWithMacosWorkaround helper");
 
         Path samplerLimitsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/sampler/SamplerLimits.java");
@@ -3390,9 +3393,10 @@ public class Phase3DrawPathTest {
             "RenderStateShard texture setup should bind through VulkanicAPI texture-view seam instead of Iris texture-id helper calls");
         assertFalse(renderStateShardSource.contains("VulkanicCoreAPI.textureId(textureView)"),
             "RenderStateShard texture setup should not extract raw texture ids from texture views");
-        assertTrue(renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), i, textureView)"),
+        assertTrue(renderStateShardSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(ctx, i, textureView)"),
             "RenderStateShard multi-texture setup should bind through VulkanicAPI texture-view seam");
-        assertTrue(renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 0, textureView)"),
+        assertTrue(renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(ctx, 0, textureView)"),
             "RenderStateShard single-texture setup should bind through VulkanicAPI texture-view seam");
         assertTrue(renderStateShardSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(i, textureView)"),
             "RenderStateShard multi-texture setup should notify TextureTracker for each texture unit binding");
@@ -3432,7 +3436,8 @@ public class Phase3DrawPathTest {
             "LightTexture should disable light layer via IrisRenderSystem default-2D helper");
         assertFalse(lightTextureSource.contains("VulkanicCoreAPI.textureId(this.texture)"),
             "LightTexture should not extract raw texture ids for light-layer binding");
-        assertTrue(lightTextureSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 2, this.textureView)"),
+        assertTrue(lightTextureSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && lightTextureSource.contains("VulkanicAPI.bindTextureUnit(ctx, 2, this.textureView)"),
             "LightTexture should enable light layer through VulkanicAPI texture-view seam");
 
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
@@ -3691,7 +3696,8 @@ public class Phase3DrawPathTest {
             "OverlayTexture should not route overlay teardown through RenderSystem.teardownOverlayColor");
         assertFalse(overlayTextureSource.contains("VulkanicCoreAPI.textureId(textureView)"),
             "OverlayTexture should not extract raw texture ids for overlay binding");
-        assertTrue(overlayTextureSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 1, textureView)"),
+        assertTrue(overlayTextureSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && overlayTextureSource.contains("VulkanicAPI.bindTextureUnit(ctx, 1, textureView)"),
             "OverlayTexture should bind overlay texture through VulkanicAPI texture-view seam");
         assertTrue(overlayTextureSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(1, textureView)"),
             "OverlayTexture should publish Sampler1 texture view updates to TextureTracker");
@@ -3810,7 +3816,9 @@ public class Phase3DrawPathTest {
             "ClearPass should not call removed GlStateManager._clear wrapper");
         assertFalse(clearPassSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
             "ClearPass should not clear through generic raw-mask macOS helper");
-        assertTrue(clearPassSource.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(clearPassSource,
+                "VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+                "VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx)"),
             "ClearPass should clear via VulkanicAPI.clearColorBufferWithMacosWorkaround");
     }
 
