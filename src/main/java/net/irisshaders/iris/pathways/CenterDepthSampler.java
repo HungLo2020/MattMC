@@ -49,7 +49,8 @@ public class CenterDepthSampler {
 
 		setupColorTexture(texture);
 		setupColorTexture(altTexture);
-		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindTexture2D(ctx, 0);
 
 		this.framebuffer.addColorAttachment(0, texture);
 
@@ -107,7 +108,8 @@ public class CenterDepthSampler {
 			this.framebuffer.bind();
 			this.program.use();
 
-			VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), 0, 0, 1, 1);
+			var ctx = VulkanicAPI.getCommandContext();
+			VulkanicAPI.setDynamicViewport(ctx, 0, 0, 1, 1);
 
 			renderPass.drawIndexed(0, 0, 6, 1);
 

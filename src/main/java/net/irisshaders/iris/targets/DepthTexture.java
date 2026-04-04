@@ -17,7 +17,8 @@ public class DepthTexture extends GlResource {
 		IrisRenderSystem.setTextureNearestFiltering(texture);
 		IrisRenderSystem.setTextureWrapMode2D(texture, true);
 
-		VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindTexture2D(ctx, 0);
 	}
 
 	void resize(int width, int height, DepthBufferFormat format) {

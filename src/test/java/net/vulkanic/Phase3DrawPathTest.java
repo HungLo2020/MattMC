@@ -978,7 +978,9 @@ public class Phase3DrawPathTest {
         String lodRendererEventsSource = Files.readString(lodRendererEventsFile);
         assertFalse(lodRendererEventsSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
             "LodRendererEvents should not clear depth through raw GL_DEPTH_BUFFER_BIT macOS clear mask");
-        assertTrue(lodRendererEventsSource.contains("VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(lodRendererEventsSource,
+                "VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+                "CommandContext ctx = VulkanicAPI.getCommandContext();\n\t\t\t\t\t\tVulkanicAPI.clearDepthBufferWithMacosWorkaround(ctx);"),
             "LodRendererEvents should clear depth through VulkanicAPI clearDepthBufferWithMacosWorkaround helper");
 
         Path textureManipulationUtilMacosFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
@@ -1705,6 +1707,28 @@ public class Phase3DrawPathTest {
             "ProgramCreator should not bind attributes through GlStateManager wrapper");
         assertTrue(programCreatorSource.contains("VulkanicAPI.setAttributeLocation(ctx, program"),
             "ProgramCreator should bind attributes through VulkanicAPI.setAttributeLocation");
+
+        Path depthTextureFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/DepthTexture.java");
+        String depthTextureSource = Files.readString(depthTextureFile);
+        assertTrue(depthTextureSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && depthTextureSource.contains("VulkanicAPI.bindTexture2D(ctx, 0);"),
+            "DepthTexture should reuse one local command context when restoring texture binding state");
+
+        Path irisRenderTargetFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTarget.java");
+        String irisRenderTargetSource = Files.readString(irisRenderTargetFile);
+        assertTrue(irisRenderTargetSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && irisRenderTargetSource.contains("VulkanicAPI.bindTexture2D(ctx, 0);"),
+            "Iris RenderTarget should reuse one local command context when cleaning up texture binding state");
+
+        Path centerDepthFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/CenterDepthSampler.java");
+        String centerDepthSource = Files.readString(centerDepthFile);
+        assertTrue(centerDepthSource.contains("VulkanicAPI.setDynamicViewport(ctx, 0, 0, 1, 1);"),
+            "CenterDepthSampler should resolve a local command context before configuring its sampling viewport");
+
+        Path shadowCompositeFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java");
+        String shadowCompositeSource = Files.readString(shadowCompositeFile);
+        assertTrue(shadowCompositeSource.contains("VulkanicAPI.setDynamicViewport(ctx, beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);"),
+            "ShadowCompositeRenderer should resolve a local command context before configuring per-pass viewport state");
 
         Path intCachedUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/custom/cached/IntCachedUniform.java");
         String intCachedUniformSource = Files.readString(intCachedUniformFile);
@@ -3872,6 +3896,9 @@ public class Phase3DrawPathTest {
             "DHCompatInternal should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
         assertTrue(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D(0"),
             "DHCompatInternal should use IrisRenderSystem default-2D copyTexImage2D helper");
+        assertTrue(dhCompatInternalSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && dhCompatInternalSource.contains("VulkanicAPI.bindTexture2D(ctx, depthTexNoTranslucent.getTextureId());"),
+            "DHCompatInternal should reuse one local command context when preparing the translucent depth copy");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = readSourceIfExists(dhWrapperFile);

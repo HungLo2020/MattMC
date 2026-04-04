@@ -210,7 +210,8 @@ public class LodRendererEvents {
 					if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
 						event.cancelEvent();
 					} else if (getInstance().shouldOverride) {
-						VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext());
+						CommandContext ctx = VulkanicAPI.getCommandContext();
+						VulkanicAPI.clearDepthBufferWithMacosWorkaround(ctx);
 						event.cancelEvent();
 					}
 				}
