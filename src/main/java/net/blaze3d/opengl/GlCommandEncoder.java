@@ -72,12 +72,9 @@ public class GlCommandEncoder implements CommandEncoder {
 	@Nullable
 	private net.vulkanic.CommandContext activeRenderPassContext;
 	private static final boolean DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS = Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
-	private static final boolean DEBUG_ENTITY_FOG_SEAM_LOGS = Boolean.getBoolean("mattmc.vulkan.debugEntityFogSeam");
 	private static int DEBUG_PIPELINE_BIND_LOGS = 0;
 	private static int DEBUG_SODIUM_SAMPLER_BIND_LOGS = 0;
 	private static int DEBUG_PARTICLE_VULKAN_BIND_LOGS = 0;
-	private static int DEBUG_ENTITY_VULKAN_BIND_LOGS = 0;
-	private static int DEBUG_ENTITY_FOG_BIND_LOGS = 0;
 
 	private CommandContext commandContext() {
 		return this.activeRenderPassContext != null ? this.activeRenderPassContext : VulkanicAPI.getCommandContext();
@@ -286,17 +283,6 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 	}
 
-	private static boolean shouldLogFogBinding(RenderPipeline pipelineInfo) {
-		if (!DEBUG_ENTITY_FOG_SEAM_LOGS || DEBUG_ENTITY_FOG_BIND_LOGS >= 256) {
-			return false;
-		}
-
-		String location = pipelineInfo.getLocation().toString();
-		return location.contains("pipeline/terrain")
-			|| location.contains("pipeline/entity_")
-			|| location.contains("pipeline/item_entity_");
-	}
-
 	@Nullable
 	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass) {
 		long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
@@ -314,10 +300,6 @@ public class GlCommandEncoder implements CommandEncoder {
 		boolean logParticleSamplers = DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PARTICLE_VULKAN_BIND_LOGS < 80
 			&& pipelineInfo.getLocation().toString().contains("pipeline/")
 			&& pipelineInfo.getLocation().toString().contains("particle");
-		boolean logEntitySamplers = (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS || DEBUG_ENTITY_FOG_SEAM_LOGS) && DEBUG_ENTITY_VULKAN_BIND_LOGS < 160
-			&& (pipelineInfo.getLocation().toString().contains("pipeline/entity_")
-				|| pipelineInfo.getLocation().toString().contains("pipeline/item_entity_"));
-		boolean logFogBinding = shouldLogFogBinding(pipelineInfo);
 
 		if (logSodiumChunkSamplers) {
 			DEBUG_SODIUM_SAMPLER_BIND_LOGS++;
@@ -336,18 +318,6 @@ public class GlCommandEncoder implements CommandEncoder {
 			LOGGER.info(
 				"Particle Vulkan sampler prep#{} pipeline={} declaredSamplers={} renderPassSamplers={} layoutBindings={}",
 				DEBUG_PARTICLE_VULKAN_BIND_LOGS,
-				pipelineInfo.getLocation(),
-				pipelineInfo.getSamplers(),
-				glRenderPass.samplers.keySet(),
-				layoutBindings.stream().map(PipelineDescriptor.ResourceBinding::name).toList()
-			);
-		}
-
-		if (logEntitySamplers) {
-			DEBUG_ENTITY_VULKAN_BIND_LOGS++;
-			LOGGER.info(
-				"Entity Vulkan sampler prep#{} pipeline={} declaredSamplers={} renderPassSamplers={} layoutBindings={}",
-				DEBUG_ENTITY_VULKAN_BIND_LOGS,
 				pipelineInfo.getLocation(),
 				pipelineInfo.getSamplers(),
 				glRenderPass.samplers.keySet(),
@@ -393,34 +363,6 @@ public class GlCommandEncoder implements CommandEncoder {
 							resourceTexture != null ? resourceTexture.getLabel() : "null"
 						);
 					}
-					if (logEntitySamplers) {
-						GpuTextureView boundView = glRenderPass.samplers.get(resourceBinding.name());
-						GpuTexture boundTexture = boundView != null ? boundView.texture() : null;
-						GpuTexture resourceTexture = textureView != null && textureView.texture() instanceof GpuTexture gpuTexture ? gpuTexture : null;
-						LOGGER.info(
-							"Entity Vulkan sampler binding pipeline={} binding={} uniformPresent={} reflectedUnit={} boundViewPresent={} boundBaseMip={} boundMipCount={} boundTexId={} boundLabel={} boundMinFilter={} boundMagFilter={} boundUsesMipmaps={} resourceViewPresent={} resourceBaseMip={} resourceMipCount={} resourceTexId={} resourceLabel={} resourceMinFilter={} resourceMagFilter={} resourceUsesMipmaps={}",
-							pipelineInfo.getLocation(),
-							resourceBinding.name(),
-							uniform instanceof Uniform.Sampler,
-							samplerIndex,
-							boundView != null,
-							boundView != null ? boundView.baseMipLevel() : -1,
-							boundView != null ? boundView.mipLevels() : 0,
-							boundTexture != null ? VulkanicCoreAPI.textureId(boundTexture) : 0,
-							boundTexture != null ? boundTexture.getLabel() : "null",
-							boundTexture != null ? boundTexture.getMinFilter() : null,
-							boundTexture != null ? boundTexture.getMagFilter() : null,
-							boundTexture != null && boundTexture.usesMipmaps(),
-							textureView != null,
-							textureView != null ? textureView.getBaseMipLevel() : -1,
-							textureView != null ? textureView.getMipLevelCount() : 0,
-							resourceTexture != null ? VulkanicCoreAPI.textureId(resourceTexture) : 0,
-							resourceTexture != null ? resourceTexture.getLabel() : "null",
-							resourceTexture != null ? resourceTexture.getMinFilter() : null,
-							resourceTexture != null ? resourceTexture.getMagFilter() : null,
-							resourceTexture != null && resourceTexture.usesMipmaps()
-						);
-					}
 					if (textureView != null) {
 						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerIndex, textureView));
 						boundResources.add(resourceBinding);
@@ -428,15 +370,6 @@ public class GlCommandEncoder implements CommandEncoder {
 				}
 				case UNIFORM_BUFFER -> {
 					net.vulkanic.VulkanicBufferSlice slice = glRenderPass.getUniformResourceSlice(resourceBinding.name());
-					if (logFogBinding && resourceBinding.name().equals("Fog")) {
-						DEBUG_ENTITY_FOG_BIND_LOGS++;
-						LOGGER.info(
-							"Fog UBO bind#{} pipeline={} slice={}",
-							DEBUG_ENTITY_FOG_BIND_LOGS,
-							pipelineInfo.getLocation(),
-							net.vulkanic.VulkanicAPI.describeBufferSlice(glRenderPass.uniforms.get(resourceBinding.name()))
-						);
-					}
 					if (slice != null) {
 						uniformBufferBindings.put(resourceBinding.name(), slice);
 						boundResources.add(resourceBinding);

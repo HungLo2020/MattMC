@@ -361,7 +361,6 @@ public class VulkanBackend {
     private static final boolean DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE = Boolean.getBoolean("mattmc.vulkan.debugParticleTexturedAlphaOne");
     private static final boolean DEBUG_VULKAN_PARTICLE_ALPHA_MASK = Boolean.getBoolean("mattmc.vulkan.debugParticleAlphaMask");
     private static final boolean DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS = Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
-    private static final boolean DEBUG_ENTITY_FOG_SEAM_LOGS = Boolean.getBoolean("mattmc.vulkan.debugEntityFogSeam");
     private static final String DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT_SOURCE = """
 #version 150
 
@@ -6683,12 +6682,10 @@ void main() {
             DescriptorSamplerKey samplerKey = descriptorSamplerKey(vulkanTextureView);
             long samplerHandle = resolveDescriptorSamplerHandle(samplerKey);
             int descriptorImageLayout = descriptorImageLayoutFor(sampledLegacyTexture);
-            boolean entityDescriptor = pipelineLocation.contains("minecraft:pipeline/entity_")
-                || pipelineLocation.contains("minecraft:pipeline/item_entity_");
             GpuTexture sampledGpuTexture = vulkanTextureView.texture() instanceof GpuTexture gpuTexture ? gpuTexture : null;
 
             if ((debugDescriptorSamplerLogCount < 160)
-                && (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS || (DEBUG_ENTITY_FOG_SEAM_LOGS && entityDescriptor))) {
+                && DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS) {
                 debugDescriptorSamplerLogCount++;
                 int sampledLegacyId = sampledLegacyTexture != null ? sampledLegacyTexture.id : 0;
                 int sampledLayout = sampledLegacyTexture != null
