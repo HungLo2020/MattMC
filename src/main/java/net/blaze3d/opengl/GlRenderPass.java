@@ -96,7 +96,25 @@ public class GlRenderPass implements RenderPass {
 
 	@Nullable
 	VulkanicTextureView getSamplerResourceView(String string) {
-		return this.samplerResourceViews.get(string);
+		VulkanicTextureView resourceView = this.samplerResourceViews.get(string);
+		if (resourceView != null) {
+			return resourceView;
+		}
+
+		GpuTextureView recoveredView = this.encoder.recoverSamplerView(string);
+		if (recoveredView == null) {
+			return null;
+		}
+
+		this.samplers.putIfAbsent(string, recoveredView);
+		VulkanicTextureView managedView = this.encoder.createSamplerResourceView(recoveredView);
+		VulkanicTextureView existingView = this.samplerResourceViews.putIfAbsent(string, managedView);
+		if (existingView != null) {
+			managedView.close();
+			return existingView;
+		}
+
+		return managedView;
 	}
 
 	private void closeSamplerResourceView(String name) {

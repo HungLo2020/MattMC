@@ -361,6 +361,7 @@ public class VulkanBackend {
     private static final boolean DEBUG_VULKAN_TEXTURED_PARTICLE_ALPHA_ONE = Boolean.getBoolean("mattmc.vulkan.debugParticleTexturedAlphaOne");
     private static final boolean DEBUG_VULKAN_PARTICLE_ALPHA_MASK = Boolean.getBoolean("mattmc.vulkan.debugParticleAlphaMask");
     private static final boolean DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS = Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
+    private static final boolean DEBUG_ENTITY_FOG_SEAM_LOGS = Boolean.getBoolean("mattmc.vulkan.debugEntityFogSeam");
     private static final String DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT_SOURCE = """
 #version 150
 
@@ -435,6 +436,19 @@ void main() {
             || "minecraft:pipeline/translucent_particle".equals(pipelineLocation);
     }
 
+    private static boolean shouldDisableFogForEntityPipeline(RenderPipeline renderPipeline) {
+        net.minecraft.resources.ResourceLocation fragmentShader = renderPipeline.getFragmentShader();
+        if (fragmentShader == null) {
+            return false;
+        }
+
+        String shaderPath = fragmentShader.toString();
+        return "minecraft:core/entity".equals(shaderPath)
+            || "minecraft:core/rendertype_entity_shadow".equals(shaderPath)
+            || "minecraft:core/rendertype_item_entity_translucent_cull".equals(shaderPath)
+            || "minecraft:core/rendertype_entity_decal".equals(shaderPath);
+    }
+
     public CompiledRenderPipeline precompileRenderPipeline(
         RenderPipeline renderPipeline,
         @Nullable BiFunction<net.minecraft.resources.ResourceLocation, ShaderType, String> sourceProvider
@@ -505,6 +519,13 @@ void main() {
                     LOGGER.info("Vulkan particle alpha-mask debug override enabled for {}", renderPipeline.getLocation());
                     fragmentWithDefines = DEBUG_VULKAN_PARTICLE_ALPHA_MASK_SOURCE;
                 }
+            }
+
+            if (shouldDisableFogForEntityPipeline(renderPipeline)) {
+                fragmentWithDefines = GlslPreprocessor.injectDefines(
+                    fragmentWithDefines,
+                    net.minecraft.client.renderer.ShaderDefines.builder().define("MATTMC_VULKAN_DISABLE_ENTITY_FOG").build()
+                );
             }
 
             VulkanicSpirvModule vertexModule = compileSpirvModuleForBackend(
@@ -4538,6 +4559,15 @@ void main() {
 
     public void generateTextureMipmapDSA(CommandContext ctx, int texture) {
         requireVulkanCommandBufferHandle("generateTextureMipmapDSA", ctx);
+
+        ensureNativeReady("generateTextureMipmapDSA");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        int legacyTextureHandle = texture;
+        spine.generateLegacyTextureMipmapForTextureId(ctx.getHandle(), legacyTextureHandle);
     }
 
     public long getBindVertexBufferPointer() {
@@ -6650,10 +6680,15 @@ void main() {
                 );
             }
 
-            long samplerHandle = resolveDescriptorSamplerHandle(vulkanTextureView);
+            DescriptorSamplerKey samplerKey = descriptorSamplerKey(vulkanTextureView);
+            long samplerHandle = resolveDescriptorSamplerHandle(samplerKey);
             int descriptorImageLayout = descriptorImageLayoutFor(sampledLegacyTexture);
+            boolean entityDescriptor = pipelineLocation.contains("minecraft:pipeline/entity_")
+                || pipelineLocation.contains("minecraft:pipeline/item_entity_");
+            GpuTexture sampledGpuTexture = vulkanTextureView.texture() instanceof GpuTexture gpuTexture ? gpuTexture : null;
 
-            if (debugDescriptorSamplerLogCount < 160) {
+            if ((debugDescriptorSamplerLogCount < 160)
+                && (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS || (DEBUG_ENTITY_FOG_SEAM_LOGS && entityDescriptor))) {
                 debugDescriptorSamplerLogCount++;
                 int sampledLegacyId = sampledLegacyTexture != null ? sampledLegacyTexture.id : 0;
                 int sampledLayout = sampledLegacyTexture != null
@@ -6667,8 +6702,9 @@ void main() {
                 int sampledLayerCount = sampledLegacyTexture != null ? legacyTextureLayerCount(sampledLegacyTexture) : 0;
                 boolean sampledCubemap = sampledLegacyTexture != null && isLegacyCubemapTarget(sampledLegacyTexture.target);
                 LOGGER.info(
-                    "Vulkan samplerDescriptor#{} binding={} texId={} label={} usage=0x{} sampler=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} target=0x{} layers={} cubemap={}",
+                    "Vulkan samplerDescriptor#{} pipeline={} binding={} texId={} label={} usage=0x{} sampler=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} target=0x{} layers={} cubemap={} gpuMinFilter={} gpuMagFilter={} gpuUsesMipmaps={} keyMinFilter=0x{} keyMagFilter=0x{} keyMaxLod={}",
                     debugDescriptorSamplerLogCount,
+                    pipelineLocation,
                     binding.name(),
                     sampledLegacyId,
                     sampledTextureLabel,
@@ -6684,7 +6720,13 @@ void main() {
                     Integer.toHexString(sampledLayout),
                     Integer.toHexString(sampledTarget),
                     sampledLayerCount,
-                    sampledCubemap
+                    sampledCubemap,
+                    sampledGpuTexture != null ? sampledGpuTexture.getMinFilter() : null,
+                    sampledGpuTexture != null ? sampledGpuTexture.getMagFilter() : null,
+                    sampledGpuTexture != null && sampledGpuTexture.usesMipmaps(),
+                    samplerKey != null ? Integer.toHexString(samplerKey.minFilter()) : "null",
+                    samplerKey != null ? Integer.toHexString(samplerKey.magFilter()) : "null",
+                    samplerKey != null ? samplerKey.maxLod() : -1
                 );
             }
 
@@ -6968,8 +7010,7 @@ void main() {
             }
         }
 
-        private long resolveDescriptorSamplerHandle(VulkanTextureView textureView) {
-            DescriptorSamplerKey key = descriptorSamplerKey(textureView);
+        private long resolveDescriptorSamplerHandle(@Nullable DescriptorSamplerKey key) {
             if (key == null) {
                 return defaultDescriptorSampler;
             }
@@ -6987,6 +7028,10 @@ void main() {
             }
 
             return createdSampler;
+        }
+
+        private long resolveDescriptorSamplerHandle(VulkanTextureView textureView) {
+            return resolveDescriptorSamplerHandle(descriptorSamplerKey(textureView));
         }
 
         private LegacyTextureObject tryResolveLegacyTexture(net.vulkanic.VulkanicTexture texture) {
@@ -8537,14 +8582,30 @@ void main() {
             }
 
             LegacyTextureObject texture = requireBoundLegacyTexture2D(target, "generateMipmap");
+            generateLegacyTextureMipmap(commandBufferHandle, texture, "generateMipmap");
+        }
+
+        private void generateLegacyTextureMipmapForTextureId(long commandBufferHandle, int textureId) {
+            ensureRecordingCommandBuffer(commandBufferHandle, "generateTextureMipmapDSA");
+            if (renderPassRecording) {
+                throw new IllegalStateException("generateTextureMipmapDSA requires command recording outside an active render pass");
+            }
+
+            LegacyTextureObject texture = requireLegacyTexture(textureId);
+            generateLegacyTextureMipmap(commandBufferHandle, texture, "generateTextureMipmapDSA");
+        }
+
+        private void generateLegacyTextureMipmap(long commandBufferHandle,
+                                                 LegacyTextureObject texture,
+                                                 String operation) {
             if (texture.imageHandle == VK10.VK_NULL_HANDLE || texture.mipLevels <= 1) {
                 return;
             }
             if (texture.aspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
-                throw new UnsupportedOperationException("generateMipmap currently supports only color textures");
+                throw new UnsupportedOperationException(operation + " currently supports only color textures");
             }
 
-            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "generateMipmap");
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
             int layerCount = legacyTextureLayerCount(texture);
             int finalLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 

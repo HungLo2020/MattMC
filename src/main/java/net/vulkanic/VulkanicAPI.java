@@ -22,6 +22,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.TimeSource.NanoTimeSource;
 import net.vulkanic.backends.opengl.OpenGLBackend;
 import net.vulkanic.backends.vulkan.VulkanBackend;
+import net.logging.LogUtils;
+import org.slf4j.Logger;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
@@ -47,6 +49,9 @@ import java.util.function.BiFunction;
  * Provides a unified API for graphics operations that can be backed by different graphics APIs.
  */
 public class VulkanicAPI {
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final boolean DEBUG_ENTITY_FOG_SEAM_LOGS = Boolean.getBoolean("mattmc.vulkan.debugEntityFogSeam");
+    private static int DEBUG_ENTITY_FOG_SET_LOGS = 0;
     private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
@@ -3787,12 +3792,32 @@ public class VulkanicAPI {
         if (fogEndListener != null) {
             fogEndListener.run();
         }
+        if (DEBUG_ENTITY_FOG_SEAM_LOGS && DEBUG_ENTITY_FOG_SET_LOGS < 256) {
+            DEBUG_ENTITY_FOG_SET_LOGS++;
+            StackTraceElement[] stackTrace = new Throwable().getStackTrace();
+            StackTraceElement caller = stackTrace.length > 1 ? stackTrace[1] : null;
+            LOGGER.info(
+                "Vulkan shader fog set#{} slice={} caller={}",
+                DEBUG_ENTITY_FOG_SET_LOGS,
+                describeBufferSlice(gpuBufferSlice),
+                caller != null ? caller.getClassName() + "#" + caller.getMethodName() + ":" + caller.getLineNumber() : "unknown"
+            );
+        }
         shaderFog = gpuBufferSlice;
     }
 
     @Nullable
     public static GpuBufferSlice getShaderFog() {
         return shaderFog;
+    }
+
+    public static String describeBufferSlice(@Nullable GpuBufferSlice slice) {
+        if (slice == null) {
+            return "null";
+        }
+
+        int handle = getBufferHandle(slice.buffer());
+        return "handle=" + handle + ",offset=" + slice.offset() + ",length=" + slice.length();
     }
 
     public static void setShaderLights(@Nullable GpuBufferSlice gpuBufferSlice) {

@@ -10,14 +10,36 @@ layout(std140) uniform Fog {
     float FogCloudsEnd;
 };
 
+const float FOG_DISABLED_SENTINEL_THRESHOLD = 1.0e12;
+
+bool fog_range_disabled(float fogStart, float fogEnd) {
+    return max(abs(fogStart), abs(fogEnd)) >= FOG_DISABLED_SENTINEL_THRESHOLD;
+}
+
+bool fog_distance_invalid(float vertexDistance) {
+    return vertexDistance != vertexDistance || abs(vertexDistance) >= FOG_DISABLED_SENTINEL_THRESHOLD;
+}
+
 float linear_fog_value(float vertexDistance, float fogStart, float fogEnd) {
+    if (fog_distance_invalid(vertexDistance)) {
+        return 0.0;
+    }
+
+    if (fog_range_disabled(fogStart, fogEnd)) {
+        return 0.0;
+    }
+
+    if (fogEnd <= fogStart) {
+        return vertexDistance > fogStart ? 1.0 : 0.0;
+    }
+
     if (vertexDistance <= fogStart) {
         return 0.0;
     } else if (vertexDistance >= fogEnd) {
         return 1.0;
     }
 
-    return (vertexDistance - fogStart) / (fogEnd - fogStart);
+    return clamp((vertexDistance - fogStart) / (fogEnd - fogStart), 0.0, 1.0);
 }
 
 float total_fog_value(float sphericalVertexDistance, float cylindricalVertexDistance, float environmentalStart, float environmantalEnd, float renderDistanceStart, float renderDistanceEnd) {
@@ -25,8 +47,19 @@ float total_fog_value(float sphericalVertexDistance, float cylindricalVertexDist
 }
 
 vec4 apply_fog(vec4 inColor, float sphericalVertexDistance, float cylindricalVertexDistance, float environmentalStart, float environmantalEnd, float renderDistanceStart, float renderDistanceEnd, vec4 fogColor) {
+#ifdef MATTMC_VULKAN_DISABLE_ENTITY_FOG
+    return inColor;
+#endif
     float fogValue = total_fog_value(sphericalVertexDistance, cylindricalVertexDistance, environmentalStart, environmantalEnd, renderDistanceStart, renderDistanceEnd);
-    return vec4(mix(inColor.rgb, fogColor.rgb, fogValue * fogColor.a), inColor.a);
+    return vec4(mix(inColor.rgb, fogColor.rgb, clamp(fogValue * fogColor.a, 0.0, 1.0)), inColor.a);
+}
+
+vec4 apply_entity_fog(vec4 inColor, float sphericalVertexDistance, float environmentalStart, float environmantalEnd, vec4 fogColor) {
+#ifdef MATTMC_VULKAN_DISABLE_ENTITY_FOG
+    return inColor;
+#endif
+    float fogValue = linear_fog_value(sphericalVertexDistance, environmentalStart, environmantalEnd);
+    return vec4(mix(inColor.rgb, fogColor.rgb, clamp(fogValue * fogColor.a, 0.0, 1.0)), inColor.a);
 }
 
 float fog_spherical_distance(vec3 pos) {

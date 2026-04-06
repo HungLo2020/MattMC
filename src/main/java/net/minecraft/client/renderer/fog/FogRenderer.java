@@ -1,6 +1,7 @@
 package net.minecraft.client.renderer.fog;
 
 import com.google.common.collect.Lists;
+import net.logging.LogUtils;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
@@ -35,9 +36,13 @@ import net.sodium.client.util.FogStorage;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
+import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class FogRenderer implements AutoCloseable, FogStorage {
+	private static final Logger LOGGER = LogUtils.getLogger();
+	private static final boolean DEBUG_ENTITY_FOG_SEAM_LOGS = Boolean.getBoolean("mattmc.vulkan.debugEntityFogSeam");
+	private static int DEBUG_ENTITY_FOG_WRITE_LOGS = 0;
 	public static final int FOG_UBO_SIZE = new Std140SizeCalculator().putVec4().putFloat().putFloat().putFloat().putFloat().putFloat().putFloat().get();
 	private static final List<FogEnvironment> FOG_ENVIRONMENTS = Lists.<FogEnvironment>newArrayList(
 		new LavaFogEnvironment(),
@@ -233,6 +238,24 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			);
 			// Sodium: Store fog parameters (from FogRendererMixin)
 			parameters = new FogParameters(vector4f.x, vector4f.y, vector4f.z, vector4f.w, fogData.environmentalStart, fogData.environmentalEnd, fogData.renderDistanceStart, fogData.renderDistanceEnd);
+		}
+		if (DEBUG_ENTITY_FOG_SEAM_LOGS && DEBUG_ENTITY_FOG_WRITE_LOGS < 128) {
+			DEBUG_ENTITY_FOG_WRITE_LOGS++;
+			LOGGER.info(
+				"Fog setup#{} color=({}, {}, {}, {}) env=({}, {}) render=({}, {}) skyEnd={} cloudEnd={} slice={}",
+				DEBUG_ENTITY_FOG_WRITE_LOGS,
+				vector4f.x,
+				vector4f.y,
+				vector4f.z,
+				vector4f.w,
+				fogData.environmentalStart,
+				fogData.environmentalEnd,
+				fogData.renderDistanceStart,
+				fogData.renderDistanceEnd,
+				fogData.skyEnd,
+				fogData.cloudEnd,
+				VulkanicAPI.describeBufferSlice(this.getBuffer(FogRenderer.FogMode.WORLD))
+			);
 		}
 		
 		// Iris: Capture fog color

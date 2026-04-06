@@ -23,10 +23,12 @@ out vec2 texCoord1;
 out vec2 texCoord2;
 
 void main() {
-    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+    vec3 pos = Position + ModelOffset;
+    vec3 viewPos = (ModelViewMat * vec4(pos, 1.0)).xyz;
+    gl_Position = ProjMat * vec4(viewPos, 1.0);
 
-    sphericalVertexDistance = fog_spherical_distance(Position);
-    cylindricalVertexDistance = fog_cylindrical_distance(Position);
+    sphericalVertexDistance = fog_spherical_distance(viewPos);
+    cylindricalVertexDistance = fog_cylindrical_distance(viewPos);
     vec4 lightColor = texelFetch(Sampler2, UV2 / 16, 0);
     vertexColor = minecraft_mix_light(Light0_Direction, Light1_Direction, Normal, Color) * vec4(lightColor.rgb, 1.0);
     texCoord0 = UV0;

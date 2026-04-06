@@ -28,10 +28,12 @@ out vec4 overlayColor;
 out vec2 texCoord0;
 
 void main() {
-    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+    vec3 pos = Position + ModelOffset;
+    vec3 viewPos = (ModelViewMat * vec4(pos, 1.0)).xyz;
+    gl_Position = ProjMat * vec4(viewPos, 1.0);
 
-    sphericalVertexDistance = fog_spherical_distance(Position);
-    cylindricalVertexDistance = fog_cylindrical_distance(Position);
+    sphericalVertexDistance = fog_spherical_distance(viewPos);
+    cylindricalVertexDistance = fog_cylindrical_distance(viewPos);
 
 #ifdef PER_FACE_LIGHTING
     vec2 light = minecraft_compute_light(Light0_Direction, Light1_Direction, Normal);
