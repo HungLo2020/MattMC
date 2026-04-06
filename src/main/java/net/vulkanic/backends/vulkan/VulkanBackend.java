@@ -30,6 +30,7 @@ import net.vulkanic.VulkanicTextureFormat;
 import net.vulkanic.VulkanicTextureUploadFormat;
 import net.vulkanic.VulkanicTextureView;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanPerfAudit;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
 import net.vulkanic.VulkanExecutionContextInfo;
@@ -6871,6 +6872,7 @@ void main() {
                                                 VulkanPipelineHandle pipeline,
                                                 PipelineDescriptor descriptor,
                                                 PipelineResourceBindings bindings) {
+            long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindPipelineResources");
 
             if (descriptorPool == VK10.VK_NULL_HANDLE) {
@@ -6959,6 +6961,10 @@ void main() {
                     descriptorSetCacheStoreCount++;
                 }
                 bindDescriptorSetIfNeeded(commandBufferHandle, activeCommandBuffer, pipeline, descriptorSetHandle);
+            } finally {
+                if (auditStartNanos != 0L) {
+                    VulkanPerfAudit.recordDescriptorBind(System.nanoTime() - auditStartNanos);
+                }
             }
         }
 
@@ -10231,6 +10237,7 @@ void main() {
         }
 
         private int beginFrame() {
+            VulkanPerfAudit.recordBeginFrameCall();
             if (logicalDevice == null) {
                 throw new IllegalStateException("Cannot begin frame: Vulkan logical device is unavailable.");
             }
@@ -10271,12 +10278,16 @@ void main() {
                 }
 
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
+                long fenceWaitStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
                 int frameFenceWaitResult = VK10.vkWaitForFences(
                     logicalDevice,
                     frameFenceBuffer,
                     true,
                     SWAPCHAIN_FRAME_FENCE_WAIT_TIMEOUT_NANOS
                 );
+                if (fenceWaitStartNanos != 0L) {
+                    VulkanPerfAudit.recordBeginFrameFenceWait(System.nanoTime() - fenceWaitStartNanos);
+                }
                 if (frameFenceWaitResult == VK10.VK_TIMEOUT) {
                     consecutiveFrameFenceTimeouts++;
 
@@ -10443,6 +10454,7 @@ void main() {
                 acquiredSwapchainImageIndex = imageIndex;
                 frameInProgress = true;
                 successfulFrameAcquireCount++;
+                VulkanPerfAudit.recordBeginFrameAcquireSuccess();
                 if (successfulFrameAcquireCount <= 5) {
                     LOGGER.info(
                         "vkAcquireNextImageKHR succeeded for image {} (frame acquire #{}, sync slot {})",
@@ -10514,6 +10526,7 @@ void main() {
                         checkVk("vkQueueWaitIdle(presentQueue)", VK10.vkQueueWaitIdle(queueForPresent));
                     }
                     successfulFramePresentCount++;
+                    VulkanPerfAudit.recordPresentedFrame();
                     if (successfulFramePresentCount <= 5) {
                         LOGGER.info(
                             "vkQueuePresentKHR succeeded for image {} (frame present #{}, sync slot {})",
@@ -11159,12 +11172,20 @@ void main() {
                 throw new IllegalStateException("Immediate Vulkan submit fence is unavailable.");
             }
 
+            long totalStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
+            long waitBeforeNanos = 0L;
+            long queueSubmitNanos = 0L;
+            long waitAfterNanos = 0L;
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer immediateFenceBuffer = stack.longs(immediateSubmitFence);
+                long waitBeforeStartNanos = totalStartNanos != 0L ? System.nanoTime() : 0L;
                 checkVk(
                     "vkWaitForFences(immediateSubmit)",
                     VK10.vkWaitForFences(logicalDevice, immediateFenceBuffer, true, Long.MAX_VALUE)
                 );
+                if (waitBeforeStartNanos != 0L) {
+                    waitBeforeNanos = System.nanoTime() - waitBeforeStartNanos;
+                }
                 checkVk("vkResetFences(immediateSubmit)", VK10.vkResetFences(logicalDevice, immediateFenceBuffer));
                 checkVk("vkEndCommandBuffer", VK10.vkEndCommandBuffer(primaryCommandBuffer));
 
@@ -11174,15 +11195,28 @@ void main() {
                 commandBuffers.put(0, primaryCommandBuffer.address());
                 submitInfos.pCommandBuffers(commandBuffers);
 
+                long queueSubmitStartNanos = totalStartNanos != 0L ? System.nanoTime() : 0L;
                 checkVk("vkQueueSubmit(immediate)",
                     VK10.vkQueueSubmit(graphicsQueue, submitInfos, immediateSubmitFence));
+                if (queueSubmitStartNanos != 0L) {
+                    queueSubmitNanos = System.nanoTime() - queueSubmitStartNanos;
+                }
+                long waitAfterStartNanos = totalStartNanos != 0L ? System.nanoTime() : 0L;
                 checkVk(
                     "vkWaitForFences(immediateSubmitComplete)",
                     VK10.vkWaitForFences(logicalDevice, immediateFenceBuffer, true, Long.MAX_VALUE)
                 );
+                if (waitAfterStartNanos != 0L) {
+                    waitAfterNanos = System.nanoTime() - waitAfterStartNanos;
+                }
                 destroyTransientRenderPassResources();
                 commandBufferRecording = false;
                 clearTrackedCommandBufferState(commandBufferHandle);
+                if (totalStartNanos != 0L) {
+                    long totalNanos = System.nanoTime() - totalStartNanos;
+                    long otherNanos = totalNanos - waitBeforeNanos - queueSubmitNanos - waitAfterNanos;
+                    VulkanPerfAudit.recordPrimarySubmit(totalNanos, waitBeforeNanos, queueSubmitNanos, waitAfterNanos, otherNanos);
+                }
             }
         }
 
@@ -11301,6 +11335,7 @@ void main() {
         private void beginRenderPass(long commandBufferHandle,
                                      VulkanicRenderPassDescriptor descriptor,
                                      ResolvedRenderTargets targets) {
+            VulkanPerfAudit.recordRenderPassBegin();
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "beginRenderPass");
             if (renderPassRecording) {
                 throw new IllegalStateException("Nested Vulkan render passes are not supported yet.");

@@ -31,6 +31,7 @@ import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicCoreAPI;
+import net.vulkanic.VulkanPerfAudit;
 import net.vulkanic.VulkanicDepthCompareOp;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicLogicOp;
@@ -240,6 +241,7 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	@Nullable
 	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass) {
+		long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
 		GlRenderPipeline glRenderPipeline = glRenderPass.pipeline;
 		RenderPipeline pipelineInfo = glRenderPipeline.info();
 		PipelineDescriptor.ResourceLayout layout = glRenderPipeline.descriptor().getResourceLayout();
@@ -342,6 +344,9 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		if (boundResources.isEmpty()) {
+			if (auditStartNanos != 0L) {
+				VulkanPerfAudit.recordBindingBuild(System.nanoTime() - auditStartNanos, false);
+			}
 			return null;
 		}
 
@@ -359,11 +364,15 @@ public class GlCommandEncoder implements CommandEncoder {
 			);
 		}
 
-		return new PipelineResourceBindingSubmission(
+		PipelineResourceBindingSubmission submission = new PipelineResourceBindingSubmission(
 			submissionDescriptor,
 			PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBufferBindings, texelBufferBindings),
 			completeCoverage
 		);
+		if (auditStartNanos != 0L) {
+			VulkanPerfAudit.recordBindingBuild(System.nanoTime() - auditStartNanos, completeCoverage);
+		}
+		return submission;
 	}
 
 	private void prepareSamplerBindingsForVulkanDescriptors(GlRenderPass glRenderPass, CommandContext ctx) {
