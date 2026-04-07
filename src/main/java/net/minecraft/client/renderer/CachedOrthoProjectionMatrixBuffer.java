@@ -17,13 +17,19 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 	private final float zNear;
 	private final float zFar;
 	private final boolean invertY;
+	private final boolean useZeroToOneDepthWhenVulkan;
 	private float width;
 	private float height;
 
 	public CachedOrthoProjectionMatrixBuffer(String string, float f, float g, boolean bl) {
+		this(string, f, g, bl, false);
+	}
+
+	public CachedOrthoProjectionMatrixBuffer(String string, float f, float g, boolean bl, boolean bl2) {
 		this.zNear = f;
 		this.zFar = g;
 		this.invertY = bl;
+		this.useZeroToOneDepthWhenVulkan = bl2;
 		this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Projection matrix UBO " + string, 136, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 		this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
 	}
@@ -45,7 +51,15 @@ public class CachedOrthoProjectionMatrixBuffer implements AutoCloseable {
 	}
 
 	private Matrix4f createProjectionMatrix(float f, float g) {
-		return new Matrix4f().setOrtho(0.0F, f, this.invertY ? g : 0.0F, this.invertY ? 0.0F : g, this.zNear, this.zFar);
+		return new Matrix4f().setOrtho(
+			0.0F,
+			f,
+			this.invertY ? g : 0.0F,
+			this.invertY ? 0.0F : g,
+			this.zNear,
+			this.zFar,
+			this.useZeroToOneDepthWhenVulkan && net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
+		);
 	}
 
 	public void close() {

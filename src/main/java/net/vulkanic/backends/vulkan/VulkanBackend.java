@@ -4941,7 +4941,23 @@ void main() {
     }
 
     public void readPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
-        requireVulkanCommandBufferHandle("readPixels", ctx);
+        long commandBufferHandle = requireVulkanCommandBufferHandle("readPixels", ctx);
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        Integer sourceTexture = resolveFramebufferTextureForCopy(boundReadFbo, pendingReadBuffer);
+        if (sourceTexture == null) {
+            return;
+        }
+
+        ensureNativeReady("readPixels");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.readLegacyTextureRegionToBoundPixelPackBuffer(commandBufferHandle, "readPixels", sourceTexture, x, y, width, height, pixels);
     }
 
     public int resolveFramebufferForTextures(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture,
@@ -8380,6 +8396,96 @@ void main() {
             trackLayoutForLevel(destTexture, destLevel, destOriginalLayout);
         }
 
+        private void readLegacyTextureRegionToBoundPixelPackBuffer(long commandBufferHandle,
+                                                                   String operation,
+                                                                   int sourceTextureId,
+                                                                   int sourceX,
+                                                                   int sourceY,
+                                                                   int width,
+                                                                   int height,
+                                                                   long bufferOffset) {
+            ensureRecordingCommandBuffer(commandBufferHandle, operation);
+            if (renderPassRecording) {
+                throw new IllegalStateException(operation + " requires command recording outside an active render pass");
+            }
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+
+            LegacyTextureObject sourceTexture = requireLegacyTexture(sourceTextureId);
+            if (sourceTexture.imageHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+            if (sourceTexture.aspectMask != VK10.VK_IMAGE_ASPECT_COLOR_BIT) {
+                throw new UnsupportedOperationException(operation + " currently supports only color textures");
+            }
+
+            VulkanBuffer destinationBuffer = requireAllocatedLegacyBuffer(requireBoundLegacyBuffer(VulkanicAPI.GL_PIXEL_PACK_BUFFER), operation);
+            long requiredBytes = (long) width * height * Math.max(1, sourceTexture.pixelBytes);
+            if (bufferOffset < 0L || bufferOffset + requiredBytes > destinationBuffer.size()) {
+                throw new IllegalArgumentException(
+                    operation + " destination range [" + bufferOffset + ", " + (bufferOffset + requiredBytes)
+                        + ") exceeds pixel-pack buffer size " + destinationBuffer.size()
+                );
+            }
+
+            VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
+            int sourceOriginalLayout = trackedLayoutForLevel(sourceTexture, 0);
+            if (sourceOriginalLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
+                sourceOriginalLayout = preferredIdleLayout(sourceTexture);
+            }
+            if (sourceOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    sourceTexture.aspectMask,
+                    sourceOriginalLayout,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    0,
+                    1,
+                    legacyTextureLayerCount(sourceTexture)
+                );
+            }
+
+            try (MemoryStack stack = stackPush()) {
+                VkBufferImageCopy.Buffer region = VkBufferImageCopy.calloc(1, stack);
+                region.get(0)
+                    .bufferOffset(bufferOffset)
+                    .bufferRowLength(0)
+                    .bufferImageHeight(0);
+                region.get(0).imageSubresource()
+                    .aspectMask(sourceTexture.aspectMask)
+                    .mipLevel(0)
+                    .baseArrayLayer(0)
+                    .layerCount(1);
+                region.get(0).imageOffset().set(sourceX, sourceY, 0);
+                region.get(0).imageExtent().set(width, height, 1);
+
+                VK10.vkCmdCopyImageToBuffer(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    destinationBuffer.getVkBufferHandle(),
+                    region
+                );
+            }
+
+            if (sourceOriginalLayout != VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+                transitionImageLayout(
+                    commandBuffer,
+                    sourceTexture.imageHandle,
+                    sourceTexture.aspectMask,
+                    VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    sourceOriginalLayout,
+                    0,
+                    1,
+                    legacyTextureLayerCount(sourceTexture)
+                );
+            }
+
+            trackLayoutForLevel(sourceTexture, 0, sourceOriginalLayout);
+        }
+
         private void copyToBoundLegacyTexture2D(long commandBufferHandle,
                                                 String operation,
                                                 int target,
@@ -11637,9 +11743,9 @@ void main() {
                 VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
                 defaultViewport.get(0)
                     .x(0.0f)
-                    .y(swapchainColorAttachment ? 0.0f : (float) height)
+					.y(swapchainColorAttachment ? 0.0f : (float) height)
                     .width((float) width)
-                    .height(swapchainColorAttachment ? (float) height : -(float) height)
+					.height(swapchainColorAttachment ? (float) height : -(float) height)
                     .minDepth(0.0f)
                     .maxDepth(1.0f);
                 VK10.vkCmdSetViewport(activeCommandBuffer, 0, defaultViewport);

@@ -52,7 +52,7 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 		}
 
 		Minecraft minecraft = Minecraft.getInstance();
-		if (minecraft.level == null || minecraft.player == null) {
+		if (!minecraft.getModelManager().hasLoadedModels()) {
 			return;
 		}
 
@@ -65,7 +65,6 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 		);
 		this.invalidateTexture();
 		this.prepare(new OversizedItemRenderState(guiItemRenderState, -32, -32, -16, -16), guiRenderState, i);
-		this.dumpTextureToAutoCapture("gui_forced_grass_block_pip_debug");
 	}
 
 	@Override
@@ -109,13 +108,17 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 	}
 
 	@Override
-	protected void afterRenderToTexture(OversizedItemRenderState oversizedItemRenderState, GuiRenderState guiRenderState, int i) {
+	protected String getDebugDumpName(OversizedItemRenderState oversizedItemRenderState, GuiRenderState guiRenderState, int i) {
 		GuiItemRenderState guiItemRenderState = oversizedItemRenderState.guiItemRenderState();
 		if (guiItemRenderState.oversizedItemBounds() == null
 			&& guiItemRenderState.itemStackRenderState().usesBlockLight()
 			&& STANDARD_BLOCK_ITEM_DEBUG_DUMPED.compareAndSet(false, true)) {
-			this.dumpTextureToAutoCapture("gui_standard_block_item_pip_debug");
+			return oversizedItemRenderState.x0() < 0 && oversizedItemRenderState.y0() < 0
+				? "gui_forced_grass_block_pip_debug"
+				: "gui_standard_block_item_pip_debug";
 		}
+
+		return null;
 	}
 
 	public void blitTexture(OversizedItemRenderState oversizedItemRenderState, GuiRenderState guiRenderState) {

@@ -81,6 +81,10 @@ public class ModelManager implements PreparableReloadListener {
 		return (ItemModel)this.bakedItemStackModels.getOrDefault(resourceLocation, this.missingModels.item());
 	}
 
+	public boolean hasLoadedModels() {
+		return this.missingModels != null;
+	}
+
 	public ClientItem.Properties getItemProperties(ResourceLocation resourceLocation) {
 		return (ClientItem.Properties)this.itemProperties.getOrDefault(resourceLocation, ClientItem.Properties.DEFAULT);
 	}

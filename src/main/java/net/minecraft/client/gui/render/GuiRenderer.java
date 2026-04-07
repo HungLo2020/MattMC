@@ -337,8 +337,12 @@ public class GuiRenderer implements AutoCloseable {
 	}
 
 	private void prepareItemElements() {
+		int i = this.getGuiScaleInvalidatingItemAtlasIfChanged();
+		Standard3dItemRenderer debugStandard3dItemRenderer = (Standard3dItemRenderer)this.standard3dItemRenderers
+			.computeIfAbsent("debug_standard_3d_grass_block", object -> new Standard3dItemRenderer(this.bufferSource));
+		debugStandard3dItemRenderer.prepareDebugStandardBlockItemDump(this.renderState, i);
+
 		if (VulkanicAPI.isVulkanBackendSelected()) {
-			int i = this.getGuiScaleInvalidatingItemAtlasIfChanged();
 			if (!this.renderState.getItemModelIdentities().isEmpty()) {
 				this.prepareItemsViaPictureInPicture(i);
 			}
@@ -347,8 +351,6 @@ public class GuiRenderer implements AutoCloseable {
 		}
 
 		if (!this.renderState.getItemModelIdentities().isEmpty()) {
-			int i = this.getGuiScaleInvalidatingItemAtlasIfChanged();
-
 			int j = 16 * i;
 			int k = this.calculateAtlasSizeInPixels(j);
 			if (this.itemsAtlas == null) {

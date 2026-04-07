@@ -1,6 +1,7 @@
 package net.minecraft.client.gui.render.pip;
 
 import net.blaze3d.ProjectionType;
+import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.platform.TextureUtil;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
@@ -66,11 +67,20 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(null);
 			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(null);
 			VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+			String string = this.getDebugDumpName(pictureInPictureRenderState, guiRenderState, i);
+			if (string != null) {
+				this.dumpTextureToAutoCapture(string);
+			}
 			this.blitTexture(pictureInPictureRenderState, guiRenderState);
 		}
 	}
 
 	protected void afterRenderToTexture(T pictureInPictureRenderState, GuiRenderState guiRenderState, int i) {
+	}
+
+	@Nullable
+	protected String getDebugDumpName(T pictureInPictureRenderState, GuiRenderState guiRenderState, int i) {
+		return null;
 	}
 
 	protected void blitTexture(T pictureInPictureRenderState, GuiRenderState guiRenderState) {
@@ -127,7 +137,11 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 		}
 
 		net.vulkanic.VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.texture, 0, this.depthTexture, 1.0);
-		net.vulkanic.VulkanicAPI.setProjectionMatrix(this.projectionMatrixBuffer.getBuffer(i, j), ProjectionType.ORTHOGRAPHIC);
+		net.vulkanic.VulkanicAPI.setProjectionMatrix(this.getProjectionMatrixBuffer(i, j), ProjectionType.ORTHOGRAPHIC);
+	}
+
+	protected GpuBufferSlice getProjectionMatrixBuffer(int i, int j) {
+		return this.projectionMatrixBuffer.getBuffer(i, j);
 	}
 
 	protected boolean textureIsReadyToBlit(T pictureInPictureRenderState) {
