@@ -3153,9 +3153,9 @@ void main() {
                     dstAccessMask |= VK10.VK_ACCESS_SHADER_READ_BIT | VK10.VK_ACCESS_SHADER_WRITE_BIT;
                 }
                 case TEXTURE_FETCH -> {
-                    srcStageMask |= shaderStages;
+                    srcStageMask |= shaderStages | VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK10.VK_PIPELINE_STAGE_TRANSFER_BIT;
                     dstStageMask |= shaderStages;
-                    srcAccessMask |= VK10.VK_ACCESS_SHADER_WRITE_BIT;
+                    srcAccessMask |= VK10.VK_ACCESS_SHADER_WRITE_BIT | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK10.VK_ACCESS_TRANSFER_WRITE_BIT;
                     dstAccessMask |= VK10.VK_ACCESS_SHADER_READ_BIT;
                 }
                 case SHADER_STORAGE -> {

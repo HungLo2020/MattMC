@@ -52,6 +52,8 @@ public class ApiNeutralityCallsiteTest {
         String debugEntrySystemSpecsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"));
         String debugScreenOverlaySource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/DebugScreenOverlay.java"));
         String guiRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"));
+        String pictureInPictureRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java"));
+        String oversizedItemRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/OversizedItemRenderer.java"));
         String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"));
         String screenshotSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Screenshot.java"));
         String voxelMapTextureAtlasSource = Files.readString(SRC_MAIN_JAVA.resolve("net/voxelmap/textures/TextureAtlas.java"));
@@ -281,6 +283,26 @@ public class ApiNeutralityCallsiteTest {
             "GuiRenderer should allocate item atlas textures through backend-owned VulkanicAPI seam");
         assertTrue(guiRendererSource.contains("VulkanicAPI.createTextureView(this.itemsAtlas)"),
             "GuiRenderer should allocate item atlas texture views through backend-owned VulkanicAPI seam");
+        assertTrue(guiRendererSource.contains("RenderPipelines.GUI_TEXTURED,"),
+            "GuiRenderer should composite the UI item atlas with the straight-alpha GUI pipeline");
+        assertFalse(guiRendererSource.contains("RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,\n\t\t\t\t\tTextureSetup.singleTexture(this.itemsAtlasView)"),
+            "GuiRenderer should not composite the UI item atlas with the premultiplied-alpha GUI pipeline");
+        assertTrue(guiRendererSource.contains("VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH);"),
+            "GuiRenderer should make offscreen item-atlas color writes visible before sampling them back into the GUI");
+        assertTrue(guiRendererSource.contains("if (VulkanicAPI.isVulkanBackendSelected()) {"),
+            "GuiRenderer should special-case Vulkan GUI items instead of always relying on the shared atlas path");
+        assertTrue(guiRendererSource.contains("this.prepareItemsViaPictureInPicture(i);"),
+            "GuiRenderer should route Vulkan GUI items through the picture-in-picture path");
+        assertTrue(guiRendererSource.contains("boolean bl2 = !VulkanicAPI.isVulkanBackendSelected();"),
+            "GuiRenderer should bypass the atlas-only render-type scissor when Vulkan backend routing is active");
+        assertTrue(pictureInPictureRendererSource.contains("RenderPipelines.GUI_TEXTURED,"),
+            "PictureInPictureRenderer should composite UI render-to-texture results with the straight-alpha GUI pipeline");
+        assertTrue(pictureInPictureRendererSource.contains("protected int getRenderTextureWidth(T pictureInPictureRenderState, int i)"),
+            "PictureInPictureRenderer should allow offscreen UI renderers to grow their intermediate textures independently from the destination slot size");
+        assertTrue(oversizedItemRendererSource.contains("trackingItemStackRenderState.getModelBoundingBox()"),
+            "OversizedItemRenderer should size Vulkan standard 3D item offscreen textures from transformed model bounds when the shared atlas is bypassed");
+        assertTrue(oversizedItemRendererSource.contains("this.usesExpandedStandardItemTexture(guiItemRenderState)"),
+            "OversizedItemRenderer should only expand the offscreen path for standard block-lit GUI items that need extra bounds");
         assertFalse(guiRendererSource.contains("GpuDevice gpuDevice = VulkanicAPI.getDevice();"),
             "GuiRenderer should avoid local direct getDevice() variables for atlas setup");
         assertTrue(compiledSectionMeshSource.contains("VulkanicAPI.createBuffer("),

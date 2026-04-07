@@ -64,7 +64,7 @@ public class GuiProfilerChartRenderer extends PictureInPictureRenderer<GuiProfil
 	}
 
 	@Override
-	protected float getTranslateY(int i, int j) {
+	protected float getTranslateY(GuiProfilerChartRenderState guiProfilerChartRenderState, int i, int j) {
 		return i / 2.0F;
 	}
 

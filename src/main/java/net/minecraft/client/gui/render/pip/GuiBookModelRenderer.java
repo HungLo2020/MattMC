@@ -44,7 +44,7 @@ public class GuiBookModelRenderer extends PictureInPictureRenderer<GuiBookModelR
 	}
 
 	@Override
-	protected float getTranslateY(int i, int j) {
+	protected float getTranslateY(GuiBookModelRenderState guiBookModelRenderState, int i, int j) {
 		return 17 * j;
 	}
 
