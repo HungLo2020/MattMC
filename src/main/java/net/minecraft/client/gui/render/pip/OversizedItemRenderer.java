@@ -78,7 +78,7 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 		ScreenRectangle screenRectangle = guiItemRenderState.oversizedItemBounds();
 		if (screenRectangle == null) {
 			boolean bl = trackingItemStackRenderState.usesBlockLight();
-			poseStack.scale(1.0F, bl ? -1.0F : 1.0F, -1.0F);
+			poseStack.scale(1.0F, -1.0F, -1.0F);
 			if (bl && this.usesExpandedStandardItemTexture(guiItemRenderState)) {
 				AABB aABB = trackingItemStackRenderState.getModelBoundingBox();
 				float f = (float)(-(aABB.minX + aABB.maxX) / 2.0);
@@ -122,7 +122,13 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 	}
 
 	public void blitTexture(OversizedItemRenderState oversizedItemRenderState, GuiRenderState guiRenderState) {
-		super.blitTexture(oversizedItemRenderState, guiRenderState);
+		GuiItemRenderState guiItemRenderState = oversizedItemRenderState.guiItemRenderState();
+		if (guiItemRenderState.oversizedItemBounds() == null && !guiItemRenderState.itemStackRenderState().usesBlockLight()) {
+			this.submitBlitTexture(guiRenderState, oversizedItemRenderState, 0.0F, 1.0F, 0.0F, 1.0F);
+		} else {
+			super.blitTexture(oversizedItemRenderState, guiRenderState);
+		}
+
 		this.usedOnThisFrame = true;
 	}
 

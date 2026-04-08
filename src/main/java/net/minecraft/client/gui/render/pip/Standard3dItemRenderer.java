@@ -89,7 +89,9 @@ public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedIt
 			float g = (float)(-(aABB.minY + aABB.maxY) / 2.0);
 			poseStack.translate(f, g, 0.0F);
 		}
-		Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
+		Minecraft.getInstance().gameRenderer.getLighting().setupFor(
+			net.vulkanic.VulkanicAPI.isVulkanBackendSelected() ? Lighting.Entry.ITEMS_3D_UPRIGHT : Lighting.Entry.ITEMS_3D
+		);
 
 		FeatureRenderDispatcher featureRenderDispatcher = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
 		SubmitNodeStorage submitNodeStorage = featureRenderDispatcher.getSubmitNodeStorage();

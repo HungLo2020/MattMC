@@ -38,12 +38,20 @@ public class Lighting implements AutoCloseable {
 		this.updateBuffer(
 			Lighting.Entry.ITEMS_3D, matrix4f2.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()), matrix4f2.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
 		);
+		Matrix4f matrix4f3 = new Matrix4f()
+			.rotateYXZ(1.0821041F, 3.2375858F, 0.0F)
+			.rotateYXZ((float) (-Math.PI / 8), (float) (Math.PI * 3.0 / 4.0), 0.0F);
+		this.updateBuffer(
+			Lighting.Entry.ITEMS_3D_UPRIGHT,
+			matrix4f3.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()),
+			matrix4f3.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
+		);
 		this.updateBuffer(Lighting.Entry.ENTITY_IN_UI, INVENTORY_DIFFUSE_LIGHT_0, INVENTORY_DIFFUSE_LIGHT_1);
-		Matrix4f matrix4f3 = new Matrix4f();
+		Matrix4f matrix4f4 = new Matrix4f();
 		this.updateBuffer(
 			Lighting.Entry.PLAYER_SKIN,
-			matrix4f3.transformDirection(INVENTORY_DIFFUSE_LIGHT_0, new Vector3f()),
-			matrix4f3.transformDirection(INVENTORY_DIFFUSE_LIGHT_1, new Vector3f())
+			matrix4f4.transformDirection(INVENTORY_DIFFUSE_LIGHT_0, new Vector3f()),
+			matrix4f4.transformDirection(INVENTORY_DIFFUSE_LIGHT_1, new Vector3f())
 		);
 	}
 
@@ -75,6 +83,7 @@ public class Lighting implements AutoCloseable {
 		LEVEL,
 		ITEMS_FLAT,
 		ITEMS_3D,
+		ITEMS_3D_UPRIGHT,
 		ENTITY_IN_UI,
 		PLAYER_SKIN
     }
