@@ -14,3 +14,13 @@
 
 ## Prompt 3: Audit Code Base
 - i want you to do a comprehensive audit and review of my project looking for issues, dead code, poor design, maintainability, etc. you should ignore the frnsrc/ directory and the ERROR-LOG.txt for this PR. also DO NOT MAKE ANY CHANGES OR CReATE OR DELETE ANY FILES! PURELY CONDUCT YOUR REVIEW ADN REPORT YOUR FINDINGS HERE
+
+-Act as an expert Principal Software Engineer performing a comprehensive, read-only code audit. Your goal is to identify the most significant issues that compromise the codebase's quality, maintainability, and performance.
+Analyze the entire codebase and provide a prioritized list of the top 20 most critical issues. For each issue, provide:
+1.  Issue Title: A brief, clear summary of the problem.
+2.  Impact Analysis: A concise explanation of why it is a problem (e.g., "causes slow database queries," "increases risk of bugs," "makes new features difficult to add").
+3.  Location: A specific example (file path and line number) where the issue can be observed.
+Focus your audit on these key areas:
+Architectural Flaws: Poor modularity, high coupling between components, circular dependencies, and violations of established design patterns.
+Performance Bottlenecks: Inefficient algorithms, unoptimized loops, redundant database calls, memory-intensive operations, and blocking I/O.
+Code Smells & Complexity: Overly complex functions/classes (high cyclomatic complexity), massive files, "god objects," and significant code duplication (violating DRY principle).
