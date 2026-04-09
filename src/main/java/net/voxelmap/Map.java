@@ -285,6 +285,22 @@ public class Map implements Runnable, IChangeObserver {
             } else {
                 VoxelConstants.getLogger().warn("VoxelMap round map texture resource not found: {}", resourceRoundMap);
             }
+
+            if (resourceManager.getResource(squareStencil).isPresent()) {
+                DynamicTexture squareStencilTexture = new DynamicTexture(() -> "Minimap Square Stencil", TextureContents.load(resourceManager, squareStencil).image());
+                squareStencilTexture.setFilter(true, false);
+                minecraft.getTextureManager().register(squareStencil, squareStencilTexture);
+            } else {
+                VoxelConstants.getLogger().warn("VoxelMap square stencil texture resource not found: {}", squareStencil);
+            }
+
+            if (resourceManager.getResource(circleStencil).isPresent()) {
+                DynamicTexture circleStencilTexture = new DynamicTexture(() -> "Minimap Circle Stencil", TextureContents.load(resourceManager, circleStencil).image());
+                circleStencilTexture.setFilter(true, false);
+                minecraft.getTextureManager().register(circleStencil, circleStencilTexture);
+            } else {
+                VoxelConstants.getLogger().warn("VoxelMap circle stencil texture resource not found: {}", circleStencil);
+            }
         } catch (Exception exception) {
             VoxelConstants.getLogger().error("Failed loading map textures", exception);
         }
@@ -1579,19 +1595,25 @@ public class Map implements Runnable, IChangeObserver {
         this.percentY = (float) (GameVariableAccessShim.zCoordDouble() - this.lastImageZ);
         this.percentX *= multi;
         this.percentY *= multi;
-        guiGraphics.enableScissor(x - 32, y - 32, x + 32, y + 32);
-        guiGraphics.pose().pushMatrix();
-        guiGraphics.pose().translate(x, y);
-        if (!this.options.rotates) {
-            guiGraphics.pose().rotate(-this.northRotate * Mth.DEG_TO_RAD);
+        float angleRadians = !this.options.rotates ? -this.northRotate * Mth.DEG_TO_RAD : this.direction * Mth.DEG_TO_RAD;
+        if (this.options.squareMap) {
+            guiGraphics.enableScissor(x - 32, y - 32, x + 32, y + 32);
+            this.drawDirectMinimapBody(guiGraphics, x, y, scale, angleRadians);
+            guiGraphics.disableScissor();
         } else {
-            guiGraphics.pose().rotate(this.direction * Mth.DEG_TO_RAD);
+            VoxelMapGuiGraphics.blitCircular(
+                    guiGraphics,
+                    RenderPipelines.GUI_TEXTURED,
+                    this.mapImages[this.zoom].getTextureView(),
+                    x,
+                    y,
+                    32.0F,
+                    angleRadians,
+                    scale,
+                    this.percentX * 512.0F / 64.0F,
+                    -this.percentY * 512.0F / 64.0F,
+                    0xFFFFFFFF);
         }
-        guiGraphics.pose().scale(scale, scale);
-        guiGraphics.pose().translate(-this.percentX * 512.0F / 64.0F, this.percentY * 512.0F / 64.0F);
-        VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, this.mapImages[this.zoom].getTextureView(), -256, -256, 512, 512, 0, 1, 0, 1, 0xFFFFFFFF);
-        guiGraphics.pose().popMatrix();
-        guiGraphics.disableScissor();
 
         double guiScale = (double) minecraft.getWindow().getWidth() / this.scWidth;
         minTablistOffset = guiScale * 63;
@@ -1616,6 +1638,16 @@ public class Map implements Runnable, IChangeObserver {
                 this.drawWaypoint(guiGraphics, highlightedPoint, textureAtlas, x, y, scScale, lastXDouble, lastZDouble, textureAtlas.getAtlasSprite("voxelmap:images/waypoints/target.png"), 1.0F, 0.0F, 0.0F);
             }
         }
+        guiGraphics.pose().popMatrix();
+    }
+
+    private void drawDirectMinimapBody(GuiGraphics guiGraphics, int x, int y, float scale, float angleRadians) {
+        guiGraphics.pose().pushMatrix();
+        guiGraphics.pose().translate(x, y);
+        guiGraphics.pose().rotate(angleRadians);
+        guiGraphics.pose().scale(scale, scale);
+        guiGraphics.pose().translate(-this.percentX * 512.0F / 64.0F, this.percentY * 512.0F / 64.0F);
+        VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, this.mapImages[this.zoom].getTextureView(), -256, -256, 512, 512, 0, 1, 0, 1, 0xFFFFFFFF);
         guiGraphics.pose().popMatrix();
     }
 
@@ -1796,7 +1828,7 @@ public class Map implements Runnable, IChangeObserver {
 
     private void drawMapFrame(GuiGraphics guiGraphics, int x, int y, boolean squaremap) {
         ResourceLocation frameResource = squaremap ? resourceSquareMap : resourceRoundMap;
-        guiGraphics.blit(VoxelMapPipelines.GUI_TEXTURED_LESS_OR_EQUAL_DEPTH_PIPELINE, frameResource, x - 32, y - 32, 0, 0, 64, 64, 64, 64);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, frameResource, x - 32, y - 32, 0, 0, 64, 64, 64, 64);
     }
 
     private void drawDirections(GuiGraphics drawContext, int x, int y, float scaleProj) {

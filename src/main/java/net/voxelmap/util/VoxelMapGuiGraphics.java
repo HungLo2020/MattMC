@@ -28,6 +28,34 @@ public class VoxelMapGuiGraphics {
         blitFloatGradient(graphics, pipeline, Minecraft.getInstance().getTextureManager().getTexture(texture).getTextureView(), x, y, w, h, minu, maxu, minv, maxv, color, color);
     }
 
+    public static void blitCircular(
+            GuiGraphics graphics,
+            RenderPipeline pipeline,
+            GpuTextureView textureView,
+            float centerX,
+            float centerY,
+            float radius,
+            float angleRadians,
+            float mapScale,
+            float sourceOffsetX,
+            float sourceOffsetY,
+            int color) {
+        graphics.guiRenderState.submitGuiElement(
+                new CircularMaskBlitRenderState(
+                        pipeline,
+                        TextureSetup.singleTexture(textureView),
+                        new Matrix3x2f(graphics.pose()),
+                        centerX,
+                        centerY,
+                        radius,
+                        angleRadians,
+                        mapScale,
+                        sourceOffsetX,
+                        sourceOffsetY,
+                        color,
+                        graphics.scissorStack.peek()));
+    }
+
     public static void fillGradient(GuiGraphics graphics, float x0, float y0, float x1, float y1, int color00, int color10, int color01, int color11) {
         graphics.guiRenderState.submitGuiElement(new FourColoredRectangleRenderState(
                 RenderPipelines.GUI, TextureSetup.noTexture(), new Matrix3x2f(graphics.pose()), x0, y0, x1, y1, color00, color10, color01, color11, graphics.scissorStack.peek()));
