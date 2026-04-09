@@ -253,7 +253,7 @@ public class Map implements Runnable, IChangeObserver {
         // DynamicTexture fboTexture = new DynamicTexture("voxelmap-fbotexture", fboTextureSize, fboTextureSize, true);
         // minecraft.getTextureManager().register(resourceFboTexture, fboTexture);
         // this.fboTexture = fboTexture.getTexture();
-        this.projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Map To Screen Proj", -256.0F, 256.0F, 256.0F, -256.0F, 1000.0F, 21000.0F);
+        this.projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Map To Screen Proj", -256.0F, 256.0F, 256.0F, -256.0F, 1000.0F, 21000.0F, true);
 
         // VoxelMap: Load map textures - check if resources exist first before loading
         try {
@@ -1596,10 +1596,21 @@ public class Map implements Runnable, IChangeObserver {
         this.percentX *= multi;
         this.percentY *= multi;
         float angleRadians = !this.options.rotates ? -this.northRotate * Mth.DEG_TO_RAD : this.direction * Mth.DEG_TO_RAD;
+        float sourceOffsetX = this.percentX * 512.0F / 64.0F;
+        float sourceOffsetY = -this.percentY * 512.0F / 64.0F;
         if (this.options.squareMap) {
-            guiGraphics.enableScissor(x - 32, y - 32, x + 32, y + 32);
-            this.drawDirectMinimapBody(guiGraphics, x, y, scale, angleRadians);
-            guiGraphics.disableScissor();
+            VoxelMapGuiGraphics.blitSquareMap(
+                    guiGraphics,
+                    RenderPipelines.GUI_TEXTURED,
+                    this.mapImages[this.zoom].getTextureView(),
+                    x,
+                    y,
+                    32.0F,
+                    angleRadians,
+                    scale,
+                    sourceOffsetX,
+                    sourceOffsetY,
+                    0xFFFFFFFF);
         } else {
             VoxelMapGuiGraphics.blitCircular(
                     guiGraphics,
@@ -1610,8 +1621,8 @@ public class Map implements Runnable, IChangeObserver {
                     32.0F,
                     angleRadians,
                     scale,
-                    this.percentX * 512.0F / 64.0F,
-                    -this.percentY * 512.0F / 64.0F,
+                    sourceOffsetX,
+                    sourceOffsetY,
                     0xFFFFFFFF);
         }
 
@@ -1638,16 +1649,6 @@ public class Map implements Runnable, IChangeObserver {
                 this.drawWaypoint(guiGraphics, highlightedPoint, textureAtlas, x, y, scScale, lastXDouble, lastZDouble, textureAtlas.getAtlasSprite("voxelmap:images/waypoints/target.png"), 1.0F, 0.0F, 0.0F);
             }
         }
-        guiGraphics.pose().popMatrix();
-    }
-
-    private void drawDirectMinimapBody(GuiGraphics guiGraphics, int x, int y, float scale, float angleRadians) {
-        guiGraphics.pose().pushMatrix();
-        guiGraphics.pose().translate(x, y);
-        guiGraphics.pose().rotate(angleRadians);
-        guiGraphics.pose().scale(scale, scale);
-        guiGraphics.pose().translate(-this.percentX * 512.0F / 64.0F, this.percentY * 512.0F / 64.0F);
-        VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, this.mapImages[this.zoom].getTextureView(), -256, -256, 512, 512, 0, 1, 0, 1, 0xFFFFFFFF);
         guiGraphics.pose().popMatrix();
     }
 

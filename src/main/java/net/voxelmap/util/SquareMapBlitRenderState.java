@@ -9,13 +9,13 @@ import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-public record CircularMaskBlitRenderState(
+public record SquareMapBlitRenderState(
         RenderPipeline pipeline,
         TextureSetup textureSetup,
         Matrix3x2f pose,
         float centerX,
         float centerY,
-        float radius,
+        float halfSize,
         float angleRadians,
         float mapScale,
         float sourceOffsetX,
@@ -23,13 +23,13 @@ public record CircularMaskBlitRenderState(
         int color,
         @Nullable ScreenRectangle scissorArea,
         @Nullable ScreenRectangle bounds) implements GuiElementRenderState {
-    public CircularMaskBlitRenderState(
+    public SquareMapBlitRenderState(
             RenderPipeline renderPipeline,
             TextureSetup textureSetup,
             Matrix3x2f matrix3x2f,
             float centerX,
             float centerY,
-            float radius,
+            float halfSize,
             float angleRadians,
             float mapScale,
             float sourceOffsetX,
@@ -42,14 +42,14 @@ public record CircularMaskBlitRenderState(
                 matrix3x2f,
                 centerX,
                 centerY,
-                radius,
+                halfSize,
                 angleRadians,
                 mapScale,
                 sourceOffsetX,
                 sourceOffsetY,
                 color,
                 screenRectangle,
-                getBounds(centerX, centerY, radius, matrix3x2f, screenRectangle));
+                getBounds(centerX, centerY, halfSize, matrix3x2f, screenRectangle));
     }
 
     @Override
@@ -57,15 +57,12 @@ public record CircularMaskBlitRenderState(
         float cos = Mth.cos(this.angleRadians());
         float sin = Mth.sin(this.angleRadians());
         float inverseScale = 1.0F / this.mapScale();
-        float screenToSourceScale = 256.0F / this.radius();
-        int radiusPixels = Mth.floor(this.radius());
-        float radiusSquared = this.radius() * this.radius();
+        float screenToSourceScale = 256.0F / this.halfSize();
+        int halfPixels = Mth.floor(this.halfSize());
+        float left = this.centerX() - this.halfSize();
+        float right = this.centerX() + this.halfSize();
 
-        for (int row = -radiusPixels; row < radiusPixels; row++) {
-            float bandCenterY = row + 0.5F;
-            float halfWidth = (float) Math.floor(Math.sqrt(Math.max(0.0F, radiusSquared - bandCenterY * bandCenterY)));
-            float left = this.centerX() - halfWidth;
-            float right = this.centerX() + halfWidth + 1.0F;
+        for (int row = -halfPixels; row < halfPixels; row++) {
             float top = this.centerY() + row;
             float bottom = top + 1.0F;
 
@@ -87,10 +84,10 @@ public record CircularMaskBlitRenderState(
     }
 
     @Nullable
-    private static ScreenRectangle getBounds(float centerX, float centerY, float radius, Matrix3x2f matrix3x2f, @Nullable ScreenRectangle screenRectangle) {
-        int left = Mth.floor(centerX - radius);
-        int top = Mth.floor(centerY - radius);
-        int size = Mth.ceil(radius * 2.0F);
+    private static ScreenRectangle getBounds(float centerX, float centerY, float halfSize, Matrix3x2f matrix3x2f, @Nullable ScreenRectangle screenRectangle) {
+        int left = Mth.floor(centerX - halfSize);
+        int top = Mth.floor(centerY - halfSize);
+        int size = Mth.ceil(halfSize * 2.0F);
         ScreenRectangle screenRectangle2 = new ScreenRectangle(left, top, size, size).transformMaxBounds(matrix3x2f);
         return screenRectangle != null ? screenRectangle.intersection(screenRectangle2) : screenRectangle2;
     }

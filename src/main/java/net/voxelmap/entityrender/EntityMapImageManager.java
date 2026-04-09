@@ -106,7 +106,7 @@ public class EntityMapImageManager {
         fboTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboTexture);
         fboDepthTextureView = net.vulkanic.VulkanicAPI.createTextureView(this.fboDepthTexture);
 
-        projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Entity Map Image Proj", 256.0F, -256.0F, -256.0F, 256.0F, 1000.0F, 21000.0F);
+        projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Entity Map Image Proj", 256.0F, -256.0F, -256.0F, 256.0F, 1000.0F, 21000.0F, true);
 
     }
 
