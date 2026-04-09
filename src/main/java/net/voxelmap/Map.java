@@ -77,6 +77,7 @@ import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicResourceBarriers;
 import org.joml.Matrix3x2fStack;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -88,6 +89,12 @@ import java.util.Random;
 import java.util.TreeSet;
 
 public class Map implements Runnable, IChangeObserver {
+    private static final VulkanicResourceBarriers OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
+            VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
+    );
+    private static final VulkanicResourceBarriers TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
+        VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
+    );
     private final Minecraft minecraft = Minecraft.getInstance();
     private final float[] lastLightBrightnessTable = new float[16];
     private final Object coordinateLock = new Object();
@@ -1561,6 +1568,7 @@ public class Map implements Runnable, IChangeObserver {
             if (this.imageChanged) {
                 this.imageChanged = false;
                 this.mapImages[this.zoom].upload();
+                VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
                 this.lastImageX = this.lastX;
                 this.lastImageZ = this.lastZ;
             }
@@ -1571,98 +1579,19 @@ public class Map implements Runnable, IChangeObserver {
         this.percentY = (float) (GameVariableAccessShim.zCoordDouble() - this.lastImageZ);
         this.percentX *= multi;
         this.percentY *= multi;
+        guiGraphics.enableScissor(x - 32, y - 32, x + 32, y + 32);
         guiGraphics.pose().pushMatrix();
-        guiGraphics.pose().identity();
-
-        BufferBuilder bufferBuilder = fboTessellator.begin(Mode.QUADS, RenderPipelines.GUI_TEXTURED.getVertexFormat());
-
-        bufferBuilder.addVertex(-256, 256, -2500).setUv(0, 0).setColor(255, 255, 255, 255);
-        bufferBuilder.addVertex(256, 256, -2500).setUv(1, 0).setColor(255, 255, 255, 255);
-        bufferBuilder.addVertex(256, -256, -2500).setUv(1, 1).setColor(255, 255, 255, 255);
-        bufferBuilder.addVertex(-256, -256, -2500).setUv(0, 1).setColor(255, 255, 255, 255);
-
-        // guiGraphics.pose().translate(256, 256);
+        guiGraphics.pose().translate(x, y);
         if (!this.options.rotates) {
             guiGraphics.pose().rotate(-this.northRotate * Mth.DEG_TO_RAD);
         } else {
             guiGraphics.pose().rotate(this.direction * Mth.DEG_TO_RAD);
         }
         guiGraphics.pose().scale(scale, scale);
-        // guiGraphics.pose().translate(-256, -256);
         guiGraphics.pose().translate(-this.percentX * 512.0F / 64.0F, this.percentY * 512.0F / 64.0F);
-
-        Vector3f vector3f = new Vector3f();
-        guiGraphics.pose().transform(-256, 256, 1, vector3f);
-        bufferBuilder.addVertex(vector3f.x, vector3f.y, -2500).setUv(0, 0).setColor(255, 255, 255, 255);
-
-        guiGraphics.pose().transform(256, 256, 1, vector3f);
-        bufferBuilder.addVertex(vector3f.x, vector3f.y, -2500).setUv(1, 0).setColor(255, 255, 255, 255);
-
-        guiGraphics.pose().transform(256, -256, 1, vector3f);
-        bufferBuilder.addVertex(vector3f.x, vector3f.y, -2500).setUv(1, 1).setColor(255, 255, 255, 255);
-
-        guiGraphics.pose().transform(-256, -256, 1, vector3f);
-        bufferBuilder.addVertex(vector3f.x, vector3f.y, -2500).setUv(0, 1).setColor(255, 255, 255, 255);
-
-        ProjectionType originalProjectionType = net.vulkanic.VulkanicAPI.getProjectionType();
-        GpuBufferSlice originalProjectionMatrix = net.vulkanic.VulkanicAPI.getProjectionMatrixBuffer();
-        net.vulkanic.VulkanicAPI.setProjectionMatrix(projection.getBuffer(), ProjectionType.ORTHOGRAPHIC);
-        VulkanicAPI.getModelViewStack().pushMatrix();
-        VulkanicAPI.getModelViewStack().identity();
-
-        GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms()
-                .writeTransform(
-                        VulkanicAPI.getModelViewMatrix(),
-                        new Vector4f(1.0F, 1.0F, 1.0F, 1.0F),
-                        new Vector3f(),
-                net.vulkanic.VulkanicAPI.getTextureMatrix(),
-                net.vulkanic.VulkanicAPI.getShaderLineWidth());
-
-        RenderPipeline renderPipeline = VoxelMapPipelines.GUI_TEXTURED_ANY_DEPTH_PIPELINE;
-        try (MeshData meshData = bufferBuilder.build()) {
-            GpuBuffer vertexBuffer = renderPipeline.getVertexFormat().uploadImmediateVertexBuffer(meshData.vertexBuffer());
-            GpuBuffer indexBuffer;
-            VertexFormat.IndexType indexType;
-            if (meshData.indexBuffer() == null) {
-                VulkanicAPI.AutoStorageIndexBuffer autoStorageIndexBuffer = VulkanicAPI.getSequentialBuffer(meshData.drawState().mode());
-                indexBuffer = autoStorageIndexBuffer.getBuffer(meshData.drawState().indexCount());
-                indexType = autoStorageIndexBuffer.type();
-            } else {
-                indexBuffer = renderPipeline.getVertexFormat().uploadImmediateIndexBuffer(meshData.indexBuffer());
-                indexType = meshData.drawState().indexType();
-            }
-
-            GpuTextureView stencilTexture = null;
-            if (this.options.squareMap) {
-                stencilTexture = Minecraft.getInstance().getTextureManager().getTexture(squareStencil).getTextureView();
-            } else {
-                stencilTexture = Minecraft.getInstance().getTextureManager().getTexture(circleStencil).getTextureView();
-            }
-
-            try (RenderPass renderPass = net.vulkanic.VulkanicAPI.createCommandEncoder().createRenderPass(() -> "Voxelmap: Map to screen", fboTextureView, OptionalInt.of(0x00000000))) {
-                renderPass.setPipeline(renderPipeline);
-                net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
-                renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
-                renderPass.setVertexBuffer(0, vertexBuffer);
-                renderPass.setIndexBuffer(indexBuffer, indexType);
-
-                renderPass.bindSampler("Sampler0", stencilTexture);
-                renderPass.drawIndexed(0, 0, meshData.drawState().indexCount() / 2, 1);
-                renderPass.setPipeline(VoxelMapPipelines.GUI_TEXTURED_ANY_DEPTH_DST_ALPHA_PIPELINE);
-
-                renderPass.bindSampler("Sampler0", mapImages[this.zoom].getTextureView());
-                renderPass.drawIndexed(0, meshData.drawState().indexCount() / 2, meshData.drawState().indexCount() / 2, 1);
-            }
-        }
-        VulkanicAPI.getModelViewStack().popMatrix();
-        net.vulkanic.VulkanicAPI.setProjectionMatrix(originalProjectionMatrix, originalProjectionType);
-        fboTessellator.clear();
-        // if (((saved++) % 1000) == 0)
-        // ImageUtils.saveImage("minimap_" + saved, fboTexture);
-
+        VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, this.mapImages[this.zoom].getTextureView(), -256, -256, 512, 512, 0, 1, 0, 1, 0xFFFFFFFF);
         guiGraphics.pose().popMatrix();
-
-        VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, fboTextureView, x - 32, y - 32, 64, 64, 0, 1, 0, 1, 0xffffffff);
+        guiGraphics.disableScissor();
 
         double guiScale = (double) minecraft.getWindow().getWidth() / this.scWidth;
         minTablistOffset = guiScale * 63;
@@ -1824,6 +1753,7 @@ public class Map implements Runnable, IChangeObserver {
             if (this.imageChanged) {
                 this.imageChanged = false;
                 this.mapImages[this.zoom].upload();
+                VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
                 this.lastImageX = this.lastX;
                 this.lastImageZ = this.lastZ;
             }
@@ -1836,7 +1766,7 @@ public class Map implements Runnable, IChangeObserver {
         matrixStack.translate(-(scWidth / 2.0F), -(scHeight / 2.0F));
         int left = scWidth / 2 - 128;
         int top = scHeight / 2 - 128;
-        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, mapResources[this.zoom], left, top, 0, 0, 256, 256, 256, 256);
+        VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, this.mapImages[this.zoom].getTextureView(), left, top, 256, 256, 0, 1, 0, 1, 0xFFFFFFFF);
         matrixStack.popMatrix();
 
         if (this.options.biomeOverlay != 0) {

@@ -15,11 +15,15 @@ import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Level;
 import org.lwjgl.system.MemoryUtil;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicResourceBarriers;
 
 public class CompressibleGLBufferedImage {
     private static final HashMap<Integer, ByteBuffer> byteBuffers = new HashMap<>(4);
     private static final int DEFAULT_SIZE = 256;
     private static final ByteBuffer defaultSizeBuffer = ByteBuffer.allocateDirect(DEFAULT_SIZE * DEFAULT_SIZE * 4).order(ByteOrder.nativeOrder());
+    private static final VulkanicResourceBarriers TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
+        VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
+    );
 
     private byte[] bytes;
     private final int width;
@@ -81,6 +85,7 @@ public class CompressibleGLBufferedImage {
         if (this.texture == null) {
             this.texture = new DynamicTexture(() -> "", new NativeImage(Format.RGBA, width, height, false));
             this.texture.setClamp(true);
+            this.texture.setFilter(true, true);
             Minecraft.getInstance().getTextureManager().register(location, texture);
         }
 
@@ -102,6 +107,7 @@ public class CompressibleGLBufferedImage {
         // Use DSA mipmap generation — avoids mutating the global GL texture bind state
         // and requires only a single VulkanicAPI call instead of a bind + generate pair.
         VulkanicAPI.generateTextureMipmapDSA(VulkanicAPI.getCommandContext(), net.vulkanic.VulkanicCoreAPI.textureId(this.texture.getTexture()));
+        VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), TEXTURE_UPLOAD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
         this.compress();
     }
 
