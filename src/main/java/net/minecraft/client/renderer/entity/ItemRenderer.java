@@ -94,12 +94,7 @@ public class ItemRenderer {
 	}
 
 	private static int getLayerColorSafe(int[] is, int i) {
-		if (i < 0 || i >= is.length) {
-			return -1;
-		}
-
-		int j = is[i];
-		return j == -1 || ARGB.alpha(j) != 0 ? j : ARGB.opaque(j);
+		return i >= 0 && i < is.length ? is[i] : -1;
 	}
 
 	private static void renderQuadList(PoseStack poseStack, VertexConsumer vertexConsumer, List<BakedQuad> list, int[] is, int i, int j, boolean allowSodiumFastPath) {

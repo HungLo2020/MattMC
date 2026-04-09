@@ -20,7 +20,6 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
@@ -29,7 +28,6 @@ import org.joml.Matrix3x2f;
 @Environment(EnvType.CLIENT)
 public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedItemRenderState> {
 	private static final AtomicBoolean STANDARD_BLOCK_ITEM_DEBUG_DUMPED = new AtomicBoolean();
-	private static final AtomicBoolean FLAT_ITEM_DEBUG_DUMPED = new AtomicBoolean();
 	private final CachedOrthoProjectionMatrixBuffer vulkanProjectionMatrixBuffer = new CachedOrthoProjectionMatrixBuffer(
 		"PIP - OversizedItemRenderer Vulkan Depth", -1000.0F, 1000.0F, true, true
 	);
@@ -74,27 +72,6 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 		this.prepare(new OversizedItemRenderState(guiItemRenderState, -32, -32, -16, -16), guiRenderState, i);
 	}
 
-	public void prepareDebugFlatItemDump(GuiRenderState guiRenderState, int i) {
-		if (FLAT_ITEM_DEBUG_DUMPED.get()) {
-			return;
-		}
-
-		Minecraft minecraft = Minecraft.getInstance();
-		if (!minecraft.getModelManager().hasLoadedModels()) {
-			return;
-		}
-
-		TrackingItemStackRenderState trackingItemStackRenderState = new TrackingItemStackRenderState();
-		minecraft
-			.getItemModelResolver()
-			.updateForTopItem(trackingItemStackRenderState, new ItemStack(Items.DIAMOND), ItemDisplayContext.GUI, minecraft.level, minecraft.player, 0);
-		GuiItemRenderState guiItemRenderState = new GuiItemRenderState(
-			"debug_flat_item", new Matrix3x2f(), trackingItemStackRenderState, -64, -32, null
-		);
-		this.invalidateTexture();
-		this.prepare(new OversizedItemRenderState(guiItemRenderState, -64, -32, -48, -16), guiRenderState, i);
-	}
-
 	@Override
 	public Class<OversizedItemRenderState> getRenderStateClass() {
 		return OversizedItemRenderState.class;
@@ -106,7 +83,7 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 		ScreenRectangle screenRectangle = guiItemRenderState.oversizedItemBounds();
 		if (screenRectangle == null) {
 			boolean bl = trackingItemStackRenderState.usesBlockLight();
-			poseStack.scale(1.0F, bl ? -1.0F : 1.0F, -1.0F);
+			poseStack.scale(1.0F, -1.0F, -1.0F);
 			if (bl && this.usesExpandedStandardItemTexture(guiItemRenderState)) {
 				AABB aABB = trackingItemStackRenderState.getModelBoundingBox();
 				float f = (float)(-(aABB.minX + aABB.maxX) / 2.0);
@@ -123,9 +100,7 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 		}
 		boolean bl = !trackingItemStackRenderState.usesBlockLight();
 		if (bl) {
-			Minecraft.getInstance().gameRenderer.getLighting().setupFor(
-				net.vulkanic.VulkanicAPI.isVulkanBackendSelected() ? Lighting.Entry.ITEMS_FLAT_UPRIGHT : Lighting.Entry.ITEMS_FLAT
-			);
+			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
 		} else {
 			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 		}
@@ -141,14 +116,6 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 	protected String getDebugDumpName(OversizedItemRenderState oversizedItemRenderState, GuiRenderState guiRenderState, int i) {
 		GuiItemRenderState guiItemRenderState = oversizedItemRenderState.guiItemRenderState();
 		if (guiItemRenderState.oversizedItemBounds() == null
-			&& !guiItemRenderState.itemStackRenderState().usesBlockLight()
-			&& oversizedItemRenderState.x0() < 0
-			&& oversizedItemRenderState.y0() < 0
-			&& FLAT_ITEM_DEBUG_DUMPED.compareAndSet(false, true)) {
-			return "gui_flat_item_pip_debug";
-		}
-
-		if (guiItemRenderState.oversizedItemBounds() == null
 			&& guiItemRenderState.itemStackRenderState().usesBlockLight()
 			&& STANDARD_BLOCK_ITEM_DEBUG_DUMPED.compareAndSet(false, true)) {
 			return oversizedItemRenderState.x0() < 0 && oversizedItemRenderState.y0() < 0
@@ -160,7 +127,12 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 	}
 
 	public void blitTexture(OversizedItemRenderState oversizedItemRenderState, GuiRenderState guiRenderState) {
-		super.blitTexture(oversizedItemRenderState, guiRenderState);
+		GuiItemRenderState guiItemRenderState = oversizedItemRenderState.guiItemRenderState();
+		if (guiItemRenderState.oversizedItemBounds() == null && !guiItemRenderState.itemStackRenderState().usesBlockLight()) {
+			this.submitBlitTexture(guiRenderState, oversizedItemRenderState, 0.0F, 1.0F, 0.0F, 1.0F);
+		} else {
+			super.blitTexture(oversizedItemRenderState, guiRenderState);
+		}
 		this.usedOnThisFrame = true;
 	}
 
