@@ -8,6 +8,7 @@ import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.platform.Lighting;
+import net.blaze3d.platform.TextureUtil;
 import net.blaze3d.platform.Window;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
@@ -25,7 +26,10 @@ import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -35,6 +39,7 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -62,6 +67,9 @@ import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicResourceBarriers;
 import org.apache.commons.lang3.mutable.MutableBoolean;
@@ -79,6 +87,7 @@ public class GuiRenderer implements AutoCloseable {
 	private static final VulkanicResourceBarriers OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
 		VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
 	);
+	private static final AtomicBoolean FLAT_ITEM_ATLAS_DEBUG_DUMPED = new AtomicBoolean();
 	private static final float MAX_GUI_Z = 10000.0F;
 	public static final float MIN_GUI_Z = 0.0F;
 	private static final float GUI_Z_NEAR = 1000.0F;
@@ -341,6 +350,12 @@ public class GuiRenderer implements AutoCloseable {
 		Standard3dItemRenderer debugStandard3dItemRenderer = (Standard3dItemRenderer)this.standard3dItemRenderers
 			.computeIfAbsent("debug_standard_3d_grass_block", object -> new Standard3dItemRenderer(this.bufferSource));
 		debugStandard3dItemRenderer.prepareDebugStandardBlockItemDump(this.renderState, i);
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			OversizedItemRenderer debugOversizedItemRenderer = (OversizedItemRenderer)this.oversizedItemRenderers
+				.computeIfAbsent("debug_flat_item_stick", object -> new OversizedItemRenderer(this.bufferSource));
+			debugOversizedItemRenderer.prepareDebugFlatItemDump(this.renderState, i);
+			this.prepareDebugFlatItemAtlasDump(i);
+		}
 
 		if (VulkanicAPI.isVulkanBackendSelected()) {
 			if (!this.renderState.getItemModelIdentities().isEmpty()) {
@@ -475,7 +490,9 @@ public class GuiRenderer implements AutoCloseable {
 		poseStack.scale(k, -k, k);
 		boolean bl = !trackingItemStackRenderState.usesBlockLight();
 		if (bl) {
-			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+			Minecraft.getInstance().gameRenderer.getLighting().setupFor(
+				VulkanicAPI.isVulkanBackendSelected() ? Lighting.Entry.ITEMS_FLAT_UPRIGHT : Lighting.Entry.ITEMS_FLAT
+			);
 		} else {
 			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 		}
@@ -518,12 +535,61 @@ public class GuiRenderer implements AutoCloseable {
 	}
 
 	private void createAtlasTextures(int i) {
-		this.itemsAtlas = VulkanicAPI.createTexture("UI items atlas", 12, TextureFormat.RGBA8, i, i, 1, 1);
+		this.itemsAtlas = VulkanicAPI.createTexture("UI items atlas", GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, TextureFormat.RGBA8, i, i, 1, 1);
 		this.itemsAtlas.setTextureFilter(FilterMode.NEAREST, false);
 		this.itemsAtlasView = VulkanicAPI.createTextureView(this.itemsAtlas);
 		this.itemsAtlasDepth = VulkanicAPI.createTexture("UI items atlas depth", 8, TextureFormat.DEPTH32, i, i, 1, 1);
 		this.itemsAtlasDepthView = VulkanicAPI.createTextureView(this.itemsAtlasDepth);
 		VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0);
+	}
+
+	private void prepareDebugFlatItemAtlasDump(int i) {
+		if (FLAT_ITEM_ATLAS_DEBUG_DUMPED.get()) {
+			return;
+		}
+
+		Minecraft minecraft = Minecraft.getInstance();
+		if (!minecraft.getModelManager().hasLoadedModels()) {
+			return;
+		}
+
+		if (this.itemsAtlas == null) {
+			this.createAtlasTextures(Math.max(16 * i, 16));
+		}
+
+		TrackingItemStackRenderState trackingItemStackRenderState = new TrackingItemStackRenderState();
+		minecraft
+			.getItemModelResolver()
+			.updateForTopItem(trackingItemStackRenderState, new ItemStack(Items.DIAMOND), ItemDisplayContext.GUI, minecraft.level, minecraft.player, 0);
+		PoseStack poseStack = new PoseStack();
+		net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(this.itemsAtlasView);
+		net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(this.itemsAtlasDepthView);
+		net.vulkanic.VulkanicAPI.setProjectionMatrix(this.itemsProjectionMatrixBuffer.getBuffer(16 * i, 16 * i), ProjectionType.ORTHOGRAPHIC);
+		VulkanicAPI.createCommandEncoder().clearColorAndDepthTextures(this.itemsAtlas, 0, this.itemsAtlasDepth, 1.0);
+		this.renderItemToAtlas(trackingItemStackRenderState, poseStack, 0, 0, 16 * i);
+		net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(null);
+		net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(null);
+		VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+		LOGGER.info("Requesting Vulkan GUI flat atlas debug dump");
+		this.dumpTextureToAutoCapture("gui_flat_item_atlas_debug", this.itemsAtlas);
+		FLAT_ITEM_ATLAS_DEBUG_DUMPED.set(true);
+	}
+
+	private void dumpTextureToAutoCapture(String string, GpuTexture gpuTexture) {
+		try {
+			Path path = this.getAutoCaptureDir();
+			Files.createDirectories(path);
+			LOGGER.info("Queueing GUI auto-capture dump '{}' to {}", string, path);
+			TextureUtil.writeAsPNG(path, string, gpuTexture, 0, integer -> integer);
+		} catch (IOException var5) {
+			LOGGER.warn("Failed to queue GUI auto-capture dump '{}'", string, var5);
+		}
+	}
+
+	private Path getAutoCaptureDir() {
+		Path path = Minecraft.getInstance().gameDirectory.toPath().toAbsolutePath().normalize();
+		Path path2 = path.getParent();
+		return (path2 != null ? path2 : path).resolve("logs/auto-capture");
 	}
 
 	private int calculateAtlasSizeInPixels(int i) {

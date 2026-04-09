@@ -22,6 +22,7 @@ import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
@@ -146,13 +147,17 @@ public class ItemRenderContext extends AbstractRenderContext {
         final int tintIndex = quad.tintIndex();
 
         if (tintIndex != -1 && tintIndex < colors.length) {
-            final int color = colors[tintIndex];
+            final int color = normalizeTintColor(colors[tintIndex]);
 
             for (int i = 0; i < 4; i++) {
                 quad.color(i, ColorMixer.mulComponentWise(color, quad.color(i)));
             }
         }
     }
+
+	private static int normalizeTintColor(int color) {
+		return color == -1 || ARGB.alpha(color) != 0 ? color : ARGB.opaque(color);
+	}
 
     private void shadeQuad(MutableQuadViewImpl quad, boolean emissive) {
         if (emissive) {

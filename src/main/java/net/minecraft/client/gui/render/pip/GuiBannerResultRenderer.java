@@ -29,7 +29,9 @@ public class GuiBannerResultRenderer extends PictureInPictureRenderer<GuiBannerR
 	}
 
 	protected void renderToTexture(GuiBannerResultRenderState guiBannerResultRenderState, PoseStack poseStack) {
-		Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+		Minecraft.getInstance().gameRenderer.getLighting().setupFor(
+			net.vulkanic.VulkanicAPI.isVulkanBackendSelected() ? Lighting.Entry.ITEMS_FLAT_UPRIGHT : Lighting.Entry.ITEMS_FLAT
+		);
 		poseStack.translate(0.0F, 0.25F, 0.0F);
 		FeatureRenderDispatcher featureRenderDispatcher = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
 		SubmitNodeStorage submitNodeStorage = featureRenderDispatcher.getSubmitNodeStorage();

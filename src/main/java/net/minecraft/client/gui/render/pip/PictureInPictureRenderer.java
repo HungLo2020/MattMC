@@ -11,6 +11,7 @@ import net.blaze3d.vertex.PoseStack;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import net.logging.LogUtils;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -24,9 +25,11 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicResourceBarriers;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderState> implements AutoCloseable {
+	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final VulkanicResourceBarriers OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
 		VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
 	);
@@ -129,7 +132,15 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 		}
 
 		if (this.texture == null) {
-			this.texture = net.vulkanic.VulkanicAPI.createTexture(() -> "UI " + this.getTextureLabel() + " texture", 14, TextureFormat.RGBA8, i, j, 1, 1);
+			this.texture = net.vulkanic.VulkanicAPI.createTexture(
+				() -> "UI " + this.getTextureLabel() + " texture",
+				GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT,
+				TextureFormat.RGBA8,
+				i,
+				j,
+				1,
+				1
+			);
 			this.texture.setTextureFilter(FilterMode.NEAREST, false);
 			this.textureView = net.vulkanic.VulkanicAPI.createTextureView(this.texture);
 			this.depthTexture = net.vulkanic.VulkanicAPI.createTexture(() -> "UI " + this.getTextureLabel() + " depth texture", 8, TextureFormat.DEPTH32, i, j, 1, 1);
@@ -156,8 +167,10 @@ public abstract class PictureInPictureRenderer<T extends PictureInPictureRenderS
 		try {
 			Path autoCaptureDir = this.getAutoCaptureDir();
 			Files.createDirectories(autoCaptureDir);
+			LOGGER.info("Queueing PIP auto-capture dump '{}' to {}", name, autoCaptureDir);
 			TextureUtil.writeAsPNG(autoCaptureDir, name, this.texture, 0, i -> i);
 		} catch (IOException ignored) {
+			LOGGER.warn("Failed to queue PIP auto-capture dump '{}'", name, ignored);
 		}
 	}
 

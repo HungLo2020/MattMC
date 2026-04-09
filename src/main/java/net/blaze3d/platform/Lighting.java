@@ -37,6 +37,12 @@ public class Lighting implements AutoCloseable {
 		this.updateBuffer(
 			Lighting.Entry.ITEMS_FLAT, matrix4f.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()), matrix4f.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
 		);
+		Matrix4f matrix4fFlatUpright = new Matrix4f().scaling(1.0F, -1.0F, 1.0F).rotateY((float) (-Math.PI / 8)).rotateX((float) (Math.PI * 3.0 / 4.0));
+		this.updateBuffer(
+			Lighting.Entry.ITEMS_FLAT_UPRIGHT,
+			matrix4fFlatUpright.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()),
+			matrix4fFlatUpright.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
+		);
 		Matrix4f matrix4f2 = new Matrix4f()
 			.scaling(1.0F, -1.0F, 1.0F)
 			.rotateYXZ(1.0821041F, 3.2375858F, 0.0F)
@@ -99,6 +105,7 @@ public class Lighting implements AutoCloseable {
 		LEVEL,
 		LEVEL_UPRIGHT,
 		ITEMS_FLAT,
+		ITEMS_FLAT_UPRIGHT,
 		ITEMS_3D,
 		ITEMS_3D_UPRIGHT,
 		ENTITY_IN_UI,

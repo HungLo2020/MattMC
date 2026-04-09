@@ -29,7 +29,9 @@ public class GuiSignRenderer extends PictureInPictureRenderer<GuiSignRenderState
 	}
 
 	protected void renderToTexture(GuiSignRenderState guiSignRenderState, PoseStack poseStack) {
-		Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_FLAT);
+		Minecraft.getInstance().gameRenderer.getLighting().setupFor(
+			net.vulkanic.VulkanicAPI.isVulkanBackendSelected() ? Lighting.Entry.ITEMS_FLAT_UPRIGHT : Lighting.Entry.ITEMS_FLAT
+		);
 		poseStack.translate(0.0F, -0.75F, 0.0F);
 		Material material = Sheets.getSignMaterial(guiSignRenderState.woodType());
 		Model.Simple simple = guiSignRenderState.signModel();
