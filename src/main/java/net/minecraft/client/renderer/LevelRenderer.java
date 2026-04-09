@@ -716,7 +716,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 			profilerFiller.push("terrain");
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
 			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
-			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
+			this.minecraft.gameRenderer
+				.getLighting()
+				.setupFor(VulkanicAPI.isVulkanBackendSelected() ? Lighting.Entry.LEVEL_UPRIGHT : Lighting.Entry.LEVEL);
 			if (resourceHandle3 != null) {
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
 			}
