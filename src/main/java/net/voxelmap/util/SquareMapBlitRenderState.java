@@ -79,7 +79,7 @@ public record SquareMapBlitRenderState(
         float sourceX = cos * dx + sin * dy + this.sourceOffsetX();
         float sourceY = -sin * dx + cos * dy + this.sourceOffsetY();
         float u = (sourceX + 256.0F) / 512.0F;
-        float v = (256.0F - sourceY) / 512.0F;
+        float v = (sourceY + 256.0F) / 512.0F;
         vertexConsumer.addVertexWith2DPose(this.pose(), x, y).setUv(u, v).setColor(this.color());
     }
 
