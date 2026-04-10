@@ -1597,7 +1597,7 @@ public class Map implements Runnable, IChangeObserver {
         this.percentY *= multi;
         float angleRadians = !this.options.rotates ? -this.northRotate * Mth.DEG_TO_RAD : this.direction * Mth.DEG_TO_RAD;
         float sourceOffsetX = this.percentX * 512.0F / 64.0F;
-        float sourceOffsetY = this.percentY * 512.0F / 64.0F;
+        float sourceOffsetY = -this.percentY * 512.0F / 64.0F;
         if (this.options.squareMap) {
             VoxelMapGuiGraphics.blitSquareMap(
                     guiGraphics,
