@@ -1799,7 +1799,7 @@ public class Map implements Runnable, IChangeObserver {
         matrixStack.translate(-(scWidth / 2.0F), -(scHeight / 2.0F));
         int left = scWidth / 2 - 128;
         int top = scHeight / 2 - 128;
-        VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, this.mapImages[this.zoom].getTextureView(), left, top, 256, 256, 0, 1, 0, 1, 0xFFFFFFFF);
+        guiGraphics.blit(this.mapResources[this.zoom], left, top, left + 256, top + 256, 0.0F, 1.0F, 0.0F, 1.0F);
         matrixStack.popMatrix();
 
         if (this.options.biomeOverlay != 0) {
