@@ -2,11 +2,12 @@ package net.irisshaders.iris.pipeline.programs;
 
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.systems.RenderPass;
 import net.sodium.client.gl.device.GLRenderDevice;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat2v;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat3v;
 import net.sodium.client.gl.shader.uniform.GlUniformMatrix4f;
-import net.sodium.client.render.chunk.shader.ChunkShaderInterface;
+import net.sodium.client.render.chunk.shader.RenderPassChunkShaderInterface;
 import net.sodium.client.render.chunk.shader.ShaderBindingContext;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
@@ -28,6 +29,7 @@ import net.irisshaders.iris.uniforms.builtin.BuiltinReplacementUniforms;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.irisshaders.iris.vertices.ImmediateState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -35,13 +37,16 @@ import org.joml.Matrix4fc;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
+import javax.annotation.Nonnull;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.function.Supplier;
 
-public class SodiumShader implements ChunkShaderInterface {
-	private static final int SUB_TEXEL_PRECISION_BITS = 5;
+public class SodiumShader implements RenderPassChunkShaderInterface {
+	@Nonnull
+	private static final ResourceLocation BLOCK_ATLAS_LOCATION = Objects.requireNonNull(ResourceLocation.withDefaultNamespace("textures/atlas/blocks.png"));
 
 	private final GlUniformMatrix4f uniformModelViewMatrix;
 	private final GlUniformMatrix4f uniformModelViewMatrixInv;
@@ -150,6 +155,7 @@ public class SodiumShader implements ChunkShaderInterface {
 		}
 	}
 
+	@SuppressWarnings("null")
 	@Override
 	public void setupState(TerrainRenderPass pass, FogParameters fogParameters) {
 		DepthColorStorage.unlockDepthColor();
@@ -163,10 +169,11 @@ public class SodiumShader implements ChunkShaderInterface {
 		if (isShadowPass) {
 			VulkanicAPI.setCullFaceEnabled(VulkanicAPI.getCommandContext(), false);
 		}
+		@Nonnull ResourceLocation blockAtlasLocation = BLOCK_ATLAS_LOCATION;
 
 		var textureAtlas = Minecraft.getInstance()
 			.getTextureManager()
-			.getTexture(TextureAtlas.LOCATION_BLOCKS);
+			.getTexture(blockAtlasLocation);
 		textureAtlas.setFilter(false, textureAtlas.getTexture().getMipLevels() > 1);
 
 		// There is a limited amount of sub-texel precision when using hardware texture sampling. The mapped texture
@@ -215,6 +222,16 @@ public class SodiumShader implements ChunkShaderInterface {
 		samplers.update();
 		uniforms.update();
 		customUniforms.push(this);
+	}
+
+	@Override
+	public void bindRenderPassResources(RenderPass renderPass, TerrainRenderPass pass) {
+		samplers.bindToRenderPass(renderPass);
+	}
+
+	@Override
+	public java.util.Collection<String> getRenderPassSamplerNames() {
+		return samplers.getRenderPassSamplerNames();
 	}
 
 	@Override

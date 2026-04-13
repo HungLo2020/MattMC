@@ -61,7 +61,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 			int j = 0;
 
 			for (String string2 : vertexFormat.getElementAttributeNames()) {
-				VulkanicAPI.setAttributeLocation(ctx, programId, j, string2);
+				VulkanicAPI.setAttributeLocation(ctx, programId, vertexFormat.getShaderAttributeLocation(j), string2);
 				j++;
 			}
 
@@ -136,7 +136,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 					LOGGER.warn("{} shader program does not use sampler {} defined in the pipeline. This might be a bug.", this.debugLabel, string2);
 				}
 			} else {
-				int n = legacySamplerUnit(string2);
+				int n = legacySamplerUnit(java.util.Objects.requireNonNull(string2, "sampler name"));
 				if (n >= 0) {
 					j = Math.max(j, n + 1);
 				} else {

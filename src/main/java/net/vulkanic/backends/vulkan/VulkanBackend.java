@@ -674,7 +674,11 @@ void main() {
         String reboundSource = shaderSource;
         List<String> attributeNames = renderPipeline.getVertexFormat().getElementAttributeNames();
         for (int location = 0; location < attributeNames.size(); location++) {
-            reboundSource = injectExplicitVertexInputLocation(reboundSource, attributeNames.get(location), location);
+			reboundSource = injectExplicitVertexInputLocation(
+				reboundSource,
+				attributeNames.get(location),
+				renderPipeline.getVertexFormat().getShaderAttributeLocation(location)
+			);
         }
         return reboundSource;
     }
@@ -12100,7 +12104,7 @@ void main() {
                 for (int i = 0; i < vfElements.size(); i++) {
                     VertexFormatElement elem = vfElements.get(i);
                     vAttribs.get(i)
-                        .location(i)
+						.location(vertexFormat.getShaderAttributeLocation(i))
                         .binding(0)
                         .format(toVkVertexElementFormat(elem))
                         .offset(vertexFormat.getOffset(elem));
@@ -12136,7 +12140,7 @@ void main() {
                         .rasterizerDiscardEnable(false)
                         .polygonMode(toVkPolygonMode(portableState.polygonMode()))
                         .lineWidth(1.0f)
-                        .cullMode(VK10.VK_CULL_MODE_NONE)
+						.cullMode(VK10.VK_CULL_MODE_NONE)
                         .frontFace(VK10.VK_FRONT_FACE_CLOCKWISE)
                         .depthBiasEnable(hasBias)
                         .depthBiasConstantFactor(portableState.depthBiasConstant())

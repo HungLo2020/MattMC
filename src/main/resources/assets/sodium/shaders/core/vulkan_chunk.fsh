@@ -25,7 +25,7 @@ void main() {
     color *= vertexColor;
 
 #ifdef USE_FRAGMENT_DISCARD
-    if (!gl_FrontFacing) {
+    if (!_material_use_mips(materialBits) && !gl_FrontFacing) {
         discard;
     }
 

@@ -1373,20 +1373,105 @@ public class Phase3DrawPathTest {
     }
 
     @Test
-    public void testSodiumVulkanChunkCutoutShaderDiscardsBackFaces() throws IOException {
+    public void testSodiumVulkanChunkCutoutShaderRestrictsBackfaceDiscardToNonMippedCutouts() throws IOException {
         Path shaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/sodium/shaders/core/vulkan_chunk.fsh");
         String shaderSource = Files.readString(shaderFile);
 
         assertTrue(shaderSource.contains("#ifdef USE_FRAGMENT_DISCARD"),
             "The Vulkan Sodium chunk fragment shader should keep the cutout-only discard branch");
-        assertTrue(shaderSource.contains("if (!gl_FrontFacing) {"),
-            "The Vulkan Sodium chunk cutout shader should discard back-facing fragments to emulate terrain culling without changing global backend raster state");
+        assertTrue(shaderSource.contains("if (!_material_use_mips(materialBits) && !gl_FrontFacing) {"),
+            "The Vulkan Sodium chunk cutout shader should only discard back-facing fragments for non-mipped alpha-tested terrain such as tall grass and leaf litter");
+        assertTrue(shaderSource.contains("if (color.a < _material_alpha_cutoff(materialBits)) {"),
+            "The Vulkan Sodium chunk cutout shader should keep alpha cutoff discard for all alpha-tested terrain");
 
         Path pipelineFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java");
         String pipelineSource = Files.readString(pipelineFile);
 
         assertTrue(pipelineSource.contains("withShaderDefine(\"USE_FRAGMENT_DISCARD\")"),
-            "The Vulkan Sodium cutout pipeline should keep the cutout-only shader define that scopes back-face discard to alpha-tested terrain");
+            "The Vulkan Sodium cutout pipeline should keep the cutout-only shader define that scopes alpha discard to alpha-tested terrain");
+    }
+
+    @Test
+    public void testVulkanChunkRendererRoutesThroughSharedActiveProgram() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java");
+        String rendererSource = Files.readString(rendererFile);
+
+        assertTrue(rendererSource.contains("super.begin(terrainPass, parameters);"),
+            "The Vulkan chunk renderer should begin through the shared Sodium chunk program path before issuing terrain draws");
+        assertTrue(rendererSource.contains("SharedChunkProgramOverrides.pushActiveProgram(this.activeProgram);"),
+            "The Vulkan chunk renderer should expose the currently active Sodium chunk program to the compatibility pipeline compiler");
+        assertTrue(rendererSource.contains("shader.setProjectionMatrix(matrices.projection());"),
+            "The Vulkan chunk renderer should update the shared chunk shader projection matrix through the same interface used by OpenGL terrain");
+        assertTrue(rendererSource.contains("shader.setModelViewMatrix(matrices.modelView());"),
+            "The Vulkan chunk renderer should update the shared chunk shader model-view matrix through the same interface used by OpenGL terrain");
+        assertTrue(rendererSource.contains("renderPass.setPipeline(SodiumChunkRenderPipelines.forPass(terrainPass, renderPassShader));"),
+            "The Vulkan chunk renderer should choose its terrain pipeline from the active shared chunk shader contract");
+        assertTrue(rendererSource.contains("renderPassShader.bindRenderPassResources(renderPass, terrainPass);"),
+            "The Vulkan chunk renderer should mirror chunk-program sampler state into the render pass before drawing");
+        assertTrue(rendererSource.contains("setModelMatrixUniforms(shader, preparedDraw.region(), camera);"),
+            "The Vulkan chunk renderer should keep per-region translation updates on the shared chunk shader interface");
+        assertTrue(rendererSource.contains("super.end(terrainPass);"),
+            "The Vulkan chunk renderer should close the shared chunk program path after terrain submission");
+    }
+
+    @Test
+    public void testSharedChunkProgramOverridePrecedesIrisOverrideMap() throws IOException {
+        Path overrideFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SharedChunkProgramOverrides.java");
+        String overrideSource = Files.readString(overrideFile);
+
+        assertTrue(overrideSource.contains("wrapper.setupUniforms(pipeline.getUniforms(), pipeline.getSamplers());"),
+            "Shared chunk program overrides should reflect the current render-pipeline sampler and uniform contract onto the wrapped Sodium program handle");
+        assertTrue(overrideSource.contains("public static void pushActiveProgram"),
+            "Shared chunk program overrides should explicitly track the currently active Sodium chunk program");
+
+        Path deviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String deviceSource = Files.readString(deviceFile);
+        int sharedOverrideIndex = deviceSource.indexOf("SharedChunkProgramOverrides.createOverride(renderPipeline)");
+        int irisOverrideIndex = deviceSource.indexOf("// Iris: Check for shader overrides first");
+
+        assertTrue(sharedOverrideIndex >= 0,
+            "GlDevice should consult the shared Sodium chunk program override seam when compiling tracked terrain pipelines");
+        assertTrue(irisOverrideIndex > sharedOverrideIndex,
+            "GlDevice must try the shared Sodium chunk program override before falling back to Iris's generic shader override map");
+    }
+
+    @Test
+    public void testSharedChunkPipelinesMirrorExtendedVertexAbiWithoutStaticRegistration() throws IOException {
+        Path pipelineFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java");
+        String pipelineSource = Files.readString(pipelineFile);
+
+        assertTrue(pipelineSource.contains("createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat())"),
+            "Shared Sodium chunk pipelines should derive their vertex ABI from the active WorldRenderingSettings format, not just the base stride");
+        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.register(solid);"),
+            "Shared Sodium chunk pipelines should register tracked terrain pipelines for active-program overrides");
+        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.unregisterAll(pipelines.asList());"),
+            "Shared Sodium chunk pipeline cache should clean up tracked override entries when shader reloads invalidate cached pipelines");
+        assertTrue(pipelineSource.contains("case 10 -> \"iris_Normal\";"),
+            "Shared Sodium chunk pipelines should carry Iris terrain attribute locations into the Vulkan terrain ABI");
+        assertFalse(pipelineSource.contains("RenderPipelines.register("),
+            "Shared Sodium chunk pipelines should no longer leak dynamic terrain pipelines into the global static RenderPipelines registry");
+    }
+
+    @Test
+    public void testGenericVertexLocationsHonorDeclaredAttributeIndices() throws IOException {
+        Path vertexFormatFile = SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java");
+        String vertexFormatSource = Files.readString(vertexFormatFile);
+        assertTrue(vertexFormatSource.contains("public int getShaderAttributeLocation(int attributeOrdinal)"),
+            "VertexFormat should expose the shader attribute location derived from its declared element metadata");
+        assertTrue(vertexFormatSource.contains("element.usage() == VertexFormatElement.Usage.GENERIC ? element.index() : attributeOrdinal"),
+            "VertexFormat should preserve explicit generic attribute indices while keeping vanilla attribute ordering unchanged");
+
+        Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
+        String glProgramSource = Files.readString(glProgramFile);
+        assertTrue(glProgramSource.contains("vertexFormat.getShaderAttributeLocation(j)"),
+            "GlProgram linking should bind declared attribute names to the shader locations supplied by the vertex format");
+
+        Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String backendSource = Files.readString(backendFile);
+        assertTrue(backendSource.contains("renderPipeline.getVertexFormat().getShaderAttributeLocation(location)"),
+            "Vulkan shader-source rebinding should inject explicit locations from the declared vertex format instead of forcing sequential chunk attributes");
+        assertTrue(backendSource.contains(".location(vertexFormat.getShaderAttributeLocation(i))"),
+            "Vulkan pipeline vertex input descriptions should preserve explicit generic attribute locations for extended terrain formats");
     }
 
     @Test

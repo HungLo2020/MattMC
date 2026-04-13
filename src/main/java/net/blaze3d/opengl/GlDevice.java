@@ -34,6 +34,7 @@ import net.minecraft.ResourceLocationException;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
+import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.VulkanicAPI;
@@ -406,6 +407,11 @@ public class GlDevice implements GpuDevice {
 	}
 
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
+		GlProgram sharedChunkProgram = SharedChunkProgramOverrides.createOverride(renderPipeline);
+		if (sharedChunkProgram != null) {
+			return this.createCompiledRenderPipeline(renderPipeline, sharedChunkProgram);
+		}
+
 		// Iris: Check for shader overrides first
 		if (renderPipeline != net.irisshaders.iris.pipeline.CompositeRenderer.COMPOSITE_PIPELINE) {
 			net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
@@ -436,7 +442,10 @@ public class GlDevice implements GpuDevice {
 	private GlRenderPipeline createCompiledRenderPipeline(RenderPipeline renderPipeline, GlProgram program) {
 		PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(renderPipeline);
 		if (program != GlProgram.INVALID_PROGRAM) {
-			descriptor = VulkanicAPI.withReflectedResourceLayout(commandContext(), descriptor, program.getProgramId());
+			descriptor = java.util.Objects.requireNonNull(
+				VulkanicAPI.withReflectedResourceLayout(commandContext(), descriptor, program.getProgramId()),
+				"descriptor"
+			);
 		}
 		return new GlRenderPipeline(renderPipeline, program, descriptor);
 	}
