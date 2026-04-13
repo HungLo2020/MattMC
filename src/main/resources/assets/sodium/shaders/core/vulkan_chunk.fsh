@@ -25,6 +25,10 @@ void main() {
     color *= vertexColor;
 
 #ifdef USE_FRAGMENT_DISCARD
+    if (!gl_FrontFacing) {
+        discard;
+    }
+
     if (color.a < _material_alpha_cutoff(materialBits)) {
         discard;
     }

@@ -1373,6 +1373,23 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testSodiumVulkanChunkCutoutShaderDiscardsBackFaces() throws IOException {
+        Path shaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/sodium/shaders/core/vulkan_chunk.fsh");
+        String shaderSource = Files.readString(shaderFile);
+
+        assertTrue(shaderSource.contains("#ifdef USE_FRAGMENT_DISCARD"),
+            "The Vulkan Sodium chunk fragment shader should keep the cutout-only discard branch");
+        assertTrue(shaderSource.contains("if (!gl_FrontFacing) {"),
+            "The Vulkan Sodium chunk cutout shader should discard back-facing fragments to emulate terrain culling without changing global backend raster state");
+
+        Path pipelineFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java");
+        String pipelineSource = Files.readString(pipelineFile);
+
+        assertTrue(pipelineSource.contains("withShaderDefine(\"USE_FRAGMENT_DISCARD\")"),
+            "The Vulkan Sodium cutout pipeline should keep the cutout-only shader define that scopes back-face discard to alpha-tested terrain");
+    }
+
+    @Test
     public void testSodiumGlShaderAndSyncWrappersUseBackendNeutralContext() throws IOException {
         Path shaderFile = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/shader/GlShader.java");
         String shaderSource = Files.readString(shaderFile);
