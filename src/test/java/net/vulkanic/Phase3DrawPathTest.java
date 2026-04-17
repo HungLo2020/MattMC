@@ -269,6 +269,39 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testMainTargetUsesBgra8AndBackendMappingsPreserveIt() throws IOException {
+        String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
+        String textureFormatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/TextureFormat.java"));
+        String gpuTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
+        String vulkanFormatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicTextureFormat.java"));
+        String openGlBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java"));
+        String vulkanBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(mainTargetSource.contains("TextureFormat.BGRA8"),
+            "MainTarget should allocate its color attachment as BGRA8 so Vulkan can present without shader compose into a BGRA swapchain");
+        assertTrue(mainTargetSource.contains("public void createBuffers(int i, int j)")
+                && mainTargetSource.contains("this.createFrameBuffer(i, j);"),
+            "MainTarget should override buffer recreation so window resizes keep using the BGRA main-target allocation path instead of the base RGBA8 RenderTarget implementation");
+        assertTrue(textureFormatSource.contains("BGRA8(4)"),
+            "TextureFormat should expose a BGRA8 color format for main-target allocation");
+        assertTrue(vulkanFormatSource.contains("BGRA8(4)"),
+            "VulkanicTextureFormat should expose BGRA8 so backends can preserve swapchain-compatible color ordering");
+        assertTrue(gpuTextureSource.contains("case BGRA8   -> VulkanicTextureFormat.BGRA8;"),
+            "GpuTexture should preserve Blaze BGRA8 textures when bridging to VulkanicTextureFormat");
+        assertTrue(openGlBackendSource.contains("case BGRA8  -> net.vulkanic.VulkanicAPI.GL_BGRA;"),
+            "OpenGL backend should preserve BGRA external format metadata for BGRA-backed managed textures");
+        assertTrue(vulkanBackendSource.contains("case BGRA8   -> VK10.VK_FORMAT_B8G8R8A8_UNORM;"),
+            "Vulkan backend should map BGRA8 textures to a BGRA VkFormat");
+        assertTrue(vulkanBackendSource.contains("case VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> VulkanicTextureFormat.BGRA8;"),
+            "Vulkan backend should preserve BGRA swapchain/image wrappers as BGRA8 instead of collapsing them to RGBA8");
+        assertTrue(vulkanBackendSource.contains("if ((format == VulkanicAPI.GL_BGRA || internalFormat == VulkanicAPI.GL_BGRA)")
+                && vulkanBackendSource.contains("return new LegacyTextureFormatInfo(VK10.VK_FORMAT_B8G8R8A8_UNORM, 4, VK10.VK_IMAGE_ASPECT_COLOR_BIT);")
+                && vulkanBackendSource.indexOf("if ((format == VulkanicAPI.GL_BGRA || internalFormat == VulkanicAPI.GL_BGRA)")
+                < vulkanBackendSource.indexOf("if ((format == VulkanicAPI.GL_RGBA || internalFormat == VulkanicAPI.GL_RGBA8 || internalFormat == VulkanicAPI.GL_RGBA16)"),
+            "Vulkan backend should resolve GL_BGRA uploads to a BGRA VkFormat before the generic RGBA8 legacy-format branch");
+    }
+
+    @Test
     public void testVulkanDescriptorSamplerKeysUseLiveGpuTextureState() throws IOException {
         String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
         String textureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));

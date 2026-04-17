@@ -3256,6 +3256,7 @@ public class OpenGLBackend implements GraphicsBackend {
     private static int[] toGlInternalFormat(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
             case RGBA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
+            case BGRA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
             case RED8   -> new int[]{org.lwjgl.opengl.GL30.GL_R8};
             case RED8I  -> new int[]{org.lwjgl.opengl.GL30.GL_R8I};
             case DEPTH32 -> new int[]{org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT32};
@@ -3265,6 +3266,7 @@ public class OpenGLBackend implements GraphicsBackend {
     private static int toGlExternalFormat(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
             case RGBA8  -> org.lwjgl.opengl.GL11.GL_RGBA;
+            case BGRA8  -> net.vulkanic.VulkanicAPI.GL_BGRA;
             case RED8, RED8I -> org.lwjgl.opengl.GL30.GL_RED;
             case DEPTH32 -> org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT;
         };
@@ -3272,7 +3274,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private static int toGlType(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
-            case RGBA8, RED8  -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+            case RGBA8, BGRA8, RED8  -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
             case RED8I        -> org.lwjgl.opengl.GL11.GL_BYTE;
             case DEPTH32      -> org.lwjgl.opengl.GL11.GL_FLOAT;
         };

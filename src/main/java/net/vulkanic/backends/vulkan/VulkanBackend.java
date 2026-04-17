@@ -2806,6 +2806,11 @@ void main() {
                 return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R4G4B4A4_UNORM_PACK16, 2, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
             }
 
+            if ((format == VulkanicAPI.GL_BGRA || internalFormat == VulkanicAPI.GL_BGRA)
+                && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
+                return new LegacyTextureFormatInfo(VK10.VK_FORMAT_B8G8R8A8_UNORM, 4, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
+            }
+
             if ((format == VulkanicAPI.GL_RGBA || internalFormat == VulkanicAPI.GL_RGBA8 || internalFormat == VulkanicAPI.GL_RGBA16)
                 && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
                 return new LegacyTextureFormatInfo(VK10.VK_FORMAT_R8G8B8A8_UNORM, 4, VK10.VK_IMAGE_ASPECT_COLOR_BIT);
@@ -10158,6 +10163,7 @@ void main() {
         private static int toVkFormat(VulkanicTextureFormat format) {
             return switch (format) {
                 case RGBA8   -> VK10.VK_FORMAT_R8G8B8A8_UNORM;
+                case BGRA8   -> VK10.VK_FORMAT_B8G8R8A8_UNORM;
                 case RED8    -> VK10.VK_FORMAT_R8_UNORM;
                 case RED8I   -> VK10.VK_FORMAT_R8_SINT;
                 case DEPTH32 -> VK10.VK_FORMAT_D32_SFLOAT;
@@ -11619,7 +11625,7 @@ void main() {
                 VK10.VK_NULL_HANDLE,
                 swapchainImageViewHandle,
                 VulkanicTexture.USAGE_RENDER_ATTACHMENT,
-                VulkanicTextureFormat.RGBA8,
+                VulkanicTextureFormat.BGRA8,
                 width,
                 height,
                 1,
@@ -11633,8 +11639,8 @@ void main() {
 
         private static VulkanicTextureFormat wrappedTextureFormatForVkFormat(int vkFormat) {
             return switch (vkFormat) {
-                case VK10.VK_FORMAT_R8G8B8A8_UNORM, VK10.VK_FORMAT_R8G8B8A8_SRGB,
-                    VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> VulkanicTextureFormat.RGBA8;
+                case VK10.VK_FORMAT_R8G8B8A8_UNORM, VK10.VK_FORMAT_R8G8B8A8_SRGB -> VulkanicTextureFormat.RGBA8;
+                case VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> VulkanicTextureFormat.BGRA8;
                 case VK10.VK_FORMAT_R8_UNORM -> VulkanicTextureFormat.RED8;
                 case VK10.VK_FORMAT_R8_SINT -> VulkanicTextureFormat.RED8I;
                 case VK10.VK_FORMAT_D32_SFLOAT -> VulkanicTextureFormat.DEPTH32;

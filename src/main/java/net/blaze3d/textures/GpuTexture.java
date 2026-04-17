@@ -70,6 +70,7 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 	public VulkanicTextureFormat getVulkanicFormat() {
 		return switch (this.format) {
 			case RGBA8   -> VulkanicTextureFormat.RGBA8;
+			case BGRA8   -> VulkanicTextureFormat.BGRA8;
 			case RED8    -> VulkanicTextureFormat.RED8;
 			case RED8I   -> VulkanicTextureFormat.RED8I;
 			case DEPTH32 -> VulkanicTextureFormat.DEPTH32;

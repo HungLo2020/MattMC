@@ -24,6 +24,11 @@ public class MainTarget extends RenderTarget {
 		this.createFrameBuffer(i, j);
 	}
 
+	@Override
+	public void createBuffers(int i, int j) {
+		this.createFrameBuffer(i, j);
+	}
+
 	private void createFrameBuffer(int i, int j) {
 		MainTarget.Dimension dimension = this.allocateAttachments(i, j);
 		if (this.colorTexture != null && this.depthTexture != null) {
@@ -83,7 +88,7 @@ public class MainTarget extends RenderTarget {
 	@Nullable
 	private GpuTexture allocateColorAttachment(MainTarget.Dimension dimension) {
 		try {
-			return net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Color", 15, TextureFormat.RGBA8, dimension.width, dimension.height, 1, 1);
+			return net.vulkanic.VulkanicAPI.createTexture(() -> this.label + " / Color", 15, TextureFormat.BGRA8, dimension.width, dimension.height, 1, 1);
 		} catch (GpuOutOfMemoryException var3) {
 			return null;
 		}
