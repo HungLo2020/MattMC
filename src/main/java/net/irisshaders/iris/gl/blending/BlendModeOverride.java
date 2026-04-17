@@ -1,5 +1,7 @@
 package net.irisshaders.iris.gl.blending;
 
+import org.jetbrains.annotations.Nullable;
+
 public class BlendModeOverride {
 	public static final BlendModeOverride OFF = new BlendModeOverride(null);
 
@@ -15,5 +17,10 @@ public class BlendModeOverride {
 
 	public void apply() {
 		BlendModeStorage.overrideBlend(this.blendMode);
+	}
+
+	@Nullable
+	public BlendMode blendMode() {
+		return this.blendMode;
 	}
 }

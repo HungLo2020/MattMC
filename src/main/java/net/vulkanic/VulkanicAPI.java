@@ -3433,6 +3433,20 @@ public class VulkanicAPI {
     }
 
     /**
+     * Creates a backend-owned render pass targeting an existing framebuffer contract.
+     */
+    public static RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        int framebuffer,
+        boolean hasDepthTexture
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createRenderPass(supplier, framebuffer, hasDepthTexture)
+            : getBackend().createRenderPass(supplier, framebuffer, hasDepthTexture);
+    }
+
+    /**
      * Creates a backend-owned GPU texture with supplier-based debug label.
      */
     public static GpuTexture createTexture(
@@ -6138,6 +6152,13 @@ public class VulkanicAPI {
     }
 
     /**
+     * Creates a pipeline handle compatible with the attachment contract of an existing framebuffer.
+     */
+    public static PipelineHandle createPipeline(PipelineDescriptor descriptor, int framebuffer) {
+        return getBackend().createPipeline(descriptor, framebuffer);
+    }
+
+    /**
      * Convenience overload: creates a pipeline directly from a Blaze3D RenderPipeline.
      *
      * @param pipeline the RenderPipeline to compile
@@ -6158,6 +6179,38 @@ public class VulkanicAPI {
         return getBackend().createPipeline(
             PipelineDescriptor.fromPortableStateAndSpirvModules(portableState, spirvModules)
         );
+    }
+
+    public static java.util.List<VulkanicSpirvModule> getLinkedProgramSpirvModules(CommandContext ctx, int program) {
+        return getBackend().getLinkedProgramSpirvModules(ctx, program);
+    }
+
+    public static PipelineDescriptor createLiveProgramPipelineDescriptor(
+        CommandContext ctx,
+        PipelineDescriptor baseDescriptor,
+        int program
+    ) {
+        Objects.requireNonNull(ctx, "ctx must not be null");
+        Objects.requireNonNull(baseDescriptor, "baseDescriptor must not be null");
+
+        java.util.List<VulkanicSpirvModule> linkedModules = getLinkedProgramSpirvModules(ctx, program);
+        if (linkedModules.isEmpty()) {
+            return withMergedReflectedResourceLayout(ctx, baseDescriptor, program);
+        }
+
+        PipelineDescriptor descriptorWithModules = PipelineDescriptor
+            .fromPortableStateAndSpirvModules(baseDescriptor.getPortableState(), linkedModules)
+            .withPushConstantRanges(baseDescriptor.getPushConstantRanges())
+            .withResourceLayout(baseDescriptor.getResourceLayout());
+
+        java.util.Set<VulkanicShaderStage> stages = linkedModules.stream()
+            .map(VulkanicSpirvModule::stage)
+            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        if (stages.isEmpty()) {
+            return withMergedReflectedResourceLayout(ctx, descriptorWithModules, program);
+        }
+
+        return withMergedReflectedResourceLayout(ctx, descriptorWithModules, program, 256, java.util.Set.copyOf(stages));
     }
 
     /**
@@ -6271,6 +6324,20 @@ public class VulkanicAPI {
         return directVulkanBackend != null
             ? directVulkanBackend.resolvePipelineHandle(renderPipeline, descriptor)
             : getBackend().resolvePipelineHandle(renderPipeline, descriptor);
+    }
+
+    /**
+     * Returns a compiled pipeline handle compatible with a specific framebuffer contract,
+     * or {@code null} if the active backend has not compiled one yet.
+     */
+    @Nullable
+    public static PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                       PipelineDescriptor descriptor,
+                                                       int framebuffer) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolvePipelineHandle(renderPipeline, descriptor, framebuffer)
+            : getBackend().resolvePipelineHandle(renderPipeline, descriptor, framebuffer);
     }
 
     // =========================================================================
@@ -6401,6 +6468,17 @@ public class VulkanicAPI {
         return beginRenderPass(ctx,
             VulkanicRenderPassDescriptor.colorAndDepth(
                 label, colorTarget, clearColor, depthTarget, clearDepth));
+    }
+
+    /**
+     * Begins a render pass using the attachment contract of an existing framebuffer.
+     */
+    public static VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        java.util.function.Supplier<String> label,
+        int framebuffer
+    ) {
+        return getBackend().beginRenderPass(ctx, label, framebuffer);
     }
 
     /**

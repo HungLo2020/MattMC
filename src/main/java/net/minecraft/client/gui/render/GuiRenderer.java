@@ -338,9 +338,11 @@ public class GuiRenderer implements AutoCloseable {
 
 	private void prepareItemElements() {
 		int i = this.getGuiScaleInvalidatingItemAtlasIfChanged();
-		Standard3dItemRenderer debugStandard3dItemRenderer = (Standard3dItemRenderer)this.standard3dItemRenderers
-			.computeIfAbsent("debug_standard_3d_grass_block", object -> new Standard3dItemRenderer(this.bufferSource));
-		debugStandard3dItemRenderer.prepareDebugStandardBlockItemDump(this.renderState, i);
+		if (Standard3dItemRenderer.isDebugDumpEnabled()) {
+			Standard3dItemRenderer debugStandard3dItemRenderer = (Standard3dItemRenderer)this.standard3dItemRenderers
+				.computeIfAbsent("debug_standard_3d_grass_block", object -> new Standard3dItemRenderer(this.bufferSource));
+			debugStandard3dItemRenderer.prepareDebugStandardBlockItemDump(this.renderState, i);
+		}
 
 		if (VulkanicAPI.isVulkanBackendSelected()) {
 			if (!this.renderState.getItemModelIdentities().isEmpty()) {

@@ -305,6 +305,49 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testIrisCustomPassesUseFramebufferOwnedRenderPassAndRecoveredPipelineSeams() throws IOException {
+        String compositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+        String shadowCompositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+
+        assertTrue(compositeRendererSource.contains("compositePass.ensurePipelineState();"),
+            "CompositeRenderer should precompute a framebuffer-compatible pipeline for custom passes before opening the render pass");
+        assertTrue(compositeRendererSource.contains("compositePass.framebuffer.getId()")
+                && compositeRendererSource.contains("compositePass.framebuffer.hasDepthAttachment()"),
+            "CompositeRenderer should create custom-pass render passes from the pass framebuffer contract");
+        assertTrue(compositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(renderPass);"),
+            "CompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
+        assertFalse(compositeRendererSource.contains("framebuffer.bind();"),
+            "CompositeRenderer custom pass setup should not manually rebind the framebuffer after backend-owned render-pass creation");
+
+        assertTrue(shadowCompositeRendererSource.contains("renderPass.ensurePipelineState();"),
+            "ShadowCompositeRenderer should precompute a framebuffer-compatible pipeline for custom passes before opening the render pass");
+        assertTrue(shadowCompositeRendererSource.contains("renderPass.framebuffer.getId()")
+                && shadowCompositeRendererSource.contains("renderPass.framebuffer.hasDepthAttachment()"),
+            "ShadowCompositeRenderer should create custom-pass render passes from the pass framebuffer contract");
+        assertTrue(shadowCompositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(pass);"),
+            "ShadowCompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
+        assertFalse(shadowCompositeRendererSource.contains("framebuffer.bind();"),
+            "ShadowCompositeRenderer custom pass setup should not manually rebind the framebuffer after backend-owned render-pass creation");
+
+        assertTrue(commandEncoderSource.contains("customPass.bindRenderPassResources(glRenderPass);"),
+            "GlCommandEncoder should let Iris custom passes contribute sampler resources to the active render pass");
+        assertTrue(commandEncoderSource.contains("customPass.pipelineHandle(submission.descriptor())")
+                && commandEncoderSource.contains("customPass.pipelineDescriptor()")
+                && commandEncoderSource.contains("buildCustomPassPipelineResourceBindings("),
+            "GlCommandEncoder should bind descriptor-matched live-program pipelines and descriptor resources for custom passes on Vulkan");
+        assertTrue(commandEncoderSource.contains("if (!submission.completeCoverage())")
+                && commandEncoderSource.contains("Skipping Vulkan custom pass"),
+            "GlCommandEncoder should fail open instead of submitting underbound Vulkan custom passes");
+        assertTrue(compositeRendererSource.contains("pipelineLayoutVariants")
+                && compositeRendererSource.contains("VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())"),
+            "CompositeRenderer custom passes should cache descriptor-layout pipeline variants for narrowed submission layouts");
+        assertTrue(shadowCompositeRendererSource.contains("pipelineLayoutVariants")
+                && shadowCompositeRendererSource.contains("VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())"),
+            "ShadowCompositeRenderer custom passes should cache descriptor-layout pipeline variants for narrowed submission layouts");
+    }
+
+    @Test
     public void testVulkanBackendBootstrapPathExists() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         assertTrue(Files.exists(vulkanBackendFile),
@@ -344,6 +387,8 @@ public class Phase3DrawPathTest {
             "GlDevice should cache reflected resource-layout metadata with compiled pipelines");
         assertTrue(trySetupSource.contains("buildPipelineResourceBindings(glRenderPass)"),
             "GlCommandEncoder trySetup should derive backend-neutral pipeline resource bindings from the live render pass");
+        assertTrue(trySetupSource.contains("PipelineDescriptor submissionDescriptor = submission.descriptor();"),
+            "GlCommandEncoder trySetup should resolve Vulkan pipelines against the actual submission descriptor after partial resource-layout narrowing");
         assertTrue(trySetupSource.contains("VulkanicAPI.bindPipelineResources("),
             "GlCommandEncoder trySetup should route sampler and UBO binding through VulkanicAPI.bindPipelineResources");
         assertTrue(trySetupSource.contains("VulkanicAPI.resolvePipelineHandle("),
@@ -1142,6 +1187,9 @@ public class Phase3DrawPathTest {
             "VulkanBackend should implement render-target binding seam");
         assertTrue(vulkanBackendSource.contains("int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);"),
             "VulkanBackend render-target binding should keep attachment-pair routing inside backend code");
+        assertTrue(vulkanBackendSource.contains("descriptorPipelineCache")
+                && vulkanBackendSource.contains("matchesStableDescriptor("),
+            "VulkanBackend should cache descriptor-layout pipeline variants for partial-coverage Vulkan draws instead of forcing them onto the full-layout precompile");
     }
 
     @Test
@@ -5134,6 +5182,18 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testCubemapRenderPassStaysColorOnly() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"));
+
+        assertTrue(source.contains("VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture())"),
+            "CubeMap should recover the main render target framebuffer contract before rendering the panorama background");
+        assertTrue(source.contains("VulkanicAPI.createRenderPass(() -> \"Cubemap\", framebuffer, renderTarget.getDepthTexture() != null)"),
+            "CubeMap should prefer the framebuffer-owned render-pass path for panorama background rendering");
+        assertTrue(source.contains(": VulkanicAPI.createRenderPass(() -> \"Cubemap\", gpuTextureView, OptionalInt.empty())"),
+            "CubeMap should retain a texture-view fallback when framebuffer recovery is unavailable");
+    }
+
+    @Test
     public void testScissorStateOwnershipMovedToVulkanicAPI() throws IOException {
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
         String renderSystemSource = Files.readString(renderSystemFile);
@@ -5247,6 +5307,45 @@ public class Phase3DrawPathTest {
             "PictureInPictureRenderer should write outputColorTextureOverride through VulkanicAPI after migration");
         assertTrue(pictureInPictureRendererSource.contains("VulkanicAPI.setOutputDepthTextureOverride("),
             "PictureInPictureRenderer should write outputDepthTextureOverride through VulkanicAPI after migration");
+
+        Path glRenderPassFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlRenderPass.java");
+        String glRenderPassSource = Files.readString(glRenderPassFile);
+        assertTrue(glRenderPassSource.contains("private final int framebuffer;"),
+            "GlRenderPass should retain the framebuffer contract backing a render pass");
+        assertTrue(glRenderPassSource.contains("public int getFramebuffer()"),
+            "GlRenderPass should expose the framebuffer contract for Vulkan pipeline resolution");
+
+        Path glCommandEncoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String glCommandEncoderSource = Files.readString(glCommandEncoderFile);
+        assertTrue(glCommandEncoderSource.contains("VulkanicAPI.resolveFramebufferForTextures("),
+            "GlCommandEncoder should recover a framebuffer contract for texture-view render passes");
+        assertTrue(glCommandEncoderSource.contains("boolean useFramebufferCompatiblePipeline = glRenderPass.getFramebuffer() != 0;"),
+            "GlCommandEncoder should resolve generic Vulkan pipeline handles against the active framebuffer contract whenever a render pass is framebuffer-backed");
+        assertTrue(glCommandEncoderSource.contains("glRenderPass.pipeline.info(),\n\t\t\t\t\t\tsubmissionDescriptor,\n\t\t\t\t\t\tglRenderPass.getFramebuffer()"),
+            "GlCommandEncoder should resolve Vulkan pipeline handles against the active framebuffer contract for offscreen override draws");
+
+        Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String vulkanBackendSource = Files.readString(vulkanBackendFile);
+        assertTrue(vulkanBackendSource.contains("virtualFramebufferStates.entrySet()")
+                && vulkanBackendSource.contains("matchesSingleColorFramebufferContract("),
+            "VulkanBackend should recover texture-pair framebuffer ids from tracked virtual framebuffer attachment state instead of leaving the seam stubbed");
+        assertTrue(vulkanBackendSource.contains("implicitFramebufferByTexturePair")
+            && vulkanBackendSource.contains("resolveOrCreateImplicitFramebuffer("),
+            "VulkanBackend should synthesize a stable virtual framebuffer contract for unbound texture pairs used by offscreen override render passes");
+    }
+
+    @Test
+    public void testStandard3dItemDebugPipDumpIsOptIn() throws IOException {
+        Path guiRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java");
+        String guiRendererSource = Files.readString(guiRendererFile);
+        Path standard3dItemRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/Standard3dItemRenderer.java");
+        String standard3dItemRendererSource = Files.readString(standard3dItemRendererFile);
+
+        assertTrue(standard3dItemRendererSource.contains("Boolean.getBoolean(\"mattmc.gui.debugStandard3dItemPipDump\")"),
+            "Standard3dItemRenderer should make its forced grass-block PIP dump opt-in behind an explicit debug flag");
+        assertTrue(guiRendererSource.contains("if (Standard3dItemRenderer.isDebugDumpEnabled())")
+                && guiRendererSource.contains("prepareDebugStandardBlockItemDump(this.renderState, i);"),
+            "GuiRenderer should only invoke the standard 3D item PIP debug dump when that explicit debug flag is enabled");
     }
 
     @Test

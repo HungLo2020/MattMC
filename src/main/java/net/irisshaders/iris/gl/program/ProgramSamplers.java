@@ -19,8 +19,10 @@ import net.vulkanic.VulkanicAPI;
 import javax.annotation.Nonnull;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.IntSupplier;
 
@@ -104,6 +106,25 @@ public class ProgramSamplers {
 			names.add(Objects.requireNonNull(binding.name(), "sampler name"));
 		}
 		return names.build();
+	}
+
+	public OptionalInt getRenderPassSamplerUnit(String samplerName) {
+		for (NamedSamplerBinding binding : namedSamplerBindings) {
+			if (binding.name().equals(samplerName)) {
+				return OptionalInt.of(binding.textureUnit());
+			}
+		}
+
+		return OptionalInt.empty();
+	}
+
+	@SuppressWarnings("null")
+	public java.util.Map<String, Integer> getRenderPassSamplerUnits() {
+		java.util.Map<String, Integer> units = new LinkedHashMap<>();
+		for (NamedSamplerBinding binding : namedSamplerBindings) {
+			units.put(Objects.requireNonNull(binding.name(), "sampler name"), binding.textureUnit());
+		}
+		return java.util.Map.copyOf(units);
 	}
 
 	@SuppressWarnings("null")

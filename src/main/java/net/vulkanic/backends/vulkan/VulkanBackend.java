@@ -245,6 +245,7 @@ public class VulkanBackend {
     private final AtomicInteger nextVirtualFboId = new AtomicInteger(1);
     private final Set<Integer>  virtualFbos      = ConcurrentHashMap.newKeySet();
     private final Map<Integer, VirtualFramebufferState> virtualFramebufferStates = new ConcurrentHashMap<>();
+    private final Map<FramebufferTexturePairKey, Integer> implicitFramebufferByTexturePair = new ConcurrentHashMap<>();
     private volatile int        boundReadFbo     = 0;
     private volatile int        boundDrawFbo     = 0;
 
@@ -257,6 +258,8 @@ public class VulkanBackend {
     private final Set<Integer>  virtualSamplers      = ConcurrentHashMap.newKeySet();
     /** Per-unit sampler binding cache: texture-unit → bound sampler handle */
     private final ConcurrentHashMap<Integer, Integer> boundSamplerPerUnit = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<DescriptorPipelineKey, PipelineHandle> descriptorPipelineCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<FramebufferPipelineKey, PipelineHandle> framebufferPipelineCache = new ConcurrentHashMap<>();
 
     // Virtual query/sync tracking for GL-compat control flow on the Vulkan path
     private final AtomicInteger nextVirtualQueryId = new AtomicInteger(1);
@@ -290,17 +293,20 @@ public class VulkanBackend {
 
     private static final class PrecompiledPipelineState implements CompiledRenderPipeline {
         private final PipelineHandle pipelineHandle;
+        private final PipelineDescriptor descriptor;
         private final String stableCacheKey;
         private final String resourceLayoutKey;
         private final boolean valid;
 
         private PrecompiledPipelineState(
             PipelineHandle pipelineHandle,
+            PipelineDescriptor descriptor,
             String stableCacheKey,
             String resourceLayoutKey,
             boolean valid
         ) {
             this.pipelineHandle = pipelineHandle;
+            this.descriptor = descriptor;
             this.stableCacheKey = stableCacheKey;
             this.resourceLayoutKey = resourceLayoutKey;
             this.valid = valid;
@@ -308,14 +314,15 @@ public class VulkanBackend {
 
         static PrecompiledPipelineState successful(
             PipelineHandle pipelineHandle,
+            PipelineDescriptor descriptor,
             String stableCacheKey,
             String resourceLayoutKey
         ) {
-            return new PrecompiledPipelineState(pipelineHandle, stableCacheKey, resourceLayoutKey, true);
+            return new PrecompiledPipelineState(pipelineHandle, descriptor, stableCacheKey, resourceLayoutKey, true);
         }
 
         static PrecompiledPipelineState failed() {
-            return new PrecompiledPipelineState(null, null, null, false);
+            return new PrecompiledPipelineState(null, null, null, null, false);
         }
 
         @Override
@@ -338,10 +345,29 @@ public class VulkanBackend {
         }
     }
 
+    private record FramebufferPipelineKey(
+        String stableCacheKey,
+        String resourceLayoutKey,
+        int framebuffer
+    ) {
+    }
+
+    private record DescriptorPipelineKey(
+        String stableCacheKey,
+        String resourceLayoutKey
+    ) {
+    }
+
+    private record FramebufferTexturePairKey(
+        int colorTexture,
+        int depthTexture
+    ) {
+    }
+
     private static final class VirtualFramebufferState {
         private final Map<Integer, Integer> attachments = new ConcurrentHashMap<>();
         private volatile int readBuffer = GL_COLOR_ATTACHMENT0;
-        private volatile int drawBuffer = GL_COLOR_ATTACHMENT0;
+        private volatile int[] drawBuffers = new int[]{GL_COLOR_ATTACHMENT0};
 
         void setAttachment(int attachment, int texture) {
             if (texture == 0) {
@@ -353,6 +379,23 @@ public class VulkanBackend {
 
         int getAttachment(int attachment) {
             return attachments.getOrDefault(attachment, 0);
+        }
+
+        int[] getDrawBuffers() {
+            return drawBuffers.clone();
+        }
+
+        int getPrimaryDrawBuffer() {
+            return drawBuffers.length == 0 ? GL_NONE : drawBuffers[0];
+        }
+
+        void setDrawBuffers(int[] buffers) {
+            if (buffers == null || buffers.length == 0) {
+                this.drawBuffers = new int[]{GL_NONE};
+                return;
+            }
+
+            this.drawBuffers = buffers.clone();
         }
     }
 
@@ -473,6 +516,18 @@ void main() {
             state.closeIfNeeded();
         }
         precompiledPipelineCache.clear();
+        for (PipelineHandle pipelineHandle : new ArrayList<>(descriptorPipelineCache.values())) {
+            if (pipelineHandle != null) {
+                pipelineHandle.close();
+            }
+        }
+        descriptorPipelineCache.clear();
+        for (PipelineHandle pipelineHandle : new ArrayList<>(framebufferPipelineCache.values())) {
+            if (pipelineHandle != null) {
+                pipelineHandle.close();
+            }
+        }
+        framebufferPipelineCache.clear();
     }
 
     private PrecompiledPipelineState compilePrecompiledPipeline(
@@ -556,6 +611,7 @@ void main() {
 
             return PrecompiledPipelineState.successful(
                 pipelineHandle,
+                descriptor,
                 descriptor.getStableCacheKey(),
                 resourceLayoutKey(descriptor.getResourceLayout())
             );
@@ -952,6 +1008,14 @@ void main() {
         java.util.OptionalDouble clearDepth
     ) {
         return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    public net.blaze3d.systems.RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        int framebuffer,
+        boolean hasDepthTexture
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);
     }
 
     public GpuTexture createTexture(
@@ -1789,11 +1853,13 @@ void main() {
         if (virtualProgram.attachedShaderIds.isEmpty()) {
             virtualProgram.linkStatus = false;
             virtualProgram.infoLog = "Program has no attached shaders.";
+            virtualProgram.linkedSpirvModules = List.of();
             return;
         }
 
         NativeSpine spine = nativeSpine;
         List<String> issues = new ArrayList<>();
+        List<VulkanicSpirvModule> linkedSpirvModules = new ArrayList<>();
         Set<VulkanicShaderStage> seenStages = new HashSet<>();
         for (int shaderId : virtualProgram.attachedShaderIds) {
             VirtualShader virtualShader = virtualShaders.get(shaderId);
@@ -1809,6 +1875,8 @@ void main() {
             if (!seenStages.add(virtualShader.stage)) {
                 issues.add("Multiple shaders attached for stage " + virtualShader.stage + ".");
             }
+
+            linkedSpirvModules.add(virtualShader.compiledModule);
 
             if (spine != null) {
                 try {
@@ -1826,10 +1894,12 @@ void main() {
             virtualProgram.activeUniformNames = List.of();
             virtualProgram.activeUniforms = List.of();
             virtualProgram.activeUniformBlocks = List.of();
+            virtualProgram.linkedSpirvModules = List.of();
             return;
         }
 
         reflectVirtualProgramResources(virtualProgram);
+        virtualProgram.linkedSpirvModules = List.copyOf(linkedSpirvModules);
         virtualProgram.linkStatus = true;
         virtualProgram.infoLog = "";
     }
@@ -2437,6 +2507,8 @@ void main() {
             throw new IllegalArgumentException("texture must be >= 0, got: " + texture);
         }
 
+        releaseImplicitFramebuffersForTexture(texture);
+
         ensureNativeReady("deleteTexture");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -2890,6 +2962,76 @@ void main() {
         }
     }
 
+    public PipelineHandle createPipeline(PipelineDescriptor descriptor, int framebuffer) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+        ResolvedFramebufferTargets targets = resolveFramebufferTargets(framebuffer);
+
+        ensureNativeReady("createPipeline(framebuffer)");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        List<VulkanicSpirvModule> spirvModules = descriptor.getSpirvModules();
+        if (spirvModules.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Vulkan pipeline creation requires precompiled SPIR-V shader modules attached to the "
+                    + "PipelineDescriptor. Use PipelineDescriptor.fromPortableStateAndSpirvModules(...) "
+                    + "or PipelineDescriptor.fromRenderPipelineAndSpirvModules(...) to provide SPIR-V "
+                    + "bytecode for both vertex and fragment stages."
+            );
+        }
+
+        VulkanicSpirvModule vertModule = null;
+        VulkanicSpirvModule geomModule = null;
+        VulkanicSpirvModule fragModule = null;
+        for (VulkanicSpirvModule module : spirvModules) {
+            if (module.stage() == VulkanicShaderStage.VERTEX) {
+                vertModule = module;
+            } else if (module.stage() == VulkanicShaderStage.GEOMETRY) {
+                geomModule = module;
+            } else if (module.stage() == VulkanicShaderStage.FRAGMENT) {
+                fragModule = module;
+            }
+        }
+        if (vertModule == null) {
+            throw new IllegalArgumentException(
+                "Vulkan pipeline creation requires a VERTEX stage SPIR-V module in the descriptor.");
+        }
+        if (fragModule == null) {
+            throw new IllegalArgumentException(
+                "Vulkan pipeline creation requires a FRAGMENT stage SPIR-V module in the descriptor.");
+        }
+
+        long vertModuleHandle = spine.createShaderModule(vertModule);
+        long geomModuleHandle = geomModule != null ? spine.createShaderModule(geomModule) : VK10.VK_NULL_HANDLE;
+        long fragModuleHandle = spine.createShaderModule(fragModule);
+        try {
+            return spine.createVulkanPipeline(
+                descriptor,
+                vertModuleHandle,
+                geomModuleHandle,
+                fragModuleHandle,
+                targets.colorFormats(),
+                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED
+            );
+        } finally {
+            spine.destroyShaderModule(vertModuleHandle);
+            if (geomModuleHandle != VK10.VK_NULL_HANDLE) {
+                spine.destroyShaderModule(geomModuleHandle);
+            }
+            spine.destroyShaderModule(fragModuleHandle);
+        }
+    }
+
+    public List<VulkanicSpirvModule> getLinkedProgramSpirvModules(CommandContext ctx, int program) {
+        requireVulkanCommandBufferHandle("getLinkedProgramSpirvModules", ctx);
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        return virtualProgram == null ? List.of() : virtualProgram.linkedSpirvModules;
+    }
+
     private static final class BoundPipelineResources {
         private final PipelineHandle pipeline;
         private final PipelineDescriptor descriptor;
@@ -3009,10 +3151,120 @@ void main() {
         if (state == null || !state.isValid()) {
             return null;
         }
-        if (descriptor != null && !state.matchesDescriptor(descriptor)) {
+        if (descriptor == null) {
+            return state.pipelineHandle;
+        }
+        if (state.matchesDescriptor(descriptor)) {
+            return state.pipelineHandle;
+        }
+        if (!matchesStableDescriptor(state, descriptor)) {
             return null;
         }
-        return state.pipelineHandle;
+
+        PipelineDescriptor variantDescriptor = descriptorVariantDescriptor(state, descriptor);
+        if (variantDescriptor == null) {
+            return null;
+        }
+
+        DescriptorPipelineKey key = new DescriptorPipelineKey(
+            variantDescriptor.getStableCacheKey(),
+            resourceLayoutKey(variantDescriptor.getResourceLayout())
+        );
+        PipelineHandle cached = descriptorPipelineCache.get(key);
+        if (cached != null) {
+            if (cached.isValid()) {
+                return cached;
+            }
+            descriptorPipelineCache.remove(key, cached);
+        }
+
+        PipelineHandle descriptorVariant = createPipeline(variantDescriptor);
+        if (descriptorVariant == null || !descriptorVariant.isValid()) {
+            if (descriptorVariant != null) {
+                descriptorVariant.close();
+            }
+            return null;
+        }
+
+        PipelineHandle raced = descriptorPipelineCache.putIfAbsent(key, descriptorVariant);
+        if (raced != null) {
+            if (raced.isValid()) {
+                descriptorVariant.close();
+                return raced;
+            }
+            descriptorPipelineCache.put(key, descriptorVariant);
+        }
+        return descriptorVariant;
+    }
+
+    public net.vulkanic.PipelineHandle resolvePipelineHandle(
+            net.blaze3d.pipeline.RenderPipeline renderPipeline,
+            net.vulkanic.PipelineDescriptor descriptor,
+            int framebuffer) {
+        if (framebuffer == 0) {
+            return resolvePipelineHandle(renderPipeline, descriptor);
+        }
+        if (renderPipeline == null) {
+            return null;
+        }
+        PrecompiledPipelineState state = precompiledPipelineCache.get(renderPipeline);
+        if (state == null || !state.isValid()) {
+            return null;
+        }
+        PipelineDescriptor pipelineDescriptor = descriptor != null ? descriptorVariantDescriptor(state, descriptor) : state.descriptor;
+        if (pipelineDescriptor == null) {
+            return null;
+        }
+        if (!state.matchesDescriptor(pipelineDescriptor) && !matchesStableDescriptor(state, pipelineDescriptor)) {
+            return null;
+        }
+
+        FramebufferPipelineKey key = new FramebufferPipelineKey(
+            pipelineDescriptor.getStableCacheKey(),
+            resourceLayoutKey(pipelineDescriptor.getResourceLayout()),
+            framebuffer
+        );
+        PipelineHandle cached = framebufferPipelineCache.get(key);
+        if (cached != null) {
+            if (cached.isValid()) {
+                return cached;
+            }
+            framebufferPipelineCache.remove(key, cached);
+        }
+
+        PipelineHandle framebufferCompatible = createPipeline(pipelineDescriptor, framebuffer);
+        if (framebufferCompatible == null || !framebufferCompatible.isValid()) {
+            if (framebufferCompatible != null) {
+                framebufferCompatible.close();
+            }
+            return null;
+        }
+
+        PipelineHandle raced = framebufferPipelineCache.putIfAbsent(key, framebufferCompatible);
+        if (raced != null) {
+            if (raced.isValid()) {
+                framebufferCompatible.close();
+                return raced;
+            }
+            framebufferPipelineCache.put(key, framebufferCompatible);
+        }
+        return framebufferCompatible;
+    }
+
+    private static @Nullable PipelineDescriptor descriptorVariantDescriptor(PrecompiledPipelineState state, PipelineDescriptor descriptor) {
+        if (descriptor.hasSpirvModules()) {
+            return descriptor;
+        }
+        if (state.descriptor == null) {
+            return null;
+        }
+        return state.descriptor.withResourceLayout(descriptor.getResourceLayout());
+    }
+
+    private static boolean matchesStableDescriptor(PrecompiledPipelineState state, @Nullable PipelineDescriptor descriptor) {
+        return descriptor != null
+            && state.stableCacheKey != null
+            && state.stableCacheKey.equals(descriptor.getStableCacheKey());
     }
 
     public void bindPipelineResources(CommandContext ctx,
@@ -3247,6 +3499,47 @@ void main() {
         }
     }
 
+    private static final class ResolvedFramebufferTargets {
+        private final List<NativeSpine.LegacyTextureObject> colorTextures;
+        private final List<Long> colorViewHandles;
+        private final NativeSpine.LegacyTextureObject depthTexture;
+        private final long depthViewHandle;
+        private final int width;
+        private final int height;
+
+        private ResolvedFramebufferTargets(
+            List<NativeSpine.LegacyTextureObject> colorTextures,
+            List<Long> colorViewHandles,
+            @Nullable NativeSpine.LegacyTextureObject depthTexture,
+            long depthViewHandle,
+            int width,
+            int height
+        ) {
+            this.colorTextures = List.copyOf(colorTextures);
+            this.colorViewHandles = List.copyOf(colorViewHandles);
+            this.depthTexture = depthTexture;
+            this.depthViewHandle = depthViewHandle;
+            this.width = width;
+            this.height = height;
+        }
+
+        private int colorAttachmentCount() {
+            return colorTextures.size();
+        }
+
+        private boolean hasDepthTarget() {
+            return depthTexture != null && depthViewHandle != VK10.VK_NULL_HANDLE;
+        }
+
+        private List<Integer> colorFormats() {
+            List<Integer> formats = new ArrayList<>(colorTextures.size());
+            for (NativeSpine.LegacyTextureObject colorTexture : colorTextures) {
+                formats.add(colorTexture.vkFormat);
+            }
+            return List.copyOf(formats);
+        }
+    }
+
     private static ResolvedRenderTargets resolveRenderTargets(VulkanicRenderPassDescriptor descriptor) {
         VulkanTextureView colorView = requireVulkanTextureView(descriptor.colorAttachment().target(), "colorAttachment.target");
         VulkanicTexture colorTexture = requireRenderPassTexture(colorView.texture(), "colorAttachment.texture");
@@ -3281,6 +3574,92 @@ void main() {
         }
 
         return new ResolvedRenderTargets(colorView, colorTexture, depthView, depthTexture, width, height);
+    }
+
+    private ResolvedFramebufferTargets resolveFramebufferTargets(int framebuffer) {
+        ensureNativeReady("resolveFramebufferTargets");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        if (framebuffer == 0) {
+            throw new IllegalArgumentException("Framebuffer-backed Vulkan render passes require a non-default framebuffer id");
+        }
+
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        if (state == null) {
+            throw new IllegalArgumentException("Unknown Vulkan virtual framebuffer handle: " + framebuffer);
+        }
+
+        int[] drawBuffers = framebufferDrawBuffers(framebuffer);
+        List<NativeSpine.LegacyTextureObject> colorTextures = new ArrayList<>(drawBuffers.length);
+        List<Long> colorViewHandles = new ArrayList<>(drawBuffers.length);
+        int width = -1;
+        int height = -1;
+
+        for (int drawBuffer : drawBuffers) {
+            if (drawBuffer == GL_NONE) {
+                continue;
+            }
+
+            int attachment = drawBuffer == VulkanicAPI.GL_BACK ? GL_COLOR_ATTACHMENT0 : drawBuffer;
+            int textureId = state.getAttachment(attachment);
+            if (textureId == 0) {
+                throw new IllegalStateException(
+                    "Framebuffer " + framebuffer + " draw buffer 0x" + Integer.toHexString(drawBuffer)
+                        + " has no attached texture"
+                );
+            }
+
+            NativeSpine.LegacyTextureObject legacyTexture = spine.requireLegacyTexture(textureId);
+            if (legacyTexture.imageHandle == VK10.VK_NULL_HANDLE || legacyTexture.defaultViewHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException(
+                    "Framebuffer color attachment texId=" + textureId + " is missing Vulkan image/view state"
+                );
+            }
+
+            if (width < 0) {
+                width = legacyTexture.width;
+                height = legacyTexture.height;
+            } else if (legacyTexture.width != width || legacyTexture.height != height) {
+                throw new IllegalStateException(
+                    "Framebuffer " + framebuffer + " has mismatched color attachment dimensions"
+                );
+            }
+
+            colorTextures.add(legacyTexture);
+            colorViewHandles.add(legacyTexture.defaultViewHandle);
+        }
+
+        if (colorTextures.isEmpty()) {
+            throw new IllegalStateException(
+                "Framebuffer " + framebuffer + " has no color attachments for draw buffers " + java.util.Arrays.toString(drawBuffers)
+            );
+        }
+
+        int depthTextureId = state.getAttachment(GL_DEPTH_ATTACHMENT);
+        if (depthTextureId == 0) {
+            depthTextureId = state.getAttachment(GL_DEPTH_STENCIL_ATTACHMENT);
+        }
+
+        NativeSpine.LegacyTextureObject depthTexture = null;
+        long depthViewHandle = VK10.VK_NULL_HANDLE;
+        if (depthTextureId != 0) {
+            depthTexture = spine.requireLegacyTexture(depthTextureId);
+            if (depthTexture.imageHandle == VK10.VK_NULL_HANDLE || depthTexture.defaultViewHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException(
+                    "Framebuffer depth attachment texId=" + depthTextureId + " is missing Vulkan image/view state"
+                );
+            }
+            if (depthTexture.width != width || depthTexture.height != height) {
+                throw new IllegalStateException(
+                    "Framebuffer " + framebuffer + " depth attachment dimensions must match color attachments"
+                );
+            }
+            depthViewHandle = depthTexture.defaultViewHandle;
+        }
+
+        return new ResolvedFramebufferTargets(colorTextures, colorViewHandles, depthTexture, depthViewHandle, width, height);
     }
 
     private static VulkanTextureView requireVulkanTextureView(VulkanicTextureView view, String fieldName) {
@@ -3649,6 +4028,25 @@ void main() {
         }
 
         spine.beginRenderPass(commandBufferHandle, safeDescriptor, resolvedTargets);
+        return new VulkanBackedRenderPass(spine, commandBufferHandle);
+    }
+
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        java.util.function.Supplier<String> label,
+        int framebuffer
+    ) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("beginRenderPass(framebuffer)", ctx);
+        Objects.requireNonNull(label, "label must not be null");
+        ResolvedFramebufferTargets resolvedTargets = resolveFramebufferTargets(framebuffer);
+
+        ensureNativeReady("beginRenderPass(framebuffer)");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.beginFramebufferRenderPass(commandBufferHandle, resolvedTargets);
         return new VulkanBackedRenderPass(spine, commandBufferHandle);
     }
 
@@ -4044,6 +4442,7 @@ void main() {
         requireVulkanCommandBufferHandle("deleteFramebuffer", ctx);
         virtualFbos.remove(fbo);
         virtualFramebufferStates.remove(fbo);
+        releaseImplicitFramebufferBinding(fbo);
         if (boundReadFbo == fbo) boundReadFbo = 0;
         if (boundDrawFbo == fbo) boundDrawFbo = 0;
     }
@@ -4908,10 +5307,10 @@ void main() {
     public void namedFramebufferDrawBuffers(CommandContext ctx, int framebuffer, int[] bufs) {
         requireVulkanCommandBufferHandle("namedFramebufferDrawBuffers", ctx);
         VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        if (state != null && bufs != null && bufs.length > 0) {
-            state.drawBuffer = bufs[0];
+        if (state != null) {
+            state.setDrawBuffers(bufs);
             if (framebuffer == boundDrawFbo) {
-                pendingDrawBuffer = bufs[0];
+                pendingDrawBuffer = state.getPrimaryDrawBuffer();
             }
         }
     }
@@ -4967,7 +5366,127 @@ void main() {
     public int resolveFramebufferForTextures(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture,
                                              net.vulkanic.VulkanicTexture depthTexture) {
         requireVulkanCommandBufferHandle("resolveFramebufferForTextures", ctx);
-        return 0;
+        int colorHandle = resolveTextureHandle(ctx, colorTexture);
+        if (colorHandle == 0) {
+            return 0;
+        }
+
+        int depthHandle = resolveTextureHandle(ctx, depthTexture);
+        if (depthTexture != null && depthHandle == 0) {
+            return 0;
+        }
+
+        int matchedFramebuffer = 0;
+        for (Map.Entry<Integer, VirtualFramebufferState> entry : virtualFramebufferStates.entrySet()) {
+            int framebuffer = entry.getKey();
+            if (framebuffer == 0) {
+                continue;
+            }
+
+            if (!matchesSingleColorFramebufferContract(entry.getValue(), colorHandle, depthHandle)) {
+                continue;
+            }
+
+            if (matchedFramebuffer == 0 || framebuffer < matchedFramebuffer) {
+                matchedFramebuffer = framebuffer;
+            }
+        }
+
+        return matchedFramebuffer != 0 ? matchedFramebuffer : resolveOrCreateImplicitFramebuffer(colorHandle, depthHandle);
+    }
+
+    private static boolean matchesSingleColorFramebufferContract(VirtualFramebufferState state, int colorHandle, int depthHandle) {
+        int colorAttachmentCount = 0;
+        for (int drawBuffer : state.getDrawBuffers()) {
+            if (drawBuffer == GL_NONE) {
+                continue;
+            }
+
+            int attachment = drawBuffer == VulkanicAPI.GL_BACK ? GL_COLOR_ATTACHMENT0 : drawBuffer;
+            if (state.getAttachment(attachment) != colorHandle) {
+                return false;
+            }
+
+            colorAttachmentCount++;
+            if (colorAttachmentCount > 1) {
+                return false;
+            }
+        }
+
+        return colorAttachmentCount == 1 && framebufferDepthAttachmentTexture(state) == depthHandle;
+    }
+
+    private static int framebufferDepthAttachmentTexture(VirtualFramebufferState state) {
+        int depthTexture = state.getAttachment(GL_DEPTH_ATTACHMENT);
+        if (depthTexture != 0) {
+            return depthTexture;
+        }
+        return state.getAttachment(GL_DEPTH_STENCIL_ATTACHMENT);
+    }
+
+    private int resolveOrCreateImplicitFramebuffer(int colorHandle, int depthHandle) {
+        FramebufferTexturePairKey key = new FramebufferTexturePairKey(colorHandle, depthHandle);
+        while (true) {
+            Integer cachedFramebuffer = implicitFramebufferByTexturePair.get(key);
+            if (cachedFramebuffer != null) {
+                if (virtualFramebufferStates.containsKey(cachedFramebuffer)) {
+                    return cachedFramebuffer;
+                }
+
+                implicitFramebufferByTexturePair.remove(key, cachedFramebuffer);
+            }
+
+            int framebuffer = nextVirtualFboId.getAndIncrement();
+            VirtualFramebufferState state = new VirtualFramebufferState();
+            state.setAttachment(GL_COLOR_ATTACHMENT0, colorHandle);
+            if (depthHandle != 0) {
+                state.setAttachment(GL_DEPTH_ATTACHMENT, depthHandle);
+            }
+
+            virtualFbos.add(framebuffer);
+            virtualFramebufferStates.put(framebuffer, state);
+
+            Integer racedFramebuffer = implicitFramebufferByTexturePair.putIfAbsent(key, framebuffer);
+            if (racedFramebuffer == null) {
+                return framebuffer;
+            }
+
+            virtualFbos.remove(framebuffer);
+            virtualFramebufferStates.remove(framebuffer);
+            if (virtualFramebufferStates.containsKey(racedFramebuffer)) {
+                return racedFramebuffer;
+            }
+
+            implicitFramebufferByTexturePair.remove(key, racedFramebuffer);
+        }
+    }
+
+    private void releaseImplicitFramebuffersForTexture(int texture) {
+        for (Map.Entry<FramebufferTexturePairKey, Integer> entry : new ArrayList<>(implicitFramebufferByTexturePair.entrySet())) {
+            FramebufferTexturePairKey key = entry.getKey();
+            if (key.colorTexture() != texture && key.depthTexture() != texture) {
+                continue;
+            }
+
+            Integer framebuffer = entry.getValue();
+            if (!implicitFramebufferByTexturePair.remove(key, framebuffer)) {
+                continue;
+            }
+
+            if (framebuffer != null) {
+                virtualFbos.remove(framebuffer);
+                virtualFramebufferStates.remove(framebuffer);
+            }
+        }
+    }
+
+    private void releaseImplicitFramebufferBinding(int framebuffer) {
+        for (Map.Entry<FramebufferTexturePairKey, Integer> entry : new ArrayList<>(implicitFramebufferByTexturePair.entrySet())) {
+            Integer mappedFramebuffer = entry.getValue();
+            if (mappedFramebuffer != null && mappedFramebuffer == framebuffer) {
+                implicitFramebufferByTexturePair.remove(entry.getKey(), mappedFramebuffer);
+            }
+        }
     }
 
     public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture) {
@@ -5539,7 +6058,7 @@ void main() {
     private void applyFramebufferDrawState(int framebuffer) {
         VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
         if (state != null) {
-            pendingDrawBuffer = state.drawBuffer;
+            pendingDrawBuffer = state.getPrimaryDrawBuffer();
         }
     }
 
@@ -5572,7 +6091,12 @@ void main() {
 
     private int framebufferDrawBuffer(int framebuffer) {
         VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
-        return state != null ? state.drawBuffer : pendingDrawBuffer;
+        return state != null ? state.getPrimaryDrawBuffer() : pendingDrawBuffer;
+    }
+
+    private int[] framebufferDrawBuffers(int framebuffer) {
+        VirtualFramebufferState state = virtualFramebufferStates.get(framebuffer);
+        return state != null ? state.getDrawBuffers() : new int[]{pendingDrawBuffer};
     }
 
     private Integer resolveFramebufferTextureForCopy(int framebuffer, int selectedBuffer) {
@@ -5715,6 +6239,7 @@ void main() {
         private volatile List<String> activeUniformNames = List.of();
         private volatile List<ReflectedUniform> activeUniforms = List.of();
         private volatile List<String> activeUniformBlocks = List.of();
+        private volatile List<VulkanicSpirvModule> linkedSpirvModules = List.of();
         private volatile boolean linkStatus;
         private volatile String infoLog = "";
     }
@@ -11798,6 +12323,181 @@ void main() {
             }
         }
 
+        private void beginFramebufferRenderPass(
+            long commandBufferHandle,
+            ResolvedFramebufferTargets targets
+        ) {
+            VulkanPerfAudit.recordRenderPassBegin();
+            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "beginFramebufferRenderPass");
+            if (renderPassRecording) {
+                throw new IllegalStateException("Nested Vulkan render passes are not supported yet.");
+            }
+
+            int colorAttachmentCount = targets.colorAttachmentCount();
+            int attachmentCount = colorAttachmentCount + (targets.hasDepthTarget() ? 1 : 0);
+            long renderPassHandle = VK10.VK_NULL_HANDLE;
+            long framebufferHandle = VK10.VK_NULL_HANDLE;
+            try (MemoryStack stack = stackPush()) {
+                VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.calloc(attachmentCount, stack);
+                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
+                    int initialLayout = trackedLayoutForLevel(colorTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                        ? trackedLayoutForLevel(colorTexture, 0)
+                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    attachments.get(colorIndex)
+                        .format(colorTexture.vkFormat)
+                        .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                        .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_LOAD)
+                        .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
+                        .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                        .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                        .initialLayout(initialLayout)
+                        .finalLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                }
+
+                VkAttachmentReference.Buffer colorReferences = VkAttachmentReference.calloc(colorAttachmentCount, stack);
+                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+                    colorReferences.get(colorIndex)
+                        .attachment(colorIndex)
+                        .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                }
+
+                VkAttachmentReference depthReference = null;
+                if (targets.hasDepthTarget()) {
+                    int depthAttachmentIndex = colorAttachmentCount;
+                    LegacyTextureObject depthTexture = targets.depthTexture;
+                    int depthInitialLayout = trackedLayoutForLevel(depthTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                        ? trackedLayoutForLevel(depthTexture, 0)
+                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                    attachments.get(depthAttachmentIndex)
+                        .format(depthTexture.vkFormat)
+                        .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                        .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_LOAD)
+                        .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
+                        .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                        .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                        .initialLayout(depthInitialLayout)
+                        .finalLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                    depthReference = VkAttachmentReference.calloc(stack)
+                        .attachment(depthAttachmentIndex)
+                        .layout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                }
+
+                VkSubpassDescription.Buffer subpasses = VkSubpassDescription.calloc(1, stack);
+                subpasses.get(0)
+                    .pipelineBindPoint(VK10.VK_PIPELINE_BIND_POINT_GRAPHICS)
+                    .colorAttachmentCount(colorAttachmentCount)
+                    .pColorAttachments(colorReferences)
+                    .pDepthStencilAttachment(depthReference);
+
+                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(1, stack);
+                dependencies.get(0)
+                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                    .dstSubpass(0)
+                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT)
+                    .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT)
+                    .srcAccessMask(0)
+                    .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+
+                VkRenderPassCreateInfo renderPassCreateInfo = VkRenderPassCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .pAttachments(attachments)
+                    .pSubpasses(subpasses)
+                    .pDependencies(dependencies);
+
+                java.nio.LongBuffer pRenderPass = stack.mallocLong(1);
+                checkVk(
+                    "vkCreateRenderPass(framebuffer)",
+                    VK10.vkCreateRenderPass(logicalDevice, renderPassCreateInfo, null, pRenderPass)
+                );
+                renderPassHandle = pRenderPass.get(0);
+
+                java.nio.LongBuffer pAttachments = stack.mallocLong(attachmentCount);
+                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+                    pAttachments.put(colorIndex, targets.colorViewHandles.get(colorIndex));
+                }
+                if (targets.hasDepthTarget()) {
+                    pAttachments.put(colorAttachmentCount, targets.depthViewHandle);
+                }
+
+                VkFramebufferCreateInfo framebufferCreateInfo = VkFramebufferCreateInfo.calloc(stack)
+                    .sType$Default()
+                    .renderPass(renderPassHandle)
+                    .pAttachments(pAttachments)
+                    .width(targets.width)
+                    .height(targets.height)
+                    .layers(1);
+
+                java.nio.LongBuffer pFramebuffer = stack.mallocLong(1);
+                checkVk(
+                    "vkCreateFramebuffer(framebuffer)",
+                    VK10.vkCreateFramebuffer(logicalDevice, framebufferCreateInfo, null, pFramebuffer)
+                );
+                framebufferHandle = pFramebuffer.get(0);
+
+                VkClearValue.Buffer clearValues = VkClearValue.calloc(attachmentCount, stack);
+                VkRenderPassBeginInfo beginInfo = VkRenderPassBeginInfo.calloc(stack)
+                    .sType$Default()
+                    .renderPass(renderPassHandle)
+                    .framebuffer(framebufferHandle)
+                    .pClearValues(clearValues);
+                beginInfo.renderArea()
+                    .offset(it -> it.x(0).y(0))
+                    .extent(it -> it.width(targets.width).height(targets.height));
+
+                VK10.vkCmdBeginRenderPass(activeCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
+
+                VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
+                defaultViewport.get(0)
+                    .x(0.0f)
+                    .y((float) targets.height)
+                    .width((float) targets.width)
+                    .height(-(float) targets.height)
+                    .minDepth(0.0f)
+                    .maxDepth(1.0f);
+                VK10.vkCmdSetViewport(activeCommandBuffer, 0, defaultViewport);
+
+                VkRect2D.Buffer defaultScissor = VkRect2D.calloc(1, stack);
+                defaultScissor.get(0)
+                    .offset(it -> it.x(0).y(0))
+                    .extent(it -> it.width(targets.width).height(targets.height));
+                VK10.vkCmdSetScissor(activeCommandBuffer, 0, defaultScissor);
+
+                scissorTestEnabled = false;
+                hasCachedScissorRect = false;
+                cachedScissorX = 0;
+                cachedScissorY = 0;
+                cachedScissorWidth = targets.width;
+                cachedScissorHeight = targets.height;
+
+                for (LegacyTextureObject colorTexture : targets.colorTextures) {
+                    trackLayoutForLevel(colorTexture, 0, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                }
+                activeRenderPassTargetsSwapchain = false;
+                renderPassSwapchainImageIndex = -1;
+                if (targets.hasDepthTarget()) {
+                    trackLayoutForLevel(targets.depthTexture, 0, VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                }
+
+                renderPassRecording = true;
+                activeRenderPassWidth = targets.width;
+                activeRenderPassHeight = targets.height;
+                transientRenderPassHandles.add(renderPassHandle);
+                transientFramebufferHandles.add(framebufferHandle);
+            } catch (RuntimeException exception) {
+                if (framebufferHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
+                }
+                if (renderPassHandle != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
+                }
+                throw exception;
+            }
+        }
+
         private boolean isSwapchainImageViewHandle(long imageViewHandle) {
             return imageViewHandle != VK10.VK_NULL_HANDLE && swapchainImageViewHandles.contains(imageViewHandle);
         }
@@ -11988,8 +12688,10 @@ void main() {
             return createVulkanPipeline(
                 descriptor,
                 vertShaderModuleHandle,
+                VK10.VK_NULL_HANDLE,
                 fragShaderModuleHandle,
-                VK10.VK_FORMAT_R8G8B8A8_UNORM
+                List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
+                VK10.VK_FORMAT_UNDEFINED
             );
         }
 
@@ -11999,15 +12701,43 @@ void main() {
             long fragShaderModuleHandle,
             int colorFormat
         ) {
+            return createVulkanPipeline(
+                descriptor,
+                vertShaderModuleHandle,
+                VK10.VK_NULL_HANDLE,
+                fragShaderModuleHandle,
+                List.of(colorFormat),
+                VK10.VK_FORMAT_UNDEFINED
+            );
+        }
+
+        private VulkanPipelineHandle createVulkanPipeline(
+            PipelineDescriptor descriptor,
+            long vertShaderModuleHandle,
+            long geomShaderModuleHandle,
+            long fragShaderModuleHandle,
+            List<Integer> colorFormats,
+            int depthFormat
+        ) {
             Objects.requireNonNull(descriptor, "descriptor must not be null");
             if (logicalDevice == null) {
                 throw new IllegalStateException("Cannot create pipeline: Vulkan logical device is unavailable.");
             }
-            if (colorFormat == VK10.VK_FORMAT_UNDEFINED) {
-                throw new IllegalArgumentException("Cannot create Vulkan pipeline with VK_FORMAT_UNDEFINED color attachment format");
+            Objects.requireNonNull(colorFormats, "colorFormats must not be null");
+            if (colorFormats.isEmpty()) {
+                throw new IllegalArgumentException("Cannot create Vulkan pipeline without at least one color attachment format");
+            }
+            for (int colorFormat : colorFormats) {
+                if (colorFormat == VK10.VK_FORMAT_UNDEFINED) {
+                    throw new IllegalArgumentException("Cannot create Vulkan pipeline with VK_FORMAT_UNDEFINED color attachment format");
+                }
             }
 
             PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
+            boolean includeDepth = depthFormat != VK10.VK_FORMAT_UNDEFINED
+                || portableState.depthTestFunction() != DepthTestFunction.NO_DEPTH_TEST
+                || portableState.writeDepth();
+            int pipelineDepthFormat = depthFormat != VK10.VK_FORMAT_UNDEFINED ? depthFormat : VK10.VK_FORMAT_D32_SFLOAT;
 
             try (MemoryStack stack = stackPush()) {
 
@@ -12033,8 +12763,7 @@ void main() {
                             .binding(b.binding())
                             .descriptorType(toVkDescriptorType(b.type()))
                             .descriptorCount(1)
-                            .stageFlags(VK10.VK_SHADER_STAGE_VERTEX_BIT
-                                | VK10.VK_SHADER_STAGE_FRAGMENT_BIT);
+                            .stageFlags(toVkShaderStageFlags(b.stages()));
                     }
                     VkDescriptorSetLayoutCreateInfo dslInfo = VkDescriptorSetLayoutCreateInfo.calloc(stack)
                         .sType$Default()
@@ -12075,14 +12804,26 @@ void main() {
 
                 // --- 3. Shader stages ---
                 java.nio.ByteBuffer mainEntry = stack.UTF8("main");
+                int shaderStageCount = geomShaderModuleHandle != VK10.VK_NULL_HANDLE ? 3 : 2;
                 VkPipelineShaderStageCreateInfo.Buffer shaderStages =
-                    VkPipelineShaderStageCreateInfo.calloc(2, stack);
+                    VkPipelineShaderStageCreateInfo.calloc(shaderStageCount, stack);
                 shaderStages.get(0)
                     .sType$Default()
                     .stage(VK10.VK_SHADER_STAGE_VERTEX_BIT)
                     .module(vertShaderModuleHandle)
                     .pName(mainEntry);
-                shaderStages.get(1)
+
+                int fragmentStageIndex = 1;
+                if (geomShaderModuleHandle != VK10.VK_NULL_HANDLE) {
+                    shaderStages.get(1)
+                        .sType$Default()
+                        .stage(VK10.VK_SHADER_STAGE_GEOMETRY_BIT)
+                        .module(geomShaderModuleHandle)
+                        .pName(mainEntry);
+                    fragmentStageIndex = 2;
+                }
+
+                shaderStages.get(fragmentStageIndex)
                     .sType$Default()
                     .stage(VK10.VK_SHADER_STAGE_FRAGMENT_BIT)
                     .module(fragShaderModuleHandle)
@@ -12180,19 +12921,21 @@ void main() {
                 java.util.Optional<PipelineDescriptor.BlendState> blendState =
                     portableState.blendState();
                 VkPipelineColorBlendAttachmentState.Buffer colorBlendAttachment =
-                    VkPipelineColorBlendAttachmentState.calloc(1, stack);
-                colorBlendAttachment.get(0)
-                    .colorWriteMask(colorWriteMask)
-                    .blendEnable(blendState.isPresent());
-                if (blendState.isPresent()) {
-                    PipelineDescriptor.BlendState blend = blendState.get();
-                    colorBlendAttachment.get(0)
-                        .srcColorBlendFactor(toVkBlendFactor(blend.sourceColor()))
-                        .dstColorBlendFactor(toVkBlendFactor(blend.destColor()))
-                        .colorBlendOp(VK10.VK_BLEND_OP_ADD)
-                        .srcAlphaBlendFactor(toVkBlendFactor(blend.sourceAlpha()))
-                        .dstAlphaBlendFactor(toVkBlendFactor(blend.destAlpha()))
-                        .alphaBlendOp(VK10.VK_BLEND_OP_ADD);
+                    VkPipelineColorBlendAttachmentState.calloc(colorFormats.size(), stack);
+                for (int colorIndex = 0; colorIndex < colorFormats.size(); colorIndex++) {
+                    colorBlendAttachment.get(colorIndex)
+                        .colorWriteMask(colorWriteMask)
+                        .blendEnable(blendState.isPresent());
+                    if (blendState.isPresent()) {
+                        PipelineDescriptor.BlendState blend = blendState.get();
+                        colorBlendAttachment.get(colorIndex)
+                            .srcColorBlendFactor(toVkBlendFactor(blend.sourceColor()))
+                            .dstColorBlendFactor(toVkBlendFactor(blend.destColor()))
+                            .colorBlendOp(VK10.VK_BLEND_OP_ADD)
+                            .srcAlphaBlendFactor(toVkBlendFactor(blend.sourceAlpha()))
+                            .dstAlphaBlendFactor(toVkBlendFactor(blend.destAlpha()))
+                            .alphaBlendOp(VK10.VK_BLEND_OP_ADD);
+                    }
                 }
 
                 boolean logicOpEnabled = portableState.colorLogic() != LogicOp.NONE;
@@ -12218,9 +12961,12 @@ void main() {
                 // with the render pass used at draw time.  We build one against the swapchain
                 // color format + D32_SFLOAT depth format so it matches the transient render
                 // passes created by beginRenderPass() for standard Minecraft draw calls.
-                long placeholderRenderPass = createPipelineCompatibleRenderPass(stack,
-                    depthTestEnabled || portableState.writeDepth(),
-                    colorFormat);
+                long placeholderRenderPass = createPipelineCompatibleRenderPass(
+                    stack,
+                    colorFormats,
+                    includeDepth,
+                    pipelineDepthFormat
+                );
 
                 // --- 13. VkGraphicsPipelineCreateInfo ---
                 VkGraphicsPipelineCreateInfo.Buffer pipelineInfo =
@@ -12312,33 +13058,65 @@ void main() {
          * @param includeDepth whether to include a D32_SFLOAT depth/stencil attachment
          */
         private long createPipelineCompatibleRenderPass(MemoryStack stack, boolean includeDepth) {
-            return createPipelineCompatibleRenderPass(stack, includeDepth, VK10.VK_FORMAT_R8G8B8A8_UNORM);
+            return createPipelineCompatibleRenderPass(
+                stack,
+                List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
+                includeDepth,
+                VK10.VK_FORMAT_D32_SFLOAT
+            );
         }
 
         private long createPipelineCompatibleRenderPass(MemoryStack stack, boolean includeDepth, int colorFormat) {
-            int attachmentCount = includeDepth ? 2 : 1;
+            return createPipelineCompatibleRenderPass(
+                stack,
+                List.of(colorFormat),
+                includeDepth,
+                VK10.VK_FORMAT_D32_SFLOAT
+            );
+        }
+
+        private long createPipelineCompatibleRenderPass(
+            MemoryStack stack,
+            List<Integer> colorFormats,
+            boolean includeDepth,
+            int depthFormat
+        ) {
+            Objects.requireNonNull(colorFormats, "colorFormats must not be null");
+            if (colorFormats.isEmpty()) {
+                throw new IllegalArgumentException("Pipeline-compatible render pass requires at least one color attachment");
+            }
+            if (includeDepth && depthFormat == VK10.VK_FORMAT_UNDEFINED) {
+                throw new IllegalArgumentException("Depth-enabled pipeline-compatible render pass requires a defined depth format");
+            }
+
+            int colorAttachmentCount = colorFormats.size();
+            int attachmentCount = colorAttachmentCount + (includeDepth ? 1 : 0);
 
             VkAttachmentDescription.Buffer attachments =
                 VkAttachmentDescription.calloc(attachmentCount, stack);
-            attachments.get(0)
-                .format(colorFormat)
-                .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
-                .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-                .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
-                .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-                .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
-                .initialLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-                .finalLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+                attachments.get(colorIndex)
+                    .format(colorFormats.get(colorIndex))
+                    .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
+                    .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                    .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
+                    .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                    .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                    .initialLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                    .finalLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            }
 
-            VkAttachmentReference.Buffer colorRef = VkAttachmentReference.calloc(1, stack);
-            colorRef.get(0)
-                .attachment(0)
-                .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            VkAttachmentReference.Buffer colorRef = VkAttachmentReference.calloc(colorAttachmentCount, stack);
+            for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+                colorRef.get(colorIndex)
+                    .attachment(colorIndex)
+                    .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            }
 
             VkAttachmentReference depthRef = null;
             if (includeDepth) {
-                attachments.get(1)
-                    .format(VK10.VK_FORMAT_D32_SFLOAT)
+                attachments.get(colorAttachmentCount)
+                    .format(depthFormat)
                     .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
                     .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                     .storeOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
@@ -12347,14 +13125,14 @@ void main() {
                     .initialLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
                     .finalLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
                 depthRef = VkAttachmentReference.calloc(stack)
-                    .attachment(1)
+                    .attachment(colorAttachmentCount)
                     .layout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
             }
 
             VkSubpassDescription.Buffer subpass = VkSubpassDescription.calloc(1, stack);
             subpass.get(0)
                 .pipelineBindPoint(VK10.VK_PIPELINE_BIND_POINT_GRAPHICS)
-                .colorAttachmentCount(1)
+                .colorAttachmentCount(colorAttachmentCount)
                 .pColorAttachments(colorRef)
                 .pDepthStencilAttachment(depthRef);
 

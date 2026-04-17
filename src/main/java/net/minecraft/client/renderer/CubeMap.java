@@ -6,7 +6,6 @@ import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTextureView;
-import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -37,7 +36,7 @@ public class CubeMap implements AutoCloseable {
 		RenderPipeline renderPipeline = RenderPipelines.PANORAMA;
 		RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
 		GpuTextureView gpuTextureView = renderTarget.getColorTextureView();
-		GpuTextureView gpuTextureView2 = renderTarget.getDepthTextureView();
+		int framebuffer = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
 		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.rotationX((float) Math.PI);
@@ -47,7 +46,9 @@ public class CubeMap implements AutoCloseable {
 			.writeTransform(new Matrix4f(matrix4fStack), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		matrix4fStack.popMatrix();
 
-		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty(), gpuTextureView2, OptionalDouble.empty())) {
+		try (RenderPass renderPass = framebuffer != 0
+			? VulkanicAPI.createRenderPass(() -> "Cubemap", framebuffer, renderTarget.getDepthTexture() != null)
+			: VulkanicAPI.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty())) {
 			renderPass.setPipeline(renderPipeline);
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);

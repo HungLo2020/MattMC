@@ -43,7 +43,10 @@ import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.PipelineDescriptor;
+import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
 
@@ -227,8 +230,15 @@ public class ShadowCompositeRenderer {
 				}
 			}
 
-			try (RenderPass pass = VulkanicAPI.createRenderPass(() -> "Shadow composites", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
+			renderPass.ensurePipelineState();
+
+			try (RenderPass pass = VulkanicAPI.createRenderPass(
+				() -> "Shadow composites",
+				renderPass.framebuffer.getId(),
+				renderPass.framebuffer.hasDepthAttachment()
+			)) {
 				pass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
+				VulkanicAPI.bindDefaultUniforms(pass);
 				pass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
 				pass.setIndexBuffer(indices, type);
 				pass.iris$setCustomPass(renderPass);
@@ -240,7 +250,6 @@ public class ShadowCompositeRenderer {
 				var ctx = VulkanicAPI.getCommandContext();
 				VulkanicAPI.setDynamicViewport(ctx, beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
 
-				renderPass.framebuffer.bind();
 				renderPass.program.use();
 
 				this.customUniforms.push(renderPass.program);
@@ -369,13 +378,54 @@ public class ShadowCompositeRenderer {
 		Program program;
 		BlendModeOverride blendModeOverride;
 		GlFramebuffer framebuffer;
+		PipelineDescriptor pipelineDescriptor;
+		PipelineHandle pipelineHandle;
+		final java.util.Map<PipelineDescriptor.ResourceLayout, PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
 		ImmutableSet<Integer> flippedAtLeastOnce;
 		ImmutableSet<Integer> stageReadsFromAlt;
 		ImmutableSet<Integer> mipmappedBuffers;
 		ViewportData viewportScale;
 		ComputeProgram[] computes;
 
+		private void closePipelineVariants() {
+			for (PipelineHandle pipelineVariant : this.pipelineLayoutVariants.values()) {
+				pipelineVariant.close();
+			}
+			this.pipelineLayoutVariants.clear();
+		}
+
+		private void ensurePipelineState() {
+			var ctx = VulkanicAPI.getCommandContext();
+			if (ctx.isImmediate()) {
+				return;
+			}
+
+			if (this.pipelineHandle != null && this.pipelineHandle.isValid() && this.pipelineDescriptor != null) {
+				return;
+			}
+
+			PipelineDescriptor descriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(
+				ctx,
+				PipelineDescriptor.fromRenderPipeline(CompositeRenderer.COMPOSITE_PIPELINE),
+				this.program.getProgramId()
+			);
+			descriptor = applyBlendOverride(descriptor, this.blendModeOverride);
+
+			this.closePipelineVariants();
+			if (this.pipelineHandle != null) {
+				this.pipelineHandle.close();
+			}
+
+			this.pipelineDescriptor = descriptor;
+			this.pipelineHandle = VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+		}
+
 		protected void destroy() {
+			this.closePipelineVariants();
+			if (this.pipelineHandle != null) {
+				this.pipelineHandle.close();
+				this.pipelineHandle = null;
+			}
 			this.program.destroy();
 			for (ComputeProgram compute : this.computes) {
 				if (compute != null) {
@@ -386,13 +436,107 @@ public class ShadowCompositeRenderer {
 
 		@Override
 		public void setupState() {
-			framebuffer.bind();
 			if (blendModeOverride != null) {
 				blendModeOverride.apply();
 			} else {
 				BlendModeStorage.restoreBlend();
 				BlendModeStorage.setBlendEnabled(false);
 			}
+		}
+
+		@Override
+		public void bindRenderPassResources(RenderPass renderPass) {
+			this.program.bindRenderPassResources(renderPass);
+		}
+
+		@Override
+		public Program program() {
+			return this.program;
+		}
+
+		@Override
+		public PipelineDescriptor pipelineDescriptor() {
+			return this.pipelineDescriptor;
+		}
+
+		@Override
+		public PipelineHandle pipelineHandle() {
+			return this.pipelineHandle;
+		}
+
+		@Override
+		public PipelineHandle pipelineHandle(PipelineDescriptor descriptor) {
+			if (descriptor == null || this.pipelineDescriptor == null || this.pipelineHandle == null) {
+				return this.pipelineHandle;
+			}
+
+			if (descriptor.getResourceLayout().equals(this.pipelineDescriptor.getResourceLayout())) {
+				return this.pipelineHandle;
+			}
+
+			PipelineHandle pipelineVariant = this.pipelineLayoutVariants.get(descriptor.getResourceLayout());
+			if (pipelineVariant != null && pipelineVariant.isValid()) {
+				return pipelineVariant;
+			}
+
+			if (pipelineVariant != null) {
+				pipelineVariant.close();
+			}
+
+			PipelineHandle createdVariant = VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+			this.pipelineLayoutVariants.put(descriptor.getResourceLayout(), createdVariant);
+			return createdVariant;
+		}
+
+		private static PipelineDescriptor applyBlendOverride(PipelineDescriptor descriptor, BlendModeOverride blendModeOverride) {
+			if (blendModeOverride == null || blendModeOverride.blendMode() == null) {
+				return descriptor;
+			}
+
+			net.irisshaders.iris.gl.blending.BlendMode blendMode = blendModeOverride.blendMode();
+			java.util.Optional<net.blaze3d.platform.SourceFactor> sourceColor = VulkanicBlendFactor.fromLegacyGlConstant(blendMode.srcRgb())
+				.map(factor -> net.blaze3d.platform.SourceFactor.valueOf(factor.name()));
+			java.util.Optional<net.blaze3d.platform.DestFactor> destColor = VulkanicBlendFactor.fromLegacyGlConstant(blendMode.dstRgb())
+				.map(factor -> net.blaze3d.platform.DestFactor.valueOf(factor.name()));
+			java.util.Optional<net.blaze3d.platform.SourceFactor> sourceAlpha = VulkanicBlendFactor.fromLegacyGlConstant(blendMode.srcAlpha())
+				.map(factor -> net.blaze3d.platform.SourceFactor.valueOf(factor.name()));
+			java.util.Optional<net.blaze3d.platform.DestFactor> destAlpha = VulkanicBlendFactor.fromLegacyGlConstant(blendMode.dstAlpha())
+				.map(factor -> net.blaze3d.platform.DestFactor.valueOf(factor.name()));
+			if (sourceColor.isEmpty() || destColor.isEmpty() || sourceAlpha.isEmpty() || destAlpha.isEmpty()) {
+				return descriptor;
+			}
+
+			PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
+			PipelineDescriptor.PortableState blendPortableState = new PipelineDescriptor.PortableState(
+				portableState.location(),
+				portableState.vertexShader(),
+				portableState.fragmentShader(),
+				portableState.shaderDefineValues(),
+				portableState.shaderDefineFlags(),
+				portableState.samplers(),
+				portableState.uniforms(),
+				java.util.Optional.of(new PipelineDescriptor.BlendState(
+					sourceColor.get(),
+					destColor.get(),
+					sourceAlpha.get(),
+					destAlpha.get()
+				)),
+				portableState.depthTestFunction(),
+				portableState.polygonMode(),
+				portableState.cull(),
+				portableState.writeColor(),
+				portableState.writeAlpha(),
+				portableState.writeDepth(),
+				portableState.colorLogic(),
+				portableState.vertexFormat(),
+				portableState.vertexFormatMode(),
+				portableState.depthBiasScaleFactor(),
+				portableState.depthBiasConstant()
+			);
+
+			return PipelineDescriptor.fromPortableStateAndSpirvModules(blendPortableState, descriptor.getSpirvModules())
+				.withPushConstantRanges(descriptor.getPushConstantRanges())
+				.withResourceLayout(descriptor.getResourceLayout());
 		}
 	}
 

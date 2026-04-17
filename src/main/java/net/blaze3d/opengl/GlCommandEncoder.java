@@ -73,8 +73,10 @@ public class GlCommandEncoder implements CommandEncoder {
 	private net.vulkanic.CommandContext activeRenderPassContext;
 	private static final boolean DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS = Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
 	private static int DEBUG_PIPELINE_BIND_LOGS = 0;
+	private static int DEBUG_CUSTOM_PASS_BIND_LOGS = 0;
 	private static int DEBUG_SODIUM_SAMPLER_BIND_LOGS = 0;
 	private static int DEBUG_PARTICLE_VULKAN_BIND_LOGS = 0;
+	private static final java.util.Set<String> WARNED_INCOMPLETE_CUSTOM_PASS_KEYS = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
 	private CommandContext commandContext() {
 		return this.activeRenderPassContext != null ? this.activeRenderPassContext : VulkanicAPI.getCommandContext();
@@ -126,12 +128,16 @@ public class GlCommandEncoder implements CommandEncoder {
 				this.inRenderPass = true;
 				this.device.debugLabels().pushDebugGroup(supplier);
 
+				int framebuffer = VulkanicAPI.resolveFramebufferForTextures(
+					gpuTextureView.texture(),
+					gpuTextureView2 == null ? null : gpuTextureView2.texture()
+				);
+
 				// Iris: the shadow temp-FBO shortcut is only safe on the immediate/OpenGL seam.
 				// Recorded Vulkan shadow passes still need a real backend beginRenderPass.
 				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() && commandContext().isImmediate()) {
 					// Iris shadow path: use GlTexture's cached FBO but do not bind it.
-					int i = VulkanicAPI.resolveFramebufferForTextures(gpuTextureView.texture(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
-					this.iris$tempFBO = i;
+					this.iris$tempFBO = framebuffer;
 					this.activeVulkanicRenderPass = null;
 					this.activeRenderPassContext = null;
 					CommandContext ctx = commandContext();
@@ -178,9 +184,33 @@ public class GlCommandEncoder implements CommandEncoder {
 				}
 
 				this.lastPipeline = null;
-				return new GlRenderPass(this, gpuTextureView2 != null);
+				return new GlRenderPass(this, gpuTextureView2 != null, framebuffer);
 			}
 		}
+	}
+
+	@Override
+	public RenderPass createRenderPass(Supplier<String> supplier, int framebuffer, boolean hasDepthTexture) {
+		if (this.inRenderPass) {
+			throw new IllegalStateException("Close the existing render pass before creating a new one!");
+		}
+
+		this.inRenderPass = true;
+		this.device.debugLabels().pushDebugGroup(supplier);
+		this.lastPipeline = null;
+
+		CommandContext ctx = commandContext();
+		if (ctx.isImmediate()) {
+			VulkanicAPI.bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			this.activeVulkanicRenderPass = null;
+			this.activeRenderPassContext = null;
+		} else {
+			CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
+			this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(renderPassCtx, supplier, framebuffer);
+			this.activeRenderPassContext = renderPassCtx;
+		}
+
+		return new GlRenderPass(this, hasDepthTexture, framebuffer);
 	}
 
 	/**
@@ -415,6 +445,57 @@ public class GlCommandEncoder implements CommandEncoder {
 			VulkanPerfAudit.recordBindingBuild(System.nanoTime() - auditStartNanos, completeCoverage);
 		}
 		return submission;
+	}
+
+	private PipelineResourceBindingSubmission buildCustomPassPipelineResourceBindings(
+		GlRenderPass glRenderPass,
+		PipelineDescriptor descriptor,
+		@Nullable net.irisshaders.iris.gl.program.Program program
+	) {
+		java.util.List<PipelineDescriptor.ResourceBinding> layoutBindings = descriptor.getResourceLayout().bindings();
+		int layoutBindingCount = layoutBindings.size();
+		java.util.Map<String, Integer> samplerUnits = program != null ? program.getRenderPassSamplerUnits() : java.util.Map.of();
+		java.util.Map<String, PipelineResourceBindings.SamplerBinding> samplerBindings = new java.util.HashMap<>(layoutBindingCount);
+		java.util.Map<String, net.vulkanic.VulkanicBufferSlice> uniformBufferBindings = new java.util.HashMap<>(layoutBindingCount);
+		java.util.Map<String, PipelineResourceBindings.TexelBufferBinding> texelBufferBindings = new java.util.HashMap<>(layoutBindingCount);
+		java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>(layoutBindingCount);
+
+		for (PipelineDescriptor.ResourceBinding resourceBinding : layoutBindings) {
+			switch (resourceBinding.type()) {
+				case SAMPLER -> {
+					Integer samplerUnit = samplerUnits.get(resourceBinding.name());
+					net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
+					if (samplerUnit != null && textureView != null) {
+						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerUnit, textureView));
+						boundResources.add(resourceBinding);
+					}
+				}
+				case UNIFORM_BUFFER -> {
+					net.vulkanic.VulkanicBufferSlice slice = glRenderPass.getUniformResourceSlice(resourceBinding.name());
+					if (slice != null) {
+						uniformBufferBindings.put(resourceBinding.name(), slice);
+						boundResources.add(resourceBinding);
+					}
+				}
+				case TEXEL_BUFFER -> {
+					Integer samplerUnit = samplerUnits.get(resourceBinding.name());
+					if (samplerUnit != null) {
+						texelBufferBindings.put(resourceBinding.name(), new PipelineResourceBindings.TexelBufferBinding(samplerUnit));
+						boundResources.add(resourceBinding);
+					}
+				}
+			}
+		}
+
+		boolean completeCoverage = boundResources.size() == layoutBindings.size();
+		PipelineDescriptor submissionDescriptor = completeCoverage
+			? descriptor
+			: descriptor.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
+		return new PipelineResourceBindingSubmission(
+			submissionDescriptor,
+			PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBufferBindings, texelBufferBindings),
+			completeCoverage
+		);
 	}
 
 	private void prepareSamplerBindingsForVulkanDescriptors(GlRenderPass glRenderPass, CommandContext ctx) {
@@ -1264,11 +1345,13 @@ public class GlCommandEncoder implements CommandEncoder {
 		iris$lastPass = glRenderPass;
 		
 		// Handle Iris custom pass
-		if (glRenderPass.iris$getCustomPass() != null) {
+		net.irisshaders.iris.mixinterface.CustomPass customPass = glRenderPass.iris$getCustomPass();
+		if (customPass != null) {
 			this.lastProgram = null;
 			net.vulkanic.CommandContext ctx = commandContext();
+			customPass.bindRenderPassResources(glRenderPass);
 			
-			((net.irisshaders.iris.mixinterface.CustomPass)glRenderPass.iris$getCustomPass()).setupState();
+			customPass.setupState();
 			
 			RenderPipeline renderPipeline = glRenderPass.pipeline.info();
 			
@@ -1315,6 +1398,53 @@ public class GlCommandEncoder implements CommandEncoder {
 						VulkanicAPI.setLogicOp(ctx, VulkanicLogicOp.OR_REVERSE);
 				}
 			}
+
+				if (!ctx.isImmediate()) {
+					PipelineDescriptor customPipelineDescriptor = customPass.pipelineDescriptor();
+					if (customPipelineDescriptor != null) {
+						PipelineResourceBindingSubmission submission = this.buildCustomPassPipelineResourceBindings(
+							glRenderPass,
+							customPipelineDescriptor,
+							customPass.program()
+						);
+						net.vulkanic.PipelineHandle customPipelineHandle = customPass.pipelineHandle(submission.descriptor());
+						if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_CUSTOM_PASS_BIND_LOGS < 40) {
+							DEBUG_CUSTOM_PASS_BIND_LOGS++;
+							LOGGER.info(
+								"Vulkan customPass bind#{} pipeline={} framebuffer={} baseLayoutBindings={} submissionBindings={} completeCoverage={} variantLayout={} resolvedPipelineHandle={}",
+								DEBUG_CUSTOM_PASS_BIND_LOGS,
+								renderPipeline.getLocation(),
+								glRenderPass.getFramebuffer(),
+								customPipelineDescriptor.getResourceLayout().bindings().size(),
+								submission.descriptor().getResourceLayout().bindings().size(),
+								submission.completeCoverage(),
+								!submission.descriptor().getResourceLayout().equals(customPipelineDescriptor.getResourceLayout()),
+								customPipelineHandle != null
+							);
+						}
+						if (!submission.completeCoverage()) {
+							String customPassKey = renderPipeline.getLocation() + "#" + glRenderPass.getFramebuffer();
+							if (WARNED_INCOMPLETE_CUSTOM_PASS_KEYS.add(customPassKey)) {
+								LOGGER.warn(
+									"Skipping Vulkan custom pass {} on framebuffer {} because only {} of {} reflected resources were available for descriptor binding",
+									renderPipeline.getLocation(),
+									glRenderPass.getFramebuffer(),
+									submission.descriptor().getResourceLayout().bindings().size(),
+									customPipelineDescriptor.getResourceLayout().bindings().size()
+								);
+							}
+							return false;
+						}
+						if (customPipelineHandle != null) {
+							VulkanicAPI.bindPipelineResources(
+								ctx,
+								customPipelineHandle,
+								submission.descriptor(),
+								submission.bindings()
+							);
+						}
+					}
+				}
 			
 			return true;
 		}
@@ -1417,12 +1547,20 @@ public class GlCommandEncoder implements CommandEncoder {
 			);
 		}
 		if (submission != null) {
+			PipelineDescriptor submissionDescriptor = submission.descriptor();
 			net.vulkanic.PipelineHandle pipelineHandle;
 			if (ctx.isImmediate()) {
 				pipelineHandle = new net.vulkanic.backends.opengl.OpenGLPipelineHandle(glRenderPass.pipeline);
 			} else {
-				pipelineHandle = VulkanicAPI.resolvePipelineHandle(
-						glRenderPass.pipeline.info(), glRenderPass.pipeline.descriptor());
+				boolean useFramebufferCompatiblePipeline = glRenderPass.getFramebuffer() != 0;
+				pipelineHandle = useFramebufferCompatiblePipeline
+					? VulkanicAPI.resolvePipelineHandle(
+						glRenderPass.pipeline.info(),
+						submissionDescriptor,
+						glRenderPass.getFramebuffer()
+					)
+					: VulkanicAPI.resolvePipelineHandle(
+						glRenderPass.pipeline.info(), submissionDescriptor);
 				if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PIPELINE_BIND_LOGS < 80) {
 					DEBUG_PIPELINE_BIND_LOGS++;
 					LOGGER.info(
@@ -1452,7 +1590,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				VulkanicAPI.bindPipelineResources(
 					ctx,
 					pipelineHandle,
-					submission.descriptor(),
+					submissionDescriptor,
 					submission.bindings()
 				);
 				if (ctx.isImmediate() && submission.completeCoverage()) {

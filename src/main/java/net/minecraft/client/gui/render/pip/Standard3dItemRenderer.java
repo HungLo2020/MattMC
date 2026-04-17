@@ -26,6 +26,7 @@ import org.joml.Matrix3x2f;
 
 @Environment(EnvType.CLIENT)
 public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedItemRenderState> {
+	private static final boolean DEBUG_STANDARD_3D_ITEM_PIP_DUMP = Boolean.getBoolean("mattmc.gui.debugStandard3dItemPipDump");
 	private static final int STANDARD_3D_ITEM_GUARD_PIXELS = 1;
 	private static final AtomicBoolean STANDARD_3D_ITEM_DEBUG_DUMPED = new AtomicBoolean();
 	private static final AtomicBoolean FORCED_STANDARD_3D_ITEM_DEBUG_DUMPED = new AtomicBoolean();
@@ -52,8 +53,12 @@ public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedIt
 		this.modelOnTextureIdentity = null;
 	}
 
+	public static boolean isDebugDumpEnabled() {
+		return DEBUG_STANDARD_3D_ITEM_PIP_DUMP;
+	}
+
 	public void prepareDebugStandardBlockItemDump(GuiRenderState guiRenderState, int i) {
-		if (STANDARD_3D_ITEM_DEBUG_DUMPED.get()) {
+		if (!DEBUG_STANDARD_3D_ITEM_PIP_DUMP || STANDARD_3D_ITEM_DEBUG_DUMPED.get()) {
 			return;
 		}
 

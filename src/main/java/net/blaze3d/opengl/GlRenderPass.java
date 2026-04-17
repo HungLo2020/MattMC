@@ -25,6 +25,7 @@ public class GlRenderPass implements RenderPass {
 	public static final boolean VALIDATION = SharedConstants.IS_RUNNING_IN_IDE;
 	private final GlCommandEncoder encoder;
 	private final boolean hasDepthTexture;
+	private final int framebuffer;
 	private boolean closed;
 	@Nullable
 	public GlRenderPipeline pipeline;
@@ -40,13 +41,18 @@ public class GlRenderPass implements RenderPass {
 	protected final Set<String> dirtyUniforms = new HashSet();
 	protected int pushedDebugGroups;
 
-	public GlRenderPass(GlCommandEncoder glCommandEncoder, boolean bl) {
+	public GlRenderPass(GlCommandEncoder glCommandEncoder, boolean bl, int framebuffer) {
 		this.encoder = glCommandEncoder;
 		this.hasDepthTexture = bl;
+		this.framebuffer = framebuffer;
 	}
 
 	public boolean hasDepthTexture() {
 		return this.hasDepthTexture;
+	}
+
+	public int getFramebuffer() {
+		return this.framebuffer;
 	}
 
 	@Override

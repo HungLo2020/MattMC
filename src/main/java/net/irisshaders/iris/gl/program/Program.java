@@ -1,8 +1,13 @@
 package net.irisshaders.iris.gl.program;
 
+import net.blaze3d.systems.RenderPass;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.OptionalInt;
 
 public final class Program extends GlResource {
 	private final ProgramUniforms uniforms;
@@ -47,5 +52,21 @@ public final class Program extends GlResource {
 
 	public int getActiveImages() {
 		return images.getActiveImages();
+	}
+
+	public void bindRenderPassResources(RenderPass renderPass) {
+		samplers.bindToRenderPass(renderPass);
+	}
+
+	public Collection<String> getRenderPassSamplerNames() {
+		return samplers.getRenderPassSamplerNames();
+	}
+
+	public OptionalInt getRenderPassSamplerUnit(String samplerName) {
+		return samplers.getRenderPassSamplerUnit(samplerName);
+	}
+
+	public Map<String, Integer> getRenderPassSamplerUnits() {
+		return samplers.getRenderPassSamplerUnits();
 	}
 }

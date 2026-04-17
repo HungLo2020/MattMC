@@ -16,6 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.function.BiFunction;
@@ -212,6 +213,30 @@ public interface GraphicsBackend {
         OptionalDouble clearDepth
     ) {
         return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    /**
+     * Creates a backend-owned render pass targeting an existing framebuffer contract.
+     */
+    default RenderPass createRenderPass(
+        Supplier<String> supplier,
+        int framebuffer,
+        boolean hasDepthTexture
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);
+    }
+
+    /**
+     * Begins a render pass that targets an existing framebuffer contract.
+     */
+    default VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        Supplier<String> label,
+        int framebuffer
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not support framebuffer-backed beginRenderPass."
+        );
     }
 
     /**
@@ -3793,6 +3818,20 @@ public interface GraphicsBackend {
     PipelineHandle createPipeline(PipelineDescriptor descriptor);
 
     /**
+     * Creates a pipeline compatible with the attachment contract of an existing framebuffer.
+     */
+    default PipelineHandle createPipeline(PipelineDescriptor descriptor, int framebuffer) {
+        return createPipeline(descriptor);
+    }
+
+    /**
+     * Returns linked SPIR-V modules associated with a live backend-neutral program handle.
+     */
+    default List<VulkanicSpirvModule> getLinkedProgramSpirvModules(CommandContext ctx, int program) {
+        return List.of();
+    }
+
+    /**
      * Resolves a {@link GpuBuffer} to the backend-specific {@link VulkanicBuffer} that
      * backs it at the native (GPU) level.
      *
@@ -3833,6 +3872,16 @@ public interface GraphicsBackend {
     default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
                                                           PipelineDescriptor descriptor) {
         return null;
+    }
+
+    /**
+     * Returns a compiled pipeline handle compatible with a specific framebuffer contract,
+     * or {@code null} if the active backend has not compiled one.
+     */
+    default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                          PipelineDescriptor descriptor,
+                                                          int framebuffer) {
+        return resolvePipelineHandle(renderPipeline, descriptor);
     }
 
     /**
