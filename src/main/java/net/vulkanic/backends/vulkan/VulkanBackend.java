@@ -10254,6 +10254,7 @@ void main() {
         private static int toVkFormat(VulkanicTextureFormat format) {
             return switch (format) {
                 case RGBA8   -> VK10.VK_FORMAT_R8G8B8A8_UNORM;
+                case RGBA16F -> VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
                 case BGRA8   -> VK10.VK_FORMAT_B8G8R8A8_UNORM;
                 case RED8    -> VK10.VK_FORMAT_R8_UNORM;
                 case RED8I   -> VK10.VK_FORMAT_R8_SINT;
@@ -11731,6 +11732,7 @@ void main() {
         private static VulkanicTextureFormat wrappedTextureFormatForVkFormat(int vkFormat) {
             return switch (vkFormat) {
                 case VK10.VK_FORMAT_R8G8B8A8_UNORM, VK10.VK_FORMAT_R8G8B8A8_SRGB -> VulkanicTextureFormat.RGBA8;
+                case VK10.VK_FORMAT_R16G16B16A16_SFLOAT -> VulkanicTextureFormat.RGBA16F;
                 case VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> VulkanicTextureFormat.BGRA8;
                 case VK10.VK_FORMAT_R8_UNORM -> VulkanicTextureFormat.RED8;
                 case VK10.VK_FORMAT_R8_SINT -> VulkanicTextureFormat.RED8I;

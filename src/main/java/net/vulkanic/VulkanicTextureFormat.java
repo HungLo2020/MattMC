@@ -9,6 +9,8 @@ package net.vulkanic;
 public enum VulkanicTextureFormat {
     /** 4-component RGBA, 8 bits per channel. */
     RGBA8(4),
+    /** 4-component RGBA, 16-bit floating-point channels. */
+    RGBA16F(8),
     /** 4-component BGRA, 8 bits per channel. */
     BGRA8(4),
     /** 1-component red, 8 bits (unsigned normalized). */
@@ -31,7 +33,7 @@ public enum VulkanicTextureFormat {
 
     /** Returns true if this format has a color component. */
     public boolean hasColorAspect() {
-        return this == RGBA8 || this == BGRA8 || this == RED8 || this == RED8I;
+        return this == RGBA8 || this == RGBA16F || this == BGRA8 || this == RED8 || this == RED8I;
     }
 
     /** Returns true if this format has a depth component. */
