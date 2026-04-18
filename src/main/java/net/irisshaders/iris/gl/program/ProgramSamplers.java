@@ -401,7 +401,9 @@ public class ProgramSamplers {
 
 		@Override
 		public boolean addDynamicSampler(TextureType type, IntSupplier texture, ValueUpdateNotifier notifier, GlSampler sampler, String... names) {
-			return false;
+			texture = getOverride(texture, names);
+
+			return samplerHolder.addDynamicSampler(type, texture, notifier, sampler, names);
 		}
 	}
 }

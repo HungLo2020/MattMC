@@ -203,6 +203,11 @@ public class IrisSamplers {
 		samplers.addDynamicSampler(pipeline::getCurrentSpecularTexture, StateUpdateNotifiers.specularTextureChangeNotifier, "specular");
 	}
 
+	public static void addCompositePbrSamplers(SamplerHolder samplers, WorldRenderingPipeline pipeline) {
+		samplers.addDynamicSampler(pipeline::getCurrentNormalTexture, StateUpdateNotifiers.normalTextureChangeNotifier, "normals");
+		samplers.addDynamicSampler(pipeline::getCurrentSpecularTexture, StateUpdateNotifiers.specularTextureChangeNotifier, "specular");
+	}
+
 	public static void addWorldDepthSamplers(SamplerHolder samplers, RenderTargets renderTargets) {
 		samplers.addDynamicSampler(() -> VulkanicCoreAPI.textureId(renderTargets.getDepthTexture()), "depthtex0");
 		// TODO: Should depthtex2 be made available to gbuffer / shadow programs?
