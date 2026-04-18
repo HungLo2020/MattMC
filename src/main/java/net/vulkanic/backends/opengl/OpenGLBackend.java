@@ -3253,6 +3253,12 @@ public class OpenGLBackend implements GraphicsBackend {
         return new OpenGLTextureView(texture, baseMipLevel, mipLevelCount);
     }
 
+    @Override
+    @Nullable
+    public net.vulkanic.VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle) {
+        return null;
+    }
+
     private static int[] toGlInternalFormat(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
             case RGBA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};

@@ -237,6 +237,11 @@ public class GlCommandEncoder implements CommandEncoder {
 	}
 
 	@Nullable
+	net.vulkanic.VulkanicTextureView createLegacySamplerResourceView(int textureId) {
+		return VulkanicAPI.createManagedLegacyTextureView(textureId);
+	}
+
+	@Nullable
 	GpuTextureView recoverSamplerView(String samplerName) {
 		Integer samplerIndex = parseSamplerIndex(samplerName);
 		if (samplerIndex == null) {

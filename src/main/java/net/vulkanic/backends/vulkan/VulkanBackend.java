@@ -159,6 +159,7 @@ import org.slf4j.Logger;
 public class VulkanBackend {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Set<Integer> LEGACY_SAMPLER_UNSUPPORTED_FORMAT_LOGS = ConcurrentHashMap.newKeySet();
 
     private static final int GL_LUMINANCE = 0x1909;
     private static final int GL_LUMINANCE_ALPHA = 0x190A;
@@ -2366,6 +2367,96 @@ void main() {
         }
 
         return spine.createManagedTextureViewForLegacyTexture(texture, legacyTextureHandle, baseMipLevel, mipLevelCount);
+    }
+
+    @Nullable
+    public VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle) {
+        ensureNativeReady("createManagedLegacyTextureView");
+        if (legacyTextureHandle <= 0) {
+            return null;
+        }
+
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        NativeSpine.LegacyTextureObject legacyTexture = spine.legacyTextures.get(legacyTextureHandle);
+        if (legacyTexture == null || legacyTexture.imageHandle == VK10.VK_NULL_HANDLE) {
+            return null;
+        }
+
+        int mipLevels = Math.max(1, legacyTexture.mipLevels);
+        int width = Math.max(1, legacyTexture.width);
+        int height = Math.max(1, legacyTexture.height);
+        int depthOrLayers = NativeSpine.legacyTextureLayerCount(legacyTexture);
+        VulkanicTextureFormat format;
+        try {
+            format = NativeSpine.wrappedTextureFormatForVkFormat(legacyTexture.vkFormat);
+        } catch (IllegalArgumentException exception) {
+            int vkFormat = legacyTexture.vkFormat;
+            if (LEGACY_SAMPLER_UNSUPPORTED_FORMAT_LOGS.add(vkFormat)) {
+                LOGGER.warn(
+                    "Skipping Vulkan legacy sampler view recovery for texture {} with unsupported VkFormat 0x{}; leaving the custom-pass sampler unbound.",
+                    legacyTextureHandle,
+                    Integer.toHexString(vkFormat)
+                );
+            }
+            return null;
+        }
+        String label = "Legacy texture " + legacyTextureHandle;
+
+        VulkanicTexture legacyTextureWrapper = new VulkanicTexture() {
+            @Override
+            public int getWidth(int mipLevel) {
+                return Math.max(1, width >> Math.max(0, mipLevel));
+            }
+
+            @Override
+            public int getHeight(int mipLevel) {
+                return Math.max(1, height >> Math.max(0, mipLevel));
+            }
+
+            @Override
+            public int getMipLevels() {
+                return mipLevels;
+            }
+
+            @Override
+            public int getDepthOrLayers() {
+                return Math.max(1, depthOrLayers);
+            }
+
+            @Override
+            public VulkanicTextureFormat getVulkanicFormat() {
+                return format;
+            }
+
+            @Override
+            public int usage() {
+                return VulkanicTexture.USAGE_TEXTURE_BINDING | VulkanicTexture.USAGE_RENDER_ATTACHMENT;
+            }
+
+            @Override
+            public String getLabel() {
+                return label;
+            }
+
+            @Override
+            public boolean isClosed() {
+                return false;
+            }
+
+            @Override
+            public void close() {
+            }
+
+            public int getGlHandle() {
+                return legacyTextureHandle;
+            }
+        };
+
+        return spine.createManagedTextureViewForLegacyTexture(legacyTextureWrapper, legacyTextureHandle, 0, mipLevels);
     }
 
     public void setActiveTextureUnit(CommandContext ctx, int unit) {

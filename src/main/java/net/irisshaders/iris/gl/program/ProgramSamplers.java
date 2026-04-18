@@ -2,6 +2,7 @@ package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import net.blaze3d.opengl.GlRenderPass;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTextureView;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
@@ -131,8 +132,9 @@ public class ProgramSamplers {
 	public void bindToRenderPass(RenderPass renderPass) {
 		for (NamedSamplerBinding binding : namedSamplerBindings) {
 			GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(binding.textureUnit());
+			int textureId = 0;
 			if (textureView == null) {
-				int textureId = IrisRenderSystem.getTextureBinding(binding.textureUnit());
+				textureId = IrisRenderSystem.getTextureBinding(binding.textureUnit());
 				if (textureId > 0) {
 					textureView = TextureTracker.INSTANCE.getTextureView(textureId);
 				}
@@ -143,6 +145,13 @@ public class ProgramSamplers {
 					Objects.requireNonNull(binding.name(), "sampler name"),
 					Objects.requireNonNull(textureView, "sampler texture view")
 				);
+				continue;
+			}
+
+			if (textureId > 0
+				&& VulkanicAPI.isVulkanBackendSelected()
+				&& renderPass instanceof GlRenderPass glRenderPass) {
+				glRenderPass.bindLegacySampler(Objects.requireNonNull(binding.name(), "sampler name"), textureId);
 			}
 		}
 	}

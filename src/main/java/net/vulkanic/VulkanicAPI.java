@@ -6116,6 +6116,18 @@ public class VulkanicAPI {
         return getBackend().createManagedTextureView(texture, baseMipLevel, mipLevelCount);
     }
 
+    /**
+     * Creates a managed texture view for a legacy texture handle when a render-pass binding path
+     * only has access to the bound texture object name.
+     *
+     * @param legacyTextureHandle legacy texture object handle
+     * @return a managed texture view, or {@code null} when the active backend cannot recover one
+     */
+    @Nullable
+    public static VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle) {
+        return getBackend().createManagedLegacyTextureView(legacyTextureHandle);
+    }
+
     // =========================================================================
     // Phase 3c: Pipeline Objects
     // =========================================================================

@@ -3799,6 +3799,19 @@ public interface GraphicsBackend {
      */
     VulkanicTextureView createManagedTextureView(VulkanicTexture texture, int baseMipLevel, int mipLevelCount);
 
+    /**
+     * Creates a managed view for a legacy texture handle when no Blaze3D {@code GpuTextureView}
+     * is available to bridge the resource into descriptor-backed render passes.
+     *
+     * <p>This is primarily used by Vulkan custom-pass binding paths that only know the live
+     * legacy texture object name assigned to a sampler unit.</p>
+     *
+     * @param legacyTextureHandle legacy texture object handle
+     * @return a managed texture view, or {@code null} when the backend cannot recover one
+     */
+    @Nullable
+    VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle);
+
     // =========================================================================
     // Phase 3c: Pipeline Objects
     // =========================================================================

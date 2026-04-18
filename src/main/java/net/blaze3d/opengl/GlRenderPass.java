@@ -100,6 +100,25 @@ public class GlRenderPass implements RenderPass {
 		this.dirtyUniforms.add(string);
 	}
 
+	public boolean bindLegacySampler(String string, int textureId) {
+		this.closeSamplerResourceView(string);
+		this.samplers.remove(string);
+		if (textureId <= 0) {
+			this.dirtyUniforms.add(string);
+			return false;
+		}
+
+		VulkanicTextureView resourceView = this.encoder.createLegacySamplerResourceView(textureId);
+		if (resourceView == null) {
+			this.dirtyUniforms.add(string);
+			return false;
+		}
+
+		this.samplerResourceViews.put(string, resourceView);
+		this.dirtyUniforms.add(string);
+		return true;
+	}
+
 	@Nullable
 	VulkanicTextureView getSamplerResourceView(String string) {
 		VulkanicTextureView resourceView = this.samplerResourceViews.get(string);
