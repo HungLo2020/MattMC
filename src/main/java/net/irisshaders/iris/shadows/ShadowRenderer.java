@@ -247,6 +247,12 @@ public class ShadowRenderer {
 		if (settings.getHardwareFiltering() && !separateHardwareSamplers) {
 			// We have to do this or else shadow hardware filtering breaks entirely!
 			IrisRenderSystem.texParameteri(glTextureId, VulkanicTextureParameterName.COMPARE_MODE, VulkanicTextureParameterValue.COMPARE_REF_TO_TEXTURE);
+		} else if (net.vulkanic.VulkanicAPI.isVulkanBackendSelected()) {
+			// On Vulkan, sampler-object compare mode (GlSampler.NEAREST_HW etc.) is silently ignored
+			// because setSamplerParameteri is a no-op. Set the comparison mode on the texture itself so
+			// that descriptorSamplerKey() picks it up and creates a proper comparison VkSampler.
+			// Shadow depth textures in this rendering path are always used as sampler2DShadow in SPIR-V.
+			IrisRenderSystem.texParameteri(glTextureId, VulkanicTextureParameterName.COMPARE_MODE, VulkanicTextureParameterValue.COMPARE_REF_TO_TEXTURE);
 		}
 
 		// Workaround for issues with old shader packs like Chocapic v4.

@@ -6350,7 +6350,8 @@ void main() {
             int wrapS,
             int wrapT,
             int wrapR,
-            int maxLod
+            int maxLod,
+            int compareMode
         ) {
         }
 
@@ -7753,8 +7754,11 @@ void main() {
             int maxLod = usesMipmappedMinFilter(minFilter)
                 ? Math.max(0, textureView.getMipLevelCount() - 1)
                 : 0;
+            int compareMode = legacyTexture.integerParameters.getOrDefault(
+                VulkanicAPI.GL_TEXTURE_COMPARE_MODE, 0
+            );
 
-            return new DescriptorSamplerKey(minFilter, magFilter, wrapS, wrapT, wrapR, maxLod);
+            return new DescriptorSamplerKey(minFilter, magFilter, wrapS, wrapT, wrapR, maxLod, compareMode);
         }
 
         private static int toLegacyMinFilter(net.blaze3d.textures.FilterMode minFilter, boolean useMipmaps) {
@@ -7790,8 +7794,10 @@ void main() {
                     .addressModeW(toVkSamplerAddressMode(key.wrapR()))
                     .anisotropyEnable(false)
                     .maxAnisotropy(1.0f)
-                    .compareEnable(false)
-                    .compareOp(VK10.VK_COMPARE_OP_ALWAYS)
+                    .compareEnable(key.compareMode() == VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE)
+                    .compareOp(key.compareMode() == VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE
+                        ? VK10.VK_COMPARE_OP_LESS_OR_EQUAL
+                        : VK10.VK_COMPARE_OP_ALWAYS)
                     .minLod(0.0f)
                     .maxLod((float) key.maxLod())
                     .borderColor(VK10.VK_BORDER_COLOR_INT_OPAQUE_BLACK)
