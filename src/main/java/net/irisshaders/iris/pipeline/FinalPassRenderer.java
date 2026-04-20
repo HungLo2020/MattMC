@@ -129,6 +129,11 @@ public class FinalPassRenderer {
 		this.lastColorTextureVersion = ((Blaze3dRenderTargetExt) Minecraft.getInstance().getMainRenderTarget()).iris$getColorBufferVersion();
 		this.colorHolder.addColorAttachment(0, lastColorTextureId);
 
+		// Wire up colorHolder to the final pass so it can compile the VkPipeline for the correct render target format.
+		if (this.finalPass != null) {
+			this.finalPass.colorHolder = this.colorHolder;
+		}
+
 		// TODO: We don't actually fully swap the content, we merely copy it from alt to main
 		// This works for the most part, but it's not perfect. A better approach would be creating secondary
 		// framebuffers for every other frame, but that would be a lot more complex...
@@ -259,7 +264,8 @@ public class FinalPassRenderer {
 				renderPass.setIndexBuffer(indices, type);
 				renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
 
-				renderPass.iris$setCustomPass(STATE);
+				finalPass.ensurePipelineState();
+				renderPass.iris$setCustomPass(finalPass);
 
 				finalPass.program.use();
 
@@ -381,6 +387,7 @@ public class FinalPassRenderer {
 		IrisSamplers.addCustomTextures(builder, irisCustomTextures);
 		IrisSamplers.addNoiseSampler(customTextureSamplerInterceptor, noiseTexture);
 		IrisSamplers.addCompositeSamplers(customTextureSamplerInterceptor, renderTargets);
+		IrisSamplers.addCompositePbrSamplers(customTextureSamplerInterceptor, pipeline);
 
 		if (IrisSamplers.hasShadowSamplers(customTextureSamplerInterceptor)) {
 			IrisSamplers.addShadowSamplers(customTextureSamplerInterceptor, shadowTargetsSupplier.get(), null, pipeline.hasFeature(FeatureFlags.SEPARATE_HARDWARE_SAMPLERS));
@@ -440,6 +447,7 @@ public class FinalPassRenderer {
 
 				IrisSamplers.addNoiseSampler(customTextureSamplerInterceptor, noiseTexture);
 				IrisSamplers.addCompositeSamplers(customTextureSamplerInterceptor, renderTargets);
+				IrisSamplers.addCompositePbrSamplers(customTextureSamplerInterceptor, pipeline);
 
 				if (IrisSamplers.hasShadowSamplers(customTextureSamplerInterceptor)) {
 					IrisSamplers.addShadowSamplers(customTextureSamplerInterceptor, shadowTargetsSupplier.get(), null, pipeline.hasFeature(FeatureFlags.SEPARATE_HARDWARE_SAMPLERS));
@@ -468,13 +476,81 @@ public class FinalPassRenderer {
 		colorHolder.destroy();
 	}
 
-	private static final class Pass {
+	private static final class Pass implements net.irisshaders.iris.mixinterface.CustomPass {
 		Program program;
 		ComputeProgram[] computes;
 		ImmutableSet<Integer> stageReadsFromAlt;
 		ImmutableSet<Integer> mipmappedBuffers;
+		GlFramebuffer colorHolder;
+		@Nullable net.vulkanic.PipelineDescriptor pipelineDescriptor;
+		@Nullable net.vulkanic.PipelineHandle pipelineHandle;
+		final java.util.Map<net.vulkanic.PipelineDescriptor.ResourceLayout, net.vulkanic.PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
+
+		void ensurePipelineState() {
+			var ctx = VulkanicAPI.getCommandContext();
+			if (ctx.isImmediate()) return;
+			if (this.pipelineHandle != null && this.pipelineHandle.isValid() && this.pipelineDescriptor != null) return;
+			net.vulkanic.PipelineDescriptor descriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(
+				ctx,
+				net.vulkanic.PipelineDescriptor.fromRenderPipeline(CompositeRenderer.COMPOSITE_PIPELINE),
+				this.program.getProgramId());
+			closePipelineVariants();
+			if (this.pipelineHandle != null) this.pipelineHandle.close();
+			this.pipelineDescriptor = descriptor;
+			this.pipelineHandle = VulkanicAPI.createPipeline(descriptor, colorHolder.getId());
+		}
+
+		private void closePipelineVariants() {
+			for (net.vulkanic.PipelineHandle v : pipelineLayoutVariants.values()) v.close();
+			pipelineLayoutVariants.clear();
+		}
+
+		@Override
+		public void bindRenderPassResources(net.blaze3d.systems.RenderPass renderPass) {
+			program.bindRenderPassResources(renderPass);
+		}
+
+		@Override
+		public void setupState() {
+		}
+
+		@Override
+		public Program program() {
+			return program;
+		}
+
+		@Override
+		public @Nullable net.vulkanic.PipelineDescriptor pipelineDescriptor() {
+			return pipelineDescriptor;
+		}
+
+		@Override
+		public @Nullable net.vulkanic.PipelineHandle pipelineHandle() {
+			return pipelineHandle;
+		}
+
+		@Override
+		public @Nullable net.vulkanic.PipelineHandle pipelineHandle(@Nullable net.vulkanic.PipelineDescriptor descriptor) {
+			if (descriptor == null || this.pipelineDescriptor == null || this.pipelineHandle == null) {
+				return this.pipelineHandle;
+			}
+			if (descriptor.getResourceLayout().equals(this.pipelineDescriptor.getResourceLayout())) {
+				return this.pipelineHandle;
+			}
+			net.vulkanic.PipelineHandle variant = pipelineLayoutVariants.get(descriptor.getResourceLayout());
+			if (variant != null && variant.isValid()) return variant;
+			if (variant != null) variant.close();
+			net.vulkanic.PipelineHandle created = VulkanicAPI.createPipeline(descriptor, colorHolder.getId());
+			pipelineLayoutVariants.put(descriptor.getResourceLayout(), created);
+			return created;
+		}
 
 		private void destroy() {
+			closePipelineVariants();
+			if (this.pipelineHandle != null) {
+				this.pipelineHandle.close();
+				this.pipelineHandle = null;
+			}
 			this.program.destroy();
 		}
 	}
