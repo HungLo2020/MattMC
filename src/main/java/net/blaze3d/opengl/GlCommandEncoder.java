@@ -294,7 +294,8 @@ public class GlCommandEncoder implements CommandEncoder {
 	private record PipelineResourceBindingSubmission(
 		PipelineDescriptor descriptor,
 		PipelineResourceBindings bindings,
-		boolean completeCoverage
+		boolean completeCoverage,
+		int boundResourceCount
 	) {
 	}
 
@@ -445,7 +446,8 @@ public class GlCommandEncoder implements CommandEncoder {
 		PipelineResourceBindingSubmission submission = new PipelineResourceBindingSubmission(
 			submissionDescriptor,
 			PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBufferBindings, texelBufferBindings),
-			completeCoverage
+			completeCoverage,
+			boundResources.size()
 		);
 		if (auditStartNanos != 0L) {
 			VulkanPerfAudit.recordBindingBuild(System.nanoTime() - auditStartNanos, completeCoverage);
@@ -494,13 +496,11 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		boolean completeCoverage = boundResources.size() == layoutBindings.size();
-		PipelineDescriptor submissionDescriptor = completeCoverage
-			? descriptor
-			: descriptor.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
 		return new PipelineResourceBindingSubmission(
-			submissionDescriptor,
+			descriptor,
 			PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBufferBindings, texelBufferBindings),
-			completeCoverage
+			completeCoverage,
+			boundResources.size()
 		);
 	}
 
@@ -1413,7 +1413,7 @@ public class GlCommandEncoder implements CommandEncoder {
 							customPipelineDescriptor,
 							customPass.program()
 						);
-						net.vulkanic.PipelineHandle customPipelineHandle = customPass.pipelineHandle(submission.descriptor());
+						net.vulkanic.PipelineHandle customPipelineHandle = null;
 						if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_CUSTOM_PASS_BIND_LOGS < 40) {
 							DEBUG_CUSTOM_PASS_BIND_LOGS++;
 							LOGGER.info(
@@ -1422,10 +1422,10 @@ public class GlCommandEncoder implements CommandEncoder {
 								renderPipeline.getLocation(),
 								glRenderPass.getFramebuffer(),
 								customPipelineDescriptor.getResourceLayout().bindings().size(),
-								submission.descriptor().getResourceLayout().bindings().size(),
+								submission.boundResourceCount(),
 								submission.completeCoverage(),
-								!submission.descriptor().getResourceLayout().equals(customPipelineDescriptor.getResourceLayout()),
-								customPipelineHandle != null
+								false,
+								false
 							);
 						}
 						if (!submission.completeCoverage()) {
@@ -1435,12 +1435,13 @@ public class GlCommandEncoder implements CommandEncoder {
 									"Skipping Vulkan custom pass {} on framebuffer {} because only {} of {} reflected resources were available for descriptor binding",
 									renderPipeline.getLocation(),
 									glRenderPass.getFramebuffer(),
-									submission.descriptor().getResourceLayout().bindings().size(),
+									submission.boundResourceCount(),
 									customPipelineDescriptor.getResourceLayout().bindings().size()
 								);
 							}
 							return false;
 						}
+						customPipelineHandle = customPass.pipelineHandle(submission.descriptor());
 						if (customPipelineHandle != null) {
 							VulkanicAPI.bindPipelineResources(
 								ctx,

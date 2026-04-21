@@ -441,7 +441,7 @@ public class GlDevice implements GpuDevice {
 
 	private GlRenderPipeline createCompiledRenderPipeline(RenderPipeline renderPipeline, GlProgram program) {
 		PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(renderPipeline);
-		if (program != GlProgram.INVALID_PROGRAM) {
+		if (program != GlProgram.INVALID_PROGRAM && !VulkanicAPI.isVulkanBackendSelected()) {
 			descriptor = java.util.Objects.requireNonNull(
 				VulkanicAPI.withReflectedResourceLayout(commandContext(), descriptor, program.getProgramId()),
 				"descriptor"

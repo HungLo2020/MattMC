@@ -48,6 +48,7 @@ import java.util.function.BiFunction;
  */
 public class VulkanicAPI {
     private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
+    private static final String GENERATED_STANDALONE_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
@@ -4777,6 +4778,7 @@ public class VulkanicAPI {
         java.util.ArrayList<PipelineDescriptor.ResourceBinding> bindings = new java.util.ArrayList<>();
         java.util.LinkedHashSet<String> seenNames = new java.util.LinkedHashSet<>();
         int bindingIndex = 0;
+        boolean hasGeneratedStandaloneUniformBlock = false;
 
         for (ActiveUniformBlockInfo blockInfo : getActiveUniformBlocks(ctx, program)) {
             String name = normalizeReflectedResourceName(blockInfo.name());
@@ -4784,6 +4786,10 @@ public class VulkanicAPI {
                 continue;
             }
             if (!seenNames.add(name)) {
+                continue;
+            }
+            if (GENERATED_STANDALONE_UNIFORM_BLOCK_NAME.equals(name)) {
+                hasGeneratedStandaloneUniformBlock = true;
                 continue;
             }
 
@@ -4817,6 +4823,18 @@ public class VulkanicAPI {
                 bindingIndex,
                 name,
                 resourceType.get(),
+                null,
+                normalizedStages
+            ));
+            bindingIndex++;
+        }
+
+        if (hasGeneratedStandaloneUniformBlock) {
+            bindings.add(new PipelineDescriptor.ResourceBinding(
+                0,
+                bindingIndex,
+                GENERATED_STANDALONE_UNIFORM_BLOCK_NAME,
+                PipelineDescriptor.ResourceType.UNIFORM_BUFFER,
                 null,
                 normalizedStages
             ));
@@ -4992,20 +5010,19 @@ public class VulkanicAPI {
                 java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
                 mergedStages.addAll(reflectedBinding.stages());
                 merged.add(baseBinding.withStages(java.util.Set.copyOf(mergedStages)));
-            } else if (reflectedBinding != null
-                && baseBinding.type() == PipelineDescriptor.ResourceType.SAMPLER
-                && reflectedBinding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER) {
-                // Upgrade: the pipeline declared this as a plain SAMPLER but GLSL reflection reveals
-                // it's a shadow comparison type. Promote to COMPARISON_SAMPLER so Vulkan will build
-                // a VkSampler with compareEnable=true for this specific binding.
+            } else if (reflectedBinding != null) {
+                // Keep the pipeline's deterministic set/binding slot, but trust reflected resource
+                // type metadata so Vulkan descriptor layout types always match shader declarations.
                 java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
                 mergedStages.addAll(reflectedBinding.stages());
                 merged.add(new PipelineDescriptor.ResourceBinding(
                     baseBinding.set(),
                     baseBinding.binding(),
                     baseBinding.name(),
-                    PipelineDescriptor.ResourceType.COMPARISON_SAMPLER,
-                    baseBinding.textureFormat(),
+                    reflectedBinding.type(),
+                    reflectedBinding.type() == PipelineDescriptor.ResourceType.TEXEL_BUFFER
+                        ? reflectedBinding.textureFormat()
+                        : null,
                     java.util.Set.copyOf(mergedStages)));
             } else {
                 merged.add(baseBinding);
