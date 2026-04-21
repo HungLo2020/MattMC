@@ -362,7 +362,7 @@ public class GlCommandEncoder implements CommandEncoder {
 
 		for (PipelineDescriptor.ResourceBinding resourceBinding : layoutBindings) {
 			switch (resourceBinding.type()) {
-				case SAMPLER -> {
+				case SAMPLER, COMPARISON_SAMPLER -> {
 					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
 					net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
 					int samplerIndex = resolveSamplerIndex(resourceBinding.name(), uniform, resourceBinding);
@@ -375,7 +375,8 @@ public class GlCommandEncoder implements CommandEncoder {
 							textureView != null,
 							glRenderPass.samplers.keySet(),
 							layoutBindings.stream()
-								.filter(binding -> binding.type() == PipelineDescriptor.ResourceType.SAMPLER)
+								.filter(binding -> binding.type() == PipelineDescriptor.ResourceType.SAMPLER
+									|| binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER)
 								.map(PipelineDescriptor.ResourceBinding::name)
 								.toList()
 						);
@@ -467,7 +468,7 @@ public class GlCommandEncoder implements CommandEncoder {
 
 		for (PipelineDescriptor.ResourceBinding resourceBinding : layoutBindings) {
 			switch (resourceBinding.type()) {
-				case SAMPLER -> {
+				case SAMPLER, COMPARISON_SAMPLER -> {
 					Integer samplerUnit = samplerUnits.get(resourceBinding.name());
 					net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
 					if (samplerUnit != null && textureView != null) {

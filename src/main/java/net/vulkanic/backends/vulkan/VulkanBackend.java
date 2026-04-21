@@ -89,6 +89,8 @@ import org.lwjgl.vulkan.VkMemoryRequirements;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
+import org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout;
+import org.lwjgl.vulkan.VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT;
 import org.lwjgl.vulkan.VkPhysicalDevicePresentIdFeaturesKHR;
 import org.lwjgl.vulkan.VkPhysicalDevicePresentWaitFeaturesKHR;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties;
@@ -1965,6 +1967,7 @@ void main() {
         virtualProgram.activeUniformNames = List.copyOf(activeUniformNames);
         virtualProgram.activeUniforms = List.copyOf(activeUniforms.values());
         virtualProgram.activeUniformBlocks = List.copyOf(activeUniformBlocks);
+
     }
 
     public void deleteShader(CommandContext ctx, int shader) {
@@ -3384,7 +3387,7 @@ void main() {
 
         for (PipelineDescriptor.ResourceBinding resourceBinding : layout.bindings()) {
             switch (resourceBinding.type()) {
-                case SAMPLER -> {
+                case SAMPLER, COMPARISON_SAMPLER -> {
                     net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
                         bindings.getSamplerBinding(resourceBinding.name())
                             .orElseThrow(() -> new IllegalStateException(
@@ -6533,6 +6536,8 @@ void main() {
         private final Map<Long, BoundDescriptorSetState> lastBoundDescriptorSetByCommandBuffer = new HashMap<>();
         private final Set<Long> managedShaderModules = ConcurrentHashMap.newKeySet();
         private final Set<Long> transientRenderPassHandles = ConcurrentHashMap.newKeySet();
+        /** Permanently-cached VkRenderPass handles keyed by configuration. Never destroyed until device cleanup. */
+        private final Map<List<Object>, Long> permanentRenderPassCache = new HashMap<>();
         private final Set<Long> transientFramebufferHandles = ConcurrentHashMap.newKeySet();
         private final List<StagingBuffer> transientStagingBuffers = Collections.synchronizedList(new ArrayList<>());
         private final List<VulkanBuffer> transientDescriptorBuffers = Collections.synchronizedList(new ArrayList<>());
@@ -6576,11 +6581,14 @@ void main() {
         private boolean instanceProperties2ExtensionEnabled;
         private boolean presentIdExtensionEnabled;
         private boolean presentWaitExtensionEnabled;
+        private boolean attachmentFeedbackLoopLayoutEnabled;
         private long nextPresentId = 1L;
         private long windowHandle;
         private boolean commandBufferRecording;
         private final boolean[] frameCommandBufferRecording = new boolean[MAX_FRAMES_IN_FLIGHT];
         private boolean renderPassRecording;
+        private final java.util.ArrayList<LegacyTextureObject> activeRenderPassColorTextures = new java.util.ArrayList<>();
+        @Nullable private LegacyTextureObject activeRenderPassDepthTexture;
         private boolean frameInProgress;
         private int acquiredSwapchainImageIndex = -1;
         private int renderPassSwapchainImageIndex = -1;
@@ -6603,7 +6611,7 @@ void main() {
         private int successfulFramePresentCount;
         private int debugColorAttachmentLogCount;
         private int debugLegacyDrawLogCount;
-        private int debugDescriptorSamplerLogCount;
+
         private int debugDescriptorSamplerViewMismatchLogCount;
         private int debugSodiumChunkDescriptorSamplerLogCount;
         private int debugParticleDescriptorSamplerLogCount;
@@ -6686,6 +6694,7 @@ void main() {
             private volatile long defaultViewHandle;
             private volatile int vkFormat = VK10.VK_FORMAT_UNDEFINED;
             private volatile int aspectMask = VK10.VK_IMAGE_ASPECT_COLOR_BIT;
+            private volatile boolean feedbackLoopCapable;
             private volatile int pixelBytes;
             private volatile int currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
             private volatile int mipLevels = 1;
@@ -6987,10 +6996,13 @@ void main() {
 
                 Set<String> supportedExtensions = enumerateDeviceExtensionNames(physicalDevice);
                 PresentCompletionSupport presentCompletionSupport = queryPresentCompletionSupport(physicalDevice, supportedExtensions);
+                boolean hasFeedbackLoopLayout = supportedExtensions.contains(
+                    EXTAttachmentFeedbackLoopLayout.VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME);
 
                 int enabledExtensionCount = 1
                     + (presentCompletionSupport.presentId ? 1 : 0)
-                    + (presentCompletionSupport.presentWait ? 1 : 0);
+                    + (presentCompletionSupport.presentWait ? 1 : 0)
+                    + (hasFeedbackLoopLayout ? 1 : 0);
                 org.lwjgl.PointerBuffer enabledExtensions = stack.mallocPointer(enabledExtensionCount);
                 enabledExtensions.put(stack.UTF8(KHRSwapchain.VK_KHR_SWAPCHAIN_EXTENSION_NAME));
                 if (presentCompletionSupport.presentId) {
@@ -6998,6 +7010,9 @@ void main() {
                 }
                 if (presentCompletionSupport.presentWait) {
                     enabledExtensions.put(stack.UTF8(KHRPresentWait.VK_KHR_PRESENT_WAIT_EXTENSION_NAME));
+                }
+                if (hasFeedbackLoopLayout) {
+                    enabledExtensions.put(stack.UTF8(EXTAttachmentFeedbackLoopLayout.VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME));
                 }
                 enabledExtensions.flip();
 
@@ -7019,6 +7034,24 @@ void main() {
                         featureChainHead = presentWaitFeatures.address();
                     }
                 }
+                VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT feedbackLoopFeatures = null;
+                if (hasFeedbackLoopLayout) {
+                    feedbackLoopFeatures = VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT.calloc(stack)
+                        .sType$Default()
+                        .attachmentFeedbackLoopLayout(true);
+                    if (featureChainHead == MemoryUtil.NULL) {
+                        featureChainHead = feedbackLoopFeatures.address();
+                    } else {
+                        // Walk to end of chain and append
+                        VkPhysicalDevicePresentWaitFeaturesKHR tailCheck = null;
+                        // Append by chaining onto presentId or presentWait if present, else set as head
+                        // Since chain building above is linear, the last-added item has pNext=0;
+                        // we re-chain by just setting featureChainHead to feedbackLoopFeatures
+                        // and pointing it to the previous head.
+                        feedbackLoopFeatures.pNext(featureChainHead);
+                        featureChainHead = feedbackLoopFeatures.address();
+                    }
+                }
 
                 VkDeviceCreateInfo createInfo = VkDeviceCreateInfo.calloc(stack)
                     .sType$Default()
@@ -7033,6 +7066,7 @@ void main() {
                 logicalDevice = new VkDevice(pDevice.get(0), physicalDevice, createInfo);
                 presentIdExtensionEnabled = presentCompletionSupport.presentId;
                 presentWaitExtensionEnabled = presentCompletionSupport.presentWait;
+                attachmentFeedbackLoopLayoutEnabled = hasFeedbackLoopLayout;
 
                 org.lwjgl.PointerBuffer pQueue = stack.mallocPointer(1);
                 VK10.vkGetDeviceQueue(logicalDevice, graphicsQueueFamilyIndex, 0, pQueue);
@@ -7213,9 +7247,13 @@ void main() {
         }
 
         private int descriptorImageLayoutFor(@Nullable LegacyTextureObject texture) {
-            return texture != null && texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
-                ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            if (texture == null) return VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            if (texture.feedbackLoopCapable) {
+                return EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+            }
+            if (texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT)
+                return VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            return VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         }
 
         private DescriptorWritePlan buildDescriptorWritePlan(
@@ -7233,7 +7271,7 @@ void main() {
 
             for (PipelineDescriptor.ResourceBinding binding : layoutBindings) {
                 ResolvedDescriptorBinding resolvedBinding = switch (binding.type()) {
-                    case SAMPLER -> resolveSamplerDescriptorBinding(
+                    case SAMPLER, COMPARISON_SAMPLER -> resolveSamplerDescriptorBinding(
                         binding,
                         bindings,
                         sodiumChunkDescriptor,
@@ -7321,53 +7359,13 @@ void main() {
                 );
             }
 
-            DescriptorSamplerKey samplerKey = descriptorSamplerKey(vulkanTextureView);
+            DescriptorSamplerKey samplerKey = descriptorSamplerKey(vulkanTextureView,
+                binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER ? Boolean.TRUE
+                    : binding.type() == PipelineDescriptor.ResourceType.SAMPLER ? Boolean.FALSE
+                    : null);
             long samplerHandle = resolveDescriptorSamplerHandle(samplerKey);
             int descriptorImageLayout = descriptorImageLayoutFor(sampledLegacyTexture);
             GpuTexture sampledGpuTexture = vulkanTextureView.texture() instanceof GpuTexture gpuTexture ? gpuTexture : null;
-
-            if ((debugDescriptorSamplerLogCount < 160)
-                && DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS) {
-                debugDescriptorSamplerLogCount++;
-                int sampledLegacyId = sampledLegacyTexture != null ? sampledLegacyTexture.id : 0;
-                int sampledLayout = sampledLegacyTexture != null
-                    ? trackedLayoutForLevel(sampledLegacyTexture, vulkanTextureView.getBaseMipLevel())
-                    : VK10.VK_IMAGE_LAYOUT_UNDEFINED;
-                int sampledWidth = sampledLegacyTexture != null ? sampledLegacyTexture.width : 0;
-                int sampledHeight = sampledLegacyTexture != null ? sampledLegacyTexture.height : 0;
-                int sampledVkFormat = sampledLegacyTexture != null ? sampledLegacyTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED;
-                long sampledImageHandle = sampledLegacyTexture != null ? sampledLegacyTexture.imageHandle : VK10.VK_NULL_HANDLE;
-                int sampledTarget = sampledLegacyTexture != null ? sampledLegacyTexture.target : 0;
-                int sampledLayerCount = sampledLegacyTexture != null ? legacyTextureLayerCount(sampledLegacyTexture) : 0;
-                boolean sampledCubemap = sampledLegacyTexture != null && isLegacyCubemapTarget(sampledLegacyTexture.target);
-                LOGGER.info(
-                    "Vulkan samplerDescriptor#{} pipeline={} binding={} texId={} label={} usage=0x{} sampler=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} target=0x{} layers={} cubemap={} gpuMinFilter={} gpuMagFilter={} gpuUsesMipmaps={} keyMinFilter=0x{} keyMagFilter=0x{} keyMaxLod={}",
-                    debugDescriptorSamplerLogCount,
-                    pipelineLocation,
-                    binding.name(),
-                    sampledLegacyId,
-                    sampledTextureLabel,
-                    Integer.toHexString(sampledUsage),
-                    Long.toHexString(samplerHandle),
-                    Long.toHexString(descriptorImageViewHandle),
-                    Long.toHexString(sampledImageHandle),
-                    sampledWidth,
-                    sampledHeight,
-                    Integer.toHexString(sampledVkFormat),
-                    vulkanTextureView.getBaseMipLevel(),
-                    vulkanTextureView.getMipLevelCount(),
-                    Integer.toHexString(sampledLayout),
-                    Integer.toHexString(sampledTarget),
-                    sampledLayerCount,
-                    sampledCubemap,
-                    sampledGpuTexture != null ? sampledGpuTexture.getMinFilter() : null,
-                    sampledGpuTexture != null ? sampledGpuTexture.getMagFilter() : null,
-                    sampledGpuTexture != null && sampledGpuTexture.usesMipmaps(),
-                    samplerKey != null ? Integer.toHexString(samplerKey.minFilter()) : "null",
-                    samplerKey != null ? Integer.toHexString(samplerKey.magFilter()) : "null",
-                    samplerKey != null ? samplerKey.maxLod() : -1
-                );
-            }
 
             if (sodiumChunkDescriptor
                 && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name()))
@@ -7700,13 +7698,35 @@ void main() {
 
             int baseMip = view.getBaseMipLevel();
             int mipCount = Math.max(1, view.getMipLevelCount());
-            int targetLayout = texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
-                ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            // Feedback-loop-capable textures live permanently in ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+            // so they can be sampled without transition from any stage (including inside a render pass
+            // where the same image may simultaneously be a color attachment).
+            int targetLayout = texture.feedbackLoopCapable
+                ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                : (texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
+                    ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
             for (int level = baseMip; level < baseMip + mipCount; level++) {
                 int trackedLayout = trackedLayoutForLevel(texture, level);
                 if (trackedLayout == targetLayout) {
+                    continue;
+                }
+
+                if (renderPassRecording) {
+                    // Emitting a vkCmdPipelineBarrier inside a render pass is illegal.
+                    // The finalLayout transitions on all render passes should pre-transition
+                    // images to the correct layout before they are sampled. If this fires,
+                    // there is a layout tracking gap that needs to be fixed.
+                    LOGGER.warn(
+                        "Illegal sampler layout transition inside render pass: texId={} trackedLayout=0x{} targetLayout=0x{} level={}",
+                        texture.id,
+                        Integer.toHexString(trackedLayout),
+                        Integer.toHexString(targetLayout),
+                        level
+                    );
+                    // Update tracking anyway so we log once, not every frame.
+                    trackLayoutForLevel(texture, level, targetLayout);
                     continue;
                 }
 
@@ -7716,6 +7736,19 @@ void main() {
         }
 
         private DescriptorSamplerKey descriptorSamplerKey(VulkanTextureView textureView) {
+            return descriptorSamplerKey(textureView, null);
+        }
+
+        /**
+         * Builds a {@link DescriptorSamplerKey} for {@code textureView}.
+         *
+         * <p>When {@code compareOverride} is non-null it replaces the texture-level
+         * {@code GL_TEXTURE_COMPARE_MODE} in the key.  Pass {@code Boolean.TRUE} for a
+         * {@code sampler2DShadow} binding (needs {@code compareEnable=true}) and
+         * {@code Boolean.FALSE} for a plain {@code sampler2D} binding of a depth texture
+         * (needs {@code compareEnable=false} regardless of how the texture was configured).
+         */
+        private DescriptorSamplerKey descriptorSamplerKey(VulkanTextureView textureView, @Nullable Boolean compareOverride) {
             LegacyTextureObject legacyTexture = tryResolveLegacyTexture(textureView.texture());
             if (legacyTexture == null) {
                 return null;
@@ -7754,9 +7787,14 @@ void main() {
             int maxLod = usesMipmappedMinFilter(minFilter)
                 ? Math.max(0, textureView.getMipLevelCount() - 1)
                 : 0;
-            int compareMode = legacyTexture.integerParameters.getOrDefault(
-                VulkanicAPI.GL_TEXTURE_COMPARE_MODE, 0
-            );
+            int compareMode;
+            if (compareOverride != null) {
+                compareMode = compareOverride ? VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE : 0;
+            } else {
+                compareMode = legacyTexture.integerParameters.getOrDefault(
+                    VulkanicAPI.GL_TEXTURE_COMPARE_MODE, 0
+                );
+            }
 
             return new DescriptorSamplerKey(minFilter, magFilter, wrapS, wrapT, wrapR, maxLod, compareMode);
         }
@@ -8311,9 +8349,7 @@ void main() {
             texture.levels.put(level, new TextureLevelInfo(width, height, internalFormat));
 
             if (pixels == null) {
-                int finalLayout = texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
-                    ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                int finalLayout = preferredIdleLayout(texture);
                 int oldLayout = trackedLayoutForLevel(texture, level);
                 transitionImageLayout(texture, oldLayout, finalLayout, level, 1);
                 trackLayoutForLevel(texture, level, finalLayout);
@@ -8457,6 +8493,14 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 int arrayLayers = legacyTextureLayerCount(texture);
                 boolean cubemapTexture = isLegacyCubemapTarget(texture.target);
+                boolean isColorTexture = formatInfo.aspectMask == VK10.VK_IMAGE_ASPECT_COLOR_BIT;
+                int legacyImageUsage = VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
+                    | VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+                    | VK10.VK_IMAGE_USAGE_SAMPLED_BIT
+                    | (isColorTexture ? VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+                if (attachmentFeedbackLoopLayoutEnabled) {
+                    legacyImageUsage |= EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+                }
                 VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
                     .sType$Default()
                     .flags(cubemapTexture ? VK10.VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0)
@@ -8466,9 +8510,7 @@ void main() {
                     .arrayLayers(arrayLayers)
                     .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
                     .tiling(VK10.VK_IMAGE_TILING_OPTIMAL)
-                    .usage(VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
-                        | VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-                        | VK10.VK_IMAGE_USAGE_SAMPLED_BIT)
+                    .usage(legacyImageUsage)
                     .sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE)
                     .initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
                 imageCreateInfo.extent()
@@ -8556,6 +8598,7 @@ void main() {
                 texture.defaultViewHandle = defaultViewHandle;
                 texture.vkFormat = formatInfo.vkFormat;
                 texture.aspectMask = formatInfo.aspectMask;
+                texture.feedbackLoopCapable = attachmentFeedbackLoopLayoutEnabled;
                 texture.pixelBytes = formatInfo.pixelBytes;
                 texture.currentLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
                 texture.mipLevels = mipLevels;
@@ -8810,7 +8853,14 @@ void main() {
                 case VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL -> VK10.VK_ACCESS_SHADER_READ_BIT;
                 case VK10.VK_IMAGE_LAYOUT_GENERAL -> VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT;
                 case KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> 0;
-                default -> VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT;
+                default -> {
+                    if (layout == EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT) {
+                        yield VK10.VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                            | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                            | VK10.VK_ACCESS_SHADER_READ_BIT;
+                    }
+                    yield VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT;
+                }
             };
         }
 
@@ -8826,7 +8876,15 @@ void main() {
                 case VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ->
                     VK10.VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
                 case KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR -> VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-                default -> VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                default -> {
+                    if (layout == EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT) {
+                        yield VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                            | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+                            | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                            | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                    }
+                    yield VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                }
             };
         }
 
@@ -8878,9 +8936,7 @@ void main() {
                     );
                 }
 
-                int finalLayout = texture.aspectMask == VK10.VK_IMAGE_ASPECT_DEPTH_BIT
-                    ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                int finalLayout = preferredIdleLayout(texture);
                 transitionImageLayout(
                     commandBuffer,
                     texture.imageHandle,
@@ -8898,6 +8954,9 @@ void main() {
         }
 
         private int preferredIdleLayout(LegacyTextureObject texture) {
+            if (texture.feedbackLoopCapable) {
+                return EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+            }
             return texture.aspectMask == VK10.VK_IMAGE_ASPECT_COLOR_BIT
                 ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                 : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -9341,7 +9400,7 @@ void main() {
 
             VkCommandBuffer commandBuffer = requireRecordingCommandBuffer(commandBufferHandle, operation);
             int layerCount = legacyTextureLayerCount(texture);
-            int finalLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            int finalLayout = preferredIdleLayout(texture);
 
             for (int level = 1; level < texture.mipLevels; level++) {
                 int sourceLevel = level - 1;
@@ -10065,6 +10124,13 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 int vkFormat = toVkFormat(format);
                 int imageUsageFlags = toVkImageUsageFlags(usage, format);
+                boolean colorWithSampling = (imageUsageFlags & VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0
+                    && (imageUsageFlags & VK10.VK_IMAGE_USAGE_SAMPLED_BIT) != 0;
+                boolean depthWithSampling = (imageUsageFlags & VK10.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0
+                    && (imageUsageFlags & VK10.VK_IMAGE_USAGE_SAMPLED_BIT) != 0;
+                if (attachmentFeedbackLoopLayoutEnabled && (colorWithSampling || depthWithSampling)) {
+                    imageUsageFlags |= EXTAttachmentFeedbackLoopLayout.VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+                }
                 boolean cubemapCompatible = isCubemapCompatibleUsage(usage);
 
                 VkImageCreateInfo imageCreateInfo = VkImageCreateInfo.calloc(stack)
@@ -11454,10 +11520,10 @@ void main() {
 
             int trackedSourceLayout = trackedLayoutForLevel(sourceTexture, request.mipLevel);
             int originalSourceLayout = trackedSourceLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                ? preferredIdleLayout(sourceTexture)
                 : trackedSourceLayout;
             int composeSourceLayout = requiresShaderCompose
-                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                ? preferredIdleLayout(sourceTexture)
                 : VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
             if (!DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
@@ -12255,7 +12321,9 @@ void main() {
                         : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 int colorFinalLayout = swapchainColorAttachment
                     ? KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-                    : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    : (legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable)
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
                 attachments.get(0)
                     .format(swapchainColorAttachment
@@ -12270,16 +12338,26 @@ void main() {
                     .finalLayout(colorFinalLayout);
 
                 VkAttachmentReference.Buffer colorReference = VkAttachmentReference.calloc(1, stack);
+                int colorSubpassLayoutSingle = (!swapchainColorAttachment && legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable)
+                    ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                    : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 colorReference.get(0)
                     .attachment(0)
-                    .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                    .layout(colorSubpassLayoutSingle);
 
                 VkAttachmentReference depthReference = null;
                 if (targets.hasDepthTarget()) {
+                    boolean depthFeedback = legacyDepthTexture != null && legacyDepthTexture.feedbackLoopCapable;
+                    int depthSubpassLayout = depthFeedback
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                     int depthInitialLayout = legacyDepthTexture != null
                         && trackedLayoutForLevel(legacyDepthTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
                             ? trackedLayoutForLevel(legacyDepthTexture, 0)
-                            : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                            : depthSubpassLayout;
+                    int depthFinalLayout = depthFeedback
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                     attachments.get(1)
                         .format(toVkFormat(depthTexture.getVulkanicFormat()))
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
@@ -12288,11 +12366,11 @@ void main() {
                         .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                         .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
                         .initialLayout(depthInitialLayout)
-                        .finalLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                        .finalLayout(depthFinalLayout);
 
                     depthReference = VkAttachmentReference.calloc(stack)
                         .attachment(1)
-                        .layout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                        .layout(depthSubpassLayout);
                 }
 
                 VkSubpassDescription.Buffer subpasses = VkSubpassDescription.calloc(1, stack);
@@ -12302,26 +12380,53 @@ void main() {
                     .pColorAttachments(colorReference)
                     .pDepthStencilAttachment(depthReference);
 
-                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(1, stack);
+                // Base external→subpass dependency for layout transition ordering.
+                // When using attachment feedback loop, also add a self-dependency with
+                // VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT so the driver knows reads
+                // in the same subpass may sample from the current attachment.
+                boolean needsFeedbackDep = (!swapchainColorAttachment && legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable)
+                    || (legacyDepthTexture != null && legacyDepthTexture.feedbackLoopCapable);
+                int dependencyCount = needsFeedbackDep ? 2 : 1;
+                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(dependencyCount, stack);
                 dependencies.get(0)
                     .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
                     .dstSubpass(0)
                     .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT)
+                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
                     .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT)
-                    .srcAccessMask(0)
+                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_SHADER_READ_BIT)
                     .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_SHADER_READ_BIT);
+                if (needsFeedbackDep) {
+                    // Self-dependency required by VK_EXT_attachment_feedback_loop_layout spec.
+                    // Without this, the driver won't guarantee read-after-write ordering for
+                    // ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT layout accesses.
+                    dependencies.get(1)
+                        .srcSubpass(0)
+                        .dstSubpass(0)
+                        .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                            | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT)
+                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                        .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                            | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
+                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
+                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
+                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
+                }
 
                 VkRenderPassCreateInfo renderPassCreateInfo = VkRenderPassCreateInfo.calloc(stack)
                     .sType$Default()
                     .pAttachments(attachments)
                     .pSubpasses(subpasses)
                     .pDependencies(dependencies);
-
                 java.nio.LongBuffer pRenderPass = stack.mallocLong(1);
-                checkVk("vkCreateRenderPass",
+                checkVk("vkCreateRenderPass(legacy)",
                     VK10.vkCreateRenderPass(logicalDevice, renderPassCreateInfo, null, pRenderPass));
                 renderPassHandle = pRenderPass.get(0);
 
@@ -12372,6 +12477,7 @@ void main() {
                     .offset(it -> it.x(0).y(0))
                     .extent(it -> it.width(width).height(height));
 
+
                 VK10.vkCmdBeginRenderPass(activeCommandBuffer, beginInfo, VK10.VK_SUBPASS_CONTENTS_INLINE);
 
                 VkViewport.Buffer defaultViewport = VkViewport.calloc(1, stack);
@@ -12399,7 +12505,14 @@ void main() {
                 cachedScissorHeight = height;
 
                 if (legacyColorTexture != null) {
-                    trackLayoutForLevel(legacyColorTexture, 0, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                    int colorActiveLayout = legacyColorTexture.feedbackLoopCapable
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    trackLayoutForLevel(legacyColorTexture, 0, colorActiveLayout);
+                    activeRenderPassColorTextures.clear();
+                    activeRenderPassColorTextures.add(legacyColorTexture);
+                } else {
+                    activeRenderPassColorTextures.clear();
                 }
                 if (swapchainColorAttachment && swapchainColorImageIndex >= 0) {
                     trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -12409,7 +12522,13 @@ void main() {
                 }
                 activeRenderPassTargetsSwapchain = swapchainColorAttachment;
                 if (legacyDepthTexture != null) {
-                    trackLayoutForLevel(legacyDepthTexture, 0, VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                    int depthActiveLayout = legacyDepthTexture.feedbackLoopCapable
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                    trackLayoutForLevel(legacyDepthTexture, 0, depthActiveLayout);
+                    activeRenderPassDepthTexture = legacyDepthTexture;
+                } else {
+                    activeRenderPassDepthTexture = null;
                 }
 
                 renderPassRecording = true;
@@ -12446,9 +12565,22 @@ void main() {
                 VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.calloc(attachmentCount, stack);
                 for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
                     LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
-                    int initialLayout = trackedLayoutForLevel(colorTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                        ? trackedLayoutForLevel(colorTexture, 0)
+                    boolean colorFeedback = colorTexture.feedbackLoopCapable;
+                    int colorSubpassLayout = colorFeedback
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                         : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    int colorFinalLayout = colorFeedback
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    // For feedbackLoopCapable textures, always use the subpass layout as
+                    // initialLayout so the render pass structure is identical each frame and
+                    // can be permanently cached. An explicit pre-barrier (below) ensures the
+                    // image is already in this layout before the render pass begins.
+                    int initialLayout = colorFeedback
+                        ? colorSubpassLayout
+                        : (trackedLayoutForLevel(colorTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                            ? trackedLayoutForLevel(colorTexture, 0)
+                            : colorSubpassLayout);
                     attachments.get(colorIndex)
                         .format(colorTexture.vkFormat)
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
@@ -12457,23 +12589,36 @@ void main() {
                         .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                         .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
                         .initialLayout(initialLayout)
-                        .finalLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                        .finalLayout(colorFinalLayout);
                 }
 
                 VkAttachmentReference.Buffer colorReferences = VkAttachmentReference.calloc(colorAttachmentCount, stack);
                 for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
+                    int colorSubpassLayout = colorTexture.feedbackLoopCapable
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     colorReferences.get(colorIndex)
                         .attachment(colorIndex)
-                        .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                        .layout(colorSubpassLayout);
                 }
 
                 VkAttachmentReference depthReference = null;
                 if (targets.hasDepthTarget()) {
                     int depthAttachmentIndex = colorAttachmentCount;
                     LegacyTextureObject depthTexture = targets.depthTexture;
-                    int depthInitialLayout = trackedLayoutForLevel(depthTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                        ? trackedLayoutForLevel(depthTexture, 0)
+                    boolean depthFeedback2 = depthTexture.feedbackLoopCapable;
+                    int depthSubpassLayout2 = depthFeedback2
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                         : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                    int depthInitialLayout2 = depthFeedback2
+                        ? depthSubpassLayout2
+                        : (trackedLayoutForLevel(depthTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+                            ? trackedLayoutForLevel(depthTexture, 0)
+                            : depthSubpassLayout2);
+                    int depthFinalLayout2 = depthFeedback2
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                     attachments.get(depthAttachmentIndex)
                         .format(depthTexture.vkFormat)
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
@@ -12481,11 +12626,11 @@ void main() {
                         .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
                         .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                         .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
-                        .initialLayout(depthInitialLayout)
-                        .finalLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                        .initialLayout(depthInitialLayout2)
+                        .finalLayout(depthFinalLayout2);
                     depthReference = VkAttachmentReference.calloc(stack)
                         .attachment(depthAttachmentIndex)
-                        .layout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                        .layout(depthSubpassLayout2);
                 }
 
                 VkSubpassDescription.Buffer subpasses = VkSubpassDescription.calloc(1, stack);
@@ -12495,30 +12640,96 @@ void main() {
                     .pColorAttachments(colorReferences)
                     .pDepthStencilAttachment(depthReference);
 
-                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(1, stack);
+                // Base external→subpass dependency + optional feedback loop self-dependency.
+                boolean hasFeedbackLoop = targets.colorTextures.stream().anyMatch(t -> t.feedbackLoopCapable)
+                    || (targets.hasDepthTarget() && targets.depthTexture.feedbackLoopCapable);
+                int dependencyCount2 = hasFeedbackLoop ? 2 : 1;
+                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(dependencyCount2, stack);
+                int extDepthStages = targets.hasDepthTarget()
+                    ? VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT : 0;
+                int extDepthAccess = targets.hasDepthTarget()
+                    ? VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : 0;
                 dependencies.get(0)
                     .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
                     .dstSubpass(0)
                     .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT)
+                        | extDepthStages
+                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
                     .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT)
-                    .srcAccessMask(0)
+                        | extDepthStages
+                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | extDepthAccess
+                        | VK10.VK_ACCESS_SHADER_READ_BIT)
                     .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+                        | extDepthAccess
+                        | VK10.VK_ACCESS_SHADER_READ_BIT);
+                if (hasFeedbackLoop) {
+                    boolean hasDepthFeedback = targets.hasDepthTarget()
+                        && targets.depthTexture.feedbackLoopCapable;
+                    dependencies.get(1)
+                        .srcSubpass(0)
+                        .dstSubpass(0)
+                        .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                            | (hasDepthFeedback ? VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT : 0))
+                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                        .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                            | (hasDepthFeedback ? VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : 0))
+                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
+                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
+                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
+                }
 
-                VkRenderPassCreateInfo renderPassCreateInfo = VkRenderPassCreateInfo.calloc(stack)
-                    .sType$Default()
-                    .pAttachments(attachments)
-                    .pSubpasses(subpasses)
-                    .pDependencies(dependencies);
+                // Build a stable cache key from the render pass configuration. For
+                // feedback-loop passes the initialLayout is now constant, so the key
+                // is fully deterministic and we can reuse the same VkRenderPass handle
+                // indefinitely, avoiding repeated create/destroy cycles that trigger an
+                // NVIDIA driver bug when the same opaque handle is recycled.
+                List<Object> rpCacheKey2 = new ArrayList<>();
+                for (int ci = 0; ci < colorAttachmentCount; ci++) {
+                    rpCacheKey2.add(attachments.get(ci).format());
+                    rpCacheKey2.add(attachments.get(ci).loadOp());
+                    rpCacheKey2.add(attachments.get(ci).storeOp());
+                    rpCacheKey2.add(attachments.get(ci).initialLayout());
+                    rpCacheKey2.add(attachments.get(ci).finalLayout());
+                    rpCacheKey2.add(colorReferences.get(ci).layout());
+                }
+                rpCacheKey2.add(targets.hasDepthTarget());
+                if (targets.hasDepthTarget()) {
+                    rpCacheKey2.add(attachments.get(colorAttachmentCount).format());
+                    rpCacheKey2.add(attachments.get(colorAttachmentCount).loadOp());
+                    rpCacheKey2.add(attachments.get(colorAttachmentCount).storeOp());
+                    rpCacheKey2.add(attachments.get(colorAttachmentCount).initialLayout());
+                    rpCacheKey2.add(attachments.get(colorAttachmentCount).finalLayout());
+                }
+                rpCacheKey2.add(hasFeedbackLoop);
 
-                java.nio.LongBuffer pRenderPass = stack.mallocLong(1);
-                checkVk(
-                    "vkCreateRenderPass(framebuffer)",
-                    VK10.vkCreateRenderPass(logicalDevice, renderPassCreateInfo, null, pRenderPass)
-                );
-                renderPassHandle = pRenderPass.get(0);
+                Long cachedRenderPass2 = permanentRenderPassCache.get(rpCacheKey2);
+                if (cachedRenderPass2 != null) {
+                    renderPassHandle = cachedRenderPass2;
+                } else {
+                    VkRenderPassCreateInfo renderPassCreateInfo2 = VkRenderPassCreateInfo.calloc(stack)
+                        .sType$Default()
+                        .pAttachments(attachments)
+                        .pSubpasses(subpasses)
+                        .pDependencies(dependencies);
+                    java.nio.LongBuffer pRenderPass2 = stack.mallocLong(1);
+                    checkVk("vkCreateRenderPass(framebuffer)",
+                        VK10.vkCreateRenderPass(logicalDevice, renderPassCreateInfo2, null, pRenderPass2));
+                    renderPassHandle = pRenderPass2.get(0);
+                    permanentRenderPassCache.put(rpCacheKey2, renderPassHandle);
+                }
+
+                if (debugColorAttachmentLogCount < 200) {
+                    debugColorAttachmentLogCount++;
+                    LOGGER.info(
+                        "Vulkan beginFramebufferRenderPass colorCount={} depthPresent={} hasFeedbackLoop={} renderPass=0x{}",
+                        colorAttachmentCount,
+                        targets.hasDepthTarget(),
+                        hasFeedbackLoop,
+                        Long.toHexString(renderPassHandle)
+                    );
+                }
 
                 java.nio.LongBuffer pAttachments = stack.mallocLong(attachmentCount);
                 for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
@@ -12579,24 +12790,41 @@ void main() {
                 cachedScissorHeight = targets.height;
 
                 for (LegacyTextureObject colorTexture : targets.colorTextures) {
-                    trackLayoutForLevel(colorTexture, 0, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                    int colorActiveLayout2 = colorTexture.feedbackLoopCapable
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    trackLayoutForLevel(colorTexture, 0, colorActiveLayout2);
                 }
+                activeRenderPassColorTextures.clear();
+                activeRenderPassColorTextures.addAll(targets.colorTextures);
                 activeRenderPassTargetsSwapchain = false;
                 renderPassSwapchainImageIndex = -1;
                 if (targets.hasDepthTarget()) {
-                    trackLayoutForLevel(targets.depthTexture, 0, VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                    int depthActiveLayout2 = targets.depthTexture.feedbackLoopCapable
+                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                    trackLayoutForLevel(targets.depthTexture, 0, depthActiveLayout2);
+                    activeRenderPassDepthTexture = targets.depthTexture;
+                } else {
+                    activeRenderPassDepthTexture = null;
                 }
 
                 renderPassRecording = true;
                 activeRenderPassWidth = targets.width;
                 activeRenderPassHeight = targets.height;
-                transientRenderPassHandles.add(renderPassHandle);
+                // Permanently-cached render passes must NOT be added to transient handles.
+                // Only add to transient if this was a newly-created (non-cached) handle.
+                if (!permanentRenderPassCache.containsValue(renderPassHandle)) {
+                    transientRenderPassHandles.add(renderPassHandle);
+                }
                 transientFramebufferHandles.add(framebufferHandle);
             } catch (RuntimeException exception) {
                 if (framebufferHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
                 }
-                if (renderPassHandle != VK10.VK_NULL_HANDLE) {
+                // Only destroy the render pass on exception if it was just created (not a cached one).
+                if (renderPassHandle != VK10.VK_NULL_HANDLE
+                    && !permanentRenderPassCache.containsValue(renderPassHandle)) {
                     VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
                 }
                 throw exception;
@@ -12618,6 +12846,20 @@ void main() {
             activeRenderPassWidth = 0;
             activeRenderPassHeight = 0;
             activeRenderPassTargetsSwapchain = false;
+            for (LegacyTextureObject colorTexture : activeRenderPassColorTextures) {
+                int postLayout = colorTexture.feedbackLoopCapable
+                    ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                trackLayoutForLevel(colorTexture, 0, postLayout);
+            }
+            activeRenderPassColorTextures.clear();
+            if (activeRenderPassDepthTexture != null) {
+                int depthPostLayout = activeRenderPassDepthTexture.feedbackLoopCapable
+                    ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                    : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                trackLayoutForLevel(activeRenderPassDepthTexture, 0, depthPostLayout);
+                activeRenderPassDepthTexture = null;
+            }
             if (renderPassSwapchainImageIndex >= 0) {
                 trackSwapchainImageLayout(renderPassSwapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
                 renderPassSwapchainImageIndex = -1;
@@ -13076,8 +13318,14 @@ void main() {
                 // --- 13. VkGraphicsPipelineCreateInfo ---
                 VkGraphicsPipelineCreateInfo.Buffer pipelineInfo =
                     VkGraphicsPipelineCreateInfo.calloc(1, stack);
+                int pipelineCreateFlags = 0;
+                if (attachmentFeedbackLoopLayoutEnabled) {
+                    pipelineCreateFlags |= EXTAttachmentFeedbackLoopLayout.VK_PIPELINE_CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+                    pipelineCreateFlags |= EXTAttachmentFeedbackLoopLayout.VK_PIPELINE_CREATE_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+                }
                 pipelineInfo.get(0)
                     .sType$Default()
+                    .flags(pipelineCreateFlags)
                     .pStages(shaderStages)
                     .pVertexInputState(vertexInputInfo)
                     .pInputAssemblyState(inputAssembly)
@@ -13194,6 +13442,17 @@ void main() {
                 throw new IllegalArgumentException("Depth-enabled pipeline-compatible render pass requires a defined depth format");
             }
 
+            // When the attachment_feedback_loop_layout extension is enabled, all pipelines use
+            // ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT as the subpass image layout.  The placeholder
+            // render pass used for pipeline creation MUST use the same layout so the pipeline is
+            // compatible with the actual render passes it will be executed in.
+            int colorSubpassLayout = attachmentFeedbackLoopLayoutEnabled
+                ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            int depthSubpassLayout = attachmentFeedbackLoopLayoutEnabled
+                ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
             int colorAttachmentCount = colorFormats.size();
             int attachmentCount = colorAttachmentCount + (includeDepth ? 1 : 0);
 
@@ -13207,15 +13466,15 @@ void main() {
                     .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
                     .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                     .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
-                    .initialLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-                    .finalLayout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                    .initialLayout(colorSubpassLayout)
+                    .finalLayout(colorSubpassLayout);
             }
 
             VkAttachmentReference.Buffer colorRef = VkAttachmentReference.calloc(colorAttachmentCount, stack);
             for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
                 colorRef.get(colorIndex)
                     .attachment(colorIndex)
-                    .layout(VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                    .layout(colorSubpassLayout);
             }
 
             VkAttachmentReference depthRef = null;
@@ -13227,11 +13486,11 @@ void main() {
                     .storeOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
                     .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                     .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
-                    .initialLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-                    .finalLayout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                    .initialLayout(depthSubpassLayout)
+                    .finalLayout(depthSubpassLayout);
                 depthRef = VkAttachmentReference.calloc(stack)
                     .attachment(colorAttachmentCount)
-                    .layout(VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                    .layout(depthSubpassLayout);
             }
 
             VkSubpassDescription.Buffer subpass = VkSubpassDescription.calloc(1, stack);
@@ -13275,7 +13534,7 @@ void main() {
 
         private static int toVkDescriptorType(PipelineDescriptor.ResourceType type) {
             return switch (type) {
-                case SAMPLER -> VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                case SAMPLER, COMPARISON_SAMPLER -> VK10.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 case UNIFORM_BUFFER -> VK10.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 case TEXEL_BUFFER -> VK10.VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
             };
@@ -13778,6 +14037,15 @@ void main() {
                 }
 
                 destroyTransientRenderPassResources();
+
+                if (!permanentRenderPassCache.isEmpty()) {
+                    new ArrayList<>(permanentRenderPassCache.values()).forEach(rpHandle -> {
+                        if (rpHandle != null && rpHandle != VK10.VK_NULL_HANDLE) {
+                            VK10.vkDestroyRenderPass(logicalDevice, rpHandle, null);
+                        }
+                    });
+                    permanentRenderPassCache.clear();
+                }
 
                 destroyTrackedSwapchainImageViews();
 

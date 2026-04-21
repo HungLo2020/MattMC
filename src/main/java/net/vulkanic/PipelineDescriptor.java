@@ -765,6 +765,14 @@ public final class PipelineDescriptor {
      */
     public enum ResourceType {
         SAMPLER,
+        /**
+         * Depth/shadow comparison sampler ({@code sampler2DShadow}, {@code sampler1DShadow},
+         * {@code samplerCubeShadow}). On Vulkan this requires a VkSampler with
+         * {@code compareEnable=true}, regardless of the underlying texture's sampler state.
+         * On OpenGL the comparison mode is driven by the texture object, so this behaves
+         * identically to {@link #SAMPLER} on that backend.
+         */
+        COMPARISON_SAMPLER,
         UNIFORM_BUFFER,
         TEXEL_BUFFER;
 

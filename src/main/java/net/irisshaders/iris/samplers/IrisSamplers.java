@@ -80,7 +80,7 @@ public class IrisSamplers {
 
 				// colortex0 is the default sampler in fullscreen passes
 				if (i == 0 && isFullscreenPass) {
-					samplers.addDefaultSampler(TextureType.TEXTURE_2D, texture, null, null, name, legacyName);
+					samplers.addDefaultSampler(TextureType.TEXTURE_2D, texture, null, null, name, legacyName, "tex");
 				} else {
 					samplers.addDynamicSampler(TextureType.TEXTURE_2D, texture, null, name, legacyName);
 				}

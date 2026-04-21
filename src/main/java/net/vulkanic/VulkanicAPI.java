@@ -4992,6 +4992,21 @@ public class VulkanicAPI {
                 java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
                 mergedStages.addAll(reflectedBinding.stages());
                 merged.add(baseBinding.withStages(java.util.Set.copyOf(mergedStages)));
+            } else if (reflectedBinding != null
+                && baseBinding.type() == PipelineDescriptor.ResourceType.SAMPLER
+                && reflectedBinding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER) {
+                // Upgrade: the pipeline declared this as a plain SAMPLER but GLSL reflection reveals
+                // it's a shadow comparison type. Promote to COMPARISON_SAMPLER so Vulkan will build
+                // a VkSampler with compareEnable=true for this specific binding.
+                java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
+                mergedStages.addAll(reflectedBinding.stages());
+                merged.add(new PipelineDescriptor.ResourceBinding(
+                    baseBinding.set(),
+                    baseBinding.binding(),
+                    baseBinding.name(),
+                    PipelineDescriptor.ResourceType.COMPARISON_SAMPLER,
+                    baseBinding.textureFormat(),
+                    java.util.Set.copyOf(mergedStages)));
             } else {
                 merged.add(baseBinding);
             }
@@ -5103,7 +5118,13 @@ public class VulkanicAPI {
         java.util.Optional<VulkanicUniformReflectionType> reflectionType
     ) {
         if (reflectionType.isPresent() && reflectionType.get().isSampler()) {
-            return java.util.Optional.of(PipelineDescriptor.ResourceType.SAMPLER);
+            VulkanicUniformReflectionType type = reflectionType.get();
+            boolean comparison = type == VulkanicUniformReflectionType.SAMPLER_1D_SHADOW
+                || type == VulkanicUniformReflectionType.SAMPLER_2D_SHADOW
+                || type == VulkanicUniformReflectionType.SAMPLER_CUBE_SHADOW;
+            return java.util.Optional.of(comparison
+                ? PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
+                : PipelineDescriptor.ResourceType.SAMPLER);
         }
         return java.util.Optional.empty();
     }

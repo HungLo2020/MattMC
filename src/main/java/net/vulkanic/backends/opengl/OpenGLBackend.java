@@ -3436,7 +3436,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
         for (net.vulkanic.PipelineDescriptor.ResourceBinding resource : layout.bindings()) {
             switch (resource.type()) {
-                case SAMPLER -> {
+                case SAMPLER, COMPARISON_SAMPLER -> {
                     net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
                         bindings.getSamplerBinding(resource.name())
                             .orElseThrow(() -> new IllegalStateException(

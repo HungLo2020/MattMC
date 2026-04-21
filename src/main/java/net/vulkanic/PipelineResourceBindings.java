@@ -100,7 +100,7 @@ public final class PipelineResourceBindings {
             String name = resourceBinding.name();
             expectedNames.add(name);
             switch (resourceBinding.type()) {
-                case SAMPLER -> {
+                case SAMPLER, COMPARISON_SAMPLER -> {
                     if (!samplerBindings.containsKey(name)) {
                         missing.add(name + "(SAMPLER)");
                     }
