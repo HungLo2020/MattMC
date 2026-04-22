@@ -162,7 +162,8 @@ public class VulkanBackendSpirvPathTest {
 
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
 
-        assertTrue(normalized.contains("layout(std140) uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("layout(std140, set = 0, binding = 1)"));
         assertTrue(normalized.contains("vec3 u_RegionOffset;"));
         assertTrue(normalized.contains("vec2 u_TexCoordShrink;"));
         assertTrue(normalized.contains("uniform sampler2D u_LightTex;"));
@@ -192,7 +193,8 @@ public class VulkanBackendSpirvPathTest {
         );
         backend.compileShader(TEST_CONTEXT, shader);
 
-        assertTrue(capturedSource.get().contains("layout(std140) uniform VulkanicStandaloneUniforms {"));
+        assertTrue(capturedSource.get().contains("uniform VulkanicStandaloneUniforms {"));
+        assertTrue(capturedSource.get().contains("layout(std140, set = 0, binding = 1)"));
         assertTrue(capturedSource.get().contains("vec4 u_FogColor;"));
         assertTrue(capturedSource.get().contains("vec2 u_EnvironmentFog;"));
         assertTrue(capturedSource.get().contains("vec2 u_RenderFog;"));
@@ -375,7 +377,7 @@ public class VulkanBackendSpirvPathTest {
 
         assertEquals(2,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORMS));
-        assertEquals(2,
+        assertEquals(3,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORM_BLOCKS));
         assertEquals(0,
             backend.getUniformLocation(introspectionContext, program, "Sampler0"));
@@ -389,6 +391,8 @@ public class VulkanBackendSpirvPathTest {
             backend.retrieveActiveUniformBlockName(introspectionContext, program, 0));
         assertEquals("Projection",
             backend.retrieveActiveUniformBlockName(introspectionContext, program, 1));
+        assertEquals("VulkanicStandaloneUniforms",
+            backend.retrieveActiveUniformBlockName(introspectionContext, program, 2));
         assertEquals("Sampler0",
             backend.getActiveUniform(introspectionContext, program, 0, 256, null, null));
         IntBuffer fogColorArraySize = IntBuffer.allocate(1);
