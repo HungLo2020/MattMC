@@ -25,9 +25,9 @@ sync_up() {
   echo "From: $LOCAL_DIR/"
   echo "To:   $REMOTE_DIR/"
 
-  rsync -a --delete --human-readable --info=stats2,progress2 "$LOCAL_DIR/" "$REMOTE_DIR/"
+  rsync -a --human-readable --info=stats2,progress2 "$LOCAL_DIR/" "$REMOTE_DIR/"
 
-  echo "Done. Remote now mirrors local."
+  echo "Done. Remote updated with local changes (files never deleted)."
 }
 
 sync_down() {
@@ -41,9 +41,9 @@ sync_down() {
   echo "From: $REMOTE_DIR/"
   echo "To:   $LOCAL_DIR/"
 
-  rsync -a --delete --human-readable --info=stats2,progress2 "$REMOTE_DIR/" "$LOCAL_DIR/"
+  rsync -a --human-readable --info=stats2,progress2 "$REMOTE_DIR/" "$LOCAL_DIR/"
 
-  echo "Done. Local now mirrors remote."
+  echo "Done. Local updated with remote changes (files never deleted)."
 }
 
 main() {
