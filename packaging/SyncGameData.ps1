@@ -38,16 +38,23 @@ function Invoke-RobocopySync {
         [string]$Destination
     )
 
+    $destinationLib = Join-Path $Destination 'lib'
+    $destinationRunJdk = Join-Path $Destination 'run\jdk'
+
+    # Pass 1: Mirror everything except lib/ (deletes enabled)
     $robocopyArgs = @(
         $Source,
         $Destination,
-        '/E',
+        '/MIR',
         '/COPY:DAT',
         '/DCOPY:DAT',
         '/R:2',
         '/W:2',
         '/XJ',
         '/FFT',
+        '/XD',
+        $destinationLib,
+        $destinationRunJdk,
         '/NP'
     )
 
@@ -56,6 +63,54 @@ function Invoke-RobocopySync {
 
     if ($exitCode -ge 8) {
         throw "robocopy failed with exit code $exitCode"
+    }
+
+    # Pass 2: Sync lib/ content without delete/purge (adds + overwrites only)
+    $sourceLib = Join-Path $Source 'lib'
+    if (Test-Path -LiteralPath $sourceLib) {
+        $robocopyLibArgs = @(
+            $sourceLib,
+            $destinationLib,
+            '/E',
+            '/COPY:DAT',
+            '/DCOPY:DAT',
+            '/R:2',
+            '/W:2',
+            '/XJ',
+            '/FFT',
+            '/NP'
+        )
+
+        & robocopy @robocopyLibArgs | Out-Host
+        $libExitCode = $LASTEXITCODE
+
+        if ($libExitCode -ge 8) {
+            throw "robocopy lib sync failed with exit code $libExitCode"
+        }
+    }
+
+    # Pass 3: Sync run/jdk content without delete/purge (adds + overwrites only)
+    $sourceRunJdk = Join-Path $Source 'run\jdk'
+    if (Test-Path -LiteralPath $sourceRunJdk) {
+        $robocopyRunJdkArgs = @(
+            $sourceRunJdk,
+            $destinationRunJdk,
+            '/E',
+            '/COPY:DAT',
+            '/DCOPY:DAT',
+            '/R:2',
+            '/W:2',
+            '/XJ',
+            '/FFT',
+            '/NP'
+        )
+
+        & robocopy @robocopyRunJdkArgs | Out-Host
+        $runJdkExitCode = $LASTEXITCODE
+
+        if ($runJdkExitCode -ge 8) {
+            throw "robocopy run/jdk sync failed with exit code $runJdkExitCode"
+        }
     }
 }
 
@@ -71,7 +126,7 @@ function Sync-Up {
 
     Invoke-RobocopySync -Source $localDir -Destination $remoteDir
 
-    Write-Host "Done. Remote updated with local changes (files never deleted)."
+    Write-Host "Done. Remote mirrored from local (deletes enabled except destination lib/ and run/jdk/)."
 }
 
 function Sync-Down {
@@ -86,7 +141,7 @@ function Sync-Down {
 
     Invoke-RobocopySync -Source $remoteDir -Destination $localDir
 
-    Write-Host "Done. Local updated with remote changes (files never deleted)."
+    Write-Host "Done. Local mirrored from remote (deletes enabled except destination lib/ and run/jdk/)."
 }
 
 function Main {
