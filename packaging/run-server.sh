@@ -28,6 +28,23 @@ fi
 JAVA_CMD="$BUNDLED_JAVA"
 echo "Using bundled JDK ${JAVA_VERSION}"
 
+# Build classpath dynamically from all jars in ../lib so mixed-platform native jars are safe.
+CLASSPATH=""
+for jar in "$SCRIPT_DIR"/../lib/*.jar; do
+    if [[ -f "$jar" ]]; then
+        if [[ -z "$CLASSPATH" ]]; then
+            CLASSPATH="$jar"
+        else
+            CLASSPATH="$CLASSPATH:$jar"
+        fi
+    fi
+done
+
+if [[ -z "$CLASSPATH" ]]; then
+    echo "Error: no JAR files found in $SCRIPT_DIR/../lib"
+    exit 1
+fi
+
 # Prefer bundled SPIR-V compiler when present
 SPIRV_COMPILER="${SCRIPT_DIR}/../libraries/deps/glslangValidator"
 SPIRV_JVM_ARG=""
@@ -51,6 +68,6 @@ fi
 
 $JAVA_CMD $JVM_ARGS \
     $SPIRV_JVM_ARG \
-    -cp "@CLASSPATH_LINUX@" \
+    -cp "$CLASSPATH" \
     net.minecraft.server.Main \
     --nogui

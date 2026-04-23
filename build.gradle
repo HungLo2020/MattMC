@@ -1005,16 +1005,6 @@ tasks.register('clientDist') {
         }
         println "Copied shader pack to ${distDir}/run/shaderpacks"
         
-        // Build classpath string for launch scripts
-        // ONE JAR with everything, plus dependencies
-        def mainJarName = jar.archiveFile.get().asFile.name
-        def classpathLinux = "lib/${mainJarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
-        def classpathWindows = "lib\\${mainJarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
-        
-        // Build classpath for server scripts (relative to server directory)
-        def serverClasspathLinux = "../lib/${mainJarName}:../lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':../lib/')
-        def serverClasspathWindows = "..\\lib\\${mainJarName};..\\lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';..\\lib\\')
-        
         // Copy and process launch scripts from packaging directory
         // Process each script file in the packaging directory
         def packagingDir = file('packaging')
@@ -1030,17 +1020,15 @@ tasks.register('clientDist') {
                 
                 // Determine if this is a client or server script
                 if (scriptFile.name.startsWith('run-server')) {
-                    // Server script - place in server directory with server classpath
+                    // Server script - place in server directory
                     def linuxScript = file("${distDir}/server/${scriptFile.name}")
                     linuxScript.text = linuxScriptTemplate
-                        .replace('@CLASSPATH_LINUX@', serverClasspathLinux)
                         .replace('@VERSION@', version)
                     linuxScript.setExecutable(true)
                 } else {
                     // Client script - place in root directory
                     def linuxScript = file("${distDir}/${scriptFile.name}")
                     linuxScript.text = linuxScriptTemplate
-                        .replace('@CLASSPATH_LINUX@', classpathLinux)
                         .replace('@VERSION@', version)
                     linuxScript.setExecutable(true)
                 }
@@ -1050,16 +1038,14 @@ tasks.register('clientDist') {
                 
                 // Determine if this is a client or server script
                 if (scriptFile.name.startsWith('run-server')) {
-                    // Server script - place in server directory with server classpath
+                    // Server script - place in server directory
                     def windowsScript = file("${distDir}/server/${scriptFile.name}")
                     windowsScript.text = windowsScriptTemplate
-                        .replace('@CLASSPATH_WINDOWS@', serverClasspathWindows)
                         .replace('@VERSION@', version)
                 } else {
                     // Client script - place in root directory
                     def windowsScript = file("${distDir}/${scriptFile.name}")
                     windowsScript.text = windowsScriptTemplate
-                        .replace('@CLASSPATH_WINDOWS@', classpathWindows)
                         .replace('@VERSION@', version)
                 }
             } else {
