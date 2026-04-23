@@ -6,12 +6,23 @@ import net.vulkanic.VulkanicIntegerQuery;
 import net.vulkanic.VulkanicShaderStage;
 import net.vulkanic.VulkanicSpirvModule;
 import net.vulkanic.VulkanicUniformReflectionType;
+import net.blaze3d.pipeline.BlendFunction;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.DepthTestFunction;
+import net.blaze3d.platform.LogicOp;
+import net.blaze3d.platform.PolygonMode;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.renderer.ShaderDefines;
+import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -21,6 +32,40 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanBackendSpirvPathTest {
+
+    private static final class TestRenderPipeline extends RenderPipeline {
+        private final VertexFormat vertexFormat;
+
+        private TestRenderPipeline(ResourceLocation location, VertexFormat vertexFormat, VertexFormat.Mode mode) {
+            super(
+                location,
+                ResourceLocation.withDefaultNamespace("core/particle"),
+                ResourceLocation.withDefaultNamespace("core/particle"),
+                ShaderDefines.builder().build(),
+                List.of(),
+                List.of(),
+                Optional.<BlendFunction>empty(),
+                DepthTestFunction.LEQUAL_DEPTH_TEST,
+                PolygonMode.FILL,
+                true,
+                true,
+                true,
+                true,
+                LogicOp.NONE,
+                vertexFormat,
+                mode,
+                0.0f,
+                0.0f,
+                0
+            );
+            this.vertexFormat = vertexFormat;
+        }
+
+        @Override
+        public VertexFormat getVertexFormat() {
+            return this.vertexFormat;
+        }
+    }
 
     private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
 
@@ -117,7 +162,8 @@ public class VulkanBackendSpirvPathTest {
 
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
 
-        assertTrue(normalized.contains("layout(std140) uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("layout(std140, set = 0, binding = 1)"));
         assertTrue(normalized.contains("vec3 u_RegionOffset;"));
         assertTrue(normalized.contains("vec2 u_TexCoordShrink;"));
         assertTrue(normalized.contains("uniform sampler2D u_LightTex;"));
@@ -147,11 +193,87 @@ public class VulkanBackendSpirvPathTest {
         );
         backend.compileShader(TEST_CONTEXT, shader);
 
-        assertTrue(capturedSource.get().contains("layout(std140) uniform VulkanicStandaloneUniforms {"));
+        assertTrue(capturedSource.get().contains("uniform VulkanicStandaloneUniforms {"));
+        assertTrue(capturedSource.get().contains("layout(std140, set = 0, binding = 1)"));
         assertTrue(capturedSource.get().contains("vec4 u_FogColor;"));
         assertTrue(capturedSource.get().contains("vec2 u_EnvironmentFog;"));
         assertTrue(capturedSource.get().contains("vec2 u_RenderFog;"));
         assertTrue(capturedSource.get().contains("uniform sampler2D u_BlockTex;"));
+    }
+
+    @Test
+    public void testInjectExplicitVulkanBindingsPinsParticleVertexInputsToVertexFormatOrder() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitVulkanBindings",
+            RenderPipeline.class,
+            net.blaze3d.shaders.ShaderType.class,
+            String.class
+        );
+        injector.setAccessible(true);
+
+        RenderPipeline particlePipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/opaque_particle"),
+            DefaultVertexFormat.PARTICLE,
+            VertexFormat.Mode.QUADS
+        );
+
+        String source = "#version 330\n"
+            + "in vec3 Position;\n"
+            + "in vec2 UV0;\n"
+            + "in vec4 Color;\n"
+            + "in ivec2 UV2;\n"
+            + "void main() { gl_Position = vec4(Position, 1.0); }\n";
+
+        String rewritten = (String) injector.invoke(null, particlePipeline, net.blaze3d.shaders.ShaderType.VERTEX, source);
+
+        assertTrue(rewritten.contains("layout(location = 0) in vec3 Position;"));
+        assertTrue(rewritten.contains("layout(location = 1) in vec2 UV0;"));
+        assertTrue(rewritten.contains("layout(location = 2) in vec4 Color;"));
+        assertTrue(rewritten.contains("layout(location = 3) in ivec2 UV2;"));
+    }
+
+    @Test
+    public void testInjectExplicitVulkanBindingsPinsParticleStageInterfaces() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitVulkanBindings",
+            RenderPipeline.class,
+            net.blaze3d.shaders.ShaderType.class,
+            String.class
+        );
+        injector.setAccessible(true);
+
+        RenderPipeline particlePipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("pipeline/opaque_particle"),
+            DefaultVertexFormat.PARTICLE,
+            VertexFormat.Mode.QUADS
+        );
+
+        String vertexSource = "#version 330\n"
+            + "out float sphericalVertexDistance;\n"
+            + "out float cylindricalVertexDistance;\n"
+            + "out vec2 texCoord0;\n"
+            + "out vec4 vertexColor;\n"
+            + "void main() { gl_Position = vec4(0.0); }\n";
+        String fragmentSource = "#version 330\n"
+            + "in float sphericalVertexDistance;\n"
+            + "in float cylindricalVertexDistance;\n"
+            + "in vec2 texCoord0;\n"
+            + "in vec4 vertexColor;\n"
+            + "out vec4 fragColor;\n"
+            + "void main() { fragColor = vec4(texCoord0, sphericalVertexDistance, vertexColor.a); }\n";
+
+        String rewrittenVertex = (String) injector.invoke(null, particlePipeline, net.blaze3d.shaders.ShaderType.VERTEX, vertexSource);
+        String rewrittenFragment = (String) injector.invoke(null, particlePipeline, net.blaze3d.shaders.ShaderType.FRAGMENT, fragmentSource);
+
+        assertTrue(rewrittenVertex.contains("layout(location = 0) out float sphericalVertexDistance;"));
+        assertTrue(rewrittenVertex.contains("layout(location = 1) out float cylindricalVertexDistance;"));
+        assertTrue(rewrittenVertex.contains("layout(location = 2) out vec2 texCoord0;"));
+        assertTrue(rewrittenVertex.contains("layout(location = 3) out vec4 vertexColor;"));
+
+        assertTrue(rewrittenFragment.contains("layout(location = 0) in float sphericalVertexDistance;"));
+        assertTrue(rewrittenFragment.contains("layout(location = 1) in float cylindricalVertexDistance;"));
+        assertTrue(rewrittenFragment.contains("layout(location = 2) in vec2 texCoord0;"));
+        assertTrue(rewrittenFragment.contains("layout(location = 3) in vec4 vertexColor;"));
     }
 
     @Test
@@ -255,7 +377,7 @@ public class VulkanBackendSpirvPathTest {
 
         assertEquals(2,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORMS));
-        assertEquals(2,
+        assertEquals(3,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORM_BLOCKS));
         assertEquals(0,
             backend.getUniformLocation(introspectionContext, program, "Sampler0"));
@@ -269,6 +391,8 @@ public class VulkanBackendSpirvPathTest {
             backend.retrieveActiveUniformBlockName(introspectionContext, program, 0));
         assertEquals("Projection",
             backend.retrieveActiveUniformBlockName(introspectionContext, program, 1));
+        assertEquals("VulkanicStandaloneUniforms",
+            backend.retrieveActiveUniformBlockName(introspectionContext, program, 2));
         assertEquals("Sampler0",
             backend.getActiveUniform(introspectionContext, program, 0, 256, null, null));
         IntBuffer fogColorArraySize = IntBuffer.allocate(1);

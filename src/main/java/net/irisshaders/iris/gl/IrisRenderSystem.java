@@ -715,10 +715,13 @@ public class IrisRenderSystem {
 	}
 
 	public static void restoreTexture() {
-		if (lastTex != -1) {
-			CommandContext ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.bindTexture2D(ctx, lastTex);
-			lastTex = -1;
+		restoreKnownTextureBinding(lastTex);
+		lastTex = -1;
+	}
+
+	private static void restoreKnownTextureBinding(int textureId) {
+		if (textureId >= 0) {
+			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), textureId);
 		}
 	}
 
@@ -1240,7 +1243,7 @@ public class IrisRenderSystem {
 			int previous = getBoundTextureOnActiveUnit();
 			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), texture);
 			VulkanicAPI.generateMipmap(VulkanicAPI.getCommandContext(), target);
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previous);
+			restoreKnownTextureBinding(previous);
 		}
 
 		@Override
@@ -1305,7 +1308,7 @@ public class IrisRenderSystem {
 			int previous = getBoundTextureOnActiveUnit();
 			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), destTexture);
 			VulkanicAPI.copyTexSubImage2D(VulkanicAPI.getCommandContext(), target, i, i1, i2, i3, i4, width, height);
-			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previous);
+			restoreKnownTextureBinding(previous);
 		}
 
 		@Override

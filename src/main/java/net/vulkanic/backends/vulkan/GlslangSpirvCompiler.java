@@ -19,7 +19,10 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     private static final java.util.regex.Pattern STANDALONE_UNIFORM_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
         "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+([^;{}]+?)\\s*;\\s*(?://.*)?$"
     );
-    private static final String GENERATED_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
+    private static final java.util.regex.Pattern EXPLICIT_BINDING_PATTERN = java.util.regex.Pattern.compile(
+        "layout\\s*\\(([^)]*\\bbinding\\s*=\\s*(\\d+)[^)]*)\\)"
+    );
+    static final String GENERATED_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
 
     @Override
     public VulkanicSpirvModule compile(VulkanicShaderStage stage, CharSequence source, String sourceName, String entryPoint) {
@@ -185,7 +188,17 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
         int insertOffset = findUniformBlockInsertionOffset(strippedSource.toString());
         StringBuilder block = new StringBuilder();
-        block.append("layout(std140) uniform ")
+        // Use the HIGHER of: (max explicit binding + 1) OR (count of non-explicitly-bound opaque
+        // uniforms). The latter ensures the UBO is placed after all auto-mapped samplers, which
+        // glslang assigns starting from binding 0 independently per resource type. Without this,
+        // VulkanicStandaloneUniforms would get explicit binding 0 and collide with the first
+        // auto-mapped sampler (e.g. colortex0 from Iris shaders that have no explicit bindings).
+        int maxExplicit = findNextExplicitBindingIndex(strippedSource.toString());
+        int nonExplicitOpaqueCount = countNonExplicitOpaqueUniforms(strippedSource.toString());
+        int standaloneBindingIndex = Math.max(maxExplicit, nonExplicitOpaqueCount);
+        block.append("layout(std140, set = 0, binding = ")
+            .append(standaloneBindingIndex)
+            .append(") uniform ")
             .append(GENERATED_UNIFORM_BLOCK_NAME)
             .append(" {\n");
 
@@ -234,6 +247,38 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         }
 
         return offset;
+    }
+
+    static int countNonExplicitOpaqueUniforms(String shaderSource) {
+        java.util.regex.Matcher matcher = STANDALONE_UNIFORM_DECLARATION_PATTERN.matcher(shaderSource);
+        int count = 0;
+        while (matcher.find()) {
+            String declaration = matcher.group(1).trim();
+            if (declaration.isEmpty()) continue;
+            String typeToken = declaration.split("\\s+", 2)[0];
+            if (!isOpaqueUniformType(typeToken)) continue;
+            // Only count if no explicit "binding" qualifier appears in the full match
+            String fullMatch = matcher.group();
+            if (!fullMatch.contains("binding")) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int findNextExplicitBindingIndex(String shaderSource) {
+        java.util.regex.Matcher matcher = EXPLICIT_BINDING_PATTERN.matcher(shaderSource);
+        int maxBinding = -1;
+        while (matcher.find()) {
+            try {
+                int binding = Integer.parseInt(matcher.group(2));
+                if (binding > maxBinding) {
+                    maxBinding = binding;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return maxBinding + 1;
     }
 
     private static void deleteTempDirectoryQuietly(Path directory) {

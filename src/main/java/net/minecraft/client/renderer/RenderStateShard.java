@@ -195,13 +195,14 @@ public abstract class RenderStateShard {
 
 		MultiTextureStateShard(List<RenderStateShard.MultiTextureStateShard.Entry> list) {
 			super(() -> {
+				var ctx = VulkanicAPI.getCommandContext();
 				for (int i = 0; i < list.size(); i++) {
 					RenderStateShard.MultiTextureStateShard.Entry entry = (RenderStateShard.MultiTextureStateShard.Entry)list.get(i);
 					TextureManager textureManager = Minecraft.getInstance().getTextureManager();
 					AbstractTexture abstractTexture = textureManager.getTexture(entry.id);
 					abstractTexture.setUseMipmaps(entry.mipmap);
 					var textureView = abstractTexture.getTextureView();
-					VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), i, textureView);
+					VulkanicAPI.bindTextureUnit(ctx, i, textureView);
 					TextureTracker.INSTANCE.onSetShaderTexture(i, textureView);
 				}
 			}, () -> {});
@@ -283,7 +284,8 @@ public abstract class RenderStateShard {
 				AbstractTexture abstractTexture = textureManager.getTexture(resourceLocation);
 				abstractTexture.setUseMipmaps(bl);
 				var textureView = abstractTexture.getTextureView();
-				VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 0, textureView);
+				var ctx = VulkanicAPI.getCommandContext();
+				VulkanicAPI.bindTextureUnit(ctx, 0, textureView);
 				TextureTracker.INSTANCE.onSetShaderTexture(0, textureView);
 			}, () -> {});
 			this.texture = Optional.of(resourceLocation);

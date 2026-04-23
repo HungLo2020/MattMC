@@ -309,10 +309,37 @@ public class ColorManager {
     }
 
     private void loadTexturePackTerrainImage() {
+        if (VoxelConstants.getMinecraft().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS) instanceof TextureAtlas blockAtlas) {
+            this.terrainBuff = this.buildTerrainImageFromAtlas(blockAtlas);
+            this.loadedTerrainImage = true;
+            return;
+        }
+
         GLUtils.readTextureContentsToBufferedImage(VoxelConstants.getMinecraft().getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getTexture(), image -> {
             terrainBuff = image;
             loadedTerrainImage = true;
         });
+    }
+
+    private BufferedImage buildTerrainImageFromAtlas(TextureAtlas blockAtlas) {
+        BufferedImage atlasImage = new BufferedImage(blockAtlas.width, blockAtlas.height, BufferedImage.TYPE_4BYTE_ABGR);
+
+        for (TextureAtlasSprite sprite : blockAtlas.texturesByName.values()) {
+            int spriteX = sprite.getX();
+            int spriteY = sprite.getY();
+            int spriteWidth = Math.min(sprite.contents().width(), sprite.contents().originalImage.getWidth());
+            int spriteHeight = Math.min(sprite.contents().height(), sprite.contents().originalImage.getHeight());
+            spriteWidth = Math.min(spriteWidth, atlasImage.getWidth() - spriteX);
+            spriteHeight = Math.min(spriteHeight, atlasImage.getHeight() - spriteY);
+
+            for (int pixelY = 0; pixelY < spriteHeight; pixelY++) {
+                for (int pixelX = 0; pixelX < spriteWidth; pixelX++) {
+                    atlasImage.setRGB(spriteX + pixelX, spriteY + pixelY, sprite.contents().originalImage.getPixel(pixelX, pixelY));
+                }
+            }
+        }
+
+        return atlasImage;
     }
 
     private void loadSpecialColors() {

@@ -5,7 +5,6 @@ import net.blaze3d.textures.AddressMode;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.TextureFormat;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.gl.texture.DepthBufferFormat;
 import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
@@ -51,7 +50,7 @@ public class RenderTargets {
 
 		this.currentDepthTexture = depthTexture;
 		this.currentDepthFormat = depthFormat;
-		this.copyStrategy = DepthCopyStrategy.fastest(currentDepthFormat.isCombinedStencil());
+		this.copyStrategy = DepthCopyStrategy.fastestDepthSnapshot(currentDepthFormat.isCombinedStencil());
 
 		this.cachedWidth = width;
 		this.cachedHeight = height;
@@ -168,7 +167,7 @@ public class RenderTargets {
 		if (depthFormatChanged) {
 			currentDepthFormat = newDepthFormat;
 			// Might need a new copy strategy
-			copyStrategy = DepthCopyStrategy.fastest(currentDepthFormat.isCombinedStencil());
+			copyStrategy = DepthCopyStrategy.fastestDepthSnapshot(currentDepthFormat.isCombinedStencil());
 		}
 
 		if (depthFormatChanged || sizeChanged) {
@@ -225,27 +224,19 @@ public class RenderTargets {
 	public void copyPreTranslucentDepth() {
 		if (translucentDepthDirty) {
 			translucentDepthDirty = false;
-			var ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(noTranslucents));
-			depthSourceFb.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
-		} else {
-			copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noTranslucentsDestFb, VulkanicCoreAPI.textureId(noTranslucents),
-				getCurrentWidth(), getCurrentHeight());
 		}
+
+		copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noTranslucentsDestFb, VulkanicCoreAPI.textureId(noTranslucents),
+			getCurrentWidth(), getCurrentHeight());
 	}
 
 	public void copyPreHandDepth() {
 		if (handDepthDirty) {
 			handDepthDirty = false;
-			var ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.bindTexture2D(ctx, VulkanicCoreAPI.textureId(noHand));
-			depthSourceFb.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
-		} else {
-			copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noHandDestFb, VulkanicCoreAPI.textureId(noHand),
-				getCurrentWidth(), getCurrentHeight());
 		}
+
+		copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noHandDestFb, VulkanicCoreAPI.textureId(noHand),
+			getCurrentWidth(), getCurrentHeight());
 	}
 
 	public boolean isFullClearRequired() {

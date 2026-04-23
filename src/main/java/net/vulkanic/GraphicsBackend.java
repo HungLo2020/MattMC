@@ -16,6 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.function.BiFunction;
@@ -212,6 +213,30 @@ public interface GraphicsBackend {
         OptionalDouble clearDepth
     ) {
         return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    /**
+     * Creates a backend-owned render pass targeting an existing framebuffer contract.
+     */
+    default RenderPass createRenderPass(
+        Supplier<String> supplier,
+        int framebuffer,
+        boolean hasDepthTexture
+    ) {
+        return createCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);
+    }
+
+    /**
+     * Begins a render pass that targets an existing framebuffer contract.
+     */
+    default VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        Supplier<String> label,
+        int framebuffer
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not support framebuffer-backed beginRenderPass."
+        );
     }
 
     /**
@@ -2944,6 +2969,21 @@ public interface GraphicsBackend {
         return 0;
     }
 
+        /**
+         * Resolves a backend-native buffer handle for transitional integrations.
+         *
+         * <p>In OpenGL this corresponds to the GL buffer object name.
+         * In Vulkan this may return a backend-managed legacy buffer token while
+         * shared Blaze3D encoder code still issues handle-based commands.</p>
+         *
+         * @param ctx Command context for recording this command
+         * @param buffer Buffer target to resolve
+         * @return Backend-native buffer handle, or {@code 0} when not applicable
+         */
+        default int resolveBufferHandle(CommandContext ctx, GpuBuffer buffer) {
+            return 0;
+        }
+
     /**
      * Resolves a backend-native framebuffer handle for the given color/depth textures.
      *
@@ -3759,6 +3799,19 @@ public interface GraphicsBackend {
      */
     VulkanicTextureView createManagedTextureView(VulkanicTexture texture, int baseMipLevel, int mipLevelCount);
 
+    /**
+     * Creates a managed view for a legacy texture handle when no Blaze3D {@code GpuTextureView}
+     * is available to bridge the resource into descriptor-backed render passes.
+     *
+     * <p>This is primarily used by Vulkan custom-pass binding paths that only know the live
+     * legacy texture object name assigned to a sampler unit.</p>
+     *
+     * @param legacyTextureHandle legacy texture object handle
+     * @return a managed texture view, or {@code null} when the backend cannot recover one
+     */
+    @Nullable
+    VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle);
+
     // =========================================================================
     // Phase 3c: Pipeline Objects
     // =========================================================================
@@ -3776,6 +3829,20 @@ public interface GraphicsBackend {
      * @return a PipelineHandle for the compiled pipeline
      */
     PipelineHandle createPipeline(PipelineDescriptor descriptor);
+
+    /**
+     * Creates a pipeline compatible with the attachment contract of an existing framebuffer.
+     */
+    default PipelineHandle createPipeline(PipelineDescriptor descriptor, int framebuffer) {
+        return createPipeline(descriptor);
+    }
+
+    /**
+     * Returns linked SPIR-V modules associated with a live backend-neutral program handle.
+     */
+    default List<VulkanicSpirvModule> getLinkedProgramSpirvModules(CommandContext ctx, int program) {
+        return List.of();
+    }
 
     /**
      * Resolves a {@link GpuBuffer} to the backend-specific {@link VulkanicBuffer} that
@@ -3818,6 +3885,16 @@ public interface GraphicsBackend {
     default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
                                                           PipelineDescriptor descriptor) {
         return null;
+    }
+
+    /**
+     * Returns a compiled pipeline handle compatible with a specific framebuffer contract,
+     * or {@code null} if the active backend has not compiled one.
+     */
+    default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                          PipelineDescriptor descriptor,
+                                                          int framebuffer) {
+        return resolvePipelineHandle(renderPipeline, descriptor);
     }
 
     /**

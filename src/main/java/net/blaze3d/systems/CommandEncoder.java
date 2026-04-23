@@ -23,6 +23,10 @@ public interface CommandEncoder {
 		Supplier<String> supplier, GpuTextureView gpuTextureView, OptionalInt optionalInt, @Nullable GpuTextureView gpuTextureView2, OptionalDouble optionalDouble
 	);
 
+	default RenderPass createRenderPass(Supplier<String> supplier, int framebuffer, boolean hasDepthTexture) {
+		throw new UnsupportedOperationException("This command encoder does not support framebuffer-backed render-pass creation.");
+	}
+
 	void clearColorTexture(GpuTexture gpuTexture, int i);
 
 	void clearColorAndDepthTextures(GpuTexture gpuTexture, int i, GpuTexture gpuTexture2, double d);

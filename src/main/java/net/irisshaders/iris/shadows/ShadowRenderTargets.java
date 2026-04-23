@@ -77,7 +77,6 @@ public class ShadowRenderTargets {
 		this.noTranslucentsDestFb.addDepthAttachment(this.noTranslucents);
 
 		this.translucentDepthDirty = true;
-		boolean shouldRefresh = false;
 	}
 
 	private static final double LN_OF_2 = Math.log(2.0);
@@ -185,7 +184,7 @@ public class ShadowRenderTargets {
 			IrisRenderSystem.blitDepthBufferNearest(depthSourceFb.getId(), noTranslucentsDestFb.getId(), 0, 0, resolution, resolution,
 				0, 0, resolution, resolution);
 		} else {
-			DepthCopyStrategy.fastest(false).copy(depthSourceFb, net.vulkanic.VulkanicCoreAPI.textureId(mainDepth), noTranslucentsDestFb, net.vulkanic.VulkanicCoreAPI.textureId(noTranslucents),
+			DepthCopyStrategy.fastestDepthSnapshot(false).copy(depthSourceFb, net.vulkanic.VulkanicCoreAPI.textureId(mainDepth), noTranslucentsDestFb, net.vulkanic.VulkanicCoreAPI.textureId(noTranslucents),
 				resolution, resolution);
 		}
 	}

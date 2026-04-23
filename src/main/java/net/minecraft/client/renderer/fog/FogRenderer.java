@@ -5,7 +5,6 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
-import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.util.List;
 import net.minecraft.api.EnvType;

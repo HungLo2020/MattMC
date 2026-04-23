@@ -26,6 +26,8 @@ import net.sodium.client.render.chunk.lists.ChunkRenderList;
 import net.sodium.client.render.chunk.lists.ChunkRenderListIterable;
 import net.sodium.client.render.chunk.region.RenderRegion;
 import net.sodium.client.render.chunk.shader.ChunkShaderInterface;
+import net.sodium.client.render.chunk.shader.RenderPassChunkShaderInterface;
+import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.sodium.client.render.chunk.shader.SodiumChunkRenderPipelines;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
@@ -83,7 +85,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                        FogParameters parameters,
                        boolean indexedRenderingEnabled) {
         if (VulkanicAPI.isVulkanBackendSelected()) {
-            this.renderWithVulkan(matrices, commandList, renderLists, renderPass, camera, indexedRenderingEnabled);
+			this.renderWithVulkan(matrices, commandList, renderLists, renderPass, camera, parameters, indexedRenderingEnabled);
             return;
         }
 
@@ -147,8 +149,17 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         ChunkRenderListIterable renderLists,
         TerrainRenderPass terrainPass,
         CameraTransform camera,
+		FogParameters parameters,
         boolean indexedRenderingEnabled
     ) {
+		super.begin(terrainPass, parameters);
+		SharedChunkProgramOverrides.pushActiveProgram(this.activeProgram);
+		ChunkShaderInterface shader = this.activeProgram.getInterface();
+		RenderPassChunkShaderInterface renderPassShader = shader instanceof RenderPassChunkShaderInterface sharedShader ? sharedShader : null;
+		shader.setProjectionMatrix(matrices.projection());
+		shader.setModelViewMatrix(matrices.modelView());
+
+		try {
         final boolean useBlockFaceCulling = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()
             ? false
             : SodiumClientMod.options().performance.useBlockFaceCulling;
@@ -248,15 +259,19 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             OptionalDouble.empty()
         )) {
             VulkanicAPI.bindDefaultUniforms(renderPass);
-            renderPass.setPipeline(SodiumChunkRenderPipelines.forPass(terrainPass));
+			renderPass.setPipeline(SodiumChunkRenderPipelines.forPass(terrainPass, renderPassShader));
             renderPass.bindSampler("Sampler0", terrainPass.getAtlas());
             renderPass.bindSampler("Sampler2", net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
+			if (renderPassShader != null) {
+				renderPassShader.bindRenderPassResources(renderPass, terrainPass);
+			}
             renderPass.setUniform("SodiumChunkParams", chunkParams);
 
             for (PreparedRegionDraw preparedDraw : preparedDraws) {
                 renderPass.setVertexBuffer(0, preparedDraw.vertexBuffer());
                 renderPass.setIndexBuffer(preparedDraw.indexBuffer(), net.blaze3d.vertex.VertexFormat.IndexType.INT);
                 renderPass.setUniform("DynamicTransforms", preparedDraw.transforms());
+				setModelMatrixUniforms(shader, preparedDraw.region(), camera);
 
                 for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
                     int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
@@ -290,6 +305,10 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             nearestModelOffsetZ,
             nearestBatchSize
         );
+		} finally {
+			SharedChunkProgramOverrides.clearActiveProgram();
+			super.end(terrainPass);
+		}
     }
 
     @Override

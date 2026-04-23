@@ -637,7 +637,7 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             for (CachedRegion region : this.regions) {
                 ResourceLocation resource = region.getTextureLocation();
                 if (resource != null) {
-                    guiGraphics.blit(VoxelMapPipelines.GUI_TEXTURED_LESS_OR_EQUAL_DEPTH_PIPELINE, resource, region.getX() * 256, region.getZ() * 256, 0, 0, region.getWidth(), region.getWidth(), region.getWidth(), region.getWidth());
+                    guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resource, region.getX() * 256, region.getZ() * 256, 0, 0, region.getWidth(), region.getWidth(), region.getWidth(), region.getWidth());
                 }
             }
 
@@ -799,7 +799,7 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             guiGraphics.pose().rotate(locate);
             guiGraphics.pose().translate(-x, -y);
 
-            VoxelMapGuiGraphics.blitFloat(guiGraphics, VoxelMapPipelines.GUI_TEXTURED_LESS_OR_EQUAL_DEPTH_PIPELINE, voxelmapSkinLocation, x - width / 2, y - height / 2, width, height, 0, 1, 0, 1, 0xFFFFFFFF);
+            VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, voxelmapSkinLocation, x - width / 2, y - height / 2, width, height, 0, 1, 0, 1, 0xFFFFFFFF);
 
             guiGraphics.pose().popMatrix();
         }

@@ -29,6 +29,14 @@ public class VoxelMapPipelines {
             .withBlend(DST_ALPHA)
             .build();
 
+    public static final RenderPipeline GUI_TEXTURED_MASKED_PIPELINE = RenderPipeline
+            .builder(RenderPipelines.GUI_TEXTURED_SNIPPET)
+            .withLocation(ResourceLocation.parse("voxelmap:pipeline/gui_textured_masked"))
+            .withFragmentShader(ResourceLocation.parse("voxelmap:core/position_tex_color_mask"))
+            .withSampler("Sampler1")
+            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+            .build();
+
     public static final RenderPipeline GUI_TEXTURED_LESS_OR_EQUAL_DEPTH_PIPELINE = RenderPipeline
             .builder(RenderPipelines.GUI_TEXTURED_SNIPPET)
             .withLocation(ResourceLocation.parse("voxelmap:pipeline/gui_textured_equal_depth"))

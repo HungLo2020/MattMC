@@ -13,11 +13,14 @@ import net.irisshaders.iris.gl.shader.ShaderType;
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 import net.irisshaders.iris.gl.texture.TextureType;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.IntSupplier;
 
 public class ProgramBuilder extends ProgramUniforms.Builder implements SamplerHolder, ImageHolder {
+	private static final Logger LOGGER = LogManager.getLogger(ProgramBuilder.class);
 	private final int program;
 	private final ProgramSamplers.Builder samplers;
 	private final ProgramImages.Builder images;
@@ -81,6 +84,18 @@ public class ProgramBuilder extends ProgramUniforms.Builder implements SamplerHo
 		compute.destroy();
 
 		return new ProgramBuilder(name, programId, reservedTextureUnits);
+	}
+
+	@Nullable
+	public static ProgramBuilder beginComputeIfSupported(String name, @Nullable String source, ImmutableSet<Integer> reservedTextureUnits) {
+		RenderSystem.assertOnRenderThread();
+
+		if (!IrisRenderSystem.supportsCompute()) {
+			LOGGER.warn("Skipping compute shader program {} because compute shaders are not supported on this runtime/backend", name);
+			return null;
+		}
+
+		return beginCompute(name, source, reservedTextureUnits);
 	}
 
 	private static GlShader buildShader(ShaderType shaderType, String name, @Nullable String source) {

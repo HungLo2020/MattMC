@@ -15,9 +15,10 @@ out float cylindricalVertexDistance;
 out vec4 vertexColor;
 
 void main() {
-    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+    vec3 viewPos = (ModelViewMat * vec4(Position, 1.0)).xyz;
+    gl_Position = ProjMat * vec4(viewPos, 1.0);
 
-    sphericalVertexDistance = fog_spherical_distance(Position);
-    cylindricalVertexDistance = fog_cylindrical_distance(Position);
+    sphericalVertexDistance = fog_spherical_distance(viewPos);
+    cylindricalVertexDistance = fog_cylindrical_distance(viewPos);
     vertexColor = Color * texelFetch(Sampler2, UV2 / 16, 0);
 }

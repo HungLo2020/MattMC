@@ -27,6 +27,12 @@ public class Lighting implements AutoCloseable {
 	public Lighting() {
 		this.paddedSize = Mth.roundToward(UBO_SIZE, VulkanicAPI.getBackendUniformOffsetAlignment());
 		this.buffer = VulkanicAPI.createBuffer(() -> "Lighting UBO", 136, this.paddedSize * Lighting.Entry.values().length);
+		Matrix4f matrix4fLevelUpright = new Matrix4f().scaling(1.0F, -1.0F, 1.0F);
+		this.updateBuffer(
+			Lighting.Entry.LEVEL_UPRIGHT,
+			matrix4fLevelUpright.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()),
+			matrix4fLevelUpright.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
+		);
 		Matrix4f matrix4f = new Matrix4f().rotationY((float) (-Math.PI / 8)).rotateX((float) (Math.PI * 3.0 / 4.0));
 		this.updateBuffer(
 			Lighting.Entry.ITEMS_FLAT, matrix4f.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()), matrix4f.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
@@ -38,20 +44,38 @@ public class Lighting implements AutoCloseable {
 		this.updateBuffer(
 			Lighting.Entry.ITEMS_3D, matrix4f2.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()), matrix4f2.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
 		);
+		Matrix4f matrix4f3 = new Matrix4f()
+			.rotateYXZ(1.0821041F, 3.2375858F, 0.0F)
+			.rotateYXZ((float) (-Math.PI / 8), (float) (Math.PI * 3.0 / 4.0), 0.0F);
+		this.updateBuffer(
+			Lighting.Entry.ITEMS_3D_UPRIGHT,
+			matrix4f3.transformDirection(DIFFUSE_LIGHT_0, new Vector3f()),
+			matrix4f3.transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
+		);
 		this.updateBuffer(Lighting.Entry.ENTITY_IN_UI, INVENTORY_DIFFUSE_LIGHT_0, INVENTORY_DIFFUSE_LIGHT_1);
-		Matrix4f matrix4f3 = new Matrix4f();
+		Matrix4f matrix4f4 = new Matrix4f();
 		this.updateBuffer(
 			Lighting.Entry.PLAYER_SKIN,
-			matrix4f3.transformDirection(INVENTORY_DIFFUSE_LIGHT_0, new Vector3f()),
-			matrix4f3.transformDirection(INVENTORY_DIFFUSE_LIGHT_1, new Vector3f())
+			matrix4f4.transformDirection(INVENTORY_DIFFUSE_LIGHT_0, new Vector3f()),
+			matrix4f4.transformDirection(INVENTORY_DIFFUSE_LIGHT_1, new Vector3f())
 		);
 	}
 
 	public void updateLevel(boolean bl) {
 		if (bl) {
 			this.updateBuffer(Lighting.Entry.LEVEL, NETHER_DIFFUSE_LIGHT_0, NETHER_DIFFUSE_LIGHT_1);
+			this.updateBuffer(
+				Lighting.Entry.LEVEL_UPRIGHT,
+				new Matrix4f().scaling(1.0F, -1.0F, 1.0F).transformDirection(NETHER_DIFFUSE_LIGHT_0, new Vector3f()),
+				new Matrix4f().scaling(1.0F, -1.0F, 1.0F).transformDirection(NETHER_DIFFUSE_LIGHT_1, new Vector3f())
+			);
 		} else {
 			this.updateBuffer(Lighting.Entry.LEVEL, DIFFUSE_LIGHT_0, DIFFUSE_LIGHT_1);
+			this.updateBuffer(
+				Lighting.Entry.LEVEL_UPRIGHT,
+				new Matrix4f().scaling(1.0F, -1.0F, 1.0F).transformDirection(DIFFUSE_LIGHT_0, new Vector3f()),
+				new Matrix4f().scaling(1.0F, -1.0F, 1.0F).transformDirection(DIFFUSE_LIGHT_1, new Vector3f())
+			);
 		}
 	}
 
@@ -73,8 +97,10 @@ public class Lighting implements AutoCloseable {
 	@Environment(EnvType.CLIENT)
 	public static enum Entry {
 		LEVEL,
+		LEVEL_UPRIGHT,
 		ITEMS_FLAT,
 		ITEMS_3D,
+		ITEMS_3D_UPRIGHT,
 		ENTITY_IN_UI,
 		PLAYER_SKIN
     }

@@ -45,7 +45,7 @@ public class GuiEntityRenderer extends PictureInPictureRenderer<GuiEntityRenderS
 	}
 
 	@Override
-	protected float getTranslateY(int i, int j) {
+	protected float getTranslateY(GuiEntityRenderState guiEntityRenderState, int i, int j) {
 		return i / 2.0F;
 	}
 

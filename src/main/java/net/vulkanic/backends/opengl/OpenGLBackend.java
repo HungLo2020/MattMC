@@ -2157,6 +2157,7 @@ public class OpenGLBackend implements GraphicsBackend {
             case MAX_COLOR_ATTACHMENTS -> VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS;
             case NUM_EXTENSIONS -> VulkanicAPI.GL_NUM_EXTENSIONS;
             case MAX_LABEL_LENGTH -> VulkanicAPI.GL_MAX_LABEL_LENGTH;
+            case MAX_TEXTURE_LOD_BIAS -> VulkanicAPI.GL_MAX_TEXTURE_LOD_BIAS;
             case TEXTURE_MAX_LEVEL -> VulkanicAPI.GL_TEXTURE_MAX_LEVEL;
             case GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX -> VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX;
         };
@@ -3252,9 +3253,17 @@ public class OpenGLBackend implements GraphicsBackend {
         return new OpenGLTextureView(texture, baseMipLevel, mipLevelCount);
     }
 
+    @Override
+    @Nullable
+    public net.vulkanic.VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle) {
+        return null;
+    }
+
     private static int[] toGlInternalFormat(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
             case RGBA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
+            case RGBA16F -> new int[]{net.vulkanic.VulkanicAPI.GL_RGBA16F};
+            case BGRA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
             case RED8   -> new int[]{org.lwjgl.opengl.GL30.GL_R8};
             case RED8I  -> new int[]{org.lwjgl.opengl.GL30.GL_R8I};
             case DEPTH32 -> new int[]{org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT32};
@@ -3263,7 +3272,8 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private static int toGlExternalFormat(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
-            case RGBA8  -> org.lwjgl.opengl.GL11.GL_RGBA;
+            case RGBA8, RGBA16F -> org.lwjgl.opengl.GL11.GL_RGBA;
+            case BGRA8  -> net.vulkanic.VulkanicAPI.GL_BGRA;
             case RED8, RED8I -> org.lwjgl.opengl.GL30.GL_RED;
             case DEPTH32 -> org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT;
         };
@@ -3271,7 +3281,8 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private static int toGlType(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
-            case RGBA8, RED8  -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+            case RGBA8, BGRA8, RED8  -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+            case RGBA16F      -> net.vulkanic.VulkanicAPI.GL_HALF_FLOAT;
             case RED8I        -> org.lwjgl.opengl.GL11.GL_BYTE;
             case DEPTH32      -> org.lwjgl.opengl.GL11.GL_FLOAT;
         };
@@ -3289,6 +3300,14 @@ public class OpenGLBackend implements GraphicsBackend {
                     + gpuBuffer.getClass().getName());
         }
         return new OpenGLBuffer(glBuffer.getHandle(), glBuffer.usage(), glBuffer.size());
+    }
+
+    @Override
+    public int resolveBufferHandle(net.vulkanic.CommandContext ctx, net.blaze3d.buffers.GpuBuffer gpuBuffer) {
+        if (!(gpuBuffer instanceof net.blaze3d.opengl.GlBuffer glBuffer)) {
+            return 0;
+        }
+        return glBuffer.getHandle();
     }
 
     @Override
@@ -3417,7 +3436,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
         for (net.vulkanic.PipelineDescriptor.ResourceBinding resource : layout.bindings()) {
             switch (resource.type()) {
-                case SAMPLER -> {
+                case SAMPLER, COMPARISON_SAMPLER -> {
                     net.vulkanic.PipelineResourceBindings.SamplerBinding samplerBinding =
                         bindings.getSamplerBinding(resource.name())
                             .orElseThrow(() -> new IllegalStateException(

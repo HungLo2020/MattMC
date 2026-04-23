@@ -16,6 +16,7 @@ import java.util.OptionalInt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanicTypedApiRoutingTest {
@@ -316,6 +317,98 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
+    public void testCreateTextureViewBypassesProxyWhenRawVulkanBackendIsAvailable() throws Exception {
+        RecordingVulkanBackend recordingVulkanBackend = new RecordingVulkanBackend();
+
+        Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
+        rawVulkanBackendField.setAccessible(true);
+        rawVulkanBackendField.set(null, recordingVulkanBackend);
+
+        invocationHandler.lastInvocation = null;
+
+        VulkanicAPI.createTextureView(null);
+
+        assertNull(invocationHandler.lastInvocation,
+            "Texture-view routing should bypass the proxy backend when raw Vulkan backend is available");
+        assertTrue(recordingVulkanBackend.createTextureViewCalled,
+            "Raw Vulkan backend should receive texture-view creation directly");
+    }
+
+    @Test
+    public void testCreateTextureViewWithMipRangeBypassesProxyWhenRawVulkanBackendIsAvailable() throws Exception {
+        RecordingVulkanBackend recordingVulkanBackend = new RecordingVulkanBackend();
+
+        Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
+        rawVulkanBackendField.setAccessible(true);
+        rawVulkanBackendField.set(null, recordingVulkanBackend);
+
+        invocationHandler.lastInvocation = null;
+
+        VulkanicAPI.createTextureView(null, 2, 3);
+
+        assertNull(invocationHandler.lastInvocation,
+            "Mip-ranged texture-view routing should bypass the proxy backend when raw Vulkan backend is available");
+        assertTrue(recordingVulkanBackend.createTextureViewWithRangeCalled,
+            "Raw Vulkan backend should receive mip-ranged texture-view creation directly");
+        assertEquals(2, recordingVulkanBackend.lastBaseMipLevel);
+        assertEquals(3, recordingVulkanBackend.lastMipLevelCount);
+    }
+
+    @Test
+    public void testCreateRenderPassBypassesProxyWhenRawVulkanBackendIsAvailable() throws Exception {
+        RecordingVulkanBackend recordingVulkanBackend = new RecordingVulkanBackend();
+
+        Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
+        rawVulkanBackendField.setAccessible(true);
+        rawVulkanBackendField.set(null, recordingVulkanBackend);
+
+        invocationHandler.lastInvocation = null;
+
+        VulkanicAPI.createRenderPass(() -> "direct-pass", null, OptionalInt.empty());
+
+        assertNull(invocationHandler.lastInvocation,
+            "Render-pass routing should bypass the proxy backend when raw Vulkan backend is available");
+        assertTrue(recordingVulkanBackend.createRenderPassCalled,
+            "Raw Vulkan backend should receive render-pass creation directly");
+    }
+
+    @Test
+    public void testCreateTextureBypassesProxyWhenRawVulkanBackendIsAvailable() throws Exception {
+        RecordingVulkanBackend recordingVulkanBackend = new RecordingVulkanBackend();
+
+        Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
+        rawVulkanBackendField.setAccessible(true);
+        rawVulkanBackendField.set(null, recordingVulkanBackend);
+
+        invocationHandler.lastInvocation = null;
+
+        VulkanicAPI.createTexture(() -> "direct-texture", 7, TextureFormat.RGBA8, 4, 4, 1, 1);
+
+        assertNull(invocationHandler.lastInvocation,
+            "Texture creation should bypass the proxy backend when raw Vulkan backend is available");
+        assertTrue(recordingVulkanBackend.createTextureCalled,
+            "Raw Vulkan backend should receive texture creation directly");
+    }
+
+    @Test
+    public void testCreateBufferBypassesProxyWhenRawVulkanBackendIsAvailable() throws Exception {
+        RecordingVulkanBackend recordingVulkanBackend = new RecordingVulkanBackend();
+
+        Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
+        rawVulkanBackendField.setAccessible(true);
+        rawVulkanBackendField.set(null, recordingVulkanBackend);
+
+        invocationHandler.lastInvocation = null;
+
+        VulkanicAPI.createBuffer(() -> "direct-buffer", 9, 64);
+
+        assertNull(invocationHandler.lastInvocation,
+            "Buffer creation should bypass the proxy backend when raw Vulkan backend is available");
+        assertTrue(recordingVulkanBackend.createBufferCalled,
+            "Raw Vulkan backend should receive buffer creation directly");
+    }
+
+    @Test
     public void testPresentTextureToScreenRoutesThroughBackendSeam() {
         VulkanicAPI.presentTextureToScreen(TEST_CONTEXT, null);
 
@@ -359,6 +452,30 @@ public class VulkanicTypedApiRoutingTest {
         assertEquals(VulkanicTextureParameterName.class, invocation.method.getParameterTypes()[2]);
         assertEquals(VulkanicTextureTarget.TEXTURE_2D, invocation.args[1]);
         assertEquals(VulkanicTextureParameterName.MIN_FILTER, invocation.args[2]);
+    }
+
+    @Test
+    public void testTypedTextureParameterRoutingBypassesProxyWhenRawVulkanBackendIsAvailable() throws Exception {
+        RecordingVulkanBackend recordingVulkanBackend = new RecordingVulkanBackend();
+
+        Field rawVulkanBackendField = VulkanicAPI.class.getDeclaredField("rawVulkanBackend");
+        rawVulkanBackendField.setAccessible(true);
+        rawVulkanBackendField.set(null, recordingVulkanBackend);
+
+        invocationHandler.lastInvocation = null;
+
+        VulkanicAPI.setTextureParameter(
+            TEST_CONTEXT,
+            VulkanicTextureTarget.TEXTURE_2D,
+            VulkanicTextureParameterName.MIN_FILTER,
+            VulkanicTextureParameterValue.LINEAR
+        );
+
+        assertNull(invocationHandler.lastInvocation,
+            "Typed Vulkan texture-parameter routing should bypass the proxy backend when raw Vulkan backend is available");
+        assertEquals(VulkanicAPI.GL_TEXTURE_2D, recordingVulkanBackend.lastTarget);
+        assertEquals(VulkanicAPI.GL_TEXTURE_MIN_FILTER, recordingVulkanBackend.lastPName);
+        assertEquals(VulkanicAPI.GL_LINEAR, recordingVulkanBackend.lastParam);
     }
 
     @Test
@@ -1064,6 +1181,66 @@ public class VulkanicTypedApiRoutingTest {
         }
 
         private record ReflectedUniform(String name, int arraySize, int legacyType) {
+        }
+    }
+
+    private static final class RecordingVulkanBackend extends net.vulkanic.backends.vulkan.VulkanBackend {
+        private int lastTarget = Integer.MIN_VALUE;
+        private int lastPName = Integer.MIN_VALUE;
+        private int lastParam = Integer.MIN_VALUE;
+        private boolean createRenderPassCalled;
+        private boolean createTextureCalled;
+        private boolean createBufferCalled;
+        private boolean createTextureViewCalled;
+        private boolean createTextureViewWithRangeCalled;
+        private int lastBaseMipLevel = Integer.MIN_VALUE;
+        private int lastMipLevelCount = Integer.MIN_VALUE;
+
+        @Override
+        public void setTextureParameter(CommandContext ctx, int target, int pname, int param) {
+            this.lastTarget = target;
+            this.lastPName = pname;
+            this.lastParam = param;
+        }
+
+        @Override
+        public net.blaze3d.textures.GpuTextureView createTextureView(net.blaze3d.textures.GpuTexture texture) {
+            this.createTextureViewCalled = true;
+            return null;
+        }
+
+        @Override
+        public net.blaze3d.textures.GpuTextureView createTextureView(net.blaze3d.textures.GpuTexture texture, int baseMipLevel, int mipLevelCount) {
+            this.createTextureViewWithRangeCalled = true;
+            this.lastBaseMipLevel = baseMipLevel;
+            this.lastMipLevelCount = mipLevelCount;
+            return null;
+        }
+
+        @Override
+        public net.blaze3d.systems.RenderPass createRenderPass(java.util.function.Supplier<String> supplier,
+                                                               net.blaze3d.textures.GpuTextureView colorTextureView,
+                                                               java.util.OptionalInt clearColor) {
+            this.createRenderPassCalled = true;
+            return null;
+        }
+
+        @Override
+        public net.blaze3d.textures.GpuTexture createTexture(java.util.function.Supplier<String> supplier,
+                                                             int usage,
+                                                             TextureFormat textureFormat,
+                                                             int width,
+                                                             int height,
+                                                             int depthOrLayers,
+                                                             int mipLevels) {
+            this.createTextureCalled = true;
+            return null;
+        }
+
+        @Override
+        public net.blaze3d.buffers.GpuBuffer createBuffer(java.util.function.Supplier<String> supplier, int usage, int size) {
+            this.createBufferCalled = true;
+            return null;
         }
     }
 }

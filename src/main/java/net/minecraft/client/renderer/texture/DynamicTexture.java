@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
 import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.FilterMode;
 import net.blaze3d.textures.TextureFormat;
 import net.logging.LogUtils;

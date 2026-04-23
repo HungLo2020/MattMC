@@ -1,5 +1,33 @@
 {
   "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx8G -Xms100m -Xlog:disable",
   "java.compile.nullAnalysis.mode": "automatic",
-  "java.debug.settings.onBuildFailureProceed": true
+  "java.debug.settings.onBuildFailureProceed": true,
+
+  	"files.exclude": {
+		"**/*.class": true,
+		"**/.gradle": true,
+		"**/build": true
+	},
+	"search.exclude": {
+		"**/*.class": true,
+		"**/.gradle/**": true,
+		"**/build/**": true
+	},
+	"files.watcherExclude": {
+		"**/*.class": true,
+		"**/.gradle/**": true,
+		"**/build/**": true,
+		"**/out/**": true,
+		"**/run/**": true,
+    "**/logs/**": true,
+		"**/.git/objects/**": true
+	},
+	"java.import.exclusions": [
+		"**/*.class",
+		"**/.gradle/**",
+		"**/build/**",
+		"**/out/**",
+    "**/logs/**",
+		"**/run/**"
+	]
 }

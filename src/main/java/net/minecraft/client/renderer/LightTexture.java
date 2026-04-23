@@ -101,6 +101,13 @@ public class LightTexture implements AutoCloseable {
 		return this.textureView;
 	}
 
+	public String debugDescribePackedLight(int packedLight) {
+		int blockLight = packedLight & 0xF;
+		int skyLight = packedLight >> 20 & 0xF;
+		int sample = this.cpuLightmapPixels.getPixel(blockLight, skyLight);
+		return "packed=0x%08X block=%d sky=%d sample=0x%08X".formatted(packedLight, blockLight, skyLight, sample);
+	}
+
 	public void close() {
 		if (this.probeLightmapDebugTexture != null) {
 			this.probeLightmapDebugTexture.close();
@@ -123,7 +130,8 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void turnOnLightLayer() {
-		VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 2, this.textureView);
+		var ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindTextureUnit(ctx, 2, this.textureView);
 		TextureTracker.INSTANCE.onSetShaderTexture(2, this.textureView);
 	}
 

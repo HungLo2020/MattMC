@@ -15,6 +15,7 @@ import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
+import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,6 +25,7 @@ public class GlRenderPass implements RenderPass {
 	public static final boolean VALIDATION = SharedConstants.IS_RUNNING_IN_IDE;
 	private final GlCommandEncoder encoder;
 	private final boolean hasDepthTexture;
+	private final int framebuffer;
 	private boolean closed;
 	@Nullable
 	public GlRenderPipeline pipeline;
@@ -32,19 +34,25 @@ public class GlRenderPass implements RenderPass {
 	protected GpuBuffer indexBuffer;
 	protected VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
 	private final ScissorState scissorState = new ScissorState();
-	protected final HashMap<String, GpuBufferSlice> uniforms = new HashMap();
-	public final HashMap<String, GpuTextureView> samplers = new HashMap();
-	private final HashMap<String, VulkanicTextureView> samplerResourceViews = new HashMap();
+	protected final HashMap<String, GpuBufferSlice> uniforms = new HashMap<>();
+	private final HashMap<String, net.vulkanic.VulkanicBufferSlice> uniformResourceSlices = new HashMap<>();
+	public final HashMap<String, GpuTextureView> samplers = new HashMap<>();
+	private final HashMap<String, VulkanicTextureView> samplerResourceViews = new HashMap<>();
 	protected final Set<String> dirtyUniforms = new HashSet();
 	protected int pushedDebugGroups;
 
-	public GlRenderPass(GlCommandEncoder glCommandEncoder, boolean bl) {
+	public GlRenderPass(GlCommandEncoder glCommandEncoder, boolean bl, int framebuffer) {
 		this.encoder = glCommandEncoder;
 		this.hasDepthTexture = bl;
+		this.framebuffer = framebuffer;
 	}
 
 	public boolean hasDepthTexture() {
 		return this.hasDepthTexture;
+	}
+
+	public int getFramebuffer() {
+		return this.framebuffer;
 	}
 
 	@Override
@@ -85,21 +93,53 @@ public class GlRenderPass implements RenderPass {
 		if (gpuTextureView == null) {
 			this.samplers.remove(string);
 		} else {
-			if (!(gpuTextureView instanceof GlTextureView glTextureView)) {
-				throw new IllegalArgumentException(
-					"Render pass sampler binding requires GlTextureView, got: " + gpuTextureView.getClass().getName()
-				);
-			}
 			this.samplers.put(string, gpuTextureView);
-			this.samplerResourceViews.put(string, this.encoder.createSamplerResourceView(glTextureView));
+			this.samplerResourceViews.put(string, this.encoder.createSamplerResourceView(gpuTextureView));
 		}
 
 		this.dirtyUniforms.add(string);
 	}
 
+	public boolean bindLegacySampler(String string, int textureId) {
+		this.closeSamplerResourceView(string);
+		this.samplers.remove(string);
+		if (textureId <= 0) {
+			this.dirtyUniforms.add(string);
+			return false;
+		}
+
+		VulkanicTextureView resourceView = this.encoder.createLegacySamplerResourceView(textureId);
+		if (resourceView == null) {
+			this.dirtyUniforms.add(string);
+			return false;
+		}
+
+		this.samplerResourceViews.put(string, resourceView);
+		this.dirtyUniforms.add(string);
+		return true;
+	}
+
 	@Nullable
 	VulkanicTextureView getSamplerResourceView(String string) {
-		return this.samplerResourceViews.get(string);
+		VulkanicTextureView resourceView = this.samplerResourceViews.get(string);
+		if (resourceView != null) {
+			return resourceView;
+		}
+
+		GpuTextureView recoveredView = this.encoder.recoverSamplerView(string);
+		if (recoveredView == null) {
+			return null;
+		}
+
+		this.samplers.putIfAbsent(string, recoveredView);
+		VulkanicTextureView managedView = this.encoder.createSamplerResourceView(recoveredView);
+		VulkanicTextureView existingView = this.samplerResourceViews.putIfAbsent(string, managedView);
+		if (existingView != null) {
+			managedView.close();
+			return existingView;
+		}
+
+		return managedView;
 	}
 
 	private void closeSamplerResourceView(String name) {
@@ -118,8 +158,7 @@ public class GlRenderPass implements RenderPass {
 
 	@Override
 	public void setUniform(String string, GpuBuffer gpuBuffer) {
-		this.uniforms.put(string, gpuBuffer.slice());
-		this.dirtyUniforms.add(string);
+		this.setUniform(string, gpuBuffer.slice());
 	}
 
 	@Override
@@ -129,8 +168,21 @@ public class GlRenderPass implements RenderPass {
 			throw new IllegalArgumentException("Uniform buffer offset must be aligned to " + i);
 		} else {
 			this.uniforms.put(string, gpuBufferSlice);
+			this.uniformResourceSlices.put(
+				string,
+				new net.vulkanic.VulkanicBufferSlice(
+					VulkanicAPI.resolveVulkanicBuffer(gpuBufferSlice.buffer()),
+					gpuBufferSlice.offset(),
+					gpuBufferSlice.length()
+				)
+			);
 			this.dirtyUniforms.add(string);
 		}
+	}
+
+	@Nullable
+	net.vulkanic.VulkanicBufferSlice getUniformResourceSlice(String string) {
+		return this.uniformResourceSlices.get(string);
 	}
 
 	@Override

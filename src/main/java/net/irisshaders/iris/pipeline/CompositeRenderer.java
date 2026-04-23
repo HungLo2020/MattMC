@@ -53,7 +53,10 @@ import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.irisshaders.iris.vertices.ImmediateState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.PipelineDescriptor;
+import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
 
@@ -276,50 +279,57 @@ public class CompositeRenderer {
 		GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
 		VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 
-		try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Composites", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
-			renderPass.setPipeline(COMPOSITE_PIPELINE);
-			renderPass.setIndexBuffer(indices, type);
-			renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
-
-			for (int i = 0, passesSize = passes.size(); i < passesSize; i++) {
-				Pass compositePass = passes.get(i);
-				GLDebug.pushGroup(20 * this.compositePass.ordinal() + i, compositePass.name);
-				boolean ranCompute = false;
-				for (ComputeProgram computeProgram : compositePass.computes) {
-					if (computeProgram != null) {
-						ranCompute = true;
-						computeProgram.use();
-						this.customUniforms.push(computeProgram);
-						computeProgram.dispatch(main.width, main.height);
-					}
+		for (int i = 0, passesSize = passes.size(); i < passesSize; i++) {
+			Pass compositePass = passes.get(i);
+			GLDebug.pushGroup(20 * this.compositePass.ordinal() + i, compositePass.name);
+			boolean ranCompute = false;
+			for (ComputeProgram computeProgram : compositePass.computes) {
+				if (computeProgram != null) {
+					ranCompute = true;
+					computeProgram.use();
+					this.customUniforms.push(computeProgram);
+					computeProgram.dispatch(main.width, main.height);
 				}
+			}
 
-				if (ranCompute) {
-					IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
+			if (ranCompute) {
+				IrisRenderSystem.memoryBarrierComputeWritesVisibleToTextureSampling();
+			}
+
+			Program.unbind();
+
+			if (compositePass instanceof ComputeOnlyPass) {
+				GLDebug.popGroup();
+				continue;
+			}
+
+			if (!compositePass.mipmappedBuffers.isEmpty()) {
+				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
+
+				for (int index : compositePass.mipmappedBuffers) {
+					setupMipmapping(CompositeRenderer.this.renderTargets.get(index), compositePass.stageReadsFromAlt.contains(index));
 				}
+			}
 
-				Program.unbind();
+			compositePass.ensurePipelineState();
 
-				if (compositePass instanceof ComputeOnlyPass) {
-					GLDebug.popGroup();
-					continue;
-				}
-
-				if (!compositePass.mipmappedBuffers.isEmpty()) {
-					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
-
-					for (int index : compositePass.mipmappedBuffers) {
-						setupMipmapping(CompositeRenderer.this.renderTargets.get(index), compositePass.stageReadsFromAlt.contains(index));
-					}
-				}
-
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(
+				() -> "Composites",
+				compositePass.framebuffer.getId(),
+				compositePass.framebuffer.hasDepthAttachment()
+			)) {
+				renderPass.setPipeline(COMPOSITE_PIPELINE);
+				VulkanicAPI.bindDefaultUniforms(renderPass);
+				renderPass.setIndexBuffer(indices, type);
+				renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
 				renderPass.iris$setCustomPass(compositePass);
+				var ctx = VulkanicAPI.getCommandContext();
 
 				float scaledWidth = compositePass.viewWidth * compositePass.viewportScale.scale();
 				float scaledHeight = compositePass.viewHeight * compositePass.viewportScale.scale();
 				int beginWidth = (int) (compositePass.viewWidth * compositePass.viewportScale.viewportX());
 				int beginHeight = (int) (compositePass.viewHeight * compositePass.viewportScale.viewportY());
-				VulkanicAPI.setDynamicViewport(VulkanicAPI.getCommandContext(), beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
+				VulkanicAPI.setDynamicViewport(ctx, beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
 
 				compositePass.program.use();
 
@@ -327,10 +337,10 @@ public class CompositeRenderer {
 				this.customUniforms.push(compositePass.program);
 
 				renderPass.drawIndexed(0, 0, 6, 1);
-
-				BlendModeOverride.restore();
-				GLDebug.popGroup();
 			}
+
+			BlendModeOverride.restore();
+			GLDebug.popGroup();
 		}
 
 
@@ -346,7 +356,8 @@ public class CompositeRenderer {
 			// NB: This is necessary for shader pack reloading to work propely
 			if (net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(i) != 0) {
 				net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(i);
-				VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), 0);
+				var ctx = VulkanicAPI.getCommandContext();
+				VulkanicAPI.bindTexture2D(ctx, 0);
 			}
 		}
 
@@ -401,6 +412,7 @@ public class CompositeRenderer {
 
 		IrisSamplers.addNoiseSampler(customTextureSamplerInterceptor, noiseTexture);
 		IrisSamplers.addCompositeSamplers(customTextureSamplerInterceptor, renderTargets);
+		IrisSamplers.addCompositePbrSamplers(customTextureSamplerInterceptor, pipeline);
 
 		if (IrisSamplers.hasShadowSamplers(customTextureSamplerInterceptor)) {
 			IrisSamplers.addShadowSamplers(customTextureSamplerInterceptor, shadowTargetsSupplier.get(), null, pipeline.hasFeature(FeatureFlags.SEPARATE_HARDWARE_SAMPLERS));
@@ -434,12 +446,16 @@ public class CompositeRenderer {
 
 					ShaderPrinter.printProgram(source.getName()).addSource(PatchShaderType.COMPUTE, transformed).print();
 
-					builder = ProgramBuilder.beginCompute(source.getName(), transformed, IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
+					builder = ProgramBuilder.beginComputeIfSupported(source.getName(), transformed, IrisSamplers.COMPOSITE_RESERVED_TEXTURE_UNITS);
 				} catch (ShaderCompileException e) {
 					throw e;
 				} catch (RuntimeException e) {
 					// TODO: Better error handling
 					throw new RuntimeException("Shader compilation failed for compute " + source.getName() + "!", e);
+				}
+
+				if (builder == null) {
+					continue;
 				}
 
 				ProgramSamplers.CustomTextureSamplerInterceptor customTextureSamplerInterceptor = ProgramSamplers.customTextureSamplerInterceptor(builder, customTextureIds, flippedAtLeastOnceSnapshot);
@@ -493,12 +509,53 @@ public class CompositeRenderer {
 		BlendModeOverride blendModeOverride;
 		ComputeProgram[] computes;
 		GlFramebuffer framebuffer;
+		PipelineDescriptor pipelineDescriptor;
+		PipelineHandle pipelineHandle;
+		final java.util.Map<PipelineDescriptor.ResourceLayout, PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
 		ImmutableSet<Integer> flippedAtLeastOnce;
 		ImmutableSet<Integer> stageReadsFromAlt;
 		ImmutableSet<Integer> mipmappedBuffers;
 		ViewportData viewportScale;
 
+		private void closePipelineVariants() {
+			for (PipelineHandle pipelineVariant : this.pipelineLayoutVariants.values()) {
+				pipelineVariant.close();
+			}
+			this.pipelineLayoutVariants.clear();
+		}
+
+		private void ensurePipelineState() {
+			var ctx = VulkanicAPI.getCommandContext();
+			if (ctx.isImmediate()) {
+				return;
+			}
+
+			if (this.pipelineHandle != null && this.pipelineHandle.isValid() && this.pipelineDescriptor != null) {
+				return;
+			}
+
+			PipelineDescriptor descriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(
+				ctx,
+				PipelineDescriptor.fromRenderPipeline(COMPOSITE_PIPELINE),
+				this.program.getProgramId()
+			);
+			descriptor = applyBlendOverride(descriptor, this.blendModeOverride);
+
+			this.closePipelineVariants();
+			if (this.pipelineHandle != null) {
+				this.pipelineHandle.close();
+			}
+
+			this.pipelineDescriptor = descriptor;
+			this.pipelineHandle = VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+		}
+
 		protected void destroy() {
+			this.closePipelineVariants();
+			if (this.pipelineHandle != null) {
+				this.pipelineHandle.close();
+				this.pipelineHandle = null;
+			}
 			this.program.destroy();
 			for (ComputeProgram compute : this.computes) {
 				if (compute != null) {
@@ -509,13 +566,107 @@ public class CompositeRenderer {
 
 		@Override
 		public void setupState() {
-			framebuffer.bind();
 			if (blendModeOverride != null) {
 				blendModeOverride.apply();
 			} else {
 				BlendModeStorage.restoreBlend();
 				BlendModeStorage.setBlendEnabled(false);
 			}
+		}
+
+		@Override
+		public void bindRenderPassResources(RenderPass renderPass) {
+			this.program.bindRenderPassResources(renderPass);
+		}
+
+		@Override
+		public Program program() {
+			return this.program;
+		}
+
+		@Override
+		public PipelineDescriptor pipelineDescriptor() {
+			return this.pipelineDescriptor;
+		}
+
+		@Override
+		public PipelineHandle pipelineHandle() {
+			return this.pipelineHandle;
+		}
+
+		@Override
+		public PipelineHandle pipelineHandle(PipelineDescriptor descriptor) {
+			if (descriptor == null || this.pipelineDescriptor == null || this.pipelineHandle == null) {
+				return this.pipelineHandle;
+			}
+
+			if (descriptor.getResourceLayout().equals(this.pipelineDescriptor.getResourceLayout())) {
+				return this.pipelineHandle;
+			}
+
+			PipelineHandle pipelineVariant = this.pipelineLayoutVariants.get(descriptor.getResourceLayout());
+			if (pipelineVariant != null && pipelineVariant.isValid()) {
+				return pipelineVariant;
+			}
+
+			if (pipelineVariant != null) {
+				pipelineVariant.close();
+			}
+
+			PipelineHandle createdVariant = VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+			this.pipelineLayoutVariants.put(descriptor.getResourceLayout(), createdVariant);
+			return createdVariant;
+		}
+
+		private static PipelineDescriptor applyBlendOverride(PipelineDescriptor descriptor, BlendModeOverride blendModeOverride) {
+			if (blendModeOverride == null || blendModeOverride.blendMode() == null) {
+				return descriptor;
+			}
+
+			net.irisshaders.iris.gl.blending.BlendMode blendMode = blendModeOverride.blendMode();
+			java.util.Optional<net.blaze3d.platform.SourceFactor> sourceColor = VulkanicBlendFactor.fromLegacyGlConstant(blendMode.srcRgb())
+				.map(factor -> net.blaze3d.platform.SourceFactor.valueOf(factor.name()));
+			java.util.Optional<net.blaze3d.platform.DestFactor> destColor = VulkanicBlendFactor.fromLegacyGlConstant(blendMode.dstRgb())
+				.map(factor -> net.blaze3d.platform.DestFactor.valueOf(factor.name()));
+			java.util.Optional<net.blaze3d.platform.SourceFactor> sourceAlpha = VulkanicBlendFactor.fromLegacyGlConstant(blendMode.srcAlpha())
+				.map(factor -> net.blaze3d.platform.SourceFactor.valueOf(factor.name()));
+			java.util.Optional<net.blaze3d.platform.DestFactor> destAlpha = VulkanicBlendFactor.fromLegacyGlConstant(blendMode.dstAlpha())
+				.map(factor -> net.blaze3d.platform.DestFactor.valueOf(factor.name()));
+			if (sourceColor.isEmpty() || destColor.isEmpty() || sourceAlpha.isEmpty() || destAlpha.isEmpty()) {
+				return descriptor;
+			}
+
+			PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
+			PipelineDescriptor.PortableState blendPortableState = new PipelineDescriptor.PortableState(
+				portableState.location(),
+				portableState.vertexShader(),
+				portableState.fragmentShader(),
+				portableState.shaderDefineValues(),
+				portableState.shaderDefineFlags(),
+				portableState.samplers(),
+				portableState.uniforms(),
+				java.util.Optional.of(new PipelineDescriptor.BlendState(
+					sourceColor.get(),
+					destColor.get(),
+					sourceAlpha.get(),
+					destAlpha.get()
+				)),
+				portableState.depthTestFunction(),
+				portableState.polygonMode(),
+				portableState.cull(),
+				portableState.writeColor(),
+				portableState.writeAlpha(),
+				portableState.writeDepth(),
+				portableState.colorLogic(),
+				portableState.vertexFormat(),
+				portableState.vertexFormatMode(),
+				portableState.depthBiasScaleFactor(),
+				portableState.depthBiasConstant()
+			);
+
+			return PipelineDescriptor.fromPortableStateAndSpirvModules(blendPortableState, descriptor.getSpirvModules())
+				.withPushConstantRanges(descriptor.getPushConstantRanges())
+				.withResourceLayout(descriptor.getResourceLayout());
 		}
 	}
 

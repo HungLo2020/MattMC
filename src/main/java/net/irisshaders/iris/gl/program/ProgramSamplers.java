@@ -2,6 +2,9 @@ package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import net.blaze3d.opengl.GlRenderPass;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.textures.GpuTextureView;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.sampler.GlSampler;
@@ -11,22 +14,34 @@ import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.irisshaders.iris.shaderpack.properties.PackRenderTargetDirectives;
 import net.vulkanic.VulkanicAPI;
+import javax.annotation.Nonnull;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.IntSupplier;
 
 public class ProgramSamplers {
 	private static ProgramSamplers active;
 	private final ImmutableList<SamplerBinding> samplerBindings;
+	private final ImmutableList<NamedSamplerBinding> namedSamplerBindings;
 	private final ImmutableList<ValueUpdateNotifier> notifiersToReset;
 	private List<GlUniform1iCall> initializer;
 
-	private ProgramSamplers(ImmutableList<SamplerBinding> samplerBindings, ImmutableList<ValueUpdateNotifier> notifiersToReset, List<GlUniform1iCall> initializer) {
+	private ProgramSamplers(
+		ImmutableList<SamplerBinding> samplerBindings,
+		ImmutableList<NamedSamplerBinding> namedSamplerBindings,
+		ImmutableList<ValueUpdateNotifier> notifiersToReset,
+		List<GlUniform1iCall> initializer
+	) {
 		this.samplerBindings = samplerBindings;
+		this.namedSamplerBindings = namedSamplerBindings;
 		this.notifiersToReset = notifiersToReset;
 		this.initializer = initializer;
 	}
@@ -85,19 +100,78 @@ public class ProgramSamplers {
 		}
 	}
 
+	@SuppressWarnings("null")
+	public ImmutableList<String> getRenderPassSamplerNames() {
+		ImmutableList.Builder<String> names = ImmutableList.builder();
+		for (NamedSamplerBinding binding : namedSamplerBindings) {
+			names.add(Objects.requireNonNull(binding.name(), "sampler name"));
+		}
+		return names.build();
+	}
+
+	public OptionalInt getRenderPassSamplerUnit(String samplerName) {
+		for (NamedSamplerBinding binding : namedSamplerBindings) {
+			if (binding.name().equals(samplerName)) {
+				return OptionalInt.of(binding.textureUnit());
+			}
+		}
+
+		return OptionalInt.empty();
+	}
+
+	@SuppressWarnings("null")
+	public java.util.Map<String, Integer> getRenderPassSamplerUnits() {
+		java.util.Map<String, Integer> units = new LinkedHashMap<>();
+		for (NamedSamplerBinding binding : namedSamplerBindings) {
+			units.put(Objects.requireNonNull(binding.name(), "sampler name"), binding.textureUnit());
+		}
+		return java.util.Map.copyOf(units);
+	}
+
+	@SuppressWarnings("null")
+	public void bindToRenderPass(RenderPass renderPass) {
+		for (NamedSamplerBinding binding : namedSamplerBindings) {
+			GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(binding.textureUnit());
+			int textureId = 0;
+			if (textureView == null) {
+				textureId = IrisRenderSystem.getTextureBinding(binding.textureUnit());
+				if (textureId > 0) {
+					textureView = TextureTracker.INSTANCE.getTextureView(textureId);
+				}
+			}
+
+			if (textureView != null) {
+				renderPass.bindSampler(
+					Objects.requireNonNull(binding.name(), "sampler name"),
+					Objects.requireNonNull(textureView, "sampler texture view")
+				);
+				continue;
+			}
+
+			if (textureId > 0
+				&& VulkanicAPI.isVulkanBackendSelected()
+				&& renderPass instanceof GlRenderPass glRenderPass) {
+				glRenderPass.bindLegacySampler(Objects.requireNonNull(binding.name(), "sampler name"), textureId);
+			}
+		}
+	}
+
 	public static final class Builder implements SamplerHolder {
 		private final int program;
 		private final ImmutableSet<Integer> reservedTextureUnits;
 		private final ImmutableList.Builder<SamplerBinding> samplers;
+		private final ImmutableList.Builder<NamedSamplerBinding> namedSamplers;
 		private final ImmutableList.Builder<ValueUpdateNotifier> notifiersToReset;
 		private final List<GlUniform1iCall> calls;
 		private int remainingUnits;
 		private int nextUnit;
 
+		@SuppressWarnings("null")
 		private Builder(int program, Set<Integer> reservedTextureUnits) {
 			this.program = program;
-			this.reservedTextureUnits = ImmutableSet.copyOf(reservedTextureUnits);
+			this.reservedTextureUnits = ImmutableSet.copyOf(Objects.requireNonNull(reservedTextureUnits, "reservedTextureUnits"));
 			this.samplers = ImmutableList.builder();
+			this.namedSamplers = ImmutableList.builder();
 			this.notifiersToReset = ImmutableList.builder();
 			this.calls = new ArrayList<>();
 
@@ -129,7 +203,8 @@ public class ProgramSamplers {
 			}
 
 			for (String name : names) {
-				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
+				String samplerName = java.util.Objects.requireNonNull(name, "sampler name");
+				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, samplerName);
 
 				if (location == -1) {
 					// There's no active sampler with this particular name in the program.
@@ -139,6 +214,7 @@ public class ProgramSamplers {
 				// Set up this sampler uniform to use this particular texture unit.
 				//System.out.println("Binding external sampler " + name + " to texture unit " + textureUnit);
 				calls.add(new GlUniform1iCall(location, textureUnit));
+				namedSamplers.add(new NamedSamplerBinding(samplerName, textureUnit));
 			}
 		}
 
@@ -183,7 +259,8 @@ public class ProgramSamplers {
 			}
 
 			for (String name : names) {
-				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, name);
+				String samplerName = java.util.Objects.requireNonNull(name, "sampler name");
+				int location = VulkanicAPI.getUniformLocationWithLegacySamplerFallback(VulkanicAPI.getCommandContext(), program, samplerName);
 
 				if (location == -1) {
 					// There's no active sampler with this particular name in the program.
@@ -192,13 +269,14 @@ public class ProgramSamplers {
 
 				// Make sure that we aren't out of texture units.
 				if (remainingUnits <= 0) {
-					throw new IllegalStateException("No more available texture units while activating sampler " + name);
+					throw new IllegalStateException("No more available texture units while activating sampler " + samplerName);
 				}
 
-				//System.out.println("Binding dynamic sampler " + name + " with type " + type.name() + " to texture unit " + nextUnit);
+				//System.out.println("Binding dynamic sampler " + samplerName + " with type " + type.name() + " to texture unit " + nextUnit);
 
 				// Set up this sampler uniform to use this particular texture unit.
 				calls.add(new GlUniform1iCall(location, nextUnit));
+				namedSamplers.add(new NamedSamplerBinding(samplerName, nextUnit));
 
 				// And mark this texture unit as used.
 				used = true;
@@ -223,8 +301,11 @@ public class ProgramSamplers {
 		}
 
 		public ProgramSamplers build() {
-			return new ProgramSamplers(samplers.build(), notifiersToReset.build(), calls);
+			return new ProgramSamplers(samplers.build(), namedSamplers.build(), notifiersToReset.build(), calls);
 		}
+	}
+
+	private record NamedSamplerBinding(@Nonnull String name, int textureUnit) {
 	}
 
 	public static final class CustomTextureSamplerInterceptor implements SamplerHolder {
@@ -232,6 +313,7 @@ public class ProgramSamplers {
 		private final Object2ObjectMap<String, TextureAccess> customTextureIds;
 		private final ImmutableSet<String> deactivatedOverrides;
 
+		@SuppressWarnings("null")
 		private CustomTextureSamplerInterceptor(SamplerHolder samplerHolder, Object2ObjectMap<String, TextureAccess> customTextureIds, ImmutableSet<Integer> flippedAtLeastOnceSnapshot) {
 			this.samplerHolder = samplerHolder;
 			this.customTextureIds = customTextureIds;
@@ -242,7 +324,10 @@ public class ProgramSamplers {
 				deactivatedOverrides.add("colortex" + deactivatedOverride);
 
 				if (deactivatedOverride < PackRenderTargetDirectives.LEGACY_RENDER_TARGETS.size()) {
-					deactivatedOverrides.add(PackRenderTargetDirectives.LEGACY_RENDER_TARGETS.get(deactivatedOverride));
+					deactivatedOverrides.add(Objects.requireNonNull(
+						PackRenderTargetDirectives.LEGACY_RENDER_TARGETS.get(deactivatedOverride),
+						"legacy render target"
+					));
 				}
 			}
 
@@ -316,7 +401,9 @@ public class ProgramSamplers {
 
 		@Override
 		public boolean addDynamicSampler(TextureType type, IntSupplier texture, ValueUpdateNotifier notifier, GlSampler sampler, String... names) {
-			return false;
+			texture = getOverride(texture, names);
+
+			return samplerHolder.addDynamicSampler(type, texture, notifier, sampler, names);
 		}
 	}
 }

@@ -14,12 +14,25 @@ import org.lwjgl.system.MemoryStack;
 public class VoxelMapCachedOrthoProjectionMatrixBuffer implements AutoCloseable {
     private final GpuBuffer buffer;
     private final GpuBufferSlice bufferSlice;
+    private final boolean useZeroToOneDepthWhenVulkan;
 
     public VoxelMapCachedOrthoProjectionMatrixBuffer(String string, float left, float right, float bottom, float top, float zNear, float zFar) {
+        this(string, left, right, bottom, top, zNear, zFar, false);
+    }
+
+    public VoxelMapCachedOrthoProjectionMatrixBuffer(String string, float left, float right, float bottom, float top, float zNear, float zFar, boolean useZeroToOneDepthWhenVulkan) {
         this.buffer = net.vulkanic.VulkanicAPI.createBuffer(() -> "Projection matrix UBO " + string, GpuBuffer.USAGE_UNIFORM + GpuBuffer.USAGE_COPY_DST, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
         this.bufferSlice = this.buffer.slice(0, RenderSystem.PROJECTION_MATRIX_UBO_SIZE);
+        this.useZeroToOneDepthWhenVulkan = useZeroToOneDepthWhenVulkan;
 
-        Matrix4f matrix4f = new Matrix4f().ortho(left, right, bottom, top, zNear, zFar);
+        Matrix4f matrix4f = new Matrix4f().setOrtho(
+                left,
+                right,
+                bottom,
+                top,
+                zNear,
+                zFar,
+                this.useZeroToOneDepthWhenVulkan && net.vulkanic.VulkanicAPI.isVulkanBackendSelected());
 
         try (MemoryStack memoryStack = MemoryStack.stackPush()) {
             ByteBuffer byteBuffer = Std140Builder.onStack(memoryStack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE)

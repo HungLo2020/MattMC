@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *       state-mutation-free {@code generateTextureMipmapDSA} call instead.</li>
  * </ol>
  *
- * <p>All tests run without an OpenGL context — they inspect source code and class structure.
+ * <p>All tests run without an OpenGL context Î“Ã‡Ã¶ they inspect source code and class structure.
  */
 public class Phase3DrawPathTest {
 
@@ -233,6 +233,139 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testSingleQuadParticlesShrinkAtlasUvsBeforeSampling() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/particle/SingleQuadParticle.java"));
+
+        assertTrue(source.contains("return this.shrinkU(this.sprite.getU0(), this.sprite.getU1());"),
+            "SingleQuadParticle should shrink the leading U edge inward before sampling atlas sprites");
+        assertTrue(source.contains("return this.shrinkU(this.sprite.getU1(), this.sprite.getU0());"),
+            "SingleQuadParticle should shrink the trailing U edge inward before sampling atlas sprites");
+        assertTrue(source.contains("return this.shrinkV(this.sprite.getV0(), this.sprite.getV1());"),
+            "SingleQuadParticle should shrink the leading V edge inward before sampling atlas sprites");
+        assertTrue(source.contains("return this.shrinkV(this.sprite.getV1(), this.sprite.getV0());"),
+            "SingleQuadParticle should shrink the trailing V edge inward before sampling atlas sprites");
+        assertTrue(source.contains("return Mth.lerp(this.particleAtlasShrinkRatio(), f, h);"),
+            "SingleQuadParticle should contract atlas UVs with its particle-local shrink ratio");
+        assertTrue(source.contains("private float particleAtlasShrinkRatio()"),
+            "SingleQuadParticle should define a particle-local atlas shrink ratio helper");
+        assertTrue(source.contains("this.sprite.contents().width() / (this.sprite.getU1() - this.sprite.getU0())"),
+            "Particle atlas shrink ratio should be derived from sprite width relative to atlas UV span");
+    }
+
+    @Test
+    public void testQuadParticleRenderStateFlushesSamplerTextureModesBeforeBinding() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java"));
+
+        assertTrue(source.contains("particleTexture.setFilter(false, false);"),
+            "QuadParticleRenderState should restore the particle atlas to nearest non-mip sampling before binding Sampler0");
+        assertTrue(source.contains("lightTextureView.texture().flushModeChanges2D();"),
+            "QuadParticleRenderState should flush lightmap texture modes before binding Sampler2");
+        assertTrue(source.contains("particleTextureView.texture().flushModeChanges2D();"),
+            "QuadParticleRenderState should flush atlas texture modes before binding Sampler0");
+        assertTrue(source.contains("renderPass.bindSampler(\"Sampler2\", lightTextureView);"),
+            "QuadParticleRenderState should bind the flushed lightmap view to Sampler2");
+        assertTrue(source.contains("renderPass.bindSampler(\"Sampler0\", particleTextureView);"),
+            "QuadParticleRenderState should bind the flushed particle atlas view to Sampler0");
+    }
+
+    @Test
+    public void testMainTargetUsesBgra8AndBackendMappingsPreserveIt() throws IOException {
+        String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
+        String textureFormatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/TextureFormat.java"));
+        String gpuTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
+        String vulkanFormatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicTextureFormat.java"));
+        String openGlBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java"));
+        String vulkanBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(mainTargetSource.contains("TextureFormat.BGRA8"),
+            "MainTarget should allocate its color attachment as BGRA8 so Vulkan can present without shader compose into a BGRA swapchain");
+        assertTrue(mainTargetSource.contains("public void createBuffers(int i, int j)")
+                && mainTargetSource.contains("this.createFrameBuffer(i, j);"),
+            "MainTarget should override buffer recreation so window resizes keep using the BGRA main-target allocation path instead of the base RGBA8 RenderTarget implementation");
+        assertTrue(textureFormatSource.contains("BGRA8(4)"),
+            "TextureFormat should expose a BGRA8 color format for main-target allocation");
+        assertTrue(vulkanFormatSource.contains("BGRA8(4)"),
+            "VulkanicTextureFormat should expose BGRA8 so backends can preserve swapchain-compatible color ordering");
+        assertTrue(gpuTextureSource.contains("case BGRA8   -> VulkanicTextureFormat.BGRA8;"),
+            "GpuTexture should preserve Blaze BGRA8 textures when bridging to VulkanicTextureFormat");
+        assertTrue(openGlBackendSource.contains("case BGRA8  -> net.vulkanic.VulkanicAPI.GL_BGRA;"),
+            "OpenGL backend should preserve BGRA external format metadata for BGRA-backed managed textures");
+        assertTrue(vulkanBackendSource.contains("case BGRA8   -> VK10.VK_FORMAT_B8G8R8A8_UNORM;"),
+            "Vulkan backend should map BGRA8 textures to a BGRA VkFormat");
+        assertTrue(vulkanBackendSource.contains("case VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> VulkanicTextureFormat.BGRA8;"),
+            "Vulkan backend should preserve BGRA swapchain/image wrappers as BGRA8 instead of collapsing them to RGBA8");
+        assertTrue(vulkanBackendSource.contains("if ((format == VulkanicAPI.GL_BGRA || internalFormat == VulkanicAPI.GL_BGRA)")
+                && vulkanBackendSource.contains("return new LegacyTextureFormatInfo(VK10.VK_FORMAT_B8G8R8A8_UNORM, 4, VK10.VK_IMAGE_ASPECT_COLOR_BIT);")
+                && vulkanBackendSource.indexOf("if ((format == VulkanicAPI.GL_BGRA || internalFormat == VulkanicAPI.GL_BGRA)")
+                < vulkanBackendSource.indexOf("if ((format == VulkanicAPI.GL_RGBA || internalFormat == VulkanicAPI.GL_RGBA8 || internalFormat == VulkanicAPI.GL_RGBA16)"),
+            "Vulkan backend should resolve GL_BGRA uploads to a BGRA VkFormat before the generic RGBA8 legacy-format branch");
+    }
+
+    @Test
+    public void testVulkanDescriptorSamplerKeysUseLiveGpuTextureState() throws IOException {
+        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String textureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
+
+        assertTrue(textureSource.contains("public FilterMode getMinFilter()"),
+            "GpuTexture should expose its live min filter so Vulkan descriptor samplers can follow current texture state");
+        assertTrue(textureSource.contains("public FilterMode getMagFilter()"),
+            "GpuTexture should expose its live mag filter so Vulkan descriptor samplers can follow current texture state");
+        assertTrue(textureSource.contains("public boolean usesMipmaps()"),
+            "GpuTexture should expose whether mipmaps are live-enabled for descriptor sampler selection");
+        assertTrue(backendSource.contains("GpuTexture gpuTexture = boundTexture instanceof GpuTexture blazeTexture ? blazeTexture : null;"),
+            "Vulkan descriptor sampler keys should bridge the backend-neutral bound texture to live GpuTexture state when available");
+        assertTrue(backendSource.contains("toLegacyMinFilter(gpuTexture.getMinFilter(), gpuTexture.usesMipmaps())"),
+            "Vulkan descriptor samplers should derive minification mode from live GpuTexture state");
+        assertTrue(backendSource.contains("toLegacyMagFilter(gpuTexture.getMagFilter())"),
+            "Vulkan descriptor samplers should derive magnification mode from live GpuTexture state");
+        assertTrue(backendSource.contains("toLegacyWrapMode(gpuTexture.getAddressModeU())"),
+            "Vulkan descriptor samplers should derive wrap state from live GpuTexture state");
+    }
+
+    @Test
+    public void testIrisCustomPassesUseFramebufferOwnedRenderPassAndRecoveredPipelineSeams() throws IOException {
+        String compositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+        String shadowCompositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+
+        assertTrue(compositeRendererSource.contains("compositePass.ensurePipelineState();"),
+            "CompositeRenderer should precompute a framebuffer-compatible pipeline for custom passes before opening the render pass");
+        assertTrue(compositeRendererSource.contains("compositePass.framebuffer.getId()")
+                && compositeRendererSource.contains("compositePass.framebuffer.hasDepthAttachment()"),
+            "CompositeRenderer should create custom-pass render passes from the pass framebuffer contract");
+        assertTrue(compositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(renderPass);"),
+            "CompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
+        assertFalse(compositeRendererSource.contains("framebuffer.bind();"),
+            "CompositeRenderer custom pass setup should not manually rebind the framebuffer after backend-owned render-pass creation");
+
+        assertTrue(shadowCompositeRendererSource.contains("renderPass.ensurePipelineState();"),
+            "ShadowCompositeRenderer should precompute a framebuffer-compatible pipeline for custom passes before opening the render pass");
+        assertTrue(shadowCompositeRendererSource.contains("renderPass.framebuffer.getId()")
+                && shadowCompositeRendererSource.contains("renderPass.framebuffer.hasDepthAttachment()"),
+            "ShadowCompositeRenderer should create custom-pass render passes from the pass framebuffer contract");
+        assertTrue(shadowCompositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(pass);"),
+            "ShadowCompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
+        assertFalse(shadowCompositeRendererSource.contains("framebuffer.bind();"),
+            "ShadowCompositeRenderer custom pass setup should not manually rebind the framebuffer after backend-owned render-pass creation");
+
+        assertTrue(commandEncoderSource.contains("customPass.bindRenderPassResources(glRenderPass);"),
+            "GlCommandEncoder should let Iris custom passes contribute sampler resources to the active render pass");
+        assertTrue(commandEncoderSource.contains("customPass.pipelineHandle(submission.descriptor())")
+                && commandEncoderSource.contains("customPass.pipelineDescriptor()")
+                && commandEncoderSource.contains("buildCustomPassPipelineResourceBindings("),
+            "GlCommandEncoder should bind descriptor-matched live-program pipelines and descriptor resources for custom passes on Vulkan");
+        assertTrue(commandEncoderSource.contains("if (!submission.completeCoverage())")
+                && commandEncoderSource.contains("Skipping Vulkan custom pass"),
+            "GlCommandEncoder should fail open instead of submitting underbound Vulkan custom passes");
+        assertTrue(compositeRendererSource.contains("pipelineLayoutVariants")
+                && compositeRendererSource.contains("VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())"),
+            "CompositeRenderer custom passes should cache descriptor-layout pipeline variants for narrowed submission layouts");
+        assertTrue(shadowCompositeRendererSource.contains("pipelineLayoutVariants")
+                && shadowCompositeRendererSource.contains("VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())"),
+            "ShadowCompositeRenderer custom passes should cache descriptor-layout pipeline variants for narrowed submission layouts");
+    }
+
+    @Test
     public void testVulkanBackendBootstrapPathExists() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         assertTrue(Files.exists(vulkanBackendFile),
@@ -248,38 +381,12 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should construct VulkanBackend for GraphicsBackendType.VULKAN routing");
         assertTrue(apiSource.contains("backend = createFailFastVulkanProxy(rawVulkanBackend);"),
             "VulkanicAPI should route Vulkan backend calls through fail-fast proxy protection");
+        assertTrue(apiSource.contains("directVulkanBackendForImplementedMethods()"),
+            "VulkanicAPI should expose a direct-dispatch helper for hot implemented Vulkan methods");
+        assertFalse(apiSource.contains("methodCache.computeIfAbsent(method"),
+            "Vulkan fail-fast proxy should precompute backend method routing instead of paying per-call computeIfAbsent overhead on the render thread");
         assertFalse(apiSource.contains("throw new UnsupportedOperationException(\"Vulkan backend not yet implemented\")"),
             "VulkanicAPI should no longer hard-fail backend selection for GraphicsBackendType.VULKAN");
-    }
-
-    @Test
-    public void testDrawPathRoutesSamplerAndUboBindingThroughPipelineResourceSeam() throws IOException {
-        String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
-        String glDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java"));
-        String openGLBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java"));
-
-        int trySetupStart = glCommandEncoderSource.indexOf("private boolean trySetup(");
-        int trySetupEnd = glCommandEncoderSource.indexOf("@Override\n\tpublic void applyPipelineState", trySetupStart);
-        assertTrue(trySetupStart >= 0 && trySetupEnd > trySetupStart,
-            "GlCommandEncoder should still expose trySetup for draw-path inspection");
-        String trySetupSource = glCommandEncoderSource.substring(trySetupStart, trySetupEnd);
-
-        assertTrue(glDeviceSource.contains("withReflectedResourceLayout("),
-            "GlDevice should cache reflected resource-layout metadata with compiled pipelines");
-        assertTrue(trySetupSource.contains("buildPipelineResourceBindings(glRenderPass)"),
-            "GlCommandEncoder trySetup should derive backend-neutral pipeline resource bindings from the live render pass");
-        assertTrue(trySetupSource.contains("VulkanicAPI.bindPipelineResources("),
-            "GlCommandEncoder trySetup should route sampler and UBO binding through VulkanicAPI.bindPipelineResources");
-        assertTrue(trySetupSource.contains("VulkanicAPI.resolvePipelineHandle("),
-            "GlCommandEncoder trySetup should resolve backend pipeline handles through VulkanicAPI seam for non-immediate contexts");
-        assertTrue(trySetupSource.contains("immediateSeamHasCompleteCoverage"),
-            "GlCommandEncoder trySetup should keep an explicit compatibility fallback path when immediate seam coverage is incomplete during migration");
-        assertFalse(trySetupSource.contains("(!ctx.isImmediate() || !immediateSeamHasCompleteCoverage)"),
-            "GlCommandEncoder trySetup legacy fallback should no longer force Vulkan contexts onto GL-shaped uniform/texture calls when descriptor seam coverage is complete");
-        assertTrue(glCommandEncoderSource.contains("VulkanicAPI.resolveVulkanicBuffer(slice.buffer())"),
-            "GlCommandEncoder should resolve uniform-buffer bindings through a backend-neutral VulkanicAPI buffer seam");
-        assertTrue(openGLBackendSource.contains("samplerBinding.textureView()"),
-            "OpenGLBackend should consume sampler texture views from the pipeline resource seam");
     }
 
     @Test
@@ -414,7 +521,7 @@ public class Phase3DrawPathTest {
             "OpenGLTextureView should extract GlTexture handles directly through getGlHandle");
     }
 
-    // ── Task 1: drawFromBuffers routes directly through VulkanicAPI ───────────
+    // Î“Ã¶Ã‡Î“Ã¶Ã‡ Task 1: drawFromBuffers routes directly through VulkanicAPI Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡Î“Ã¶Ã‡
 
     @Test
     public void testDrawFromBuffersNoGlStateManagerDrawCall() throws IOException {
@@ -471,7 +578,7 @@ public class Phase3DrawPathTest {
             "net/blaze3d/opengl/GlCommandEncoder.java");
         String source = Files.readString(file);
 
-        // The Iris tessellation override (TRIANGLES → PATCHES) must still be present
+        // The Iris tessellation override (TRIANGLES Î“Ã¥Ã† PATCHES) must still be present
         // in the non-instanced indexed draw path, since we replaced GlStateManager._drawElements
         // which previously contained it.
         assertTrue(source.contains("usingTessellation"),
@@ -489,8 +596,8 @@ public class Phase3DrawPathTest {
         String source = Files.readString(file);
 
         // Verify that drawFromBuffers obtains the context once and reuses it (ctx variable),
-        // rather than calling getCommandContext() repeatedly.
-        assertTrue(source.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
+        // rather than repeatedly resolving the backend-global context.
+        assertTrue(source.contains("CommandContext ctx = commandContext();"),
             "drawFromBuffers should obtain a single CommandContext and reuse it");
     }
 
@@ -688,347 +795,6 @@ public class Phase3DrawPathTest {
     }
 
     @Test
-    public void testFramebufferIntentCallsitesUseVulkanicAPIHelpers() throws IOException {
-        Path commandEncoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String commandEncoderSource = Files.readString(commandEncoderFile);
-        assertFalse(commandEncoderSource.contains("IrisRenderSystem.bindFramebuffer("),
-            "GlCommandEncoder framebuffer paths should not bind through IrisRenderSystem framebuffer helper wrappers");
-        assertTrue(commandEncoderSource.contains("VulkanicAPI.bindDefaultFramebuffer("),
-            "GlCommandEncoder framebuffer paths should bind default FBO through VulkanicAPI helper");
-
-        Path directStateAccessFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
-        String directStateAccessSource = Files.readString(directStateAccessFile);
-        assertFalse(directStateAccessSource.contains("IrisRenderSystem.getFrameBuffer("),
-            "DirectStateAccess should not read framebuffer bindings through IrisRenderSystem helper wrappers");
-        assertFalse(directStateAccessSource.contains("IrisRenderSystem.bindFramebuffer("),
-            "DirectStateAccess should not bind framebuffer targets through IrisRenderSystem helper wrappers");
-        assertTrue(directStateAccessSource.contains("VulkanicAPI.getFramebufferBinding("),
-            "DirectStateAccess should read framebuffer bindings through VulkanicAPI cached binding helpers");
-
-        Path renderTargetFile = SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/RenderTarget.java");
-        String renderTargetSource = Files.readString(renderTargetFile);
-        assertFalse(renderTargetSource.contains("IrisRenderSystem.bindFramebuffer("),
-            "RenderTarget iris$bindFramebuffer path should not bind through IrisRenderSystem helper wrappers");
-        assertFalse(renderTargetSource.contains("VulkanicAPI.resolveFramebufferForTextures(this.colorTexture, this.depthTexture)"),
-            "RenderTarget iris$bindFramebuffer path should not resolve backend framebuffer ids directly");
-        assertTrue(renderTargetSource.contains("VulkanicAPI.bindRenderTarget(VulkanicAPI.getCommandContext(), this.colorTexture, this.depthTexture);"),
-            "RenderTarget iris$bindFramebuffer path should bind through VulkanicAPI render-target helper");
-
-        Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
-        String dhWrapperSource = readSourceIfExists(dhWrapperFile);
-        assertFalse(dhWrapperSource.contains("IrisRenderSystem.bindFramebuffer("),
-            "MinecraftGLWrapper should not perform duplicate framebuffer binds through IrisRenderSystem helper wrappers");
-        assertFalse(dhWrapperSource.contains("glBindFramebuffer("),
-            "MinecraftGLWrapper should no longer expose framebuffer bind wrapper after VulkanicAPI callsite migration");
-
-        Path dhInterfaceFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/wrapperInterfaces/minecraft/IMinecraftGLWrapper.java");
-        String dhInterfaceSource = readSourceIfExists(dhInterfaceFile);
-        assertFalse(dhInterfaceSource.contains("void glBindFramebuffer("),
-            "IMinecraftGLWrapper should no longer declare framebuffer bind wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void enableBlend("),
-            "IMinecraftGLWrapper should no longer declare blend enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void disableBlend("),
-            "IMinecraftGLWrapper should no longer declare blend disable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void glBlendFunc("),
-            "IMinecraftGLWrapper should no longer declare blend function wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void glBlendFuncSeparate("),
-            "IMinecraftGLWrapper should no longer declare blend separate wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void enableDepthMask("),
-            "IMinecraftGLWrapper should no longer declare depth-mask enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void disableDepthMask("),
-            "IMinecraftGLWrapper should no longer declare depth-mask disable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("int glGenTextures("),
-            "IMinecraftGLWrapper should no longer declare texture generation wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void glDeleteTextures("),
-            "IMinecraftGLWrapper should no longer declare texture deletion wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("int glGenBuffers("),
-            "IMinecraftGLWrapper should no longer declare buffer generation wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void glDeleteBuffers("),
-            "IMinecraftGLWrapper should no longer declare buffer deletion wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void enableScissorTest("),
-            "IMinecraftGLWrapper should no longer declare scissor enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void disableScissorTest("),
-            "IMinecraftGLWrapper should no longer declare scissor disable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void enableDepthTest("),
-            "IMinecraftGLWrapper should no longer declare depth-test enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void disableDepthTest("),
-            "IMinecraftGLWrapper should no longer declare depth-test disable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void glDepthFunc("),
-            "IMinecraftGLWrapper should no longer declare depth-function wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void enableFaceCulling("),
-            "IMinecraftGLWrapper should no longer declare cull enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhInterfaceSource.contains("void disableFaceCulling("),
-            "IMinecraftGLWrapper should no longer declare cull disable wrapper after VulkanicAPI callsite migration");
-
-        assertFalse(dhWrapperSource.contains("public void enableBlend("),
-            "MinecraftGLWrapper should not implement blend enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void disableBlend("),
-            "MinecraftGLWrapper should not implement blend disable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void glBlendFunc("),
-            "MinecraftGLWrapper should not implement blend function wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void glBlendFuncSeparate("),
-            "MinecraftGLWrapper should not implement blend separate wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void enableDepthMask("),
-            "MinecraftGLWrapper should not implement depth-mask enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void disableDepthMask("),
-            "MinecraftGLWrapper should not implement depth-mask disable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public int glGenTextures("),
-            "MinecraftGLWrapper should not implement texture generation wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void glDeleteTextures("),
-            "MinecraftGLWrapper should not implement texture deletion wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public int glGenBuffers("),
-            "MinecraftGLWrapper should not implement buffer generation wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void glDeleteBuffers("),
-            "MinecraftGLWrapper should not implement buffer deletion wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void enableScissorTest("),
-            "MinecraftGLWrapper should not implement scissor enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void disableScissorTest("),
-            "MinecraftGLWrapper should not implement scissor disable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void enableDepthTest("),
-            "MinecraftGLWrapper should not implement depth-test enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void disableDepthTest("),
-            "MinecraftGLWrapper should not implement depth-test disable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void glDepthFunc("),
-            "MinecraftGLWrapper should not implement depth-function wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void enableFaceCulling("),
-            "MinecraftGLWrapper should not implement cull enable wrapper after VulkanicAPI callsite migration");
-        assertFalse(dhWrapperSource.contains("public void disableFaceCulling("),
-            "MinecraftGLWrapper should not implement cull disable wrapper after VulkanicAPI callsite migration");
-
-        Path dhFramebufferFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/texture/DhFramebuffer.java");
-        String dhFramebufferSource = Files.readString(dhFramebufferFile);
-        assertFalse(dhFramebufferSource.contains("GLMC.glBindFramebuffer("),
-            "DhFramebuffer should not bind framebuffers through GLMC wrapper");
-        assertTrue(dhFramebufferSource.contains("VulkanicAPI.bindReadFramebuffer("),
-            "DhFramebuffer should bind read framebuffer through VulkanicAPI helper");
-        assertTrue(dhFramebufferSource.contains("VulkanicAPI.bindDrawFramebuffer("),
-            "DhFramebuffer should bind draw framebuffer through VulkanicAPI helper");
-        assertFalse(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, depthAttachment, VulkanicAPI.GL_TEXTURE_2D"),
-            "DhFramebuffer should not pass explicit GL_TEXTURE_2D in depth attachment path");
-        assertFalse(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + textureIndex, VulkanicAPI.GL_TEXTURE_2D"),
-            "DhFramebuffer should not pass explicit GL_TEXTURE_2D in color attachment path");
-        assertFalse(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, depthAttachment, textureId, 0)"),
-            "DhFramebuffer should not hard-code GL_FRAMEBUFFER target in depth attachment path");
-        assertTrue(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, depthAttachment, textureId, 0)"),
-            "DhFramebuffer should attach depth textures through VulkanicAPI default-target framebufferTexture2D overload");
-        assertFalse(dhFramebufferSource.contains("VulkanicAPI.framebufferTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + textureIndex, textureId, 0)"),
-            "DhFramebuffer should not compute color-attachment enums inline for color attachment path");
-        assertFalse(dhFramebufferSource.contains("VulkanicAPI.framebufferColorAttachmentTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, textureIndex, textureId, 0)"),
-            "DhFramebuffer should not hard-code GL_FRAMEBUFFER target in color attachment path");
-        assertTrue(dhFramebufferSource.contains("VulkanicAPI.framebufferColorAttachmentTexture2D(ctx, textureIndex, textureId, 0)"),
-            "DhFramebuffer should attach color textures through VulkanicAPI default-target color-attachment helper");
-        assertTrue(dhFramebufferSource.contains("VulkanicAPI.colorAttachment(buffer)"),
-            "DhFramebuffer draw/read buffer paths should use VulkanicAPI.colorAttachment helper");
-        assertTrue(dhFramebufferSource.contains("VulkanicAPI.setReadBufferColorAttachment(ctx, buffer)"),
-            "DhFramebuffer read-buffer path should use VulkanicAPI.setReadBufferColorAttachment helper");
-        assertFalse(dhFramebufferSource.contains("VulkanicAPI.checkFramebufferStatus(ctx, VulkanicAPI.GL_FRAMEBUFFER)"),
-            "DhFramebuffer should not hard-code GL_FRAMEBUFFER target in framebuffer status path");
-        assertTrue(dhFramebufferSource.contains("VulkanicAPI.checkFramebufferStatus(ctx)"),
-            "DhFramebuffer should query status through VulkanicAPI default-target helper");
-
-        Path lodRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
-        String lodRendererSource = Files.readString(lodRendererFile);
-        assertFalse(lodRendererSource.contains("getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME)"),
-            "LodRenderer should not query color attachment object name through raw GL_FRAMEBUFFER/GL_COLOR_ATTACHMENT0 constants");
-        assertTrue(lodRendererSource.contains("VulkanicAPI.getFramebufferColorAttachment0ObjectName(ctx)"),
-            "LodRenderer should query color attachment object name through VulkanicAPI helper");
-        assertFalse(lodRendererSource.contains("this.framebuffer.getStatus() != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE"),
-            "LodRenderer should not compare framebuffer status against raw GL_FRAMEBUFFER_COMPLETE constant");
-        assertTrue(lodRendererSource.contains("!VulkanicAPI.isFramebufferComplete(this.framebuffer.getStatus())"),
-            "LodRenderer should validate framebuffer status through VulkanicAPI completeness helper");
-        assertFalse(lodRendererSource.contains("VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
-            "LodRenderer should not clear depth via raw GL_DEPTH_BUFFER_BIT mask");
-        assertFalse(lodRendererSource.contains("VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
-            "LodRenderer should not clear color+depth via raw GL bitmask");
-        assertTrue(lodRendererSource.contains("VulkanicAPI.clearDepthBuffer(ctx)"),
-            "LodRenderer should clear depth through VulkanicAPI clearDepthBuffer helper");
-        assertTrue(lodRendererSource.contains("VulkanicAPI.clearColorAndDepthBuffers(ctx)"),
-            "LodRenderer should clear color+depth through VulkanicAPI clearColorAndDepthBuffers helper");
-
-        Path renderTargetsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTargets.java");
-        String renderTargetsSource = Files.readString(renderTargetsFile);
-        assertFalse(renderTargetsSource.contains("status != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE"),
-            "RenderTargets should not compare framebuffer status against raw GL_FRAMEBUFFER_COMPLETE constant");
-        assertTrue(renderTargetsSource.contains("!VulkanicAPI.isFramebufferComplete(status)"),
-            "RenderTargets should validate framebuffer status through VulkanicAPI completeness helper");
-
-        Path shadowRenderTargetsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderTargets.java");
-        String shadowRenderTargetsSource = Files.readString(shadowRenderTargetsFile);
-        assertFalse(shadowRenderTargetsSource.contains("status != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE"),
-            "ShadowRenderTargets should not compare framebuffer status against raw GL_FRAMEBUFFER_COMPLETE constant");
-        assertTrue(shadowRenderTargetsSource.contains("!VulkanicAPI.isFramebufferComplete(status)"),
-            "ShadowRenderTargets should validate framebuffer status through VulkanicAPI completeness helper");
-        assertFalse(shadowRenderTargetsSource.contains("IrisRenderSystem.blitFramebuffer(depthSourceFb.getId(), noTranslucentsDestFb.getId()"),
-            "ShadowRenderTargets should not blit depth via generic blitFramebuffer + raw mask/filter constants");
-        assertTrue(shadowRenderTargetsSource.contains("IrisRenderSystem.blitDepthBufferNearest(depthSourceFb.getId(), noTranslucentsDestFb.getId()"),
-            "ShadowRenderTargets should blit depth through IrisRenderSystem blitDepthBufferNearest helper");
-
-        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
-        assertTrue(vulkanicApiSource.contains("public static boolean isFramebufferComplete(int framebufferStatus)"),
-            "VulkanicAPI should expose framebuffer completeness helper");
-        assertTrue(vulkanicApiSource.contains("return framebufferStatus == GL_FRAMEBUFFER_COMPLETE;"),
-            "VulkanicAPI framebuffer completeness helper should map to GL_FRAMEBUFFER_COMPLETE semantics");
-        assertTrue(vulkanicApiSource.contains("public static void clearDepthBuffer(CommandContext ctx)"),
-            "VulkanicAPI should expose clearDepthBuffer helper");
-        assertTrue(vulkanicApiSource.contains("public static void clearColorAndDepthBuffers(CommandContext ctx)"),
-            "VulkanicAPI should expose clearColorAndDepthBuffers helper");
-        assertTrue(vulkanicApiSource.contains("public static void clearColorBufferWithMacosWorkaround(CommandContext ctx)"),
-            "VulkanicAPI should expose clearColorBufferWithMacosWorkaround helper");
-        assertTrue(vulkanicApiSource.contains("public static void clearDepthBufferWithMacosWorkaround(CommandContext ctx)"),
-            "VulkanicAPI should expose clearDepthBufferWithMacosWorkaround helper");
-        assertTrue(vulkanicApiSource.contains("public static void clearColorAndDepthBuffersWithMacosWorkaround(CommandContext ctx)"),
-            "VulkanicAPI should expose clearColorAndDepthBuffersWithMacosWorkaround helper");
-        assertTrue(vulkanicApiSource.contains("public static final int GL_STENCIL_BUFFER_BIT = 0x00000400;"),
-            "VulkanicAPI should define GL_STENCIL_BUFFER_BIT for centralized depth-stencil blit helpers");
-        assertTrue(vulkanicApiSource.contains("public static void blitDepthBufferNearest(CommandContext ctx"),
-            "VulkanicAPI should expose blitDepthBufferNearest helper");
-        assertTrue(vulkanicApiSource.contains("public static void blitDepthAndStencilBuffersNearest(CommandContext ctx"),
-            "VulkanicAPI should expose blitDepthAndStencilBuffersNearest helper");
-
-        Path irisRenderingPipelineFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java");
-        String irisRenderingPipelineSource = Files.readString(irisRenderingPipelineFile);
-        assertFalse(irisRenderingPipelineSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
-            "IrisRenderingPipeline should not clear depth through raw GL_DEPTH_BUFFER_BIT macOS clear mask");
-        assertTrue(irisRenderingPipelineSource.contains("VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
-            "IrisRenderingPipeline should clear depth through VulkanicAPI clearDepthBufferWithMacosWorkaround helper");
-
-        Path lodRendererEventsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/LodRendererEvents.java");
-        String lodRendererEventsSource = Files.readString(lodRendererEventsFile);
-        assertFalse(lodRendererEventsSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
-            "LodRendererEvents should not clear depth through raw GL_DEPTH_BUFFER_BIT macOS clear mask");
-        assertTrue(lodRendererEventsSource.contains("VulkanicAPI.clearDepthBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
-            "LodRendererEvents should clear depth through VulkanicAPI clearDepthBufferWithMacosWorkaround helper");
-
-        Path textureManipulationUtilMacosFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
-        String textureManipulationUtilMacosSource = Files.readString(textureManipulationUtilMacosFile);
-        assertFalse(textureManipulationUtilMacosSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT)"),
-            "TextureManipulationUtil should not clear color through raw GL_COLOR_BUFFER_BIT macOS clear mask");
-        assertTrue(textureManipulationUtilMacosSource.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx)"),
-            "TextureManipulationUtil should clear color through VulkanicAPI clearColorBufferWithMacosWorkaround helper");
-
-        Path dhApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/DhApplyShader.java");
-        String dhApplySource = Files.readString(dhApplyFile);
-        assertFalse(dhApplySource.contains("VulkanicAPI.framebufferTexture(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D"),
-            "DhApplyShader should not attach color texture via raw framebufferTexture + explicit GL_TEXTURE_2D path");
-        assertTrue(dhApplySource.contains("VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, targetColorTextureId, 0)")
-                || dhApplySource.contains("VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.activeTargetColorTextureId, 0)"),
-            "DhApplyShader should attach draw color via VulkanicAPI framebufferColorAttachment0Texture2D helper");
-
-        Path fogApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogApplyShader.java");
-        String fogApplySource = Files.readString(fogApplyFile);
-        assertFalse(fogApplySource.contains("GLMC.glBindFramebuffer("),
-            "FogApplyShader should not bind read/draw framebuffers through GLMC wrapper");
-
-        Path fogShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogShader.java");
-        String fogShaderSource = Files.readString(fogShaderFile);
-        assertFalse(fogShaderSource.contains("VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
-            "FogShader should not clear color+depth via raw GL bitmask");
-        assertTrue(fogShaderSource.contains("VulkanicAPI.clearColorAndDepthBuffers(ctx)"),
-            "FogShader should clear color+depth through VulkanicAPI clearColorAndDepthBuffers helper");
-
-        Path ssaoApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOApplyShader.java");
-        String ssaoApplySource = Files.readString(ssaoApplyFile);
-        assertFalse(ssaoApplySource.contains("GLMC.glBindFramebuffer("),
-            "SSAOApplyShader should not bind read/draw framebuffers through GLMC wrapper");
-
-        Path fadeApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FadeApplyShader.java");
-        String fadeApplySource = Files.readString(fadeApplyFile);
-        assertFalse(fadeApplySource.contains("GLMC.glBindFramebuffer("),
-            "FadeApplyShader should not bind read/draw framebuffers through GLMC wrapper");
-
-        Path glStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/GLState.java");
-        String glStateSource = Files.readString(glStateFile);
-        assertFalse(glStateSource.contains("GLMC.enableBlend("),
-            "GLState should not restore blending through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.disableBlend("),
-            "GLState should not restore blending through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.glBlendFunc("),
-            "GLState should not restore blend function through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.glBlendFuncSeparate("),
-            "GLState should not restore blend function separate through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.enableDepthMask("),
-            "GLState should not restore depth mask through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.disableDepthMask("),
-            "GLState should not restore depth mask through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.enableScissorTest("),
-            "GLState should not restore scissor state through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.disableScissorTest("),
-            "GLState should not restore scissor state through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.enableDepthTest("),
-            "GLState should not restore depth test through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.disableDepthTest("),
-            "GLState should not restore depth test through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.glDepthFunc("),
-            "GLState should not restore depth function through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.enableFaceCulling("),
-            "GLState should not restore culling through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("GLMC.disableFaceCulling("),
-            "GLState should not restore culling through GLMC wrapper methods");
-        assertFalse(glStateSource.contains("DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE0)"),
-            "GLState should not select texture unit 0 through raw GL_TEXTURE0 constants");
-        assertTrue(glStateSource.contains("DhTextureState.setActiveTextureUnitIndex(0)"),
-            "GLState should select texture unit 0 through index-based helper");
-        assertFalse(glStateSource.contains("getFramebufferAttachmentParameteri(ctx, VulkanicAPI.GL_FRAMEBUFFER"),
-            "GLState should not query framebuffer attachment names via raw GL_FRAMEBUFFER constants");
-        assertTrue(glStateSource.contains("getFramebufferColorAttachment0ObjectName(ctx)"),
-            "GLState should query framebuffer color attachment 0 through VulkanicAPI helper");
-        assertTrue(glStateSource.contains("framebufferColorAttachment1Texture2D(ctx, this.frameBufferTexture1, 0)"),
-            "GLState should restore framebuffer color attachment 1 through VulkanicAPI helper");
-
-        Path fogRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/FogRenderer.java");
-        String fogRendererSource = Files.readString(fogRendererFile);
-        assertFalse(fogRendererSource.contains("GLMC.glGenTextures("),
-            "FogRenderer should not generate textures through GLMC wrapper methods");
-        assertFalse(fogRendererSource.contains("GLMC.glDeleteTextures("),
-            "FogRenderer should not delete textures through GLMC wrapper methods");
-        assertTrue(fogRendererSource.contains("VulkanicAPI.createTexture2D("),
-            "FogRenderer should generate textures through VulkanicAPI helper");
-        assertTrue(fogRendererSource.contains("VulkanicAPI.deleteTexture("),
-            "FogRenderer should delete textures through VulkanicAPI helper");
-
-        Path ssaoRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/SSAORenderer.java");
-        String ssaoRendererSource = Files.readString(ssaoRendererFile);
-        assertFalse(ssaoRendererSource.contains("GLMC.glGenTextures("),
-            "SSAORenderer should not generate textures through GLMC wrapper methods");
-        assertFalse(ssaoRendererSource.contains("GLMC.glDeleteTextures("),
-            "SSAORenderer should not delete textures through GLMC wrapper methods");
-        assertTrue(ssaoRendererSource.contains("VulkanicAPI.createTexture2D("),
-            "SSAORenderer should generate textures through VulkanicAPI helper");
-        assertTrue(ssaoRendererSource.contains("VulkanicAPI.deleteTexture("),
-            "SSAORenderer should delete textures through VulkanicAPI helper");
-
-        Path testRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/TestRenderer.java");
-        String testRendererSource = Files.readString(testRendererFile);
-        assertFalse(testRendererSource.contains("VulkanicAPI.clearBuffers(ctx, VulkanicAPI.GL_DEPTH_BUFFER_BIT)"),
-            "TestRenderer should not clear depth via raw GL_DEPTH_BUFFER_BIT mask");
-        assertTrue(testRendererSource.contains("VulkanicAPI.clearDepthBuffer(ctx)"),
-            "TestRenderer should clear depth through VulkanicAPI clearDepthBuffer helper");
-
-        Path dhGlBufferFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/buffer/GLBuffer.java");
-        String dhGlBufferSource = Files.readString(dhGlBufferFile);
-        assertFalse(dhGlBufferSource.contains("GLMC.glGenBuffers("),
-            "DH GLBuffer should not generate buffers through GLMC wrapper methods");
-        assertFalse(dhGlBufferSource.contains("GLMC.glDeleteBuffers("),
-            "DH GLBuffer should not delete buffers through GLMC wrapper methods");
-        assertTrue(dhGlBufferSource.contains("VulkanicAPI.createBuffer("),
-            "DH GLBuffer should create buffers through VulkanicAPI helper");
-        assertTrue(dhGlBufferSource.contains("VulkanicAPI.deleteBuffer("),
-            "DH GLBuffer should delete buffers through VulkanicAPI helper");
-
-        Path renderableBoxGroupFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/generic/RenderableBoxGroup.java");
-        String renderableBoxGroupSource = Files.readString(renderableBoxGroupFile);
-        assertFalse(renderableBoxGroupSource.contains("GLMC.glGenBuffers("),
-            "RenderableBoxGroup should not generate instance buffers through GLMC wrapper methods");
-        assertFalse(renderableBoxGroupSource.contains("GLMC.glDeleteBuffers("),
-            "RenderableBoxGroup should not delete instance buffers through GLMC wrapper methods");
-        assertTrue(renderableBoxGroupSource.contains("VulkanicAPI.createBuffer("),
-            "RenderableBoxGroup should create instance buffers through VulkanicAPI helper");
-        assertTrue(renderableBoxGroupSource.contains("VulkanicAPI.deleteBuffer("),
-            "RenderableBoxGroup should delete instance buffers through VulkanicAPI helper");
-    }
-
-    @Test
     public void testRenderTargetBindingOwnedByBackendSeam() throws IOException {
         Path backendInterfaceFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
         String backendInterfaceSource = Files.readString(backendInterfaceFile);
@@ -1059,6 +825,9 @@ public class Phase3DrawPathTest {
             "VulkanBackend should implement render-target binding seam");
         assertTrue(vulkanBackendSource.contains("int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);"),
             "VulkanBackend render-target binding should keep attachment-pair routing inside backend code");
+        assertTrue(vulkanBackendSource.contains("descriptorPipelineCache")
+                && vulkanBackendSource.contains("matchesStableDescriptor("),
+            "VulkanBackend should cache descriptor-layout pipeline variants for partial-coverage Vulkan draws instead of forcing them onto the full-layout precompile");
     }
 
     @Test
@@ -1241,6 +1010,13 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should pass explicit command-buffer context into VulkanicAPI.beginRenderPass");
         assertTrue(source.contains("VulkanicAPI.submitCommandBuffer(renderPassCtx);"),
             "GlCommandEncoder should submit command-buffer scope when finishing Vulkanic render passes");
+        assertTrue(source.contains("return this.activeRenderPassContext != null ? this.activeRenderPassContext : VulkanicAPI.getCommandContext();"),
+            "GlCommandEncoder should prefer the active render-pass command context over the backend-global current context");
+        assertTrue(source.contains("ShadowRenderingState.areShadowsCurrentlyBeingRendered() && commandContext().isImmediate()"),
+            "GlCommandEncoder should restrict the Iris shadow temp-FBO shortcut to immediate contexts so Vulkan shadow draws keep a real active render pass");
+        assertTrue(source.contains("if (ctx.isImmediate()")
+                && source.contains("VulkanicAPI.bindFramebuffer(commandContext(), iris$tempFBO);"),
+            "GlCommandEncoder trySetup should only rebind the Iris shadow temp FBO on the immediate compatibility seam");
     }
 
     @Test
@@ -1255,8 +1031,8 @@ public class Phase3DrawPathTest {
         assertFalse(source.contains("createFenceSync(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0)"),
             "GLRenderDevice should not create completion fences via raw createFenceSync parameters");
 
-        assertTrue(source.contains("getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.TEXTURE_MAX_LEVEL)"),
-            "GLRenderDevice should use typed VulkanicIntegerQuery instead of raw texture query constants");
+        assertTrue(source.contains("getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_TEXTURE_LOD_BIAS)"),
+            "GLRenderDevice should use typed VulkanicIntegerQuery.MAX_TEXTURE_LOD_BIAS instead of raw texture query constants");
         assertFalse(source.contains("VulkanicAPI.bindBuffer(ctx, target.getTargetParameter(), buffer.handle())"),
             "GLRenderDevice should no longer bind buffers through raw GlBufferTarget integer targets where typed targets are available");
         assertTrue(source.contains("VulkanicAPI.bindBuffer(ctx, target.toVulkanicBufferTarget(), buffer.handle())"),
@@ -1280,6 +1056,108 @@ public class Phase3DrawPathTest {
             "Sodium GlProgram should not hard-wire immediate-context retrieval");
         assertTrue(source.contains("VulkanicAPI.getCommandContext()"),
             "Sodium GlProgram should fetch backend-neutral command context");
+    }
+
+    @Test
+    public void testSodiumVulkanChunkCutoutShaderRestrictsBackfaceDiscardToNonMippedCutouts() throws IOException {
+        Path shaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/sodium/shaders/core/vulkan_chunk.fsh");
+        String shaderSource = Files.readString(shaderFile);
+
+        assertTrue(shaderSource.contains("#ifdef USE_FRAGMENT_DISCARD"),
+            "The Vulkan Sodium chunk fragment shader should keep the cutout-only discard branch");
+        assertTrue(shaderSource.contains("if (!_material_use_mips(materialBits) && !gl_FrontFacing) {"),
+            "The Vulkan Sodium chunk cutout shader should only discard back-facing fragments for non-mipped alpha-tested terrain such as tall grass and leaf litter");
+        assertTrue(shaderSource.contains("if (color.a < _material_alpha_cutoff(materialBits)) {"),
+            "The Vulkan Sodium chunk cutout shader should keep alpha cutoff discard for all alpha-tested terrain");
+
+        Path pipelineFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java");
+        String pipelineSource = Files.readString(pipelineFile);
+
+        assertTrue(pipelineSource.contains("withShaderDefine(\"USE_FRAGMENT_DISCARD\")"),
+            "The Vulkan Sodium cutout pipeline should keep the cutout-only shader define that scopes alpha discard to alpha-tested terrain");
+    }
+
+    @Test
+    public void testVulkanChunkRendererRoutesThroughSharedActiveProgram() throws IOException {
+        Path rendererFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java");
+        String rendererSource = Files.readString(rendererFile);
+
+        assertTrue(rendererSource.contains("super.begin(terrainPass, parameters);"),
+            "The Vulkan chunk renderer should begin through the shared Sodium chunk program path before issuing terrain draws");
+        assertTrue(rendererSource.contains("SharedChunkProgramOverrides.pushActiveProgram(this.activeProgram);"),
+            "The Vulkan chunk renderer should expose the currently active Sodium chunk program to the compatibility pipeline compiler");
+        assertTrue(rendererSource.contains("shader.setProjectionMatrix(matrices.projection());"),
+            "The Vulkan chunk renderer should update the shared chunk shader projection matrix through the same interface used by OpenGL terrain");
+        assertTrue(rendererSource.contains("shader.setModelViewMatrix(matrices.modelView());"),
+            "The Vulkan chunk renderer should update the shared chunk shader model-view matrix through the same interface used by OpenGL terrain");
+        assertTrue(rendererSource.contains("renderPass.setPipeline(SodiumChunkRenderPipelines.forPass(terrainPass, renderPassShader));"),
+            "The Vulkan chunk renderer should choose its terrain pipeline from the active shared chunk shader contract");
+        assertTrue(rendererSource.contains("renderPassShader.bindRenderPassResources(renderPass, terrainPass);"),
+            "The Vulkan chunk renderer should mirror chunk-program sampler state into the render pass before drawing");
+        assertTrue(rendererSource.contains("setModelMatrixUniforms(shader, preparedDraw.region(), camera);"),
+            "The Vulkan chunk renderer should keep per-region translation updates on the shared chunk shader interface");
+        assertTrue(rendererSource.contains("super.end(terrainPass);"),
+            "The Vulkan chunk renderer should close the shared chunk program path after terrain submission");
+    }
+
+    @Test
+    public void testSharedChunkProgramOverridePrecedesIrisOverrideMap() throws IOException {
+        Path overrideFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SharedChunkProgramOverrides.java");
+        String overrideSource = Files.readString(overrideFile);
+
+        assertTrue(overrideSource.contains("wrapper.setupUniforms(pipeline.getUniforms(), pipeline.getSamplers());"),
+            "Shared chunk program overrides should reflect the current render-pipeline sampler and uniform contract onto the wrapped Sodium program handle");
+        assertTrue(overrideSource.contains("public static void pushActiveProgram"),
+            "Shared chunk program overrides should explicitly track the currently active Sodium chunk program");
+
+        Path deviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
+        String deviceSource = Files.readString(deviceFile);
+        int sharedOverrideIndex = deviceSource.indexOf("SharedChunkProgramOverrides.createOverride(renderPipeline)");
+        int irisOverrideIndex = deviceSource.indexOf("// Iris: Check for shader overrides first");
+
+        assertTrue(sharedOverrideIndex >= 0,
+            "GlDevice should consult the shared Sodium chunk program override seam when compiling tracked terrain pipelines");
+        assertTrue(irisOverrideIndex > sharedOverrideIndex,
+            "GlDevice must try the shared Sodium chunk program override before falling back to Iris's generic shader override map");
+    }
+
+    @Test
+    public void testSharedChunkPipelinesMirrorExtendedVertexAbiWithoutStaticRegistration() throws IOException {
+        Path pipelineFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java");
+        String pipelineSource = Files.readString(pipelineFile);
+
+        assertTrue(pipelineSource.contains("createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat())"),
+            "Shared Sodium chunk pipelines should derive their vertex ABI from the active WorldRenderingSettings format, not just the base stride");
+        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.register(solid);"),
+            "Shared Sodium chunk pipelines should register tracked terrain pipelines for active-program overrides");
+        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.unregisterAll(pipelines.asList());"),
+            "Shared Sodium chunk pipeline cache should clean up tracked override entries when shader reloads invalidate cached pipelines");
+        assertTrue(pipelineSource.contains("case 10 -> \"iris_Normal\";"),
+            "Shared Sodium chunk pipelines should carry Iris terrain attribute locations into the Vulkan terrain ABI");
+        assertFalse(pipelineSource.contains("RenderPipelines.register("),
+            "Shared Sodium chunk pipelines should no longer leak dynamic terrain pipelines into the global static RenderPipelines registry");
+    }
+
+    @Test
+    public void testGenericVertexLocationsHonorDeclaredAttributeIndices() throws IOException {
+        Path vertexFormatFile = SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java");
+        String vertexFormatSource = Files.readString(vertexFormatFile);
+        assertTrue(vertexFormatSource.contains("public int getShaderAttributeLocation(int attributeOrdinal)"),
+            "VertexFormat should expose the shader attribute location derived from its declared element metadata");
+        assertTrue(vertexFormatSource.contains("element.usage() == VertexFormatElement.Usage.GENERIC ? element.index() : attributeOrdinal"),
+            "VertexFormat should preserve explicit generic attribute indices while keeping vanilla attribute ordering unchanged");
+
+        Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
+        String glProgramSource = Files.readString(glProgramFile);
+        assertTrue(glProgramSource.contains("vertexFormat.getShaderAttributeLocation(j)"),
+            "GlProgram linking should bind declared attribute names to the shader locations supplied by the vertex format");
+
+        Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String backendSource = Files.readString(backendFile);
+        assertTrue(backendSource.contains("renderPipeline.getVertexFormat().getShaderAttributeLocation(location)"),
+            "Vulkan shader-source rebinding should inject explicit locations from the declared vertex format instead of forcing sequential chunk attributes");
+        assertTrue(backendSource.contains(".location(vertexFormat.getShaderAttributeLocation(i))"),
+            "Vulkan pipeline vertex input descriptions should preserve explicit generic attribute locations for extended terrain formats");
     }
 
     @Test
@@ -1576,7 +1454,8 @@ public class Phase3DrawPathTest {
             "ClearPass should not track generic raw clear flag masks for color-only clear passes");
         assertFalse(clearPassSource.contains("clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), clearFlags)"),
             "ClearPass should not clear via generic raw clear mask plumbing");
-        assertTrue(clearPassSource.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(clearPassSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && clearPassSource.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx)"),
             "ClearPass should clear color through explicit VulkanicAPI clearColorBufferWithMacosWorkaround helper");
 
         Path samplerLimitsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/sampler/SamplerLimits.java");
@@ -1616,6 +1495,28 @@ public class Phase3DrawPathTest {
             "ProgramCreator should not bind attributes through GlStateManager wrapper");
         assertTrue(programCreatorSource.contains("VulkanicAPI.setAttributeLocation(ctx, program"),
             "ProgramCreator should bind attributes through VulkanicAPI.setAttributeLocation");
+
+        Path depthTextureFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/DepthTexture.java");
+        String depthTextureSource = Files.readString(depthTextureFile);
+        assertTrue(depthTextureSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && depthTextureSource.contains("VulkanicAPI.bindTexture2D(ctx, 0);"),
+            "DepthTexture should reuse one local command context when restoring texture binding state");
+
+        Path irisRenderTargetFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTarget.java");
+        String irisRenderTargetSource = Files.readString(irisRenderTargetFile);
+        assertTrue(irisRenderTargetSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && irisRenderTargetSource.contains("VulkanicAPI.bindTexture2D(ctx, 0);"),
+            "Iris RenderTarget should reuse one local command context when cleaning up texture binding state");
+
+        Path centerDepthFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/CenterDepthSampler.java");
+        String centerDepthSource = Files.readString(centerDepthFile);
+        assertTrue(centerDepthSource.contains("VulkanicAPI.setDynamicViewport(ctx, 0, 0, 1, 1);"),
+            "CenterDepthSampler should resolve a local command context before configuring its sampling viewport");
+
+        Path shadowCompositeFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java");
+        String shadowCompositeSource = Files.readString(shadowCompositeFile);
+        assertTrue(shadowCompositeSource.contains("VulkanicAPI.setDynamicViewport(ctx, beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);"),
+            "ShadowCompositeRenderer should resolve a local command context before configuring per-pass viewport state");
 
         Path intCachedUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/custom/cached/IntCachedUniform.java");
         String intCachedUniformSource = Files.readString(intCachedUniformFile);
@@ -1881,6 +1782,13 @@ public class Phase3DrawPathTest {
         String vulkanicApiSource = Files.readString(vulkanicApiFile);
         assertTrue(vulkanicApiSource.contains("getUniformLocationWithLegacySamplerFallback"),
             "VulkanicAPI should expose getUniformLocationWithLegacySamplerFallback for legacy Sampler0/1/2 compatibility");
+
+        Path glProgramSamplerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
+        String glProgramSamplerSource = Files.readString(glProgramSamplerFile);
+        assertTrue(glProgramSamplerSource.contains("private static int legacySamplerUnit(String samplerName)"),
+            "GlProgram should define legacy sampler unit routing for fixed-function sampler names");
+        assertTrue(glProgramSamplerSource.contains("case \"Sampler2\" -> 2;"),
+            "GlProgram should preserve Sampler2 as legacy lightmap unit 2 instead of renumbering it sequentially");
     }
 
     @Test
@@ -3224,6 +3132,10 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should not bridge Sampler0 through RenderSystem.setShaderTexture in Iris setup path");
         assertTrue(encoderSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, sam)"),
             "GlCommandEncoder should notify Iris texture tracking directly for Sampler0 setup");
+		assertTrue(encoderSource.contains("IrisRenderSystem.setTextureBinding(samplerIndex, textureHandle);"),
+			"GlCommandEncoder should mirror pipeline sampler binds into the Iris texture-binding cache");
+		assertTrue(encoderSource.contains("IrisRenderSystem.setTextureBinding(var46, textureHandle);"),
+			"GlCommandEncoder should mirror draw-time sampler binds into the Iris texture-binding cache");
 
         Path commonUniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/CommonUniforms.java");
         String commonUniformsSource = Files.readString(commonUniformsFile);
@@ -3293,9 +3205,10 @@ public class Phase3DrawPathTest {
             "RenderStateShard texture setup should bind through VulkanicAPI texture-view seam instead of Iris texture-id helper calls");
         assertFalse(renderStateShardSource.contains("VulkanicCoreAPI.textureId(textureView)"),
             "RenderStateShard texture setup should not extract raw texture ids from texture views");
-        assertTrue(renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), i, textureView)"),
+        assertTrue(renderStateShardSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(ctx, i, textureView)"),
             "RenderStateShard multi-texture setup should bind through VulkanicAPI texture-view seam");
-        assertTrue(renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 0, textureView)"),
+        assertTrue(renderStateShardSource.contains("VulkanicAPI.bindTextureUnit(ctx, 0, textureView)"),
             "RenderStateShard single-texture setup should bind through VulkanicAPI texture-view seam");
         assertTrue(renderStateShardSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(i, textureView)"),
             "RenderStateShard multi-texture setup should notify TextureTracker for each texture unit binding");
@@ -3335,7 +3248,8 @@ public class Phase3DrawPathTest {
             "LightTexture should disable light layer via IrisRenderSystem default-2D helper");
         assertFalse(lightTextureSource.contains("VulkanicCoreAPI.textureId(this.texture)"),
             "LightTexture should not extract raw texture ids for light-layer binding");
-        assertTrue(lightTextureSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 2, this.textureView)"),
+        assertTrue(lightTextureSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && lightTextureSource.contains("VulkanicAPI.bindTextureUnit(ctx, 2, this.textureView)"),
             "LightTexture should enable light layer through VulkanicAPI texture-view seam");
 
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
@@ -3594,7 +3508,8 @@ public class Phase3DrawPathTest {
             "OverlayTexture should not route overlay teardown through RenderSystem.teardownOverlayColor");
         assertFalse(overlayTextureSource.contains("VulkanicCoreAPI.textureId(textureView)"),
             "OverlayTexture should not extract raw texture ids for overlay binding");
-        assertTrue(overlayTextureSource.contains("VulkanicAPI.bindTextureUnit(VulkanicAPI.getCommandContext(), 1, textureView)"),
+        assertTrue(overlayTextureSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && overlayTextureSource.contains("VulkanicAPI.bindTextureUnit(ctx, 1, textureView)"),
             "OverlayTexture should bind overlay texture through VulkanicAPI texture-view seam");
         assertTrue(overlayTextureSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(1, textureView)"),
             "OverlayTexture should publish Sampler1 texture view updates to TextureTracker");
@@ -3713,7 +3628,9 @@ public class Phase3DrawPathTest {
             "ClearPass should not call removed GlStateManager._clear wrapper");
         assertFalse(clearPassSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
             "ClearPass should not clear through generic raw-mask macOS helper");
-        assertTrue(clearPassSource.contains("VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())"),
+        assertTrue(containsAny(clearPassSource,
+                "VulkanicAPI.clearColorBufferWithMacosWorkaround(VulkanicAPI.getCommandContext())",
+                "VulkanicAPI.clearColorBufferWithMacosWorkaround(ctx)"),
             "ClearPass should clear via VulkanicAPI.clearColorBufferWithMacosWorkaround");
     }
 
@@ -3736,12 +3653,30 @@ public class Phase3DrawPathTest {
         String renderTargetsSource = Files.readString(renderTargetsFile);
         assertFalse(renderTargetsSource.contains("GlStateManager._bindTexture("),
             "RenderTargets should not call removed GlStateManager._bindTexture wrapper");
-        assertTrue(renderTargetsSource.contains("VulkanicAPI.bindTexture2D("),
-            "RenderTargets should bind textures through VulkanicAPI.bindTexture2D");
         assertFalse(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D"),
             "RenderTargets should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
-        assertTrue(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(0"),
-            "RenderTargets should use IrisRenderSystem default-2D copyTexImage2D helper");
+        assertFalse(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(0"),
+            "RenderTargets depth snapshots should avoid legacy copyTexImage2D now that depth targets are preallocated");
+        assertTrue(renderTargetsSource.contains("DepthCopyStrategy.fastestDepthSnapshot(currentDepthFormat.isCombinedStencil())"),
+            "RenderTargets should use the Vulkan-safe depth snapshot strategy selector");
+        assertTrue(renderTargetsSource.contains("copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noHandDestFb, VulkanicCoreAPI.textureId(noHand),"),
+            "RenderTargets pre-hand depth path should route through the shared depth copy strategy");
+        assertTrue(renderTargetsSource.contains("copyStrategy.copy(depthSourceFb, VulkanicCoreAPI.textureId(getDepthTexture()), noTranslucentsDestFb, VulkanicCoreAPI.textureId(noTranslucents),"),
+            "RenderTargets pre-translucent depth path should route through the shared depth copy strategy");
+
+        Path depthCopyStrategyFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/DepthCopyStrategy.java");
+        String depthCopyStrategySource = Files.readString(depthCopyStrategyFile);
+        assertTrue(depthCopyStrategySource.contains("fastestDepthSnapshot(boolean combinedStencilRequired)"),
+            "DepthCopyStrategy should expose a dedicated depth snapshot selector");
+        assertTrue(depthCopyStrategySource.contains("VulkanicAPI.isVulkanBackendSelected()"),
+            "DepthCopyStrategy depth snapshot selector should special-case Vulkan");
+        assertTrue(depthCopyStrategySource.contains("class Gl30BlitFbDepth implements DepthCopyStrategy"),
+            "DepthCopyStrategy should provide a depth-only framebuffer blit strategy");
+
+        Path shadowRenderTargetsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderTargets.java");
+        String shadowRenderTargetsSource = Files.readString(shadowRenderTargetsFile);
+        assertTrue(shadowRenderTargetsSource.contains("DepthCopyStrategy.fastestDepthSnapshot(false).copy("),
+            "ShadowRenderTargets should reuse the Vulkan-safe depth snapshot strategy after the initial blit");
 
         Path dhCompatInternalFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/DHCompatInternal.java");
         String dhCompatInternalSource = Files.readString(dhCompatInternalFile);
@@ -3749,6 +3684,9 @@ public class Phase3DrawPathTest {
             "DHCompatInternal should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
         assertTrue(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D(0"),
             "DHCompatInternal should use IrisRenderSystem default-2D copyTexImage2D helper");
+        assertTrue(dhCompatInternalSource.contains("var ctx = VulkanicAPI.getCommandContext();")
+                && dhCompatInternalSource.contains("VulkanicAPI.bindTexture2D(ctx, depthTexNoTranslucent.getTextureId());"),
+            "DHCompatInternal should reuse one local command context when preparing the translucent depth copy");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = readSourceIfExists(dhWrapperFile);
@@ -3759,6 +3697,41 @@ public class Phase3DrawPathTest {
         String dhTextureStateSource = Files.readString(dhTextureStateFile);
         assertTrue(dhTextureStateSource.contains("VulkanicAPI.bindTexture2D("),
             "DhTextureState should bind textures through VulkanicAPI.bindTexture2D");
+    }
+
+    @Test
+    public void testIrisComputePipelinesFailOpenWhenComputeUnsupported() throws IOException {
+        Path programBuilderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramBuilder.java");
+        String programBuilderSource = Files.readString(programBuilderFile);
+
+        assertTrue(programBuilderSource.contains("beginComputeIfSupported("),
+            "ProgramBuilder should expose a compute fail-open helper for unsupported runtimes");
+        assertTrue(programBuilderSource.contains("return null;"),
+            "ProgramBuilder compute fail-open helper should return null when compute is unsupported");
+        assertTrue(programBuilderSource.contains("Skipping compute shader program"),
+            "ProgramBuilder compute fail-open helper should log when compute programs are skipped");
+
+        List<String> pipelineFiles = List.of(
+            "net/irisshaders/iris/shadows/ShadowCompositeRenderer.java",
+            "net/irisshaders/iris/pipeline/CompositeRenderer.java",
+            "net/irisshaders/iris/pipeline/FinalPassRenderer.java",
+            "net/irisshaders/iris/pipeline/IrisRenderingPipeline.java"
+        );
+
+        for (String relative : pipelineFiles) {
+            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            assertTrue(source.contains("ProgramBuilder.beginComputeIfSupported("),
+                "Iris compute pipeline should use compute fail-open helper: " + relative);
+        }
+
+        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java")).contains("ProgramBuilder.beginCompute("),
+            "ShadowCompositeRenderer should not use fatal compute builder directly");
+        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java")).contains("ProgramBuilder.beginCompute("),
+            "CompositeRenderer should not use fatal compute builder directly");
+        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java")).contains("ProgramBuilder.beginCompute("),
+            "FinalPassRenderer should not use fatal compute builder directly");
+        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java")).contains("ProgramBuilder.beginCompute("),
+            "IrisRenderingPipeline should not use fatal compute builder directly");
     }
 
     @Test
@@ -4847,6 +4820,18 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testCubemapRenderPassStaysColorOnly() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"));
+
+        assertTrue(source.contains("VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture())"),
+            "CubeMap should recover the main render target framebuffer contract before rendering the panorama background");
+        assertTrue(source.contains("VulkanicAPI.createRenderPass(() -> \"Cubemap\", framebuffer, renderTarget.getDepthTexture() != null)"),
+            "CubeMap should prefer the framebuffer-owned render-pass path for panorama background rendering");
+        assertTrue(source.contains(": VulkanicAPI.createRenderPass(() -> \"Cubemap\", gpuTextureView, OptionalInt.empty())"),
+            "CubeMap should retain a texture-view fallback when framebuffer recovery is unavailable");
+    }
+
+    @Test
     public void testScissorStateOwnershipMovedToVulkanicAPI() throws IOException {
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
         String renderSystemSource = Files.readString(renderSystemFile);
@@ -4892,74 +4877,17 @@ public class Phase3DrawPathTest {
     }
 
     @Test
-    public void testOutputOverrideOwnershipMovedToVulkanicAPI() throws IOException {
-        Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
-        String renderSystemSource = Files.readString(renderSystemFile);
-
-        assertFalse(renderSystemSource.contains("public static GpuTextureView outputColorTextureOverride"),
-            "RenderSystem should not own outputColorTextureOverride after migration to VulkanicAPI");
-        assertFalse(renderSystemSource.contains("public static GpuTextureView outputDepthTextureOverride"),
-            "RenderSystem should not own outputDepthTextureOverride after migration to VulkanicAPI");
-
-        Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
-
-        assertTrue(vulkanicApiSource.contains("private static GpuTextureView outputColorTextureOverride"),
-            "VulkanicAPI should own outputColorTextureOverride after migration");
-        assertTrue(vulkanicApiSource.contains("private static GpuTextureView outputDepthTextureOverride"),
-            "VulkanicAPI should own outputDepthTextureOverride after migration");
-        assertTrue(vulkanicApiSource.contains("public static void setOutputColorTextureOverride("),
-            "VulkanicAPI should expose output color override setter after migration");
-        assertTrue(vulkanicApiSource.contains("public static GpuTextureView getOutputColorTextureOverride("),
-            "VulkanicAPI should expose output color override getter after migration");
-        assertTrue(vulkanicApiSource.contains("public static void setOutputDepthTextureOverride("),
-            "VulkanicAPI should expose output depth override setter after migration");
-        assertTrue(vulkanicApiSource.contains("public static GpuTextureView getOutputDepthTextureOverride("),
-            "VulkanicAPI should expose output depth override getter after migration");
-
-        Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
-        String renderTypeSource = Files.readString(renderTypeFile);
-        assertFalse(renderTypeSource.contains("RenderSystem.outputColorTextureOverride"),
-            "RenderType should not read outputColorTextureOverride through RenderSystem after migration");
-        assertFalse(renderTypeSource.contains("RenderSystem.outputDepthTextureOverride"),
-            "RenderType should not read outputDepthTextureOverride through RenderSystem after migration");
-        assertTrue(renderTypeSource.contains("VulkanicAPI.getOutputColorTextureOverride()"),
-            "RenderType should read outputColorTextureOverride through VulkanicAPI after migration");
-        assertTrue(renderTypeSource.contains("VulkanicAPI.getOutputDepthTextureOverride()"),
-            "RenderType should read outputDepthTextureOverride through VulkanicAPI after migration");
-
+    public void testStandard3dItemDebugPipDumpIsOptIn() throws IOException {
         Path guiRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java");
         String guiRendererSource = Files.readString(guiRendererFile);
-        assertFalse(guiRendererSource.contains("RenderSystem.outputColorTextureOverride"),
-            "GuiRenderer should not write outputColorTextureOverride through RenderSystem after migration");
-        assertFalse(guiRendererSource.contains("RenderSystem.outputDepthTextureOverride"),
-            "GuiRenderer should not write outputDepthTextureOverride through RenderSystem after migration");
-        assertTrue(guiRendererSource.contains("VulkanicAPI.setOutputColorTextureOverride("),
-            "GuiRenderer should write outputColorTextureOverride through VulkanicAPI after migration");
-        assertTrue(guiRendererSource.contains("VulkanicAPI.setOutputDepthTextureOverride("),
-            "GuiRenderer should write outputDepthTextureOverride through VulkanicAPI after migration");
+        Path standard3dItemRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/Standard3dItemRenderer.java");
+        String standard3dItemRendererSource = Files.readString(standard3dItemRendererFile);
 
-        Path levelRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java");
-        String levelRendererSource = Files.readString(levelRendererFile);
-        assertFalse(levelRendererSource.contains("RenderSystem.outputColorTextureOverride"),
-            "LevelRenderer should not write outputColorTextureOverride through RenderSystem after migration");
-        assertFalse(levelRendererSource.contains("RenderSystem.outputDepthTextureOverride"),
-            "LevelRenderer should not write outputDepthTextureOverride through RenderSystem after migration");
-        assertTrue(levelRendererSource.contains("VulkanicAPI.setOutputColorTextureOverride("),
-            "LevelRenderer should write outputColorTextureOverride through VulkanicAPI after migration");
-        assertTrue(levelRendererSource.contains("VulkanicAPI.setOutputDepthTextureOverride("),
-            "LevelRenderer should write outputDepthTextureOverride through VulkanicAPI after migration");
-
-        Path pictureInPictureRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java");
-        String pictureInPictureRendererSource = Files.readString(pictureInPictureRendererFile);
-        assertFalse(pictureInPictureRendererSource.contains("RenderSystem.outputColorTextureOverride"),
-            "PictureInPictureRenderer should not write outputColorTextureOverride through RenderSystem after migration");
-        assertFalse(pictureInPictureRendererSource.contains("RenderSystem.outputDepthTextureOverride"),
-            "PictureInPictureRenderer should not write outputDepthTextureOverride through RenderSystem after migration");
-        assertTrue(pictureInPictureRendererSource.contains("VulkanicAPI.setOutputColorTextureOverride("),
-            "PictureInPictureRenderer should write outputColorTextureOverride through VulkanicAPI after migration");
-        assertTrue(pictureInPictureRendererSource.contains("VulkanicAPI.setOutputDepthTextureOverride("),
-            "PictureInPictureRenderer should write outputDepthTextureOverride through VulkanicAPI after migration");
+        assertTrue(standard3dItemRendererSource.contains("Boolean.getBoolean(\"mattmc.gui.debugStandard3dItemPipDump\")"),
+            "Standard3dItemRenderer should make its forced grass-block PIP dump opt-in behind an explicit debug flag");
+        assertTrue(guiRendererSource.contains("if (Standard3dItemRenderer.isDebugDumpEnabled())")
+                && guiRendererSource.contains("prepareDebugStandardBlockItemDump(this.renderState, i);"),
+            "GuiRenderer should only invoke the standard 3D item PIP debug dump when that explicit debug flag is enabled");
     }
 
     @Test
@@ -5122,5 +5050,59 @@ public class Phase3DrawPathTest {
             "BaseVertex indexed draw must still be present in drawFromBuffers");
         assertTrue(source.contains("VulkanicAPI.drawArraysInstanced("),
             "Instanced non-indexed draw must still be present in drawFromBuffers");
+    }
+
+    @Test
+    public void testParticleDrawPathRebindsPipelineScopedStateAfterSetPipeline() throws IOException {
+        Path particleFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java");
+        String particleSource = Files.readString(particleFile);
+
+        int pipelineIndex = particleSource.indexOf("renderPass.setPipeline(((SingleQuadParticle.Layer)entry.getKey()).pipeline());");
+        int defaultUniformsIndex = particleSource.indexOf("VulkanicAPI.bindDefaultUniforms(renderPass);", pipelineIndex);
+        int dynamicTransformsIndex = particleSource.indexOf("renderPass.setUniform(\"DynamicTransforms\", preparedBuffers.dynamicTransforms);", pipelineIndex);
+        int lightmapIndex = particleSource.indexOf("renderPass.bindSampler(\"Sampler2\", lightTextureView);", pipelineIndex);
+        int atlasIndex = particleSource.indexOf("renderPass.bindSampler(\"Sampler0\", particleTextureView);", pipelineIndex);
+        int drawIndex = particleSource.indexOf("renderPass.drawIndexed(", pipelineIndex);
+
+        assertTrue(pipelineIndex >= 0, "Particle draw path must set a pipeline before drawing");
+        assertTrue(defaultUniformsIndex > pipelineIndex, "Particle draw path must rebind default uniforms after setPipeline");
+        assertTrue(dynamicTransformsIndex > defaultUniformsIndex, "Particle draw path must rebind DynamicTransforms after default uniforms");
+        assertTrue(lightmapIndex > dynamicTransformsIndex, "Particle draw path must rebind the lightmap after setPipeline");
+        assertTrue(atlasIndex > lightmapIndex, "Particle draw path must bind the particle atlas after the lightmap");
+        assertTrue(drawIndex > atlasIndex, "Particle draw path must draw only after rebinding pipeline-scoped resources");
+    }
+
+    @Test
+    public void testParticleFeatureRendererExplicitlyScopesLightLayerAroundParticlePasses() throws IOException {
+        Path particleFeatureRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java");
+        String source = Files.readString(particleFeatureRendererFile);
+
+        int turnOnIndex = source.indexOf("minecraft.gameRenderer.lightTexture().turnOnLightLayer();");
+        int mainLoopIndex = source.indexOf("for (SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer : submitNodeCollection.getParticleGroupRenderers())");
+        int turnOffIndex = source.indexOf("minecraft.gameRenderer.lightTexture().turnOffLightLayer();");
+
+        assertTrue(turnOnIndex >= 0,
+            "ParticleFeatureRenderer should explicitly enable the light layer before particle pass submission");
+        assertTrue(turnOffIndex >= 0,
+            "ParticleFeatureRenderer should explicitly disable the light layer after particle pass submission");
+        assertTrue(mainLoopIndex > turnOnIndex,
+            "ParticleFeatureRenderer should enable the light layer before iterating particle group renderers");
+        assertTrue(turnOffIndex > mainLoopIndex,
+            "ParticleFeatureRenderer should disable the light layer after particle group rendering completes");
+    }
+
+    @Test
+    public void testIrisFallbackTextureRestoreSkipsUnknownBindingSentinels() throws IOException {
+        Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
+        String source = Files.readString(irisRenderSystemFile);
+
+        assertTrue(source.contains("private static void restoreKnownTextureBinding(int textureId)"),
+            "IrisRenderSystem should centralize legacy texture restore guards for fallback paths");
+        assertTrue(source.contains("if (textureId >= 0) {"),
+            "IrisRenderSystem should treat negative cached texture bindings as unknown sentinels instead of rebinding them");
+        assertTrue(source.contains("restoreKnownTextureBinding(previous);"),
+            "Iris fallback DSA paths should restore prior texture bindings only through the guarded helper");
+        assertFalse(source.contains("VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previous);"),
+            "Iris fallback DSA paths should not blindly rebind cached previous texture ids");
     }
 }

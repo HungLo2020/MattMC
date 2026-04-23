@@ -38,7 +38,6 @@ import java.lang.invoke.MethodType;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
@@ -49,6 +48,7 @@ import java.util.function.BiFunction;
  */
 public class VulkanicAPI {
     private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
+    private static final String GENERATED_STANDALONE_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
@@ -367,6 +367,7 @@ public class VulkanicAPI {
     public static final int GL_TEXTURE_MIN_LOD = 0x813A;
     public static final int GL_TEXTURE_MAX_LOD = 0x813B;
     public static final int GL_TEXTURE_LOD_BIAS = 0x8501;
+    public static final int GL_MAX_TEXTURE_LOD_BIAS = 0x84FD;
     public static final int GL_LINEAR = 0x2601;
     public static final int GL_NEAREST = 0x2600;
     public static final int GL_NEAREST_MIPMAP_NEAREST = 0x2700;
@@ -745,6 +746,39 @@ public class VulkanicAPI {
         return backend;
     }
 
+    @Nullable
+    private static VulkanBackend directVulkanBackendForImplementedMethods() {
+        if (backend == null) {
+            initialize();
+        }
+        return rawVulkanBackend;
+    }
+
+    private static void dispatchImplementedVoid(
+        java.util.function.Consumer<VulkanBackend> directCall,
+        java.util.function.Consumer<GraphicsBackend> fallbackCall
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directCall.accept(directVulkanBackend);
+            return;
+        }
+
+        fallbackCall.accept(getBackend());
+    }
+
+    private static <T> T dispatchImplementedValue(
+        java.util.function.Function<VulkanBackend, T> directCall,
+        java.util.function.Function<GraphicsBackend, T> fallbackCall
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directCall.apply(directVulkanBackend);
+        }
+
+        return fallbackCall.apply(getBackend());
+    }
+
     /**
      * Gets the currently active backend identity.
      */
@@ -970,7 +1004,23 @@ public class VulkanicAPI {
     }
 
     private static GraphicsBackend createFailFastVulkanProxy(VulkanBackend vulkanBackend) {
-        java.util.Map<Method, java.util.Optional<Method>> methodCache = new ConcurrentHashMap<>();
+        java.util.Map<Method, Method> implementedMethods = new java.util.HashMap<>();
+        java.util.Set<Method> missingMethods = new java.util.HashSet<>();
+
+        for (Method interfaceMethod : GraphicsBackend.class.getMethods()) {
+            if (interfaceMethod.getDeclaringClass() == Object.class) {
+                continue;
+            }
+
+            try {
+                implementedMethods.put(
+                    interfaceMethod,
+                    VulkanBackend.class.getMethod(interfaceMethod.getName(), interfaceMethod.getParameterTypes())
+                );
+            } catch (NoSuchMethodException ignored) {
+                missingMethods.add(interfaceMethod);
+            }
+        }
 
         return (GraphicsBackend) Proxy.newProxyInstance(
             GraphicsBackend.class.getClassLoader(),
@@ -980,15 +1030,8 @@ public class VulkanicAPI {
                     return method.invoke(vulkanBackend, args);
                 }
 
-                java.util.Optional<Method> backendMethod = methodCache.computeIfAbsent(method, key -> {
-                    try {
-                        return java.util.Optional.of(VulkanBackend.class.getMethod(key.getName(), key.getParameterTypes()));
-                    } catch (NoSuchMethodException ignored) {
-                        return java.util.Optional.empty();
-                    }
-                });
-
-                if (backendMethod.isEmpty()) {
+                Method backendMethod = implementedMethods.get(method);
+                if (backendMethod == null && missingMethods.contains(method)) {
                     if (method.isDefault()) {
                         return invokeDefaultInterfaceMethod(proxy, method, args);
                     }
@@ -998,7 +1041,7 @@ public class VulkanicAPI {
                 }
 
                 try {
-                    return backendMethod.get().invoke(vulkanBackend, args);
+                    return backendMethod.invoke(vulkanBackend, args);
                 } catch (InvocationTargetException exception) {
                     throw exception.getTargetException();
                 }
@@ -1055,7 +1098,10 @@ public class VulkanicAPI {
         if (stack != null && !stack.isEmpty()) {
             return stack.peek();
         }
-        return getBackend().getCurrentCommandContext();
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.getCurrentCommandContext()
+            : getBackend().getCurrentCommandContext();
     }
 
     /**
@@ -1146,6 +1192,11 @@ public class VulkanicAPI {
      * @param height The height of the viewport in pixels
      */
     public static void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setDynamicViewport(ctx, x, y, width, height);
+            return;
+        }
         getBackend().setDynamicViewport(ctx, x, y, width, height);
     }
     
@@ -1282,6 +1333,11 @@ public class VulkanicAPI {
      * @param programId The shader program ID
      */
     public static void bindShaderProgram(CommandContext ctx, int programId) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.bindShaderProgram(ctx, programId);
+            return;
+        }
         getBackend().bindShaderProgram(ctx, programId);
     }
     
@@ -1301,6 +1357,11 @@ public class VulkanicAPI {
     }
 
     public static void setCapabilityEnabled(CommandContext ctx, VulkanicCapability capability, boolean enabled) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setCapabilityEnabled(ctx, capability, enabled);
+            return;
+        }
         getBackend().setCapabilityEnabled(ctx, capability, enabled);
     }
 
@@ -1332,18 +1393,27 @@ public class VulkanicAPI {
      * @param textureId The texture ID to bind
      */
     public static void bindTexture2D(CommandContext ctx, int textureId) {
-        getBackend().bindTexture2D(ctx, textureId);
+        dispatchImplementedVoid(
+            direct -> direct.bindTexture2D(ctx, textureId),
+            activeBackend -> activeBackend.bindTexture2D(ctx, textureId)
+        );
     }
 
     public static void bindTexture(CommandContext ctx, VulkanicTextureTarget target, int textureId) {
-        getBackend().bindTexture(ctx, target, textureId);
+        dispatchImplementedVoid(
+            direct -> direct.bindTexture(ctx, target, textureId),
+            activeBackend -> activeBackend.bindTexture(ctx, target, textureId)
+        );
     }
     
     public static void bindTexture(CommandContext ctx, int target, int textureId) {
         VulkanicTextureTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bindTexture(ctx, typedTarget, textureId),
-                () -> getBackend().bindTexture(ctx, target, textureId)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.bindTexture(ctx, target, textureId),
+                    activeBackend -> activeBackend.bindTexture(ctx, target, textureId)
+                )
             );
     }
 
@@ -1366,7 +1436,10 @@ public class VulkanicAPI {
     }
     
     public static void bindSampler(CommandContext ctx, int unit, int sampler) {
-        getBackend().bindSampler(ctx, unit, sampler);
+        dispatchImplementedVoid(
+            direct -> direct.bindSampler(ctx, unit, sampler),
+            activeBackend -> activeBackend.bindSampler(ctx, unit, sampler)
+        );
     }
     
     /**
@@ -1441,7 +1514,10 @@ public class VulkanicAPI {
     public static void bindFramebuffer(CommandContext ctx, int target, int fbo) {
         if (target == GL_READ_FRAMEBUFFER) {
             if (readFramebufferBinding != fbo) {
-                getBackend().bindFramebuffer(ctx, target, fbo);
+                dispatchImplementedVoid(
+                    direct -> direct.bindFramebuffer(ctx, target, fbo),
+                    activeBackend -> activeBackend.bindFramebuffer(ctx, target, fbo)
+                );
                 readFramebufferBinding = fbo;
             }
             return;
@@ -1449,7 +1525,10 @@ public class VulkanicAPI {
 
         if (target == GL_DRAW_FRAMEBUFFER) {
             if (drawFramebufferBinding != fbo) {
-                getBackend().bindFramebuffer(ctx, target, fbo);
+                dispatchImplementedVoid(
+                    direct -> direct.bindFramebuffer(ctx, target, fbo),
+                    activeBackend -> activeBackend.bindFramebuffer(ctx, target, fbo)
+                );
                 drawFramebufferBinding = fbo;
             }
             return;
@@ -1457,14 +1536,20 @@ public class VulkanicAPI {
 
         if (target == GL_FRAMEBUFFER) {
             if (readFramebufferBinding != fbo || drawFramebufferBinding != fbo) {
-                getBackend().bindFramebuffer(ctx, target, fbo);
+                dispatchImplementedVoid(
+                    direct -> direct.bindFramebuffer(ctx, target, fbo),
+                    activeBackend -> activeBackend.bindFramebuffer(ctx, target, fbo)
+                );
                 readFramebufferBinding = fbo;
                 drawFramebufferBinding = fbo;
             }
             return;
         }
 
-        getBackend().bindFramebuffer(ctx, target, fbo);
+        dispatchImplementedVoid(
+            direct -> direct.bindFramebuffer(ctx, target, fbo),
+            activeBackend -> activeBackend.bindFramebuffer(ctx, target, fbo)
+        );
     }
 
     /**
@@ -1493,7 +1578,10 @@ public class VulkanicAPI {
         VulkanicTexture depthTarget = depthTexture instanceof VulkanicTexture texture ? texture : null;
         getBackend().bindRenderTarget(ctx, colorTarget, depthTarget);
 
-        int framebuffer = getBackend().resolveFramebufferForTextures(ctx, colorTarget, depthTarget);
+        int framebuffer = dispatchImplementedValue(
+            direct -> direct.resolveFramebufferForTextures(ctx, colorTarget, depthTarget),
+            activeBackend -> activeBackend.resolveFramebufferForTextures(ctx, colorTarget, depthTarget)
+        );
         readFramebufferBinding = framebuffer;
         drawFramebufferBinding = framebuffer;
     }
@@ -1548,12 +1636,18 @@ public class VulkanicAPI {
         VulkanicBufferTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bindBuffer(ctx, typedTarget, buffer),
-                () -> getBackend().bindBuffer(ctx, target, buffer)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.bindBuffer(ctx, target, buffer),
+                    activeBackend -> activeBackend.bindBuffer(ctx, target, buffer)
+                )
             );
     }
 
     public static void bindBuffer(CommandContext ctx, VulkanicBufferTarget target, int buffer) {
-        getBackend().bindBuffer(ctx, target, buffer);
+        dispatchImplementedVoid(
+            direct -> direct.bindBuffer(ctx, target, buffer),
+            activeBackend -> activeBackend.bindBuffer(ctx, target, buffer)
+        );
     }
 
     /**
@@ -1599,12 +1693,18 @@ public class VulkanicAPI {
         VulkanicBufferTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bindBufferBase(ctx, typedTarget, index, buffer),
-                () -> getBackend().bindBufferBase(ctx, target, index, buffer)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.bindBufferBase(ctx, target, index, buffer),
+                    activeBackend -> activeBackend.bindBufferBase(ctx, target, index, buffer)
+                )
             );
     }
 
     public static void bindBufferBase(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer) {
-        getBackend().bindBufferBase(ctx, target, index, buffer);
+        dispatchImplementedVoid(
+            direct -> direct.bindBufferBase(ctx, target.toLegacyGlTarget(), index, buffer),
+            activeBackend -> activeBackend.bindBufferBase(ctx, target, index, buffer)
+        );
     }
     
     /**
@@ -1652,9 +1752,9 @@ public class VulkanicAPI {
                 typedTarget -> VulkanicTextureParameterName.fromLegacyGlPName(pname)
                     .ifPresentOrElse(
                         typedParameterName -> setTextureParameter(ctx, typedTarget, typedParameterName, param),
-                        () -> getBackend().setTextureParameter(ctx, target, pname, param)
+                        () -> setTextureParameterRaw(ctx, target, pname, param)
                     ),
-                () -> getBackend().setTextureParameter(ctx, target, pname, param)
+                () -> setTextureParameterRaw(ctx, target, pname, param)
             );
     }
 
@@ -1667,7 +1767,7 @@ public class VulkanicAPI {
         VulkanicTextureTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> setTextureParameter(ctx, typedTarget, pname, param),
-                () -> getBackend().setTextureParameter(ctx, target, pname.toLegacyGlPName(), param)
+                () -> setTextureParameterRaw(ctx, target, pname.toLegacyGlPName(), param)
             );
     }
 
@@ -1686,6 +1786,11 @@ public class VulkanicAPI {
         VulkanicTextureParameterName pname,
         int param
     ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setTextureParameter(ctx, target.toLegacyGlTarget(), pname.toLegacyGlPName(), param);
+            return;
+        }
         getBackend().setTextureParameter(ctx, target, pname, param);
     }
 
@@ -1695,6 +1800,25 @@ public class VulkanicAPI {
         VulkanicTextureParameterName pname,
         VulkanicTextureParameterValue param
     ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setTextureParameter(
+                ctx,
+                target.toLegacyGlTarget(),
+                pname.toLegacyGlPName(),
+                param.toLegacyGlConstant()
+            );
+            return;
+        }
+        getBackend().setTextureParameter(ctx, target, pname, param);
+    }
+
+    private static void setTextureParameterRaw(CommandContext ctx, int target, int pname, int param) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setTextureParameter(ctx, target, pname, param);
+            return;
+        }
         getBackend().setTextureParameter(ctx, target, pname, param);
     }
 
@@ -2209,19 +2333,31 @@ public class VulkanicAPI {
     // Direct State Access buffer operations
     // CommandContext versions of DSA buffer operations
     public static int createBufferDSA(CommandContext ctx) {
-        return getBackend().createBufferDSA(ctx);
+        return dispatchImplementedValue(
+            direct -> direct.createBufferDSA(ctx),
+            activeBackend -> activeBackend.createBufferDSA(ctx)
+        );
     }
     
     public static void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
-        getBackend().namedBufferDataDSA(ctx, buffer, size, usage);
+        dispatchImplementedVoid(
+            direct -> direct.namedBufferDataDSA(ctx, buffer, size, usage),
+            activeBackend -> activeBackend.namedBufferDataDSA(ctx, buffer, size, usage)
+        );
     }
     
     public static void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
-        getBackend().namedBufferDataDSA(ctx, buffer, data, usage);
+        dispatchImplementedVoid(
+            direct -> direct.namedBufferDataDSA(ctx, buffer, data, usage),
+            activeBackend -> activeBackend.namedBufferDataDSA(ctx, buffer, data, usage)
+        );
     }
     
     public static void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
-        getBackend().namedBufferSubDataDSA(ctx, buffer, offset, data);
+        dispatchImplementedVoid(
+            direct -> direct.namedBufferSubDataDSA(ctx, buffer, offset, data),
+            activeBackend -> activeBackend.namedBufferSubDataDSA(ctx, buffer, offset, data)
+        );
     }
     
     public static void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
@@ -2233,7 +2369,10 @@ public class VulkanicAPI {
     }
     
     public static java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
-        return getBackend().mapNamedBufferRangeDSA(ctx, buffer, offset, length, access);
+        return dispatchImplementedValue(
+            direct -> direct.mapNamedBufferRangeDSA(ctx, buffer, offset, length, access),
+            activeBackend -> activeBackend.mapNamedBufferRangeDSA(ctx, buffer, offset, length, access)
+        );
     }
     
     // CommandContext versions of DSA operations
@@ -2243,7 +2382,10 @@ public class VulkanicAPI {
      * @param buffer The buffer object to unmap
      */
     public static void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
-        getBackend().unmapNamedBufferDSA(ctx, buffer);
+        dispatchImplementedVoid(
+            direct -> direct.unmapNamedBufferDSA(ctx, buffer),
+            activeBackend -> activeBackend.unmapNamedBufferDSA(ctx, buffer)
+        );
     }
     
     /**
@@ -2267,7 +2409,10 @@ public class VulkanicAPI {
      * @param size Number of bytes to copy
      */
     public static void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        getBackend().copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size);
+        dispatchImplementedVoid(
+            direct -> direct.copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size),
+            activeBackend -> activeBackend.copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size)
+        );
     }
     
     /**
@@ -2334,7 +2479,10 @@ public class VulkanicAPI {
         VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
             .ifPresentOrElse(
                 typedMode -> drawArrays(ctx, typedMode, first, count),
-                () -> getBackend().drawArrays(ctx, mode, first, count)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.drawArrays(ctx, mode, first, count),
+                    activeBackend -> activeBackend.drawArrays(ctx, mode, first, count)
+                )
             );
     }
 
@@ -2342,7 +2490,10 @@ public class VulkanicAPI {
      * Draws array primitives using a backend-neutral primitive mode.
      */
     public static void drawArrays(CommandContext ctx, VulkanicPrimitiveMode mode, int first, int count) {
-        getBackend().drawArrays(ctx, mode.toGlModeConstant(), first, count);
+        dispatchImplementedVoid(
+            direct -> direct.drawArrays(ctx, mode.toGlModeConstant(), first, count),
+            activeBackend -> activeBackend.drawArrays(ctx, mode.toGlModeConstant(), first, count)
+        );
     }
     
     public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
@@ -2353,7 +2504,10 @@ public class VulkanicAPI {
             return;
         }
 
-        getBackend().drawElements(ctx, mode, count, type, indices);
+        dispatchImplementedVoid(
+            direct -> direct.drawElements(ctx, mode, count, type, indices),
+            activeBackend -> activeBackend.drawElements(ctx, mode, count, type, indices)
+        );
     }
 
     /**
@@ -2363,7 +2517,10 @@ public class VulkanicAPI {
         VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
             .ifPresentOrElse(
                 typedMode -> drawElements(ctx, typedMode, count, indexType, indices),
-                () -> getBackend().drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices),
+                    activeBackend -> activeBackend.drawElements(ctx, mode, count, indexType.toGlTypeConstant(), indices)
+                )
             );
     }
 
@@ -2374,7 +2531,10 @@ public class VulkanicAPI {
         VulkanicIndexType.fromLegacyGlConstant(type)
             .ifPresentOrElse(
                 typedIndexType -> drawElements(ctx, mode, count, typedIndexType, indices),
-                () -> getBackend().drawElements(ctx, mode.toGlModeConstant(), count, type, indices)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.drawElements(ctx, mode.toGlModeConstant(), count, type, indices),
+                    activeBackend -> activeBackend.drawElements(ctx, mode.toGlModeConstant(), count, type, indices)
+                )
             );
     }
 
@@ -2382,7 +2542,10 @@ public class VulkanicAPI {
      * Draws indexed primitives using backend-neutral primitive and index types.
      */
     public static void drawElements(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices) {
-        getBackend().drawElements(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices);
+        dispatchImplementedVoid(
+            direct -> direct.drawElements(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices),
+            activeBackend -> activeBackend.drawElements(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices)
+        );
     }
     
     public static void setBlendFunction(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
@@ -3234,7 +3397,10 @@ public class VulkanicAPI {
      * callsites.
      */
     public static CommandEncoder createCommandEncoder() {
-        return getBackend().createCommandEncoder();
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createCommandEncoder()
+            : getBackend().createCommandEncoder();
     }
 
     /**
@@ -3245,7 +3411,10 @@ public class VulkanicAPI {
         GpuTextureView colorTextureView,
         java.util.OptionalInt clearColor
     ) {
-        return getBackend().createRenderPass(supplier, colorTextureView, clearColor);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createRenderPass(supplier, colorTextureView, clearColor)
+            : getBackend().createRenderPass(supplier, colorTextureView, clearColor);
     }
 
     /**
@@ -3258,7 +3427,24 @@ public class VulkanicAPI {
         @Nullable GpuTextureView depthTextureView,
         java.util.OptionalDouble clearDepth
     ) {
-        return getBackend().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth)
+            : getBackend().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+    }
+
+    /**
+     * Creates a backend-owned render pass targeting an existing framebuffer contract.
+     */
+    public static RenderPass createRenderPass(
+        java.util.function.Supplier<String> supplier,
+        int framebuffer,
+        boolean hasDepthTexture
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createRenderPass(supplier, framebuffer, hasDepthTexture)
+            : getBackend().createRenderPass(supplier, framebuffer, hasDepthTexture);
     }
 
     /**
@@ -3273,7 +3459,10 @@ public class VulkanicAPI {
         int depthOrLayers,
         int mipLevels
     ) {
-        return getBackend().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels)
+            : getBackend().createTexture(supplier, usage, format, width, height, depthOrLayers, mipLevels);
     }
 
     /**
@@ -3288,35 +3477,50 @@ public class VulkanicAPI {
         int depthOrLayers,
         int mipLevels
     ) {
-        return getBackend().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createTexture(label, usage, format, width, height, depthOrLayers, mipLevels)
+            : getBackend().createTexture(label, usage, format, width, height, depthOrLayers, mipLevels);
     }
 
     /**
      * Creates a backend-owned GPU buffer with size allocation.
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, int size) {
-        return getBackend().createBuffer(supplier, usage, size);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createBuffer(supplier, usage, size)
+            : getBackend().createBuffer(supplier, usage, size);
     }
 
     /**
      * Creates a backend-owned GPU buffer initialized from byte data.
      */
     public static GpuBuffer createBuffer(@Nullable java.util.function.Supplier<String> supplier, int usage, ByteBuffer data) {
-        return getBackend().createBuffer(supplier, usage, data);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createBuffer(supplier, usage, data)
+            : getBackend().createBuffer(supplier, usage, data);
     }
 
     /**
      * Creates a backend-owned texture view for a full texture range.
      */
     public static GpuTextureView createTextureView(GpuTexture texture) {
-        return getBackend().createTextureView(texture);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createTextureView(texture)
+            : getBackend().createTextureView(texture);
     }
 
     /**
      * Creates a backend-owned texture view for an explicit mip range.
      */
     public static GpuTextureView createTextureView(GpuTexture texture, int baseMipLevel, int mipLevelCount) {
-        return getBackend().createTextureView(texture, baseMipLevel, mipLevelCount);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createTextureView(texture, baseMipLevel, mipLevelCount)
+            : getBackend().createTextureView(texture, baseMipLevel, mipLevelCount);
     }
 
     public static String getApiDescription() {
@@ -3741,6 +3945,20 @@ public class VulkanicAPI {
     }
 
     /**
+     * Returns the backend-native buffer handle for transitional integrations.
+     *
+     * <p>Resolution is delegated to the active backend so callsites stay backend-neutral
+     * while GL/Vulkan-specific handle semantics remain backend-owned.</p>
+     */
+    public static int getBufferHandle(@Nullable GpuBuffer buffer) {
+        if (buffer == null) {
+            return 0;
+        }
+
+        return getBackend().resolveBufferHandle(getCommandContext(), buffer);
+    }
+
+    /**
      * Returns a backend-native framebuffer handle for a color/depth texture pair.
      */
     public static int resolveFramebufferForTextures(@Nullable GpuTexture colorTexture, @Nullable GpuTexture depthTexture) {
@@ -4161,14 +4379,20 @@ public class VulkanicAPI {
      * @param ctx Command context
      */
     public static void drawArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
-        getBackend().drawArraysInstanced(ctx, mode, first, count, instanceCount);
+        dispatchImplementedVoid(
+            direct -> direct.drawArraysInstanced(ctx, mode, first, count, instanceCount),
+            activeBackend -> activeBackend.drawArraysInstanced(ctx, mode, first, count, instanceCount)
+        );
     }
 
     /**
      * Renders primitives using array data with instancing via backend-neutral primitive mode.
      */
     public static void drawArraysInstanced(CommandContext ctx, VulkanicPrimitiveMode mode, int first, int count, int instanceCount) {
-        getBackend().drawArraysInstanced(ctx, mode.toGlModeConstant(), first, count, instanceCount);
+        dispatchImplementedVoid(
+            direct -> direct.drawArraysInstanced(ctx, mode.toGlModeConstant(), first, count, instanceCount),
+            activeBackend -> activeBackend.drawArraysInstanced(ctx, mode.toGlModeConstant(), first, count, instanceCount)
+        );
     }
     
     /**
@@ -4179,7 +4403,10 @@ public class VulkanicAPI {
         VulkanicBufferTarget.fromLegacyGlTarget(target)
             .ifPresentOrElse(
                 typedTarget -> bindUniformBufferRange(ctx, typedTarget, index, buffer, offset, size),
-                () -> getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.bindUniformBufferRange(ctx, target, index, buffer, offset, size),
+                    activeBackend -> activeBackend.bindUniformBufferRange(ctx, target, index, buffer, offset, size)
+                )
             );
     }
 
@@ -4187,14 +4414,20 @@ public class VulkanicAPI {
      * Binds a range of a buffer to a uniform buffer binding point using backend-neutral target semantics.
      */
     public static void bindUniformBufferRange(CommandContext ctx, VulkanicBufferTarget target, int index, int buffer, long offset, long size) {
-        getBackend().bindUniformBufferRange(ctx, target, index, buffer, offset, size);
+        dispatchImplementedVoid(
+            direct -> direct.bindUniformBufferRange(ctx, target.toLegacyGlTarget(), index, buffer, offset, size),
+            activeBackend -> activeBackend.bindUniformBufferRange(ctx, target, index, buffer, offset, size)
+        );
     }
 
     /**
      * Binds a range of a buffer to a uniform buffer binding point.
      */
     public static void bindUniformBufferRange(CommandContext ctx, int index, int buffer, long offset, long size) {
-        getBackend().bindUniformBufferRange(ctx, VulkanicBufferTarget.UNIFORM, index, buffer, offset, size);
+        dispatchImplementedVoid(
+            direct -> direct.bindUniformBufferRange(ctx, VulkanicBufferTarget.UNIFORM.toLegacyGlTarget(), index, buffer, offset, size),
+            activeBackend -> activeBackend.bindUniformBufferRange(ctx, VulkanicBufferTarget.UNIFORM, index, buffer, offset, size)
+        );
     }
     
     /**
@@ -4545,6 +4778,7 @@ public class VulkanicAPI {
         java.util.ArrayList<PipelineDescriptor.ResourceBinding> bindings = new java.util.ArrayList<>();
         java.util.LinkedHashSet<String> seenNames = new java.util.LinkedHashSet<>();
         int bindingIndex = 0;
+        boolean hasGeneratedStandaloneUniformBlock = false;
 
         for (ActiveUniformBlockInfo blockInfo : getActiveUniformBlocks(ctx, program)) {
             String name = normalizeReflectedResourceName(blockInfo.name());
@@ -4552,6 +4786,10 @@ public class VulkanicAPI {
                 continue;
             }
             if (!seenNames.add(name)) {
+                continue;
+            }
+            if (GENERATED_STANDALONE_UNIFORM_BLOCK_NAME.equals(name)) {
+                hasGeneratedStandaloneUniformBlock = true;
                 continue;
             }
 
@@ -4585,6 +4823,18 @@ public class VulkanicAPI {
                 bindingIndex,
                 name,
                 resourceType.get(),
+                null,
+                normalizedStages
+            ));
+            bindingIndex++;
+        }
+
+        if (hasGeneratedStandaloneUniformBlock) {
+            bindings.add(new PipelineDescriptor.ResourceBinding(
+                0,
+                bindingIndex,
+                GENERATED_STANDALONE_UNIFORM_BLOCK_NAME,
+                PipelineDescriptor.ResourceType.UNIFORM_BUFFER,
                 null,
                 normalizedStages
             ));
@@ -4760,6 +5010,20 @@ public class VulkanicAPI {
                 java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
                 mergedStages.addAll(reflectedBinding.stages());
                 merged.add(baseBinding.withStages(java.util.Set.copyOf(mergedStages)));
+            } else if (reflectedBinding != null) {
+                // Keep the pipeline's deterministic set/binding slot, but trust reflected resource
+                // type metadata so Vulkan descriptor layout types always match shader declarations.
+                java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
+                mergedStages.addAll(reflectedBinding.stages());
+                merged.add(new PipelineDescriptor.ResourceBinding(
+                    baseBinding.set(),
+                    baseBinding.binding(),
+                    baseBinding.name(),
+                    reflectedBinding.type(),
+                    reflectedBinding.type() == PipelineDescriptor.ResourceType.TEXEL_BUFFER
+                        ? reflectedBinding.textureFormat()
+                        : null,
+                    java.util.Set.copyOf(mergedStages)));
             } else {
                 merged.add(baseBinding);
             }
@@ -4871,7 +5135,13 @@ public class VulkanicAPI {
         java.util.Optional<VulkanicUniformReflectionType> reflectionType
     ) {
         if (reflectionType.isPresent() && reflectionType.get().isSampler()) {
-            return java.util.Optional.of(PipelineDescriptor.ResourceType.SAMPLER);
+            VulkanicUniformReflectionType type = reflectionType.get();
+            boolean comparison = type == VulkanicUniformReflectionType.SAMPLER_1D_SHADOW
+                || type == VulkanicUniformReflectionType.SAMPLER_2D_SHADOW
+                || type == VulkanicUniformReflectionType.SAMPLER_CUBE_SHADOW;
+            return java.util.Optional.of(comparison
+                ? PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
+                : PipelineDescriptor.ResourceType.SAMPLER);
         }
         return java.util.Optional.empty();
     }
@@ -5021,7 +5291,10 @@ public class VulkanicAPI {
     
     
     public static void bindSamplers(CommandContext ctx, int first, int[] samplers) {
-        getBackend().bindSamplers(ctx, first, samplers);
+        dispatchImplementedVoid(
+            direct -> direct.bindSamplers(ctx, first, samplers),
+            activeBackend -> activeBackend.bindSamplers(ctx, first, samplers)
+        );
     }
     
     
@@ -5881,6 +6154,18 @@ public class VulkanicAPI {
         return getBackend().createManagedTextureView(texture, baseMipLevel, mipLevelCount);
     }
 
+    /**
+     * Creates a managed texture view for a legacy texture handle when a render-pass binding path
+     * only has access to the bound texture object name.
+     *
+     * @param legacyTextureHandle legacy texture object handle
+     * @return a managed texture view, or {@code null} when the active backend cannot recover one
+     */
+    @Nullable
+    public static VulkanicTextureView createManagedLegacyTextureView(int legacyTextureHandle) {
+        return getBackend().createManagedLegacyTextureView(legacyTextureHandle);
+    }
+
     // =========================================================================
     // Phase 3c: Pipeline Objects
     // =========================================================================
@@ -5917,6 +6202,13 @@ public class VulkanicAPI {
     }
 
     /**
+     * Creates a pipeline handle compatible with the attachment contract of an existing framebuffer.
+     */
+    public static PipelineHandle createPipeline(PipelineDescriptor descriptor, int framebuffer) {
+        return getBackend().createPipeline(descriptor, framebuffer);
+    }
+
+    /**
      * Convenience overload: creates a pipeline directly from a Blaze3D RenderPipeline.
      *
      * @param pipeline the RenderPipeline to compile
@@ -5937,6 +6229,38 @@ public class VulkanicAPI {
         return getBackend().createPipeline(
             PipelineDescriptor.fromPortableStateAndSpirvModules(portableState, spirvModules)
         );
+    }
+
+    public static java.util.List<VulkanicSpirvModule> getLinkedProgramSpirvModules(CommandContext ctx, int program) {
+        return getBackend().getLinkedProgramSpirvModules(ctx, program);
+    }
+
+    public static PipelineDescriptor createLiveProgramPipelineDescriptor(
+        CommandContext ctx,
+        PipelineDescriptor baseDescriptor,
+        int program
+    ) {
+        Objects.requireNonNull(ctx, "ctx must not be null");
+        Objects.requireNonNull(baseDescriptor, "baseDescriptor must not be null");
+
+        java.util.List<VulkanicSpirvModule> linkedModules = getLinkedProgramSpirvModules(ctx, program);
+        if (linkedModules.isEmpty()) {
+            return withMergedReflectedResourceLayout(ctx, baseDescriptor, program);
+        }
+
+        PipelineDescriptor descriptorWithModules = PipelineDescriptor
+            .fromPortableStateAndSpirvModules(baseDescriptor.getPortableState(), linkedModules)
+            .withPushConstantRanges(baseDescriptor.getPushConstantRanges())
+            .withResourceLayout(baseDescriptor.getResourceLayout());
+
+        java.util.Set<VulkanicShaderStage> stages = linkedModules.stream()
+            .map(VulkanicSpirvModule::stage)
+            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        if (stages.isEmpty()) {
+            return withMergedReflectedResourceLayout(ctx, descriptorWithModules, program);
+        }
+
+        return withMergedReflectedResourceLayout(ctx, descriptorWithModules, program, 256, java.util.Set.copyOf(stages));
     }
 
     /**
@@ -6001,6 +6325,11 @@ public class VulkanicAPI {
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
             PipelineResourceBindings bindings) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.bindPipelineResources(ctx, pipeline, descriptor, bindings);
+            return;
+        }
         getBackend().bindPipelineResources(ctx, pipeline, descriptor, bindings);
     }
 
@@ -6018,7 +6347,10 @@ public class VulkanicAPI {
      * @return the backend-native buffer representation
      */
     public static VulkanicBuffer resolveVulkanicBuffer(GpuBuffer gpuBuffer) {
-        return getBackend().resolveVulkanicBuffer(gpuBuffer);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolveVulkanicBuffer(gpuBuffer)
+            : getBackend().resolveVulkanicBuffer(gpuBuffer);
     }
 
     /**
@@ -6038,7 +6370,24 @@ public class VulkanicAPI {
     @Nullable
     public static PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
                                                        PipelineDescriptor descriptor) {
-        return getBackend().resolvePipelineHandle(renderPipeline, descriptor);
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolvePipelineHandle(renderPipeline, descriptor)
+            : getBackend().resolvePipelineHandle(renderPipeline, descriptor);
+    }
+
+    /**
+     * Returns a compiled pipeline handle compatible with a specific framebuffer contract,
+     * or {@code null} if the active backend has not compiled one yet.
+     */
+    @Nullable
+    public static PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                       PipelineDescriptor descriptor,
+                                                       int framebuffer) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolvePipelineHandle(renderPipeline, descriptor, framebuffer)
+            : getBackend().resolvePipelineHandle(renderPipeline, descriptor, framebuffer);
     }
 
     // =========================================================================
@@ -6169,6 +6518,17 @@ public class VulkanicAPI {
         return beginRenderPass(ctx,
             VulkanicRenderPassDescriptor.colorAndDepth(
                 label, colorTarget, clearColor, depthTarget, clearDepth));
+    }
+
+    /**
+     * Begins a render pass using the attachment contract of an existing framebuffer.
+     */
+    public static VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        java.util.function.Supplier<String> label,
+        int framebuffer
+    ) {
+        return getBackend().beginRenderPass(ctx, label, framebuffer);
     }
 
     /**

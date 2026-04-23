@@ -23,6 +23,18 @@ public interface DepthCopyStrategy {
 		}
 	}
 
+	static DepthCopyStrategy fastestDepthSnapshot(boolean combinedStencilRequired) {
+		if (combinedStencilRequired) {
+			return new Gl30BlitFbCombinedDepthStencil();
+		}
+
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			return new Gl30BlitFbDepth();
+		}
+
+		return fastest(false);
+	}
+
 	boolean needsDestFramebuffer();
 
 	/**
@@ -66,6 +78,24 @@ public interface DepthCopyStrategy {
 				height);
 
 			VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previousTexture);
+		}
+	}
+
+	// FB -> FB
+	class Gl30BlitFbDepth implements DepthCopyStrategy {
+		private Gl30BlitFbDepth() {
+			// private
+		}
+
+		@Override
+		public boolean needsDestFramebuffer() {
+			return true;
+		}
+
+		@Override
+		public void copy(GlFramebuffer sourceFb, int sourceTexture, GlFramebuffer destFb, int destTexture, int width, int height) {
+			IrisRenderSystem.blitDepthBufferNearest(sourceFb.getId(), destFb.getId(), 0, 0, width, height,
+				0, 0, width, height);
 		}
 	}
 

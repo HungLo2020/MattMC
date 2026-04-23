@@ -1,6 +1,7 @@
 package net.sodium.client.render.chunk.shader;
 
 import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.systems.RenderPass;
 import net.sodium.client.gl.device.GLRenderDevice;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat2v;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat3v;
@@ -10,20 +11,27 @@ import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
 import net.sodium.client.util.FogParameters;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
 import org.joml.Matrix4fc;
+import javax.annotation.Nonnull;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A forward-rendering shader program for chunks.
  */
-public class DefaultShaderInterface implements ChunkShaderInterface {
+@SuppressWarnings("null")
+public class DefaultShaderInterface implements RenderPassChunkShaderInterface {
+    @Nonnull
+    private static final ResourceLocation BLOCK_ATLAS_LOCATION = Objects.requireNonNull(ResourceLocation.withDefaultNamespace("textures/atlas/blocks.png"));
+	private static final java.util.List<String> RENDER_PASS_SAMPLER_NAMES = java.util.List.of("u_BlockTex", "u_LightTex");
     private final Map<ChunkShaderTextureSlot, GlUniformInt> uniformTextures;
 
     private final GlUniformMatrix4f uniformModelViewMatrix;
@@ -47,14 +55,13 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
         this.fogShader = options.fog().getFactory().apply(context);
     }
 
+	@SuppressWarnings("null")
     @Override // the shader interface should not modify pipeline state
     public void setupState(TerrainRenderPass pass, FogParameters parameters) {
         this.bindTexture(ChunkShaderTextureSlot.BLOCK, pass.getAtlas());
         this.bindTexture(ChunkShaderTextureSlot.LIGHT, Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 
-        var textureAtlas = (TextureAtlas) Minecraft.getInstance()
-                .getTextureManager()
-                .getTexture(TextureAtlas.LOCATION_BLOCKS);
+        var textureAtlas = getBlockTextureAtlas();
 
         // There is a limited amount of sub-texel precision when using hardware texture sampling. The mapped texture
         // area must be "shrunk" by at least one sub-texel to avoid bleed between textures in the atlas. And since we
@@ -68,6 +75,13 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
         );
 
         this.fogShader.setup(parameters);
+    }
+
+    @SuppressWarnings("null")
+    private static TextureAtlas getBlockTextureAtlas() {
+        return (TextureAtlas) Minecraft.getInstance()
+            .getTextureManager()
+            .getTexture(BLOCK_ATLAS_LOCATION);
     }
 
     @Override // the shader interface should not modify pipeline state
@@ -102,5 +116,17 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
     @Override
     public void setRegionOffset(float x, float y, float z) {
         this.uniformRegionOffset.set(x, y, z);
+    }
+
+	@SuppressWarnings("null")
+    @Override
+    public void bindRenderPassResources(RenderPass renderPass, TerrainRenderPass pass) {
+        renderPass.bindSampler("u_BlockTex", Objects.requireNonNull(pass.getAtlas(), "chunk atlas view"));
+        renderPass.bindSampler("u_LightTex", Objects.requireNonNull(Minecraft.getInstance().gameRenderer.lightTexture().getTextureView(), "light texture view"));
+    }
+
+    @Override
+    public java.util.Collection<String> getRenderPassSamplerNames() {
+        return RENDER_PASS_SAMPLER_NAMES;
     }
 }

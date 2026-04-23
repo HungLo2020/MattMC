@@ -45,6 +45,7 @@ import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.pip.OversizedItemRenderer;
 import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
+import net.minecraft.client.gui.render.pip.Standard3dItemRenderer;
 import net.minecraft.client.gui.render.state.BlitRenderState;
 import net.minecraft.client.gui.render.state.GlyphRenderState;
 import net.minecraft.client.gui.render.state.GuiElementRenderState;
@@ -62,6 +63,7 @@ import net.minecraft.client.renderer.item.TrackingItemStackRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicResourceBarriers;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
@@ -74,6 +76,9 @@ import org.slf4j.Logger;
 @Environment(EnvType.CLIENT)
 public class GuiRenderer implements AutoCloseable {
 	private static final Logger LOGGER = LogUtils.getLogger();
+	private static final VulkanicResourceBarriers OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
+		VulkanicResourceBarriers.Barrier.TEXTURE_FETCH
+	);
 	private static final float MAX_GUI_Z = 10000.0F;
 	public static final float MIN_GUI_Z = 0.0F;
 	private static final float GUI_Z_NEAR = 1000.0F;
@@ -92,6 +97,7 @@ public class GuiRenderer implements AutoCloseable {
 		.thenComparing(GuiElementRenderState::textureSetup, TEXTURE_COMPARATOR);
 	private final Map<Object, GuiRenderer.AtlasPosition> atlasPositions = new Object2ObjectOpenHashMap<>();
 	private final Map<Object, OversizedItemRenderer> oversizedItemRenderers = new Object2ObjectOpenHashMap<>();
+	private final Map<Object, Standard3dItemRenderer> standard3dItemRenderers = new Object2ObjectOpenHashMap<>();
 	final GuiRenderState renderState;
 	private final List<GuiRenderer.Draw> draws = new ArrayList();
 	private final List<GuiRenderer.MeshToDraw> meshesToDraw = new ArrayList();
@@ -162,6 +168,7 @@ public class GuiRenderer implements AutoCloseable {
 		this.renderState.reset();
 		this.firstDrawIndexAfterBlur = Integer.MAX_VALUE;
 		this.clearUnusedOversizedItemRenderers();
+		this.clearUnusedStandard3dItemRenderers();
 		if (SharedConstants.DEBUG_SHUFFLE_UI_RENDERING_ORDER) {
 			RenderPipeline.updateSortKeySeed();
 			TextureSetup.updateSortKeySeed();
@@ -179,6 +186,21 @@ public class GuiRenderer implements AutoCloseable {
 				iterator.remove();
 			} else {
 				oversizedItemRenderer.resetUsedOnThisFrame();
+			}
+		}
+	}
+
+	private void clearUnusedStandard3dItemRenderers() {
+		Iterator<Entry<Object, Standard3dItemRenderer>> iterator = this.standard3dItemRenderers.entrySet().iterator();
+
+		while (iterator.hasNext()) {
+			Entry<Object, Standard3dItemRenderer> entry = (Entry<Object, Standard3dItemRenderer>)iterator.next();
+			Standard3dItemRenderer standard3dItemRenderer = (Standard3dItemRenderer)entry.getValue();
+			if (!standard3dItemRenderer.usedOnThisFrame()) {
+				standard3dItemRenderer.close();
+				iterator.remove();
+			} else {
+				standard3dItemRenderer.resetUsedOnThisFrame();
 			}
 		}
 	}
@@ -315,8 +337,22 @@ public class GuiRenderer implements AutoCloseable {
 	}
 
 	private void prepareItemElements() {
+		int i = this.getGuiScaleInvalidatingItemAtlasIfChanged();
+		if (Standard3dItemRenderer.isDebugDumpEnabled()) {
+			Standard3dItemRenderer debugStandard3dItemRenderer = (Standard3dItemRenderer)this.standard3dItemRenderers
+				.computeIfAbsent("debug_standard_3d_grass_block", object -> new Standard3dItemRenderer(this.bufferSource));
+			debugStandard3dItemRenderer.prepareDebugStandardBlockItemDump(this.renderState, i);
+		}
+
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			if (!this.renderState.getItemModelIdentities().isEmpty()) {
+				this.prepareItemsViaPictureInPicture(i);
+			}
+
+			return;
+		}
+
 		if (!this.renderState.getItemModelIdentities().isEmpty()) {
-			int i = this.getGuiScaleInvalidatingItemAtlasIfChanged();
 			int j = 16 * i;
 			int k = this.calculateAtlasSizeInPixels(j);
 			if (this.itemsAtlas == null) {
@@ -380,6 +416,7 @@ public class GuiRenderer implements AutoCloseable {
 				);
 			net.vulkanic.VulkanicAPI.setOutputColorTextureOverride(null);
 			net.vulkanic.VulkanicAPI.setOutputDepthTextureOverride(null);
+			VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_COLOR_WRITES_VISIBLE_TO_TEXTURE_FETCH);
 			if (mutableBoolean2.getValue()) {
 				this.renderState
 					.forEachItem(
@@ -398,6 +435,27 @@ public class GuiRenderer implements AutoCloseable {
 					);
 			}
 		}
+	}
+
+	private void prepareItemsViaPictureInPicture(int i) {
+		this.renderState.forEachItem(guiItemRenderState -> {
+			TrackingItemStackRenderState trackingItemStackRenderState = guiItemRenderState.itemStackRenderState();
+			ScreenRectangle screenRectangle = guiItemRenderState.oversizedItemBounds();
+			int j = screenRectangle != null ? screenRectangle.left() : guiItemRenderState.x();
+			int k = screenRectangle != null ? screenRectangle.top() : guiItemRenderState.y();
+			int l = screenRectangle != null ? screenRectangle.right() : guiItemRenderState.x() + 16;
+			int m = screenRectangle != null ? screenRectangle.bottom() : guiItemRenderState.y() + 16;
+			OversizedItemRenderState oversizedItemRenderState = new OversizedItemRenderState(guiItemRenderState, j, k, l, m);
+			if (screenRectangle == null && trackingItemStackRenderState.usesBlockLight()) {
+				Standard3dItemRenderer standard3dItemRenderer = (Standard3dItemRenderer)this.standard3dItemRenderers
+					.computeIfAbsent(trackingItemStackRenderState.getModelIdentity(), object -> new Standard3dItemRenderer(this.bufferSource));
+				standard3dItemRenderer.prepare(oversizedItemRenderState, this.renderState, i);
+			} else {
+				OversizedItemRenderer oversizedItemRenderer = (OversizedItemRenderer)this.oversizedItemRenderers
+					.computeIfAbsent(trackingItemStackRenderState.getModelIdentity(), object -> new OversizedItemRenderer(this.bufferSource));
+				oversizedItemRenderer.prepare(oversizedItemRenderState, this.renderState, i);
+			}
+		});
 	}
 
 	private void preparePictureInPicture() {
@@ -424,11 +482,16 @@ public class GuiRenderer implements AutoCloseable {
 			Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 		}
 
-		net.vulkanic.VulkanicAPI.enableScissorForRenderTypeDraws(i, this.itemsAtlas.getHeight(0) - j - k, k, k);
+		boolean bl2 = !VulkanicAPI.isVulkanBackendSelected();
+		if (bl2) {
+			net.vulkanic.VulkanicAPI.enableScissorForRenderTypeDraws(i, this.itemsAtlas.getHeight(0) - j - k, k, k);
+		}
 		trackingItemStackRenderState.submit(poseStack, this.submitNodeCollector, 15728880, OverlayTexture.NO_OVERLAY, 0);
 		this.featureRenderDispatcher.renderAllFeatures();
 		this.bufferSource.endBatch();
-		net.vulkanic.VulkanicAPI.disableScissorForRenderTypeDraws();
+		if (bl2) {
+			net.vulkanic.VulkanicAPI.disableScissorForRenderTypeDraws();
+		}
 		poseStack.popPose();
 	}
 
@@ -438,7 +501,7 @@ public class GuiRenderer implements AutoCloseable {
 		this.renderState
 			.submitBlitToCurrentLayer(
 				new BlitRenderState(
-					RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,
+					RenderPipelines.GUI_TEXTURED,
 					TextureSetup.singleTexture(this.itemsAtlasView),
 					guiItemRenderState.pose(),
 					guiItemRenderState.x(),
@@ -502,6 +565,10 @@ public class GuiRenderer implements AutoCloseable {
 
 			for (OversizedItemRenderer oversizedItemRenderer : this.oversizedItemRenderers.values()) {
 				oversizedItemRenderer.invalidateTexture();
+			}
+
+			for (Standard3dItemRenderer standard3dItemRenderer : this.standard3dItemRenderers.values()) {
+				standard3dItemRenderer.invalidateTexture();
 			}
 
 			this.cachedGuiScale = i;
@@ -691,6 +758,7 @@ public class GuiRenderer implements AutoCloseable {
 		}
 
 		this.oversizedItemRenderers.values().forEach(PictureInPictureRenderer::close);
+		this.standard3dItemRenderers.values().forEach(PictureInPictureRenderer::close);
 	}
 
 	@Environment(EnvType.CLIENT)

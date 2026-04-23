@@ -80,7 +80,7 @@ public class IrisSamplers {
 
 				// colortex0 is the default sampler in fullscreen passes
 				if (i == 0 && isFullscreenPass) {
-					samplers.addDefaultSampler(TextureType.TEXTURE_2D, texture, null, null, name, legacyName);
+					samplers.addDefaultSampler(TextureType.TEXTURE_2D, texture, null, null, name, legacyName, "tex");
 				} else {
 					samplers.addDynamicSampler(TextureType.TEXTURE_2D, texture, null, name, legacyName);
 				}
@@ -199,6 +199,11 @@ public class IrisSamplers {
 			samplers.addDynamicSampler(() -> VulkanicCoreAPI.textureId(whitePixel.getTexture()), "iris_overlay");
 		}
 
+		samplers.addDynamicSampler(pipeline::getCurrentNormalTexture, StateUpdateNotifiers.normalTextureChangeNotifier, "normals");
+		samplers.addDynamicSampler(pipeline::getCurrentSpecularTexture, StateUpdateNotifiers.specularTextureChangeNotifier, "specular");
+	}
+
+	public static void addCompositePbrSamplers(SamplerHolder samplers, WorldRenderingPipeline pipeline) {
 		samplers.addDynamicSampler(pipeline::getCurrentNormalTexture, StateUpdateNotifiers.normalTextureChangeNotifier, "normals");
 		samplers.addDynamicSampler(pipeline::getCurrentSpecularTexture, StateUpdateNotifiers.specularTextureChangeNotifier, "specular");
 	}

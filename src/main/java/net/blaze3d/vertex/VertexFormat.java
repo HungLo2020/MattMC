@@ -94,6 +94,11 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 		}
 	}
 
+	public int getShaderAttributeLocation(int attributeOrdinal) {
+		VertexFormatElement element = this.elements.get(attributeOrdinal);
+		return element.usage() == VertexFormatElement.Usage.GENERIC ? element.index() : attributeOrdinal;
+	}
+
 	public boolean equals(Object object) {
 		return this == object || object instanceof VertexFormat vertexFormat
                 && this.elementsMask == vertexFormat.elementsMask

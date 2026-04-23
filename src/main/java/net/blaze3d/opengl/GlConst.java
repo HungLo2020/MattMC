@@ -246,6 +246,7 @@ public class GlConst {
 	public static int toGlInternalId(TextureFormat textureFormat) {
 		return switch (textureFormat) {
 			case RGBA8 -> 32856;
+			case BGRA8 -> 32856;
 			case RED8 -> 33321;
 			case RED8I -> 33329;
 			case DEPTH32 -> 33191;
@@ -255,6 +256,7 @@ public class GlConst {
 	public static int toGlExternalId(TextureFormat textureFormat) {
 		return switch (textureFormat) {
 			case RGBA8 -> 6408;
+			case BGRA8 -> net.vulkanic.VulkanicAPI.GL_BGRA;
 			case RED8 -> 6403;
 			case RED8I -> 6403;
 			case DEPTH32 -> 6402;
@@ -264,6 +266,7 @@ public class GlConst {
 	public static int toGlType(TextureFormat textureFormat) {
 		return switch (textureFormat) {
 			case RGBA8 -> 5121;
+			case BGRA8 -> 5121;
 			case RED8 -> 5121;
 			case RED8I -> 5121;
 			case DEPTH32 -> 5126;

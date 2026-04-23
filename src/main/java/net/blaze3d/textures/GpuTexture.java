@@ -70,6 +70,7 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 	public VulkanicTextureFormat getVulkanicFormat() {
 		return switch (this.format) {
 			case RGBA8   -> VulkanicTextureFormat.RGBA8;
+			case BGRA8   -> VulkanicTextureFormat.BGRA8;
 			case RED8    -> VulkanicTextureFormat.RED8;
 			case RED8I   -> VulkanicTextureFormat.RED8I;
 			case DEPTH32 -> VulkanicTextureFormat.DEPTH32;
@@ -101,6 +102,26 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 
 	public void setUseMipmaps(boolean bl) {
 		this.useMipmaps = bl;
+	}
+
+	public AddressMode getAddressModeU() {
+		return this.addressModeU;
+	}
+
+	public AddressMode getAddressModeV() {
+		return this.addressModeV;
+	}
+
+	public FilterMode getMinFilter() {
+		return this.minFilter;
+	}
+
+	public FilterMode getMagFilter() {
+		return this.magFilter;
+	}
+
+	public boolean usesMipmaps() {
+		return this.useMipmaps;
 	}
 
 	public String getLabel() {

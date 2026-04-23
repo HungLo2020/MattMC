@@ -3,6 +3,7 @@ package net.vulkanic;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,8 +34,40 @@ public final class PipelineResourceBindings {
         this.texelBufferBindings = Map.copyOf(texelBufferBindings);
     }
 
+    private PipelineResourceBindings(
+        Map<String, SamplerBinding> samplerBindings,
+        Map<String, VulkanicBufferSlice> uniformBufferBindings,
+        Map<String, TexelBufferBinding> texelBufferBindings,
+        boolean adoptResolvedBindings
+    ) {
+        if (adoptResolvedBindings) {
+            this.samplerBindings = Collections.unmodifiableMap(Objects.requireNonNull(samplerBindings, "samplerBindings must not be null"));
+            this.uniformBufferBindings = Collections.unmodifiableMap(Objects.requireNonNull(uniformBufferBindings, "uniformBufferBindings must not be null"));
+            this.texelBufferBindings = Collections.unmodifiableMap(Objects.requireNonNull(texelBufferBindings, "texelBufferBindings must not be null"));
+            return;
+        }
+
+        this.samplerBindings = Map.copyOf(samplerBindings);
+        this.uniformBufferBindings = Map.copyOf(uniformBufferBindings);
+        this.texelBufferBindings = Map.copyOf(texelBufferBindings);
+    }
+
     public static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Creates immutable bindings from already-resolved maps without re-copying them.
+     *
+     * <p>The caller transfers ownership of the provided maps and must not mutate them after
+     * invoking this method.</p>
+     */
+    public static PipelineResourceBindings ofResolvedBindings(
+        Map<String, SamplerBinding> samplerBindings,
+        Map<String, VulkanicBufferSlice> uniformBufferBindings,
+        Map<String, TexelBufferBinding> texelBufferBindings
+    ) {
+        return new PipelineResourceBindings(samplerBindings, uniformBufferBindings, texelBufferBindings, true);
     }
 
     public Optional<SamplerBinding> getSamplerBinding(String name) {
@@ -67,7 +100,7 @@ public final class PipelineResourceBindings {
             String name = resourceBinding.name();
             expectedNames.add(name);
             switch (resourceBinding.type()) {
-                case SAMPLER -> {
+                case SAMPLER, COMPARISON_SAMPLER -> {
                     if (!samplerBindings.containsKey(name)) {
                         missing.add(name + "(SAMPLER)");
                     }
