@@ -1,0 +1,86 @@
+name: Build Linux x64 Release
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      asset_name:
+        description: Linux x64 release asset filename
+        value: ${{ jobs.build.outputs.asset_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Linux x64 Distribution
+    runs-on: ubuntu-latest
+    outputs:
+      asset_name: ${{ steps.metadata.outputs.asset_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build client distribution zip
+        run: ./gradlew clean clientDistZip --no-daemon
+
+      - name: Locate and label Linux x64 zip
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_FILE="$(find build/distributions -maxdepth 1 -type f -name 'MattMC-Client-*.zip' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
+
+          if [ -z "$ZIP_FILE" ] || [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: No MattMC client distribution zip found in build/distributions"
+            exit 1
+          fi
+
+          ZIP_LIST_FILE="$(mktemp)"
+          unzip -Z1 "$ZIP_FILE" > "$ZIP_LIST_FILE"
+
+          if ! grep -qE '(^|/)run-mattmc\.sh$|(^|/)run-mattmc\.bat$' "$ZIP_LIST_FILE"; then
+            echo "ERROR: Selected archive does not look like the exported client distribution"
+            rm -f "$ZIP_LIST_FILE"
+            exit 1
+          fi
+
+          if grep -qE '(^|/)src/main/java/|(^|/)build\.gradle$|(^|/)settings\.gradle$|(^|/)gradlew$' "$ZIP_LIST_FILE"; then
+            echo "ERROR: Selected archive appears to be a source/project archive"
+            rm -f "$ZIP_LIST_FILE"
+            exit 1
+          fi
+
+          rm -f "$ZIP_LIST_FILE"
+
+          ZIP_BASENAME="$(basename "$ZIP_FILE")"
+          VERSION="${ZIP_BASENAME#MattMC-Client-}"
+          VERSION="${VERSION%.zip}"
+
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$ZIP_BASENAME" ]; then
+            echo "ERROR: Could not parse version from zip name: $ZIP_BASENAME"
+            exit 1
+          fi
+
+          LINUX_ZIP_FILE="build/distributions/MattMC-Client-${VERSION}-linux-x64.zip"
+          cp -f "$ZIP_FILE" "$LINUX_ZIP_FILE"
+
+          echo "asset_file=$LINUX_ZIP_FILE" >> "$GITHUB_OUTPUT"
+          echo "asset_name=$(basename "$LINUX_ZIP_FILE")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Linux x64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-release
+          path: ${{ steps.metadata.outputs.asset_file }}
+          if-no-files-found: error

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # RunWorkflows.sh - Trigger GitHub Actions workflows for MattMC
-# Default behavior: run the "Build And Publish Latest" workflow manually.
+# Default behavior: run the "Release Latest" workflow manually.
 
 set -euo pipefail
 
@@ -19,7 +19,7 @@ fi
 
 cd "$PROJECT_ROOT"
 
-WORKFLOW_NAME="${1:-Build And Publish Latest}"
+WORKFLOW_NAME="${1:-Release Latest}"
 WORKFLOW_REF="${WORKFLOW_REF:-$(git rev-parse --abbrev-ref HEAD)}"
 
 if ! command -v gh >/dev/null 2>&1; then
