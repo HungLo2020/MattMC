@@ -10,16 +10,28 @@ REM Get the directory containing this script (should be in server directory)
 cd /d "%~dp0"
 set SCRIPT_DIR=%CD%
 
-REM Require bundled JDK - located in parent run directory
-set BUNDLED_JAVA=%SCRIPT_DIR%\..\run\jdk-%JAVA_VERSION%\bin\java.exe
-if not exist "%BUNDLED_JAVA%" (
-    echo Error: Bundled JDK not found at: %BUNDLED_JAVA%
-    echo Please ensure the distribution includes the bundled JDK.
+REM Require system Java on PATH and enforce Java 25
+set JAVA_CMD=java
+where %JAVA_CMD% >nul 2>&1
+if errorlevel 1 (
+    echo Error: Java was not found on PATH.
+    echo Please install Java %JAVA_VERSION% and ensure 'java' is available from the command line.
     exit /b 1
 )
 
-set JAVA_CMD=%BUNDLED_JAVA%
-echo Using bundled JDK %JAVA_VERSION%
+set "JAVA_OK="
+for /f "delims=" %%L in ('"%JAVA_CMD%" -version 2^>^&1') do (
+    echo %%L | findstr /R /C:"%JAVA_VERSION%\." >nul && set "JAVA_OK=1"
+)
+
+if not defined JAVA_OK (
+    echo Error: Java %JAVA_VERSION% is required.
+    echo Current java version output:
+    "%JAVA_CMD%" -version
+    exit /b 1
+)
+
+echo Using system Java %JAVA_VERSION%
 
 REM Build classpath dynamically from all jars in ..\lib so mixed-platform native jars are safe.
 set "CLASSPATH="
