@@ -981,14 +981,17 @@ tasks.register('clientDist') {
         }
 
         // Copy bundled SPIR-V compiler if available
-        def bundledCompiler = file(resolveBundledSpirvCompilerPath() ?: '')
-        if (bundledCompiler.exists() && bundledCompiler.isFile()) {
-            copy {
-                from bundledCompiler
-                into "${distDir}/libraries/deps"
+        def spirvCompilerPath = resolveBundledSpirvCompilerPath()
+        if (spirvCompilerPath != null) {
+            def bundledCompiler = file(spirvCompilerPath)
+            if (bundledCompiler.exists() && bundledCompiler.isFile()) {
+                copy {
+                    from bundledCompiler
+                    into "${distDir}/libraries/deps"
+                }
+                file("${distDir}/libraries/deps/${bundledCompiler.name}").setExecutable(true)
+                println "✅ Bundled SPIR-V compiler copied to ${distDir}/libraries/deps/${bundledCompiler.name}"
             }
-            file("${distDir}/libraries/deps/${bundledCompiler.name}").setExecutable(true)
-            println "✅ Bundled SPIR-V compiler copied to ${distDir}/libraries/deps/${bundledCompiler.name}"
         }
         
         // Assets are now loaded directly from the JAR - no filesystem copy needed!
