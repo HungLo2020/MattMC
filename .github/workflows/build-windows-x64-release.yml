@@ -1,0 +1,65 @@
+name: Build Windows x64 Release
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      asset_name:
+        description: Windows x64 release asset filename
+        value: ${{ jobs.build.outputs.asset_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows x64 Distribution
+    runs-on: windows-latest
+    outputs:
+      asset_name: ${{ steps.metadata.outputs.asset_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build client distribution zip
+        shell: pwsh
+        run: .\gradlew.bat clean clientDistZip --no-daemon
+
+      - name: Locate and label Windows x64 zip
+        id: metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $zipFile = Get-ChildItem -Path 'build/distributions' -Filter 'MattMC-Client-*.zip' -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $zipFile) {
+            throw 'No MattMC client distribution zip found in build/distributions'
+          }
+
+          $version = [regex]::Match($zipFile.Name, '^MattMC-Client-(.+)\.zip$').Groups[1].Value
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw "Could not parse version from zip name: $($zipFile.Name)"
+          }
+
+          $windowsZipFile = Join-Path 'build/distributions' "MattMC-Client-$version-windows-x64.zip"
+          Copy-Item -Path $zipFile.FullName -Destination $windowsZipFile -Force
+
+          "asset_file=$windowsZipFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "asset_name=$(Split-Path $windowsZipFile -Leaf)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload Windows x64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-release
+          path: ${{ steps.metadata.outputs.asset_file }}
+          if-no-files-found: error

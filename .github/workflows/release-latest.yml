@@ -1,4 +1,4 @@
-name: Build And Publish Latest
+name: Release Latest
 
 on:
   workflow_dispatch:
@@ -7,62 +7,48 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    name: Build Export And Replace Latest Release
+  build-linux-x64:
+    name: Build Linux x64 Release
+    uses: ./.github/workflows/build-linux-x64-release.yml
+
+  build-windows-x64:
+    name: Build Windows x64 Release
+    uses: ./.github/workflows/build-windows-x64-release.yml
+
+  publish-latest:
+    name: Replace Latest Release With Platform Assets
     runs-on: ubuntu-latest
+    needs:
+      - build-linux-x64
+      - build-windows-x64
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Download Linux x64 artifact
+        uses: actions/download-artifact@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          name: linux-x64-release
+          path: release-assets
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      - name: Download Windows x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-x64-release
+          path: release-assets
 
-      - name: Build client distribution zip
-        run: ./gradlew clean clientDistZip --no-daemon
-
-      - name: Locate built distribution zip
-        id: locate_zip
+      - name: Verify release assets
+        id: assets
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$(find build/distributions -maxdepth 1 -type f -name 'MattMC-Client-*.zip' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
+          mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f -name 'MattMC-Client-*-x64.zip' | sort)
 
-          if [ -z "$ZIP_FILE" ] || [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: No MattMC client distribution zip found in build/distributions"
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "ERROR: No release assets found in release-assets"
             exit 1
           fi
 
-          if ! unzip -Z1 "$ZIP_FILE" | head -n 4000 | grep -qE '(^|/)run-mattmc\.sh$|(^|/)run-mattmc\.bat$'; then
-            echo "ERROR: Selected archive does not look like the exported client distribution"
-            exit 1
-          fi
-
-          if unzip -Z1 "$ZIP_FILE" | head -n 4000 | grep -qE '(^|/)src/main/java/|(^|/)build\.gradle$|(^|/)settings\.gradle$|(^|/)gradlew$'; then
-            echo "ERROR: Selected archive appears to be a source/project archive"
-            exit 1
-          fi
-
-          ZIP_BASENAME="$(basename "$ZIP_FILE")"
-          VERSION="${ZIP_BASENAME#MattMC-Client-}"
-          VERSION="${VERSION%.zip}"
-
-          if [ -z "$VERSION" ] || [ "$VERSION" = "$ZIP_BASENAME" ]; then
-            echo "ERROR: Could not parse version from zip name: $ZIP_BASENAME"
-            exit 1
-          fi
-
-          LINUX_ZIP_FILE="build/distributions/MattMC-Client-${VERSION}-linux-x64.zip"
-          cp -f "$ZIP_FILE" "$LINUX_ZIP_FILE"
-
-          echo "zip_file=$LINUX_ZIP_FILE" >> "$GITHUB_OUTPUT"
-          echo "zip_name=$(basename "$LINUX_ZIP_FILE")" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${ASSETS[@]}"
+          echo "asset_list=${ASSETS[*]}" >> "$GITHUB_OUTPUT"
 
       - name: Delete previous latest release if it exists
         env:
@@ -74,11 +60,13 @@ jobs:
             gh release delete latest --yes --cleanup-tag
           fi
 
-      - name: Create latest release and upload asset
+      - name: Create latest release and upload assets
         env:
           GH_TOKEN: ${{ github.token }}
+          LINUX_ASSET: ${{ needs.build-linux-x64.outputs.asset_name }}
+          WINDOWS_ASSET: ${{ needs.build-windows-x64.outputs.asset_name }}
         run: |
-          gh release create latest "${{ steps.locate_zip.outputs.zip_file }}" \
+          gh release create latest release-assets/*.zip \
             --title "latest" \
-            --notes "Automated build upload from GitHub Actions.\n\nAsset: ${{ steps.locate_zip.outputs.zip_name }}" \
+            --notes "Automated build upload from GitHub Actions.\n\nAssets:\n- ${LINUX_ASSET}\n- ${WINDOWS_ASSET}" \
             --latest
