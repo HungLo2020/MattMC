@@ -10,12 +10,20 @@ REM Get the directory containing this script (should be in server directory)
 cd /d "%~dp0"
 set SCRIPT_DIR=%CD%
 
-REM Require system Java on PATH and enforce Java 25
-set JAVA_CMD=java
-where %JAVA_CMD% >nul 2>&1
-if errorlevel 1 (
-    echo Error: Java was not found on PATH.
-    echo Please install Java %JAVA_VERSION% and ensure 'java' is available from the command line.
+REM Prefer bundled platform-specific JDK in distribution
+set "JAVA_CMD="
+for %%J in (
+    "%SCRIPT_DIR%\..\run\jdk\win-x64\bin\java.exe"
+    "%SCRIPT_DIR%\..\run\jdk\win-aarch64\bin\java.exe"
+) do (
+    if not defined JAVA_CMD if exist %%~J set "JAVA_CMD=%%~J"
+)
+
+if not defined JAVA_CMD (
+    echo Error: Bundled JDK not found.
+    echo Expected one of:
+    echo   %SCRIPT_DIR%\..\run\jdk\win-x64\bin\java.exe
+    echo   %SCRIPT_DIR%\..\run\jdk\win-aarch64\bin\java.exe
     exit /b 1
 )
 
@@ -31,7 +39,7 @@ if not defined JAVA_OK (
     exit /b 1
 )
 
-echo Using system Java %JAVA_VERSION%
+echo Using bundled JDK: %JAVA_CMD%
 
 REM Build classpath dynamically from all jars in ..\lib so mixed-platform native jars are safe.
 set "CLASSPATH="

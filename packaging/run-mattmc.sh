@@ -9,12 +9,37 @@ JAVA_VERSION=25
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Require bundled JDK - do not fall back to system Java
-BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk-${JAVA_VERSION}/bin/java"
+# Require bundled platform-specific JDK - do not fall back to system Java
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+if [[ "$OS" == "Linux" ]]; then
+    if [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" ]]; then
+        PLATFORM="linux-x64"
+    elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+        PLATFORM="linux-aarch64"
+    else
+        echo "Error: Unsupported Linux architecture: $ARCH"
+        exit 1
+    fi
+elif [[ "$OS" == "Darwin" ]]; then
+    if [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" ]]; then
+        PLATFORM="mac-x64"
+    elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+        PLATFORM="mac-aarch64"
+    else
+        echo "Error: Unsupported macOS architecture: $ARCH"
+        exit 1
+    fi
+else
+    echo "Error: Unsupported operating system: $OS"
+    exit 1
+fi
+
+BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk/${PLATFORM}/bin/java"
 if [[ ! -f "$BUNDLED_JAVA" ]]; then
     echo "Error: Bundled JDK not found at: $BUNDLED_JAVA"
-    echo "Please ensure the distribution includes the bundled JDK."
-    echo "To build with bundled JDK, run: ./gradlew downloadJdk copyJdkToRun clientDist"
+    echo "Please ensure the distribution includes run/jdk/${PLATFORM}."
     exit 1
 fi
 
@@ -27,7 +52,7 @@ if [[ ! -x "$BUNDLED_JAVA" ]]; then
 fi
 
 JAVA_CMD="$BUNDLED_JAVA"
-echo "Using bundled JDK ${JAVA_VERSION}"
+echo "Using bundled JDK ${JAVA_VERSION} (${PLATFORM})"
 
 # Build classpath dynamically from all jars in lib/ so mixed-platform native jars are safe.
 CLASSPATH=""
