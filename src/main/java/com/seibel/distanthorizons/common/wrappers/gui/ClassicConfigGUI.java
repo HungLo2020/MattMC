@@ -16,12 +16,10 @@ import com.seibel.distanthorizons.common.wrappers.gui.config.ConfigGuiInfo;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigHandler;
 import com.seibel.distanthorizons.core.config.types.*;
-import com.seibel.distanthorizons.common.wrappers.gui.updater.ChangelogScreen;
 
 import com.seibel.distanthorizons.core.config.types.enums.EConfigCommentTextPosition;
 import com.seibel.distanthorizons.core.config.types.enums.EConfigValidity;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.jar.updater.SelfUpdater;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.util.AnnotationUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.config.IConfigGui;
@@ -156,39 +154,6 @@ public class ClassicConfigGUI
 			if (!this.reload)
 			{
 				ConfigHandler.INSTANCE.configFileHandler.loadFromFile();
-			}
-			
-			// Changelog button
-			if (Config.Client.Advanced.AutoUpdater.enableAutoUpdater.get()
-				// we only have changelogs for stable builds		
-				&& !ModInfo.IS_DEV_BUILD)
-			{
-				this.addBtn(new TexturedButtonWidget(
-						// Where the button is on the screen
-						this.width - 28, this.height - 28,
-						// Width and height of the button
-						20, 20,
-						// texture UV Offset
-						0, 0,
-						// Some texture stuff
-						0, 
-						ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
-						20, 20,
-						// Create the button and tell it where to go
-						(buttonWidget) -> {
-							ChangelogScreen changelogScreen = new ChangelogScreen(this);
-							if (changelogScreen.usable)
-							{
-								Objects.requireNonNull(this.minecraft).setScreen(changelogScreen);
-							}
-							else
-							{
-								LOGGER.warn("Changelog was not able to open");
-							}
-						},
-						// Add a title to the button
-						Translatable(ModInfo.ID + ".updater.title")
-				));
 			}
 			
 			
@@ -660,13 +625,6 @@ public class ClassicConfigGUI
 			// render DH version
 			this.DhDrawString(matrices, this.font, TextOrLiteral(ModInfo.VERSION), 2, this.height - 10, 
 					0xFFAAAAAA); // ARGB white
-			
-			// If the update is pending, display this message to inform the user that it will apply when the game restarts
-			if (SelfUpdater.deleteOldJarOnJvmShutdown)
-			{
-				this.DhDrawString(matrices, this.font, Translatable(ModInfo.ID + ".updater.waitingForClose"), 4, this.height - 42, 
-						0xFFFFFFFF); // ARGB white
-			}
 			
 			
 			this.renderTooltip(matrices, mouseX, mouseY, delta);
