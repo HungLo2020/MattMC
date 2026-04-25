@@ -7533,20 +7533,28 @@ void main() {
                 }
             }
 
-            transitionLegacyTextureToSampleLayout(sampledLegacyTexture, resolvedTextureView);
-
             long requestedImageViewHandle = resolvedTextureView.getVkImageViewHandle();
             long descriptorImageViewHandle = requestedImageViewHandle;
             long sampledDefaultViewHandle = sampledLegacyTexture != null
                 ? sampledLegacyTexture.defaultViewHandle
                 : VK10.VK_NULL_HANDLE;
+            int descriptorBaseMipLevel = Math.max(0, resolvedTextureView.getBaseMipLevel());
+            int descriptorMipLevelCount = Math.max(1, resolvedTextureView.getMipLevelCount());
 
             if (sampledLegacyTexture != null
                 && sampledDefaultViewHandle != VK10.VK_NULL_HANDLE
                 && resolvedTextureView.getBaseMipLevel() == 0
                 && resolvedTextureView.getMipLevelCount() >= sampledLegacyTexture.mipLevels) {
                 descriptorImageViewHandle = sampledDefaultViewHandle;
+                descriptorBaseMipLevel = 0;
+                descriptorMipLevelCount = Math.max(1, sampledLegacyTexture.mipLevels);
             }
+
+            transitionLegacyTextureToSampleLayout(
+                sampledLegacyTexture,
+                descriptorBaseMipLevel,
+                descriptorMipLevelCount
+            );
 
             String sampledTextureLabel = resolvedTextureView.texture().getLabel();
             int sampledUsage = resolvedTextureView.texture().usage();
@@ -7926,12 +7934,28 @@ void main() {
 
         private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,
                                                            VulkanTextureView view) {
+            transitionLegacyTextureToSampleLayout(
+                texture,
+                Math.max(0, view.getBaseMipLevel()),
+                Math.max(1, view.getMipLevelCount())
+            );
+        }
+
+        private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,
+                                                           int baseMip,
+                                                           int mipCount) {
             if (texture == null || texture.imageHandle == VK10.VK_NULL_HANDLE) {
                 return;
             }
 
-            int baseMip = view.getBaseMipLevel();
-            int mipCount = Math.max(1, view.getMipLevelCount());
+            int safeBaseMip = Math.max(0, baseMip);
+            int safeMipCount = Math.max(1, mipCount);
+            int maxMipLevels = Math.max(1, texture.mipLevels);
+            if (safeBaseMip >= maxMipLevels) {
+                return;
+            }
+            int endMipExclusive = Math.min(maxMipLevels, safeBaseMip + safeMipCount);
+
             // Feedback-loop-capable textures live permanently in ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
             // so they can be sampled without transition from any stage (including inside a render pass
             // where the same image may simultaneously be a color attachment).
@@ -7941,7 +7965,7 @@ void main() {
                     ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                     : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-            for (int level = baseMip; level < baseMip + mipCount; level++) {
+            for (int level = safeBaseMip; level < endMipExclusive; level++) {
                 int trackedLayout = trackedLayoutForLevel(texture, level);
                 if (trackedLayout == targetLayout) {
                     continue;
@@ -9020,7 +9044,10 @@ void main() {
         }
 
         private static int trackedLayoutForLevel(LegacyTextureObject texture, int level) {
-            return texture.levelLayouts.getOrDefault(level, texture.currentLayout);
+            if (texture.levelLayouts.containsKey(level)) {
+                return texture.levelLayouts.get(level);
+            }
+            return level == 0 ? texture.currentLayout : VK10.VK_IMAGE_LAYOUT_UNDEFINED;
         }
 
         private static void trackLayoutForLevel(LegacyTextureObject texture, int level, int layout) {
