@@ -54,7 +54,7 @@ MattMC/
 │       └── resources/    # Resource files
 │           └── version.json       # Version information
 └── run/                  # Runtime directory (created on first run)
-    ├── jdk-21/           # Bundled JDK (optional)
+    ├── jdk/              # Bundled JDK(s) by platform (optional)
     ├── assets/           # Game assets
     └── server.properties # Server configuration
 ```

@@ -12,8 +12,28 @@ echo "  MattMC Bundled JDK Verification"
 echo "================================================"
 echo ""
 
+OS_NAME="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m)"
+
+if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+    ARCH_KEY="aarch64"
+else
+    ARCH_KEY="x64"
+fi
+
+if [[ "$OS_NAME" == "linux" ]]; then
+    PLATFORM_KEY="linux-$ARCH_KEY"
+elif [[ "$OS_NAME" == "darwin" ]]; then
+    PLATFORM_KEY="mac-$ARCH_KEY"
+elif [[ "$OS_NAME" == "msys" || "$OS_NAME" == "mingw" || "$OS_NAME" == "cygwin" ]]; then
+    PLATFORM_KEY="win-$ARCH_KEY"
+else
+    echo "❌ Unsupported OS for platform key detection: $OS_NAME"
+    exit 1
+fi
+
 # Check if JDK exists in libraries
-JDK_LIB_DIR="libraries/jdk-21"
+JDK_LIB_DIR="libraries/jdk/$PLATFORM_KEY"
 if [[ -d "$JDK_LIB_DIR" && -x "$JDK_LIB_DIR/bin/java" ]]; then
     echo "✅ Bundled JDK found in libraries/"
     echo "   Location: $JDK_LIB_DIR"
@@ -30,7 +50,7 @@ fi
 echo ""
 
 # Check if JDK exists in run directory
-JDK_RUN_DIR="run/jdk-21"
+JDK_RUN_DIR="run/jdk/$PLATFORM_KEY"
 if [[ -d "$JDK_RUN_DIR" && -x "$JDK_RUN_DIR/bin/java" ]]; then
     echo "✅ Bundled JDK found in run/"
     echo "   Location: $JDK_RUN_DIR"
@@ -45,7 +65,7 @@ fi
 echo ""
 
 # Check gitignore
-if grep -q "libraries/jdk-21/" .gitignore; then
+if grep -q "/libraries/jdk/" .gitignore; then
     echo "✅ JDK directories properly gitignored"
 else
     echo "⚠️  JDK directories not in .gitignore"

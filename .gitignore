@@ -24,7 +24,10 @@ Thumbs.db
 *.tmp
 
 # JDK (too large to commit)
-libraries/jdk-21/
+/libraries/jdk/
+
+# Data generation output
+generated/
 
 # Test outputs and reports
 build/test-results/
@@ -39,5 +42,4 @@ jmh-result.txt
 .jacoco/
 /Task
 *.inline_backup
-/libraries/jdk-25/
 /mattmc_performance_history.html

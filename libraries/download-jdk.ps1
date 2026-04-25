@@ -17,7 +17,7 @@ if (Test-Path $GradlePropertiesPath) {
     $JavaVersion = "25"
 }
 
-$JdkDir = Join-Path $ScriptDir "jdk-$JavaVersion"
+$JdkRoot = Join-Path $ScriptDir "jdk"
 
 # JDK version configuration - Update these when a new Java version is released
 # This is the specific build version to download (e.g., 25.0.1+8)
@@ -27,12 +27,12 @@ $JdkBuild = "25.0.1_8"
 # Detect architecture
 $Arch = $env:PROCESSOR_ARCHITECTURE
 if ($Arch -eq "AMD64") {
-    $Platform = "windows-x64"
+    $Platform = "win-x64"
     $JdkUrl = "https://github.com/adoptium/temurin$JavaVersion-binaries/releases/download/jdk-$JdkVersion/OpenJDK$($JavaVersion)U-jdk_x64_windows_hotspot_$JdkBuild.zip"
     $JdkArchive = "OpenJDK$($JavaVersion)U-jdk_x64_windows_hotspot_$JdkBuild.zip"
     $JdkExtractedDir = "jdk-$JdkVersion"
 } elseif ($Arch -eq "ARM64") {
-    $Platform = "windows-aarch64"
+    $Platform = "win-aarch64"
     $JdkUrl = "https://github.com/adoptium/temurin$JavaVersion-binaries/releases/download/jdk-$JdkVersion/OpenJDK$($JavaVersion)U-jdk_aarch64_windows_hotspot_$JdkBuild.zip"
     $JdkArchive = "OpenJDK$($JavaVersion)U-jdk_aarch64_windows_hotspot_$JdkBuild.zip"
     $JdkExtractedDir = "jdk-$JdkVersion"
@@ -40,6 +40,8 @@ if ($Arch -eq "AMD64") {
     Write-Host "[ERROR] Unsupported architecture: $Arch" -ForegroundColor Red
     exit 1
 }
+
+$JdkDir = Join-Path $JdkRoot $Platform
 
 # Check if JDK already exists
 $JavaExe = Join-Path $JdkDir "bin\java.exe"
@@ -70,6 +72,9 @@ try {
     
     # Move to final location
     Write-Host "[INFO] Installing JDK to: $JdkDir" -ForegroundColor Yellow
+    if (-not (Test-Path $JdkRoot)) {
+        New-Item -ItemType Directory -Path $JdkRoot -Force | Out-Null
+    }
     
     # Remove old JDK if exists
     if (Test-Path $JdkDir) {

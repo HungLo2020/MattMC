@@ -17,6 +17,26 @@ require_command() {
   fi
 }
 
+sync_with_lib_exception() {
+  local source_dir="$1"
+  local destination_dir="$2"
+
+  rsync -a --delete --human-readable --info=stats2,progress2 \
+    --exclude='/lib/***' \
+    --exclude='/run/jdk/***' \
+    "$source_dir/" "$destination_dir/"
+
+  if [[ -d "$source_dir/lib" ]]; then
+    rsync -a --human-readable --info=stats2,progress2 \
+      "$source_dir/lib/" "$destination_dir/lib/"
+  fi
+
+  if [[ -d "$source_dir/run/jdk" ]]; then
+    rsync -a --human-readable --info=stats2,progress2 \
+      "$source_dir/run/jdk/" "$destination_dir/run/jdk/"
+  fi
+}
+
 sync_up() {
   mkdir -p "$REMOTE_DIR"
 
@@ -25,9 +45,9 @@ sync_up() {
   echo "From: $LOCAL_DIR/"
   echo "To:   $REMOTE_DIR/"
 
-  rsync -a --delete --human-readable --info=stats2,progress2 "$LOCAL_DIR/" "$REMOTE_DIR/"
+  sync_with_lib_exception "$LOCAL_DIR" "$REMOTE_DIR"
 
-  echo "Done. Remote now mirrors local."
+  echo "Done. Remote mirrored from local (deletes enabled except destination lib/ and run/jdk/)."
 }
 
 sync_down() {
@@ -41,9 +61,9 @@ sync_down() {
   echo "From: $REMOTE_DIR/"
   echo "To:   $LOCAL_DIR/"
 
-  rsync -a --delete --human-readable --info=stats2,progress2 "$REMOTE_DIR/" "$LOCAL_DIR/"
+  sync_with_lib_exception "$REMOTE_DIR" "$LOCAL_DIR"
 
-  echo "Done. Local now mirrors remote."
+  echo "Done. Local mirrored from remote (deletes enabled except destination lib/ and run/jdk/)."
 }
 
 main() {

@@ -29,6 +29,6 @@ Server files and world data are stored in the `run/` subdirectory.
 
 ## Notes
 
-- The server shares the bundled JDK with the client (located at `../run/jdk-25/`)
+- The server shares the bundled JDK with the client (located at `../run/jdk/<platform>/`)
 - All dependencies are shared with the client in the `../lib/` directory
 - Server runtime files are isolated in the `server/run/` directory

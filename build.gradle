@@ -461,23 +461,53 @@ if (bundledSpirvCompilerPath != null) {
     println "⚠ SPIR-V compiler not bundled. Run './Install.sh' to add glslangValidator in libraries/deps/."
 }
 
+def resolveCurrentPlatformKey() {
+    def osName = System.getProperty('os.name').toLowerCase()
+    def arch = System.getProperty('os.arch').toLowerCase()
+
+    def archKey = (arch.contains('aarch64') || arch.contains('arm64')) ? 'aarch64' : 'x64'
+
+    if (osName.contains('windows') || osName.contains('win')) {
+        return "win-${archKey}"
+    }
+    if (osName.contains('linux')) {
+        return "linux-${archKey}"
+    }
+    if (osName.contains('mac')) {
+        return "mac-${archKey}"
+    }
+
+    return null
+}
+
+def resolveBundledJdkExecutableForCurrentPlatform(File baseDir) {
+    def platformKey = resolveCurrentPlatformKey()
+    if (platformKey == null) {
+        return null
+    }
+
+    def osName = System.getProperty('os.name').toLowerCase()
+    def javaExecutableName = (osName.contains('windows') || osName.contains('win')) ? 'java.exe' : 'java'
+
+    def platformPath = new File(baseDir, "run/jdk/${platformKey}/bin/${javaExecutableName}")
+    if (platformPath.exists()) {
+        return platformPath
+    }
+
+    return null
+}
+
 // Helper method to configure JavaExec tasks to use bundled JDK (if available) or toolchain
 def configureBundledJdk(JavaExec task) {
-    def bundledJdkDir = file("run/jdk-${targetJavaVersion}")
-    def osName = System.getProperty('os.name').toLowerCase()
-    def isWindows = osName.contains('windows') || osName.contains('win')
-    
-    // Determine the Java executable path based on OS
-    def bundledJavaExe = isWindows ? 
-        new File(bundledJdkDir, 'bin/java.exe') : 
-        new File(bundledJdkDir, 'bin/java')
+    def bundledJavaExe = resolveBundledJdkExecutableForCurrentPlatform(project.projectDir)
+    def platformKey = resolveCurrentPlatformKey()
     
     // Check if bundled JDK exists at configuration time
-    if (bundledJavaExe.exists()) {
+    if (bundledJavaExe != null && bundledJavaExe.exists()) {
         // Use bundled JDK if available
         task.executable = bundledJavaExe.absolutePath
         task.doFirst {
-            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
+            println "Using bundled JDK from: ${bundledJavaExe.parentFile.parentFile.absolutePath}"
         }
     } else {
         // Use Gradle toolchain (will auto-download Java if needed via Foojay resolver)
@@ -488,6 +518,9 @@ def configureBundledJdk(JavaExec task) {
             println "Using Gradle toolchain for Java ${targetJavaVersion} (bundled JDK not found)"
             println "Toolchain will be auto-downloaded if not available locally"
             println ""
+            if (platformKey != null) {
+                println "💡 Expected bundled JDK at: run/jdk/${platformKey}/bin"
+            }
             println "💡 To use bundled JDK instead, run: ./gradlew downloadJdk copyJdkToRun"
         }
     }
@@ -641,18 +674,19 @@ tasks.register('downloadJdk', Exec) {
     group = 'minecraft'
     description = "Downloads Temurin OpenJDK ${targetJavaVersion} if not already present"
     
-    def jdkDir = file("libraries/jdk-${targetJavaVersion}")
+    def platformKey = resolveCurrentPlatformKey()
+    def jdkDir = platformKey != null ? file("libraries/jdk/${platformKey}") : null
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     def isLinux = osName.contains('linux')
     def isMac = osName.contains('mac')
     
     // Determine the Java executable path based on OS
-    def javaExe = isWindows ? new File(jdkDir, 'bin/java.exe') : new File(jdkDir, 'bin/java')
+    def javaExe = (jdkDir == null) ? null : (isWindows ? new File(jdkDir, 'bin/java.exe') : new File(jdkDir, 'bin/java'))
     
     // Only run if JDK doesn't exist
     onlyIf { 
-        !javaExe.exists()
+        platformKey != null && (javaExe == null || !javaExe.exists())
     }
     
     workingDir = file('.')
@@ -667,6 +701,9 @@ tasks.register('downloadJdk', Exec) {
     }
     
     doFirst {
+        if (platformKey != null) {
+            println "📂 Target bundled JDK path: libraries/jdk/${platformKey}"
+        }
         if (isWindows) {
             println "📥 Downloading JDK for Windows..."
         } else if (isLinux) {
@@ -688,26 +725,34 @@ tasks.register('copyJdkToRun') {
     
     dependsOn 'downloadJdk'
     
-    def srcJdkDir = file("libraries/jdk-${targetJavaVersion}")
-    def destJdkDir = file("run/jdk-${targetJavaVersion}")
+    def platformKey = resolveCurrentPlatformKey()
+    def platformSrcJdkDir = platformKey != null ? file("libraries/jdk/${platformKey}") : null
+    def destJdkDir = platformKey != null ? file("run/jdk/${platformKey}") : null
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     
     // Determine the Java executable path based on OS
-    def javaExe = isWindows ? 
-        new File(srcJdkDir, 'bin/java.exe') : 
-        new File(srcJdkDir, 'bin/java')
+    def platformJavaExe = platformSrcJdkDir == null ? null : (isWindows ? 
+        new File(platformSrcJdkDir, 'bin/java.exe') : 
+        new File(platformSrcJdkDir, 'bin/java'))
     
     // Declare inputs only - not outputs to avoid Gradle detecting
     // implicit dependencies with compileJava task
-    inputs.dir(srcJdkDir).skipWhenEmpty()
+    if (platformSrcJdkDir != null && platformSrcJdkDir.exists()) {
+        inputs.dir(platformSrcJdkDir).skipWhenEmpty()
+    }
     
     // Only run if source JDK exists
-    onlyIf { srcJdkDir.exists() && javaExe.exists() }
+    onlyIf { platformSrcJdkDir != null && platformJavaExe != null && platformSrcJdkDir.exists() && platformJavaExe.exists() }
     
     doLast {
-        if (!srcJdkDir.exists()) {
-            println "⚠️  JDK not found at ${srcJdkDir}."
+        if (platformKey == null) {
+            println "⚠️  Unsupported platform for bundled JDK copy."
+            return
+        }
+
+        if (platformSrcJdkDir == null || !platformSrcJdkDir.exists()) {
+            println "⚠️  JDK not found at libraries/jdk/${platformKey}."
             println "   Run: ./gradlew downloadJdk"
             println "   Or see libraries/JDK-README.md for manual setup"
             return
@@ -720,7 +765,7 @@ tasks.register('copyJdkToRun') {
         
         println "📂 Copying JDK to run directory..."
         copy {
-            from srcJdkDir
+            from platformSrcJdkDir
             into destJdkDir
         }
         println "✅ JDK copied to ${destJdkDir}"
@@ -728,6 +773,139 @@ tasks.register('copyJdkToRun') {
 }
 
 
+
+// ============================================================================
+// DATA GENERATION TASKS
+// ============================================================================
+// Run Minecraft's built-in data generation to create JSON resources
+// (recipes, loot tables, tags, advancements, models, etc.)
+// ============================================================================
+
+// Task to run server-side data generation
+tasks.register('runDatagen', JavaExec) {
+    group = 'minecraft'
+    description = 'Generates server-side data (recipes, loot tables, tags, advancements, etc.)'
+    
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
+    
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.minecraft.data.Main'
+    
+    workingDir = file('.')
+    
+    // JVM arguments optimized for data generation
+    jvmArgs = [
+        '-Xmx4G',
+        '-Xms2G',
+        '-XX:+UseG1GC'
+    ]
+    
+    // Arguments for data generation
+    // --output: where to write generated files
+    // --server: generate server-side data (recipes, loot, tags, advancements)
+    // --reports: generate data reports (useful for debugging)
+    // --all: generate everything
+    args = [
+        '--output', file('generated').absolutePath,
+        '--server',
+        '--reports',
+        '--all'
+    ]
+    
+    doFirst {
+        verifyMainClassExists('net/minecraft/data/Main.class', 'Data generation main class')
+        file('generated').mkdirs()
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "Starting server-side data generation..."
+        println "Output directory: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+    
+    doLast {
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "✅ Server-side data generation complete!"
+        println "Generated files are in: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
+}
+
+// Task to run client-side data generation
+tasks.register('runDatagenClient', JavaExec) {
+    group = 'minecraft'
+    description = 'Generates client-side data (models, atlases, etc.)'
+    
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
+    
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.minecraft.client.data.Main'
+    
+    workingDir = file('.')
+    
+    // JVM arguments optimized for data generation
+    jvmArgs = [
+        '-Xmx4G',
+        '-Xms2G',
+        '-XX:+UseG1GC'
+    ]
+    
+    // Arguments for data generation
+    // --output: where to write generated files
+    // --client: generate client-side data (models, atlases)
+    // --all: generate everything
+    args = [
+        '--output', file('generated').absolutePath,
+        '--client',
+        '--all'
+    ]
+    
+    doFirst {
+        verifyMainClassExists('net/minecraft/client/data/Main.class', 'Client data generation main class')
+        file('generated').mkdirs()
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "Starting client-side data generation..."
+        println "Output directory: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+    
+    doLast {
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "✅ Client-side data generation complete!"
+        println "Generated files are in: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
+}
+
+// Task to run both server and client data generation
+tasks.register('runDatagenAll') {
+    group = 'minecraft'
+    description = 'Generates all data (server + client)'
+    
+    dependsOn 'runDatagen', 'runDatagenClient'
+    
+    doLast {
+        println ""
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "✅ All data generation complete!"
+        println "   - Server data: recipes, loot tables, tags, advancements"
+        println "   - Client data: models, atlases"
+        println "   - Reports: data validation and debugging info"
+        println ""
+        println "Output directory: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+}
 
 // Build task configuration
 tasks.withType(JavaCompile).configureEach {
@@ -836,26 +1014,41 @@ tasks.register('clientDist') {
         // All resources (assets, data, shaders, etc.) are already in the JAR
         // No need to copy them separately to the distribution
         
-        // Copy bundled JDK to distribution
-        def srcJdkDir = file("libraries/jdk-${targetJavaVersion}")
-        if (srcJdkDir.exists()) {
-            println "📂 Copying bundled JDK to distribution..."
-            copy {
-                from srcJdkDir
-                into "${distDir}/run/jdk-${targetJavaVersion}"
+        // Copy bundled JDK(s) to distribution using platform-labeled paths
+        def copiedPlatformJdks = []
+        def multiPlatformRoot = file("libraries/jdk")
+        if (multiPlatformRoot.exists() && multiPlatformRoot.isDirectory()) {
+            multiPlatformRoot.eachDir { platformDir ->
+                def isWindowsPlatform = platformDir.name.startsWith('win-')
+                def javaExe = isWindowsPlatform ?
+                    new File(platformDir, 'bin/java.exe') :
+                    new File(platformDir, 'bin/java')
+                if (javaExe.exists()) {
+                    copy {
+                        from platformDir
+                        into "${distDir}/run/jdk/${platformDir.name}"
+                    }
+                    copiedPlatformJdks << platformDir.name
+                }
             }
-            println "✅ JDK copied to distribution"
+        }
+
+        if (!copiedPlatformJdks.isEmpty()) {
+            println "✅ JDK copied to distribution for platform(s): ${copiedPlatformJdks.join(', ')}"
         }
 
         // Copy bundled SPIR-V compiler if available
-        def bundledCompiler = file(resolveBundledSpirvCompilerPath() ?: '')
-        if (bundledCompiler.exists() && bundledCompiler.isFile()) {
-            copy {
-                from bundledCompiler
-                into "${distDir}/libraries/deps"
+        def spirvCompilerPath = resolveBundledSpirvCompilerPath()
+        if (spirvCompilerPath != null) {
+            def bundledCompiler = file(spirvCompilerPath)
+            if (bundledCompiler.exists() && bundledCompiler.isFile()) {
+                copy {
+                    from bundledCompiler
+                    into "${distDir}/libraries/deps"
+                }
+                file("${distDir}/libraries/deps/${bundledCompiler.name}").setExecutable(true)
+                println "✅ Bundled SPIR-V compiler copied to ${distDir}/libraries/deps/${bundledCompiler.name}"
             }
-            file("${distDir}/libraries/deps/${bundledCompiler.name}").setExecutable(true)
-            println "✅ Bundled SPIR-V compiler copied to ${distDir}/libraries/deps/${bundledCompiler.name}"
         }
         
         // Assets are now loaded directly from the JAR - no filesystem copy needed!
@@ -868,16 +1061,6 @@ tasks.register('clientDist') {
             include '*.zip'
         }
         println "Copied shader pack to ${distDir}/run/shaderpacks"
-        
-        // Build classpath string for launch scripts
-        // ONE JAR with everything, plus dependencies
-        def mainJarName = jar.archiveFile.get().asFile.name
-        def classpathLinux = "lib/${mainJarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
-        def classpathWindows = "lib\\${mainJarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
-        
-        // Build classpath for server scripts (relative to server directory)
-        def serverClasspathLinux = "../lib/${mainJarName}:../lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':../lib/')
-        def serverClasspathWindows = "..\\lib\\${mainJarName};..\\lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';..\\lib\\')
         
         // Copy and process launch scripts from packaging directory
         // Process each script file in the packaging directory
@@ -894,17 +1077,15 @@ tasks.register('clientDist') {
                 
                 // Determine if this is a client or server script
                 if (scriptFile.name.startsWith('run-server')) {
-                    // Server script - place in server directory with server classpath
+                    // Server script - place in server directory
                     def linuxScript = file("${distDir}/server/${scriptFile.name}")
                     linuxScript.text = linuxScriptTemplate
-                        .replace('@CLASSPATH_LINUX@', serverClasspathLinux)
                         .replace('@VERSION@', version)
                     linuxScript.setExecutable(true)
                 } else {
                     // Client script - place in root directory
                     def linuxScript = file("${distDir}/${scriptFile.name}")
                     linuxScript.text = linuxScriptTemplate
-                        .replace('@CLASSPATH_LINUX@', classpathLinux)
                         .replace('@VERSION@', version)
                     linuxScript.setExecutable(true)
                 }
@@ -914,16 +1095,14 @@ tasks.register('clientDist') {
                 
                 // Determine if this is a client or server script
                 if (scriptFile.name.startsWith('run-server')) {
-                    // Server script - place in server directory with server classpath
+                    // Server script - place in server directory
                     def windowsScript = file("${distDir}/server/${scriptFile.name}")
                     windowsScript.text = windowsScriptTemplate
-                        .replace('@CLASSPATH_WINDOWS@', serverClasspathWindows)
                         .replace('@VERSION@', version)
                 } else {
                     // Client script - place in root directory
                     def windowsScript = file("${distDir}/${scriptFile.name}")
                     windowsScript.text = windowsScriptTemplate
-                        .replace('@CLASSPATH_WINDOWS@', classpathWindows)
                         .replace('@VERSION@', version)
                 }
             } else {

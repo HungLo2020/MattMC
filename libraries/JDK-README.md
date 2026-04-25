@@ -44,13 +44,15 @@ If automatic download doesn't work, download manually:
    - **Package Type:** JDK
    - **Archive Type:** .tar.gz (Linux/macOS) or .zip (Windows)
 
-3. Download and extract to `libraries/jdk-25/`
+3. Download and extract to: `libraries/jdk/<platform>/`
+    (e.g. `libraries/jdk/win-x64/`, `libraries/jdk/linux-x64/`)
 
 ### Linux:
 ```bash
 cd libraries
 tar -xzf /path/to/OpenJDK25U-jdk_*.tar.gz
-mv jdk-25.0.1+8 jdk-25
+mkdir -p jdk/linux-x64
+mv jdk-25.0.1+8/* jdk/linux-x64/
 ```
 
 ### macOS:
@@ -58,14 +60,16 @@ mv jdk-25.0.1+8 jdk-25
 cd libraries
 tar -xzf /path/to/OpenJDK25U-jdk_*.tar.gz
 # On macOS, the JDK is in Contents/Home subdirectory
-mv jdk-25.0.1+8/Contents/Home jdk-25
+mkdir -p jdk/mac-aarch64
+mv jdk-25.0.1+8/Contents/Home/* jdk/mac-aarch64/
 ```
 
 ### Windows:
 ```cmd
 cd libraries
 "C:\Program Files\7-Zip\7z.exe" x C:\path\to\OpenJDK25U-jdk_*.zip
-move jdk-25.0.1+8 jdk-25
+mkdir jdk\win-x64
+xcopy /E /I jdk-25.0.1+8\* jdk\win-x64\
 ```
 
 ## Directory Structure
@@ -73,18 +77,22 @@ move jdk-25.0.1+8 jdk-25
 ```
 MattMC/
 ├── libraries/
-│   ├── jdk-25/              # Bundled JDK (not committed to git)
-│   │   ├── bin/
-│   │   │   ├── java         # Java executable (Linux/macOS)
-│   │   │   └── java.exe     # Java executable (Windows)
-│   │   ├── lib/
-│   │   └── ...
+│   ├── jdk/                 # Multi-platform JDK layout
+│   │   ├── win-x64/
+│   │   ├── linux-x64/
+│   │   └── mac-aarch64/
+│   │       ├── bin/
+│   │       │   ├── java         # Java executable (Linux/macOS)
+│   │       │   └── java.exe     # Java executable (Windows)
+│   │       ├── lib/
+│   │       └── ...
 │   ├── download-jdk.sh      # Automatic download script (Linux/macOS)
 │   └── download-jdk.ps1     # Automatic download script (Windows)
 └── run/
-    └── jdk-25/              # JDK copied here at runtime (not committed to git)
-        ├── bin/
-        └── ...
+    └── jdk/
+        ├── win-x64/         # Bundled JDK selected by Windows launchers
+        ├── linux-x64/       # Bundled JDK selected by Linux launchers
+        └── mac-aarch64/     # Bundled JDK selected by macOS launchers
 ```
 
 ## Why Bundle JDK?
@@ -100,7 +108,7 @@ The JDK is **not committed to the git repository** because it's too large (~200M
 
 ## Distribution
 
-When building distributions (`clientDist` or `clientDistZip`), the bundled JDK is automatically included in the package, ensuring users don't need to install Java separately.
+When building distributions (`clientDist` or `clientDistZip`), bundled JDKs are included under platform-labeled paths (`run/jdk/<platform>/`) and launchers select the matching runtime for the host OS/architecture.
 
 ## Technical Details
 
