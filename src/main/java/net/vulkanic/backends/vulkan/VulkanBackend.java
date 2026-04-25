@@ -9975,9 +9975,12 @@ void main() {
                 | VulkanicBuffer.USAGE_COPY_DST;
 
             if (target == VulkanicAPI.GL_ARRAY_BUFFER) {
-                usage |= VulkanicBuffer.USAGE_VERTEX;
+                // GL allows rebinding the same buffer name between ARRAY/ELEMENT targets.
+                // Allocate both roles up front so draw-time binds stay valid regardless of
+                // whichever target last configured storage.
+                usage |= VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX;
             } else if (target == VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER) {
-                usage |= VulkanicBuffer.USAGE_INDEX;
+                usage |= VulkanicBuffer.USAGE_VERTEX | VulkanicBuffer.USAGE_INDEX;
             } else if (target == VulkanicAPI.GL_UNIFORM_BUFFER) {
                 usage |= VulkanicBuffer.USAGE_UNIFORM;
             } else if (target == VulkanicAPI.GL_TEXTURE_BUFFER) {
