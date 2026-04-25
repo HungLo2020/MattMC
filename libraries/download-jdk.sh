@@ -16,8 +16,6 @@ else
     JAVA_VERSION=25
 fi
 
-JDK_DIR="${SCRIPT_DIR}/jdk-${JAVA_VERSION}"
-
 # JDK version configuration - Update these when a new Java version is released
 # This is the specific build version to download (e.g., 25.0.1+8)
 JDK_VERSION="25.0.1+8"
@@ -65,6 +63,8 @@ else
     exit 1
 fi
 
+JDK_DIR="${SCRIPT_DIR}/jdk/${PLATFORM}"
+
 # Check if JDK already exists
 if [[ -d "$JDK_DIR" && -f "$JDK_DIR/bin/java" ]]; then
     echo "✅ JDK already exists at: $JDK_DIR"
@@ -96,6 +96,7 @@ tar -xzf "$JDK_ARCHIVE"
 # Move to final location
 echo "📂 Installing JDK to: $JDK_DIR"
 rm -rf "$JDK_DIR"
+mkdir -p "$(dirname "$JDK_DIR")"
 
 # Handle macOS directory structure (Contents/Home)
 if [[ "$OS" == "darwin" ]]; then

@@ -44,15 +44,15 @@ If automatic download doesn't work, download manually:
    - **Package Type:** JDK
    - **Archive Type:** .tar.gz (Linux/macOS) or .zip (Windows)
 
-3. Download and extract to one of:
-    - Legacy single-platform path: `libraries/jdk-25/`
-    - Preferred multi-platform path: `libraries/jdk/<platform>/` (e.g. `libraries/jdk/win-x64/`, `libraries/jdk/linux-x64/`)
+3. Download and extract to: `libraries/jdk/<platform>/`
+    (e.g. `libraries/jdk/win-x64/`, `libraries/jdk/linux-x64/`)
 
 ### Linux:
 ```bash
 cd libraries
 tar -xzf /path/to/OpenJDK25U-jdk_*.tar.gz
-mv jdk-25.0.1+8 jdk-25
+mkdir -p jdk/linux-x64
+mv jdk-25.0.1+8/* jdk/linux-x64/
 ```
 
 ### macOS:
@@ -60,14 +60,16 @@ mv jdk-25.0.1+8 jdk-25
 cd libraries
 tar -xzf /path/to/OpenJDK25U-jdk_*.tar.gz
 # On macOS, the JDK is in Contents/Home subdirectory
-mv jdk-25.0.1+8/Contents/Home jdk-25
+mkdir -p jdk/mac-aarch64
+mv jdk-25.0.1+8/Contents/Home/* jdk/mac-aarch64/
 ```
 
 ### Windows:
 ```cmd
 cd libraries
 "C:\Program Files\7-Zip\7z.exe" x C:\path\to\OpenJDK25U-jdk_*.zip
-move jdk-25.0.1+8 jdk-25
+mkdir jdk\win-x64
+xcopy /E /I jdk-25.0.1+8\* jdk\win-x64\
 ```
 
 ## Directory Structure
@@ -75,8 +77,7 @@ move jdk-25.0.1+8 jdk-25
 ```
 MattMC/
 ├── libraries/
-│   ├── jdk-25/              # Legacy single-platform JDK (optional)
-│   ├── jdk/                 # Preferred multi-platform JDK layout
+│   ├── jdk/                 # Multi-platform JDK layout
 │   │   ├── win-x64/
 │   │   ├── linux-x64/
 │   │   └── mac-aarch64/

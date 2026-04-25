@@ -494,11 +494,6 @@ def resolveBundledJdkExecutableForCurrentPlatform(File baseDir) {
         return platformPath
     }
 
-    def legacyPath = new File(baseDir, "run/jdk-${targetJavaVersion}/bin/${javaExecutableName}")
-    if (legacyPath.exists()) {
-        return legacyPath
-    }
-
     return null
 }
 
@@ -679,18 +674,19 @@ tasks.register('downloadJdk', Exec) {
     group = 'minecraft'
     description = "Downloads Temurin OpenJDK ${targetJavaVersion} if not already present"
     
-    def jdkDir = file("libraries/jdk-${targetJavaVersion}")
+    def platformKey = resolveCurrentPlatformKey()
+    def jdkDir = platformKey != null ? file("libraries/jdk/${platformKey}") : null
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     def isLinux = osName.contains('linux')
     def isMac = osName.contains('mac')
     
     // Determine the Java executable path based on OS
-    def javaExe = isWindows ? new File(jdkDir, 'bin/java.exe') : new File(jdkDir, 'bin/java')
+    def javaExe = (jdkDir == null) ? null : (isWindows ? new File(jdkDir, 'bin/java.exe') : new File(jdkDir, 'bin/java'))
     
     // Only run if JDK doesn't exist
     onlyIf { 
-        !javaExe.exists()
+        platformKey != null && (javaExe == null || !javaExe.exists())
     }
     
     workingDir = file('.')
@@ -705,6 +701,9 @@ tasks.register('downloadJdk', Exec) {
     }
     
     doFirst {
+        if (platformKey != null) {
+            println "📂 Target bundled JDK path: libraries/jdk/${platformKey}"
+        }
         if (isWindows) {
             println "📥 Downloading JDK for Windows..."
         } else if (isLinux) {
@@ -726,43 +725,34 @@ tasks.register('copyJdkToRun') {
     
     dependsOn 'downloadJdk'
     
-    def srcJdkDir = file("libraries/jdk-${targetJavaVersion}")
     def platformKey = resolveCurrentPlatformKey()
     def platformSrcJdkDir = platformKey != null ? file("libraries/jdk/${platformKey}") : null
-    def destJdkDir = platformKey != null ? file("run/jdk/${platformKey}") : file("run/jdk-${targetJavaVersion}")
+    def destJdkDir = platformKey != null ? file("run/jdk/${platformKey}") : null
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     
     // Determine the Java executable path based on OS
-    def javaExe = isWindows ? 
-        new File(srcJdkDir, 'bin/java.exe') : 
-        new File(srcJdkDir, 'bin/java')
-
-    def effectiveSrcJdkDir = srcJdkDir
-    def effectiveJavaExe = javaExe
-    if (platformSrcJdkDir != null) {
-        def platformJavaExe = isWindows ? 
-            new File(platformSrcJdkDir, 'bin/java.exe') : 
-            new File(platformSrcJdkDir, 'bin/java')
-        if (platformSrcJdkDir.exists() && platformJavaExe.exists()) {
-            effectiveSrcJdkDir = platformSrcJdkDir
-            effectiveJavaExe = platformJavaExe
-        }
-    }
+    def platformJavaExe = platformSrcJdkDir == null ? null : (isWindows ? 
+        new File(platformSrcJdkDir, 'bin/java.exe') : 
+        new File(platformSrcJdkDir, 'bin/java'))
     
     // Declare inputs only - not outputs to avoid Gradle detecting
     // implicit dependencies with compileJava task
-    inputs.dir(srcJdkDir).skipWhenEmpty()
-    if (platformSrcJdkDir != null) {
-        inputs.dir(platformSrcJdkDir).optional()
+    if (platformSrcJdkDir != null && platformSrcJdkDir.exists()) {
+        inputs.dir(platformSrcJdkDir).skipWhenEmpty()
     }
     
     // Only run if source JDK exists
-    onlyIf { effectiveSrcJdkDir.exists() && effectiveJavaExe.exists() }
+    onlyIf { platformSrcJdkDir != null && platformJavaExe != null && platformSrcJdkDir.exists() && platformJavaExe.exists() }
     
     doLast {
-        if (!effectiveSrcJdkDir.exists()) {
-            println "⚠️  JDK not found at ${effectiveSrcJdkDir}."
+        if (platformKey == null) {
+            println "⚠️  Unsupported platform for bundled JDK copy."
+            return
+        }
+
+        if (platformSrcJdkDir == null || !platformSrcJdkDir.exists()) {
+            println "⚠️  JDK not found at libraries/jdk/${platformKey}."
             println "   Run: ./gradlew downloadJdk"
             println "   Or see libraries/JDK-README.md for manual setup"
             return
@@ -775,7 +765,7 @@ tasks.register('copyJdkToRun') {
         
         println "📂 Copying JDK to run directory..."
         copy {
-            from effectiveSrcJdkDir
+            from platformSrcJdkDir
             into destJdkDir
         }
         println "✅ JDK copied to ${destJdkDir}"
@@ -1040,20 +1030,6 @@ tasks.register('clientDist') {
                     }
                     copiedPlatformJdks << platformDir.name
                 }
-            }
-        }
-
-        // Legacy fallback: map libraries/jdk-<version> to current platform key
-        if (copiedPlatformJdks.isEmpty()) {
-            def legacyJdkDir = file("libraries/jdk-${targetJavaVersion}")
-            def platformKey = resolveCurrentPlatformKey()
-            if (legacyJdkDir.exists() && platformKey != null) {
-                println "📂 Copying bundled JDK to distribution..."
-                copy {
-                    from legacyJdkDir
-                    into "${distDir}/run/jdk/${platformKey}"
-                }
-                copiedPlatformJdks << platformKey
             }
         }
 
