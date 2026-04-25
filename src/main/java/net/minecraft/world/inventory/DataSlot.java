@@ -11,8 +11,8 @@ public abstract class DataSlot {
 			}
 
 			@Override
-			public void set(int i) {
-				containerData.set(i, i);
+			public void set(int j) {
+				containerData.set(i, j);
 			}
 		};
 	}
@@ -25,8 +25,8 @@ public abstract class DataSlot {
 			}
 
 			@Override
-			public void set(int i) {
-				is[i] = i;
+			public void set(int j) {
+				is[i] = j;
 			}
 		};
 	}
