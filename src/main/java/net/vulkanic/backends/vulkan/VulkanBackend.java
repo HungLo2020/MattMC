@@ -182,6 +182,7 @@ public class VulkanBackend {
     private static final int GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME = 0x8CD1;
     private static final int GL_NONE = 0;
     private static final int GL_TEXTURE = 0x1702;
+    private static final int GL_TEXTURE_COMPARE_FUNC = 0x884D;
     private static final int GL_COLOR_BUFFER_BIT = 0x00004000;
     private static final int GL_DEPTH_BUFFER_BIT = 0x00000100;
     private static final int GL_STENCIL_BUFFER_BIT = 0x00000400;
@@ -260,6 +261,8 @@ public class VulkanBackend {
     // Virtual sampler tracking (Vulkan samplers created at pipeline init; virtual IDs for GL compat)
     private final AtomicInteger nextVirtualSamplerId = new AtomicInteger(1);
     private final Set<Integer>  virtualSamplers      = ConcurrentHashMap.newKeySet();
+    /** Per-sampler-object state cache mirroring GL sampler parameters. */
+    private final ConcurrentHashMap<Integer, VirtualSamplerState> virtualSamplerStates = new ConcurrentHashMap<>();
     /** Per-unit sampler binding cache: texture-unit → bound sampler handle */
     private final ConcurrentHashMap<Integer, Integer> boundSamplerPerUnit = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<DescriptorPipelineKey, PipelineHandle> descriptorPipelineCache = new ConcurrentHashMap<>();
@@ -401,6 +404,63 @@ public class VulkanBackend {
 
             this.drawBuffers = buffers.clone();
         }
+    }
+
+    private static final class VirtualSamplerState {
+        private volatile int minFilter = VulkanicAPI.GL_NEAREST_MIPMAP_LINEAR;
+        private volatile int magFilter = VulkanicAPI.GL_LINEAR;
+        private volatile int wrapS = VulkanicAPI.GL_REPEAT;
+        private volatile int wrapT = VulkanicAPI.GL_REPEAT;
+        private volatile int wrapR = VulkanicAPI.GL_REPEAT;
+        private volatile int compareMode = 0;
+        private volatile int compareFunc = VulkanicAPI.GL_LEQUAL;
+        private volatile float maxLod = 1000.0f;
+
+        private void setParameteri(int pname, int param) {
+            switch (pname) {
+                case VulkanicAPI.GL_TEXTURE_MIN_FILTER -> minFilter = param;
+                case VulkanicAPI.GL_TEXTURE_MAG_FILTER -> magFilter = param;
+                case VulkanicAPI.GL_TEXTURE_WRAP_S -> wrapS = param;
+                case VulkanicAPI.GL_TEXTURE_WRAP_T -> wrapT = param;
+                case VulkanicAPI.GL_TEXTURE_WRAP_R -> wrapR = param;
+                case VulkanicAPI.GL_TEXTURE_COMPARE_MODE -> compareMode = param;
+                case VulkanBackend.GL_TEXTURE_COMPARE_FUNC -> compareFunc = param;
+                case VulkanicAPI.GL_TEXTURE_MAX_LOD -> maxLod = param;
+                default -> {
+                    // Keep compatibility behavior for currently-unused sampler params.
+                }
+            }
+        }
+
+        private void setParameterf(int pname, float param) {
+            if (pname == VulkanicAPI.GL_TEXTURE_MAX_LOD) {
+                maxLod = param;
+                return;
+            }
+
+            setParameteri(pname, Math.round(param));
+        }
+
+        private int effectiveMaxLod(int textureViewMipCount) {
+            int textureMaxLod = Math.max(0, textureViewMipCount - 1);
+            int samplerMaxLod = Math.max(0, (int) Math.floor(maxLod));
+            return Math.min(textureMaxLod, samplerMaxLod);
+        }
+    }
+
+    @Nullable
+    private VirtualSamplerState getBoundVirtualSamplerStateForUnit(int textureUnit) {
+        Integer samplerId = boundSamplerPerUnit.get(textureUnit);
+        if (samplerId == null || samplerId == 0) {
+            return null;
+        }
+
+        return virtualSamplerStates.get(samplerId);
+    }
+
+    @Nullable
+    private VirtualSamplerState getVirtualSamplerState(int samplerId) {
+        return virtualSamplerStates.get(samplerId);
     }
 
     private static final boolean DEBUG_VULKAN_SOLID_PARTICLE_FRAGMENT = Boolean.getBoolean("mattmc.vulkan.debugParticleSolidColor");
@@ -6040,6 +6100,7 @@ void main() {
         requireVulkanCommandBufferHandle("createSampler", ctx);
         int id = nextVirtualSamplerId.getAndIncrement();
         virtualSamplers.add(id);
+        virtualSamplerStates.put(id, new VirtualSamplerState());
         return id;
     }
 
@@ -6047,6 +6108,7 @@ void main() {
     public void deleteSampler(CommandContext ctx, int sampler) {
         requireVulkanCommandBufferHandle("deleteSampler", ctx);
         virtualSamplers.remove(sampler);
+        virtualSamplerStates.remove(sampler);
         boundSamplerPerUnit.values().removeIf(bound -> bound.equals(sampler));
     }
 
@@ -6084,14 +6146,31 @@ void main() {
      */
     public void setSamplerParameteri(CommandContext ctx, int sampler, int pname, int param) {
         requireVulkanCommandBufferHandle("setSamplerParameteri", ctx);
+        VirtualSamplerState samplerState = getVirtualSamplerState(sampler);
+        if (samplerState == null) {
+            return;
+        }
+
+        samplerState.setParameteri(pname, param);
     }
 
     public void setSamplerParameterf(CommandContext ctx, int sampler, int pname, float param) {
         requireVulkanCommandBufferHandle("setSamplerParameterf", ctx);
+        VirtualSamplerState samplerState = getVirtualSamplerState(sampler);
+        if (samplerState == null) {
+            return;
+        }
+
+        samplerState.setParameterf(pname, param);
     }
 
     public void setSamplerParameteriv(CommandContext ctx, int sampler, int pname, int[] params) {
         requireVulkanCommandBufferHandle("setSamplerParameteriv", ctx);
+        if (params == null || params.length == 0) {
+            return;
+        }
+
+        setSamplerParameteri(ctx, sampler, pname, params[0]);
     }
 
     // =====================================================================
@@ -6386,7 +6465,8 @@ void main() {
             int wrapT,
             int wrapR,
             int maxLod,
-            int compareMode
+            int compareMode,
+            int compareFunc
         ) {
         }
 
@@ -7389,6 +7469,7 @@ void main() {
             return binding;
         }
 
+        @SuppressWarnings("resource")
         private ResolvedSamplerDescriptorBinding resolveSamplerDescriptorBinding(
             PipelineDescriptor.ResourceBinding binding,
             PipelineResourceBindings bindings,
@@ -7427,9 +7508,11 @@ void main() {
                     if (fallbackBinding.isEmpty()) {
                         continue;
                     }
-                    if (!(fallbackBinding.get().textureView() instanceof VulkanTextureView fallbackView)) {
+                    PipelineResourceBindings.SamplerBinding fallbackSamplerBinding = fallbackBinding.get();
+                    if (!(fallbackSamplerBinding.textureView() instanceof VulkanTextureView)) {
                         continue;
                     }
+                    VulkanTextureView fallbackView = (VulkanTextureView) fallbackSamplerBinding.textureView();
                     LegacyTextureObject fallbackTexture = tryResolveLegacyTexture(fallbackView.texture());
                     if (fallbackTexture == null || fallbackTexture.aspectMask != VK10.VK_IMAGE_ASPECT_DEPTH_BIT) {
                         continue;
@@ -7505,15 +7588,16 @@ void main() {
                 );
             }
 
-            DescriptorSamplerKey samplerKey = descriptorSamplerKey(resolvedTextureView,
+            DescriptorSamplerKey samplerKey = descriptorSamplerKey(
+                resolvedTextureView,
+                samplerBinding.textureUnit(),
                 wantsComparisonSampler
                     ? (canUseComparisonSampler ? Boolean.TRUE : Boolean.FALSE)
                     : binding.type() == PipelineDescriptor.ResourceType.SAMPLER ? Boolean.FALSE
-                    : null);
+                    : null
+            );
             long samplerHandle = resolveDescriptorSamplerHandle(samplerKey);
             int descriptorImageLayout = descriptorImageLayoutFor(sampledLegacyTexture);
-            GpuTexture sampledGpuTexture = resolvedTextureView.texture() instanceof GpuTexture gpuTexture ? gpuTexture : null;
-
             if (sodiumChunkDescriptor
                 && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name()))
                 && debugSodiumChunkDescriptorSamplerLogCount < 80) {
@@ -7886,7 +7970,7 @@ void main() {
         }
 
         private DescriptorSamplerKey descriptorSamplerKey(VulkanTextureView textureView) {
-            return descriptorSamplerKey(textureView, null);
+            return descriptorSamplerKey(textureView, -1, null);
         }
 
         /**
@@ -7898,55 +7982,84 @@ void main() {
          * {@code Boolean.FALSE} for a plain {@code sampler2D} binding of a depth texture
          * (needs {@code compareEnable=false} regardless of how the texture was configured).
          */
-        private DescriptorSamplerKey descriptorSamplerKey(VulkanTextureView textureView, @Nullable Boolean compareOverride) {
+        private DescriptorSamplerKey descriptorSamplerKey(
+            VulkanTextureView textureView,
+            int textureUnit,
+            @Nullable Boolean compareOverride
+        ) {
             LegacyTextureObject legacyTexture = tryResolveLegacyTexture(textureView.texture());
             if (legacyTexture == null) {
                 return null;
             }
 
+            VirtualSamplerState samplerState = textureUnit >= 0
+                ? backend.getBoundVirtualSamplerStateForUnit(textureUnit)
+                : null;
+
             net.vulkanic.VulkanicTexture boundTexture = textureView.texture();
             GpuTexture gpuTexture = boundTexture instanceof GpuTexture blazeTexture ? blazeTexture : null;
-            int minFilter = gpuTexture != null
+            int minFilter = samplerState != null
+                ? samplerState.minFilter
+                : gpuTexture != null
                 ? toLegacyMinFilter(gpuTexture.getMinFilter(), gpuTexture.usesMipmaps())
                 : legacyTexture.integerParameters.getOrDefault(
                     VulkanicAPI.GL_TEXTURE_MIN_FILTER,
                     VulkanicAPI.GL_NEAREST
                 );
-            int magFilter = gpuTexture != null
+            int magFilter = samplerState != null
+                ? samplerState.magFilter
+                : gpuTexture != null
                 ? toLegacyMagFilter(gpuTexture.getMagFilter())
                 : legacyTexture.integerParameters.getOrDefault(
                     VulkanicAPI.GL_TEXTURE_MAG_FILTER,
                     VulkanicAPI.GL_LINEAR
                 );
-            int wrapS = gpuTexture != null
+            int wrapS = samplerState != null
+                ? samplerState.wrapS
+                : gpuTexture != null
                 ? toLegacyWrapMode(gpuTexture.getAddressModeU())
                 : legacyTexture.integerParameters.getOrDefault(
                     VulkanicAPI.GL_TEXTURE_WRAP_S,
                     VulkanicAPI.GL_REPEAT
                 );
-            int wrapT = gpuTexture != null
+            int wrapT = samplerState != null
+                ? samplerState.wrapT
+                : gpuTexture != null
                 ? toLegacyWrapMode(gpuTexture.getAddressModeV())
                 : legacyTexture.integerParameters.getOrDefault(
                     VulkanicAPI.GL_TEXTURE_WRAP_T,
                     VulkanicAPI.GL_REPEAT
                 );
-            int wrapR = legacyTexture.integerParameters.getOrDefault(
-                VulkanicAPI.GL_TEXTURE_WRAP_R,
-                wrapT
-            );
+            int wrapR = samplerState != null
+                ? samplerState.wrapR
+                : legacyTexture.integerParameters.getOrDefault(
+                    VulkanicAPI.GL_TEXTURE_WRAP_R,
+                    wrapT
+                );
             int maxLod = usesMipmappedMinFilter(minFilter)
-                ? Math.max(0, textureView.getMipLevelCount() - 1)
+                ? (samplerState != null
+                    ? samplerState.effectiveMaxLod(textureView.getMipLevelCount())
+                    : Math.max(0, textureView.getMipLevelCount() - 1))
                 : 0;
             int compareMode;
             if (compareOverride != null) {
                 compareMode = compareOverride ? VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE : 0;
             } else {
-                compareMode = legacyTexture.integerParameters.getOrDefault(
-                    VulkanicAPI.GL_TEXTURE_COMPARE_MODE, 0
-                );
+                compareMode = samplerState != null
+                    ? samplerState.compareMode
+                    : legacyTexture.integerParameters.getOrDefault(
+                        VulkanicAPI.GL_TEXTURE_COMPARE_MODE, 0
+                    );
             }
 
-            return new DescriptorSamplerKey(minFilter, magFilter, wrapS, wrapT, wrapR, maxLod, compareMode);
+            int compareFunc = samplerState != null
+                ? samplerState.compareFunc
+                : legacyTexture.integerParameters.getOrDefault(
+                    VulkanBackend.GL_TEXTURE_COMPARE_FUNC,
+                    VulkanicAPI.GL_LEQUAL
+                );
+
+            return new DescriptorSamplerKey(minFilter, magFilter, wrapS, wrapT, wrapR, maxLod, compareMode, compareFunc);
         }
 
         private static int toLegacyMinFilter(net.blaze3d.textures.FilterMode minFilter, boolean useMipmaps) {
@@ -7984,7 +8097,7 @@ void main() {
                     .maxAnisotropy(1.0f)
                     .compareEnable(key.compareMode() == VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE)
                     .compareOp(key.compareMode() == VulkanicAPI.GL_COMPARE_REF_TO_TEXTURE
-                        ? VK10.VK_COMPARE_OP_LESS_OR_EQUAL
+                        ? toVkSamplerCompareOp(key.compareFunc())
                         : VK10.VK_COMPARE_OP_ALWAYS)
                     .minLod(0.0f)
                     .maxLod((float) key.maxLod())
@@ -8051,6 +8164,20 @@ void main() {
                 case VulkanicAPI.GL_CLAMP_TO_EDGE -> VK10.VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
                 default -> throw new IllegalArgumentException(
                     "Unsupported descriptor sampler wrap mode: " + wrapMode);
+            };
+        }
+
+        private static int toVkSamplerCompareOp(int compareFunc) {
+            return switch (compareFunc) {
+                case VulkanicAPI.GL_NEVER -> VK10.VK_COMPARE_OP_NEVER;
+                case VulkanicAPI.GL_LESS -> VK10.VK_COMPARE_OP_LESS;
+                case VulkanicAPI.GL_EQUAL -> VK10.VK_COMPARE_OP_EQUAL;
+                case VulkanicAPI.GL_LEQUAL -> VK10.VK_COMPARE_OP_LESS_OR_EQUAL;
+                case VulkanicAPI.GL_GREATER -> VK10.VK_COMPARE_OP_GREATER;
+                case VulkanicAPI.GL_NOTEQUAL -> VK10.VK_COMPARE_OP_NOT_EQUAL;
+                case VulkanicAPI.GL_GEQUAL -> VK10.VK_COMPARE_OP_GREATER_OR_EQUAL;
+                case VulkanicAPI.GL_ALWAYS -> VK10.VK_COMPARE_OP_ALWAYS;
+                default -> VK10.VK_COMPARE_OP_LESS_OR_EQUAL;
             };
         }
 
