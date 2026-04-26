@@ -634,12 +634,6 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		// Show beta warning once
 		if (!this.warned) {
 			this.warned = true;
-			net.irisshaders.iris.Iris.getUpdateChecker().getBetaInfo().ifPresent(info ->
-				net.minecraft.client.Minecraft.getInstance().gui.getChat().addMessage(
-					net.minecraft.network.chat.Component.literal("A new beta is out for Iris " + info.betaTag + ". Please redownload it.")
-						.withStyle(net.minecraft.ChatFormatting.BOLD, net.minecraft.ChatFormatting.RED)
-				)
-			);
 		}
 		
 		net.irisshaders.iris.gl.IrisRenderSystem.restoreCullingState();

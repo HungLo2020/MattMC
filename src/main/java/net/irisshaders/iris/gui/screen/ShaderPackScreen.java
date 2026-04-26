@@ -21,7 +21,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -36,7 +35,6 @@ import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -76,7 +74,6 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 	private boolean optionMenuOpen = false;
 	private boolean dropChanges = false;
 	private MutableComponent developmentComponent;
-	private MutableComponent updateComponent;
 	private boolean guiHidden = false;
 	public final SmoothedFloat blurTransition = new SmoothedFloat(2, 2, () -> {
 		if (guiHidden) {
@@ -119,11 +116,6 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 		}
 
 		this.irisTextComponent = Component.literal(irisName).withStyle(ChatFormatting.GRAY);
-
-		if (Iris.getUpdateChecker().getUpdateMessage().isPresent()) {
-			this.updateComponent = Component.literal("New update available!").withStyle(ChatFormatting.GREEN).withStyle(ChatFormatting.UNDERLINE);
-			irisTextComponent.append(Component.literal(" (outdated)").withStyle(ChatFormatting.RED));
-		}
 
 		refreshForChangedPack();
 	}
@@ -212,9 +204,6 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 		if (this.developmentComponent != null) {
 			guiGraphics.drawString(font, developmentComponent, 2, this.height - 10, 0xFFFFFFFF);
 			guiGraphics.drawString(font, irisTextComponent, 2, this.height - 20, 0xFFFFFFFF);
-		} else if (this.updateComponent != null) {
-			guiGraphics.drawString(font, updateComponent, 2, this.height - 10, 0xFFFFFFFF);
-			guiGraphics.drawString(font, irisTextComponent, 2, this.height - 20, 0xFFFFFFFF);
 		} else {
 			guiGraphics.drawString(font, irisTextComponent, 2, this.height - 10, 0xFFFFFFFF);
 		}
@@ -222,17 +211,6 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean bl2) {
-		int widthValue = this.font.width("New update available!");
-		double x = event.x();
-		double y = event.y();
-		if (this.updateComponent != null && x < widthValue && y > (this.height - 10) && y < this.height) {
-			this.minecraft.setScreen(new ConfirmLinkScreen(bl -> {
-				if (bl) {
-					Iris.getUpdateChecker().getUpdateLink().ifPresent(Util.getPlatform()::openUri);
-				}
-				this.minecraft.setScreen(this);
-			}, Iris.getUpdateChecker().getUpdateLink().map(URI::toString).orElse(""), true));
-		}
 		return super.mouseClicked(event, bl2);
 	}
 
