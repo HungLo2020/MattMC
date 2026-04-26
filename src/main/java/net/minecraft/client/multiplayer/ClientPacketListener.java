@@ -577,9 +577,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		
 		// Iris: Show update message and error messages
 		if (this.minecraft.player != null) {
-			net.irisshaders.iris.Iris.getUpdateChecker().getUpdateMessage().ifPresent(msg ->
-				this.minecraft.player.displayClientMessage(msg, false));
-
 			net.irisshaders.iris.Iris.getStoredError().ifPresent(e ->
 				this.minecraft.player.displayClientMessage(net.minecraft.network.chat.Component.translatable(e instanceof net.irisshaders.iris.gl.shader.ShaderCompileException ? "iris.load.failure.shader" : "iris.load.failure.generic").append(net.minecraft.network.chat.Component.literal("Copy Info").withStyle(arg -> arg.withUnderlined(true).withColor(net.minecraft.ChatFormatting.BLUE).withClickEvent(new net.minecraft.network.chat.ClickEvent.CopyToClipboard(e.getMessage())).withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(net.minecraft.network.chat.Component.translatable("chat.copy.click"))))), false));
 

@@ -18,21 +18,6 @@
 
 
 
-
-  "distanthorizons.updater.title": "Автоматическое обновление Distant Horizons",
-  "distanthorizons.updater.text1": "§lДоступно новое обновление!",
-  "distanthorizons.updater.text2": "§fВы хотите перейти с %s§f на %s§f?",
-  "distanthorizons.updater.later": "Не сейчас",
-  "distanthorizons.updater.never": "Не показывать снова",
-  "distanthorizons.updater.update": "Обновить",
-  "distanthorizons.updater.update.@tooltip": "Обновить мод 1 раз\n(обновляется при закрытии игры)",
-  "distanthorizons.updater.silent": "Всегда тихое обновление",
-  "distanthorizons.updater.silent.@tooltip": "Каждый раз, когда доступно обновление, оно будет обновляться\n(§6ПРЕДУПРЕЖДЕНИЕ§r: Оно не будет запрашивать у пользователя разрешение на обновление, но будет поддерживать мод в актуальном состоянии)",
-  "distanthorizons.updater.waitingForClose": "Обновление Distant Horizons завершится после перезапуска игры",
-
-
-
-
   "distanthorizons.config.title": "Конфигурация Distant Horizons",
 
   "distanthorizons.config.client": "Клиент",
@@ -248,11 +233,6 @@
   "distanthorizons.config.client.advanced.buffers.gpuUploadPerMegabyteInMilliseconds.@tooltip": "Сколько времени должен ждать буфер на каждый мегабайт загруженных данных?\nМожет быть увеличено, если наблюдается прерывание кадров.",
   
   
-  "distanthorizons.config.client.advanced.autoUpdater": "Автообновление",
-  "distanthorizons.config.client.advanced.autoUpdater.enableAutoUpdater": "Включить автоматические обновления",
-  "distanthorizons.config.client.advanced.autoUpdater.enableSilentUpdates": "Включить бесшумные обновления",
-  "distanthorizons.config.client.advanced.autoUpdater.enableSilentUpdates.@tooltip": "Автоматически обновляет мод, когда доступно обновление",
-
   "distanthorizons.config.client.advanced.logging": "Логирование",
   "distanthorizons.config.client.advanced.logging.@tooltip": "Управляет тем, как должно обрабатываться логирование.",
 

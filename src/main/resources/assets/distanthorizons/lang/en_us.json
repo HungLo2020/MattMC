@@ -29,32 +29,6 @@
   "distanthorizons.general.disabledByApi.@tooltip":
     "This option is controlled by another mod via DH's API \nso it cannot be changed via the UI or config file.",
 
-
-
-
-  "distanthorizons.updater.title":
-    "Distant Horizons auto updater",
-  "distanthorizons.updater.text1":
-    "§lNew update available!",
-  "distanthorizons.updater.text2":
-    "§fDo you want to update from %s§f to %s§f?",
-  "distanthorizons.updater.later":
-    "Not now",
-  "distanthorizons.updater.never":
-    "Don't show again",
-  "distanthorizons.updater.update":
-    "Update",
-  "distanthorizons.updater.update.@tooltip":
-    "Updates the mod this one time\n(Updates when game is closed)",
-  "distanthorizons.updater.silent":
-    "Always silent update",
-  "distanthorizons.updater.silent.@tooltip":
-    "Every time an update is available, it would update\n(§6WARNING§r: This wont prompt you when updating)",
-  "distanthorizons.updater.waitingForClose":
-    "Distant Horizons will finish updating once the game restarts",
-  
-  
-  
   
   "distanthorizons.config.title":
     "Distant Horizons config",
@@ -408,24 +382,6 @@
     "Only load center LODs",
   "distanthorizons.config.client.advanced.graphics.experimental.onlyLoadCenterLods.@tooltip":
     "Skips loading adjacent LODs to significantly reduce load times (~5x)\nbut causes lighting on LOD borders to appear as full-bright\nand other graphical bugs.\n",
-
-
-
-  "distanthorizons.config.client.advanced.autoUpdater":
-    "Auto Updater",
-  
-  "distanthorizons.config.client.advanced.autoUpdater.enableAutoUpdater":
-    "Enable automatic updates",
-  "distanthorizons.config.client.advanced.autoUpdater.enableSilentUpdates":
-    "Enable Silent Updates",
-  "distanthorizons.config.client.advanced.autoUpdater.enableSilentUpdates.@tooltip":
-    "Automatically updates the mod when an update is available",
-  "distanthorizons.config.client.advanced.autoUpdater.updateBranch":
-    "Update Branch",
-  "distanthorizons.config.client.advanced.autoUpdater.updateBranch.@tooltip":
-    "Where to download the latest update from. \n\nAuto: Downloads either stable or nightly builds based on the current jar. \nStable: Stable builds from Modrinth. \nNightly: Nightly builds from Gitlab.",
-
-
 
   "distanthorizons.config.client.advanced.multiplayer":
     "Multiplayer",
@@ -1086,13 +1042,6 @@
     "Enabled",
   "distanthorizons.config.enum.EDhApiLodShading.DISABLED":
     "Disabled",
-
-  "distanthorizons.config.enum.EDhApiUpdateBranch.STABLE":
-    "Stable",
-  "distanthorizons.config.enum.EDhApiUpdateBranch.NIGHTLY":
-    "Nightly",
-  "distanthorizons.config.enum.EDhApiUpdateBranch.AUTO":
-    "Auto",
 
   "distanthorizons.config.enum.EDhApiGrassSideRendering.AS_GRASS":
     "As Grass",

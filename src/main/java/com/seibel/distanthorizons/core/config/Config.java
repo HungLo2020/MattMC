@@ -112,7 +112,6 @@ public class Config
 			public static ConfigCategory server = new ConfigCategory.Builder().set(Server.class).setDestination("server").build();
 			public static ConfigCategory lodBuilding = new ConfigCategory.Builder().set(Common.LodBuilding.class).setDestination("common.lodBuilding").build();
 			public static ConfigCategory multiThreading = new ConfigCategory.Builder().set(Common.MultiThreading.class).setDestination("common.multiThreading").build();
-			public static ConfigCategory autoUpdater = new ConfigCategory.Builder().set(AutoUpdater.class).build();
 			
 			public static ConfigCategory logging = new ConfigCategory.Builder().set(Common.Logging.class).setDestination("common.logging").build();
 			public static ConfigCategory debugging = new ConfigCategory.Builder().set(Debugging.class).build();
@@ -857,35 +856,6 @@ public class Config
 							.build();
 				}
 				
-			}
-			
-			public static class AutoUpdater
-			{
-				public static ConfigUIComment autoUpdaterHeader = new ConfigUIComment.Builder().setParentConfigClass(AutoUpdater.class).build();
-				
-				public static ConfigEntry<Boolean> enableAutoUpdater = new ConfigEntry.Builder<Boolean>()
-						.set(!isRunningInDevEnvironment())
-						.comment(""
-								+ "Automatically check for updates on game launch? \n"
-								+ "")
-						.build();
-				
-				public static ConfigEntry<Boolean> enableSilentUpdates = new ConfigEntry.Builder<Boolean>()
-						.set(false)
-						.comment(""
-								+ "Should Distant Horizons silently, automatically download and install new versions? \n"
-								+ "This setting is force disabled on dedicated servers for stability reasons. \n"
-								+ "")
-						.build();
-				
-				public static ConfigEntry<EDhApiUpdateBranch> updateBranch = new ConfigEntry.Builder<EDhApiUpdateBranch>()
-						.set(EDhApiUpdateBranch.AUTO)
-						.comment(""
-								+ "If DH should use the nightly (provided by Gitlab), or stable (provided by Modrinth) build. \n"
-								+ "If ["+EDhApiUpdateBranch.AUTO+"] is selected DH will update to new stable releases if the current jar is a stable jar \n"
-								+ "and will update to new nightly builds if the current jar is a nightly jar (IE the version number ends in '-dev')."
-								+ "")
-						.build();
 			}
 			
 			public static class Multiplayer

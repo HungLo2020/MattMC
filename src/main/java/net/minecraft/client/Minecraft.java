@@ -741,10 +741,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private void onGameLoadFinished(@Nullable Minecraft.GameLoadCookie gameLoadCookie) {
 		Runnable runnable = this.buildInitialScreens(gameLoadCookie);
-		
-		// DH auto updater: wrap the runnable if needed
-		runnable = wrapRunnableForDhUpdater(runnable);
-		
 		runnable.run();
 		
 		// VoxelMap: Removed manual lateInit() call - let original pattern work (first render/tick triggers it)
@@ -753,47 +749,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.options.save();
 	}
 	
-	/**
-	 * DH auto updater integration - wraps the initial screen runnable
-	 * to potentially show the updater screen first.
-	 */
-	private Runnable wrapRunnableForDhUpdater(Runnable originalRunnable) {
-		boolean showUpdater = com.seibel.distanthorizons.core.jar.updater.SelfUpdater.onStart();
-		
-		if (!showUpdater || !com.seibel.distanthorizons.core.config.Config.Client.Advanced.AutoUpdater.enableAutoUpdater.get()) {
-			return originalRunnable;
-		}
-		
-		// Wrap the runnable to show updater screen
-		return () -> {
-			try {
-				String versionId = null;
-				com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch updateBranch = 
-					com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch.convertAutoToStableOrNightly(
-						com.seibel.distanthorizons.core.config.Config.Client.Advanced.AutoUpdater.updateBranch.get());
-				
-				if (updateBranch == com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch.STABLE) {
-					versionId = com.seibel.distanthorizons.core.jar.installer.ModrinthGetter.getLatestIDForVersion(
-						com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE.get(
-							com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants.class).getMinecraftVersion());
-				} else {
-					versionId = com.seibel.distanthorizons.core.jar.installer.GitlabGetter.INSTANCE.projectPipelines.get(0).get("sha");
-				}
-				
-				if (versionId != null) {
-					this.setScreen(new com.seibel.distanthorizons.common.wrappers.gui.updater.UpdateModScreen(
-						new net.minecraft.client.gui.screens.TitleScreen(false),
-						versionId
-					));
-				} else {
-					LOGGER.info("Unable to find new DH update for the [" + updateBranch + "] branch. Assuming DH is up to date...");
-				}
-			} catch (Exception e) {
-				LOGGER.info("Unable to show DH update screen, reason: [" + e.getMessage() + "].");
-			}
-		};
-	}
-
 	public boolean isGameLoadFinished() {
 		return this.gameLoadFinished;
 	}
@@ -1281,9 +1236,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		} catch (Exception e) {
 			LOGGER.error("Error calling VoxelMap CLIENT_STOPPING event", e);
 		}
-		
-		// DH auto updater cleanup
-		com.seibel.distanthorizons.core.jar.updater.SelfUpdater.onClose();
 		
 		if (this.currentFrameProfile != null) {
 			this.currentFrameProfile.cancel();

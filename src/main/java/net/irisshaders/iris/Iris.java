@@ -103,7 +103,6 @@ public class Iris {
 	// behavior is more concrete and therefore is more likely to repair a user's issues
 	private static boolean resetShaderPackOptions = false;
 	private static String IRIS_VERSION;
-	private static UpdateChecker updateChecker;
 	private static boolean fallback;
 	private static boolean loadShaderPackWhenPossible;
 
@@ -676,10 +675,6 @@ public class Iris {
 		return irisConfig;
 	}
 
-	public static UpdateChecker getUpdateChecker() {
-		return updateChecker;
-	}
-
 	public static boolean isFallback() {
 		return fallback;
 	}
@@ -765,8 +760,6 @@ public class Iris {
 	public void onEarlyInitialize() {
 		IRIS_VERSION = IrisPlatformHelpers.getInstance().getVersion();
 
-		updateChecker = new UpdateChecker(IRIS_VERSION);
-
 		reloadKeybind = IrisPlatformHelpers.getInstance().registerKeyBinding(new KeyMapping("iris.keybind.reload", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, irisKeybindCategory));
 		toggleShadersKeybind = IrisPlatformHelpers.getInstance().registerKeyBinding(new KeyMapping("iris.keybind.toggleShaders", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, irisKeybindCategory));
 		shaderpackScreenKeybind = IrisPlatformHelpers.getInstance().registerKeyBinding(new KeyMapping("iris.keybind.shaderPackSelection", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, irisKeybindCategory));
@@ -791,8 +784,6 @@ public class Iris {
 			logger.error("Failed to initialize Iris configuration, default values will be used instead");
 			logger.error("", e);
 		}
-
-		updateChecker.checkForUpdates(irisConfig);
 
 		initialized = true;
 	}
