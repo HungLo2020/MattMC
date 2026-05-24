@@ -3,13 +3,20 @@ package net.minecraft.worldedit.command;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.worldedit.clipboard.Clipboard;
@@ -19,14 +26,18 @@ import net.minecraft.worldedit.math.BlockVector3;
 import net.minecraft.worldedit.math.transform.AffineTransform;
 import net.minecraft.worldedit.platform.MattMCPlatform;
 import net.minecraft.worldedit.region.Region;
+import net.minecraft.worldedit.region.selector.CuboidRegionSelector;
 import net.minecraft.worldedit.session.LocalSession;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Clipboard-related commands for WorldEdit.
  * Includes //copy, //cut, //paste, //rotate, //flip.
  */
 public class ClipboardCommands {
+    private static final Set<Character> COPY_CUT_SWITCHES = Set.of('e', 'b');
+    private static final Set<Character> PASTE_SWITCHES = Set.of('a', 'v', 'o', 's', 'n', 'e', 'b');
     
     /**
      * Register all clipboard commands.
@@ -35,17 +46,38 @@ public class ClipboardCommands {
         // //copy command
         dispatcher.register(Commands.literal("/copy")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.clipboard.copy"))
-            .executes(ClipboardCommands::copy));
+            .executes(ctx -> copy(ctx, ""))
+            .then(Commands.argument("options", StringArgumentType.greedyString())
+                .executes(ctx -> copy(ctx, StringArgumentType.getString(ctx, "options")))));
         
         // //cut command
         dispatcher.register(Commands.literal("/cut")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.clipboard.cut"))
-            .executes(ClipboardCommands::cut));
+            .executes(ctx -> cut(ctx, "air", ""))
+            .then(Commands.argument("arg1", StringArgumentType.word())
+                .executes(ctx -> {
+                    String arg1 = StringArgumentType.getString(ctx, "arg1");
+                    if (arg1.startsWith("-")) {
+                        return cut(ctx, "air", arg1);
+                    }
+                    return cut(ctx, arg1, "");
+                })
+                .then(Commands.argument("rest", StringArgumentType.greedyString())
+                    .executes(ctx -> {
+                        String arg1 = StringArgumentType.getString(ctx, "arg1");
+                        String rest = StringArgumentType.getString(ctx, "rest");
+                        if (arg1.startsWith("-")) {
+                            return cut(ctx, "air", arg1 + " " + rest);
+                        }
+                        return cut(ctx, arg1, rest);
+                    }))));
         
         // //paste command
         dispatcher.register(Commands.literal("/paste")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.clipboard.paste"))
-            .executes(ClipboardCommands::paste));
+            .executes(ctx -> paste(ctx, ""))
+            .then(Commands.argument("options", StringArgumentType.greedyString())
+                .executes(ctx -> paste(ctx, StringArgumentType.getString(ctx, "options")))));
         
         // //rotate command
         dispatcher.register(Commands.literal("/rotate")
@@ -62,9 +94,22 @@ public class ClipboardCommands {
     /**
      * Copy the selection to clipboard.
      */
-    private static int copy(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+    private static int copy(CommandContext<CommandSourceStack> context, String optionsTail) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
+        ParsedOptions options = parseOptions(optionsTail, COPY_CUT_SWITCHES, player);
+        if (options == null) {
+            return 0;
+        }
+
+        if (!options.positionals().isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cUnexpected argument(s): " + String.join(" ", options.positionals())));
+            return 0;
+        }
+
+        if (options.switches().contains('e') || options.switches().contains('b')) {
+            player.sendSystemMessage(Component.literal("§eSwitches -e/-b are accepted, but entities/biomes are not yet persisted in this clipboard implementation."));
+        }
         
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         Region region = session.getSelection(world);
@@ -97,9 +142,22 @@ public class ClipboardCommands {
     /**
      * Cut the selection to clipboard (copy then delete).
      */
-    private static int cut(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+    private static int cut(CommandContext<CommandSourceStack> context, String leavePattern, String optionsTail) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
+        ParsedOptions options = parseOptions(optionsTail, COPY_CUT_SWITCHES, player);
+        if (options == null) {
+            return 0;
+        }
+
+        if (!options.positionals().isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cUnexpected argument(s): " + String.join(" ", options.positionals())));
+            return 0;
+        }
+
+        if (options.switches().contains('e') || options.switches().contains('b')) {
+            player.sendSystemMessage(Component.literal("§eSwitches -e/-b are accepted, but entities/biomes are not yet persisted in this clipboard implementation."));
+        }
         
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         Region region = session.getSelection(world);
@@ -116,13 +174,18 @@ public class ClipboardCommands {
         // Create edit session for cutting
         EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
         editSession.setFastMode(session.isFastMode());
+
+        BlockState leaveState = parseBlockState(leavePattern);
+        if (leaveState == null) {
+            player.sendSystemMessage(Component.literal("§cInvalid block for cut replacement: " + leavePattern));
+            return 0;
+        }
         
         // Copy and remove blocks
-        BlockState air = Blocks.AIR.defaultBlockState();
         for (BlockVector3 pos : region) {
             BlockState block = world.getBlockState(pos.toBlockPos());
             clipboard.setBlock(pos, block);
-            editSession.setBlock(pos, air);
+            editSession.setBlock(pos, leaveState);
         }
         
         // Store in session and remember for undo
@@ -139,9 +202,27 @@ public class ClipboardCommands {
     /**
      * Paste the clipboard.
      */
-    private static int paste(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+    private static int paste(CommandContext<CommandSourceStack> context, String optionsTail) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
+        ParsedOptions options = parseOptions(optionsTail, PASTE_SWITCHES, player);
+        if (options == null) {
+            return 0;
+        }
+
+        if (!options.positionals().isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cUnexpected argument(s): " + String.join(" ", options.positionals())));
+            return 0;
+        }
+
+        boolean ignoreAirBlocks = options.switches().contains('a');
+        boolean pasteAtOrigin = options.switches().contains('o');
+        boolean selectOnly = options.switches().contains('n');
+        boolean selectAfter = selectOnly || options.switches().contains('s');
+
+        if (options.switches().contains('v') || options.switches().contains('e') || options.switches().contains('b')) {
+            player.sendSystemMessage(Component.literal("§eSwitches -v/-e/-b are accepted, but this clipboard currently stores blocks only."));
+        }
         
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
@@ -155,19 +236,61 @@ public class ClipboardCommands {
         System.out.println("Pasting clipboard with " + clipboard.getVolume() + " blocks");
         System.out.println("Clipboard blocks map size: " + clipboard.getBlocks().size());
         
+        BlockVector3 target = pasteAtOrigin ? clipboard.getOrigin() : BlockVector3.from(player.blockPosition());
+        BlockVector3 origin = clipboard.getOrigin();
+        AffineTransform transform = clipboard.getTransform();
+
+        if (selectAfter) {
+            BlockVector3 selectionMin = null;
+            BlockVector3 selectionMax = null;
+
+            for (BlockVector3 clipboardPos : clipboard.getBlocks().keySet()) {
+                BlockVector3 relativePos = clipboardPos.subtract(origin);
+                if (transform != null) {
+                    relativePos = transform.apply(relativePos);
+                }
+                BlockVector3 worldPos = target.add(relativePos);
+
+                if (selectionMin == null) {
+                    selectionMin = worldPos;
+                    selectionMax = worldPos;
+                } else {
+                    selectionMin = BlockVector3.at(
+                        Math.min(selectionMin.getX(), worldPos.getX()),
+                        Math.min(selectionMin.getY(), worldPos.getY()),
+                        Math.min(selectionMin.getZ(), worldPos.getZ())
+                    );
+                    selectionMax = BlockVector3.at(
+                        Math.max(selectionMax.getX(), worldPos.getX()),
+                        Math.max(selectionMax.getY(), worldPos.getY()),
+                        Math.max(selectionMax.getZ(), worldPos.getZ())
+                    );
+                }
+            }
+
+            if (selectionMin != null && selectionMax != null) {
+                session.setRegionSelector(world, new CuboidRegionSelector(world, selectionMin, selectionMax));
+                player.sendSystemMessage(Component.literal("§aSelection updated to pasted region"));
+            }
+        }
+
+        if (selectOnly) {
+            player.sendSystemMessage(Component.literal("§aClipboard region selected (-n), no blocks pasted"));
+            return Command.SINGLE_SUCCESS;
+        }
+
         // Create edit session for pasting
         EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
         editSession.setFastMode(session.isFastMode());
-        
-        // Paste blocks
-        BlockVector3 target = BlockVector3.from(player.blockPosition());
-        BlockVector3 origin = clipboard.getOrigin();
-        AffineTransform transform = clipboard.getTransform();
         
         int count = 0;
         for (Map.Entry<BlockVector3, BlockState> entry : clipboard.getBlocks().entrySet()) {
             BlockVector3 clipboardPos = entry.getKey();
             BlockState block = entry.getValue();
+
+            if (ignoreAirBlocks && block.is(Blocks.AIR)) {
+                continue;
+            }
             
             // Calculate relative position from origin
             BlockVector3 relativePos = clipboardPos.subtract(origin);
@@ -293,5 +416,44 @@ public class ClipboardCommands {
         } catch (CommandSyntaxException e) {
             return false;
         }
+    }
+
+    private static BlockState parseBlockState(String blockName) {
+        ResourceLocation blockId = blockName.contains(":")
+            ? ResourceLocation.tryParse(blockName)
+            : ResourceLocation.withDefaultNamespace(blockName);
+        if (blockId == null) {
+            return null;
+        }
+
+        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
+        return block == null ? null : block.defaultBlockState();
+    }
+
+    private static ParsedOptions parseOptions(String tail, Set<Character> allowedSwitches, ServerPlayer player) {
+        Set<Character> switches = new HashSet<>();
+        List<String> positionals = new ArrayList<>();
+
+        if (!tail.isBlank()) {
+            for (String token : tail.trim().split("\\s+")) {
+                if (token.startsWith("-") && token.length() > 1) {
+                    for (int i = 1; i < token.length(); i++) {
+                        char option = token.charAt(i);
+                        if (!allowedSwitches.contains(option)) {
+                            player.sendSystemMessage(Component.literal("§cUnknown switch '-" + option + "'."));
+                            return null;
+                        }
+                        switches.add(option);
+                    }
+                } else {
+                    positionals.add(token);
+                }
+            }
+        }
+
+        return new ParsedOptions(switches, positionals);
+    }
+
+    private record ParsedOptions(Set<Character> switches, List<String> positionals) {
     }
 }

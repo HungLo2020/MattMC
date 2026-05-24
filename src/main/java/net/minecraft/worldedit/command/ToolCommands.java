@@ -36,7 +36,7 @@ public class ToolCommands {
         // //tool command (unbind tool)
         dispatcher.register(Commands.literal("/tool")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.tool.none"))
-            .then(Commands.literal("/none")
+            .then(Commands.literal("none")
                 .executes(ToolCommands::toolNone)));
         
         // //none command (unbind tool)
@@ -52,31 +52,31 @@ public class ToolCommands {
         // //superpickaxe command
         dispatcher.register(Commands.literal("/superpickaxe")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.superpickaxe"))
-            .then(Commands.literal("/single")
+            .then(Commands.literal("single")
                 .executes(ctx -> superPickaxeMode(ctx, "single")))
-            .then(Commands.literal("/area")
+            .then(Commands.literal("area")
                 .then(Commands.argument("range", IntegerArgumentType.integer(1, 5))
                     .executes(ctx -> superPickaxeMode(ctx, "area"))))
-            .then(Commands.literal("/recursive")
+            .then(Commands.literal("recursive")
                 .then(Commands.argument("range", IntegerArgumentType.integer(1, 5))
                     .executes(ctx -> superPickaxeMode(ctx, "recursive")))));
         
         // //brush sphere command
         dispatcher.register(Commands.literal("/brush")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.brush.sphere"))
-            .then(Commands.literal("/sphere")
+            .then(Commands.literal("sphere")
                 .then(Commands.argument("block", StringArgumentType.word())
                     .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
                         .executes(ctx -> brushSphere(ctx,
                             StringArgumentType.getString(ctx, "block"),
                             IntegerArgumentType.getInteger(ctx, "radius"))))))
-            .then(Commands.literal("/cylinder")
+            .then(Commands.literal("cylinder")
                 .then(Commands.argument("block", StringArgumentType.word())
                     .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
                         .executes(ctx -> brushCylinder(ctx,
                             StringArgumentType.getString(ctx, "block"),
                             IntegerArgumentType.getInteger(ctx, "radius"))))))
-            .then(Commands.literal("/smooth")
+            .then(Commands.literal("smooth")
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
                     .executes(ctx -> brushSmooth(ctx,
                         IntegerArgumentType.getInteger(ctx, "radius"))))));
