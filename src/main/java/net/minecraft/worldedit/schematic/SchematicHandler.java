@@ -54,11 +54,13 @@ public class SchematicHandler {
         root.putShort("Length", (short) dimensions.getZ());
         
         // Offset (origin) - store as relative to schematic coordinates
-        // For schematics, we want origin at the minimum corner
+        // Preserve the original clipboard anchor relative to minimum corner.
+        // This keeps paste positioning identical after save/load round-trips.
+        BlockVector3 clipboardOffset = clipboard.getOffset();
         int[] offset = new int[3];
-        offset[0] = 0;
-        offset[1] = 0;
-        offset[2] = 0;
+        offset[0] = clipboardOffset.getX();
+        offset[1] = clipboardOffset.getY();
+        offset[2] = clipboardOffset.getZ();
         root.putIntArray("Offset", offset);
         
         // Save palette and block data
@@ -120,7 +122,8 @@ public class SchematicHandler {
         short height = root.getShortOr("Height", (short) 0);
         short length = root.getShortOr("Length", (short) 0);
         
-        // Read offset (origin) - for schematics, origin should be at (0,0,0)
+        // Read offset as clipboard origin relative to minimum corner.
+        // The loaded clipboard uses a 0-based region min, so origin equals this offset.
         int[] offsetArray = root.getIntArray("Offset").orElse(new int[]{0, 0, 0});
         BlockVector3 origin = BlockVector3.ZERO;
         if (offsetArray.length >= 3) {

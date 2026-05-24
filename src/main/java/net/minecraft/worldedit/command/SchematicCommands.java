@@ -18,7 +18,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.worldedit.clipboard.Clipboard;
 import net.minecraft.worldedit.core.WorldEdit;
 import net.minecraft.worldedit.platform.MattMCPlatform;
-import net.minecraft.worldedit.region.Region;
 import net.minecraft.worldedit.schematic.SchematicHandler;
 import net.minecraft.worldedit.session.LocalSession;
 
@@ -109,7 +108,7 @@ public class SchematicCommands {
      */
     private static int save(CommandContext<CommandSourceStack> context, String name, String tail) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
-        ServerLevel world = player.level();
+        net.minecraft.server.level.ServerLevel world = player.level();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         ParsedOptions options = parseOptions(tail, SAVE_SWITCHES, player);
         if (options == null) {
@@ -128,27 +127,16 @@ public class SchematicCommands {
             player.sendSystemMessage(Component.literal("§cSchematic already exists. Use -f to overwrite."));
             return 0;
         }
-        
-        // Get selection
-        Region region = session.getSelection(world);
-        if (region == null) {
-            player.sendSystemMessage(Component.literal("§cNo selection defined. Use the wand or //pos commands."));
+
+        if (!session.hasClipboard()) {
+            player.sendSystemMessage(Component.literal("§cNo clipboard available. Use //copy first."));
             return 0;
         }
-        
-        // Copy selection to clipboard
-        Clipboard clipboard = new Clipboard(region, region.getMinimumPoint());
-        
-        // Copy all blocks from region to clipboard
-        for (int x = region.getMinimumPoint().getX(); x <= region.getMaximumPoint().getX(); x++) {
-            for (int y = region.getMinimumPoint().getY(); y <= region.getMaximumPoint().getY(); y++) {
-                for (int z = region.getMinimumPoint().getZ(); z <= region.getMaximumPoint().getZ(); z++) {
-                    net.minecraft.worldedit.math.BlockVector3 pos = net.minecraft.worldedit.math.BlockVector3.at(x, y, z);
-                    net.minecraft.world.level.block.state.BlockState state = 
-                        world.getBlockState(new net.minecraft.core.BlockPos(x, y, z));
-                    clipboard.setBlock(pos, state);
-                }
-            }
+
+        Clipboard clipboard = (Clipboard) session.getClipboard();
+        if (clipboard.isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cClipboard is empty. Use //copy first."));
+            return 0;
         }
         
         // Save schematic
