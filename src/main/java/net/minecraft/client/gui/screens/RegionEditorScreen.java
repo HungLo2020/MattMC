@@ -11,9 +11,11 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.CompletionException;
@@ -93,6 +95,8 @@ public class RegionEditorScreen extends Screen {
 	private static final long SLOW_FRAME_THRESHOLD_NANOS = 33_000_000L;
 	private static final long EXTREME_FRAME_THRESHOLD_NANOS = 250_000_000L;
 	private static final int DEFAULT_CHUNK_COLOR = 0xFF4A8F4A;
+	private static final int REGION_SELECTION_TINT = 0x66FF8C00;
+	private static final int CHUNK_SELECTION_TINT = 0x66FF8C00;
 	private static final int CHUNK_SAMPLE_STEP = 4;
 	private static final int FALLBACK_MIN_Y = -64;
 	private static final int BLOCKS_PER_CHUNK_EDGE = 16;
@@ -104,10 +108,13 @@ public class RegionEditorScreen extends Screen {
 
 	private final Screen lastScreen;
 	private Button fileButton;
+	private Button actionButton;
 	private Button loadWorldButton;
+	private Button deleteButton;
 	private Button backButton;
 
 	private boolean fileMenuOpen;
+	private boolean actionMenuOpen;
 	private boolean worldPickerOpen;
 	private boolean loadingWorldList;
 	private final List<Button> worldButtons = new ArrayList<>();
@@ -125,6 +132,8 @@ public class RegionEditorScreen extends Screen {
 	private final Map<Long, int[]> chunkColorsByRegion = new HashMap<>();
 	private final Map<Long, RegionTexture> regionTextures = new HashMap<>();
 	private final Map<Long, int[]> blockColorsByChunk = new HashMap<>();
+	private final Set<Long> selectedRegions = new HashSet<>();
+	private final Map<Long, BitSet> selectedChunksByRegion = new HashMap<>();
 	private Path currentRegionDir;
 	private int minRegionX;
 	private int maxRegionX;
@@ -162,6 +171,12 @@ public class RegionEditorScreen extends Screen {
 				.build()
 		);
 
+		this.actionButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Action"), button -> this.toggleActionMenu())
+				.bounds(62, 8, 60, 20)
+				.build()
+		);
+
 		this.loadWorldButton = this.addRenderableWidget(
 			Button.builder(Component.literal("Load World"), button -> this.openWorldPicker())
 				.bounds(12, 32, 120, 20)
@@ -169,6 +184,14 @@ public class RegionEditorScreen extends Screen {
 		);
 		this.loadWorldButton.visible = false;
 		this.loadWorldButton.active = false;
+
+		this.deleteButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Delete"), button -> this.deleteSelectedFromDisk())
+				.bounds(66, 32, 120, 20)
+				.build()
+		);
+		this.deleteButton.visible = false;
+		this.deleteButton.active = false;
 
 		this.backButton = this.addRenderableWidget(
 			Button.builder(CommonComponents.GUI_BACK, button -> this.minecraft.setScreen(this.lastScreen))
@@ -181,8 +204,20 @@ public class RegionEditorScreen extends Screen {
 
 	private void toggleFileMenu() {
 		this.fileMenuOpen = !this.fileMenuOpen;
+		if (this.fileMenuOpen) {
+			this.actionMenuOpen = false;
+		}
 		this.trace("toggleFileMenu(): fileMenuOpen=" + this.fileMenuOpen + " worldPickerOpen=" + this.worldPickerOpen);
 		if (!this.fileMenuOpen) {
+			this.worldPickerOpen = false;
+		}
+		this.refreshMenuVisibility();
+	}
+
+	private void toggleActionMenu() {
+		this.actionMenuOpen = !this.actionMenuOpen;
+		if (this.actionMenuOpen) {
+			this.fileMenuOpen = false;
 			this.worldPickerOpen = false;
 		}
 		this.refreshMenuVisibility();
@@ -204,6 +239,8 @@ public class RegionEditorScreen extends Screen {
 	private void refreshMenuVisibility() {
 		this.loadWorldButton.visible = this.fileMenuOpen;
 		this.loadWorldButton.active = this.fileMenuOpen && !this.loadingWorldList;
+		this.deleteButton.visible = this.actionMenuOpen;
+		this.deleteButton.active = this.actionMenuOpen && !this.loadingWorld && this.hasSelection();
 
 		boolean showWorldButtons = this.fileMenuOpen && this.worldPickerOpen;
 		for (Button button : this.worldButtons) {
@@ -257,6 +294,8 @@ public class RegionEditorScreen extends Screen {
 		this.clearRegionTextures();
 		this.chunkColorsByRegion.clear();
 		this.blockColorsByChunk.clear();
+		this.selectedRegions.clear();
+		this.selectedChunksByRegion.clear();
 		this.pendingChunkDetailUpdates.clear();
 		this.chunkDetailsInFlight.clear();
 		this.mapZoom = 1.0F;
@@ -301,9 +340,165 @@ public class RegionEditorScreen extends Screen {
 			this.pendingRegionUpdates.add(RegionBatchUpdate.complete(this.loadFilesScanned, this.loadRegionsApplied));
 		});
 		this.fileMenuOpen = false;
+		this.actionMenuOpen = false;
 		this.worldPickerOpen = false;
 		this.refreshMenuVisibility();
 		this.traceNanos("loadWorld(): queued background work for requestId=" + requestId, startNanos);
+	}
+
+	private boolean hasSelection() {
+		if (!this.selectedRegions.isEmpty()) {
+			return true;
+		}
+
+		for (BitSet bitSet : this.selectedChunksByRegion.values()) {
+			if (bitSet != null && !bitSet.isEmpty()) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private void deleteSelectedFromDisk() {
+		if (this.currentRegionDir == null || !this.hasSelection()) {
+			return;
+		}
+
+		Path regionDir = this.currentRegionDir;
+		Set<Long> regionsToDelete = new HashSet<>(this.selectedRegions);
+		Map<Long, BitSet> chunksToDeleteByRegion = new HashMap<>();
+		for (Map.Entry<Long, BitSet> entry : this.selectedChunksByRegion.entrySet()) {
+			if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+				chunksToDeleteByRegion.put(entry.getKey(), (BitSet)entry.getValue().clone());
+			}
+		}
+
+		this.selectedRegions.clear();
+		this.selectedChunksByRegion.clear();
+
+		int deletedRegions = 0;
+		int deletedChunks = 0;
+		Set<Long> regionsToReload = new HashSet<>();
+
+		for (long regionKey : regionsToDelete) {
+			int regionX = unpackRegionX(regionKey);
+			int regionZ = unpackRegionZ(regionKey);
+			Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
+			try {
+				if (Files.deleteIfExists(regionFilePath)) {
+					deletedRegions++;
+				}
+			} catch (IOException exception) {
+				LOGGER.warn("Region Editor: failed deleting region file {}", regionFilePath, exception);
+			}
+
+			this.removeRegionCache(regionKey);
+			for (int chunkZ = 0; chunkZ < CHUNKS_PER_REGION; chunkZ++) {
+				for (int chunkX = 0; chunkX < CHUNKS_PER_REGION; chunkX++) {
+					int globalChunkX = regionX * CHUNKS_PER_REGION + chunkX;
+					int globalChunkZ = regionZ * CHUNKS_PER_REGION + chunkZ;
+					this.blockColorsByChunk.remove(packChunk(globalChunkX, globalChunkZ));
+				}
+			}
+		}
+
+		for (Map.Entry<Long, BitSet> entry : chunksToDeleteByRegion.entrySet()) {
+			long regionKey = entry.getKey();
+			if (regionsToDelete.contains(regionKey)) {
+				continue;
+			}
+
+			int regionX = unpackRegionX(regionKey);
+			int regionZ = unpackRegionZ(regionKey);
+			Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
+			if (!Files.isRegularFile(regionFilePath)) {
+				continue;
+			}
+
+			BitSet selected = entry.getValue();
+			try (RegionFile regionFile = new RegionFile(REGION_EDITOR_STORAGE_INFO, regionFilePath, regionDir, false)) {
+				for (int idx = selected.nextSetBit(0); idx >= 0; idx = selected.nextSetBit(idx + 1)) {
+					int chunkX = idx & 31;
+					int chunkZ = idx >> 5;
+					int globalChunkX = regionX * CHUNKS_PER_REGION + chunkX;
+					int globalChunkZ = regionZ * CHUNKS_PER_REGION + chunkZ;
+					ChunkPos chunkPos = new ChunkPos(globalChunkX, globalChunkZ);
+					if (regionFile.hasChunk(chunkPos)) {
+						regionFile.clear(chunkPos);
+						deletedChunks++;
+					}
+					this.blockColorsByChunk.remove(packChunk(globalChunkX, globalChunkZ));
+				}
+			} catch (IOException exception) {
+				LOGGER.warn("Region Editor: failed deleting selected chunks in {}", regionFilePath, exception);
+			}
+
+			regionsToReload.add(regionKey);
+		}
+
+		for (long regionKey : regionsToReload) {
+			if (regionsToDelete.contains(regionKey)) {
+				continue;
+			}
+
+			int regionX = unpackRegionX(regionKey);
+			int regionZ = unpackRegionZ(regionKey);
+			Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
+			if (!Files.isRegularFile(regionFilePath)) {
+				this.removeRegionCache(regionKey);
+				continue;
+			}
+
+			RegionFileResult refreshed = readRegionFile(regionFilePath, regionX, regionZ);
+			if (refreshed == null) {
+				this.removeRegionCache(regionKey);
+			} else {
+				this.chunkColorsByRegion.put(regionKey, refreshed.chunkColors());
+				this.uploadRegionTexture(regionKey, refreshed.regionImage());
+			}
+		}
+
+		this.recomputeBoundsFromLoadedRegions();
+		this.loadStatus = "Deleted " + deletedRegions + " regions and " + deletedChunks + " chunks.";
+		this.actionMenuOpen = false;
+		this.refreshMenuVisibility();
+	}
+
+	private void removeRegionCache(long regionKey) {
+		this.chunkColorsByRegion.remove(regionKey);
+		RegionTexture existing = this.regionTextures.remove(regionKey);
+		if (existing != null && this.minecraft != null) {
+			this.minecraft.getTextureManager().release(existing.location());
+		}
+	}
+
+	private void recomputeBoundsFromLoadedRegions() {
+		if (this.chunkColorsByRegion.isEmpty()) {
+			this.minRegionX = 0;
+			this.maxRegionX = 0;
+			this.minRegionZ = 0;
+			this.maxRegionZ = 0;
+			return;
+		}
+
+		int minX = Integer.MAX_VALUE;
+		int maxX = Integer.MIN_VALUE;
+		int minZ = Integer.MAX_VALUE;
+		int maxZ = Integer.MIN_VALUE;
+		for (long regionKey : this.chunkColorsByRegion.keySet()) {
+			int regionX = unpackRegionX(regionKey);
+			int regionZ = unpackRegionZ(regionKey);
+			if (regionX < minX) minX = regionX;
+			if (regionX > maxX) maxX = regionX;
+			if (regionZ < minZ) minZ = regionZ;
+			if (regionZ > maxZ) maxZ = regionZ;
+		}
+
+		this.minRegionX = minX;
+		this.maxRegionX = maxX;
+		this.minRegionZ = minZ;
+		this.maxRegionZ = maxZ;
 	}
 
 	private void streamRegionData(Path regionDir, int requestId) throws IOException {
@@ -902,6 +1097,91 @@ public class RegionEditorScreen extends Screen {
 	}
 
 	@Override
+	public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
+		double mouseX = mouseButtonEvent.x();
+		double mouseY = mouseButtonEvent.y();
+		int button = mouseButtonEvent.button();
+		if (this.fileMenuOpen || this.chunkColorsByRegion.isEmpty() || !this.isInMapArea(mouseX, mouseY)) {
+			return super.mouseClicked(mouseButtonEvent, bl);
+		}
+
+		if (button == 0) {
+			if (this.updateSelectionAt(mouseX, mouseY, true)) {
+				return true;
+			}
+		} else if (button == 1) {
+			if (this.updateSelectionAt(mouseX, mouseY, false)) {
+				return true;
+			}
+		}
+
+		return super.mouseClicked(mouseButtonEvent, bl);
+	}
+
+	private boolean updateSelectionAt(double mouseX, double mouseY, boolean select) {
+		MapTransform transform = this.computeMapTransform(this.mapInnerLeft, this.mapInnerTop, this.mapInnerRight, this.mapInnerBottom);
+		int regionPixel = transform.regionPixel();
+		if (regionPixel <= 0) {
+			return false;
+		}
+
+		int regionCountX = this.maxRegionX - this.minRegionX + 1;
+		int regionCountZ = this.maxRegionZ - this.minRegionZ + 1;
+		if (regionCountX <= 0 || regionCountZ <= 0) {
+			return false;
+		}
+
+		double worldX = mouseX - transform.startX();
+		double worldZ = mouseY - transform.startZ();
+		int regionGridX = (int)Math.floor(worldX / regionPixel);
+		int regionGridZ = (int)Math.floor(worldZ / regionPixel);
+		if (regionGridX < 0 || regionGridZ < 0 || regionGridX >= regionCountX || regionGridZ >= regionCountZ) {
+			return false;
+		}
+
+		int regionX = this.minRegionX + regionGridX;
+		int regionZ = this.minRegionZ + regionGridZ;
+		long regionKey = packRegion(regionX, regionZ);
+		if (!this.chunkColorsByRegion.containsKey(regionKey)) {
+			return false;
+		}
+
+		double chunkPixel = regionPixel / (double)CHUNKS_PER_REGION;
+		if (chunkPixel >= 2.0) {
+			double localRegionX = worldX - regionGridX * regionPixel;
+			double localRegionZ = worldZ - regionGridZ * regionPixel;
+			int chunkLocalX = Mth.clamp((int)Math.floor(localRegionX * CHUNKS_PER_REGION / regionPixel), 0, CHUNKS_PER_REGION - 1);
+			int chunkLocalZ = Mth.clamp((int)Math.floor(localRegionZ * CHUNKS_PER_REGION / regionPixel), 0, CHUNKS_PER_REGION - 1);
+			int idx = chunkLocalX + chunkLocalZ * CHUNKS_PER_REGION;
+			int[] regionChunkColors = this.chunkColorsByRegion.get(regionKey);
+			if (regionChunkColors == null || (regionChunkColors[idx] >>> 24) == 0) {
+				return false;
+			}
+
+			if (select) {
+				BitSet selected = this.selectedChunksByRegion.computeIfAbsent(regionKey, key -> new BitSet(CHUNK_COUNT_PER_REGION));
+				selected.set(idx);
+			} else {
+				BitSet selected = this.selectedChunksByRegion.get(regionKey);
+				if (selected != null) {
+					selected.clear(idx);
+					if (selected.isEmpty()) {
+						this.selectedChunksByRegion.remove(regionKey);
+					}
+				}
+			}
+			return true;
+		}
+
+		if (select) {
+			this.selectedRegions.add(regionKey);
+		} else {
+			this.selectedRegions.remove(regionKey);
+		}
+		return true;
+	}
+
+	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		if (!this.isInMapArea(mouseX, mouseY) || scrollY == 0.0) {
 			return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -975,6 +1255,10 @@ public class RegionEditorScreen extends Screen {
 			this.renderFileMenu(guiGraphics);
 		}
 
+		if (this.actionMenuOpen) {
+			this.renderActionMenu(guiGraphics);
+		}
+
 		guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 14, 0xFFFFFFFF);
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 
@@ -1025,6 +1309,15 @@ public class RegionEditorScreen extends Screen {
 		}
 	}
 
+	private void renderActionMenu(GuiGraphics guiGraphics) {
+		int menuLeft = 62;
+		int menuTop = 30;
+		int menuWidth = 134;
+		int menuHeight = 30;
+		guiGraphics.fill(menuLeft, menuTop, menuLeft + menuWidth, menuTop + menuHeight, 0xF0202020);
+		guiGraphics.fill(menuLeft + 1, menuTop + 1, menuLeft + menuWidth - 1, menuTop + menuHeight - 1, 0xF0323232);
+	}
+
 	private RenderStats renderRegionMap(GuiGraphics guiGraphics, int left, int top, int right, int bottom) {
 		int regionCountX = this.maxRegionX - this.minRegionX + 1;
 		int regionCountZ = this.maxRegionZ - this.minRegionZ + 1;
@@ -1046,9 +1339,10 @@ public class RegionEditorScreen extends Screen {
 		guiGraphics.enableScissor(left, top, right, bottom);
 		try {
 			for (Map.Entry<Long, int[]> entry : this.chunkColorsByRegion.entrySet()) {
+				long regionKey = entry.getKey();
 
-				int regionX = unpackRegionX(entry.getKey());
-				int regionZ = unpackRegionZ(entry.getKey());
+				int regionX = unpackRegionX(regionKey);
+				int regionZ = unpackRegionZ(regionKey);
 				int rx = regionX - this.minRegionX;
 				int rz = regionZ - this.minRegionZ;
 				int px = startX + rx * regionPixel;
@@ -1061,7 +1355,7 @@ public class RegionEditorScreen extends Screen {
 				}
 
 				guiGraphics.fill(px, pz, px2, pz2, 0xFF2B2B2B);
-				RegionTexture regionTexture = this.regionTextures.get(entry.getKey());
+				RegionTexture regionTexture = this.regionTextures.get(regionKey);
 				if (regionTexture != null) {
 					guiGraphics.blit(
 						RenderPipelines.GUI_TEXTURED,
@@ -1078,6 +1372,24 @@ public class RegionEditorScreen extends Screen {
 						BLOCKS_PER_REGION_EDGE
 					);
 				}
+
+				if (this.selectedRegions.contains(regionKey)) {
+					guiGraphics.fill(px, pz, px2, pz2, REGION_SELECTION_TINT);
+				}
+
+				BitSet selectedChunks = this.selectedChunksByRegion.get(regionKey);
+				if (selectedChunks != null && !selectedChunks.isEmpty() && regionPixel >= 2) {
+					for (int idx = selectedChunks.nextSetBit(0); idx >= 0; idx = selectedChunks.nextSetBit(idx + 1)) {
+						int chunkX = idx & 31;
+						int chunkZ = idx >> 5;
+						int cx1 = px + (chunkX * regionPixel) / CHUNKS_PER_REGION;
+						int cz1 = pz + (chunkZ * regionPixel) / CHUNKS_PER_REGION;
+						int cx2 = px + ((chunkX + 1) * regionPixel) / CHUNKS_PER_REGION;
+						int cz2 = pz + ((chunkZ + 1) * regionPixel) / CHUNKS_PER_REGION;
+						guiGraphics.fill(cx1, cz1, cx2, cz2, CHUNK_SELECTION_TINT);
+					}
+				}
+
 				drawn++;
 				renderGridLines(guiGraphics, px, pz, regionPixel);
 				if (regionPixel >= 2) {
