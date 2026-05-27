@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.blaze3d.platform.NativeImage;
 import net.logging.LogUtils;
 import net.minecraft.Util;
 import net.minecraft.api.EnvType;
@@ -31,12 +33,16 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.world.level.ChunkPos;
@@ -53,6 +59,7 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.storage.LevelStorageException;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.LevelSummary;
+import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -70,6 +77,7 @@ public class RegionEditorScreen extends Screen {
 	private static final int MAX_REGION_CELLS_DRAWN_PER_FRAME = 40000;
 	private static final int MAX_CHUNK_DETAIL_REQUESTS_PER_FRAME = 96;
 	private static final int MAX_CHUNK_DETAILS_APPLIED_PER_TICK = 96;
+	private static final int MIN_BLOCK_PIXEL_FOR_DETAIL = 2;
 	private static final float MIN_MAP_ZOOM = 0.25F;
 	private static final float MAX_MAP_ZOOM = 128.0F;
 	private static final float MAP_ZOOM_STEP = 1.2F;
@@ -108,6 +116,7 @@ public class RegionEditorScreen extends Screen {
 	private final ConcurrentHashMap<Long, Boolean> chunkDetailsInFlight = new ConcurrentHashMap<>();
 
 	private final Map<Long, int[]> chunkColorsByRegion = new HashMap<>();
+	private final Map<Long, RegionTexture> regionTextures = new HashMap<>();
 	private final Map<Long, int[]> blockColorsByChunk = new HashMap<>();
 	private Path currentRegionDir;
 	private int minRegionX;
@@ -238,6 +247,7 @@ public class RegionEditorScreen extends Screen {
 		this.loadedWorldName = summary.getLevelName();
 		this.loadingWorld = true;
 		this.loadStatus = "Loading world: " + this.loadedWorldName + "...";
+		this.clearRegionTextures();
 		this.chunkColorsByRegion.clear();
 		this.blockColorsByChunk.clear();
 		this.pendingChunkDetailUpdates.clear();
@@ -251,7 +261,7 @@ public class RegionEditorScreen extends Screen {
 		this.maxRegionZ = 0;
 		this.loadFilesScanned = 0;
 		this.loadRegionsApplied = 0;
-		this.pendingRegionUpdates.clear();
+		this.clearPendingRegionUpdates();
 		this.loggedFirstBatchApply = false;
 		this.worldLoadStartNanos = System.nanoTime();
 		this.lastProgressLogNanos = this.worldLoadStartNanos;
@@ -297,7 +307,7 @@ public class RegionEditorScreen extends Screen {
 			return;
 		}
 
-		Map<Long, int[]> batch = new LinkedHashMap<>();
+		Map<Long, RegionFileResult> batch = new LinkedHashMap<>();
 		int filesScanned = 0;
 		int regionsLoaded = 0;
 		int lastLoggedFiles = 0;
@@ -334,7 +344,7 @@ public class RegionEditorScreen extends Screen {
 						RegionFileResult result = takeCompletedRegion(completionService, requestId);
 						inFlight--;
 						if (result != null) {
-							batch.put(result.packedRegion(), result.chunkColors());
+							batch.put(result.packedRegion(), result);
 							regionsLoaded++;
 						}
 						if (batch.size() >= REGION_BATCH_SIZE) {
@@ -360,7 +370,7 @@ public class RegionEditorScreen extends Screen {
 				RegionFileResult result = takeCompletedRegion(completionService, requestId);
 				inFlight--;
 				if (result != null) {
-					batch.put(result.packedRegion(), result.chunkColors());
+					batch.put(result.packedRegion(), result);
 					regionsLoaded++;
 				}
 				if (batch.size() >= REGION_BATCH_SIZE) {
@@ -472,6 +482,8 @@ public class RegionEditorScreen extends Screen {
 		}
 
 		int[] chunkColors = new int[CHUNK_COUNT_PER_REGION];
+		NativeImage regionImage = new NativeImage(BLOCKS_PER_REGION_EDGE, BLOCKS_PER_REGION_EDGE, true);
+		IntBuffer regionPixels = MemoryUtil.memIntBuffer(regionImage.pixels, BLOCKS_PER_REGION_EDGE * BLOCKS_PER_REGION_EDGE);
 		boolean hasAnyChunk = false;
 		Path regionFolder = regionFile.getParent();
 
@@ -487,13 +499,18 @@ public class RegionEditorScreen extends Screen {
 				try (DataInputStream chunkInput = anvilRegion.getChunkDataInputStream(chunkPos)) {
 					if (chunkInput == null) {
 						chunkColors[idx] = DEFAULT_CHUNK_COLOR;
+						fillChunkPixels(regionPixels, chunkLocalX, chunkLocalZ, null, DEFAULT_CHUNK_COLOR);
 						continue;
 					}
 
 					CompoundTag chunkTag = NbtIo.read(chunkInput);
-					chunkColors[idx] = extractChunkTopColor(chunkTag);
+					int[] blockColors = extractChunkTopBlockColors(chunkTag);
+					int chunkColor = averageChunkTopColor(blockColors);
+					chunkColors[idx] = chunkColor;
+					fillChunkPixels(regionPixels, chunkLocalX, chunkLocalZ, blockColors, chunkColor);
 				} catch (Exception exception) {
 					chunkColors[idx] = DEFAULT_CHUNK_COLOR;
+					fillChunkPixels(regionPixels, chunkLocalX, chunkLocalZ, null, DEFAULT_CHUNK_COLOR);
 					LOGGER.debug("Region Editor: failed to decode chunk color for {}", chunkPos, exception);
 				}
 			}
@@ -501,11 +518,15 @@ public class RegionEditorScreen extends Screen {
 			LOGGER.warn("Region Editor: failed to decode region {}, using fallback occupancy colors", regionFile.getFileName(), exception);
 			for (int idx = chunkPresence.nextSetBit(0); idx >= 0; idx = chunkPresence.nextSetBit(idx + 1)) {
 				hasAnyChunk = true;
+				int chunkLocalX = idx & 31;
+				int chunkLocalZ = idx >> 5;
 				chunkColors[idx] = DEFAULT_CHUNK_COLOR;
+				fillChunkPixels(regionPixels, chunkLocalX, chunkLocalZ, null, DEFAULT_CHUNK_COLOR);
 			}
 		}
 
 		if (!hasAnyChunk) {
+			regionImage.close();
 			return null;
 		}
 
@@ -514,11 +535,15 @@ public class RegionEditorScreen extends Screen {
 			LOGGER.info("Region Editor: readRegionFile slow path file={} took={}ms", regionFile.getFileName(), elapsedNanos / 1_000_000L);
 			System.out.println("[RegionEditor] readRegionFile slow path file=" + regionFile.getFileName() + " took=" + (elapsedNanos / 1_000_000L) + "ms");
 		}
-		return new RegionFileResult(packRegion(regionX, regionZ), chunkColors);
+		return new RegionFileResult(packRegion(regionX, regionZ), chunkColors, regionImage);
 	}
 
 	private static int extractChunkTopColor(CompoundTag chunkTag) {
 		int[] blockColors = extractChunkTopBlockColors(chunkTag);
+		return averageChunkTopColor(blockColors);
+	}
+
+	private static int averageChunkTopColor(int[] blockColors) {
 		if (blockColors == null) {
 			return DEFAULT_CHUNK_COLOR;
 		}
@@ -550,6 +575,21 @@ public class RegionEditorScreen extends Screen {
 			| ((red / samples) << 16)
 			| ((green / samples) << 8)
 			| (blue / samples);
+	}
+
+	private static void fillChunkPixels(IntBuffer regionPixels, int chunkLocalX, int chunkLocalZ, int[] blockColors, int fallbackColor) {
+		int baseX = chunkLocalX * BLOCKS_PER_CHUNK_EDGE;
+		int baseZ = chunkLocalZ * BLOCKS_PER_CHUNK_EDGE;
+		for (int localZ = 0; localZ < BLOCKS_PER_CHUNK_EDGE; localZ++) {
+			int rowStart = (baseZ + localZ) * BLOCKS_PER_REGION_EDGE + baseX;
+			for (int localX = 0; localX < BLOCKS_PER_CHUNK_EDGE; localX++) {
+				int argb = blockColors != null ? blockColors[localX + localZ * BLOCKS_PER_CHUNK_EDGE] : fallbackColor;
+				if (argb == 0) {
+					argb = fallbackColor;
+				}
+				regionPixels.put(rowStart + localX, ARGB.toABGR(argb));
+			}
+		}
 	}
 
 	private static int[] extractChunkTopBlockColors(CompoundTag chunkTag) {
@@ -887,43 +927,54 @@ public class RegionEditorScreen extends Screen {
 		}
 
 		int drawStride = 1;
-		if (regionPixel <= 2 && this.chunkColorsByRegion.size() > MAX_REGION_CELLS_DRAWN_PER_FRAME) {
-			drawStride = Math.max(1, this.chunkColorsByRegion.size() / MAX_REGION_CELLS_DRAWN_PER_FRAME);
-		}
-		int sampled = 0;
 		int drawn = 0;
-		int detailRequestsRemaining = MAX_CHUNK_DETAIL_REQUESTS_PER_FRAME;
 
-		for (Map.Entry<Long, int[]> entry : this.chunkColorsByRegion.entrySet()) {
-			if (drawStride > 1 && (sampled++ % drawStride) != 0) {
-				continue;
-			}
+		guiGraphics.enableScissor(left, top, right, bottom);
+		try {
+			for (Map.Entry<Long, int[]> entry : this.chunkColorsByRegion.entrySet()) {
 
-			int regionX = unpackRegionX(entry.getKey());
-			int regionZ = unpackRegionZ(entry.getKey());
-			int rx = regionX - this.minRegionX;
-			int rz = regionZ - this.minRegionZ;
-			int px = startX + rx * regionPixel;
-			int pz = startZ + rz * regionPixel;
-			int px2 = px + regionPixel;
-			int pz2 = pz + regionPixel;
+				int regionX = unpackRegionX(entry.getKey());
+				int regionZ = unpackRegionZ(entry.getKey());
+				int rx = regionX - this.minRegionX;
+				int rz = regionZ - this.minRegionZ;
+				int px = startX + rx * regionPixel;
+				int pz = startZ + rz * regionPixel;
+				int px2 = px + regionPixel;
+				int pz2 = pz + regionPixel;
 
-			if (px2 < left || px > right || pz2 < top || pz > bottom) {
-				continue;
-			}
+				if (px2 < left || px > right || pz2 < top || pz > bottom) {
+					continue;
+				}
 
-			guiGraphics.fill(px, pz, px2, pz2, 0xFF2B2B2B);
-			drawn++;
-			if (drawStride == 1) {
-				detailRequestsRemaining = this.renderChunkCells(guiGraphics, px, pz, regionX, regionZ, regionPixel, entry.getValue(), detailRequestsRemaining);
+				guiGraphics.fill(px, pz, px2, pz2, 0xFF2B2B2B);
+				RegionTexture regionTexture = this.regionTextures.get(entry.getKey());
+				if (regionTexture != null) {
+					guiGraphics.blit(
+						RenderPipelines.GUI_TEXTURED,
+						regionTexture.location(),
+						px,
+						pz,
+						0.0F,
+						0.0F,
+						regionPixel,
+						regionPixel,
+						BLOCKS_PER_REGION_EDGE,
+						BLOCKS_PER_REGION_EDGE,
+						BLOCKS_PER_REGION_EDGE,
+						BLOCKS_PER_REGION_EDGE
+					);
+				}
+				drawn++;
 				renderGridLines(guiGraphics, px, pz, regionPixel);
+				if (regionPixel >= 2) {
+					guiGraphics.fill(px, pz, px2, pz + 1, 0xFFFFFFFF);
+					guiGraphics.fill(px, pz2 - 1, px2, pz2, 0xFFFFFFFF);
+					guiGraphics.fill(px, pz, px + 1, pz2, 0xFFFFFFFF);
+					guiGraphics.fill(px2 - 1, pz, px2, pz2, 0xFFFFFFFF);
+				}
 			}
-			if (regionPixel >= 2) {
-				guiGraphics.fill(px, pz, px2, pz + 1, 0xFFFFFFFF);
-				guiGraphics.fill(px, pz2 - 1, px2, pz2, 0xFFFFFFFF);
-				guiGraphics.fill(px, pz, px + 1, pz2, 0xFFFFFFFF);
-				guiGraphics.fill(px2 - 1, pz, px2, pz2, 0xFFFFFFFF);
-			}
+		} finally {
+			guiGraphics.disableScissor();
 		}
 
 		return new RenderStats(regionCountX * regionCountZ, this.chunkColorsByRegion.size(), drawn, drawStride, regionPixel);
@@ -970,9 +1021,6 @@ public class RegionEditorScreen extends Screen {
 			return detailRequestsRemaining;
 		}
 
-		boolean allowBlockDetail = chunkPixel >= BLOCKS_PER_CHUNK_EDGE;
-		int blockPixel = allowBlockDetail ? Math.max(1, chunkPixel / BLOCKS_PER_CHUNK_EDGE) : 0;
-
 		for (int idx = 0; idx < chunkColors.length; idx++) {
 			int color = chunkColors[idx];
 			if ((color >>> 24) == 0) {
@@ -982,10 +1030,16 @@ public class RegionEditorScreen extends Screen {
 			int chunkZ = idx >> 5;
 			int globalChunkX = regionX * CHUNKS_PER_REGION + chunkX;
 			int globalChunkZ = regionZ * CHUNKS_PER_REGION + chunkZ;
-			int x1 = regionLeft + chunkX * chunkPixel;
-			int z1 = regionTop + chunkZ * chunkPixel;
-			int x2 = Math.min(regionLeft + regionPixel, x1 + chunkPixel);
-			int z2 = Math.min(regionTop + regionPixel, z1 + chunkPixel);
+			int x1 = regionLeft + (chunkX * regionPixel) / CHUNKS_PER_REGION;
+			int z1 = regionTop + (chunkZ * regionPixel) / CHUNKS_PER_REGION;
+			int x2 = regionLeft + ((chunkX + 1) * regionPixel) / CHUNKS_PER_REGION;
+			int z2 = regionTop + ((chunkZ + 1) * regionPixel) / CHUNKS_PER_REGION;
+
+			int chunkWidth = Math.max(1, x2 - x1);
+			int chunkHeight = Math.max(1, z2 - z1);
+			int blockPixelX = Math.max(1, chunkWidth / BLOCKS_PER_CHUNK_EDGE);
+			int blockPixelZ = Math.max(1, chunkHeight / BLOCKS_PER_CHUNK_EDGE);
+			boolean allowBlockDetail = Math.min(blockPixelX, blockPixelZ) >= MIN_BLOCK_PIXEL_FOR_DETAIL;
 
 			if (allowBlockDetail) {
 				long chunkKey = packChunk(globalChunkX, globalChunkZ);
@@ -998,10 +1052,10 @@ public class RegionEditorScreen extends Screen {
 								continue;
 							}
 
-							int bx1 = x1 + blockX * blockPixel;
-							int bz1 = z1 + blockZ * blockPixel;
-							int bx2 = Math.min(x2, bx1 + blockPixel);
-							int bz2 = Math.min(z2, bz1 + blockPixel);
+							int bx1 = x1 + (blockX * chunkWidth) / BLOCKS_PER_CHUNK_EDGE;
+							int bz1 = z1 + (blockZ * chunkHeight) / BLOCKS_PER_CHUNK_EDGE;
+							int bx2 = x1 + ((blockX + 1) * chunkWidth) / BLOCKS_PER_CHUNK_EDGE;
+							int bz2 = z1 + ((blockZ + 1) * chunkHeight) / BLOCKS_PER_CHUNK_EDGE;
 							guiGraphics.fill(bx1, bz1, bx2, bz2, blockColor);
 						}
 					}
@@ -1026,8 +1080,8 @@ public class RegionEditorScreen extends Screen {
 		}
 
 		for (int i = 1; i < CHUNKS_PER_REGION; i++) {
-			int x = regionLeft + i * chunkPixel;
-			int z = regionTop + i * chunkPixel;
+			int x = regionLeft + (i * regionPixel) / CHUNKS_PER_REGION;
+			int z = regionTop + (i * regionPixel) / CHUNKS_PER_REGION;
 			int color = (i % 8 == 0) ? 0x9096D8FF : 0x504070A0;
 			guiGraphics.fill(x, regionTop, x + 1, regionTop + regionPixel, color);
 			guiGraphics.fill(regionLeft, z, regionLeft + regionPixel, z + 1, color);
@@ -1105,8 +1159,9 @@ public class RegionEditorScreen extends Screen {
 		return new MapTransform(regionPixel, startX, startZ);
 	}
 
-	private void publishBatch(int requestId, Map<Long, int[]> batch, int filesScanned, int regionsLoaded, boolean finalBatch) {
+	private void publishBatch(int requestId, Map<Long, RegionFileResult> batch, int filesScanned, int regionsLoaded, boolean finalBatch) {
 		if (requestId != this.activeLoadRequest) {
+			closeRegionBatch(batch);
 			return;
 		}
 
@@ -1155,11 +1210,13 @@ public class RegionEditorScreen extends Screen {
 				this.loggedFirstBatchApply = true;
 				this.trace("applyRegionUpdate(): first region batch applied batchSize=" + update.batch().size());
 			}
-			for (Map.Entry<Long, int[]> entry : update.batch().entrySet()) {
+			for (Map.Entry<Long, RegionFileResult> entry : update.batch().entrySet()) {
 				long packedRegion = entry.getKey();
 				int regionX = unpackRegionX(packedRegion);
 				int regionZ = unpackRegionZ(packedRegion);
-				this.chunkColorsByRegion.put(packedRegion, entry.getValue());
+				RegionFileResult region = entry.getValue();
+				this.chunkColorsByRegion.put(packedRegion, region.chunkColors());
+				this.uploadRegionTexture(packedRegion, region.regionImage());
 				this.updateBounds(regionX, regionZ);
 			}
 		}
@@ -1196,6 +1253,59 @@ public class RegionEditorScreen extends Screen {
 		if (update.logProgress()) {
 			LOGGER.info("Region Editor: loading {} progress - {} regions, {} files scanned", this.loadedWorldName, this.loadRegionsApplied, this.loadFilesScanned);
 		}
+	}
+
+	private void uploadRegionTexture(long packedRegion, NativeImage regionImage) {
+		RegionTexture existing = this.regionTextures.remove(packedRegion);
+		if (existing != null) {
+			this.minecraft.getTextureManager().release(existing.location());
+		}
+
+		ResourceLocation location = ResourceLocation.fromNamespaceAndPath(
+			"mattmc",
+			"region_editor/" + this.activeLoadRequest + "/" + unpackRegionX(packedRegion) + "_" + unpackRegionZ(packedRegion)
+		);
+		DynamicTexture texture = new DynamicTexture(() -> "Region Editor " + unpackRegionX(packedRegion) + "," + unpackRegionZ(packedRegion), regionImage);
+		texture.setClamp(true);
+		texture.setFilter(false, false);
+		this.minecraft.getTextureManager().register(location, texture);
+		this.regionTextures.put(packedRegion, new RegionTexture(location, texture));
+	}
+
+	private void clearRegionTextures() {
+		if (this.minecraft == null) {
+			this.regionTextures.clear();
+			return;
+		}
+
+		for (RegionTexture regionTexture : this.regionTextures.values()) {
+			this.minecraft.getTextureManager().release(regionTexture.location());
+		}
+		this.regionTextures.clear();
+	}
+
+	private void clearPendingRegionUpdates() {
+		RegionBatchUpdate update;
+		while ((update = this.pendingRegionUpdates.poll()) != null) {
+			closeRegionBatch(update.batch());
+		}
+	}
+
+	private static void closeRegionBatch(Map<Long, RegionFileResult> batch) {
+		if (batch == null) {
+			return;
+		}
+
+		for (RegionFileResult result : batch.values()) {
+			result.regionImage().close();
+		}
+	}
+
+	@Override
+	public void onClose() {
+		this.clearPendingRegionUpdates();
+		this.clearRegionTextures();
+		super.onClose();
 	}
 
 	private void trace(String message) {
@@ -1243,8 +1353,8 @@ public class RegionEditorScreen extends Screen {
 		return (int)packedRegion;
 	}
 
-	private record RegionBatchUpdate(Map<Long, int[]> batch, int filesScanned, int regionsLoaded, boolean completed, boolean failed, boolean logProgress) {
-		private static RegionBatchUpdate batch(Map<Long, int[]> batch, int filesScanned, int regionsLoaded, boolean logProgress) {
+	private record RegionBatchUpdate(Map<Long, RegionFileResult> batch, int filesScanned, int regionsLoaded, boolean completed, boolean failed, boolean logProgress) {
+		private static RegionBatchUpdate batch(Map<Long, RegionFileResult> batch, int filesScanned, int regionsLoaded, boolean logProgress) {
 			return new RegionBatchUpdate(batch, filesScanned, regionsLoaded, false, false, logProgress);
 		}
 
@@ -1261,7 +1371,10 @@ public class RegionEditorScreen extends Screen {
 		}
 	}
 
-	private record RegionFileResult(long packedRegion, int[] chunkColors) {
+	private record RegionFileResult(long packedRegion, int[] chunkColors, NativeImage regionImage) {
+	}
+
+	private record RegionTexture(ResourceLocation location, DynamicTexture texture) {
 	}
 
 	private record ChunkDetailUpdate(long chunkKey, int[] blockColors, int requestId) {
