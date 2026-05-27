@@ -1880,7 +1880,6 @@ public class RegionEditorScreen extends Screen {
 		this.lastMouseY = mouseY;
 		long renderStartNanos = System.nanoTime();
 		this.renderFrameCounter++;
-		this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
 		int mapLeft = 8;
 		int mapTop = 36;
