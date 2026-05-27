@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.CompletionException;
@@ -27,6 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.blaze3d.platform.NativeImage;
 import net.logging.LogUtils;
+import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -39,12 +41,14 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
-import net.minecraft.util.SimpleBitStorage;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.Level;
@@ -53,6 +57,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.Strategy;
+import net.minecraft.world.level.chunk.storage.ChunkStorage;
 import net.minecraft.world.level.chunk.storage.RegionFile;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.minecraft.world.level.material.MapColor;
@@ -503,7 +508,7 @@ public class RegionEditorScreen extends Screen {
 						continue;
 					}
 
-					CompoundTag chunkTag = NbtIo.read(chunkInput);
+					CompoundTag chunkTag = maybeDataFixChunkTag(NbtIo.read(chunkInput));
 					int[] blockColors = extractChunkTopBlockColors(chunkTag);
 					int chunkColor = averageChunkTopColor(blockColors);
 					chunkColors[idx] = chunkColor;
@@ -594,38 +599,45 @@ public class RegionEditorScreen extends Screen {
 
 	private static int[] extractChunkTopBlockColors(CompoundTag chunkTag) {
 		CompoundTag root = chunkTag.contains("Level") ? chunkTag.getCompoundOrEmpty("Level") : chunkTag;
-		long[] heightmap = readPreferredHeightmap(root);
-		if (heightmap == null) {
-			return null;
-		}
-
 		Map<Integer, PalettedContainer<BlockState>> sectionsByY = decodeSections(root);
 		if (sectionsByY.isEmpty()) {
 			return null;
 		}
 
-		int minY = resolveChunkMinY(root, sectionsByY);
-		int bits = inferHeightmapBits(heightmap.length);
-		if (bits <= 0) {
-			return null;
-		}
-
-		SimpleBitStorage storage;
-		try {
-			storage = new SimpleBitStorage(bits, 256, heightmap);
-		} catch (Exception exception) {
-			return null;
-		}
-
 		int[] blockColors = new int[BLOCKS_PER_CHUNK_EDGE * BLOCKS_PER_CHUNK_EDGE];
-		for (int localZ = 0; localZ < BLOCKS_PER_CHUNK_EDGE; localZ++) {
-			for (int localX = 0; localX < BLOCKS_PER_CHUNK_EDGE; localX++) {
-				int index = localX + localZ * BLOCKS_PER_CHUNK_EDGE;
-				int topY = storage.get(index) + minY - 1;
-				BlockState state = getStateAt(sectionsByY, localX, topY, localZ);
-				blockColors[index] = colorForBlockState(state);
+		boolean[] unresolved = new boolean[BLOCKS_PER_CHUNK_EDGE * BLOCKS_PER_CHUNK_EDGE];
+		int unresolvedCount = unresolved.length;
+		for (int i = 0; i < unresolved.length; i++) {
+			unresolved[i] = true;
+		}
+
+		int sectionMax = sectionsByY.keySet().stream().max(Integer::compareTo).orElse(FALLBACK_MIN_Y / 16);
+		int sectionMin = sectionsByY.keySet().stream().min(Integer::compareTo).orElse(sectionMax);
+		for (int sectionY = sectionMax; sectionY >= sectionMin && unresolvedCount > 0; sectionY--) {
+			PalettedContainer<BlockState> section = sectionsByY.get(sectionY);
+			if (section == null) {
+				continue;
+			}
+
+			for (int yInSection = 15; yInSection >= 0 && unresolvedCount > 0; yInSection--) {
+				for (int localZ = 0; localZ < BLOCKS_PER_CHUNK_EDGE; localZ++) {
+					for (int localX = 0; localX < BLOCKS_PER_CHUNK_EDGE; localX++) {
+						int index = localX + localZ * BLOCKS_PER_CHUNK_EDGE;
+						if (!unresolved[index]) {
+							continue;
+						}
+
+						BlockState state = section.get(localX & 15, yInSection, localZ & 15);
+						if (!state.isAir()) {
+							blockColors[index] = colorForBlockState(state);
+							unresolved[index] = false;
+							unresolvedCount--;
+						}
+					}
+				}
 			}
 		}
+
 		return blockColors;
 	}
 
@@ -646,49 +658,28 @@ public class RegionEditorScreen extends Screen {
 		return sectionsByY;
 	}
 
-	private static long[] readPreferredHeightmap(CompoundTag chunkRoot) {
-		CompoundTag heightmaps = chunkRoot.getCompoundOrEmpty("Heightmaps");
-		long[] worldSurface = heightmaps.getLongArray("WORLD_SURFACE").orElse(null);
-		if (worldSurface != null && worldSurface.length > 0) {
-			return worldSurface;
+	private static CompoundTag maybeDataFixChunkTag(CompoundTag chunkTag) {
+		int dataVersion = NbtUtils.getDataVersion(chunkTag, -1);
+		int currentVersion = SharedConstants.getCurrentVersion().dataVersion().version();
+		if (dataVersion == currentVersion) {
+			return chunkTag;
 		}
 
-		long[] motionBlocking = heightmaps.getLongArray("MOTION_BLOCKING").orElse(null);
-		if (motionBlocking != null && motionBlocking.length > 0) {
-			return motionBlocking;
-		}
-
-		return null;
-	}
-
-	private static int resolveChunkMinY(CompoundTag chunkRoot, Map<Integer, PalettedContainer<BlockState>> sectionsByY) {
-		int sectionMin = sectionsByY.keySet().stream().min(Integer::compareTo).orElse(FALLBACK_MIN_Y / 16);
-		return chunkRoot.getIntOr("yPos", sectionMin) * 16;
-	}
-
-	private static int inferHeightmapBits(int longArrayLength) {
-		for (int bits = 1; bits <= 16; bits++) {
-			int valuesPerLong = 64 / bits;
-			if (valuesPerLong <= 0) {
-				continue;
+		try {
+			CompoundTag working = chunkTag.copy();
+			if (dataVersion < 1493) {
+				working = DataFixTypes.CHUNK.update(DataFixers.getDataFixer(), working, dataVersion, 1493);
 			}
-			int expectedLength = Mth.positiveCeilDiv(256, valuesPerLong);
-			if (expectedLength == longArrayLength) {
-				return bits;
-			}
-		}
-		return -1;
-	}
 
-	private static BlockState getStateAt(Map<Integer, PalettedContainer<BlockState>> sectionsByY, int localX, int worldY, int localZ) {
-		int sectionY = Math.floorDiv(worldY, 16);
-		PalettedContainer<BlockState> section = sectionsByY.get(sectionY);
-		if (section == null) {
-			return AIR_BLOCK_STATE;
+			ChunkStorage.injectDatafixingContext(working, Level.OVERWORLD, Optional.empty());
+			working = DataFixTypes.CHUNK.updateToCurrentVersion(DataFixers.getDataFixer(), working, Math.max(1493, dataVersion));
+			working.remove("__context");
+			NbtUtils.addCurrentDataVersion(working);
+			return working;
+		} catch (Exception exception) {
+			LOGGER.debug("Region Editor: chunk datafix failed, using raw chunk data", exception);
+			return chunkTag;
 		}
-
-		int yInSection = worldY & 15;
-		return section.get(localX & 15, yInSection, localZ & 15);
 	}
 
 	private static int colorForBlockState(BlockState state) {
@@ -1133,7 +1124,7 @@ public class RegionEditorScreen extends Screen {
 				return null;
 			}
 
-			CompoundTag chunkTag = NbtIo.read(input);
+			CompoundTag chunkTag = maybeDataFixChunkTag(NbtIo.read(input));
 			return extractChunkTopBlockColors(chunkTag);
 		} catch (Exception exception) {
 			return null;
