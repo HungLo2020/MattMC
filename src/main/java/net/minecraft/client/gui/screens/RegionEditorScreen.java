@@ -101,6 +101,8 @@ public class RegionEditorScreen extends Screen {
 	private static final int DEFAULT_CHUNK_COLOR = 0xFF4A8F4A;
 	private static final int REGION_SELECTION_TINT = 0x66FF8C00;
 	private static final int CHUNK_SELECTION_TINT = 0x66FF8C00;
+	private static final int PASTE_PREVIEW_FILL = 0x5533D6FF;
+	private static final int PASTE_PREVIEW_BORDER = 0xFF7CE8FF;
 	private static final int CHUNK_SAMPLE_STEP = 4;
 	private static final int FALLBACK_MIN_Y = -64;
 	private static final int BLOCKS_PER_CHUNK_EDGE = 16;
@@ -142,6 +144,7 @@ public class RegionEditorScreen extends Screen {
 	private final Set<Long> selectedRegions = new HashSet<>();
 	private final Map<Long, BitSet> selectedChunksByRegion = new HashMap<>();
 	private ClipboardData clipboard;
+	private boolean pastePreviewActive;
 	private final Deque<UndoAction> undoStack = new ArrayDeque<>();
 	private Path currentRegionDir;
 	private int minRegionX;
@@ -337,6 +340,7 @@ public class RegionEditorScreen extends Screen {
 		this.blockColorsByChunk.clear();
 		this.selectedRegions.clear();
 		this.selectedChunksByRegion.clear();
+		this.pastePreviewActive = false;
 		this.undoStack.clear();
 		this.pendingChunkDetailUpdates.clear();
 		this.chunkDetailsInFlight.clear();
@@ -562,6 +566,7 @@ public class RegionEditorScreen extends Screen {
 		int widthChunks = (maxChunkX - minChunkX) + 1;
 		int heightChunks = (maxChunkZ - minChunkZ) + 1;
 		this.clipboard = new ClipboardData(chunksByRelativeOffset, regionSnap, widthChunks, heightChunks, selectedChunks.size());
+		this.pastePreviewActive = false;
 		String snapMode = regionSnap ? "region" : "chunk";
 		this.loadStatus = "Copied " + chunksByRelativeOffset.size() + " chunks. Paste snaps to " + snapMode + " grid.";
 		this.actionMenuOpen = false;
@@ -570,6 +575,13 @@ public class RegionEditorScreen extends Screen {
 
 	private void pasteClipboardAtMouse() {
 		if (this.currentRegionDir == null || this.clipboard == null) {
+			return;
+		}
+
+		if (!this.pastePreviewActive) {
+			this.pastePreviewActive = true;
+			this.loadStatus = "Paste preview active. Press Ctrl+V to paste at preview origin.";
+			this.refreshMenuVisibility();
 			return;
 		}
 
@@ -608,6 +620,7 @@ public class RegionEditorScreen extends Screen {
 
 		this.refreshRegionsFromDisk(touchedRegions);
 		this.recomputeBoundsFromLoadedRegions();
+		this.pastePreviewActive = false;
 		this.loadStatus = "Pasted " + pastedChunks + " chunks at " + pasteOrigin.summary() + ".";
 		this.actionMenuOpen = false;
 		this.refreshMenuVisibility();
@@ -617,6 +630,7 @@ public class RegionEditorScreen extends Screen {
 		if (this.currentRegionDir == null || this.undoStack.isEmpty()) {
 			return;
 		}
+		this.pastePreviewActive = false;
 
 		UndoAction undoAction = this.undoStack.pop();
 		Set<Long> touchedRegions = new HashSet<>();
@@ -1683,6 +1697,11 @@ public class RegionEditorScreen extends Screen {
 			this.renderActionMenu(guiGraphics);
 		}
 
+		if (this.pastePreviewActive && this.clipboard != null) {
+			this.renderPastePreview(guiGraphics, this.mapInnerLeft, this.mapInnerTop, this.mapInnerRight, this.mapInnerBottom);
+			guiGraphics.drawString(this.font, Component.literal("Paste Preview: press Ctrl+V to paste"), mapLeft + 8, mapTop + 32, 0xFFBEEFFF);
+		}
+
 		guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 14, 0xFFFFFFFF);
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 
@@ -1740,6 +1759,48 @@ public class RegionEditorScreen extends Screen {
 		int menuHeight = 92;
 		guiGraphics.fill(menuLeft, menuTop, menuLeft + menuWidth, menuTop + menuHeight, 0xF0202020);
 		guiGraphics.fill(menuLeft + 1, menuTop + 1, menuLeft + menuWidth - 1, menuTop + menuHeight - 1, 0xF0323232);
+	}
+
+	private void renderPastePreview(GuiGraphics guiGraphics, int left, int top, int right, int bottom) {
+		if (this.clipboard == null || this.chunkColorsByRegion.isEmpty()) {
+			return;
+		}
+
+		PasteOrigin origin = this.computePasteOrigin(this.lastMouseX, this.lastMouseY, this.clipboard.snapToRegionGrid());
+		if (origin == null) {
+			return;
+		}
+
+		MapTransform transform = this.computeMapTransform(left, top, right, bottom);
+		int regionPixel = transform.regionPixel();
+		if (regionPixel <= 0) {
+			return;
+		}
+
+		int minChunkX = this.minRegionX * CHUNKS_PER_REGION;
+		int minChunkZ = this.minRegionZ * CHUNKS_PER_REGION;
+		double chunkPixel = regionPixel / (double)CHUNKS_PER_REGION;
+
+		double relChunkX1 = origin.originChunkX() - minChunkX;
+		double relChunkZ1 = origin.originChunkZ() - minChunkZ;
+		double relChunkX2 = relChunkX1 + this.clipboard.widthChunks();
+		double relChunkZ2 = relChunkZ1 + this.clipboard.heightChunks();
+
+		int x1 = transform.startX() + (int)Math.floor(relChunkX1 * chunkPixel);
+		int z1 = transform.startZ() + (int)Math.floor(relChunkZ1 * chunkPixel);
+		int x2 = transform.startX() + (int)Math.ceil(relChunkX2 * chunkPixel);
+		int z2 = transform.startZ() + (int)Math.ceil(relChunkZ2 * chunkPixel);
+
+		guiGraphics.enableScissor(left, top, right, bottom);
+		try {
+			guiGraphics.fill(x1, z1, x2, z2, PASTE_PREVIEW_FILL);
+			guiGraphics.fill(x1, z1, x2, z1 + 1, PASTE_PREVIEW_BORDER);
+			guiGraphics.fill(x1, z2 - 1, x2, z2, PASTE_PREVIEW_BORDER);
+			guiGraphics.fill(x1, z1, x1 + 1, z2, PASTE_PREVIEW_BORDER);
+			guiGraphics.fill(x2 - 1, z1, x2, z2, PASTE_PREVIEW_BORDER);
+		} finally {
+			guiGraphics.disableScissor();
+		}
 	}
 
 	private RenderStats renderRegionMap(GuiGraphics guiGraphics, int left, int top, int right, int bottom) {
