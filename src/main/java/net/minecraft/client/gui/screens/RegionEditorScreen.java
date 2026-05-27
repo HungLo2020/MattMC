@@ -2,13 +2,16 @@ package net.minecraft.client.gui.screens;
 
 import com.mojang.serialization.Codec;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,6 +39,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -110,7 +114,10 @@ public class RegionEditorScreen extends Screen {
 	private Button fileButton;
 	private Button actionButton;
 	private Button loadWorldButton;
+	private Button copyButton;
+	private Button pasteButton;
 	private Button deleteButton;
+	private Button undoButton;
 	private Button backButton;
 
 	private boolean fileMenuOpen;
@@ -134,6 +141,8 @@ public class RegionEditorScreen extends Screen {
 	private final Map<Long, int[]> blockColorsByChunk = new HashMap<>();
 	private final Set<Long> selectedRegions = new HashSet<>();
 	private final Map<Long, BitSet> selectedChunksByRegion = new HashMap<>();
+	private ClipboardData clipboard;
+	private final Deque<UndoAction> undoStack = new ArrayDeque<>();
 	private Path currentRegionDir;
 	private int minRegionX;
 	private int maxRegionX;
@@ -156,6 +165,8 @@ public class RegionEditorScreen extends Screen {
 	private int mapInnerTop;
 	private int mapInnerRight;
 	private int mapInnerBottom;
+	private double lastMouseX;
+	private double lastMouseY;
 
 	public RegionEditorScreen(Screen lastScreen) {
 		super(TITLE);
@@ -185,13 +196,37 @@ public class RegionEditorScreen extends Screen {
 		this.loadWorldButton.visible = false;
 		this.loadWorldButton.active = false;
 
+		this.copyButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Copy"), button -> this.copySelectionToClipboard())
+				.bounds(66, 32, 120, 20)
+				.build()
+		);
+		this.copyButton.visible = false;
+		this.copyButton.active = false;
+
+		this.pasteButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Paste"), button -> this.pasteClipboardAtMouse())
+				.bounds(66, 54, 120, 20)
+				.build()
+		);
+		this.pasteButton.visible = false;
+		this.pasteButton.active = false;
+
 		this.deleteButton = this.addRenderableWidget(
 			Button.builder(Component.literal("Delete"), button -> this.deleteSelectedFromDisk())
-				.bounds(66, 32, 120, 20)
+				.bounds(66, 76, 120, 20)
 				.build()
 		);
 		this.deleteButton.visible = false;
 		this.deleteButton.active = false;
+
+		this.undoButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Undo"), button -> this.undoLastAction())
+				.bounds(66, 98, 120, 20)
+				.build()
+		);
+		this.undoButton.visible = false;
+		this.undoButton.active = false;
 
 		this.backButton = this.addRenderableWidget(
 			Button.builder(CommonComponents.GUI_BACK, button -> this.minecraft.setScreen(this.lastScreen))
@@ -239,8 +274,14 @@ public class RegionEditorScreen extends Screen {
 	private void refreshMenuVisibility() {
 		this.loadWorldButton.visible = this.fileMenuOpen;
 		this.loadWorldButton.active = this.fileMenuOpen && !this.loadingWorldList;
+		this.copyButton.visible = this.actionMenuOpen;
+		this.copyButton.active = this.actionMenuOpen && !this.loadingWorld && this.currentRegionDir != null && this.hasSelection();
+		this.pasteButton.visible = this.actionMenuOpen;
+		this.pasteButton.active = this.actionMenuOpen && !this.loadingWorld && this.currentRegionDir != null && this.clipboard != null;
 		this.deleteButton.visible = this.actionMenuOpen;
 		this.deleteButton.active = this.actionMenuOpen && !this.loadingWorld && this.hasSelection();
+		this.undoButton.visible = this.actionMenuOpen;
+		this.undoButton.active = this.actionMenuOpen && !this.loadingWorld && this.currentRegionDir != null && !this.undoStack.isEmpty();
 
 		boolean showWorldButtons = this.fileMenuOpen && this.worldPickerOpen;
 		for (Button button : this.worldButtons) {
@@ -296,6 +337,7 @@ public class RegionEditorScreen extends Screen {
 		this.blockColorsByChunk.clear();
 		this.selectedRegions.clear();
 		this.selectedChunksByRegion.clear();
+		this.undoStack.clear();
 		this.pendingChunkDetailUpdates.clear();
 		this.chunkDetailsInFlight.clear();
 		this.mapZoom = 1.0F;
@@ -376,14 +418,17 @@ public class RegionEditorScreen extends Screen {
 
 		this.selectedRegions.clear();
 		this.selectedChunksByRegion.clear();
+		this.refreshMenuVisibility();
 
 		int deletedRegions = 0;
 		int deletedChunks = 0;
 		Set<Long> regionsToReload = new HashSet<>();
+		Map<Long, UndoChunkSnapshot> undoSnapshotByChunk = new LinkedHashMap<>();
 
 		for (long regionKey : regionsToDelete) {
 			int regionX = unpackRegionX(regionKey);
 			int regionZ = unpackRegionZ(regionKey);
+			captureRegionUndoSnapshot(regionDir, regionX, regionZ, undoSnapshotByChunk);
 			Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
 			try {
 				if (Files.deleteIfExists(regionFilePath)) {
@@ -423,6 +468,7 @@ public class RegionEditorScreen extends Screen {
 					int chunkZ = idx >> 5;
 					int globalChunkX = regionX * CHUNKS_PER_REGION + chunkX;
 					int globalChunkZ = regionZ * CHUNKS_PER_REGION + chunkZ;
+					captureUndoSnapshotForChunk(regionDir, globalChunkX, globalChunkZ, undoSnapshotByChunk);
 					ChunkPos chunkPos = new ChunkPos(globalChunkX, globalChunkZ);
 					if (regionFile.hasChunk(chunkPos)) {
 						regionFile.clear(chunkPos);
@@ -459,10 +505,364 @@ public class RegionEditorScreen extends Screen {
 			}
 		}
 
+		if (!undoSnapshotByChunk.isEmpty()) {
+			this.undoStack.push(new UndoAction("delete", new ArrayList<>(undoSnapshotByChunk.values())));
+		}
+
 		this.recomputeBoundsFromLoadedRegions();
 		this.loadStatus = "Deleted " + deletedRegions + " regions and " + deletedChunks + " chunks.";
 		this.actionMenuOpen = false;
 		this.refreshMenuVisibility();
+	}
+
+	private void copySelectionToClipboard() {
+		if (this.currentRegionDir == null) {
+			return;
+		}
+
+		Set<Long> selectedChunks = this.collectSelectedChunks();
+		if (selectedChunks.isEmpty()) {
+			this.loadStatus = "Nothing selected to copy.";
+			return;
+		}
+
+		boolean regionSnap = this.selectedChunksByRegion.values().stream().allMatch(bitSet -> bitSet == null || bitSet.isEmpty()) && !this.selectedRegions.isEmpty();
+		int minChunkX = Integer.MAX_VALUE;
+		int minChunkZ = Integer.MAX_VALUE;
+		int maxChunkX = Integer.MIN_VALUE;
+		int maxChunkZ = Integer.MIN_VALUE;
+		for (long chunkKey : selectedChunks) {
+			int chunkX = unpackRegionX(chunkKey);
+			int chunkZ = unpackRegionZ(chunkKey);
+			if (chunkX < minChunkX) minChunkX = chunkX;
+			if (chunkX > maxChunkX) maxChunkX = chunkX;
+			if (chunkZ < minChunkZ) minChunkZ = chunkZ;
+			if (chunkZ > maxChunkZ) maxChunkZ = chunkZ;
+		}
+
+		Map<Long, CompoundTag> chunksByRelativeOffset = new HashMap<>();
+		for (long chunkKey : selectedChunks) {
+			int chunkX = unpackRegionX(chunkKey);
+			int chunkZ = unpackRegionZ(chunkKey);
+			CompoundTag chunkTag = readChunkTag(this.currentRegionDir, chunkX, chunkZ);
+			if (chunkTag == null) {
+				continue;
+			}
+
+			int relX = chunkX - minChunkX;
+			int relZ = chunkZ - minChunkZ;
+			chunksByRelativeOffset.put(packChunk(relX, relZ), chunkTag.copy());
+		}
+
+		if (chunksByRelativeOffset.isEmpty()) {
+			this.loadStatus = "Selection had no readable chunk data to copy.";
+			return;
+		}
+
+		int widthChunks = (maxChunkX - minChunkX) + 1;
+		int heightChunks = (maxChunkZ - minChunkZ) + 1;
+		this.clipboard = new ClipboardData(chunksByRelativeOffset, regionSnap, widthChunks, heightChunks, selectedChunks.size());
+		String snapMode = regionSnap ? "region" : "chunk";
+		this.loadStatus = "Copied " + chunksByRelativeOffset.size() + " chunks. Paste snaps to " + snapMode + " grid.";
+		this.actionMenuOpen = false;
+		this.refreshMenuVisibility();
+	}
+
+	private void pasteClipboardAtMouse() {
+		if (this.currentRegionDir == null || this.clipboard == null) {
+			return;
+		}
+
+		PasteOrigin pasteOrigin = this.computePasteOrigin(this.lastMouseX, this.lastMouseY, this.clipboard.snapToRegionGrid());
+		if (pasteOrigin == null) {
+			this.loadStatus = "Move mouse over map to choose a paste origin.";
+			return;
+		}
+
+		Map<Long, UndoChunkSnapshot> undoSnapshotByChunk = new LinkedHashMap<>();
+		Set<Long> touchedRegions = new HashSet<>();
+		int pastedChunks = 0;
+		for (Map.Entry<Long, CompoundTag> entry : this.clipboard.chunksByRelativeOffset().entrySet()) {
+			int relChunkX = unpackRegionX(entry.getKey());
+			int relChunkZ = unpackRegionZ(entry.getKey());
+			int targetChunkX = pasteOrigin.originChunkX() + relChunkX;
+			int targetChunkZ = pasteOrigin.originChunkZ() + relChunkZ;
+			captureUndoSnapshotForChunk(this.currentRegionDir, targetChunkX, targetChunkZ, undoSnapshotByChunk);
+			CompoundTag targetTag = entry.getValue().copy();
+			setChunkCoordinates(targetTag, targetChunkX, targetChunkZ);
+			if (writeChunkTag(this.currentRegionDir, targetChunkX, targetChunkZ, targetTag)) {
+				pastedChunks++;
+				touchedRegions.add(packRegion(Math.floorDiv(targetChunkX, CHUNKS_PER_REGION), Math.floorDiv(targetChunkZ, CHUNKS_PER_REGION)));
+				this.blockColorsByChunk.remove(packChunk(targetChunkX, targetChunkZ));
+			}
+		}
+
+		if (pastedChunks <= 0) {
+			this.loadStatus = "Paste failed. No chunks were written.";
+			return;
+		}
+
+		if (!undoSnapshotByChunk.isEmpty()) {
+			this.undoStack.push(new UndoAction("paste", new ArrayList<>(undoSnapshotByChunk.values())));
+		}
+
+		this.refreshRegionsFromDisk(touchedRegions);
+		this.recomputeBoundsFromLoadedRegions();
+		this.loadStatus = "Pasted " + pastedChunks + " chunks at " + pasteOrigin.summary() + ".";
+		this.actionMenuOpen = false;
+		this.refreshMenuVisibility();
+	}
+
+	private void undoLastAction() {
+		if (this.currentRegionDir == null || this.undoStack.isEmpty()) {
+			return;
+		}
+
+		UndoAction undoAction = this.undoStack.pop();
+		Set<Long> touchedRegions = new HashSet<>();
+		int restored = 0;
+		for (UndoChunkSnapshot snapshot : undoAction.snapshots()) {
+			boolean ok;
+			if (snapshot.hadChunk()) {
+				ok = writeChunkTag(this.currentRegionDir, snapshot.chunkX(), snapshot.chunkZ(), snapshot.previousTag().copy());
+			} else {
+				ok = clearChunkFromDisk(this.currentRegionDir, snapshot.chunkX(), snapshot.chunkZ());
+			}
+
+			if (ok) {
+				restored++;
+				touchedRegions.add(packRegion(Math.floorDiv(snapshot.chunkX(), CHUNKS_PER_REGION), Math.floorDiv(snapshot.chunkZ(), CHUNKS_PER_REGION)));
+				this.blockColorsByChunk.remove(packChunk(snapshot.chunkX(), snapshot.chunkZ()));
+			}
+		}
+
+		this.refreshRegionsFromDisk(touchedRegions);
+		this.recomputeBoundsFromLoadedRegions();
+		this.loadStatus = "Undo " + undoAction.description() + ": restored " + restored + " chunks.";
+		this.refreshMenuVisibility();
+	}
+
+	private void refreshRegionsFromDisk(Set<Long> regionKeys) {
+		if (this.currentRegionDir == null || regionKeys.isEmpty()) {
+			return;
+		}
+
+		for (long regionKey : regionKeys) {
+			int regionX = unpackRegionX(regionKey);
+			int regionZ = unpackRegionZ(regionKey);
+			Path regionFilePath = this.currentRegionDir.resolve("r." + regionX + "." + regionZ + ".mca");
+			if (!Files.isRegularFile(regionFilePath)) {
+				this.removeRegionCache(regionKey);
+				continue;
+			}
+
+			RegionFileResult refreshed = readRegionFile(regionFilePath, regionX, regionZ);
+			if (refreshed == null) {
+				this.removeRegionCache(regionKey);
+			} else {
+				this.chunkColorsByRegion.put(regionKey, refreshed.chunkColors());
+				this.uploadRegionTexture(regionKey, refreshed.regionImage());
+			}
+		}
+	}
+
+	private Set<Long> collectSelectedChunks() {
+		Set<Long> selectedChunks = new HashSet<>();
+
+		for (long regionKey : this.selectedRegions) {
+			int[] regionChunkColors = this.chunkColorsByRegion.get(regionKey);
+			if (regionChunkColors == null) {
+				continue;
+			}
+
+			int regionX = unpackRegionX(regionKey);
+			int regionZ = unpackRegionZ(regionKey);
+			for (int idx = 0; idx < regionChunkColors.length; idx++) {
+				if ((regionChunkColors[idx] >>> 24) == 0) {
+					continue;
+				}
+
+				int localChunkX = idx & 31;
+				int localChunkZ = idx >> 5;
+				int chunkX = regionX * CHUNKS_PER_REGION + localChunkX;
+				int chunkZ = regionZ * CHUNKS_PER_REGION + localChunkZ;
+				selectedChunks.add(packChunk(chunkX, chunkZ));
+			}
+		}
+
+		for (Map.Entry<Long, BitSet> entry : this.selectedChunksByRegion.entrySet()) {
+			long regionKey = entry.getKey();
+			BitSet selected = entry.getValue();
+			if (selected == null || selected.isEmpty()) {
+				continue;
+			}
+
+			int[] regionChunkColors = this.chunkColorsByRegion.get(regionKey);
+			if (regionChunkColors == null) {
+				continue;
+			}
+
+			int regionX = unpackRegionX(regionKey);
+			int regionZ = unpackRegionZ(regionKey);
+			for (int idx = selected.nextSetBit(0); idx >= 0; idx = selected.nextSetBit(idx + 1)) {
+				if (idx < 0 || idx >= regionChunkColors.length || (regionChunkColors[idx] >>> 24) == 0) {
+					continue;
+				}
+
+				int localChunkX = idx & 31;
+				int localChunkZ = idx >> 5;
+				int chunkX = regionX * CHUNKS_PER_REGION + localChunkX;
+				int chunkZ = regionZ * CHUNKS_PER_REGION + localChunkZ;
+				selectedChunks.add(packChunk(chunkX, chunkZ));
+			}
+		}
+
+		return selectedChunks;
+	}
+
+	private PasteOrigin computePasteOrigin(double mouseX, double mouseY, boolean snapToRegionGrid) {
+		if (!this.isInMapArea(mouseX, mouseY) || this.chunkColorsByRegion.isEmpty()) {
+			return null;
+		}
+
+		MapTransform transform = this.computeMapTransform(this.mapInnerLeft, this.mapInnerTop, this.mapInnerRight, this.mapInnerBottom);
+		int regionPixel = transform.regionPixel();
+		if (regionPixel <= 0) {
+			return null;
+		}
+
+		double worldX = mouseX - transform.startX();
+		double worldZ = mouseY - transform.startZ();
+		if (snapToRegionGrid) {
+			int regionGridX = (int)Math.floor(worldX / regionPixel);
+			int regionGridZ = (int)Math.floor(worldZ / regionPixel);
+			int originRegionX = this.minRegionX + regionGridX;
+			int originRegionZ = this.minRegionZ + regionGridZ;
+			return new PasteOrigin(
+				originRegionX * CHUNKS_PER_REGION,
+				originRegionZ * CHUNKS_PER_REGION,
+				"region " + originRegionX + "," + originRegionZ
+			);
+		}
+
+		int chunkGridX = (int)Math.floor(worldX * CHUNKS_PER_REGION / regionPixel);
+		int chunkGridZ = (int)Math.floor(worldZ * CHUNKS_PER_REGION / regionPixel);
+		int originChunkX = this.minRegionX * CHUNKS_PER_REGION + chunkGridX;
+		int originChunkZ = this.minRegionZ * CHUNKS_PER_REGION + chunkGridZ;
+		return new PasteOrigin(originChunkX, originChunkZ, "chunk " + originChunkX + "," + originChunkZ);
+	}
+
+	private static CompoundTag readChunkTag(Path regionDir, int chunkX, int chunkZ) {
+		int regionX = Math.floorDiv(chunkX, CHUNKS_PER_REGION);
+		int regionZ = Math.floorDiv(chunkZ, CHUNKS_PER_REGION);
+		Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
+		if (!Files.isRegularFile(regionFilePath)) {
+			return null;
+		}
+
+		try (RegionFile regionFile = new RegionFile(REGION_EDITOR_STORAGE_INFO, regionFilePath, regionDir, false);
+			DataInputStream input = regionFile.getChunkDataInputStream(new ChunkPos(chunkX, chunkZ))) {
+			if (input == null) {
+				return null;
+			}
+			return NbtIo.read(input);
+		} catch (Exception exception) {
+			return null;
+		}
+	}
+
+	private static boolean writeChunkTag(Path regionDir, int chunkX, int chunkZ, CompoundTag chunkTag) {
+		try {
+			Files.createDirectories(regionDir);
+			int regionX = Math.floorDiv(chunkX, CHUNKS_PER_REGION);
+			int regionZ = Math.floorDiv(chunkZ, CHUNKS_PER_REGION);
+			Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
+			try (RegionFile regionFile = new RegionFile(REGION_EDITOR_STORAGE_INFO, regionFilePath, regionDir, false);
+				DataOutputStream output = regionFile.getChunkDataOutputStream(new ChunkPos(chunkX, chunkZ))) {
+				NbtIo.write(chunkTag, output);
+				regionFile.flush();
+			}
+			return true;
+		} catch (Exception exception) {
+			LOGGER.warn("Region Editor: failed writing chunk {},{}", chunkX, chunkZ, exception);
+			return false;
+		}
+	}
+
+	private static boolean clearChunkFromDisk(Path regionDir, int chunkX, int chunkZ) {
+		try {
+			int regionX = Math.floorDiv(chunkX, CHUNKS_PER_REGION);
+			int regionZ = Math.floorDiv(chunkZ, CHUNKS_PER_REGION);
+			Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
+			if (!Files.isRegularFile(regionFilePath)) {
+				return true;
+			}
+
+			try (RegionFile regionFile = new RegionFile(REGION_EDITOR_STORAGE_INFO, regionFilePath, regionDir, false)) {
+				regionFile.clear(new ChunkPos(chunkX, chunkZ));
+				regionFile.flush();
+			}
+			return true;
+		} catch (Exception exception) {
+			LOGGER.warn("Region Editor: failed clearing chunk {},{}", chunkX, chunkZ, exception);
+			return false;
+		}
+	}
+
+	private static void setChunkCoordinates(CompoundTag chunkTag, int chunkX, int chunkZ) {
+		chunkTag.putInt("xPos", chunkX);
+		chunkTag.putInt("zPos", chunkZ);
+		if (chunkTag.contains("Level")) {
+			CompoundTag level = chunkTag.getCompoundOrEmpty("Level");
+			level.putInt("xPos", chunkX);
+			level.putInt("zPos", chunkZ);
+		}
+	}
+
+	private static void captureUndoSnapshotForChunk(Path regionDir, int chunkX, int chunkZ, Map<Long, UndoChunkSnapshot> snapshots) {
+		long chunkKey = packChunk(chunkX, chunkZ);
+		if (snapshots.containsKey(chunkKey)) {
+			return;
+		}
+
+		CompoundTag existing = readChunkTag(regionDir, chunkX, chunkZ);
+		snapshots.put(chunkKey, new UndoChunkSnapshot(chunkX, chunkZ, existing != null, existing == null ? new CompoundTag() : existing.copy()));
+	}
+
+	private static void captureRegionUndoSnapshot(Path regionDir, int regionX, int regionZ, Map<Long, UndoChunkSnapshot> snapshots) {
+		Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
+		if (!Files.isRegularFile(regionFilePath)) {
+			return;
+		}
+
+		try (RegionFile regionFile = new RegionFile(REGION_EDITOR_STORAGE_INFO, regionFilePath, regionDir, false)) {
+			for (int chunkZ = 0; chunkZ < CHUNKS_PER_REGION; chunkZ++) {
+				for (int chunkX = 0; chunkX < CHUNKS_PER_REGION; chunkX++) {
+					int globalChunkX = regionX * CHUNKS_PER_REGION + chunkX;
+					int globalChunkZ = regionZ * CHUNKS_PER_REGION + chunkZ;
+					ChunkPos chunkPos = new ChunkPos(globalChunkX, globalChunkZ);
+					if (!regionFile.hasChunk(chunkPos)) {
+						continue;
+					}
+
+					long chunkKey = packChunk(globalChunkX, globalChunkZ);
+					if (snapshots.containsKey(chunkKey)) {
+						continue;
+					}
+
+					try (DataInputStream input = regionFile.getChunkDataInputStream(chunkPos)) {
+						if (input == null) {
+							continue;
+						}
+						CompoundTag existing = NbtIo.read(input);
+						snapshots.put(chunkKey, new UndoChunkSnapshot(globalChunkX, globalChunkZ, true, existing == null ? new CompoundTag() : existing));
+					} catch (Exception ignored) {
+					}
+				}
+			}
+		} catch (Exception exception) {
+			LOGGER.warn("Region Editor: failed capturing undo snapshot for region {},{}", regionX, regionZ, exception);
+		}
 	}
 
 	private void removeRegionCache(long regionKey) {
@@ -1107,10 +1507,12 @@ public class RegionEditorScreen extends Screen {
 
 		if (button == 0) {
 			if (this.updateSelectionAt(mouseX, mouseY, true)) {
+				this.refreshMenuVisibility();
 				return true;
 			}
 		} else if (button == 1) {
 			if (this.updateSelectionAt(mouseX, mouseY, false)) {
+				this.refreshMenuVisibility();
 				return true;
 			}
 		}
@@ -1182,6 +1584,26 @@ public class RegionEditorScreen extends Screen {
 	}
 
 	@Override
+	public boolean keyPressed(KeyEvent keyEvent) {
+		if (keyEvent.hasControlDown()) {
+			if (keyEvent.key() == 67) {
+				this.copySelectionToClipboard();
+				return true;
+			}
+			if (keyEvent.key() == 86) {
+				this.pasteClipboardAtMouse();
+				return true;
+			}
+			if (keyEvent.key() == 90) {
+				this.undoLastAction();
+				return true;
+			}
+		}
+
+		return super.keyPressed(keyEvent);
+	}
+
+	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		if (!this.isInMapArea(mouseX, mouseY) || scrollY == 0.0) {
 			return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -1221,6 +1643,8 @@ public class RegionEditorScreen extends Screen {
 
 	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		this.lastMouseX = mouseX;
+		this.lastMouseY = mouseY;
 		long renderStartNanos = System.nanoTime();
 		this.renderFrameCounter++;
 		this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
@@ -1313,7 +1737,7 @@ public class RegionEditorScreen extends Screen {
 		int menuLeft = 62;
 		int menuTop = 30;
 		int menuWidth = 134;
-		int menuHeight = 30;
+		int menuHeight = 92;
 		guiGraphics.fill(menuLeft, menuTop, menuLeft + menuWidth, menuTop + menuHeight, 0xF0202020);
 		guiGraphics.fill(menuLeft + 1, menuTop + 1, menuLeft + menuWidth - 1, menuTop + menuHeight - 1, 0xF0323232);
 	}
@@ -1807,6 +2231,18 @@ public class RegionEditorScreen extends Screen {
 	}
 
 	private record ChunkDetailUpdate(long chunkKey, int[] blockColors, int requestId) {
+	}
+
+	private record ClipboardData(Map<Long, CompoundTag> chunksByRelativeOffset, boolean snapToRegionGrid, int widthChunks, int heightChunks, int sourceChunkCount) {
+	}
+
+	private record PasteOrigin(int originChunkX, int originChunkZ, String summary) {
+	}
+
+	private record UndoChunkSnapshot(int chunkX, int chunkZ, boolean hadChunk, CompoundTag previousTag) {
+	}
+
+	private record UndoAction(String description, List<UndoChunkSnapshot> snapshots) {
 	}
 
 	private record MapTransform(int regionPixel, int startX, int startZ) {
