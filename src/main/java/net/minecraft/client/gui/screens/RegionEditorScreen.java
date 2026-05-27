@@ -38,6 +38,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
@@ -47,6 +48,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
+import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.world.level.ChunkPos;
@@ -601,7 +603,7 @@ public class RegionEditorScreen extends Screen {
 		CompoundTag root = chunkTag.contains("Level") ? chunkTag.getCompoundOrEmpty("Level") : chunkTag;
 		Map<Integer, PalettedContainer<BlockState>> sectionsByY = decodeSections(root);
 		if (sectionsByY.isEmpty()) {
-			return null;
+			return extractChunkTopBlockColorsLegacy(root);
 		}
 
 		int[] blockColors = new int[BLOCKS_PER_CHUNK_EDGE * BLOCKS_PER_CHUNK_EDGE];
@@ -638,12 +640,119 @@ public class RegionEditorScreen extends Screen {
 			}
 		}
 
+		if (unresolvedCount > 0) {
+			int[] legacyFallback = extractChunkTopBlockColorsLegacy(root);
+			if (legacyFallback != null) {
+				for (int i = 0; i < unresolved.length; i++) {
+					if (unresolved[i]) {
+						blockColors[i] = legacyFallback[i];
+					}
+				}
+			}
+		}
+
 		return blockColors;
+	}
+
+	private static int[] extractChunkTopBlockColorsLegacy(CompoundTag chunkRoot) {
+		Map<Integer, LegacySectionData> sectionsByY = new HashMap<>();
+		for (CompoundTag sectionTag : streamSectionTags(chunkRoot)) {
+			int sectionY = sectionTag.getByteOr("Y", (byte)0);
+			List<CompoundTag> paletteTags = sectionTag.getListOrEmpty("Palette").compoundStream().toList();
+			if (paletteTags.isEmpty()) {
+				continue;
+			}
+
+			BlockState[] palette = new BlockState[paletteTags.size()];
+			for (int i = 0; i < paletteTags.size(); i++) {
+				palette[i] = NbtUtils.readBlockState(BuiltInRegistries.BLOCK, paletteTags.get(i));
+			}
+
+			long[] packed = sectionTag.getLongArray("BlockStates").orElse(null);
+			SimpleBitStorage storage = null;
+			if (packed != null && packed.length > 0) {
+				int bits = Math.max(4, Mth.ceillog2(Math.max(1, palette.length)));
+				try {
+					storage = new SimpleBitStorage(bits, 4096, packed);
+				} catch (Exception ignored) {
+					storage = null;
+				}
+			}
+
+			sectionsByY.put(sectionY, new LegacySectionData(palette, storage));
+		}
+
+		if (sectionsByY.isEmpty()) {
+			return null;
+		}
+
+		int[] blockColors = new int[BLOCKS_PER_CHUNK_EDGE * BLOCKS_PER_CHUNK_EDGE];
+		boolean[] unresolved = new boolean[BLOCKS_PER_CHUNK_EDGE * BLOCKS_PER_CHUNK_EDGE];
+		int unresolvedCount = unresolved.length;
+		for (int i = 0; i < unresolved.length; i++) {
+			unresolved[i] = true;
+		}
+
+		int sectionMax = sectionsByY.keySet().stream().max(Integer::compareTo).orElse(FALLBACK_MIN_Y / 16);
+		int sectionMin = sectionsByY.keySet().stream().min(Integer::compareTo).orElse(sectionMax);
+		for (int sectionY = sectionMax; sectionY >= sectionMin && unresolvedCount > 0; sectionY--) {
+			LegacySectionData section = sectionsByY.get(sectionY);
+			if (section == null) {
+				continue;
+			}
+
+			for (int yInSection = 15; yInSection >= 0 && unresolvedCount > 0; yInSection--) {
+				for (int localZ = 0; localZ < BLOCKS_PER_CHUNK_EDGE; localZ++) {
+					for (int localX = 0; localX < BLOCKS_PER_CHUNK_EDGE; localX++) {
+						int index = localX + localZ * BLOCKS_PER_CHUNK_EDGE;
+						if (!unresolved[index]) {
+							continue;
+						}
+
+						BlockState state = readLegacyState(section, localX, yInSection, localZ);
+						if (!state.isAir()) {
+							blockColors[index] = colorForBlockState(state);
+							unresolved[index] = false;
+							unresolvedCount--;
+						}
+					}
+				}
+			}
+		}
+
+		return blockColors;
+	}
+
+	private static List<CompoundTag> streamSectionTags(CompoundTag chunkRoot) {
+		List<CompoundTag> lower = chunkRoot.getListOrEmpty("sections").compoundStream().toList();
+		if (!lower.isEmpty()) {
+			return lower;
+		}
+
+		return chunkRoot.getListOrEmpty("Sections").compoundStream().toList();
+	}
+
+	private static BlockState readLegacyState(LegacySectionData section, int localX, int yInSection, int localZ) {
+		if (section.palette.length == 0) {
+			return AIR_BLOCK_STATE;
+		}
+
+		if (section.storage == null) {
+			return section.palette[0];
+		}
+
+		int packedIndex = (yInSection << 8) | (localZ << 4) | localX;
+		int paletteIndex = section.storage.get(packedIndex);
+		if (paletteIndex < 0 || paletteIndex >= section.palette.length) {
+			return AIR_BLOCK_STATE;
+		}
+
+		return section.palette[paletteIndex];
 	}
 
 	private static Map<Integer, PalettedContainer<BlockState>> decodeSections(CompoundTag chunkRoot) {
 		Map<Integer, PalettedContainer<BlockState>> sectionsByY = new HashMap<>();
-		for (CompoundTag sectionTag : chunkRoot.getListOrEmpty("sections").compoundStream().toList()) {
+		for (CompoundTag sectionTag : streamSectionTags(chunkRoot)) {
 			int sectionY = sectionTag.getByteOr("Y", (byte)0);
 			CompoundTag blockStatesTag = sectionTag.getCompound("block_states").orElse(null);
 			if (blockStatesTag == null || blockStatesTag.isEmpty()) {
@@ -692,8 +801,22 @@ public class RegionEditorScreen extends Screen {
 		if (rgb == 0) {
 			rgb = state.getBlock().defaultBlockState().getMapColor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).col;
 		}
+		if (rgb == 0) {
+			rgb = deriveFallbackColor(state);
+		}
 
-		return rgb == 0 ? 0 : (0xFF000000 | rgb);
+		return 0xFF000000 | rgb;
+	}
+
+	private static int deriveFallbackColor(BlockState state) {
+		// Some modded blocks report MapColor.NONE (0). Use a stable per-block fallback
+		// so we still render top-of-column detail instead of collapsing to flat chunk color.
+		ResourceLocation key = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+		int hash = key == null ? state.getBlock().hashCode() : key.hashCode();
+		int r = 64 + ((hash >> 16) & 0x7F);
+		int g = 64 + ((hash >> 8) & 0x7F);
+		int b = 64 + (hash & 0x7F);
+		return (r << 16) | (g << 8) | b;
 	}
 
 	@Override
@@ -1363,6 +1486,9 @@ public class RegionEditorScreen extends Screen {
 	}
 
 	private record RegionFileResult(long packedRegion, int[] chunkColors, NativeImage regionImage) {
+	}
+
+	private record LegacySectionData(BlockState[] palette, SimpleBitStorage storage) {
 	}
 
 	private record RegionTexture(ResourceLocation location, DynamicTexture texture) {
