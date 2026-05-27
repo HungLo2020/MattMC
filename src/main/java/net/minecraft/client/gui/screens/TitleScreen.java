@@ -104,8 +104,10 @@ public class TitleScreen extends Screen {
 			l = this.createNormalMenuOptions(l, 24);
 		}
 
+		l = this.createToolsMenuButton(l, 24);
+
 		l = this.createTestWorldButton(l, 24);
-		l += 36;
+		l += 24;
 		this.addRenderableWidget(
 			Button.builder(Component.translatable("menu.options"), button -> this.minecraft.setScreen(new OptionsScreen(this, this.minecraft.options)))
 				.bounds(this.width / 2 - 100, l, 98, 20)
@@ -136,6 +138,13 @@ public class TitleScreen extends Screen {
 			);
 		}
 
+		return i;
+	}
+
+	private int createToolsMenuButton(int i, int j) {
+		this.addRenderableWidget(
+			Button.builder(Component.literal("Tools"), button -> this.minecraft.setScreen(new ToolsScreen(this))).bounds(this.width / 2 - 100, i = i + j, 200, 20).build()
+		);
 		return i;
 	}
 
