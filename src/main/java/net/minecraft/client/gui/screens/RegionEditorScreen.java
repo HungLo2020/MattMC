@@ -145,6 +145,13 @@ public class RegionEditorScreen extends Screen {
 	private final Map<Long, BitSet> selectedChunksByRegion = new HashMap<>();
 	private ClipboardData clipboard;
 	private boolean pastePreviewActive;
+	private boolean ctrlChunkDragActive;
+	private boolean ctrlChunkDragSelectMode;
+	private boolean ctrlChunkDragChunkMode;
+	private int ctrlChunkDragAnchorChunkX;
+	private int ctrlChunkDragAnchorChunkZ;
+	private int ctrlChunkDragCurrentChunkX;
+	private int ctrlChunkDragCurrentChunkZ;
 	private final Deque<UndoAction> undoStack = new ArrayDeque<>();
 	private Path currentRegionDir;
 	private int minRegionX;
@@ -1519,6 +1526,38 @@ public class RegionEditorScreen extends Screen {
 			return super.mouseClicked(mouseButtonEvent, bl);
 		}
 
+		if (this.minecraft != null && this.minecraft.hasControlDown() && (button == 0 || button == 1)) {
+			this.ctrlChunkDragChunkMode = this.isChunkSelectionMode();
+			GridCoord startCoord = this.ctrlChunkDragChunkMode ? this.screenToChunk(mouseX, mouseY) : this.screenToRegion(mouseX, mouseY);
+			if (startCoord != null) {
+				this.ctrlChunkDragActive = true;
+				this.ctrlChunkDragSelectMode = button == 0;
+				this.ctrlChunkDragAnchorChunkX = startCoord.x();
+				this.ctrlChunkDragAnchorChunkZ = startCoord.z();
+				this.ctrlChunkDragCurrentChunkX = startCoord.x();
+				this.ctrlChunkDragCurrentChunkZ = startCoord.z();
+				if (this.ctrlChunkDragChunkMode) {
+					this.applyChunkBoxSelection(
+						this.ctrlChunkDragAnchorChunkX,
+						this.ctrlChunkDragAnchorChunkZ,
+						this.ctrlChunkDragCurrentChunkX,
+						this.ctrlChunkDragCurrentChunkZ,
+						this.ctrlChunkDragSelectMode
+					);
+				} else {
+					this.applyRegionBoxSelection(
+						this.ctrlChunkDragAnchorChunkX,
+						this.ctrlChunkDragAnchorChunkZ,
+						this.ctrlChunkDragCurrentChunkX,
+						this.ctrlChunkDragCurrentChunkZ,
+						this.ctrlChunkDragSelectMode
+					);
+				}
+				this.refreshMenuVisibility();
+				return true;
+			}
+		}
+
 		if (button == 0) {
 			if (this.updateSelectionAt(mouseX, mouseY, true)) {
 				this.refreshMenuVisibility();
@@ -1642,6 +1681,35 @@ public class RegionEditorScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent mouseButtonEvent, double deltaX, double deltaY) {
+		if (this.ctrlChunkDragActive && (mouseButtonEvent.button() == 0 || mouseButtonEvent.button() == 1)) {
+			GridCoord dragCoord = this.ctrlChunkDragChunkMode
+				? this.screenToChunk(mouseButtonEvent.x(), mouseButtonEvent.y())
+				: this.screenToRegion(mouseButtonEvent.x(), mouseButtonEvent.y());
+			if (dragCoord != null && (dragCoord.x() != this.ctrlChunkDragCurrentChunkX || dragCoord.z() != this.ctrlChunkDragCurrentChunkZ)) {
+				this.ctrlChunkDragCurrentChunkX = dragCoord.x();
+				this.ctrlChunkDragCurrentChunkZ = dragCoord.z();
+				if (this.ctrlChunkDragChunkMode) {
+					this.applyChunkBoxSelection(
+						this.ctrlChunkDragAnchorChunkX,
+						this.ctrlChunkDragAnchorChunkZ,
+						this.ctrlChunkDragCurrentChunkX,
+						this.ctrlChunkDragCurrentChunkZ,
+						this.ctrlChunkDragSelectMode
+					);
+				} else {
+					this.applyRegionBoxSelection(
+						this.ctrlChunkDragAnchorChunkX,
+						this.ctrlChunkDragAnchorChunkZ,
+						this.ctrlChunkDragCurrentChunkX,
+						this.ctrlChunkDragCurrentChunkZ,
+						this.ctrlChunkDragSelectMode
+					);
+				}
+				this.refreshMenuVisibility();
+			}
+			return true;
+		}
+
 		if (mouseButtonEvent.button() == 0 && this.isInMapArea(mouseButtonEvent.x(), mouseButtonEvent.y()) && !this.fileMenuOpen) {
 			this.mapPanX += deltaX;
 			this.mapPanZ += deltaY;
@@ -1649,6 +1717,157 @@ public class RegionEditorScreen extends Screen {
 		}
 
 		return super.mouseDragged(mouseButtonEvent, deltaX, deltaY);
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent mouseButtonEvent) {
+		if (this.ctrlChunkDragActive && (mouseButtonEvent.button() == 0 || mouseButtonEvent.button() == 1)) {
+			this.ctrlChunkDragActive = false;
+			this.refreshMenuVisibility();
+			return true;
+		}
+
+		return super.mouseReleased(mouseButtonEvent);
+	}
+
+	private ChunkGridCoord screenToChunk(double mouseX, double mouseY) {
+		if (!this.isInMapArea(mouseX, mouseY)) {
+			return null;
+		}
+
+		MapTransform transform = this.computeMapTransform(this.mapInnerLeft, this.mapInnerTop, this.mapInnerRight, this.mapInnerBottom);
+		int regionPixel = transform.regionPixel();
+		if (regionPixel <= 0) {
+			return null;
+		}
+
+		int regionCountX = this.maxRegionX - this.minRegionX + 1;
+		int regionCountZ = this.maxRegionZ - this.minRegionZ + 1;
+		if (regionCountX <= 0 || regionCountZ <= 0) {
+			return null;
+		}
+
+		double worldX = mouseX - transform.startX();
+		double worldZ = mouseY - transform.startZ();
+		int chunkGridX = (int)Math.floor(worldX * CHUNKS_PER_REGION / regionPixel);
+		int chunkGridZ = (int)Math.floor(worldZ * CHUNKS_PER_REGION / regionPixel);
+		int maxChunkGridX = regionCountX * CHUNKS_PER_REGION - 1;
+		int maxChunkGridZ = regionCountZ * CHUNKS_PER_REGION - 1;
+		if (chunkGridX < 0 || chunkGridZ < 0 || chunkGridX > maxChunkGridX || chunkGridZ > maxChunkGridZ) {
+			return null;
+		}
+
+		int chunkX = this.minRegionX * CHUNKS_PER_REGION + chunkGridX;
+		int chunkZ = this.minRegionZ * CHUNKS_PER_REGION + chunkGridZ;
+		return new ChunkGridCoord(chunkX, chunkZ);
+	}
+
+	private RegionGridCoord screenToRegion(double mouseX, double mouseY) {
+		if (!this.isInMapArea(mouseX, mouseY)) {
+			return null;
+		}
+
+		MapTransform transform = this.computeMapTransform(this.mapInnerLeft, this.mapInnerTop, this.mapInnerRight, this.mapInnerBottom);
+		int regionPixel = transform.regionPixel();
+		if (regionPixel <= 0) {
+			return null;
+		}
+
+		int regionCountX = this.maxRegionX - this.minRegionX + 1;
+		int regionCountZ = this.maxRegionZ - this.minRegionZ + 1;
+		if (regionCountX <= 0 || regionCountZ <= 0) {
+			return null;
+		}
+
+		double worldX = mouseX - transform.startX();
+		double worldZ = mouseY - transform.startZ();
+		int regionGridX = (int)Math.floor(worldX / regionPixel);
+		int regionGridZ = (int)Math.floor(worldZ / regionPixel);
+		if (regionGridX < 0 || regionGridZ < 0 || regionGridX >= regionCountX || regionGridZ >= regionCountZ) {
+			return null;
+		}
+
+		int regionX = this.minRegionX + regionGridX;
+		int regionZ = this.minRegionZ + regionGridZ;
+		if (!this.chunkColorsByRegion.containsKey(packRegion(regionX, regionZ))) {
+			return null;
+		}
+
+		return new RegionGridCoord(regionX, regionZ);
+	}
+
+	private boolean isChunkSelectionMode() {
+		MapTransform transform = this.computeMapTransform(this.mapInnerLeft, this.mapInnerTop, this.mapInnerRight, this.mapInnerBottom);
+		int regionPixel = transform.regionPixel();
+		if (regionPixel <= 0) {
+			return false;
+		}
+
+		double chunkPixel = regionPixel / (double)CHUNKS_PER_REGION;
+		return chunkPixel >= 2.0;
+	}
+
+	private void applyChunkBoxSelection(int chunkX1, int chunkZ1, int chunkX2, int chunkZ2, boolean select) {
+		int minChunkX = Math.min(chunkX1, chunkX2);
+		int maxChunkX = Math.max(chunkX1, chunkX2);
+		int minChunkZ = Math.min(chunkZ1, chunkZ2);
+		int maxChunkZ = Math.max(chunkZ1, chunkZ2);
+
+		for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+			for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+				int regionX = Math.floorDiv(chunkX, CHUNKS_PER_REGION);
+				int regionZ = Math.floorDiv(chunkZ, CHUNKS_PER_REGION);
+				long regionKey = packRegion(regionX, regionZ);
+				int[] regionChunkColors = this.chunkColorsByRegion.get(regionKey);
+				if (regionChunkColors == null) {
+					continue;
+				}
+
+				int localChunkX = Math.floorMod(chunkX, CHUNKS_PER_REGION);
+				int localChunkZ = Math.floorMod(chunkZ, CHUNKS_PER_REGION);
+				int idx = localChunkX + localChunkZ * CHUNKS_PER_REGION;
+				if ((regionChunkColors[idx] >>> 24) == 0) {
+					continue;
+				}
+
+				if (select) {
+					this.selectedRegions.remove(regionKey);
+					BitSet selected = this.selectedChunksByRegion.computeIfAbsent(regionKey, key -> new BitSet(CHUNK_COUNT_PER_REGION));
+					selected.set(idx);
+				} else {
+					this.selectedRegions.remove(regionKey);
+					BitSet selected = this.selectedChunksByRegion.get(regionKey);
+					if (selected != null) {
+						selected.clear(idx);
+						if (selected.isEmpty()) {
+							this.selectedChunksByRegion.remove(regionKey);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private void applyRegionBoxSelection(int regionX1, int regionZ1, int regionX2, int regionZ2, boolean select) {
+		int minRegionX = Math.min(regionX1, regionX2);
+		int maxRegionX = Math.max(regionX1, regionX2);
+		int minRegionZ = Math.min(regionZ1, regionZ2);
+		int maxRegionZ = Math.max(regionZ1, regionZ2);
+
+		for (int regionZ = minRegionZ; regionZ <= maxRegionZ; regionZ++) {
+			for (int regionX = minRegionX; regionX <= maxRegionX; regionX++) {
+				long regionKey = packRegion(regionX, regionZ);
+				if (!this.chunkColorsByRegion.containsKey(regionKey)) {
+					continue;
+				}
+
+				if (select) {
+					this.selectedRegions.add(regionKey);
+				} else {
+					this.selectedRegions.remove(regionKey);
+				}
+			}
+		}
 	}
 
 	private boolean isInMapArea(double x, double y) {
@@ -1701,6 +1920,10 @@ public class RegionEditorScreen extends Screen {
 			this.renderPastePreview(guiGraphics, this.mapInnerLeft, this.mapInnerTop, this.mapInnerRight, this.mapInnerBottom);
 			guiGraphics.drawString(this.font, Component.literal("Paste Preview: press Ctrl+V to paste"), mapLeft + 8, mapTop + 32, 0xFFBEEFFF);
 		}
+
+		String dragTip = "Tip: Ctrl+drag selects box (L add, R remove)";
+		int tipX = this.width - 8 - this.font.width(dragTip);
+		guiGraphics.drawString(this.font, Component.literal(dragTip), tipX, 32, 0xFF9FD2E8);
 
 		guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 14, 0xFFFFFFFF);
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -2310,5 +2533,35 @@ public class RegionEditorScreen extends Screen {
 	}
 
 	private record RenderStats(int totalRegionGrid, int loadedRegions, int drawnRegions, int drawStride, int regionPixel) {
+	}
+
+	private interface GridCoord {
+		int x();
+
+		int z();
+	}
+
+	private record ChunkGridCoord(int chunkX, int chunkZ) implements GridCoord {
+		@Override
+		public int x() {
+			return this.chunkX;
+		}
+
+		@Override
+		public int z() {
+			return this.chunkZ;
+		}
+	}
+
+	private record RegionGridCoord(int regionX, int regionZ) implements GridCoord {
+		@Override
+		public int x() {
+			return this.regionX;
+		}
+
+		@Override
+		public int z() {
+			return this.regionZ;
+		}
 	}
 }
