@@ -4,15 +4,21 @@ import net.blaze3d.opengl.GlProgram;
 import net.blaze3d.opengl.Uniform;
 import net.blaze3d.pipeline.RenderPipeline;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Tracks Vulkan chunk-terrain pipelines that should reuse the currently active Sodium chunk program.
  */
+@SuppressWarnings("null")
 public final class SharedChunkProgramOverrides {
+	private static final Logger LOGGER = LoggerFactory.getLogger(SharedChunkProgramOverrides.class);
+	private static final AtomicInteger DEBUG_CREATE_OVERRIDE_LOG_COUNT = new AtomicInteger();
 	private static final Set<RenderPipeline> TRACKED_PIPELINES = ConcurrentHashMap.newKeySet();
 	private static final ThreadLocal<net.sodium.client.gl.shader.GlProgram<? extends ChunkShaderInterface>> ACTIVE_CHUNK_PROGRAM = new ThreadLocal<>();
 
@@ -48,6 +54,16 @@ public final class SharedChunkProgramOverrides {
 		}
 
 		var activeProgram = ACTIVE_CHUNK_PROGRAM.get();
+		int logIndex = DEBUG_CREATE_OVERRIDE_LOG_COUNT.getAndIncrement();
+		if (logIndex < 32) {
+			LOGGER.info(
+				"Shared chunk override probe#{} pipeline={} activeProgramPresent={} activeProgramHandle={}",
+				logIndex + 1,
+				pipeline.getLocation(),
+				activeProgram != null,
+				activeProgram == null ? -1 : activeProgram.handle()
+			);
+		}
 		if (activeProgram == null) {
 			return null;
 		}

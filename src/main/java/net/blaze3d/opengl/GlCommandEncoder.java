@@ -331,21 +331,27 @@ public class GlCommandEncoder implements CommandEncoder {
 		java.util.Map<String, net.vulkanic.VulkanicBufferSlice> uniformBufferBindings = new java.util.HashMap<>(layoutBindingCount);
 		java.util.Map<String, PipelineResourceBindings.TexelBufferBinding> texelBufferBindings = new java.util.HashMap<>(layoutBindingCount);
 		java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>(layoutBindingCount);
-		boolean logSodiumChunkSamplers = DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_SODIUM_SAMPLER_BIND_LOGS < 24
-			&& pipelineInfo.getLocation().toString().contains("sodium:pipeline/vulkan_chunk_");
+		boolean logSodiumChunkSamplers = DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_SODIUM_SAMPLER_BIND_LOGS < 36
+			&& pipelineInfo.getLocation().toString().contains("sodium:pipeline/")
+			&& pipelineInfo.getLocation().toString().contains("shared_chunk_");
 		boolean logParticleSamplers = DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PARTICLE_VULKAN_BIND_LOGS < 80
 			&& pipelineInfo.getLocation().toString().contains("pipeline/")
 			&& pipelineInfo.getLocation().toString().contains("particle");
 
 		if (logSodiumChunkSamplers) {
 			DEBUG_SODIUM_SAMPLER_BIND_LOGS++;
+			boolean standaloneInLayout = layoutBindings.stream()
+				.anyMatch(binding -> VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name()));
+			boolean standaloneInProgram = glRenderPipeline.program().getUniform(VulkanicAPI.generatedStandaloneUniformBlockName()) instanceof Uniform.Ubo;
 			LOGGER.info(
-				"Sodium Vulkan sampler prep#{} pipeline={} declaredSamplers={} renderPassSamplers={} layoutBindings={}",
+				"Sodium Vulkan sampler prep#{} pipeline={} declaredSamplers={} renderPassSamplers={} layoutBindings={} standaloneInLayout={} standaloneInProgram={}",
 				DEBUG_SODIUM_SAMPLER_BIND_LOGS,
 				pipelineInfo.getLocation(),
 				pipelineInfo.getSamplers(),
 				glRenderPass.samplers.keySet(),
-				layoutBindings.stream().map(PipelineDescriptor.ResourceBinding::name).toList()
+				layoutBindings.stream().map(PipelineDescriptor.ResourceBinding::name).toList(),
+				standaloneInLayout,
+				standaloneInProgram
 			);
 		}
 
@@ -366,6 +372,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				case SAMPLER, COMPARISON_SAMPLER -> {
 					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
 					net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
+					boolean uniformPresent = uniform instanceof Uniform.Sampler;
 					int samplerIndex = resolveSamplerIndex(resourceBinding.name(), uniform, resourceBinding);
 					if (logSodiumChunkSamplers) {
 						LOGGER.info(
@@ -400,13 +407,20 @@ public class GlCommandEncoder implements CommandEncoder {
 							resourceTexture != null ? resourceTexture.getLabel() : "null"
 						);
 					}
-					if (textureView != null) {
+					if (uniformPresent && textureView != null) {
 						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerIndex, textureView));
 						boundResources.add(resourceBinding);
 					}
 				}
 				case UNIFORM_BUFFER -> {
 					net.vulkanic.VulkanicBufferSlice slice = glRenderPass.getUniformResourceSlice(resourceBinding.name());
+					if (slice == null
+						&& VulkanicAPI.generatedStandaloneUniformBlockName().equals(resourceBinding.name())) {
+						slice = VulkanicAPI.getStandaloneUniformBufferSlice(
+							VulkanicAPI.getCommandContext(),
+							glRenderPipeline.program().getProgramId()
+						);
+					}
 					if (slice != null) {
 						uniformBufferBindings.put(resourceBinding.name(), slice);
 						boundResources.add(resourceBinding);

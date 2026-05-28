@@ -3094,6 +3094,12 @@ public class VulkanicAPI {
             location = getUniformLocation(ctx, program, "iris_overlay");
         } else if (uniformName.equals("Sampler2")) {
             location = getUniformLocation(ctx, program, "lightmap");
+            if (location == -1) {
+                location = getUniformLocation(ctx, program, "iris_lightmap");
+            }
+            if (location == -1) {
+                location = getUniformLocation(ctx, program, "gaux2");
+            }
         }
 
         return location;
@@ -3104,6 +3110,19 @@ public class VulkanicAPI {
      */
     public static VulkanicUniformLocation resolveUniformLocationWithLegacySamplerFallback(CommandContext ctx, int program, CharSequence name) {
         return VulkanicUniformLocation.of(getUniformLocationWithLegacySamplerFallback(ctx, program, name));
+    }
+
+    public static String generatedStandaloneUniformBlockName() {
+        return GENERATED_STANDALONE_UNIFORM_BLOCK_NAME;
+    }
+
+    @Nullable
+    public static VulkanicBufferSlice getStandaloneUniformBufferSlice(CommandContext ctx, int program) {
+        GraphicsBackend activeBackend = getBackend();
+        if (activeBackend instanceof VulkanBackend vulkanBackend) {
+            return vulkanBackend.getStandaloneUniformBufferSlice(ctx, program);
+        }
+        return null;
     }
     
     public static int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {

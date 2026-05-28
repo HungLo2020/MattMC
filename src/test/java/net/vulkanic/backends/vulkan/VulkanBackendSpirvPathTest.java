@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanBackendSpirvPathTest {
@@ -379,9 +380,14 @@ public class VulkanBackendSpirvPathTest {
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORMS));
         assertEquals(3,
             backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_ACTIVE_UNIFORM_BLOCKS));
-        assertEquals(0,
+        int samplerLocation = backend.getUniformLocation(introspectionContext, program, "Sampler0");
+        int fogColorLocation = backend.getUniformLocation(introspectionContext, program, "FogColor");
+        assertTrue(samplerLocation >= 0);
+        assertTrue(fogColorLocation >= 0);
+        assertNotEquals(samplerLocation, fogColorLocation);
+        assertEquals(samplerLocation,
             backend.getUniformLocation(introspectionContext, program, "Sampler0"));
-        assertEquals(1,
+        assertEquals(fogColorLocation,
             backend.getUniformLocation(introspectionContext, program, "FogColor"));
         assertEquals(0,
             backend.getUniformBlockIndex(introspectionContext, program, "DynamicTransforms"));

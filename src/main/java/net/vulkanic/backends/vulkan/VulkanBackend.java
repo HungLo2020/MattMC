@@ -161,6 +161,11 @@ import org.slf4j.Logger;
 public class VulkanBackend {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final AtomicLong STANDALONE_UNIFORM_CALL_COUNT = new AtomicLong();
+    private static final AtomicLong STANDALONE_UNIFORM_TOKEN_HIT_COUNT = new AtomicLong();
+    private static final AtomicLong STANDALONE_UNIFORM_FALLBACK_COUNT = new AtomicLong();
+    private static final AtomicLong STANDALONE_UNIFORM_WRITE_COUNT = new AtomicLong();
+    private static final AtomicInteger STANDALONE_UNIFORM_STATS_LOG_COUNT = new AtomicInteger();
     private static final java.util.concurrent.atomic.AtomicLong glslDumpCounter = new java.util.concurrent.atomic.AtomicLong(0);
     private static final Set<Integer> LEGACY_SAMPLER_UNSUPPORTED_FORMAT_LOGS = ConcurrentHashMap.newKeySet();
 
@@ -202,10 +207,12 @@ public class VulkanBackend {
     private final Map<RenderPipeline, PrecompiledPipelineState> precompiledPipelineCache = new ConcurrentHashMap<>();
     private final AtomicInteger nextVirtualShaderId = new AtomicInteger(1);
     private final AtomicInteger nextVirtualProgramId = new AtomicInteger(1);
+    private final AtomicInteger nextVirtualUniformLocationToken = new AtomicInteger(1);
     private final AtomicInteger presentQueueLogCount = new AtomicInteger();
     private static final AtomicInteger PRESENT_FORMAT_MISMATCH_LOG_COUNT = new AtomicInteger();
     private final Map<Integer, VirtualShader> virtualShaders = new ConcurrentHashMap<>();
     private final Map<Integer, VirtualProgram> virtualPrograms = new ConcurrentHashMap<>();
+    private final Map<Integer, UniformLocationRef> uniformLocationRefs = new ConcurrentHashMap<>();
     private final Map<Long, BoundPipelineResources> boundPipelineResourcesByCommandBuffer = new ConcurrentHashMap<>();
 
     // -----------------------------------------------------------------------
@@ -2017,9 +2024,9 @@ void main() {
             while (blockMatcher.find()) {
                 activeUniformBlocks.add(blockMatcher.group(1));
             }
-            // If this shader has bare opaque uniforms, the Vulkan normalizer will inject
-            // VulkanicStandaloneUniforms UBO — ensure reflection reports it as an active block.
-            if (GlslangSpirvCompiler.countNonExplicitOpaqueUniforms(normalizedSource) > 0) {
+            // If this shader has standalone non-opaque uniforms, the Vulkan normalizer rewrites
+            // them into VulkanicStandaloneUniforms; mirror that here so reflection stays aligned.
+            if (GlslangSpirvCompiler.hasStandaloneUniformBlockMembers(normalizedSource)) {
                 activeUniformBlocks.add(GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
             }
 
@@ -2046,7 +2053,117 @@ void main() {
         virtualProgram.activeUniformNames = List.copyOf(activeUniformNames);
         virtualProgram.activeUniforms = List.copyOf(activeUniforms.values());
         virtualProgram.activeUniformBlocks = List.copyOf(activeUniformBlocks);
+        initializeStandaloneUniformState(virtualProgram, activeUniforms);
 
+    }
+
+    private void initializeStandaloneUniformState(
+        VirtualProgram virtualProgram,
+        java.util.LinkedHashMap<String, ReflectedUniform> reflectedUniformsByName
+    ) {
+        int offset = 0;
+        Map<Integer, StandaloneUniformField> fieldsByLocation = new HashMap<>();
+
+        List<String> uniformNames = virtualProgram.activeUniformNames;
+        for (int location = 0; location < uniformNames.size(); location++) {
+            String name = uniformNames.get(location);
+            ReflectedUniform reflectedUniform = reflectedUniformsByName.get(name);
+            if (reflectedUniform == null) {
+                continue;
+            }
+
+            Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
+                net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(reflectedUniform.legacyType());
+            if (reflectionType.isEmpty() || reflectionType.get().isSampler() || reflectionType.get().isImage()) {
+                continue;
+            }
+
+            int baseAlignment = std140BaseAlignment(reflectionType.get());
+            int typeSize = std140TypeSize(reflectionType.get());
+            int arraySize = Math.max(1, reflectedUniform.arraySize());
+            int stride = arraySize > 1 ? roundUpTo(typeSize, 16) : typeSize;
+
+            offset = roundUpTo(offset, baseAlignment);
+            fieldsByLocation.put(
+                location,
+                new StandaloneUniformField(name, reflectionType.get(), offset, arraySize, stride)
+            );
+            offset += stride * arraySize;
+        }
+
+        int backingSize = roundUpTo(offset, 16);
+        synchronized (virtualProgram) {
+            unregisterUniformLocationTokens(virtualProgram);
+            virtualProgram.standaloneFieldsByLocation = Map.copyOf(fieldsByLocation);
+            virtualProgram.standaloneBackingSize = backingSize;
+            virtualProgram.standaloneBackingData =
+                backingSize > 0 ? java.nio.ByteBuffer.allocate(backingSize).order(ByteOrder.nativeOrder()) : null;
+            virtualProgram.standaloneDirty = backingSize > 0;
+            virtualProgram.closeStandaloneUniformBacking();
+        }
+    }
+
+    private void unregisterUniformLocationTokens(VirtualProgram virtualProgram) {
+        for (Integer token : virtualProgram.uniformLocationTokensByName.values()) {
+            uniformLocationRefs.remove(token);
+        }
+        virtualProgram.uniformLocationTokensByName.clear();
+    }
+
+    private int resolveUniformLocationToken(int programId, VirtualProgram virtualProgram, String uniformName, int uniformIndex) {
+        Integer existing = virtualProgram.uniformLocationTokensByName.get(uniformName);
+        if (existing != null) {
+            return existing;
+        }
+
+        int token = nextVirtualUniformLocationToken.getAndIncrement();
+        Integer raced = virtualProgram.uniformLocationTokensByName.putIfAbsent(uniformName, token);
+        if (raced != null) {
+            return raced;
+        }
+
+        uniformLocationRefs.put(token, new UniformLocationRef(programId, uniformIndex));
+        return token;
+    }
+
+    @Nullable
+    private UniformLocationRef resolveUniformLocationRef(int location) {
+        if (location < 0) {
+            return null;
+        }
+        return uniformLocationRefs.get(location);
+    }
+
+    private static int roundUpTo(int value, int alignment) {
+        if (alignment <= 0) {
+            return value;
+        }
+        int remainder = value % alignment;
+        return remainder == 0 ? value : value + (alignment - remainder);
+    }
+
+    private static int std140BaseAlignment(net.vulkanic.VulkanicUniformReflectionType type) {
+        return switch (type) {
+            case FLOAT, INT, UINT, BOOL -> 4;
+            case FLOAT_VEC2, INT_VEC2, UINT_VEC2, BOOL_VEC2 -> 8;
+            case FLOAT_VEC3, INT_VEC3, UINT_VEC3, BOOL_VEC3,
+                FLOAT_VEC4, INT_VEC4, UINT_VEC4, BOOL_VEC4,
+                FLOAT_MAT2, FLOAT_MAT3, FLOAT_MAT4 -> 16;
+            default -> 16;
+        };
+    }
+
+    private static int std140TypeSize(net.vulkanic.VulkanicUniformReflectionType type) {
+        return switch (type) {
+            case FLOAT, INT, UINT, BOOL -> 4;
+            case FLOAT_VEC2, INT_VEC2, UINT_VEC2, BOOL_VEC2 -> 8;
+            case FLOAT_VEC3, INT_VEC3, UINT_VEC3, BOOL_VEC3,
+                FLOAT_VEC4, INT_VEC4, UINT_VEC4, BOOL_VEC4 -> 16;
+            case FLOAT_MAT2 -> 32;
+            case FLOAT_MAT3 -> 48;
+            case FLOAT_MAT4 -> 64;
+            default -> 16;
+        };
     }
 
     public void deleteShader(CommandContext ctx, int shader) {
@@ -2060,7 +2177,11 @@ void main() {
     }
 
     public void deleteProgram(CommandContext ctx, int program) {
-        virtualPrograms.remove(program);
+        VirtualProgram removedProgram = virtualPrograms.remove(program);
+        if (removedProgram != null) {
+            unregisterUniformLocationTokens(removedProgram);
+            removedProgram.closeStandaloneUniformBacking();
+        }
         if (boundVirtualProgram == program) {
             boundVirtualProgram = 0;
         }
@@ -4657,69 +4778,364 @@ void main() {
 
     // =====================================================================
     //  Shader uniform setters
-    //  Vulkan uses push constants / descriptor sets exclusively;
-    //  these methods satisfy the contract but are intentional no-ops
-    //  when Vulkan is active (callers must use bindPipelineResources).
     // =====================================================================
+
+    private void captureStandaloneUniformInts(int location, int[] values) {
+        if (values == null || values.length == 0) {
+            return;
+        }
+        STANDALONE_UNIFORM_CALL_COUNT.incrementAndGet();
+
+        UniformLocationRef locationRef = resolveUniformLocationRef(location);
+        if (locationRef != null) {
+            STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
+            VirtualProgram program = virtualPrograms.get(locationRef.programId());
+            if (program != null) {
+                writeStandaloneUniformInts(program, locationRef.uniformIndex(), values);
+            }
+            maybeLogStandaloneUniformStats();
+            return;
+        }
+
+        VirtualProgram boundProgram = virtualPrograms.get(boundVirtualProgram);
+        if (boundProgram != null) {
+            STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
+            writeStandaloneUniformInts(boundProgram, location, values);
+        }
+        maybeLogStandaloneUniformStats();
+    }
+
+    private void captureStandaloneUniformFloats(int location, float[] values) {
+        if (values == null || values.length == 0) {
+            return;
+        }
+        STANDALONE_UNIFORM_CALL_COUNT.incrementAndGet();
+
+        UniformLocationRef locationRef = resolveUniformLocationRef(location);
+        if (locationRef != null) {
+            STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
+            VirtualProgram program = virtualPrograms.get(locationRef.programId());
+            if (program != null) {
+                writeStandaloneUniformFloats(program, locationRef.uniformIndex(), values);
+            }
+            maybeLogStandaloneUniformStats();
+            return;
+        }
+
+        VirtualProgram boundProgram = virtualPrograms.get(boundVirtualProgram);
+        if (boundProgram != null) {
+            STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
+            writeStandaloneUniformFloats(boundProgram, location, values);
+        }
+        maybeLogStandaloneUniformStats();
+    }
+
+    private void maybeLogStandaloneUniformStats() {
+        if (STANDALONE_UNIFORM_STATS_LOG_COUNT.get() >= 16) {
+            return;
+        }
+        long callCount = STANDALONE_UNIFORM_CALL_COUNT.get();
+        if (callCount % 200 != 0) {
+            return;
+        }
+        if (STANDALONE_UNIFORM_STATS_LOG_COUNT.incrementAndGet() <= 16) {
+            LOGGER.info(
+                "Standalone uniform stats calls={} tokenHits={} fallbacks={} writes={}",
+                callCount,
+                STANDALONE_UNIFORM_TOKEN_HIT_COUNT.get(),
+                STANDALONE_UNIFORM_FALLBACK_COUNT.get(),
+                STANDALONE_UNIFORM_WRITE_COUNT.get()
+            );
+        }
+    }
+
+    private boolean writeStandaloneUniformInts(VirtualProgram virtualProgram, int location, int[] values) {
+        StandaloneUniformField field = virtualProgram.standaloneFieldsByLocation.get(location);
+        if (field == null) {
+            return false;
+        }
+
+        synchronized (virtualProgram) {
+            java.nio.ByteBuffer backingData = virtualProgram.standaloneBackingData;
+            if (backingData == null) {
+                return false;
+            }
+
+            writeIntUniform(field, backingData, values);
+            virtualProgram.standaloneDirty = true;
+            STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
+            return true;
+        }
+    }
+
+    private boolean writeStandaloneUniformFloats(VirtualProgram virtualProgram, int location, float[] values) {
+        StandaloneUniformField field = virtualProgram.standaloneFieldsByLocation.get(location);
+        if (field == null) {
+            return false;
+        }
+
+        synchronized (virtualProgram) {
+            java.nio.ByteBuffer backingData = virtualProgram.standaloneBackingData;
+            if (backingData == null) {
+                return false;
+            }
+
+            writeFloatUniform(field, backingData, values);
+            virtualProgram.standaloneDirty = true;
+            STANDALONE_UNIFORM_WRITE_COUNT.incrementAndGet();
+            return true;
+        }
+    }
+
+    private static void writeIntUniform(StandaloneUniformField field, java.nio.ByteBuffer backingData, int[] values) {
+        int offset = field.offset();
+        int[] padded = new int[4];
+        int copyLength = Math.min(values.length, 4);
+        System.arraycopy(values, 0, padded, 0, copyLength);
+
+        switch (field.type()) {
+            case INT, UINT, BOOL -> backingData.putInt(offset, padded[0]);
+            case INT_VEC2, UINT_VEC2, BOOL_VEC2 -> {
+                backingData.putInt(offset, padded[0]);
+                backingData.putInt(offset + 4, padded[1]);
+            }
+            case INT_VEC3, UINT_VEC3, BOOL_VEC3 -> {
+                backingData.putInt(offset, padded[0]);
+                backingData.putInt(offset + 4, padded[1]);
+                backingData.putInt(offset + 8, padded[2]);
+            }
+            case INT_VEC4, UINT_VEC4, BOOL_VEC4 -> {
+                backingData.putInt(offset, padded[0]);
+                backingData.putInt(offset + 4, padded[1]);
+                backingData.putInt(offset + 8, padded[2]);
+                backingData.putInt(offset + 12, padded[3]);
+            }
+            default -> {
+                // Ignore mismatched updates for non-int field types.
+            }
+        }
+    }
+
+    private static void writeFloatUniform(StandaloneUniformField field, java.nio.ByteBuffer backingData, float[] values) {
+        int offset = field.offset();
+
+        switch (field.type()) {
+            case FLOAT -> backingData.putFloat(offset, values[0]);
+            case FLOAT_VEC2 -> {
+                backingData.putFloat(offset, values[0]);
+                backingData.putFloat(offset + 4, values.length > 1 ? values[1] : 0.0F);
+            }
+            case FLOAT_VEC3 -> {
+                backingData.putFloat(offset, values[0]);
+                backingData.putFloat(offset + 4, values.length > 1 ? values[1] : 0.0F);
+                backingData.putFloat(offset + 8, values.length > 2 ? values[2] : 0.0F);
+            }
+            case FLOAT_VEC4 -> {
+                backingData.putFloat(offset, values[0]);
+                backingData.putFloat(offset + 4, values.length > 1 ? values[1] : 0.0F);
+                backingData.putFloat(offset + 8, values.length > 2 ? values[2] : 0.0F);
+                backingData.putFloat(offset + 12, values.length > 3 ? values[3] : 0.0F);
+            }
+            case FLOAT_MAT2 -> writeStd140MatrixColumns(backingData, offset, values, 2, 2);
+            case FLOAT_MAT3 -> writeStd140MatrixColumns(backingData, offset, values, 3, 3);
+            case FLOAT_MAT4 -> writeStd140MatrixColumns(backingData, offset, values, 4, 4);
+            default -> {
+                // Ignore mismatched updates for non-float field types.
+            }
+        }
+    }
+
+    private static void writeStd140MatrixColumns(
+        java.nio.ByteBuffer backingData,
+        int baseOffset,
+        float[] values,
+        int columns,
+        int rows
+    ) {
+        for (int col = 0; col < columns; col++) {
+            int columnOffset = baseOffset + (col * 16);
+            for (int row = 0; row < rows; row++) {
+                int sourceIndex = (col * rows) + row;
+                float component = sourceIndex < values.length ? values[sourceIndex] : 0.0F;
+                backingData.putFloat(columnOffset + (row * 4), component);
+            }
+        }
+    }
+
+    private static float[] transpose3(float[] values) {
+        return new float[] {
+            values[0], values[3], values[6],
+            values[1], values[4], values[7],
+            values[2], values[5], values[8]
+        };
+    }
+
+    private static float[] transpose4(float[] values) {
+        return new float[] {
+            values[0], values[4], values[8], values[12],
+            values[1], values[5], values[9], values[13],
+            values[2], values[6], values[10], values[14],
+            values[3], values[7], values[11], values[15]
+        };
+    }
+
+    @Nullable
+    public VulkanicBufferSlice getStandaloneUniformBufferSlice(CommandContext ctx, int program) {
+        requireVulkanCommandBufferHandle("getStandaloneUniformBufferSlice", ctx);
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        if (virtualProgram == null || virtualProgram.standaloneBackingSize <= 0) {
+            return null;
+        }
+
+        synchronized (virtualProgram) {
+            java.nio.ByteBuffer backingData = virtualProgram.standaloneBackingData;
+            if (backingData == null || virtualProgram.standaloneBackingSize <= 0) {
+                return null;
+            }
+
+            if (virtualProgram.standaloneGpuBuffer == null
+                || virtualProgram.standaloneGpuBuffer.isClosed()
+                || virtualProgram.standaloneDirty) {
+                java.nio.ByteBuffer upload = backingData.duplicate();
+                upload.clear();
+
+                VulkanBuffer previous = virtualProgram.standaloneGpuBuffer;
+                virtualProgram.standaloneGpuBuffer = (VulkanBuffer) createManagedBuffer(
+                    () -> "vulkan-standalone-uniforms-" + program,
+                    GpuBuffer.USAGE_UNIFORM,
+                    upload
+                );
+                virtualProgram.standaloneDirty = false;
+
+                if (previous != null && !previous.isClosed()) {
+                    previous.close();
+                }
+            }
+
+            return new VulkanicBufferSlice(virtualProgram.standaloneGpuBuffer, 0, virtualProgram.standaloneBackingSize);
+        }
+    }
 
     public void setUniform1i(CommandContext ctx, int location, int value) {
         requireVulkanCommandBufferHandle("setUniform1i", ctx);
+        captureStandaloneUniformInts(location, new int[] {value});
     }
 
     public void setUniform1f(CommandContext ctx, int location, float value) {
         requireVulkanCommandBufferHandle("setUniform1f", ctx);
+        captureStandaloneUniformFloats(location, new float[] {value});
     }
 
     public void setUniform2f(CommandContext ctx, int location, float v0, float v1) {
         requireVulkanCommandBufferHandle("setUniform2f", ctx);
+        captureStandaloneUniformFloats(location, new float[] {v0, v1});
     }
 
     public void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
         requireVulkanCommandBufferHandle("setUniform2i", ctx);
+        captureStandaloneUniformInts(location, new int[] {v0, v1});
     }
 
     public void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2) {
         requireVulkanCommandBufferHandle("setUniform3f", ctx);
+        captureStandaloneUniformFloats(location, new float[] {v0, v1, v2});
     }
 
     public void setUniform3i(CommandContext ctx, int location, int v0, int v1, int v2) {
         requireVulkanCommandBufferHandle("setUniform3i", ctx);
+        captureStandaloneUniformInts(location, new int[] {v0, v1, v2});
     }
 
     public void setUniform4f(CommandContext ctx, int location, float v0, float v1, float v2, float v3) {
         requireVulkanCommandBufferHandle("setUniform4f", ctx);
+        captureStandaloneUniformFloats(location, new float[] {v0, v1, v2, v3});
     }
 
     public void setUniform4i(CommandContext ctx, int location, int v0, int v1, int v2, int v3) {
         requireVulkanCommandBufferHandle("setUniform4i", ctx);
+        captureStandaloneUniformInts(location, new int[] {v0, v1, v2, v3});
     }
 
     public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
         requireVulkanCommandBufferHandle("setUniformMatrix3fv", ctx);
+        java.nio.FloatBuffer duplicate = matrix.duplicate();
+        float[] values = new float[Math.min(duplicate.remaining(), 9)];
+        duplicate.get(values);
+        if (transpose && values.length >= 9) {
+            values = transpose3(values);
+        }
+        if (values.length > 0) {
+            captureStandaloneUniformFloats(location, values);
+        }
     }
 
     public void setUniformMatrix3fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
         requireVulkanCommandBufferHandle("setUniformMatrix3fv", ctx);
+        if (matrix == null || matrix.length == 0) {
+            return;
+        }
+        float[] values = java.util.Arrays.copyOf(matrix, Math.min(matrix.length, 9));
+        if (transpose && values.length >= 9) {
+            values = transpose3(values);
+        }
+        captureStandaloneUniformFloats(location, values);
     }
 
     public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer matrix) {
         requireVulkanCommandBufferHandle("setUniformMatrix4fv", ctx);
+        java.nio.FloatBuffer duplicate = matrix.duplicate();
+        float[] values = new float[Math.min(duplicate.remaining(), 16)];
+        duplicate.get(values);
+        if (transpose && values.length >= 16) {
+            values = transpose4(values);
+        }
+        if (values.length > 0) {
+            captureStandaloneUniformFloats(location, values);
+        }
     }
 
     public void setUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, float[] matrix) {
         requireVulkanCommandBufferHandle("setUniformMatrix4fv", ctx);
+        if (matrix == null || matrix.length == 0) {
+            return;
+        }
+        float[] values = java.util.Arrays.copyOf(matrix, Math.min(matrix.length, 16));
+        if (transpose && values.length >= 16) {
+            values = transpose4(values);
+        }
+        captureStandaloneUniformFloats(location, values);
     }
 
     public void setUniform2fv(CommandContext ctx, int location, float[] value) {
         requireVulkanCommandBufferHandle("setUniform2fv", ctx);
+        if (value != null && value.length > 0) {
+            captureStandaloneUniformFloats(location, value.length >= 2 ? new float[] {value[0], value[1]} : new float[] {value[0], 0.0F});
+        }
     }
 
     public void setUniform3fv(CommandContext ctx, int location, float[] value) {
         requireVulkanCommandBufferHandle("setUniform3fv", ctx);
+        if (value != null && value.length > 0) {
+            captureStandaloneUniformFloats(
+                location,
+                new float[] {value[0], value.length > 1 ? value[1] : 0.0F, value.length > 2 ? value[2] : 0.0F}
+            );
+        }
     }
 
     public void setUniform4fv(CommandContext ctx, int location, float[] value) {
         requireVulkanCommandBufferHandle("setUniform4fv", ctx);
+        if (value != null && value.length > 0) {
+            captureStandaloneUniformFloats(
+                location,
+                new float[] {
+                    value[0],
+                    value.length > 1 ? value[1] : 0.0F,
+                    value.length > 2 ? value[2] : 0.0F,
+                    value.length > 3 ? value[3] : 0.0F
+                }
+            );
+        }
     }
 
     // =====================================================================
@@ -4734,7 +5150,17 @@ void main() {
     public int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
         requireVulkanCommandBufferHandle("getUniformLocation", ctx);
         VirtualProgram virtualProgram = virtualPrograms.get(program);
-        return virtualProgram == null ? -1 : virtualProgram.activeUniformNames.indexOf(name.toString());
+        if (virtualProgram == null) {
+            return -1;
+        }
+
+        String uniformName = name.toString();
+        int uniformIndex = virtualProgram.activeUniformNames.indexOf(uniformName);
+        if (uniformIndex < 0) {
+            return -1;
+        }
+
+        return resolveUniformLocationToken(program, virtualProgram, uniformName, uniformIndex);
     }
 
     // =====================================================================
@@ -6446,15 +6872,43 @@ void main() {
 
     private static final class VirtualProgram {
         private final Set<Integer> attachedShaderIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        private final Map<String, Integer> uniformLocationTokensByName = new ConcurrentHashMap<>();
         private volatile List<String> activeUniformNames = List.of();
         private volatile List<ReflectedUniform> activeUniforms = List.of();
         private volatile List<String> activeUniformBlocks = List.of();
         private volatile List<VulkanicSpirvModule> linkedSpirvModules = List.of();
+        private volatile Map<Integer, StandaloneUniformField> standaloneFieldsByLocation = Map.of();
+        private volatile int standaloneBackingSize;
+        @Nullable
+        private volatile java.nio.ByteBuffer standaloneBackingData;
+        @Nullable
+        private volatile VulkanBuffer standaloneGpuBuffer;
+        private volatile boolean standaloneDirty;
         private volatile boolean linkStatus;
         private volatile String infoLog = "";
+
+        private void closeStandaloneUniformBacking() {
+            VulkanBuffer buffer = standaloneGpuBuffer;
+            standaloneGpuBuffer = null;
+            if (buffer != null && !buffer.isClosed()) {
+                buffer.close();
+            }
+        }
     }
 
     private record ReflectedUniform(String name, int arraySize, int legacyType) {
+    }
+
+    private record StandaloneUniformField(
+        String name,
+        net.vulkanic.VulkanicUniformReflectionType type,
+        int offset,
+        int arraySize,
+        int stride
+    ) {
+    }
+
+    private record UniformLocationRef(int programId, int uniformIndex) {
     }
 
     private static final class NativeSpine {

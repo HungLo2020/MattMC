@@ -266,6 +266,22 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         return count;
     }
 
+    static boolean hasStandaloneUniformBlockMembers(String shaderSource) {
+        java.util.regex.Matcher matcher = STANDALONE_UNIFORM_DECLARATION_PATTERN.matcher(shaderSource);
+        while (matcher.find()) {
+            String declaration = matcher.group(1).trim();
+            if (declaration.isEmpty()) {
+                continue;
+            }
+
+            String typeToken = declaration.split("\\s+", 2)[0];
+            if (!isOpaqueUniformType(typeToken)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static int findNextExplicitBindingIndex(String shaderSource) {
         java.util.regex.Matcher matcher = EXPLICIT_BINDING_PATTERN.matcher(shaderSource);
         int maxBinding = -1;
