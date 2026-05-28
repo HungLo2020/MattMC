@@ -90,6 +90,7 @@ public class RegionEditorScreen extends Screen {
 	private static final int MAX_REGION_CELLS_DRAWN_PER_FRAME = 40000;
 	private static final int MAX_CHUNK_DETAIL_REQUESTS_PER_FRAME = 96;
 	private static final int MAX_CHUNK_DETAILS_APPLIED_PER_TICK = 96;
+	private static final int MAX_UNDO_CHUNKS_PER_ACTION = 256;
 	private static final int MIN_BLOCK_PIXEL_FOR_DETAIL = 2;
 	private static final float MIN_MAP_ZOOM = 0.25F;
 	private static final float MAX_MAP_ZOOM = 128.0F;
@@ -435,11 +436,15 @@ public class RegionEditorScreen extends Screen {
 		int deletedChunks = 0;
 		Set<Long> regionsToReload = new HashSet<>();
 		Map<Long, UndoChunkSnapshot> undoSnapshotByChunk = new LinkedHashMap<>();
+		long estimatedAffectedChunks = estimateDeleteChunkCount(regionsToDelete, chunksToDeleteByRegion);
+		boolean captureUndo = estimatedAffectedChunks <= MAX_UNDO_CHUNKS_PER_ACTION;
 
 		for (long regionKey : regionsToDelete) {
 			int regionX = unpackRegionX(regionKey);
 			int regionZ = unpackRegionZ(regionKey);
-			captureRegionUndoSnapshot(regionDir, regionX, regionZ, undoSnapshotByChunk);
+			if (captureUndo) {
+				captureRegionUndoSnapshot(regionDir, regionX, regionZ, undoSnapshotByChunk);
+			}
 			Path regionFilePath = regionDir.resolve("r." + regionX + "." + regionZ + ".mca");
 			try {
 				if (Files.deleteIfExists(regionFilePath)) {
@@ -479,7 +484,9 @@ public class RegionEditorScreen extends Screen {
 					int chunkZ = idx >> 5;
 					int globalChunkX = regionX * CHUNKS_PER_REGION + chunkX;
 					int globalChunkZ = regionZ * CHUNKS_PER_REGION + chunkZ;
-					captureUndoSnapshotForChunk(regionDir, globalChunkX, globalChunkZ, undoSnapshotByChunk);
+					if (captureUndo) {
+						captureUndoSnapshotForChunk(regionDir, globalChunkX, globalChunkZ, undoSnapshotByChunk);
+					}
 					ChunkPos chunkPos = new ChunkPos(globalChunkX, globalChunkZ);
 					if (regionFile.hasChunk(chunkPos)) {
 						regionFile.clear(chunkPos);
@@ -516,12 +523,13 @@ public class RegionEditorScreen extends Screen {
 			}
 		}
 
-		if (!undoSnapshotByChunk.isEmpty()) {
+		if (captureUndo && !undoSnapshotByChunk.isEmpty()) {
 			this.undoStack.push(new UndoAction("delete", new ArrayList<>(undoSnapshotByChunk.values())));
 		}
 
 		this.recomputeBoundsFromLoadedRegions();
-		this.loadStatus = "Deleted " + deletedRegions + " regions and " + deletedChunks + " chunks.";
+		this.loadStatus = "Deleted " + deletedRegions + " regions and " + deletedChunks + " chunks."
+			+ (captureUndo ? "" : " Undo skipped for large operation.");
 		this.actionMenuOpen = false;
 		this.refreshMenuVisibility();
 	}
@@ -599,6 +607,7 @@ public class RegionEditorScreen extends Screen {
 		}
 
 		Map<Long, UndoChunkSnapshot> undoSnapshotByChunk = new LinkedHashMap<>();
+		boolean captureUndo = this.clipboard.chunksByRelativeOffset().size() <= MAX_UNDO_CHUNKS_PER_ACTION;
 		Set<Long> touchedRegions = new HashSet<>();
 		int pastedChunks = 0;
 		for (Map.Entry<Long, CompoundTag> entry : this.clipboard.chunksByRelativeOffset().entrySet()) {
@@ -606,7 +615,9 @@ public class RegionEditorScreen extends Screen {
 			int relChunkZ = unpackRegionZ(entry.getKey());
 			int targetChunkX = pasteOrigin.originChunkX() + relChunkX;
 			int targetChunkZ = pasteOrigin.originChunkZ() + relChunkZ;
-			captureUndoSnapshotForChunk(this.currentRegionDir, targetChunkX, targetChunkZ, undoSnapshotByChunk);
+			if (captureUndo) {
+				captureUndoSnapshotForChunk(this.currentRegionDir, targetChunkX, targetChunkZ, undoSnapshotByChunk);
+			}
 			CompoundTag targetTag = entry.getValue().copy();
 			setChunkCoordinates(targetTag, targetChunkX, targetChunkZ);
 			if (writeChunkTag(this.currentRegionDir, targetChunkX, targetChunkZ, targetTag)) {
@@ -621,16 +632,32 @@ public class RegionEditorScreen extends Screen {
 			return;
 		}
 
-		if (!undoSnapshotByChunk.isEmpty()) {
+		if (captureUndo && !undoSnapshotByChunk.isEmpty()) {
 			this.undoStack.push(new UndoAction("paste", new ArrayList<>(undoSnapshotByChunk.values())));
 		}
 
 		this.refreshRegionsFromDisk(touchedRegions);
 		this.recomputeBoundsFromLoadedRegions();
 		this.pastePreviewActive = false;
-		this.loadStatus = "Pasted " + pastedChunks + " chunks at " + pasteOrigin.summary() + ".";
+		this.loadStatus = "Pasted " + pastedChunks + " chunks at " + pasteOrigin.summary() + "."
+			+ (captureUndo ? "" : " Undo skipped for large operation.");
 		this.actionMenuOpen = false;
 		this.refreshMenuVisibility();
+	}
+
+	private static long estimateDeleteChunkCount(Set<Long> regionsToDelete, Map<Long, BitSet> chunksToDeleteByRegion) {
+		long count = (long)regionsToDelete.size() * CHUNK_COUNT_PER_REGION;
+		for (Map.Entry<Long, BitSet> entry : chunksToDeleteByRegion.entrySet()) {
+			if (regionsToDelete.contains(entry.getKey())) {
+				continue;
+			}
+
+			BitSet selected = entry.getValue();
+			if (selected != null) {
+				count += selected.cardinality();
+			}
+		}
+		return count;
 	}
 
 	private void undoLastAction() {
@@ -1907,6 +1934,11 @@ public class RegionEditorScreen extends Screen {
 			guiGraphics.drawString(this.font, Component.literal("Loading..."), mapLeft + 8, mapTop + 20, 0xFFE0C070);
 		}
 
+		int loadedRegionCount = this.chunkColorsByRegion.size();
+		int selectedRegionCount = this.selectedRegions.size();
+		guiGraphics.drawString(this.font, Component.literal("Regions: " + loadedRegionCount), mapLeft + 8, mapTop + 32, 0xFF9FD2E8);
+		guiGraphics.drawString(this.font, Component.literal("Selected Regions: " + selectedRegionCount), mapLeft + 8, mapTop + 44, 0xFFFFB56B);
+
 		if (this.fileMenuOpen) {
 			this.renderFileMenu(guiGraphics);
 		}
@@ -1917,7 +1949,7 @@ public class RegionEditorScreen extends Screen {
 
 		if (this.pastePreviewActive && this.clipboard != null) {
 			this.renderPastePreview(guiGraphics, this.mapInnerLeft, this.mapInnerTop, this.mapInnerRight, this.mapInnerBottom);
-			guiGraphics.drawString(this.font, Component.literal("Paste Preview: press Ctrl+V to paste"), mapLeft + 8, mapTop + 32, 0xFFBEEFFF);
+			guiGraphics.drawString(this.font, Component.literal("Paste Preview: press Ctrl+V to paste"), mapLeft + 8, mapTop + 56, 0xFFBEEFFF);
 		}
 
 		String dragTip = "Tip: Ctrl+drag selects box (L add, R remove)";
