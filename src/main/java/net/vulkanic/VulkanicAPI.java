@@ -148,13 +148,13 @@ public class VulkanicAPI {
             }
         }
     }
-    
+
     // Functional interfaces for debug callbacks
     @FunctionalInterface
     public interface DebugMessageCallback {
         void invoke(int source, int type, int id, int severity, String message);
     }
-    
+
     @FunctionalInterface
     public interface DebugMessageCallbackAMD {
         void invoke(int id, int category, int severity, String message);
@@ -3118,11 +3118,23 @@ public class VulkanicAPI {
 
     @Nullable
     public static VulkanicBufferSlice getStandaloneUniformBufferSlice(CommandContext ctx, int program) {
+        return dispatchImplementedValue(
+            vulkanBackend -> vulkanBackend.getStandaloneUniformBufferSlice(ctx, program),
+            ignored -> null
+        );
+    }
+
+    public static void logStandaloneSliceTrace(
+        CommandContext ctx,
+        String stage,
+        int program,
+        @Nullable String programName,
+        @Nullable String note
+    ) {
         GraphicsBackend activeBackend = getBackend();
         if (activeBackend instanceof VulkanBackend vulkanBackend) {
-            return vulkanBackend.getStandaloneUniformBufferSlice(ctx, program);
+            vulkanBackend.logStandaloneSliceTrace(ctx, stage, program, programName, note);
         }
-        return null;
     }
     
     public static int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {

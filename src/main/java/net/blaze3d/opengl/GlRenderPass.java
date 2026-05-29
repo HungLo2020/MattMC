@@ -18,11 +18,14 @@ import net.minecraft.SharedConstants;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Environment(EnvType.CLIENT)
 public class GlRenderPass implements RenderPass {
 	protected static final int MAX_VERTEX_BUFFERS = 1;
 	public static final boolean VALIDATION = SharedConstants.IS_RUNNING_IN_IDE;
+	private static final Logger LOGGER = LoggerFactory.getLogger(GlRenderPass.class);
 	private final GlCommandEncoder encoder;
 	private final boolean hasDepthTexture;
 	private final int framebuffer;
@@ -176,13 +179,59 @@ public class GlRenderPass implements RenderPass {
 					gpuBufferSlice.length()
 				)
 			);
+			if (VulkanicAPI.generatedStandaloneUniformBlockName().equals(string)) {
+				LOGGER.info(
+					"StandaloneLookupKeyTrace stage=renderpass-store lookupType=resource-name key={} keyHash={} mapSize={} containsExactKey=yes availableKeys={} note=render-pass-uniform-slice-stored",
+					string,
+					Integer.toHexString(string.hashCode()),
+					this.uniformResourceSlices.size(),
+					this.describeUniformResourceSliceKeys()
+				);
+			}
 			this.dirtyUniforms.add(string);
 		}
 	}
 
+	public void setUniform(String string, net.vulkanic.VulkanicBufferSlice vulkanicBufferSlice) {
+		this.uniformResourceSlices.put(string, vulkanicBufferSlice);
+		if (VulkanicAPI.generatedStandaloneUniformBlockName().equals(string)) {
+			LOGGER.info(
+				"StandaloneLookupKeyTrace stage=renderpass-store renderPassId={} lookupType=resource-name key={} keyHash={} mapSize={} containsExactKey=yes availableKeys={} note=standalone-buffer-slice-stored",
+				System.identityHashCode(this),
+				string,
+				Integer.toHexString(string.hashCode()),
+				this.uniformResourceSlices.size(),
+				this.describeUniformResourceSliceKeys()
+			);
+		}
+		this.dirtyUniforms.add(string);
+	}
+
 	@Nullable
 	net.vulkanic.VulkanicBufferSlice getUniformResourceSlice(String string) {
-		return this.uniformResourceSlices.get(string);
+		net.vulkanic.VulkanicBufferSlice slice = this.uniformResourceSlices.get(string);
+		if (VulkanicAPI.generatedStandaloneUniformBlockName().equals(string)) {
+			LOGGER.info(
+				"StandaloneLookupKeyTrace stage=renderpass-lookup renderPassId={} lookupType=resource-name key={} keyHash={} mapSize={} containsExactKey={} availableKeys={} sliceAvailable={} note=uniformResourceSlices-get",
+				System.identityHashCode(this),
+				string,
+				Integer.toHexString(string.hashCode()),
+				this.uniformResourceSlices.size(),
+				this.uniformResourceSlices.containsKey(string) ? "yes" : "no",
+				this.describeUniformResourceSliceKeys(),
+				slice != null ? "yes" : "no"
+			);
+		}
+		return slice;
+	}
+
+	private String describeUniformResourceSliceKeys() {
+		java.util.ArrayList<String> keys = new java.util.ArrayList<>(this.uniformResourceSlices.keySet());
+		java.util.Collections.sort(keys);
+		if (keys.size() > 8) {
+			return keys.subList(0, 8) + "...(" + keys.size() + " total)";
+		}
+		return keys.toString();
 	}
 
 	@Override

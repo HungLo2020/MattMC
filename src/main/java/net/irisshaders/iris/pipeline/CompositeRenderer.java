@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.buffers.GpuBuffer;
+import net.logging.LogUtils;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.DepthTestFunction;
 import net.blaze3d.systems.RenderPass;
@@ -67,8 +68,10 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
 
 public class CompositeRenderer {
+	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final RenderPipeline COMPOSITE_PIPELINE = RenderPipeline.builder()
 		.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 		.withDepthWrite(false)
@@ -423,6 +426,12 @@ public class CompositeRenderer {
 		centerDepthSampler.setUsage(builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth"));
 
 		Program build = builder.build();
+		LOGGER.info(
+			"CompositePassProgramTrace stage=createProgram passName={} programId={} programObjectId={}",
+			source.getName(),
+			build.getProgramId(),
+			System.identityHashCode(build)
+		);
 
 		// tell the customUniforms that those locations belong to this pass
 		// this is just an object to index the internal map
@@ -548,6 +557,24 @@ public class CompositeRenderer {
 
 			this.pipelineDescriptor = descriptor;
 			this.pipelineHandle = VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+			boolean descriptorHasStandaloneBlock = descriptor.getResourceLayout().bindings().stream()
+				.anyMatch(binding -> VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name()));
+			LOGGER.info(
+				"CompositePassProgramTrace stage=ensurePipelineState passName={} programId={} programObjectId={} descriptorStandaloneBlockPresent={} framebuffer={}",
+				this.name,
+				this.program.getProgramId(),
+				System.identityHashCode(this.program),
+				descriptorHasStandaloneBlock ? "yes" : "no",
+				this.framebuffer.getId()
+			);
+			VulkanicAPI.logStandaloneSliceTrace(
+				ctx,
+				"composite-pass-program",
+				this.program.getProgramId(),
+				this.name,
+				"programObjectId=" + System.identityHashCode(this.program)
+					+ " descriptorStandaloneBlockPresent=" + (descriptorHasStandaloneBlock ? "yes" : "no")
+			);
 		}
 
 		protected void destroy() {

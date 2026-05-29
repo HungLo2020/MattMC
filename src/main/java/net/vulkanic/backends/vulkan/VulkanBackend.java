@@ -161,11 +161,15 @@ import org.slf4j.Logger;
 public class VulkanBackend {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Set<String> STANDALONE_SLICE_TRACE_KEYS = ConcurrentHashMap.newKeySet();
     private static final AtomicLong STANDALONE_UNIFORM_CALL_COUNT = new AtomicLong();
     private static final AtomicLong STANDALONE_UNIFORM_TOKEN_HIT_COUNT = new AtomicLong();
     private static final AtomicLong STANDALONE_UNIFORM_FALLBACK_COUNT = new AtomicLong();
     private static final AtomicLong STANDALONE_UNIFORM_WRITE_COUNT = new AtomicLong();
     private static final AtomicInteger STANDALONE_UNIFORM_STATS_LOG_COUNT = new AtomicInteger();
+    private static final AtomicInteger STANDALONE_SLICE_TRACE_LOG_COUNT = new AtomicInteger();
+    private static final AtomicInteger STANDALONE_LOOKUP_SAMPLE_PROGRAM = new AtomicInteger(-1);
+    private static final int MAX_STANDALONE_SLICE_TRACE_LOGS = 256;
     private static final java.util.concurrent.atomic.AtomicLong glslDumpCounter = new java.util.concurrent.atomic.AtomicLong(0);
     private static final Set<Integer> LEGACY_SAMPLER_UNSUPPORTED_FORMAT_LOGS = ConcurrentHashMap.newKeySet();
 
@@ -1917,6 +1921,9 @@ void main() {
     public int createShaderProgram(CommandContext ctx) {
         int programId = nextVirtualProgramId.getAndIncrement();
         virtualPrograms.put(programId, new VirtualProgram());
+		if (programId == 5) {
+			logStandaloneProgramKeyTrace("program-store", programId, virtualPrograms.get(programId), "createShaderProgram");
+		}
         return programId;
     }
 
@@ -1982,7 +1989,7 @@ void main() {
             return;
         }
 
-        reflectVirtualProgramResources(virtualProgram);
+        reflectVirtualProgramResources(program, virtualProgram);
         virtualProgram.linkedSpirvModules = List.copyOf(linkedSpirvModules);
         virtualProgram.linkStatus = true;
         virtualProgram.infoLog = "";
@@ -2006,7 +2013,7 @@ void main() {
         return requireVirtualProgram(program).infoLog;
     }
 
-    private void reflectVirtualProgramResources(VirtualProgram virtualProgram) {
+    private void reflectVirtualProgramResources(int programId, VirtualProgram virtualProgram) {
         java.util.LinkedHashMap<String, ReflectedUniform> activeUniforms = new java.util.LinkedHashMap<>();
         Set<String> activeUniformNames = new java.util.LinkedHashSet<>();
         Set<String> activeUniformBlocks = new java.util.LinkedHashSet<>();
@@ -2053,11 +2060,13 @@ void main() {
         virtualProgram.activeUniformNames = List.copyOf(activeUniformNames);
         virtualProgram.activeUniforms = List.copyOf(activeUniforms.values());
         virtualProgram.activeUniformBlocks = List.copyOf(activeUniformBlocks);
-        initializeStandaloneUniformState(virtualProgram, activeUniforms);
+        logStandaloneSliceTraceInternal(programId, "reflection", null, virtualProgram, null, false, null);
+        initializeStandaloneUniformState(programId, virtualProgram, activeUniforms);
 
     }
 
     private void initializeStandaloneUniformState(
+        int programId,
         VirtualProgram virtualProgram,
         java.util.LinkedHashMap<String, ReflectedUniform> reflectedUniformsByName
     ) {
@@ -2101,6 +2110,118 @@ void main() {
             virtualProgram.standaloneDirty = backingSize > 0;
             virtualProgram.closeStandaloneUniformBacking();
         }
+		if (programId == 5) {
+			logStandaloneProgramKeyTrace("backing-store", programId, virtualProgram, "initializeStandaloneUniformState");
+		}
+        logStandaloneSliceTraceInternal(programId, "backing-init", null, virtualProgram, null, false, null);
+    }
+
+    public void logStandaloneSliceTrace(
+        CommandContext ctx,
+        String stage,
+        int program,
+        @Nullable String programName,
+        @Nullable String note
+    ) {
+        requireVulkanCommandBufferHandle("logStandaloneSliceTrace", ctx);
+        logStandaloneSliceTraceInternal(program, stage, programName, virtualPrograms.get(program), null, true, note);
+    }
+
+    private void logStandaloneSliceTraceInternal(
+        int programId,
+        String stage,
+        @Nullable String programName,
+        @Nullable VirtualProgram virtualProgram,
+        @Nullable Boolean sliceAvailableOverride,
+        boolean dedupe,
+        @Nullable String note
+    ) {
+        if (STANDALONE_SLICE_TRACE_LOG_COUNT.get() >= MAX_STANDALONE_SLICE_TRACE_LOGS) {
+            return;
+        }
+
+        String traceKey = stage + "#" + programId;
+        if (dedupe && !STANDALONE_SLICE_TRACE_KEYS.add(traceKey)) {
+            return;
+        }
+
+        boolean programRecordPresent = virtualProgram != null;
+        boolean reflectedStandaloneBlockPresent = programRecordPresent
+            && virtualProgram.activeUniformBlocks.contains(GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME);
+        boolean backingAllocated = programRecordPresent
+            && virtualProgram.standaloneBackingSize > 0
+            && virtualProgram.standaloneBackingData != null;
+        boolean sliceAvailable = sliceAvailableOverride != null ? sliceAvailableOverride : backingAllocated;
+
+        String reason;
+        if (!programRecordPresent) {
+            reason = "program-record-missing";
+        } else if (!reflectedStandaloneBlockPresent) {
+            reason = "standalone-block-not-reflected";
+        } else if (virtualProgram.standaloneBackingSize <= 0) {
+            reason = "backing-size-zero";
+        } else if (virtualProgram.standaloneBackingData == null) {
+            reason = "backing-data-missing";
+        } else if (!sliceAvailable) {
+            reason = "slice-lookup-returned-null";
+        } else {
+            reason = "available";
+        }
+
+        if (STANDALONE_SLICE_TRACE_LOG_COUNT.incrementAndGet() <= MAX_STANDALONE_SLICE_TRACE_LOGS) {
+            LOGGER.info(
+                "StandaloneSliceTrace stage={} programId={} programName={} programRecordPresent={} reflectedStandaloneBlockPresent={} backingAllocated={} sliceAvailable={} activeUniformBlockCount={} standaloneFieldCount={} backingSize={} gpuBufferPresent={} dirty={} reason={}{}",
+                stage,
+                programId,
+                programName == null ? "unknown" : programName,
+                yesNo(programRecordPresent),
+                yesNo(reflectedStandaloneBlockPresent),
+                yesNo(backingAllocated),
+                yesNo(sliceAvailable),
+                programRecordPresent ? virtualProgram.activeUniformBlocks.size() : 0,
+                programRecordPresent ? virtualProgram.standaloneFieldsByLocation.size() : 0,
+                programRecordPresent ? virtualProgram.standaloneBackingSize : 0,
+                yesNo(programRecordPresent && virtualProgram.standaloneGpuBuffer != null && !virtualProgram.standaloneGpuBuffer.isClosed()),
+                yesNo(programRecordPresent && virtualProgram.standaloneDirty),
+                reason,
+                note == null ? "" : " note=" + note
+            );
+        }
+    }
+
+    private static String yesNo(boolean value) {
+        return value ? "yes" : "no";
+    }
+
+    private void logStandaloneProgramKeyTrace(String stage, int programId, @Nullable VirtualProgram virtualProgram, @Nullable String note) {
+        java.util.ArrayList<Integer> keys = new java.util.ArrayList<>(virtualPrograms.keySet());
+        java.util.Collections.sort(keys);
+        LOGGER.info(
+            "StandaloneLookupKeyTrace stage={} lookupType=program-id key={} keyHash={} mapSize={} containsExactKey={} nearestEntries={} lookupUses=program-id-int storeContainer=virtualPrograms virtualProgramIdentity={} note={}",
+            stage,
+            programId,
+            Integer.toHexString(Integer.hashCode(programId)),
+            virtualPrograms.size(),
+            yesNo(virtualPrograms.containsKey(programId)),
+            describeNearestProgramKeys(keys, programId),
+            virtualProgram != null ? System.identityHashCode(virtualProgram) : -1,
+            note == null ? "none" : note
+        );
+    }
+
+    private static String describeNearestProgramKeys(java.util.List<Integer> keys, int target) {
+        if (keys.isEmpty()) {
+            return "[]";
+        }
+
+        int insertionPoint = java.util.Collections.binarySearch(keys, target);
+        if (insertionPoint < 0) {
+            insertionPoint = -insertionPoint - 1;
+        }
+
+        int from = Math.max(0, insertionPoint - 3);
+        int to = Math.min(keys.size(), insertionPoint + 4);
+        return keys.subList(from, to).toString();
     }
 
     private void unregisterUniformLocationTokens(VirtualProgram virtualProgram) {
@@ -4981,16 +5102,95 @@ void main() {
 
     @Nullable
     public VulkanicBufferSlice getStandaloneUniformBufferSlice(CommandContext ctx, int program) {
+        boolean ctxIsVulkan = ctx instanceof VulkanCommandContext;
+        long ctxHandle = ctx != null ? ctx.getHandle() : 0L;
+        int sampledProgram = STANDALONE_LOOKUP_SAMPLE_PROGRAM.get();
+        boolean traceLookup = program == 5 || program == sampledProgram;
+        if (traceLookup) {
+            LOGGER.info(
+                "StandaloneLookupDecisionTrace stage=enter programId={} sampledProgram={} commandBufferContextIsVulkan={} commandBufferHandle={} commandBufferExists={}",
+                program,
+                sampledProgram,
+                yesNo(ctxIsVulkan),
+                ctxHandle,
+                yesNo(ctxIsVulkan && ctxHandle != 0L)
+            );
+        }
+
         requireVulkanCommandBufferHandle("getStandaloneUniformBufferSlice", ctx);
+
         VirtualProgram virtualProgram = virtualPrograms.get(program);
+        if (traceLookup) {
+            logStandaloneProgramKeyTrace("lookup-request", program, virtualProgram, "getStandaloneUniformBufferSlice-enter");
+            java.util.ArrayList<Integer> keys = new java.util.ArrayList<>(virtualPrograms.keySet());
+            java.util.Collections.sort(keys);
+            LOGGER.info(
+                "StandaloneLookupDecisionTrace stage=virtual-program programId={} containsExactKey={} mapSize={} nearestEntries={} virtualProgramPresent={} reflectedStandaloneBlockPresent={} backingSize={} backingDataPresent={} backingBufferPresent={}",
+                program,
+                yesNo(virtualPrograms.containsKey(program)),
+                virtualPrograms.size(),
+                describeNearestProgramKeys(keys, program),
+                yesNo(virtualProgram != null),
+                yesNo(virtualProgram != null
+                    && virtualProgram.activeUniformBlocks.contains(VulkanicAPI.generatedStandaloneUniformBlockName())
+                    && !virtualProgram.standaloneFieldsByLocation.isEmpty()),
+                virtualProgram != null ? virtualProgram.standaloneBackingSize : 0,
+                yesNo(virtualProgram != null && virtualProgram.standaloneBackingData != null),
+                yesNo(virtualProgram != null
+                    && virtualProgram.standaloneGpuBuffer != null
+                    && !virtualProgram.standaloneGpuBuffer.isClosed())
+            );
+        }
+
         if (virtualProgram == null || virtualProgram.standaloneBackingSize <= 0) {
+            if (traceLookup) {
+                String nullReason = virtualProgram == null
+                    ? "virtual-program-missing"
+                    : "standalone-backing-size-zero-or-negative";
+                logStandaloneProgramKeyTrace("lookup-miss", program, virtualProgram, nullReason);
+                LOGGER.info(
+                    "StandaloneLookupDecisionTrace stage=return-null programId={} reason={} sliceCreationAttempted=no",
+                    program,
+                    nullReason
+                );
+            }
+            logStandaloneSliceTraceInternal(program, "slice-lookup", null, virtualProgram, false, true, null);
             return null;
         }
 
         synchronized (virtualProgram) {
             java.nio.ByteBuffer backingData = virtualProgram.standaloneBackingData;
             if (backingData == null || virtualProgram.standaloneBackingSize <= 0) {
+                if (traceLookup) {
+                    String nullReason = backingData == null
+                        ? "standalone-backing-data-null"
+                        : "standalone-backing-size-zero-or-negative";
+                    logStandaloneProgramKeyTrace("lookup-miss", program, virtualProgram, nullReason);
+                    LOGGER.info(
+                        "StandaloneLookupDecisionTrace stage=return-null programId={} reason={} sliceCreationAttempted=no backingBufferPresent={} dirty={}",
+                        program,
+                        nullReason,
+                        yesNo(virtualProgram.standaloneGpuBuffer != null && !virtualProgram.standaloneGpuBuffer.isClosed()),
+                        yesNo(virtualProgram.standaloneDirty)
+                    );
+                }
+                logStandaloneSliceTraceInternal(program, "slice-lookup", null, virtualProgram, false, true, null);
                 return null;
+            }
+
+            boolean backingBufferPresent = virtualProgram.standaloneGpuBuffer != null && !virtualProgram.standaloneGpuBuffer.isClosed();
+            boolean recreateBackingBuffer = virtualProgram.standaloneGpuBuffer == null
+                || virtualProgram.standaloneGpuBuffer.isClosed()
+                || virtualProgram.standaloneDirty;
+            if (traceLookup) {
+                LOGGER.info(
+                    "StandaloneLookupDecisionTrace stage=slice-creation-check programId={} sliceCreationAttempted=yes recreateBackingBuffer={} backingBufferPresent={} dirty={} backingSize={} backingDataPresent=yes",
+                    program,
+                    yesNo(recreateBackingBuffer),
+                    yesNo(backingBufferPresent),
+                    yesNo(virtualProgram.standaloneDirty),
+                    virtualProgram.standaloneBackingSize
+                );
             }
 
             if (virtualProgram.standaloneGpuBuffer == null
@@ -5012,7 +5212,23 @@ void main() {
                 }
             }
 
-            return new VulkanicBufferSlice(virtualProgram.standaloneGpuBuffer, 0, virtualProgram.standaloneBackingSize);
+            VulkanicBufferSlice slice = new VulkanicBufferSlice(virtualProgram.standaloneGpuBuffer, 0, virtualProgram.standaloneBackingSize);
+            if (program != 5) {
+                STANDALONE_LOOKUP_SAMPLE_PROGRAM.compareAndSet(-1, program);
+            }
+            int sampledAfterCreate = STANDALONE_LOOKUP_SAMPLE_PROGRAM.get();
+            if (program == 5 || program == sampledAfterCreate) {
+                logStandaloneProgramKeyTrace("slice-created", program, virtualProgram, "new VulkanicBufferSlice from virtualPrograms map entry");
+                LOGGER.info(
+                    "StandaloneLookupDecisionTrace stage=return-slice programId={} sampledProgram={} sliceAvailable=yes sliceId={} sliceLength={} reason=success",
+                    program,
+                    sampledAfterCreate,
+                    System.identityHashCode(slice),
+                    virtualProgram.standaloneBackingSize
+                );
+            }
+            logStandaloneSliceTraceInternal(program, "slice-lookup", null, virtualProgram, true, true, null);
+            return slice;
         }
     }
 
