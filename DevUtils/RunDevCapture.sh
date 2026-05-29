@@ -291,6 +291,47 @@ extract_client_arg_assignment() {
         | sed -E "s/(^|[[:space:]])${key}=//"
 }
 
+upsert_property() {
+    local file_path="$1"
+    local key="$2"
+    local value="$3"
+
+    if [[ ! -f "$file_path" ]]; then
+        return 1
+    fi
+
+    if grep -q "^${key}=" "$file_path"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file_path"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$file_path"
+    fi
+}
+
+apply_iris_overrides() {
+    local iris_file="$RUN_DIR/config/iris.properties"
+    local normalized_enable=""
+
+    if [[ ! -f "$iris_file" ]]; then
+        echo "iris_override_note=iris.properties_missing" >> "$META_LOG"
+        return
+    fi
+
+    if [[ -n "$CLIENT_ARG_ENABLE_SHADERS" ]]; then
+        normalized_enable="$(printf '%s' "$CLIENT_ARG_ENABLE_SHADERS" | tr '[:upper:]' '[:lower:]')"
+        if [[ "$normalized_enable" == "true" || "$normalized_enable" == "false" ]]; then
+            upsert_property "$iris_file" "enableShaders" "$normalized_enable"
+            echo "iris_override_enable_shaders=$normalized_enable" >> "$META_LOG"
+        else
+            echo "iris_override_enable_shaders_ignored=$CLIENT_ARG_ENABLE_SHADERS" >> "$META_LOG"
+        fi
+    fi
+
+    if [[ -n "$CLIENT_ARG_SHADER_PACK" ]]; then
+        upsert_property "$iris_file" "shaderPack" "$CLIENT_ARG_SHADER_PACK"
+        echo "iris_override_shader_pack=$CLIENT_ARG_SHADER_PACK" >> "$META_LOG"
+    fi
+}
+
 resolve_shader_pack_path() {
     local shader_pack_name="$1"
     local candidate
@@ -511,6 +552,8 @@ IRIS_PROPERTY_ENABLE_SHADERS="$(extract_property_value "$CONFIG_BEFORE_DIR/iris.
 IRIS_PROPERTY_COLOR_SPACE="$(extract_property_value "$CONFIG_BEFORE_DIR/iris.properties" colorSpace || true)"
 EFFECTIVE_SHADER_PACK="${CLIENT_ARG_SHADER_PACK:-$IRIS_PROPERTY_SHADER_PACK}"
 EFFECTIVE_ENABLE_SHADERS="${CLIENT_ARG_ENABLE_SHADERS:-$IRIS_PROPERTY_ENABLE_SHADERS}"
+
+apply_iris_overrides
 
 collect_system_snapshot
 collect_git_snapshot
