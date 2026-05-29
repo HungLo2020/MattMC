@@ -9,6 +9,7 @@ import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTextureView;
+import net.irisshaders.iris.Iris;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gl.buffer.GlMutableBuffer;
 import net.sodium.client.gl.device.CommandList;
@@ -153,9 +154,16 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         boolean indexedRenderingEnabled
     ) {
 		super.begin(terrainPass, parameters);
-		SharedChunkProgramOverrides.pushActiveProgram(this.activeProgram);
+        boolean shadersEnabled = Iris.getIrisConfig().areShadersEnabled();
+        if (shadersEnabled) {
+            SharedChunkProgramOverrides.pushActiveProgram(this.activeProgram);
+        } else {
+            SharedChunkProgramOverrides.clearActiveProgram();
+        }
 		ChunkShaderInterface shader = this.activeProgram.getInterface();
-		RenderPassChunkShaderInterface renderPassShader = shader instanceof RenderPassChunkShaderInterface sharedShader ? sharedShader : null;
+        RenderPassChunkShaderInterface renderPassShader = shadersEnabled && shader instanceof RenderPassChunkShaderInterface sharedShader
+            ? sharedShader
+            : null;
 		shader.setProjectionMatrix(matrices.projection());
 		shader.setModelViewMatrix(matrices.modelView());
 
@@ -265,6 +273,11 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 			if (renderPassShader != null) {
 				renderPassShader.bindRenderPassResources(renderPass, terrainPass);
 			}
+            if (!Iris.getIrisConfig().areShadersEnabled()) {
+                // In no-shader mode, active shared chunk overrides expect u_BlockTex/u_LightTex aliases.
+                renderPass.bindSampler("u_BlockTex", terrainPass.getAtlas());
+                renderPass.bindSampler("u_LightTex", net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
+            }
             renderPass.setUniform("SodiumChunkParams", chunkParams);
 
             for (PreparedRegionDraw preparedDraw : preparedDraws) {
