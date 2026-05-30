@@ -2656,6 +2656,8 @@ public class Items {
 	public static final Item VAULT = registerBlock(Blocks.VAULT);
 	// WorldEdit wand item
 	public static final Item WAND = registerItem("wand", WandItem::new, new Item.Properties().stacksTo(1));
+	// Trowel: randomly places a block from the player's hotbar on right-click
+	public static final Item TROWEL = registerItem("trowel", TrowelItem::new, new Item.Properties().stacksTo(1));
 	
 	public static final Item OMINOUS_BOTTLE = registerItem(
 		"ominous_bottle",
