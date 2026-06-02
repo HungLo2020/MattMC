@@ -6635,11 +6635,16 @@ void main() {
     // =====================================================================
 
     /**
-     * No-op. Vulkan subpass attachments define color outputs at render-pass
-     * creation time; runtime draw-buffer selection is not supported.
+     * Records draw-buffer selection on the currently bound draw framebuffer so
+     * framebuffer-backed render passes can resolve the intended color outputs.
      */
     public void drawBuffers(CommandContext ctx, int[] buffers) {
         requireVulkanCommandBufferHandle("drawBuffers", ctx);
+        VirtualFramebufferState state = virtualFramebufferStates.get(boundDrawFbo);
+        if (state != null) {
+            state.setDrawBuffers(buffers);
+            pendingDrawBuffer = state.getPrimaryDrawBuffer();
+        }
     }
 
     // =====================================================================
