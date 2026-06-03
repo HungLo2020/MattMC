@@ -47,9 +47,26 @@ public final class SharedChunkProgramOverrides {
 		ACTIVE_CHUNK_PROGRAM.remove();
 	}
 
+	public static boolean isTracked(RenderPipeline pipeline) {
+		return TRACKED_PIPELINES.contains(pipeline);
+	}
+
+	public static boolean isTrackedSolidPipeline(RenderPipeline pipeline) {
+		return isTracked(pipeline) && pipeline.getLocation().toString().contains("sodium:pipeline/shared_chunk_solid");
+	}
+
+	public static int activeProgramHandle(RenderPipeline pipeline) {
+		if (!isTracked(pipeline)) {
+			return -1;
+		}
+
+		var activeProgram = ACTIVE_CHUNK_PROGRAM.get();
+		return activeProgram == null ? -1 : activeProgram.handle();
+	}
+
 	@Nullable
 	public static GlProgram createOverride(RenderPipeline pipeline) {
-		if (!TRACKED_PIPELINES.contains(pipeline)) {
+		if (!isTracked(pipeline)) {
 			return null;
 		}
 

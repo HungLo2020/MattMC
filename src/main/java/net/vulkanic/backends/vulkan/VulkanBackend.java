@@ -6533,21 +6533,24 @@ void main() {
         return virtualSyncs.contains(sync) ? 0x911A /* GL_ALREADY_SIGNALED */ : 0x911B /* GL_TIMEOUT_EXPIRED */;
     }
 
-    /**
-     * Returns {@code -1}. Vertex input attribute locations in Vulkan are set
-     * statically in the pipeline {@code VkPipelineVertexInputStateCreateInfo}.
-     */
     public int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
         requireVulkanCommandBufferHandle("getAttributeLocation", ctx);
-        return -1;
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        if (virtualProgram == null || name == null) {
+            return -1;
+        }
+
+        return virtualProgram.attributeLocationsByName.getOrDefault(name.toString(), -1);
     }
 
-    /**
-     * No-op. Attribute locations in Vulkan are fixed in SPIR-V / pipeline state
-     * and cannot be changed at runtime.
-     */
     public void setAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
         requireVulkanCommandBufferHandle("setAttributeLocation", ctx);
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        if (virtualProgram == null || name == null) {
+            return;
+        }
+
+        virtualProgram.attributeLocationsByName.put(name.toString(), index);
     }
 
     /**
@@ -7093,6 +7096,7 @@ void main() {
 
     private static final class VirtualProgram {
         private final Set<Integer> attachedShaderIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        private final Map<String, Integer> attributeLocationsByName = new ConcurrentHashMap<>();
         private final Map<String, Integer> uniformLocationTokensByName = new ConcurrentHashMap<>();
         private volatile List<String> activeUniformNames = List.of();
         private volatile List<ReflectedUniform> activeUniforms = List.of();

@@ -11,6 +11,8 @@ public final class VulkanicSpirvModule {
     private final String entryPoint;
     private final String sourceName;
     private final String compilerName;
+    private final boolean sourceContainsIrisFragData0;
+    private final boolean sourceIsSodiumCoreVulkanChunk;
     private final byte[] spirvBytes;
 
     public VulkanicSpirvModule(
@@ -20,10 +22,24 @@ public final class VulkanicSpirvModule {
         String sourceName,
         String compilerName
     ) {
+        this(stage, entryPoint, spirvBytes, sourceName, compilerName, false, "sodium:core/vulkan_chunk".equals(sourceName));
+    }
+
+    public VulkanicSpirvModule(
+        VulkanicShaderStage stage,
+        String entryPoint,
+        byte[] spirvBytes,
+        String sourceName,
+        String compilerName,
+        boolean sourceContainsIrisFragData0,
+        boolean sourceIsSodiumCoreVulkanChunk
+    ) {
         this.stage = Objects.requireNonNull(stage, "stage must not be null");
         this.entryPoint = Objects.requireNonNull(entryPoint, "entryPoint must not be null");
         this.sourceName = Objects.requireNonNull(sourceName, "sourceName must not be null");
         this.compilerName = Objects.requireNonNull(compilerName, "compilerName must not be null");
+        this.sourceContainsIrisFragData0 = sourceContainsIrisFragData0;
+        this.sourceIsSodiumCoreVulkanChunk = sourceIsSodiumCoreVulkanChunk;
         this.spirvBytes = Objects.requireNonNull(spirvBytes, "spirvBytes must not be null").clone();
     }
 
@@ -41,6 +57,14 @@ public final class VulkanicSpirvModule {
 
     public String compilerName() {
         return compilerName;
+    }
+
+    public boolean sourceContainsIrisFragData0() {
+        return sourceContainsIrisFragData0;
+    }
+
+    public boolean sourceIsSodiumCoreVulkanChunk() {
+        return sourceIsSodiumCoreVulkanChunk;
     }
 
     public byte[] spirvBytes() {
@@ -64,12 +88,14 @@ public final class VulkanicSpirvModule {
             && entryPoint.equals(other.entryPoint)
             && sourceName.equals(other.sourceName)
             && compilerName.equals(other.compilerName)
+            && sourceContainsIrisFragData0 == other.sourceContainsIrisFragData0
+            && sourceIsSodiumCoreVulkanChunk == other.sourceIsSodiumCoreVulkanChunk
             && Arrays.equals(spirvBytes, other.spirvBytes);
     }
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(stage, entryPoint, sourceName, compilerName);
+        int result = Objects.hash(stage, entryPoint, sourceName, compilerName, sourceContainsIrisFragData0, sourceIsSodiumCoreVulkanChunk);
         result = 31 * result + Arrays.hashCode(spirvBytes);
         return result;
     }

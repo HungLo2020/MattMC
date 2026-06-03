@@ -84,7 +84,17 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
                 );
             }
 
-            return new VulkanicSpirvModule(stage, entryPoint, spirvBytes, sourceName, compilerExecutable);
+            return new VulkanicSpirvModule(
+                stage,
+                entryPoint,
+                spirvBytes,
+                sourceName,
+                compilerExecutable,
+                shaderSource.contains("iris_FragData0"),
+                "sodium:core/vulkan_chunk".equals(sourceName)
+                    || shaderSource.contains("sodium_core_vulkan_chunk")
+                    || shaderSource.contains("sodium:core/vulkan_chunk")
+            );
         } catch (IOException exception) {
             throw new IllegalStateException(
                 "Failed to invoke SPIR-V compiler for '" + sourceName + "'. Ensure glslangValidator is installed"

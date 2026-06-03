@@ -28,6 +28,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.pbr.TextureTracker;
+import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineResourceBindings;
@@ -76,6 +77,7 @@ public class GlCommandEncoder implements CommandEncoder {
 	private static int DEBUG_CUSTOM_PASS_BIND_LOGS = 0;
 	private static int DEBUG_SODIUM_SAMPLER_BIND_LOGS = 0;
 	private static int DEBUG_PARTICLE_VULKAN_BIND_LOGS = 0;
+	private static int DEBUG_SHARED_CHUNK_LIVE_DESCRIPTOR_LOGS = 0;
 	private static final java.util.Set<String> WARNED_INCOMPLETE_CUSTOM_PASS_KEYS = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
 	private CommandContext commandContext() {
@@ -291,6 +293,66 @@ public class GlCommandEncoder implements CommandEncoder {
 		return handle;
 	}
 
+	@Nullable
+	private static PipelineDescriptor createSharedChunkLiveDescriptor(
+		CommandContext ctx,
+		RenderPipeline renderPipeline,
+		PipelineDescriptor baseDescriptor,
+		int activeProgramHandle
+	) {
+		if (!SharedChunkProgramOverrides.isTrackedSolidPipeline(renderPipeline) || activeProgramHandle <= 0) {
+			return null;
+		}
+
+		PipelineDescriptor liveDescriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(ctx, baseDescriptor, activeProgramHandle);
+		return liveDescriptor != null && liveDescriptor.hasSpirvModules() ? liveDescriptor : null;
+	}
+
+	@Nullable
+	private static net.vulkanic.VulkanicSpirvModule findFragmentModule(PipelineDescriptor descriptor) {
+		for (net.vulkanic.VulkanicSpirvModule module : descriptor.getSpirvModules()) {
+			if (module.stage() == net.vulkanic.VulkanicShaderStage.FRAGMENT) {
+				return module;
+			}
+		}
+
+		return null;
+	}
+
+	private static void logSharedChunkLiveDescriptorSelection(
+		RenderPipeline renderPipeline,
+		int activeProgramHandle,
+		String descriptorSource,
+		PipelineDescriptor descriptor,
+		@Nullable net.vulkanic.PipelineHandle pipelineHandle,
+		String fallbackReason
+	) {
+		if (!SharedChunkProgramOverrides.isTrackedSolidPipeline(renderPipeline) || DEBUG_SHARED_CHUNK_LIVE_DESCRIPTOR_LOGS >= 16) {
+			return;
+		}
+
+		DEBUG_SHARED_CHUNK_LIVE_DESCRIPTOR_LOGS++;
+		net.vulkanic.VulkanicSpirvModule fragmentModule = findFragmentModule(descriptor);
+		String fragmentSourceName = fragmentModule != null ? fragmentModule.sourceName() : renderPipeline.getFragmentShader().toString();
+		boolean fragmentContainsIrisFragData0 = fragmentModule != null && fragmentModule.sourceContainsIrisFragData0();
+		boolean fragmentIsSodiumCoreVulkanChunk = fragmentModule != null
+			? fragmentModule.sourceIsSodiumCoreVulkanChunk()
+			: "sodium:core/vulkan_chunk".equals(fragmentSourceName);
+		LOGGER.info(
+			"MATTMC_SHARED_CHUNK_LIVE_DESCRIPTOR diagnostic#{} pipelineLocation={} activeProgramPresent={} activeProgramHandle={} descriptorSource={} finalBoundFragmentSourceName={} finalBoundFragmentContainsIrisFragData0={} finalBoundFragmentIsSodiumCoreVulkanChunk={} resolvedPipelineHandle={} fallbackReason={}",
+			DEBUG_SHARED_CHUNK_LIVE_DESCRIPTOR_LOGS,
+			renderPipeline.getLocation(),
+			activeProgramHandle > 0,
+			activeProgramHandle,
+			descriptorSource,
+			fragmentSourceName,
+			fragmentContainsIrisFragData0,
+			fragmentIsSodiumCoreVulkanChunk,
+			pipelineHandle,
+			fallbackReason
+		);
+	}
+
 	private record PipelineResourceBindingSubmission(
 		PipelineDescriptor descriptor,
 		PipelineResourceBindings bindings,
@@ -356,10 +418,15 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	@Nullable
 	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass) {
+		return this.buildPipelineResourceBindings(glRenderPass, glRenderPass.pipeline.descriptor());
+	}
+
+	@Nullable
+	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass, PipelineDescriptor descriptor) {
 		long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
 		GlRenderPipeline glRenderPipeline = glRenderPass.pipeline;
 		RenderPipeline pipelineInfo = glRenderPipeline.info();
-		PipelineDescriptor.ResourceLayout layout = glRenderPipeline.descriptor().getResourceLayout();
+		PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
 		java.util.List<PipelineDescriptor.ResourceBinding> layoutBindings = layout.bindings();
 		int layoutBindingCount = layoutBindings.size();
 		java.util.Map<String, PipelineResourceBindings.SamplerBinding> samplerBindings = new java.util.HashMap<>(layoutBindingCount);
@@ -538,8 +605,8 @@ public class GlCommandEncoder implements CommandEncoder {
 
 		boolean completeCoverage = boundResources.size() == layout.bindings().size();
 		PipelineDescriptor submissionDescriptor = completeCoverage
-			? glRenderPipeline.descriptor()
-			: glRenderPipeline.descriptor().withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
+			? descriptor
+			: descriptor.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
 		if (logParticleSamplers) {
 			LOGGER.info(
 				"Particle Vulkan sampler submission pipeline={} boundResources={} totalBindings={} completeCoverage={}",
@@ -1682,7 +1749,32 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.prepareTexelBufferBindingsForVulkanDescriptors(glRenderPass, ctx);
 			this.prepareSamplerBindingsForVulkanDescriptors(glRenderPass, ctx);
 		}
-		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass);
+		PipelineDescriptor baseDescriptor = glRenderPass.pipeline.descriptor();
+		PipelineDescriptor selectedDescriptor = baseDescriptor;
+		String descriptorSource = "precompiled RenderPipeline";
+		String fallbackReason = "";
+		int activeSharedChunkProgramHandle = !ctx.isImmediate()
+			? SharedChunkProgramOverrides.activeProgramHandle(renderPipeline)
+			: -1;
+		if (!ctx.isImmediate() && activeSharedChunkProgramHandle > 0 && SharedChunkProgramOverrides.isTrackedSolidPipeline(renderPipeline)) {
+			try {
+				PipelineDescriptor liveDescriptor = createSharedChunkLiveDescriptor(
+					ctx,
+					renderPipeline,
+					baseDescriptor,
+					activeSharedChunkProgramHandle
+				);
+				if (liveDescriptor != null) {
+					selectedDescriptor = liveDescriptor;
+					descriptorSource = "live active Iris program";
+				} else {
+					fallbackReason = "live descriptor unavailable";
+				}
+			} catch (RuntimeException exception) {
+				fallbackReason = "live descriptor failed: " + exception.getClass().getSimpleName() + ": " + exception.getMessage();
+			}
+		}
+		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass, selectedDescriptor);
 		if (!ctx.isImmediate() && DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PIPELINE_BIND_LOGS < 80) {
 			DEBUG_PIPELINE_BIND_LOGS++;
 			LOGGER.info(
@@ -1713,6 +1805,34 @@ public class GlCommandEncoder implements CommandEncoder {
 					)
 					: VulkanicAPI.resolvePipelineHandle(
 						glRenderPass.pipeline.info(), submissionDescriptor);
+				if (pipelineHandle == null && "live active Iris program".equals(descriptorSource)) {
+					fallbackReason = fallbackReason.isEmpty()
+						? "live pipeline handle resolution failed"
+						: fallbackReason + "; live pipeline handle resolution failed";
+					descriptorSource = "precompiled RenderPipeline";
+					submission = this.buildPipelineResourceBindings(glRenderPass, baseDescriptor);
+					if (submission != null) {
+						submissionDescriptor = submission.descriptor();
+						pipelineHandle = useFramebufferCompatiblePipeline
+							? VulkanicAPI.resolvePipelineHandle(
+								glRenderPass.pipeline.info(),
+								submissionDescriptor,
+								glRenderPass.getFramebuffer()
+							)
+							: VulkanicAPI.resolvePipelineHandle(
+								glRenderPass.pipeline.info(), submissionDescriptor);
+					}
+				}
+				if (submission != null) {
+					logSharedChunkLiveDescriptorSelection(
+						renderPipeline,
+						activeSharedChunkProgramHandle,
+						descriptorSource,
+						submissionDescriptor,
+						pipelineHandle,
+						fallbackReason
+					);
+				}
 				if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PIPELINE_BIND_LOGS < 80) {
 					DEBUG_PIPELINE_BIND_LOGS++;
 					LOGGER.info(
