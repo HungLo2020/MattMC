@@ -131,7 +131,7 @@ public class Main {
 		OptionSpec<Integer> optionSpec13 = optionParser.accepts("proxyPort").withRequiredArg().defaultsTo("8080").ofType(Integer.class);
 		OptionSpec<String> optionSpec14 = optionParser.accepts("proxyUser").withRequiredArg();
 		OptionSpec<String> optionSpec15 = optionParser.accepts("proxyPass").withRequiredArg();
-		OptionSpec<String> optionSpec16 = optionParser.accepts("username").withRequiredArg().defaultsTo("Player" + System.currentTimeMillis() % 1000L);
+		OptionSpec<String> optionSpec16 = optionParser.accepts("username").withRequiredArg().defaultsTo("steve");
 		OptionSpec<Void> optionSpec17 = optionParser.accepts("offlineDeveloperMode");
 		OptionSpec<String> optionSpec18 = optionParser.accepts("uuid").withRequiredArg();
 		OptionSpec<String> optionSpec19 = optionParser.accepts("xuid").withOptionalArg().defaultsTo("");
@@ -208,18 +208,14 @@ public class Main {
 			String string6 = parseArgument(optionSet, optionSpec28);
 			File file2 = optionSet.has(optionSpec10) ? parseArgument(optionSet, optionSpec10) : new File(file, "assets/");
 			File file3 = optionSet.has(optionSpec11) ? parseArgument(optionSet, optionSpec11) : new File(file, "resourcepacks/");
-			UUID uUID = hasValidUuid(optionSpec18, optionSet, logger)
-				? UndashedUuid.fromStringLenient(optionSpec18.value(optionSet))
-				: UUIDUtil.createOfflinePlayerUUID(optionSpec16.value(optionSet));
+			String playerName = readPlayerNameFromOptions(file, optionSpec16.value(optionSet));
+			UUID uUID = resolvePlayerUuid(optionSpec18, optionSet, logger, playerName);
 			String string7 = optionSet.has(optionSpec27) ? optionSpec27.value(optionSet) : null;
 			String string8 = optionSet.valueOf(optionSpec19);
 			String string9 = optionSet.valueOf(optionSpec20);
 			String string10 = parseArgument(optionSet, optionSpec5);
 			GameConfig.QuickPlayVariant quickPlayVariant = getQuickPlayVariant(optionSet, optionSpec6, optionSpec7, optionSpec8);
-			
-			// Read player name from options.txt, fallback to "steve" if not set
-			String playerName = readPlayerNameFromOptions(file);
-			
+
 			User user = new User(
 				playerName, uUID, optionSpec21.value(optionSet), emptyStringToEmptyOptional(string8), emptyStringToEmptyOptional(string9)
 			);
@@ -342,6 +338,12 @@ public class Main {
 		return optionSet.has(optionSpec) && isUuidValid(optionSpec, optionSet, logger);
 	}
 
+	private static UUID resolvePlayerUuid(OptionSpec<String> optionSpec, OptionSet optionSet, Logger logger, String playerName) {
+		return hasValidUuid(optionSpec, optionSet, logger)
+			? UndashedUuid.fromStringLenient(optionSpec.value(optionSet))
+			: UUIDUtil.createOfflinePlayerUUID(playerName);
+	}
+
 	private static boolean isUuidValid(OptionSpec<String> optionSpec, OptionSet optionSet, Logger logger) {
 		try {
 			UndashedUuid.fromStringLenient(optionSpec.value(optionSet));
@@ -354,16 +356,16 @@ public class Main {
 
 	/**
 	 * Read player name from options.txt file if it exists.
-	 * Returns "steve" as default if file doesn't exist or playerName is not set.
+	 * Returns the provided fallback if the file doesn't exist or playerName is not set.
 	 */
-	private static String readPlayerNameFromOptions(File gameDirectory) {
+	private static String readPlayerNameFromOptions(File gameDirectory, String fallbackName) {
 		File optionsFile = new File(gameDirectory, "options.txt");
 		if (!optionsFile.exists()) {
-			return "steve";
+			return fallbackName;
 		}
 
-		try {
-			Optional<String> playerNameLine = java.nio.file.Files.lines(optionsFile.toPath())
+		try (Stream<String> lines = java.nio.file.Files.lines(optionsFile.toPath())) {
+			Optional<String> playerNameLine = lines
 				.filter(line -> line.startsWith("playerName:"))
 				.findFirst();
 			
@@ -374,10 +376,10 @@ public class Main {
 				}
 			}
 		} catch (Exception e) {
-			// If we can't read the file, just use default
+			// If we can't read the file, just use the launch fallback.
 		}
 
-		return "steve";
+		return fallbackName;
 	}
 
 	static {
