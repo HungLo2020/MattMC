@@ -88,7 +88,7 @@ import org.lwjgl.vulkan.VkMemoryAllocateInfo;
 import org.lwjgl.vulkan.VkMemoryBarrier;
 import org.lwjgl.vulkan.VkMemoryRequirements;
 import org.lwjgl.vulkan.VkPhysicalDevice;
-import org.lwjgl.vulkan.VkPhysicalDeviceFeatures2;
+import org.lwjgl.vulkan.VkPhysicalDeviceFeatures;
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties;
 import org.lwjgl.vulkan.EXTAttachmentFeedbackLoopLayout;
 import org.lwjgl.vulkan.VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT;
@@ -7777,6 +7777,9 @@ void main() {
         private int physicalDeviceVendorId;
         private int physicalDeviceApiVersion = VK10.VK_API_VERSION_1_0;
         private String physicalDeviceName = "Vulkan GPU";
+        private boolean fillModeNonSolidSupported;
+        private boolean fillModeNonSolidEnabled;
+        private boolean warnedWireframeFallback;
         private boolean instanceProperties2ExtensionEnabled;
         private boolean presentIdExtensionEnabled;
         private boolean presentWaitExtensionEnabled;
@@ -8148,8 +8151,11 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 VkPhysicalDeviceProperties properties = VkPhysicalDeviceProperties.malloc(stack);
                 VK10.vkGetPhysicalDeviceProperties(device, properties);
+                VkPhysicalDeviceFeatures features = VkPhysicalDeviceFeatures.malloc(stack);
+                VK10.vkGetPhysicalDeviceFeatures(device, features);
                 physicalDeviceVendorId = properties.vendorID();
                 physicalDeviceApiVersion = properties.apiVersion();
+                fillModeNonSolidSupported = features.fillModeNonSolid();
                 minUniformBufferOffsetAlignment = Math.max(1L, properties.limits().minUniformBufferOffsetAlignment());
                 int maxPerStageSamplers = properties.limits().maxPerStageDescriptorSamplers();
                 int maxPerStageSampledImages = properties.limits().maxPerStageDescriptorSampledImages();
@@ -8257,8 +8263,6 @@ void main() {
                     if (featureChainHead == MemoryUtil.NULL) {
                         featureChainHead = feedbackLoopFeatures.address();
                     } else {
-                        // Walk to end of chain and append
-                        VkPhysicalDevicePresentWaitFeaturesKHR tailCheck = null;
                         // Append by chaining onto presentId or presentWait if present, else set as head
                         // Since chain building above is linear, the last-added item has pNext=0;
                         // we re-chain by just setting featureChainHead to feedbackLoopFeatures
@@ -8268,10 +8272,16 @@ void main() {
                     }
                 }
 
+                VkPhysicalDeviceFeatures enabledFeatures = VkPhysicalDeviceFeatures.calloc(stack);
+                if (fillModeNonSolidSupported) {
+                    enabledFeatures.fillModeNonSolid(true);
+                }
+
                 VkDeviceCreateInfo createInfo = VkDeviceCreateInfo.calloc(stack)
                     .sType$Default()
                     .pQueueCreateInfos(queueCreateInfos)
-                    .ppEnabledExtensionNames(enabledExtensions);
+                    .ppEnabledExtensionNames(enabledExtensions)
+                    .pEnabledFeatures(enabledFeatures);
                 if (featureChainHead != MemoryUtil.NULL) {
                     createInfo.pNext(featureChainHead);
                 }
@@ -8279,6 +8289,7 @@ void main() {
                 org.lwjgl.PointerBuffer pDevice = stack.mallocPointer(1);
                 checkVk("vkCreateDevice", VK10.vkCreateDevice(physicalDevice, createInfo, null, pDevice));
                 logicalDevice = new VkDevice(pDevice.get(0), physicalDevice, createInfo);
+                fillModeNonSolidEnabled = fillModeNonSolidSupported;
                 presentIdExtensionEnabled = presentCompletionSupport.presentId;
                 presentWaitExtensionEnabled = presentCompletionSupport.presentWait;
                 attachmentFeedbackLoopLayoutEnabled = hasFeedbackLoopLayout;
@@ -15081,9 +15092,9 @@ void main() {
                         .sType$Default()
                         .depthClampEnable(false)
                         .rasterizerDiscardEnable(false)
-                        .polygonMode(toVkPolygonMode(portableState.polygonMode()))
+                        .polygonMode(toVkPolygonMode(portableState.polygonMode(), portableState.location().toString()))
                         .lineWidth(1.0f)
-						.cullMode(VK10.VK_CULL_MODE_NONE)
+                        .cullMode(VK10.VK_CULL_MODE_NONE)
                         .frontFace(VK10.VK_FRONT_FACE_CLOCKWISE)
                         .depthBiasEnable(hasBias)
                         .depthBiasConstantFactor(portableState.depthBiasConstant())
@@ -15529,10 +15540,24 @@ void main() {
             };
         }
 
-        private static int toVkPolygonMode(PolygonMode mode) {
+        private int toVkPolygonMode(PolygonMode mode, String pipelineLocation) {
             return switch (mode) {
                 case FILL -> VK10.VK_POLYGON_MODE_FILL;
-                case WIREFRAME -> VK10.VK_POLYGON_MODE_LINE;
+                case WIREFRAME -> {
+                    if (fillModeNonSolidEnabled) {
+                        yield VK10.VK_POLYGON_MODE_LINE;
+                    }
+                    if (!warnedWireframeFallback) {
+                        warnedWireframeFallback = true;
+                        LOGGER.warn(
+                            "Vulkan physical device '{}' does not have fillModeNonSolid enabled; "
+                                + "falling back to filled polygon mode for wireframe pipelines. First pipeline: {}",
+                            physicalDeviceName,
+                            pipelineLocation
+                        );
+                    }
+                    yield VK10.VK_POLYGON_MODE_FILL;
+                }
             };
         }
 
@@ -16037,6 +16062,9 @@ void main() {
                 VK10.vkDestroyInstance(instance, null);
                 instance = null;
                 physicalDevice = null;
+                fillModeNonSolidSupported = false;
+                fillModeNonSolidEnabled = false;
+                warnedWireframeFallback = false;
             }
         }
 

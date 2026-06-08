@@ -107,6 +107,18 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should destroy per-image render-finished semaphores with swapchain resources");
         assertFalse(vulkanBackendSource.contains("swapchainRenderFinishedSemaphores[currentFrameSyncIndex]"),
             "Vulkan backend must not reuse present wait semaphores by frame slot across different swapchain images");
+        assertTrue(vulkanBackendSource.contains("vkGetPhysicalDeviceFeatures(device, features)"),
+            "Vulkan backend should query core physical-device feature support before device creation");
+        assertTrue(vulkanBackendSource.contains("enabledFeatures.fillModeNonSolid(true)"),
+            "Vulkan backend should enable fillModeNonSolid when the selected device supports it");
+        assertTrue(vulkanBackendSource.contains(".pEnabledFeatures(enabledFeatures)"),
+            "Vulkan backend should pass requested core features to vkCreateDevice");
+        assertTrue(vulkanBackendSource.contains("toVkPolygonMode(portableState.polygonMode(), portableState.location().toString())"),
+            "Vulkan backend should map polygon mode with pipeline context for diagnostics");
+        assertTrue(vulkanBackendSource.contains("fillModeNonSolidEnabled"),
+            "Vulkan backend should track whether non-solid fill mode was actually enabled");
+        assertTrue(vulkanBackendSource.contains("falling back to filled polygon mode for wireframe pipelines"),
+            "Vulkan backend should avoid invalid VK_POLYGON_MODE_LINE when fillModeNonSolid is unavailable");
         assertTrue(vulkanBackendSource.contains("if (spine.isFrameInProgress())"),
             "Vulkan beginCommandBuffer should route in-frame work to the frame command buffer lifecycle");
         assertTrue(vulkanBackendSource.contains("commandBufferHandle = spine.currentFrameCommandBufferHandle();"),
