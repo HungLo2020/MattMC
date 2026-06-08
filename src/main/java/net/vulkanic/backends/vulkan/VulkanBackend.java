@@ -7709,8 +7709,8 @@ void main() {
         private long descriptorPool;
         private long defaultDescriptorSampler;
         private final long[] swapchainImageAvailableSemaphores = new long[MAX_FRAMES_IN_FLIGHT];
-        private final long[] swapchainRenderFinishedSemaphores = new long[MAX_FRAMES_IN_FLIGHT];
         private final long[] swapchainFrameFences = new long[MAX_FRAMES_IN_FLIGHT];
+        private long[] swapchainRenderFinishedSemaphoresByImage = new long[0];
         private long[] swapchainImagesInFlight = new long[0];
         private int currentFrameSyncIndex;
         private long immediateSubmitFence;
@@ -8381,10 +8381,10 @@ void main() {
                     VK10.vkCreateSampler(logicalDevice, samplerInfo, null, pSampler));
                 defaultDescriptorSampler = pSampler.get(0);
 
-                VkSemaphoreCreateInfo semaphoreInfo = VkSemaphoreCreateInfo.calloc(stack).sType$Default();
                 VkFenceCreateInfo frameFenceInfo = VkFenceCreateInfo.calloc(stack)
                     .sType$Default()
                     .flags(VK10.VK_FENCE_CREATE_SIGNALED_BIT);
+                VkSemaphoreCreateInfo semaphoreInfo = VkSemaphoreCreateInfo.calloc(stack).sType$Default();
                 java.nio.LongBuffer pSemaphore = stack.mallocLong(1);
                 java.nio.LongBuffer pFrameFence = stack.mallocLong(1);
                 for (int frameIndex = 0; frameIndex < MAX_FRAMES_IN_FLIGHT; frameIndex++) {
@@ -8393,12 +8393,6 @@ void main() {
                         VK10.vkCreateSemaphore(logicalDevice, semaphoreInfo, null, pSemaphore)
                     );
                     swapchainImageAvailableSemaphores[frameIndex] = pSemaphore.get(0);
-
-                    checkVk(
-                        "vkCreateSemaphore(swapchainRenderFinished[" + frameIndex + "])",
-                        VK10.vkCreateSemaphore(logicalDevice, semaphoreInfo, null, pSemaphore)
-                    );
-                    swapchainRenderFinishedSemaphores[frameIndex] = pSemaphore.get(0);
 
                     checkVk(
                         "vkCreateFence(swapchainFrame[" + frameIndex + "])",
@@ -12008,6 +12002,7 @@ void main() {
 
         private void createSwapchain(long oldSwapchainHandle) {
             long newSwapchainHandle = VK10.VK_NULL_HANDLE;
+            long[] newRenderFinishedSemaphores = new long[0];
             try (MemoryStack stack = stackPush()) {
                 VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc(stack);
                 checkVk("vkGetPhysicalDeviceSurfaceCapabilitiesKHR",
@@ -12117,6 +12112,7 @@ void main() {
                     newSwapchainHandle,
                     chosenFormat.format()
                 );
+                newRenderFinishedSemaphores = createSwapchainRenderFinishedSemaphores(imageResources.imageHandles.size());
 
                 List<Long> previousImageViewHandles = new ArrayList<>(swapchainImageViewHandles);
 
@@ -12145,6 +12141,9 @@ void main() {
                     swapchainImageLayouts.add(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
                 }
                 swapchainImagesInFlight = new long[swapchainImageCount];
+                destroySwapchainRenderFinishedSemaphores();
+                swapchainRenderFinishedSemaphoresByImage = newRenderFinishedSemaphores;
+                newRenderFinishedSemaphores = new long[0];
 
                 LOGGER.info(
                     "Created Vulkan swapchain: extent={}x{}, images={}, format=0x{}, presentMode=0x{}, usage=0x{}, windowHandle=0x{}",
@@ -12160,8 +12159,32 @@ void main() {
                 if (newSwapchainHandle != VK10.VK_NULL_HANDLE) {
                     KHRSwapchain.vkDestroySwapchainKHR(logicalDevice, newSwapchainHandle, null);
                 }
+                destroySemaphores(newRenderFinishedSemaphores);
                 throw exception;
             }
+        }
+
+        private long[] createSwapchainRenderFinishedSemaphores(int imageCount) {
+            if (imageCount <= 0) {
+                throw new IllegalStateException("Cannot create render-finished semaphores without swapchain images.");
+            }
+
+            long[] semaphores = new long[imageCount];
+            try (MemoryStack stack = stackPush()) {
+                VkSemaphoreCreateInfo semaphoreInfo = VkSemaphoreCreateInfo.calloc(stack).sType$Default();
+                java.nio.LongBuffer pSemaphore = stack.mallocLong(1);
+                for (int imageIndex = 0; imageIndex < imageCount; imageIndex++) {
+                    checkVk(
+                        "vkCreateSemaphore(swapchainRenderFinishedByImage[" + imageIndex + "])",
+                        VK10.vkCreateSemaphore(logicalDevice, semaphoreInfo, null, pSemaphore)
+                    );
+                    semaphores[imageIndex] = pSemaphore.get(0);
+                }
+            } catch (RuntimeException exception) {
+                destroySemaphores(semaphores);
+                throw exception;
+            }
+            return semaphores;
         }
 
         private SwapchainImageResources createSwapchainImageResources(
@@ -12231,6 +12254,25 @@ void main() {
                     VK10.vkDestroyImageView(logicalDevice, imageViewHandle, null);
                 }
             }
+        }
+
+        private void destroySemaphores(long[] semaphores) {
+            if (logicalDevice == null || semaphores == null) {
+                return;
+            }
+
+            for (int i = 0; i < semaphores.length; i++) {
+                long semaphore = semaphores[i];
+                if (semaphore != VK10.VK_NULL_HANDLE) {
+                    VK10.vkDestroySemaphore(logicalDevice, semaphore, null);
+                    semaphores[i] = VK10.VK_NULL_HANDLE;
+                }
+            }
+        }
+
+        private void destroySwapchainRenderFinishedSemaphores() {
+            destroySemaphores(swapchainRenderFinishedSemaphoresByImage);
+            swapchainRenderFinishedSemaphoresByImage = new long[0];
         }
 
         private void createSwapchainPresentTargets(List<Long> imageViewHandles,
@@ -12349,6 +12391,7 @@ void main() {
         private void destroyTrackedSwapchainImageViews() {
             destroySwapchainPresentTargets();
             destroySwapchainImageViews(new ArrayList<>(swapchainImageViewHandles));
+            destroySwapchainRenderFinishedSemaphores();
             swapchainImageViewHandles.clear();
             swapchainImageHandles.clear();
             swapchainImageLayouts.clear();
@@ -12653,7 +12696,6 @@ void main() {
         private boolean hasValidFrameSyncPrimitives() {
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 if (swapchainImageAvailableSemaphores[i] == VK10.VK_NULL_HANDLE
-                    || swapchainRenderFinishedSemaphores[i] == VK10.VK_NULL_HANDLE
                     || swapchainFrameFences[i] == VK10.VK_NULL_HANDLE) {
                     return false;
                 }
@@ -12664,6 +12706,14 @@ void main() {
             if (swapchainImagesInFlight.length != swapchainImageCount) {
                 return false;
             }
+            if (swapchainRenderFinishedSemaphoresByImage.length != swapchainImageCount) {
+                return false;
+            }
+            for (long semaphore : swapchainRenderFinishedSemaphoresByImage) {
+                if (semaphore == VK10.VK_NULL_HANDLE) {
+                    return false;
+                }
+            }
             return true;
         }
 
@@ -12671,11 +12721,20 @@ void main() {
             return swapchainImageAvailableSemaphores[currentFrameSyncIndex];
         }
 
-        private long currentSwapchainRenderFinishedSemaphore() {
-            long semaphoreHandle = swapchainRenderFinishedSemaphores[currentFrameSyncIndex];
+        private long acquiredSwapchainRenderFinishedSemaphore() {
+            if (acquiredSwapchainImageIndex < 0
+                || acquiredSwapchainImageIndex >= swapchainRenderFinishedSemaphoresByImage.length) {
+                throw new IllegalStateException(
+                    "Render-finished semaphore is unavailable for acquired swapchain image "
+                        + acquiredSwapchainImageIndex + " (semaphores="
+                        + swapchainRenderFinishedSemaphoresByImage.length + ")."
+                );
+            }
+            long semaphoreHandle = swapchainRenderFinishedSemaphoresByImage[acquiredSwapchainImageIndex];
             if (semaphoreHandle == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException(
-                    "Render-finished semaphore for sync slot " + currentFrameSyncIndex + " is unavailable."
+                    "Render-finished semaphore for acquired swapchain image "
+                        + acquiredSwapchainImageIndex + " is unavailable."
                 );
             }
             return semaphoreHandle;
@@ -13052,7 +13111,7 @@ void main() {
 
                 VkPresentInfoKHR presentInfo = VkPresentInfoKHR.calloc(stack)
                     .sType$Default()
-                    .pWaitSemaphores(stack.longs(currentSwapchainRenderFinishedSemaphore()))
+                    .pWaitSemaphores(stack.longs(acquiredSwapchainRenderFinishedSemaphore()))
                     .swapchainCount(1)
                     .pSwapchains(pSwapchains)
                     .pImageIndices(pImageIndices);
@@ -13839,7 +13898,7 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 long frameFence = currentSwapchainFrameFence();
                 long imageAvailableSemaphore = currentSwapchainImageAvailableSemaphore();
-                long renderFinishedSemaphore = currentSwapchainRenderFinishedSemaphore();
+                long renderFinishedSemaphore = acquiredSwapchainRenderFinishedSemaphore();
 
                 VkSubmitInfo.Buffer submitInfos = VkSubmitInfo.calloc(1, stack)
                     .sType$Default()
@@ -13865,7 +13924,7 @@ void main() {
             try (MemoryStack stack = stackPush()) {
                 long frameFence = currentSwapchainFrameFence();
                 long imageAvailableSemaphore = currentSwapchainImageAvailableSemaphore();
-                long renderFinishedSemaphore = currentSwapchainRenderFinishedSemaphore();
+                long renderFinishedSemaphore = acquiredSwapchainRenderFinishedSemaphore();
 
                 checkVk(
                     "vkEndCommandBuffer(frame[" + currentFrameSyncIndex + "])",
@@ -15932,10 +15991,6 @@ void main() {
                     if (swapchainImageAvailableSemaphores[frameIndex] != VK10.VK_NULL_HANDLE) {
                         VK10.vkDestroySemaphore(logicalDevice, swapchainImageAvailableSemaphores[frameIndex], null);
                         swapchainImageAvailableSemaphores[frameIndex] = VK10.VK_NULL_HANDLE;
-                    }
-                    if (swapchainRenderFinishedSemaphores[frameIndex] != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroySemaphore(logicalDevice, swapchainRenderFinishedSemaphores[frameIndex], null);
-                        swapchainRenderFinishedSemaphores[frameIndex] = VK10.VK_NULL_HANDLE;
                     }
                     if (swapchainFrameFences[frameIndex] != VK10.VK_NULL_HANDLE) {
                         VK10.vkDestroyFence(logicalDevice, swapchainFrameFences[frameIndex], null);

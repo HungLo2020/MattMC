@@ -99,6 +99,14 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should dedicate separate command buffers to swapchain frame submission");
         assertTrue(vulkanBackendSource.contains("ensureCurrentFrameCommandBufferRecording"),
             "Vulkan backend should begin frame-presentation command recording on a dedicated frame buffer path");
+        assertTrue(vulkanBackendSource.contains("createSwapchainRenderFinishedSemaphores(imageResources.imageHandles.size())"),
+            "Vulkan backend should create render-finished semaphores from the swapchain image count");
+        assertTrue(vulkanBackendSource.contains("swapchainRenderFinishedSemaphoresByImage[acquiredSwapchainImageIndex]"),
+            "Vulkan backend should signal/present with a render-finished semaphore owned by the acquired swapchain image");
+        assertTrue(vulkanBackendSource.contains("destroySwapchainRenderFinishedSemaphores()"),
+            "Vulkan backend should destroy per-image render-finished semaphores with swapchain resources");
+        assertFalse(vulkanBackendSource.contains("swapchainRenderFinishedSemaphores[currentFrameSyncIndex]"),
+            "Vulkan backend must not reuse present wait semaphores by frame slot across different swapchain images");
         assertTrue(vulkanBackendSource.contains("if (spine.isFrameInProgress())"),
             "Vulkan beginCommandBuffer should route in-frame work to the frame command buffer lifecycle");
         assertTrue(vulkanBackendSource.contains("commandBufferHandle = spine.currentFrameCommandBufferHandle();"),
