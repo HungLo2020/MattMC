@@ -5023,55 +5023,46 @@ public class VulkanicAPI {
             return baseLayout;
         }
 
-        java.util.Map<String, PipelineDescriptor.ResourceBinding> reflectedByName = new java.util.LinkedHashMap<>();
-        for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedBindings) {
-            reflectedByName.put(reflectedBinding.name(), reflectedBinding);
+        java.util.Map<String, PipelineDescriptor.ResourceBinding> baseByName = new java.util.LinkedHashMap<>();
+        for (PipelineDescriptor.ResourceBinding baseBinding : baseBindings) {
+            baseByName.put(baseBinding.name(), baseBinding);
         }
 
         java.util.List<PipelineDescriptor.ResourceBinding> merged = new java.util.ArrayList<>(baseBindings.size() + reflectedBindings.size());
         java.util.Set<String> seenNames = new java.util.LinkedHashSet<>();
         int nextBindingIndex = 0;
 
-        for (PipelineDescriptor.ResourceBinding baseBinding : baseBindings) {
-            seenNames.add(baseBinding.name());
-            nextBindingIndex = Math.max(nextBindingIndex, baseBinding.binding() + 1);
-
-            PipelineDescriptor.ResourceBinding reflectedBinding = reflectedByName.remove(baseBinding.name());
-            if (reflectedBinding != null && reflectedBinding.type() == baseBinding.type()) {
-                java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
-                mergedStages.addAll(reflectedBinding.stages());
-                merged.add(baseBinding.withStages(java.util.Set.copyOf(mergedStages)));
-            } else if (reflectedBinding != null) {
-                // Keep the pipeline's deterministic set/binding slot, but trust reflected resource
-                // type metadata so Vulkan descriptor layout types always match shader declarations.
-                java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
-                mergedStages.addAll(reflectedBinding.stages());
-                merged.add(new PipelineDescriptor.ResourceBinding(
-                    baseBinding.set(),
-                    baseBinding.binding(),
-                    baseBinding.name(),
-                    reflectedBinding.type(),
-                    reflectedBinding.type() == PipelineDescriptor.ResourceType.TEXEL_BUFFER
-                        ? reflectedBinding.textureFormat()
-                        : null,
-                    java.util.Set.copyOf(mergedStages)));
-            } else {
-                merged.add(baseBinding);
-            }
-        }
-
-        for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedByName.values()) {
-            if (!seenNames.add(reflectedBinding.name())) {
-                continue;
+        for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedBindings) {
+            PipelineDescriptor.ResourceBinding baseBinding = baseByName.get(reflectedBinding.name());
+            java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(reflectedBinding.stages());
+            if (baseBinding != null) {
+                mergedStages.addAll(baseBinding.stages());
             }
 
             merged.add(new PipelineDescriptor.ResourceBinding(
                 reflectedBinding.set(),
-                nextBindingIndex,
+                reflectedBinding.binding(),
                 reflectedBinding.name(),
                 reflectedBinding.type(),
                 reflectedBinding.textureFormat(),
-                reflectedBinding.stages()
+                java.util.Set.copyOf(mergedStages)
+            ));
+            seenNames.add(reflectedBinding.name());
+            nextBindingIndex = Math.max(nextBindingIndex, reflectedBinding.binding() + 1);
+        }
+
+        for (PipelineDescriptor.ResourceBinding baseBinding : baseBindings) {
+            if (!seenNames.add(baseBinding.name())) {
+                continue;
+            }
+
+            merged.add(new PipelineDescriptor.ResourceBinding(
+                baseBinding.set(),
+                nextBindingIndex,
+                baseBinding.name(),
+                baseBinding.type(),
+                baseBinding.textureFormat(),
+                baseBinding.stages()
             ));
             nextBindingIndex++;
         }

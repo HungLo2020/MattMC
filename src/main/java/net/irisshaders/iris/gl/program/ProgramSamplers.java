@@ -131,12 +131,17 @@ public class ProgramSamplers {
 	@SuppressWarnings("null")
 	public void bindToRenderPass(RenderPass renderPass) {
 		for (NamedSamplerBinding binding : namedSamplerBindings) {
-			GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(binding.textureUnit());
-			int textureId = 0;
-			if (textureView == null) {
+			int suppliedTextureId = binding.texture() != null ? binding.texture().getAsInt() : 0;
+			int textureId = suppliedTextureId;
+			if (textureId <= 0) {
 				textureId = IrisRenderSystem.getTextureBinding(binding.textureUnit());
-				if (textureId > 0) {
-					textureView = TextureTracker.INSTANCE.getTextureView(textureId);
+			}
+
+			GpuTextureView textureView = textureId > 0 ? TextureTracker.INSTANCE.getTextureView(textureId) : null;
+			if (textureView == null && suppliedTextureId <= 0) {
+				textureView = TextureTracker.INSTANCE.getShaderTexture(binding.textureUnit());
+				if (textureView != null) {
+					textureId = VulkanicAPI.isVulkanBackendSelected() ? net.vulkanic.VulkanicCoreAPI.textureId(textureView) : textureId;
 				}
 			}
 
@@ -214,7 +219,7 @@ public class ProgramSamplers {
 				// Set up this sampler uniform to use this particular texture unit.
 				//System.out.println("Binding external sampler " + name + " to texture unit " + textureUnit);
 				calls.add(new GlUniform1iCall(location, textureUnit));
-				namedSamplers.add(new NamedSamplerBinding(samplerName, textureUnit));
+				namedSamplers.add(new NamedSamplerBinding(samplerName, textureUnit, null));
 			}
 		}
 
@@ -276,7 +281,7 @@ public class ProgramSamplers {
 
 				// Set up this sampler uniform to use this particular texture unit.
 				calls.add(new GlUniform1iCall(location, nextUnit));
-				namedSamplers.add(new NamedSamplerBinding(samplerName, nextUnit));
+				namedSamplers.add(new NamedSamplerBinding(samplerName, nextUnit, texture));
 
 				// And mark this texture unit as used.
 				used = true;
@@ -305,7 +310,7 @@ public class ProgramSamplers {
 		}
 	}
 
-	private record NamedSamplerBinding(@Nonnull String name, int textureUnit) {
+	private record NamedSamplerBinding(@Nonnull String name, int textureUnit, IntSupplier texture) {
 	}
 
 	public static final class CustomTextureSamplerInterceptor implements SamplerHolder {

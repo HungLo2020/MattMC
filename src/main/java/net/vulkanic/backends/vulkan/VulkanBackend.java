@@ -1949,6 +1949,8 @@ void main() {
         }
 
         NativeSpine spine = nativeSpine;
+        reflectVirtualProgramResources(program, virtualProgram);
+
         List<String> issues = new ArrayList<>();
         List<VulkanicSpirvModule> linkedSpirvModules = new ArrayList<>();
         Set<VulkanicShaderStage> seenStages = new HashSet<>();
@@ -1967,7 +1969,7 @@ void main() {
                 issues.add("Multiple shaders attached for stage " + virtualShader.stage + ".");
             }
 
-            linkedSpirvModules.add(virtualShader.compiledModule);
+            linkedSpirvModules.add(createLinkedProgramModule(ctx, shaderId, virtualShader, virtualProgram));
 
             if (spine != null) {
                 try {
@@ -1989,10 +1991,83 @@ void main() {
             return;
         }
 
-        reflectVirtualProgramResources(program, virtualProgram);
         virtualProgram.linkedSpirvModules = List.copyOf(linkedSpirvModules);
         virtualProgram.linkStatus = true;
         virtualProgram.infoLog = "";
+    }
+
+    private VulkanicSpirvModule createLinkedProgramModule(
+        CommandContext ctx,
+        int shaderId,
+        VirtualShader virtualShader,
+        VirtualProgram virtualProgram
+    ) {
+        String reboundSource = virtualShader.source;
+        if (virtualShader.stage == VulkanicShaderStage.VERTEX) {
+            for (Map.Entry<String, Integer> entry : virtualProgram.attributeLocationsByName.entrySet()) {
+                reboundSource = injectExplicitVertexInputLocation(reboundSource, entry.getKey(), entry.getValue());
+            }
+        }
+        reboundSource = injectExplicitReflectedResourceBindings(reboundSource, virtualProgram);
+
+        if (reboundSource.equals(virtualShader.source)) {
+            return virtualShader.compiledModule;
+        }
+
+        return compileSpirvModule(
+            ctx,
+            virtualShader.stage,
+            reboundSource,
+            "shader-" + shaderId,
+            "main"
+        );
+    }
+
+    private static String injectExplicitReflectedResourceBindings(String shaderSource, VirtualProgram virtualProgram) {
+        String reboundSource = shaderSource;
+        Set<String> seenNames = new java.util.LinkedHashSet<>();
+        int bindingIndex = 0;
+        boolean hasGeneratedStandaloneUniformBlock = false;
+
+        for (String blockName : virtualProgram.activeUniformBlocks) {
+            if (blockName == null || blockName.isBlank() || blockName.startsWith("gl_")) {
+                continue;
+            }
+            if (!seenNames.add(blockName)) {
+                continue;
+            }
+            if (VulkanicAPI.generatedStandaloneUniformBlockName().equals(blockName)) {
+                hasGeneratedStandaloneUniformBlock = true;
+                continue;
+            }
+            reboundSource = injectExplicitUniformBlockBinding(reboundSource, blockName, bindingIndex++);
+        }
+
+        for (ReflectedUniform uniform : virtualProgram.activeUniforms) {
+            Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
+                net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(uniform.legacyType());
+            if (reflectionType.isEmpty() || !reflectionType.get().isSampler()) {
+                continue;
+            }
+            String uniformName = uniform.name();
+            if (uniformName == null || uniformName.isBlank() || uniformName.startsWith("gl_")) {
+                continue;
+            }
+            if (!seenNames.add(uniformName)) {
+                continue;
+            }
+            reboundSource = injectExplicitNamedUniformBinding(reboundSource, uniformName, bindingIndex++);
+        }
+
+        if (hasGeneratedStandaloneUniformBlock) {
+            reboundSource = injectExplicitUniformBlockBinding(
+                reboundSource,
+                VulkanicAPI.generatedStandaloneUniformBlockName(),
+                bindingIndex
+            );
+        }
+
+        return reboundSource;
     }
 
     public int getProgramParameter(CommandContext ctx, int program, int pname) {
@@ -5195,21 +5270,30 @@ void main() {
 
             if (virtualProgram.standaloneGpuBuffer == null
                 || virtualProgram.standaloneGpuBuffer.isClosed()
-                || virtualProgram.standaloneDirty) {
+                || virtualProgram.standaloneGpuBuffer.size() < virtualProgram.standaloneBackingSize) {
                 java.nio.ByteBuffer upload = backingData.duplicate();
                 upload.clear();
 
-                VulkanBuffer previous = virtualProgram.standaloneGpuBuffer;
                 virtualProgram.standaloneGpuBuffer = (VulkanBuffer) createManagedBuffer(
                     () -> "vulkan-standalone-uniforms-" + program,
-                    GpuBuffer.USAGE_UNIFORM,
+                    GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_MAP_WRITE,
                     upload
                 );
                 virtualProgram.standaloneDirty = false;
-
-                if (previous != null && !previous.isClosed()) {
-                    previous.close();
+            } else if (virtualProgram.standaloneDirty) {
+                try (VulkanicBuffer.MappedView mappedView = mapManagedBuffer(
+                    virtualProgram.standaloneGpuBuffer,
+                    false,
+                    true
+                )) {
+                    java.nio.ByteBuffer upload = backingData.duplicate();
+                    upload.clear();
+                    upload.limit(virtualProgram.standaloneBackingSize);
+                    java.nio.ByteBuffer target = mappedView.data().duplicate();
+                    target.position(0);
+                    target.put(upload);
                 }
+                virtualProgram.standaloneDirty = false;
             }
 
             VulkanicBufferSlice slice = new VulkanicBufferSlice(virtualProgram.standaloneGpuBuffer, 0, virtualProgram.standaloneBackingSize);
@@ -7338,6 +7422,7 @@ void main() {
         private final Set<Long> transientFramebufferHandles = ConcurrentHashMap.newKeySet();
         private final List<StagingBuffer> transientStagingBuffers = Collections.synchronizedList(new ArrayList<>());
         private final List<VulkanBuffer> transientDescriptorBuffers = Collections.synchronizedList(new ArrayList<>());
+        private final List<List<VulkanBuffer>> transientFrameDescriptorBuffers = createTransientDescriptorBufferBuckets();
         private final List<PendingLegacyTextureStorageDestroy> pendingLegacyTextureStorageDestroys = Collections.synchronizedList(new ArrayList<>());
     /** Tracks {@code VkPipeline} handles owned by live {@link VulkanPipelineHandle} objects. */
     private final Set<Long> managedVkPipelineHandles = ConcurrentHashMap.newKeySet();
@@ -7442,6 +7527,14 @@ void main() {
         private static final int FRAME_FENCE_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE = 180;
         private static final int PRIMARY_COMMAND_TIMEOUTS_BEFORE_SWAPCHAIN_RECREATE = 180;
         private static final long ACQUIRE_TIMEOUT_LOG_INTERVAL_NANOS = 5_000_000_000L;
+
+        private static List<List<VulkanBuffer>> createTransientDescriptorBufferBuckets() {
+            List<List<VulkanBuffer>> buckets = new ArrayList<>(MAX_FRAMES_IN_FLIGHT);
+            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                buckets.add(Collections.synchronizedList(new ArrayList<>()));
+            }
+            return buckets;
+        }
 
         private NativeSpine(VulkanBackend backend) {
             this.backend = Objects.requireNonNull(backend, "backend must not be null");
@@ -7652,10 +7745,9 @@ void main() {
                     .applicationVersion(VK10.VK_MAKE_API_VERSION(0, 0, 1, 0))
                     .pEngineName(stack.UTF8("Vulkanic"))
                     .engineVersion(VK10.VK_MAKE_API_VERSION(0, 0, 1, 0))
-                    // Request the baseline Vulkan API level directly during bring-up.
-                    // Probing VK.getInstanceVersionSupported() has proven unstable on this
-                    // Linux/NVIDIA path and is not required for successful instance creation.
-                    .apiVersion(VK10.VK_API_VERSION_1_0);
+                    // Vulkanic uses negative-height viewports for GL-style offscreen rendering.
+                    // That is core in Vulkan 1.1; requesting 1.0 makes validation reject those draws.
+                    .apiVersion(VK11.VK_API_VERSION_1_1);
 
                 VkInstanceCreateInfo createInfo = VkInstanceCreateInfo.calloc(stack)
                     .sType$Default()
@@ -8262,24 +8354,20 @@ void main() {
             if (wantsComparisonSampler && !canUseComparisonSampler && debugComparisonSamplerFallbackLogCount < 40) {
                 debugComparisonSamplerFallbackLogCount++;
                 LOGGER.warn(
-                    "Rejecting comparison sampler binding '{}' for non-depth texId={} vkFormat=0x{} aspectMask=0x{}.",
+                    "Downgrading comparison sampler binding '{}' to a non-comparison sampler because it is backed by non-depth texId={} vkFormat=0x{} aspectMask=0x{}.",
                     binding.name(),
                     sampledLegacyTexture != null ? sampledLegacyTexture.id : 0,
                     Integer.toHexString(sampledLegacyTexture != null ? sampledLegacyTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED),
                     Integer.toHexString(sampledLegacyTexture != null ? sampledLegacyTexture.aspectMask : 0)
                 );
             }
-            if (wantsComparisonSampler && !canUseComparisonSampler) {
-                throw new DescriptorValidationException(
-                    "Comparison sampler '" + binding.name() + "' has no depth-capable image binding"
-                );
-            }
+            boolean useComparisonSampler = wantsComparisonSampler && canUseComparisonSampler;
 
             DescriptorSamplerKey samplerKey = descriptorSamplerKey(
                 resolvedTextureView,
                 samplerBinding.textureUnit(),
-                wantsComparisonSampler
-                    ? (canUseComparisonSampler ? Boolean.TRUE : Boolean.FALSE)
+                binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
+                    ? useComparisonSampler
                     : binding.type() == PipelineDescriptor.ResourceType.SAMPLER ? Boolean.FALSE
                     : null
             );
@@ -12195,6 +12283,7 @@ void main() {
                     );
                 }
                 checkVk("vkWaitForFences(allSwapchainFrames)", waitResult);
+                destroyAllTransientFrameDescriptorBuffers();
                 consecutivePrimaryCommandFenceTimeouts = 0;
             }
         }
@@ -12333,6 +12422,7 @@ void main() {
                 }
 
                 checkVk("vkWaitForFences(swapchainFrame)", frameFenceWaitResult);
+                destroyTransientFrameDescriptorBuffers(currentFrameSyncIndex);
                 consecutiveFrameFenceTimeouts = 0;
 
                 java.nio.IntBuffer pImageIndex = stack.ints(0);
@@ -14174,6 +14264,26 @@ void main() {
             }
         }
 
+        private void destroyTransientFrameDescriptorBuffers(int frameIndex) {
+            if (frameIndex < 0 || frameIndex >= transientFrameDescriptorBuffers.size()) {
+                return;
+            }
+
+            List<VulkanBuffer> frameBuffers = transientFrameDescriptorBuffers.get(frameIndex);
+            synchronized (frameBuffers) {
+                if (!frameBuffers.isEmpty()) {
+                    new ArrayList<>(frameBuffers).forEach(VulkanBuffer::close);
+                    frameBuffers.clear();
+                }
+            }
+        }
+
+        private void destroyAllTransientFrameDescriptorBuffers() {
+            for (int frameIndex = 0; frameIndex < transientFrameDescriptorBuffers.size(); frameIndex++) {
+                destroyTransientFrameDescriptorBuffers(frameIndex);
+            }
+        }
+
         private VulkanBuffer materializeDescriptorUniformBuffer(
             String bindingName,
             VulkanicBufferSlice slice,
@@ -14196,7 +14306,11 @@ void main() {
                 slice.length(),
                 initialData
             );
-            transientDescriptorBuffers.add(transientBuffer);
+            if (frameInProgress) {
+                transientFrameDescriptorBuffers.get(currentFrameSyncIndex).add(transientBuffer);
+            } else {
+                transientDescriptorBuffers.add(transientBuffer);
+            }
             return transientBuffer;
         }
 
@@ -14789,7 +14903,8 @@ void main() {
         private static int toVkVertexElementFormat(VertexFormatElement element) {
             VertexFormatElement.Type type = element.type();
             int count = element.count();
-            boolean useIntegerFormat = element.usage() == VertexFormatElement.Usage.GENERIC || element.usage() == VertexFormatElement.Usage.UV;
+            boolean useIntegerFormat = (element.usage() == VertexFormatElement.Usage.GENERIC || element.usage() == VertexFormatElement.Usage.UV)
+                && !isSodiumIrisFloatAttribute(element);
 
             return switch (type) {
                 case FLOAT -> switch (count) {
@@ -14849,6 +14964,12 @@ void main() {
                         "Unsupported UINT vertex component count: " + count);
                 };
             };
+        }
+
+        private static boolean isSodiumIrisFloatAttribute(VertexFormatElement element) {
+            return (element.index() == 10 && element.type() == VertexFormatElement.Type.BYTE && element.count() == 4)
+                || (element.index() == 12 && element.type() == VertexFormatElement.Type.USHORT && element.count() == 2)
+                || (element.index() == 13 && element.type() == VertexFormatElement.Type.BYTE && element.count() == 4);
         }
 
         private static int toVkPrimitiveTopology(VertexFormat.Mode mode) {
@@ -15264,6 +15385,7 @@ void main() {
                 }
 
                 destroyTransientRenderPassResources();
+                destroyAllTransientFrameDescriptorBuffers();
 
                 if (!permanentRenderPassCache.isEmpty()) {
                     new ArrayList<>(permanentRenderPassCache.values()).forEach(rpHandle -> {
@@ -15384,4 +15506,3 @@ void main() {
         }
     }
 }
-

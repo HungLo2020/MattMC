@@ -263,6 +263,7 @@ public class FinalPassRenderer {
 				VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setIndexBuffer(indices, type);
 				renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
+				VulkanicAPI.setDynamicViewport(ctx, 0, 0, baseWidth, baseHeight);
 
 				finalPass.ensurePipelineState();
 				renderPass.iris$setCustomPass(finalPass);

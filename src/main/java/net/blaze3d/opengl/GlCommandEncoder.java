@@ -1598,71 +1598,86 @@ public class GlCommandEncoder implements CommandEncoder {
 
 				if (!ctx.isImmediate()) {
 					PipelineDescriptor customPipelineDescriptor = customPass.pipelineDescriptor();
-					if (customPipelineDescriptor != null) {
-						PipelineResourceBindingSubmission submission = this.buildCustomPassPipelineResourceBindings(
-							glRenderPass,
-							customPipelineDescriptor,
-							customPass.program()
+					if (customPipelineDescriptor == null) {
+						LOGGER.warn(
+							"Skipping Vulkan custom pass {} on framebuffer {} because no pipeline descriptor is available",
+							renderPipeline.getLocation(),
+							glRenderPass.getFramebuffer()
 						);
-						net.vulkanic.PipelineHandle customPipelineHandle = null;
-						if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_CUSTOM_PASS_BIND_LOGS < 40) {
-							DEBUG_CUSTOM_PASS_BIND_LOGS++;
-							LOGGER.info(
-								"Vulkan customPass bind#{} pipeline={} framebuffer={} baseLayoutBindings={} submissionBindings={} completeCoverage={} variantLayout={} resolvedPipelineHandle={}",
-								DEBUG_CUSTOM_PASS_BIND_LOGS,
-								renderPipeline.getLocation(),
-								glRenderPass.getFramebuffer(),
-								customPipelineDescriptor.getResourceLayout().bindings().size(),
-								submission.boundResourceCount(),
-								submission.completeCoverage(),
-								false,
-								false
-							);
-						}
-						if (!submission.completeCoverage()) {
-							LOGGER.info(
-								"CompositePassStandaloneLookupTrace stage=skip pipeline={} framebuffer={} programId={} boundResourceCount={} reflectedResourceCount={}",
-								renderPipeline.getLocation(),
-								glRenderPass.getFramebuffer(),
-								customPass.program().getProgramId(),
-								submission.boundResourceCount(),
-								customPipelineDescriptor.getResourceLayout().bindings().size()
-							);
-							VulkanicAPI.logStandaloneSliceTrace(
-								ctx,
-								"custom-pass-skip",
-								customPass.program().getProgramId(),
-								renderPipeline.getLocation().toString(),
-								"framebuffer=" + glRenderPass.getFramebuffer()
-							);
-							String customPassKey = renderPipeline.getLocation() + "#" + glRenderPass.getFramebuffer();
-							if (WARNED_INCOMPLETE_CUSTOM_PASS_KEYS.add(customPassKey)) {
-								java.util.List<String> missingResources = collectMissingCustomPassResources(
-									glRenderPass,
-									customPipelineDescriptor,
-									customPass.program()
-								);
-								LOGGER.warn(
-									"Skipping Vulkan custom pass {} on framebuffer {} because only {} of {} reflected resources were available for descriptor binding; missingResources={}",
-									renderPipeline.getLocation(),
-									glRenderPass.getFramebuffer(),
-									submission.boundResourceCount(),
-									customPipelineDescriptor.getResourceLayout().bindings().size(),
-									missingResources
-								);
-							}
-							return false;
-						}
-						customPipelineHandle = customPass.pipelineHandle(submission.descriptor());
-						if (customPipelineHandle != null) {
-							VulkanicAPI.bindPipelineResources(
-								ctx,
-								customPipelineHandle,
-								submission.descriptor(),
-								submission.bindings()
-							);
-						}
+						return false;
 					}
+
+					PipelineResourceBindingSubmission submission = this.buildCustomPassPipelineResourceBindings(
+						glRenderPass,
+						customPipelineDescriptor,
+						customPass.program()
+					);
+					if (!submission.completeCoverage()) {
+						LOGGER.info(
+							"CompositePassStandaloneLookupTrace stage=skip pipeline={} framebuffer={} programId={} boundResourceCount={} reflectedResourceCount={}",
+							renderPipeline.getLocation(),
+							glRenderPass.getFramebuffer(),
+							customPass.program().getProgramId(),
+							submission.boundResourceCount(),
+							customPipelineDescriptor.getResourceLayout().bindings().size()
+						);
+						VulkanicAPI.logStandaloneSliceTrace(
+							ctx,
+							"custom-pass-skip",
+							customPass.program().getProgramId(),
+							renderPipeline.getLocation().toString(),
+							"framebuffer=" + glRenderPass.getFramebuffer()
+						);
+						String customPassKey = renderPipeline.getLocation() + "#" + glRenderPass.getFramebuffer();
+						if (WARNED_INCOMPLETE_CUSTOM_PASS_KEYS.add(customPassKey)) {
+							java.util.List<String> missingResources = collectMissingCustomPassResources(
+								glRenderPass,
+								customPipelineDescriptor,
+								customPass.program()
+							);
+							LOGGER.warn(
+								"Skipping Vulkan custom pass {} on framebuffer {} because only {} of {} reflected resources were available for descriptor binding; missingResources={}",
+								renderPipeline.getLocation(),
+								glRenderPass.getFramebuffer(),
+								submission.boundResourceCount(),
+								customPipelineDescriptor.getResourceLayout().bindings().size(),
+								missingResources
+							);
+						}
+						return false;
+					}
+
+					net.vulkanic.PipelineHandle customPipelineHandle = customPass.pipelineHandle(submission.descriptor());
+					boolean resolvedPipelineHandle = customPipelineHandle != null && customPipelineHandle.isValid();
+					if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_CUSTOM_PASS_BIND_LOGS < 40) {
+						DEBUG_CUSTOM_PASS_BIND_LOGS++;
+						LOGGER.info(
+							"Vulkan customPass bind#{} pipeline={} framebuffer={} baseLayoutBindings={} submissionBindings={} completeCoverage={} variantLayout={} resolvedPipelineHandle={}",
+							DEBUG_CUSTOM_PASS_BIND_LOGS,
+							renderPipeline.getLocation(),
+							glRenderPass.getFramebuffer(),
+							customPipelineDescriptor.getResourceLayout().bindings().size(),
+							submission.boundResourceCount(),
+							submission.completeCoverage(),
+							!submission.descriptor().getResourceLayout().equals(customPipelineDescriptor.getResourceLayout()),
+							resolvedPipelineHandle
+						);
+					}
+					if (!resolvedPipelineHandle) {
+						LOGGER.warn(
+							"Skipping Vulkan custom pass {} on framebuffer {} because its pipeline handle could not be resolved",
+							renderPipeline.getLocation(),
+							glRenderPass.getFramebuffer()
+						);
+						return false;
+					}
+
+					VulkanicAPI.bindPipelineResources(
+						ctx,
+						customPipelineHandle,
+						submission.descriptor(),
+						submission.bindings()
+					);
 				}
 			
 			return true;
