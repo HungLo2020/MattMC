@@ -37,7 +37,7 @@ public class FormatAnalyzer {
 
 		int offset = 20; // Normal Sodium stuff
 
-		int blockIdOffset, normalOffset, midUvOffset, midBlockOffset;
+		int blockIdOffset, normalOffset, tangentOffset, midUvOffset, midBlockOffset;
 
 		if (blockId) {
 			blockIdOffset = offset;
@@ -49,8 +49,11 @@ public class FormatAnalyzer {
 		if (normal) {
 			normalOffset = offset;
 			offset += 4;
+			tangentOffset = offset;
+			offset += 4;
 		} else {
 			normalOffset = 0;
+			tangentOffset = 0;
 		}
 
 		if (midUV) {
@@ -79,6 +82,7 @@ public class FormatAnalyzer {
 
 		if (normal) {
 			VERTEX_FORMAT.addElement(IrisChunkMeshAttributes.NORMAL, 10, normalOffset);
+			VERTEX_FORMAT.addElement(IrisChunkMeshAttributes.TANGENT, 13, tangentOffset);
 		}
 
 		if (midUV) {
@@ -89,6 +93,6 @@ public class FormatAnalyzer {
 			VERTEX_FORMAT.addElement(IrisChunkMeshAttributes.MID_BLOCK, 14, midBlockOffset);
 		}
 
-		return classMap.computeIfAbsent(key, k -> new XHFPModelVertexType(VERTEX_FORMAT.build(), blockIdOffset, normalOffset, midUvOffset, midBlockOffset));
+		return classMap.computeIfAbsent(key, k -> new XHFPModelVertexType(VERTEX_FORMAT.build(), blockIdOffset, normalOffset, tangentOffset, midUvOffset, midBlockOffset));
 	}
 }

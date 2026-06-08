@@ -137,12 +137,25 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     }
 
     static String normalizeForVulkan(VulkanicShaderStage stage, String shaderSource) {
+        return normalizeForVulkan(stage, shaderSource, null, -1);
+    }
+
+    static String normalizeForVulkan(
+        VulkanicShaderStage stage,
+        String shaderSource,
+        List<String> standaloneUniformDeclarations,
+        int standaloneUniformBindingIndex
+    ) {
         if (shaderSource.isEmpty()) {
             return shaderSource;
         }
 
         String normalized = promoteVersionForVulkan(shaderSource);
-        normalized = rewriteStandaloneUniformsForVulkan(normalized);
+        normalized = rewriteStandaloneUniformsForVulkan(
+            normalized,
+            standaloneUniformDeclarations,
+            standaloneUniformBindingIndex
+        );
 
         if (stage != VulkanicShaderStage.VERTEX) {
             return normalized;
@@ -168,10 +181,14 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             + shaderSource.substring(versionMatcher.end(1));
     }
 
-    private static String rewriteStandaloneUniformsForVulkan(String shaderSource) {
+    private static String rewriteStandaloneUniformsForVulkan(
+        String shaderSource,
+        List<String> canonicalBlockMembers,
+        int standaloneUniformBindingIndex
+    ) {
         java.util.regex.Matcher matcher = STANDALONE_UNIFORM_DECLARATION_PATTERN.matcher(shaderSource);
         StringBuffer strippedSource = new StringBuffer();
-        List<String> blockMembers = new ArrayList<>();
+        List<String> localBlockMembers = new ArrayList<>();
 
         while (matcher.find()) {
             String declaration = matcher.group(1).trim();
@@ -186,16 +203,19 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
                 continue;
             }
 
-            blockMembers.add(declaration + ";");
+            localBlockMembers.add(declaration + ";");
             matcher.appendReplacement(strippedSource, "");
         }
 
         matcher.appendTail(strippedSource);
 
-        if (blockMembers.isEmpty()) {
+        if (localBlockMembers.isEmpty()) {
             return shaderSource;
         }
 
+        List<String> blockMembers = canonicalBlockMembers == null || canonicalBlockMembers.isEmpty()
+            ? localBlockMembers
+            : canonicalBlockMembers;
         int insertOffset = findUniformBlockInsertionOffset(strippedSource.toString());
         StringBuilder block = new StringBuilder();
         // Use the HIGHER of: (max explicit binding + 1) OR (count of non-explicitly-bound opaque
@@ -203,9 +223,12 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         // glslang assigns starting from binding 0 independently per resource type. Without this,
         // VulkanicStandaloneUniforms would get explicit binding 0 and collide with the first
         // auto-mapped sampler (e.g. colortex0 from Iris shaders that have no explicit bindings).
-        int maxExplicit = findNextExplicitBindingIndex(strippedSource.toString());
-        int nonExplicitOpaqueCount = countNonExplicitOpaqueUniforms(strippedSource.toString());
-        int standaloneBindingIndex = Math.max(maxExplicit, nonExplicitOpaqueCount);
+        int standaloneBindingIndex = standaloneUniformBindingIndex >= 0
+            ? standaloneUniformBindingIndex
+            : Math.max(
+                findNextExplicitBindingIndex(strippedSource.toString()),
+                countNonExplicitOpaqueUniforms(strippedSource.toString())
+            );
         block.append("layout(std140, set = 0, binding = ")
             .append(standaloneBindingIndex)
             .append(") uniform ")

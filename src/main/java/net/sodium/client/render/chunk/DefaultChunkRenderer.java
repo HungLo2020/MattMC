@@ -10,6 +10,8 @@ import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.textures.GpuTextureView;
 import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
+import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gl.buffer.GlMutableBuffer;
 import net.sodium.client.gl.device.CommandList;
@@ -174,6 +176,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         final boolean useIndexedTessellation = terrainPass.isTranslucent() && indexedRenderingEnabled;
 
         RenderTarget target = terrainPass.getTarget();
+        GlFramebuffer shaderFramebuffer = this.resolveShaderFramebuffer(terrainPass, shadersEnabled);
         GpuTextureView colorTargetView = VulkanicAPI.getOutputColorTextureOverride() != null
             ? VulkanicAPI.getOutputColorTextureOverride()
             : target.getColorTextureView();
@@ -259,13 +262,20 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
         int submittedDrawCommands = 0;
         long submittedIndexCount = 0L;
-        try (RenderPass renderPass = commandEncoder.createRenderPass(
-            () -> "Sodium chunk terrain",
-            colorTargetView,
-            OptionalInt.empty(),
-            depthTargetView,
-            OptionalDouble.empty()
-        )) {
+        try (RenderPass renderPass = shaderFramebuffer != null
+            ? commandEncoder.createRenderPass(
+                () -> "Sodium chunk terrain",
+                shaderFramebuffer.getId(),
+                shaderFramebuffer.hasDepthAttachment()
+            )
+            : commandEncoder.createRenderPass(
+                () -> "Sodium chunk terrain",
+                colorTargetView,
+                OptionalInt.empty(),
+                depthTargetView,
+                OptionalDouble.empty()
+            )
+        ) {
             VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setPipeline(SodiumChunkRenderPipelines.forPass(terrainPass, renderPassShader));
             renderPass.bindSampler("Sampler0", terrainPass.getAtlas());
@@ -322,6 +332,14 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 			SharedChunkProgramOverrides.clearActiveProgram();
 			super.end(terrainPass);
 		}
+    }
+
+    private GlFramebuffer resolveShaderFramebuffer(TerrainRenderPass terrainPass, boolean shadersEnabled) {
+        if (!shadersEnabled || !(Iris.getPipelineManager().getPipelineNullable() instanceof IrisRenderingPipeline irisRenderingPipeline)) {
+            return null;
+        }
+
+        return irisRenderingPipeline.getSodiumPrograms().getFramebuffer(terrainPass);
     }
 
     @Override

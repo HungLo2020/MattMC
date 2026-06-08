@@ -300,7 +300,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		PipelineDescriptor baseDescriptor,
 		int activeProgramHandle
 	) {
-		if (!SharedChunkProgramOverrides.isTrackedSolidPipeline(renderPipeline) || activeProgramHandle <= 0) {
+		if (!SharedChunkProgramOverrides.isTracked(renderPipeline) || activeProgramHandle <= 0) {
 			return null;
 		}
 
@@ -327,7 +327,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		@Nullable net.vulkanic.PipelineHandle pipelineHandle,
 		String fallbackReason
 	) {
-		if (!SharedChunkProgramOverrides.isTrackedSolidPipeline(renderPipeline) || DEBUG_SHARED_CHUNK_LIVE_DESCRIPTOR_LOGS >= 16) {
+		if (!SharedChunkProgramOverrides.isTracked(renderPipeline) || DEBUG_SHARED_CHUNK_LIVE_DESCRIPTOR_LOGS >= 16) {
 			return;
 		}
 
@@ -1771,7 +1771,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		int activeSharedChunkProgramHandle = !ctx.isImmediate()
 			? SharedChunkProgramOverrides.activeProgramHandle(renderPipeline)
 			: -1;
-		if (!ctx.isImmediate() && activeSharedChunkProgramHandle > 0 && SharedChunkProgramOverrides.isTrackedSolidPipeline(renderPipeline)) {
+		if (!ctx.isImmediate() && activeSharedChunkProgramHandle > 0 && SharedChunkProgramOverrides.isTracked(renderPipeline)) {
 			try {
 				PipelineDescriptor liveDescriptor = createSharedChunkLiveDescriptor(
 					ctx,

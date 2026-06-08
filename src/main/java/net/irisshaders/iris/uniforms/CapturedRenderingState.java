@@ -33,7 +33,7 @@ public class CapturedRenderingState {
 	}
 
 	public void setGbufferModelView(Matrix4fc gbufferModelView) {
-		this.gbufferModelView = gbufferModelView;
+		this.gbufferModelView = new Matrix4f(gbufferModelView);
 	}
 
 	public Matrix4fc getGbufferProjection() {

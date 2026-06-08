@@ -31,15 +31,17 @@ public class XHFPTerrainVertex implements ChunkVertexEncoder {
 	private final Vector4f tangent = new Vector4f(0.0f, 1.0f, 0.0f, 1.0f);
 	private final int blockIdOffset;
 	private final int normalOffset;
+	private final int tangentOffset;
 	private final int midBlockOffset;
 	private final int midUvOffset;
 	private final int stride;
 	private final Vector2f normEncoded = new Vector2f();
 	private final Vector2f tangEncoded = new Vector2f();
 
-	public XHFPTerrainVertex(int blockIdOffset, int normalOffset, int midUvOffset, int midBlockOffset, int stride) {
+	public XHFPTerrainVertex(int blockIdOffset, int normalOffset, int tangentOffset, int midUvOffset, int midBlockOffset, int stride) {
 		this.blockIdOffset = blockIdOffset;
 		this.normalOffset = normalOffset;
+		this.tangentOffset = tangentOffset;
 		this.midUvOffset = midUvOffset;
 		this.midBlockOffset = midBlockOffset;
 		this.stride = stride;
@@ -115,6 +117,7 @@ public class XHFPTerrainVertex implements ChunkVertexEncoder {
 		int midUV = XHFPModelVertexType.encodeOld(texCentroidU, texCentroidV);
 
 		int finalNorm;
+		int finalTangent;
 		if (normalOffset != 0) {
 			NormalHelper.computeFaceNormalManual(normal,
 				vertices[0].x, vertices[0].y, vertices[0].z,
@@ -126,8 +129,10 @@ public class XHFPTerrainVertex implements ChunkVertexEncoder {
 			NormalHelper.octahedronEncode(normEncoded, normal.x, normal.y, normal.z);
 			NormalHelper.tangentEncode(tangEncoded, this.tangent);
 			finalNorm = NormI8.pack(normEncoded.x, normEncoded.y, tangEncoded.x, tangEncoded.y);
+			finalTangent = NormI8.pack(this.tangent.x, this.tangent.y, this.tangent.z, this.tangent.w);
 		} else {
 			finalNorm = DEFAULT_NORMAL;
+			finalTangent = NormI8.pack(0.0f, 1.0f, 0.0f, 1.0f);
 		}
 
 		for (int i = 0; i < 4; i++) {
@@ -164,6 +169,10 @@ public class XHFPTerrainVertex implements ChunkVertexEncoder {
 
 			if (normalOffset != 0) {
 				MemoryUtil.memPutInt(ptr + normalOffset, finalNorm);
+			}
+
+			if (tangentOffset != 0) {
+				MemoryUtil.memPutInt(ptr + tangentOffset, finalTangent);
 			}
 
 			ptr += stride;
