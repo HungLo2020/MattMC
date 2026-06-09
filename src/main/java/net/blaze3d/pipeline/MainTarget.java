@@ -34,8 +34,8 @@ public class MainTarget extends RenderTarget {
 		if (this.colorTexture != null && this.depthTexture != null) {
 			this.colorTexture.setTextureFilter(FilterMode.NEAREST, false);
 			this.colorTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
-			this.colorTexture.setTextureFilter(FilterMode.NEAREST, false);
-			this.colorTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
+			this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);
+			this.depthTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
 			this.width = dimension.width;
 			this.height = dimension.height;
 		} else {

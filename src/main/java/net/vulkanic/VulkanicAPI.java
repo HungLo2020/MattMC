@@ -651,6 +651,7 @@ public class VulkanicAPI {
     public static final int GL_UNSIGNED_INT_8_8_8_8_REV = 0x8367;
     public static final int GL_UNSIGNED_INT_10_10_10_2 = 0x8036;
     public static final int GL_UNSIGNED_INT_2_10_10_10_REV = 0x8368;
+    public static final int GL_UNSIGNED_INT_10F_11F_11F_REV = 0x8C3B;
     public static final int GL_UNSIGNED_INT_24_8 = 0x84FA;
     public static final int GL_FLOAT_32_UNSIGNED_INT_24_8_REV = 0x8DAD;
     

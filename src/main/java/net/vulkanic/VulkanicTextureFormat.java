@@ -11,6 +11,12 @@ public enum VulkanicTextureFormat {
     RGBA8(4),
     /** 4-component RGBA, 16-bit floating-point channels. */
     RGBA16F(8),
+    /** 4-component RGBA, 8-bit signed-normalized channels. */
+    RGBA8_SNORM(4),
+    /** Packed unsigned floating-point R11/G11/B10 color. */
+    R11F_G11F_B10F(4),
+    /** 1-component red, 32-bit floating point. */
+    RED32F(4),
     /** 4-component BGRA, 8 bits per channel. */
     BGRA8(4),
     /** 1-component red, 8 bits (unsigned normalized). */
@@ -33,7 +39,14 @@ public enum VulkanicTextureFormat {
 
     /** Returns true if this format has a color component. */
     public boolean hasColorAspect() {
-        return this == RGBA8 || this == RGBA16F || this == BGRA8 || this == RED8 || this == RED8I;
+        return this == RGBA8
+            || this == RGBA16F
+            || this == RGBA8_SNORM
+            || this == R11F_G11F_B10F
+            || this == RED32F
+            || this == BGRA8
+            || this == RED8
+            || this == RED8I;
     }
 
     /** Returns true if this format has a depth component. */

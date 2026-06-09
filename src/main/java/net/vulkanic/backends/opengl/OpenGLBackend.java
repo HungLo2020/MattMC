@@ -3263,6 +3263,9 @@ public class OpenGLBackend implements GraphicsBackend {
         return switch (format) {
             case RGBA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
             case RGBA16F -> new int[]{net.vulkanic.VulkanicAPI.GL_RGBA16F};
+            case RGBA8_SNORM -> new int[]{net.vulkanic.VulkanicAPI.GL_RGBA8_SNORM};
+            case R11F_G11F_B10F -> new int[]{net.vulkanic.VulkanicAPI.GL_R11F_G11F_B10F};
+            case RED32F -> new int[]{net.vulkanic.VulkanicAPI.GL_R32F};
             case BGRA8  -> new int[]{org.lwjgl.opengl.GL11.GL_RGBA8};
             case RED8   -> new int[]{org.lwjgl.opengl.GL30.GL_R8};
             case RED8I  -> new int[]{org.lwjgl.opengl.GL30.GL_R8I};
@@ -3272,9 +3275,10 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private static int toGlExternalFormat(net.vulkanic.VulkanicTextureFormat format) {
         return switch (format) {
-            case RGBA8, RGBA16F -> org.lwjgl.opengl.GL11.GL_RGBA;
+            case RGBA8, RGBA16F, RGBA8_SNORM -> org.lwjgl.opengl.GL11.GL_RGBA;
+            case R11F_G11F_B10F -> org.lwjgl.opengl.GL11.GL_RGB;
             case BGRA8  -> net.vulkanic.VulkanicAPI.GL_BGRA;
-            case RED8, RED8I -> org.lwjgl.opengl.GL30.GL_RED;
+            case RED8, RED8I, RED32F -> org.lwjgl.opengl.GL30.GL_RED;
             case DEPTH32 -> org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT;
         };
     }
@@ -3283,6 +3287,9 @@ public class OpenGLBackend implements GraphicsBackend {
         return switch (format) {
             case RGBA8, BGRA8, RED8  -> org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
             case RGBA16F      -> net.vulkanic.VulkanicAPI.GL_HALF_FLOAT;
+            case RGBA8_SNORM  -> org.lwjgl.opengl.GL11.GL_BYTE;
+            case R11F_G11F_B10F -> net.vulkanic.VulkanicAPI.GL_UNSIGNED_INT_10F_11F_11F_REV;
+            case RED32F       -> org.lwjgl.opengl.GL11.GL_FLOAT;
             case RED8I        -> org.lwjgl.opengl.GL11.GL_BYTE;
             case DEPTH32      -> org.lwjgl.opengl.GL11.GL_FLOAT;
         };

@@ -751,6 +751,10 @@ public class IrisRenderSystem {
 		samplers[unit] = sampler;
 	}
 
+	public static int getBoundSamplerOnUnit(int unit) {
+		return samplers[unit];
+	}
+
 	public static void unbindAllSamplers() {
 		boolean usedASampler = false;
 		for (int i = 0; i < samplers.length; i++) {

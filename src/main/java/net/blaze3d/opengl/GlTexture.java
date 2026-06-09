@@ -171,6 +171,7 @@ public class GlTexture extends GpuTexture {
 	@Override
 	public void iris$copyStateTo(GpuTexture texture) {
 		texture.setTextureFilter(this.minFilter, this.magFilter, this.useMipmaps);
+		texture.setAddressMode(this.addressModeU, this.addressModeV);
 	}
 
 	@Override

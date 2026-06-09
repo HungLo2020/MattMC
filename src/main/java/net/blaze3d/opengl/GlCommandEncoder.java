@@ -545,7 +545,8 @@ public class GlCommandEncoder implements CommandEncoder {
 						);
 					}
 					if (uniformPresent && textureView != null) {
-						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerIndex, textureView));
+						Integer samplerObject = currentBoundSamplerObject(samplerIndex);
+						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerIndex, samplerObject, textureView));
 						boundResources.add(resourceBinding);
 					}
 				}
@@ -648,7 +649,8 @@ public class GlCommandEncoder implements CommandEncoder {
 					Integer samplerUnit = samplerUnits.get(resourceBinding.name());
 					net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
 					if (samplerUnit != null && textureView != null) {
-						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerUnit, textureView));
+						Integer samplerObject = currentBoundSamplerObject(samplerUnit);
+						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerUnit, samplerObject, textureView));
 						boundResources.add(resourceBinding);
 					}
 				}
@@ -723,6 +725,12 @@ public class GlCommandEncoder implements CommandEncoder {
 			VulkanicAPI.setTextureParameter(ctx, textureTarget, VulkanicTextureParameterName.MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
 			texture.flushModeChanges(textureTarget);
 		}
+	}
+
+	@Nullable
+	private static Integer currentBoundSamplerObject(int samplerUnit) {
+		int samplerObject = net.irisshaders.iris.gl.IrisRenderSystem.getBoundSamplerOnUnit(samplerUnit);
+		return samplerObject > 0 ? samplerObject : null;
 	}
 
 	@Override

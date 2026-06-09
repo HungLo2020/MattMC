@@ -323,6 +323,95 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testVulkanDescriptorSamplersUseCapturedIrisSamplerObjectState() throws IOException {
+        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String irisRenderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java"));
+
+        assertTrue(irisRenderSystemSource.contains("public static int getBoundSamplerOnUnit(int unit)"),
+            "Iris should expose the cached sampler object per texture unit so Vulkan descriptor binding can snapshot it");
+        assertTrue(commandEncoderSource.contains("currentBoundSamplerObject(samplerIndex)")
+                && commandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding(samplerIndex, samplerObject, textureView)"),
+            "Regular Vulkan descriptor bindings should carry the captured Iris sampler object, not only the texture unit");
+        assertTrue(commandEncoderSource.contains("currentBoundSamplerObject(samplerUnit)")
+                && commandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding(samplerUnit, samplerObject, textureView)"),
+            "Iris custom/fullscreen pass descriptor bindings should carry the captured sampler object for colortex/depthtex inputs");
+        assertTrue(backendSource.contains("samplerBinding.samplerObject()"),
+            "Vulkan descriptor resolution should consume the captured sampler object from PipelineResourceBindings");
+        assertTrue(backendSource.contains("VirtualSamplerState samplerState = samplerObject != null")
+                && backendSource.contains("backend.getVirtualSamplerState(samplerObject)")
+                && backendSource.contains("backend.getBoundVirtualSamplerStateForUnit(textureUnit)"),
+            "Vulkan descriptor sampler keys should prefer captured sampler-object state and only fall back to the live texture-unit binding");
+    }
+
+    @Test
+    public void testVulkanLegacyRenderTargetStoragePreservesIrisSizedInternalFormats() throws IOException {
+        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String formatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicTextureFormat.java"));
+
+        assertTrue(backendSource.contains("pixels == null")
+                && backendSource.contains("LegacyTextureFormatInfo.resolveStorage(internalFormat, format, type)"),
+            "Null texImage2D render-target allocation should use internal-format storage semantics instead of upload tuple semantics");
+        assertTrue(backendSource.contains("case VulkanicAPI.GL_R11F_G11F_B10F")
+                && backendSource.contains("VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32"),
+            "Vulkan legacy storage should preserve Iris R11F_G11F_B10F colortex targets");
+        assertTrue(backendSource.contains("case VulkanicAPI.GL_RGBA8_SNORM")
+                && backendSource.contains("VK10.VK_FORMAT_R8G8B8A8_SNORM"),
+            "Vulkan legacy storage should preserve Iris signed-normal RGBA8 normal targets");
+        assertTrue(backendSource.contains("case VulkanicAPI.GL_R32F")
+                && backendSource.contains("VK10.VK_FORMAT_R32_SFLOAT"),
+            "Vulkan legacy storage should preserve Iris R32F history/depth render targets even when the null allocation external type is unsigned byte");
+        assertTrue(formatSource.contains("RGBA8_SNORM(4)")
+                && formatSource.contains("R11F_G11F_B10F(4)")
+                && formatSource.contains("RED32F(4)"),
+            "Vulkanic texture wrappers should be able to represent shaderpack render-target formats without collapsing them to RGBA8");
+        assertTrue(backendSource.contains("case VK10.VK_FORMAT_R8G8B8A8_SNORM -> VulkanicTextureFormat.RGBA8_SNORM")
+                && backendSource.contains("case VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> VulkanicTextureFormat.R11F_G11F_B10F")
+                && backendSource.contains("case VK10.VK_FORMAT_R32_SFLOAT -> VulkanicTextureFormat.RED32F"),
+            "Managed legacy texture wrappers should expose the preserved VkFormat through VulkanicTextureFormat");
+    }
+
+    @Test
+    public void testVulkanLegacyStoragePreservesBgraExternalFormatForMainTarget() throws IOException {
+        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        int resolveStorageIndex = backendSource.indexOf("private static LegacyTextureFormatInfo resolveStorage");
+        int sizedSwitchIndex = backendSource.indexOf("LegacyTextureFormatInfo sizedFormat = switch (internalFormat)", resolveStorageIndex);
+        int bgraIndex = backendSource.indexOf("format == VulkanicAPI.GL_BGRA", resolveStorageIndex);
+        int bgraVkIndex = backendSource.indexOf("VK10.VK_FORMAT_B8G8R8A8_UNORM", bgraIndex);
+
+        assertTrue(resolveStorageIndex >= 0, "Vulkan legacy storage resolver must exist");
+        assertTrue(bgraIndex > resolveStorageIndex && bgraIndex < sizedSwitchIndex,
+            "BGRA null-storage allocation must be resolved before the internal-format-first sized switch");
+        assertTrue(bgraVkIndex > bgraIndex && bgraVkIndex < sizedSwitchIndex,
+            "BGRA null-storage allocation should create B8G8R8A8 storage for MainTarget");
+    }
+
+    @Test
+    public void testMainTargetDepthTextureUsesDepthSamplingStateForIrisDepthtex0() throws IOException {
+        String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
+
+        assertTrue(mainTargetSource.contains("this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);"),
+            "MainTarget depth should be sampled with nearest filtering so Iris depthtex0 neighbor reads do not blur block edges");
+        assertTrue(mainTargetSource.contains("this.depthTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);"),
+            "MainTarget depth should clamp at screen edges so Vulkan descriptor samplers do not repeat depthtex0");
+        assertTrue(mainTargetSource.indexOf("this.colorTexture.setAddressMode(AddressMode.CLAMP_TO_EDGE);")
+                < mainTargetSource.indexOf("this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);"),
+            "MainTarget should configure both color and depth textures instead of configuring the color texture twice");
+    }
+
+    @Test
+    public void testIrisTextureStateCopyPreservesWrapModeForDerivedShaderTextures() throws IOException {
+        String glTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java"));
+        String vulkanTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanGpuTexture.java"));
+
+        assertTrue(glTextureSource.contains("texture.setAddressMode(this.addressModeU, this.addressModeV);"),
+            "OpenGL Iris texture state copies should preserve wrap mode alongside filter and mipmap state");
+        assertTrue(vulkanTextureSource.contains("texture.setAddressMode(this.addressModeU, this.addressModeV);"),
+            "Vulkan Iris texture state copies should preserve wrap mode so derived PBR textures do not fall back to repeat");
+    }
+
+    @Test
     public void testIrisCustomPassesUseFramebufferOwnedRenderPassAndRecoveredPipelineSeams() throws IOException {
         String compositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
         String shadowCompositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
@@ -5104,5 +5193,55 @@ public class Phase3DrawPathTest {
             "Iris fallback DSA paths should restore prior texture bindings only through the guarded helper");
         assertFalse(source.contains("VulkanicAPI.bindTexture2D(VulkanicAPI.getCommandContext(), previous);"),
             "Iris fallback DSA paths should not blindly rebind cached previous texture ids");
+    }
+
+    @Test
+    public void testVulkanFramebufferPipelineCacheKeyIncludesAttachmentFormats() throws IOException {
+        Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String source = Files.readString(vulkanBackendFile);
+
+        assertTrue(source.contains("private record FramebufferPipelineKey("),
+            "VulkanBackend should retain a dedicated key for framebuffer-compatible pipeline variants");
+        assertTrue(source.contains("List<Integer> colorFormats,"),
+            "Framebuffer pipeline variants must be keyed by the resolved color attachment formats, not only the FBO id");
+        assertTrue(source.contains("int depthFormat"),
+            "Framebuffer pipeline variants must include the resolved depth attachment format");
+        assertTrue(source.contains("colorFormats = List.copyOf(colorFormats);"),
+            "Framebuffer pipeline keys should defensively snapshot the color format list");
+        assertTrue(source.contains("targets.colorFormats(),"),
+            "Framebuffer pipeline resolution should key variants from the current resolved framebuffer color formats");
+        assertTrue(source.contains("targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED"),
+            "Framebuffer pipeline resolution should key variants from the current resolved framebuffer depth format");
+    }
+
+    @Test
+    public void testVulkanFeedbackLoopPipelineRenderPassUsesFeedbackSubpassLayouts() throws IOException {
+        Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String source = Files.readString(vulkanBackendFile);
+
+        assertTrue(source.contains("int colorAttachmentRefLayout = feedbackLoopCompatible"),
+            "Pipeline-compatible render passes should choose color subpass layouts from attachment-feedback-loop mode");
+        assertTrue(source.contains("int depthAttachmentRefLayout = feedbackLoopCompatible"),
+            "Pipeline-compatible render passes should choose depth subpass layouts from attachment-feedback-loop mode");
+        assertTrue(source.contains(".layout(colorAttachmentRefLayout);"),
+            "Color attachment references in the pipeline-compatible render pass must use the selected layout");
+        assertTrue(source.contains(".layout(depthAttachmentRefLayout);"),
+            "Depth attachment references in the pipeline-compatible render pass must use the selected layout");
+    }
+
+    @Test
+    public void testVulkanSwapchainComposePipelineUsesPresentCompatibleRenderPassContract() throws IOException {
+        Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String source = Files.readString(vulkanBackendFile);
+
+        assertTrue(source.contains("boolean swapchainPresentCompatible"),
+            "Vulkan pipeline creation should distinguish swapchain-present render-pass compatibility from feedback-loop compatibility");
+        assertTrue(source.contains("swapchainImageFormat,\n                    true"),
+            "Swapchain present compose pipeline should request the swapchain-present-compatible render pass contract");
+        assertTrue(source.contains("if (swapchainPresentCompatible)"),
+            "Pipeline-compatible render pass creation should emit a dedicated dependency set for swapchain-present passes");
+        assertTrue(source.contains(".dstSubpass(VK10.VK_SUBPASS_EXTERNAL)")
+                && source.contains(".dstStageMask(VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)"),
+            "Swapchain-present-compatible placeholder render passes should match the persistent swapchain present render pass dependencies");
     }
 }
