@@ -144,6 +144,22 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanRewritesIrisFragmentCoordYToLowerLeft() {
+        String source = "#version 330\n"
+            + "uniform float viewHeight;\n"
+            + "out vec4 fragColor;\n"
+            + "void main(){fragColor = vec4(gl_FragCoord.xy, gl_FragCoord.z, gl_FragCoord.w);}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("float viewHeight;"));
+        assertFalse(normalized.contains("vec4(gl_FragCoord.xy"));
+        assertTrue(normalized.contains(
+            "vec4((vec4(gl_FragCoord.x, viewHeight - gl_FragCoord.y, gl_FragCoord.z, gl_FragCoord.w)).xy"
+        ));
+    }
+
+    @Test
     public void testNormalizeForVulkanPromotesLegacyShaderVersions() {
         String source = "#version 330\nvoid main(){}";
 

@@ -15,7 +15,9 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
     private static final java.util.regex.Pattern LEGACY_VERTEX_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_VertexID\\b");
     private static final java.util.regex.Pattern LEGACY_INSTANCE_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_InstanceID\\b");
+    private static final java.util.regex.Pattern LEGACY_FRAG_COORD_PATTERN = java.util.regex.Pattern.compile("\\bgl_FragCoord\\b");
     private static final java.util.regex.Pattern GLSL_VERSION_PATTERN = java.util.regex.Pattern.compile("(?m)^\\s*#version\\s+(\\d+)");
+    private static final java.util.regex.Pattern VIEW_HEIGHT_DECLARATION_PATTERN = java.util.regex.Pattern.compile("\\bfloat\\s+viewHeight\\s*;");
     private static final java.util.regex.Pattern STANDALONE_UNIFORM_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
         "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+([^;{}]+?)\\s*;\\s*(?://.*)?$"
     );
@@ -157,12 +159,31 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             standaloneUniformBindingIndex
         );
 
+        if (stage == VulkanicShaderStage.FRAGMENT) {
+            normalized = rewriteFragmentCoordForVulkan(normalized);
+        }
+
         if (stage != VulkanicShaderStage.VERTEX) {
             return normalized;
         }
 
         normalized = LEGACY_VERTEX_ID_PATTERN.matcher(normalized).replaceAll("gl_VertexIndex");
         return LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
+    }
+
+    private static String rewriteFragmentCoordForVulkan(String shaderSource) {
+        if (!shaderSource.contains("gl_FragCoord")
+            || !VIEW_HEIGHT_DECLARATION_PATTERN.matcher(shaderSource).find()) {
+            return shaderSource;
+        }
+
+        // Offscreen Vulkan render passes use a negative-height viewport so geometry follows
+        // OpenGL's clip-space orientation, but gl_FragCoord.y still arrives in Vulkan's
+        // upper-left framebuffer coordinate system. Iris shaderpacks expect lower-left
+        // screen coordinates, so normalize only shaders that already carry viewHeight.
+        return LEGACY_FRAG_COORD_PATTERN.matcher(shaderSource).replaceAll(
+            "(vec4(gl_FragCoord.x, viewHeight - gl_FragCoord.y, gl_FragCoord.z, gl_FragCoord.w))"
+        );
     }
 
     private static String promoteVersionForVulkan(String shaderSource) {

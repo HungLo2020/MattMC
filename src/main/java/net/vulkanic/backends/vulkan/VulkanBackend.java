@@ -11002,15 +11002,15 @@ void main() {
                     .mipLevel(sourceLevel)
                     .baseArrayLayer(0)
                     .layerCount(layerCount);
-                blit.get(0).srcOffsets(0).set(srcX0, srcY0, 0);
-                blit.get(0).srcOffsets(1).set(srcX1, srcY1, 1);
+                blit.get(0).srcOffsets(0).set(srcX0, toVulkanImageY(sourceTexture, sourceLevel, srcY0), 0);
+                blit.get(0).srcOffsets(1).set(srcX1, toVulkanImageY(sourceTexture, sourceLevel, srcY1), 1);
                 blit.get(0).dstSubresource()
                     .aspectMask(destTexture.aspectMask)
                     .mipLevel(destLevel)
                     .baseArrayLayer(0)
                     .layerCount(layerCount);
-                blit.get(0).dstOffsets(0).set(dstX0, dstY0, 0);
-                blit.get(0).dstOffsets(1).set(dstX1, dstY1, 1);
+                blit.get(0).dstOffsets(0).set(dstX0, toVulkanImageY(destTexture, destLevel, dstY0), 0);
+                blit.get(0).dstOffsets(1).set(dstX1, toVulkanImageY(destTexture, destLevel, dstY1), 1);
 
                 VK10.vkCmdBlitImage(
                     commandBuffer,
@@ -11050,6 +11050,18 @@ void main() {
 
             trackLayoutForLevel(sourceTexture, sourceLevel, sourceOriginalLayout);
             trackLayoutForLevel(destTexture, destLevel, destOriginalLayout);
+        }
+
+        private static int toVulkanImageY(LegacyTextureObject texture, int level, int glY) {
+            return legacyTextureLevelHeight(texture, level) - glY;
+        }
+
+        private static int legacyTextureLevelHeight(LegacyTextureObject texture, int level) {
+            TextureLevelInfo levelInfo = texture.levels.get(level);
+            if (levelInfo != null) {
+                return Math.max(1, levelInfo.height);
+            }
+            return Math.max(1, texture.height >> Math.max(0, level));
         }
 
         private void generateLegacyTextureMipmap(long commandBufferHandle, int target) {
