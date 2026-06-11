@@ -10725,13 +10725,21 @@ void main() {
                     .mipLevel(sourceLevel)
                     .baseArrayLayer(0)
                     .layerCount(layerCount);
-                region.get(0).srcOffset().set(sourceX, sourceY, sourceZ);
+                region.get(0).srcOffset().set(
+                    sourceX,
+                    toVulkanImageRegionY(sourceTexture, sourceLevel, sourceY, height),
+                    sourceZ
+                );
                 region.get(0).dstSubresource()
                     .aspectMask(destTexture.aspectMask)
                     .mipLevel(destLevel)
                     .baseArrayLayer(0)
                     .layerCount(layerCount);
-                region.get(0).dstOffset().set(destX, destY, destZ);
+                region.get(0).dstOffset().set(
+                    destX,
+                    toVulkanImageRegionY(destTexture, destLevel, destY, height),
+                    destZ
+                );
                 region.get(0).extent().set(width, height, depth);
 
                 VK10.vkCmdCopyImage(
@@ -11054,6 +11062,10 @@ void main() {
 
         private static int toVulkanImageY(LegacyTextureObject texture, int level, int glY) {
             return legacyTextureLevelHeight(texture, level) - glY;
+        }
+
+        private static int toVulkanImageRegionY(LegacyTextureObject texture, int level, int glY, int regionHeight) {
+            return legacyTextureLevelHeight(texture, level) - glY - regionHeight;
         }
 
         private static int legacyTextureLevelHeight(LegacyTextureObject texture, int level) {

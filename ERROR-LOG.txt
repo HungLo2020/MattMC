@@ -23,45 +23,45 @@
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk/linux-x64
-[19:18:35] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[19:18:35] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[19:18:35] [main/INFO]: Mappings not present!
-[19:18:35] [main/INFO]: Loading 3 mods:
+[11:24:10] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[11:24:10] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[11:24:10] [main/INFO]: Mappings not present!
+[11:24:10] [main/INFO]: Loading 3 mods:
 	- java 25
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[19:18:35] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[19:18:35] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[19:18:35] [main/INFO]: Searching for graphics cards...
-[19:18:35] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[19:18:35] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[19:18:35] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[11:24:10] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[11:24:10] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[11:24:10] [main/INFO]: Searching for graphics cards...
+[11:24:10] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[11:24:10] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[11:24:10] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
 WARNING: A restricted method in java.lang.System has been called
 WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/home/matt/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.14.0/67bf3eaea4f0718cb376a181a629e5f88fa1c9dd/jna-5.14.0.jar)
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[19:18:36] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 194 milliseconds
+[11:24:11] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 183 milliseconds
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/home/matt/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar)
 WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
 WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
-[19:18:38] [Render thread/INFO]: Setting user: HungLo
-[19:18:38] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[19:18:38] [Render thread/INFO]: Running library validation...
-[19:18:38] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
-[19:18:38] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[19:18:38] [Render thread/INFO]: Registering Fabric Client Events
-[19:18:38] [Render thread/INFO]: Registering Distant Horizons hooks
-[19:18:38] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[19:18:38] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[19:18:38] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[19:18:38] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[19:18:38] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[19:18:38] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[19:18:38] [Render thread/INFO]: [DistantHorizons] Config initialised
-[19:18:38] [Render thread/INFO]: Applying config to loggers
-[19:18:38] [Render thread/INFO]: Distant Horizons client Initialized.
+[11:24:13] [Render thread/INFO]: Setting user: HungLo
+[11:24:13] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[11:24:13] [Render thread/INFO]: Running library validation...
+[11:24:13] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
+[11:24:13] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[11:24:13] [Render thread/INFO]: Registering Fabric Client Events
+[11:24:13] [Render thread/INFO]: Registering Distant Horizons hooks
+[11:24:13] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[11:24:13] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[11:24:13] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[11:24:13] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[11:24:13] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[11:24:13] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[11:24:13] [Render thread/INFO]: [DistantHorizons] Config initialised
+[11:24:13] [Render thread/INFO]: Applying config to loggers
+[11:24:13] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.17.0-29-generic
 	JRE: Linux amd64 25.0.1
@@ -72,17 +72,17 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[19:18:38] [Render thread/INFO]: Queuing DH event binding...
-[19:18:38] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[11:24:13] [Render thread/INFO]: Queuing DH event binding...
+[11:24:13] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[19:18:38] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[19:18:38] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
-[19:18:38] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[11:24:13] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[11:24:13] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[11:24:13] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -94,166 +94,166 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
-[19:18:38] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+[11:24:13] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
 [LWJGL] Java 10 multiplyHigh enabled
-[19:18:39] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[19:18:39] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[19:18:39] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 590.48.01
-[19:18:39] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[19:18:39] [Render thread/INFO]: Debug functionality is disabled.
-[19:18:39] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[19:18:39] [Render thread/INFO]: Using optional rendering features: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[19:18:39] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
-[19:18:39] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
-[19:18:39] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
-[19:18:39] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
-[19:18:39] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[11:24:13] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[11:24:13] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[11:24:13] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 590.48.01
+[11:24:13] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[11:24:13] [Render thread/INFO]: Debug functionality is disabled.
+[11:24:13] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[11:24:13] [Render thread/INFO]: Using optional rendering features: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[11:24:13] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
+[11:24:13] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
+[11:24:13] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
+[11:24:13] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
+[11:24:14] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[W][19:18:39.137033] pw.conf      | [          conf.c: 1204 pw_conf_load_conf_for_context()] setting config.name to client-rt.conf is deprecated, using client.conf
-[19:18:39] [Render thread/INFO]: Hardware information:
-[19:18:39] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[19:18:39] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (OpenGL 3.3.0 NVIDIA 590.48.01)
-[19:18:39] [Render thread/INFO]: OS: Linux (6.17.0-29-generic)
+[W][11:24:14.015863] pw.conf      | [          conf.c: 1204 pw_conf_load_conf_for_context()] setting config.name to client-rt.conf is deprecated, using client.conf
+[11:24:14] [Render thread/INFO]: Hardware information:
+[11:24:14] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[11:24:14] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (OpenGL 3.3.0 NVIDIA 590.48.01)
+[11:24:14] [Render thread/INFO]: OS: Linux (6.17.0-29-generic)
 [LWJGL] Java 16 memcpy enabled
-[19:18:39] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[19:18:39] [Render thread/INFO]: Initializing VoxelMap...
-[19:18:39] [Worker-Main-17/INFO]: Found unifont_pua-16.0.03.hex, loading
-[19:18:39] [Render thread/INFO]: VoxelMap initialization complete
-[19:18:39] [Worker-Main-19/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#1 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: Shaders are disabled because enableShaders is set to false in iris.properties
-[19:18:39] [Worker-Main-10/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[19:18:39] [Render thread/INFO]: Created: 256x256 waypoints-atlas
-[19:18:39] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
-[19:18:39] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
-[19:18:39] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
-[19:18:39] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
-[19:18:39] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
-[19:18:39] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#2 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#3 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#4 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#5 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#6 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#7 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#8 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#9 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#10 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#1 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.03656123 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9986 magFilter=9729 wrapS=10497 wrapT=10497
-[19:18:39] [Render thread/INFO]: FPS limit debug#1: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#11 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay tick#12 instance=334784567 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#2 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.0847218 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#2: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#3 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.13047434 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#3: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#4 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.1739438 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#4: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#5 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.2152398 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#5: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#6 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.25185406 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#6: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#7 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.2867023 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#7: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#8 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.32010132 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#8: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#9 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.35251167 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#9: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#10 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.38364214 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#10: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#11 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.41347048 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#11: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: LoadingOverlay render#12 instance=334784567 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.44200572 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[19:18:39] [Render thread/INFO]: FPS limit debug#12: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: FPS limit debug#13: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: FPS limit debug#14: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Worker-Main-13/WARN]: Missing textures in model minecraft:block/tree_star:
+[11:24:14] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[11:24:14] [Render thread/INFO]: Initializing VoxelMap...
+[11:24:14] [Worker-Main-19/INFO]: Found unifont_pua-16.0.03.hex, loading
+[11:24:14] [Render thread/INFO]: VoxelMap initialization complete
+[11:24:14] [Worker-Main-17/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#1 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: Shaders are disabled because enableShaders is set to false in iris.properties
+[11:24:14] [Worker-Main-10/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[11:24:14] [Render thread/INFO]: Created: 256x256 waypoints-atlas
+[11:24:14] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
+[11:24:14] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
+[11:24:14] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
+[11:24:14] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
+[11:24:14] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
+[11:24:14] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#2 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#3 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#4 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#5 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#6 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#7 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#8 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#9 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#10 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#1 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.013176478 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9986 magFilter=9729 wrapS=10497 wrapT=10497
+[11:24:14] [Render thread/INFO]: FPS limit debug#1: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#11 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay tick#12 instance=281188787 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#2 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.04241797 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#2: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#3 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.07375029 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#3: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#4 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.10809992 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#4: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#5 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.14628848 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#5: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#6 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.18893993 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#6: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#7 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.22946791 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#7: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#8 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.26798314 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#8: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#9 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.3045726 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#9: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#10 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.33933717 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#10: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#11 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.371593 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#11: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: LoadingOverlay render#12 instance=281188787 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.4003896 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
+[11:24:14] [Render thread/INFO]: FPS limit debug#12: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: FPS limit debug#13: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: FPS limit debug#14: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: FPS limit debug#15: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: FPS limit debug#16: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: FPS limit debug#17: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: FPS limit debug#18: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: FPS limit debug#19: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Worker-Main-15/WARN]: Missing textures in model minecraft:block/tree_star:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[19:18:39] [Render thread/INFO]: FPS limit debug#15: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Worker-Main-13/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
+[11:24:14] [Worker-Main-15/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[19:18:39] [Worker-Main-13/WARN]: Missing texture references in model minecraft:block/fern_thatch:
+[11:24:14] [Worker-Main-15/WARN]: Missing texture references in model minecraft:block/fern_thatch:
     #missing
-[19:18:39] [Render thread/INFO]: FPS limit debug#16: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:39] [Render thread/INFO]: FPS limit debug#17: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:40] [Render thread/INFO]: OpenAL initialized on device CORSAIR Slipstream Multi-Device Receiver Analog Stereo
-[19:18:40] [Render thread/INFO]: Sound engine started
-[19:18:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[19:18:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[19:18:40] [Render thread/INFO]: FPS limit debug#18: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:40] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[19:18:40] [Render thread/INFO]: FPS limit debug#19: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:18:40] [Render thread/INFO]: FPS limit debug#20: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[19:19:05] [Render thread/ERROR]: Couldn't load tag minecraft:resists_totem_of_possession as it is missing following references: #c:bosses (from vanilla)
-[19:19:05] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_breedables as it is missing following references: minecraft:seeds (from vanilla)
-[19:19:05] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_breedables as it is missing following references: minecraft:cosmic_cod (from vanilla)
-[19:19:05] [Render thread/ERROR]: Couldn't load tag minecraft:insect_items as it is missing following references: minecraft:maggot (from vanilla), minecraft:mosquito_larva (from vanilla)
-[19:19:05] [Render thread/ERROR]: Couldn't load tag minecraft:anteater_foodstuffs as it is missing following references: #minecraft:insect_items (from vanilla)
-[19:19:05] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_tameables as it is missing following references: minecraft:cosmic_cod (from vanilla)
-[19:19:05] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_foodstuffs as it is missing following references: #minecraft:cosmaw_breedables (from vanilla), #minecraft:cosmaw_tameables (from vanilla)
-[19:19:06] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[19:19:06] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[19:19:06] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
-[19:19:06] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[19:19:06] [Render thread/INFO]: Loaded 1484 recipes
-[19:19:06] [Render thread/INFO]: Loaded 1574 advancements
-[19:19:06] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
-[19:19:06] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[19:19:06] [Server thread/INFO]: Generating keypair
-[19:19:06] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/data)]].
-[19:19:06] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[19:19:06] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[19:19:06] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data)]].
-[19:19:06] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[19:19:06] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data)]].
-[19:19:06] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[19:19:06] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data)]].
-[19:19:06] [Server thread/INFO]: Loading 0 persistent chunks...
-[19:19:06] [Server thread/INFO]: WorldEdit initialized
-[19:19:06] [Server thread/INFO]: WorldEdit commands registered
-[19:19:07] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[19:19:07] [Server thread/INFO]: Preparing spawn area: 16%
-[19:19:07] [Server thread/INFO]: Preparing spawn area: 38%
-[19:19:07] [Server thread/INFO]: Time elapsed: 574 ms
-[19:19:07] [Server thread/INFO]: HungLo[local:E:003ff365] logged in with entity id 75 at (269.2655283229394, 70.36109723217417, 505.7672022218614)
-[19:19:07] [Server thread/INFO]: Player [HungLo] joined.
-[19:19:07] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[19:19:07] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[19:19:07] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[19:19:07] [Server thread/INFO]: HungLo joined the game
-[19:19:07] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[19:19:07] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[19:19:07] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[19:19:07] [Render thread/INFO]: Started 10 worker threads
-[19:19:07] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
-[19:19:07] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
-[19:19:07] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
-[19:19:07] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
-[19:19:07] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
-[19:19:07] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
-[19:19:07] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
-[19:19:07] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[19:19:07] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[19:19:07] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
-[19:19:07] [Render thread/INFO]: Loaded 152 advancements
-[19:19:07] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[19:19:07] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[19:19:07] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 590.48.01].
-[19:19:07] [Render thread/INFO]: minecraftGlCapabilities:
+[11:24:14] [Render thread/INFO]: FPS limit debug#20: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
+[11:24:14] [Render thread/INFO]: OpenAL initialized on device CORSAIR Slipstream Multi-Device Receiver Analog Stereo
+[11:24:14] [Render thread/INFO]: Sound engine started
+[11:24:14] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[11:24:14] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[11:24:14] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[11:24:21] [Render thread/ERROR]: Couldn't load tag minecraft:resists_totem_of_possession as it is missing following references: #c:bosses (from vanilla)
+[11:24:21] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_breedables as it is missing following references: minecraft:seeds (from vanilla)
+[11:24:21] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_breedables as it is missing following references: minecraft:cosmic_cod (from vanilla)
+[11:24:21] [Render thread/ERROR]: Couldn't load tag minecraft:insect_items as it is missing following references: minecraft:maggot (from vanilla), minecraft:mosquito_larva (from vanilla)
+[11:24:21] [Render thread/ERROR]: Couldn't load tag minecraft:anteater_foodstuffs as it is missing following references: #minecraft:insect_items (from vanilla)
+[11:24:21] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_tameables as it is missing following references: minecraft:cosmic_cod (from vanilla)
+[11:24:21] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_foodstuffs as it is missing following references: #minecraft:cosmaw_breedables (from vanilla), #minecraft:cosmaw_tameables (from vanilla)
+[11:24:21] [Worker-Main-8/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[11:24:21] [Worker-Main-8/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[11:24:21] [Worker-Main-8/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
+[11:24:21] [Worker-Main-8/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[11:24:21] [Render thread/INFO]: Loaded 1484 recipes
+[11:24:21] [Render thread/INFO]: Loaded 1574 advancements
+[11:24:21] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
+[11:24:21] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[11:24:21] [Server thread/INFO]: Generating keypair
+[11:24:22] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[11:24:22] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/data)]].
+[11:24:22] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[11:24:22] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/data)]].
+[11:24:22] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[11:24:22] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/data)]].
+[11:24:22] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[11:24:22] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/data)]].
+[11:24:22] [Server thread/INFO]: Loading 0 persistent chunks...
+[11:24:22] [Server thread/INFO]: WorldEdit initialized
+[11:24:22] [Server thread/INFO]: WorldEdit commands registered
+[11:24:22] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[11:24:22] [Server thread/INFO]: Preparing spawn area: 16%
+[11:24:22] [Server thread/INFO]: Preparing spawn area: 100%
+[11:24:22] [Server thread/INFO]: Time elapsed: 512 ms
+[11:24:22] [Server thread/INFO]: HungLo[local:E:2c0760a9] logged in with entity id 93 at (269.2655283229394, 70.36109723217417, 505.7672022218614)
+[11:24:23] [Server thread/INFO]: Player [HungLo] joined.
+[11:24:23] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[11:24:23] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[11:24:23] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[11:24:23] [Server thread/INFO]: HungLo joined the game
+[11:24:23] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[11:24:23] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
+[11:24:23] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
+[11:24:23] [Render thread/INFO]: Started 10 worker threads
+[11:24:23] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
+[11:24:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
+[11:24:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
+[11:24:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
+[11:24:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
+[11:24:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
+[11:24:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
+[11:24:23] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[11:24:23] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
+[11:24:23] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[11:24:23] [Render thread/INFO]: Loaded 152 advancements
+[11:24:23] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[11:24:23] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[11:24:23] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 590.48.01].
+[11:24:23] [Render thread/INFO]: minecraftGlCapabilities:
 Your OpenGL support:
 openGL version 3.2+: [true] <- REQUIRED
 Vertex Attribute Buffer Binding: [true] <- optional improvement
@@ -261,319 +261,324 @@ Buffer Storage: [true] <- optional improvement
 
 [LWJGL] [GL] Using KHR_debug for error logging.
 [LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
-[19:19:07] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
-[19:19:07] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
-[19:19:07] [Render thread/ERROR]: Invalid path voxelmap:images/backgroundmaps/Origin/overworld/map.png: Invalid segment 'Origin' in path 'images/backgroundmaps/Origin/overworld/map.png'
-[19:19:08] [Render thread/INFO]: Setting up renderer
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
-[19:19:08] [Render thread/INFO]: Renderer setup complete
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 8
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35633]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: Loading shader with type: [35632]
-[19:19:08] [Render thread/INFO]: Shader loaded sucessfully.
-[19:19:08] [Render thread/INFO]: [System] [CHAT] §ENo waypoints exist for this world/server.
-[19:19:08] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#1 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#1 particleCount=1 layers=minecraft:pipeline/opaque_particle[1]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#1 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#1 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=6 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#2 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#2 particleCount=1 layers=minecraft:pipeline/opaque_particle[1]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#2 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#3 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#3 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#3 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#2 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#4 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#4 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#4 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#5 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#5 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#5 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#3 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#6 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#6 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#6 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#7 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#7 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#7 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#4 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#8 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#8 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#8 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#9 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#9 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#9 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#5 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#10 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#10 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#10 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#11 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#11 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#11 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#6 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#12 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#12 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#12 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#13 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#13 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#13 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#7 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#14 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#14 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#14 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#15 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#15 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#15 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#8 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#16 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#16 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#16 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#17 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#17 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#17 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#9 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#18 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#18 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#18 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#19 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#19 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#19 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#10 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#20 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#20 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#20 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#21 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#21 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#21 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#11 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#22 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#22 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#22 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#23 groupRenderers=1 phase=OPAQUE
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#23 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#23 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#12 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: ParticleFeatureRenderer batch#24 groupRenderers=1 phase=TRANSLUCENT
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#24 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#24 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#25 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#25 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#13 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#26 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#26 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#27 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#27 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#14 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#28 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#28 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#29 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#29 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#15 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#30 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#30 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#31 particleCount=3 layers=minecraft:pipeline/opaque_particle[3]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#31 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#16 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState prepare#32 particleCount=3 layers=minecraft:pipeline/opaque_particle[3]
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#32 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#33 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#17 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#34 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#35 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#18 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#36 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#37 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#19 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#38 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState sample#39 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:08] [Render thread/INFO]: QuadParticleRenderState draw#20 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#40 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#41 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#21 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#42 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#43 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#22 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#44 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#45 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#23 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#46 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#47 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#24 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState sample#48 layerPipeline=minecraft:pipeline/opaque_particle pos=(-21.412,-13.144,-16.094) quat=(-0.006,0.819,0.009,0.574) size=0.084 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00A00000 block=0 sky=10 sample=0x00000000
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#25 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#26 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#27 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#28 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#29 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#30 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#31 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#32 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#33 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#34 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#35 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#36 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#37 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#38 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#39 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#40 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#41 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#42 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#43 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#44 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#45 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#46 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#47 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#48 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#49 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#50 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=30 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#51 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=30 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#52 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=30 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#53 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=30 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#54 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#55 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#56 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#57 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#58 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#59 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=30 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#60 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=36 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#61 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=36 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#62 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=36 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#63 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=36 vertexOffset=0
-[19:19:09] [Render thread/INFO]: QuadParticleRenderState draw#64 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=36 vertexOffset=0
-[19:19:10] [Server thread/INFO]: Saving and pausing game...
-[19:19:10] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:overworld
-[19:19:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_end
-[19:19:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_nether
-[19:19:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:primordial_caves
-[19:19:13] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[19:19:13] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
-[19:19:14] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[19:19:14] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[19:19:14] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=deferred1 programId=222 programObjectId=962155002
-[19:19:14] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite programId=223 programObjectId=1638909102
-[19:19:14] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite3 programId=224 programObjectId=304666841
-[19:19:14] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite4 programId=225 programObjectId=371162821
-[19:19:14] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite5 programId=226 programObjectId=1255761240
-[19:19:14] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite6 programId=227 programObjectId=289845336
-[19:19:14] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite7 programId=228 programObjectId=1333795091
-[19:19:14] [Render thread/WARN]: Type is VERTEX
-[19:19:14] [Render thread/WARN]: Type is FRAGMENT
-[19:19:14] [Render thread/WARN]: Type is VERTEX
-[19:19:14] [Render thread/WARN]: Type is FRAGMENT
-[19:19:14] [Render thread/WARN]: Type is VERTEX
-[19:19:14] [Render thread/WARN]: Type is FRAGMENT
-[19:19:16] [Render thread/INFO]: Stopping worker threads
-[19:19:16] [Render thread/INFO]: Started 10 worker threads
-[19:19:16] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[19:19:16] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[19:19:16] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[19:19:16] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[19:19:16] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[19:19:16] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[19:19:16] [Render thread/INFO]: Stopping worker threads
-[19:19:16] [Render thread/INFO]: Started 10 worker threads
-[19:19:16] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
-[19:19:16] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[19:19:18] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
-[19:19:18] [level shutdown/INFO]: Shutting down ClientRenderState
-[19:19:18] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}].
-[19:19:18] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}].
-[19:19:18] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}].
-[19:19:18] [level shutdown/INFO]: Shutting down LodQuadTree...
-[19:19:18] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}
-[19:19:18] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_nether}
-[19:19:18] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_end}
-[19:19:18] [level shutdown/INFO]: Finished shutting down LodQuadTree
-[19:19:18] [level shutdown/INFO]: Closing world gen queue
-[19:19:18] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[19:19:18] [level shutdown/INFO]: Shutting down world generator thread pool...
-[19:19:18] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
-[19:19:18] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[19:19:18] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[19:19:18] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[19:19:18] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}].
-[19:19:18] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:overworld}
-[19:19:18] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[19:19:18] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}].
-[19:19:18] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_end}
-[19:19:18] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}].
-[19:19:18] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_nether}
-[19:19:18] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}].
-[19:19:18] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}
-[19:19:18] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}].
-[19:19:18] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:overworld}
-[19:19:18] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[19:19:18] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[19:19:18] [Render thread/INFO]: Closing all [4] database connections...
-[19:19:18] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[19:19:18] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data/DistantHorizons.sqlite]
-[19:19:18] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/data/DistantHorizons.sqlite]
-[19:19:18] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data/DistantHorizons.sqlite]
-[19:19:18] [Server thread/INFO]: HungLo lost connection: Disconnected
-[19:19:18] [Server thread/INFO]: HungLo left the game
-[19:19:18] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[19:19:18] [Server thread/INFO]: WorldEdit shutdown
-[19:19:18] [Server thread/INFO]: Stopping server
-[19:19:18] [Server thread/INFO]: Saving players
-[19:19:18] [Server thread/INFO]: Saving worlds
-[19:19:18] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:overworld
-[19:19:18] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_end
-[19:19:18] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_nether
-[19:19:18] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:primordial_caves
-[19:19:18] [Server thread/INFO]: ThreadedAnvilChunkStorage (Origin): All chunks are saved
-[19:19:18] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[19:19:18] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[19:19:18] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[19:19:18] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[19:19:18] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[fjnt5oq7b84se@minecraft:overworld].
-[19:19:18] [Render thread/INFO]: Stopping worker threads
-[19:19:19] [Render thread/INFO]: Stopping!
-[19:19:19] [Render thread/INFO]: Saving all world maps
-[19:19:19] [Render thread/INFO]: Save queue flushed!
+[11:24:23] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[11:24:23] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[11:24:23] [Render thread/ERROR]: Invalid path voxelmap:images/backgroundmaps/Origin/overworld/map.png: Invalid segment 'Origin' in path 'images/backgroundmaps/Origin/overworld/map.png'
+[11:24:23] [Render thread/INFO]: Setting up renderer
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[11:24:23] [Render thread/INFO]: Renderer setup complete
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 8
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#1 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#1 particleCount=1 layers=minecraft:pipeline/opaque_particle[1]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#1 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.689,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#1 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=6 vertexOffset=0
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35633]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: Loading shader with type: [35632]
+[11:24:23] [Render thread/INFO]: Shader loaded sucessfully.
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#2 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#2 particleCount=1 layers=minecraft:pipeline/opaque_particle[1]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#2 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.689,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: [System] [CHAT] §ENo waypoints exist for this world/server.
+[11:24:23] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#3 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#3 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#3 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.731,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#2 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#4 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#4 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#4 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.731,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#5 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#5 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#5 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#3 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#6 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#6 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#6 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#7 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#7 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#7 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#4 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#8 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#8 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#8 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#9 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#9 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#9 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#5 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#10 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#10 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#10 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#11 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#11 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#11 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#6 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#12 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#12 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#12 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#13 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#13 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#13 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#7 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#14 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#14 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#14 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#15 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#15 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#15 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#8 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=12 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#16 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#16 particleCount=2 layers=minecraft:pipeline/opaque_particle[2]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#16 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#17 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#17 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#17 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#9 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#18 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#18 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#18 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#19 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#19 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#19 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#10 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#20 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#20 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#20 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#21 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#21 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#21 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#11 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#22 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#22 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#22 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#23 groupRenderers=1 phase=OPAQUE
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#23 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#23 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#12 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:23] [Render thread/INFO]: ParticleFeatureRenderer batch#24 groupRenderers=1 phase=TRANSLUCENT
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#24 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#24 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#25 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#25 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#13 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#26 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#26 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#27 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#27 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState draw#14 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState prepare#28 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:23] [Render thread/INFO]: QuadParticleRenderState sample#28 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState prepare#29 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#29 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#15 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState prepare#30 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#30 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState prepare#31 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#31 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#16 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState prepare#32 particleCount=4 layers=minecraft:pipeline/opaque_particle[4]
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#32 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#33 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#17 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#34 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#35 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#18 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#36 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#37 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#19 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#38 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#39 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#20 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=24 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#40 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#41 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#21 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#42 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#43 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#22 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#44 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#45 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#23 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#46 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#47 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#24 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState sample#48 layerPipeline=minecraft:pipeline/opaque_particle pos=(-25.781,-11.733,-14.123) quat=(0.033,0.797,-0.044,0.602) size=0.113 uv=[0.531311,0.546814]-[0.781372,0.812378] color=0xFF6666B2 rgba=(178,102,102,255) packed=0x00C00000 block=0 sky=12 sample=0x00000000
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#25 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#26 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#27 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#28 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#29 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#30 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#31 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#32 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#33 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#34 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#35 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#36 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#37 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#38 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#39 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#40 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#41 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#42 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#43 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#44 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#45 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#46 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#47 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#48 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#49 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#50 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#51 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#52 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#53 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#54 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#55 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#56 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#57 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#58 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#59 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#60 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#61 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#62 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#63 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:24] [Render thread/INFO]: QuadParticleRenderState draw#64 translucentPass=false layerPipeline=minecraft:pipeline/opaque_particle atlas=minecraft:textures/atlas/particles.png texId=40 label=40 minFilter=NEAREST magFilter=NEAREST mipmaps=false indexCount=18 vertexOffset=0
+[11:24:32] [Server thread/INFO]: Saving and pausing game...
+[11:24:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:overworld
+[11:24:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_nether
+[11:24:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_end
+[11:24:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:primordial_caves
+[11:24:35] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[11:24:35] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
+[11:24:35] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[11:24:35] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[11:24:35] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=deferred1 programId=222 programObjectId=1867979076
+[11:24:35] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite programId=223 programObjectId=1102924885
+[11:24:36] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite3 programId=224 programObjectId=701066570
+[11:24:36] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite4 programId=225 programObjectId=632323457
+[11:24:36] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite5 programId=226 programObjectId=170141568
+[11:24:36] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite6 programId=227 programObjectId=1756670527
+[11:24:36] [Render thread/INFO]: CompositePassProgramTrace stage=createProgram passName=composite7 programId=228 programObjectId=810074223
+[11:24:36] [Render thread/WARN]: Type is VERTEX
+[11:24:36] [Render thread/WARN]: Type is FRAGMENT
+[11:24:36] [Render thread/WARN]: Type is VERTEX
+[11:24:36] [Render thread/WARN]: Type is FRAGMENT
+[11:24:36] [Render thread/WARN]: Type is VERTEX
+[11:24:36] [Render thread/WARN]: Type is FRAGMENT
+[11:24:36] [Render thread/INFO]: Stopping worker threads
+[11:24:36] [Render thread/INFO]: Started 10 worker threads
+[11:24:36] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
+[11:24:36] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
+[11:24:36] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
+[11:24:36] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[11:24:36] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
+[11:24:36] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[11:24:36] [Render thread/INFO]: Stopping worker threads
+[11:24:36] [Render thread/INFO]: Started 10 worker threads
+[11:24:37] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
+[11:24:37] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[11:24:46] [Server thread/INFO]: Saving and pausing game...
+[11:24:46] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:overworld
+[11:24:46] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_nether
+[11:24:46] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_end
+[11:24:46] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:primordial_caves
+[11:24:47] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
+[11:24:47] [level shutdown/INFO]: Shutting down ClientRenderState
+[11:24:47] [level shutdown/INFO]: Shutting down LodQuadTree...
+[11:24:47] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}].
+[11:24:47] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[11:24:47] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_nether}
+[11:24:47] [level shutdown/INFO]: Closing world gen queue
+[11:24:47] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}].
+[11:24:47] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}].
+[11:24:47] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}
+[11:24:47] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_end}
+[11:24:47] [level shutdown/INFO]: Closing WorldGenerationQueue...
+[11:24:47] [level shutdown/INFO]: Shutting down world generator thread pool...
+[11:24:47] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
+[11:24:47] [level shutdown/INFO]: [BatchGenerator] shutting down...
+[11:24:47] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
+[11:24:47] [level shutdown/INFO]: Finished closing WorldGenerationQueue
+[11:24:47] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}].
+[11:24:47] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:overworld}
+[11:24:47] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[11:24:47] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}].
+[11:24:47] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}].
+[11:24:47] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}].
+[11:24:47] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}
+[11:24:47] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:overworld}
+[11:24:47] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_nether}
+[11:24:47] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}].
+[11:24:47] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_end}
+[11:24:47] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[11:24:47] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[11:24:47] [Render thread/INFO]: Closing all [4] database connections...
+[11:24:47] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data/DistantHorizons.sqlite]
+[11:24:47] [Server thread/INFO]: HungLo lost connection: Disconnected
+[11:24:47] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data/DistantHorizons.sqlite]
+[11:24:47] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
+[11:24:47] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/data/DistantHorizons.sqlite]
+[11:24:47] [Server thread/INFO]: HungLo left the game
+[11:24:47] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[11:24:47] [Server thread/INFO]: WorldEdit shutdown
+[11:24:47] [Server thread/INFO]: Stopping server
+[11:24:47] [Server thread/INFO]: Saving players
+[11:24:47] [Server thread/INFO]: Saving worlds
+[11:24:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:overworld
+[11:24:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_nether
+[11:24:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_end
+[11:24:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:primordial_caves
+[11:24:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (Origin): All chunks are saved
+[11:24:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[11:24:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[11:24:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
+[11:24:47] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[11:24:47] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[fjnt5oq7b84se@minecraft:overworld].
+[11:24:47] [Render thread/INFO]: Stopping worker threads
+[11:24:48] [Render thread/INFO]: Stopping!
+[11:24:48] [Render thread/INFO]: Saving all world maps
+[11:24:48] [Render thread/INFO]: Save queue flushed!
 
 [Incubating] Problems report is available at: file:///home/matt/Documents/Repos/MattMC/build/reports/problems/problems-report.html
 
@@ -583,6 +588,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 58s
+BUILD SUCCESSFUL in 52s
 9 actionable tasks: 6 executed, 3 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html

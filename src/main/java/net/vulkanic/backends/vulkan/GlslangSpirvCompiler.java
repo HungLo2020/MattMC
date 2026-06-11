@@ -15,7 +15,16 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
     private static final java.util.regex.Pattern LEGACY_VERTEX_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_VertexID\\b");
     private static final java.util.regex.Pattern LEGACY_INSTANCE_ID_PATTERN = java.util.regex.Pattern.compile("\\bgl_InstanceID\\b");
-    private static final java.util.regex.Pattern LEGACY_FRAG_COORD_PATTERN = java.util.regex.Pattern.compile("\\bgl_FragCoord\\b");
+    private static final java.util.regex.Pattern LEGACY_FRAG_COORD_Y_PATTERN = java.util.regex.Pattern.compile("\\bgl_FragCoord\\s*\\.\\s*y\\b");
+    private static final java.util.regex.Pattern LEGACY_FRAG_COORD_XY_VIEW_PATTERN = java.util.regex.Pattern.compile(
+        "\\bgl_FragCoord\\s*\\.\\s*xy\\s*/\\s*vec2\\s*\\(\\s*viewWidth\\s*,\\s*viewHeight\\s*\\)"
+    );
+    private static final java.util.regex.Pattern LEGACY_FRAG_COORD_XY_NOISE_PATTERN = java.util.regex.Pattern.compile(
+        "\\bgl_FragCoord\\s*\\.\\s*xy\\s*/\\s*128\\.0f?"
+    );
+    private static final java.util.regex.Pattern LEGACY_BAYER_FRAG_COORD_XY_PATTERN = java.util.regex.Pattern.compile(
+        "\\b(Bayer(?:2|4|8|16|32|64|128)?)\\s*\\(\\s*gl_FragCoord\\s*\\.\\s*xy\\s*\\)"
+    );
     private static final java.util.regex.Pattern GLSL_VERSION_PATTERN = java.util.regex.Pattern.compile("(?m)^\\s*#version\\s+(\\d+)");
     private static final java.util.regex.Pattern VIEW_HEIGHT_DECLARATION_PATTERN = java.util.regex.Pattern.compile("\\bfloat\\s+viewHeight\\s*;");
     private static final java.util.regex.Pattern STANDALONE_UNIFORM_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
@@ -161,6 +170,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
         if (stage == VulkanicShaderStage.FRAGMENT) {
             normalized = rewriteFragmentCoordForVulkan(normalized);
+            normalized = rewriteFramebufferTextureSamplingForVulkan(normalized);
         }
 
         if (stage != VulkanicShaderStage.VERTEX) {
@@ -177,13 +187,190 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             return shaderSource;
         }
 
-        // Offscreen Vulkan render passes use a negative-height viewport so geometry follows
-        // OpenGL's clip-space orientation, but gl_FragCoord.y still arrives in Vulkan's
-        // upper-left framebuffer coordinate system. Iris shaderpacks expect lower-left
-        // screen coordinates, so normalize only shaders that already carry viewHeight.
-        return LEGACY_FRAG_COORD_PATTERN.matcher(shaderSource).replaceAll(
-            "(vec4(gl_FragCoord.x, viewHeight - gl_FragCoord.y, gl_FragCoord.z, gl_FragCoord.w))"
-        );
+        String lowerLeftXy = lowerLeftFragmentCoordXyExpression();
+        String rewritten = LEGACY_FRAG_COORD_Y_PATTERN.matcher(shaderSource)
+            .replaceAll(java.util.regex.Matcher.quoteReplacement("(viewHeight - gl_FragCoord.y)"));
+        rewritten = LEGACY_FRAG_COORD_XY_VIEW_PATTERN.matcher(rewritten)
+            .replaceAll(java.util.regex.Matcher.quoteReplacement("(" + lowerLeftXy + " / vec2(viewWidth, viewHeight))"));
+        rewritten = LEGACY_FRAG_COORD_XY_NOISE_PATTERN.matcher(rewritten)
+            .replaceAll(java.util.regex.Matcher.quoteReplacement("(" + lowerLeftXy + " / 128.0f)"));
+        return LEGACY_BAYER_FRAG_COORD_XY_PATTERN.matcher(rewritten)
+            .replaceAll("$1" + java.util.regex.Matcher.quoteReplacement("(" + lowerLeftXy + ")"));
+    }
+
+    private static String lowerLeftFragmentCoordXyExpression() {
+        return "vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y)";
+    }
+
+    private static String rewriteFramebufferTextureSamplingForVulkan(String shaderSource) {
+        if (!shaderSource.contains("texture")) {
+            return shaderSource;
+        }
+
+        StringBuilder rewritten = new StringBuilder(shaderSource.length());
+        int cursor = 0;
+        while (cursor < shaderSource.length()) {
+            int callStart = nextTextureCall(shaderSource, cursor);
+            if (callStart < 0) {
+                rewritten.append(shaderSource, cursor, shaderSource.length());
+                break;
+            }
+
+            rewritten.append(shaderSource, cursor, callStart);
+            int openParen = shaderSource.indexOf('(', callStart);
+            int closeParen = findMatchingParen(shaderSource, openParen);
+            if (openParen < 0 || closeParen < 0) {
+                rewritten.append(shaderSource, callStart, shaderSource.length());
+                break;
+            }
+
+            String functionName = shaderSource.substring(callStart, openParen);
+            String arguments = shaderSource.substring(openParen + 1, closeParen);
+            String replacementArguments = rewriteFramebufferTextureArguments(arguments);
+            rewritten.append(functionName)
+                .append('(')
+                .append(replacementArguments)
+                .append(')');
+            cursor = closeParen + 1;
+        }
+
+        return rewritten.toString();
+    }
+
+    private static int nextTextureCall(String shaderSource, int start) {
+        int texture = indexOfFunctionCall(shaderSource, "texture", start);
+        int texture2D = indexOfFunctionCall(shaderSource, "texture2D", start);
+        if (texture < 0) {
+            return texture2D;
+        }
+        if (texture2D < 0) {
+            return texture;
+        }
+        return Math.min(texture, texture2D);
+    }
+
+    private static int indexOfFunctionCall(String shaderSource, String functionName, int start) {
+        int cursor = Math.max(0, start);
+        while (cursor < shaderSource.length()) {
+            int index = shaderSource.indexOf(functionName, cursor);
+            if (index < 0) {
+                return -1;
+            }
+            int afterName = index + functionName.length();
+            if (isIdentifierBoundary(shaderSource, index - 1)
+                && isIdentifierBoundary(shaderSource, afterName)
+                && nextNonWhitespaceIs(shaderSource, afterName, '(')) {
+                return index;
+            }
+            cursor = afterName;
+        }
+        return -1;
+    }
+
+    private static boolean isIdentifierBoundary(String text, int index) {
+        return index < 0 || index >= text.length() || !isGlslIdentifierPart(text.charAt(index));
+    }
+
+    private static boolean isGlslIdentifierPart(char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
+    }
+
+    private static boolean nextNonWhitespaceIs(String text, int start, char expected) {
+        for (int index = start; index < text.length(); index++) {
+            if (!Character.isWhitespace(text.charAt(index))) {
+                return text.charAt(index) == expected;
+            }
+        }
+        return false;
+    }
+
+    private static int findMatchingParen(String text, int openParen) {
+        if (openParen < 0 || openParen >= text.length() || text.charAt(openParen) != '(') {
+            return -1;
+        }
+        int depth = 0;
+        for (int index = openParen; index < text.length(); index++) {
+            char c = text.charAt(index);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+                if (depth == 0) {
+                    return index;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static String rewriteFramebufferTextureArguments(String arguments) {
+        List<int[]> argumentRanges = topLevelArgumentRanges(arguments);
+        if (argumentRanges.size() < 2) {
+            return arguments;
+        }
+
+        String sampler = slice(arguments, argumentRanges.get(0)).trim();
+        if (!isFramebufferSamplerName(sampler)) {
+            return arguments;
+        }
+
+        int[] coordRange = argumentRanges.get(1);
+        String coord = slice(arguments, coordRange).trim();
+        if (coord.isEmpty() || coord.contains("vulkanicFramebufferTexCoord")) {
+            return arguments;
+        }
+
+        StringBuilder rewritten = new StringBuilder(arguments.length() + coord.length() + 48);
+        rewritten.append(arguments, 0, coordRange[0]);
+        rewritten.append(framebufferTextureCoordExpression(coord));
+        rewritten.append(arguments, coordRange[1], arguments.length());
+        return rewritten.toString();
+    }
+
+    private static List<int[]> topLevelArgumentRanges(String arguments) {
+        List<int[]> ranges = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int index = 0; index < arguments.length(); index++) {
+            char c = arguments.charAt(index);
+            if (c == '(' || c == '[' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == ']' || c == '}') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                ranges.add(trimmedRange(arguments, start, index));
+                start = index + 1;
+            }
+        }
+        ranges.add(trimmedRange(arguments, start, arguments.length()));
+        return ranges;
+    }
+
+    private static int[] trimmedRange(String text, int start, int end) {
+        int trimmedStart = start;
+        int trimmedEnd = end;
+        while (trimmedStart < trimmedEnd && Character.isWhitespace(text.charAt(trimmedStart))) {
+            trimmedStart++;
+        }
+        while (trimmedEnd > trimmedStart && Character.isWhitespace(text.charAt(trimmedEnd - 1))) {
+            trimmedEnd--;
+        }
+        return new int[] {trimmedStart, trimmedEnd};
+    }
+
+    private static String slice(String text, int[] range) {
+        return text.substring(range[0], range[1]);
+    }
+
+    private static boolean isFramebufferSamplerName(String sampler) {
+        return sampler.matches("colortex\\d+")
+            || sampler.matches("depthtex\\d*")
+            || sampler.matches("gaux\\d+")
+            || sampler.matches("dhDepthTex\\d*");
+    }
+
+    private static String framebufferTextureCoordExpression(String coord) {
+        return "vec2((" + coord + ").x, 1.0f - (" + coord + ").y)";
     }
 
     private static String promoteVersionForVulkan(String shaderSource) {

@@ -144,19 +144,125 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
-    public void testNormalizeForVulkanRewritesIrisFragmentCoordYToLowerLeft() {
+    public void testNormalizeForVulkanRewritesFragmentCoordScreenMathToLowerLeft() {
         String source = "#version 330\n"
             + "uniform float viewHeight;\n"
+            + "uniform float viewWidth;\n"
             + "out vec4 fragColor;\n"
-            + "void main(){fragColor = vec4(gl_FragCoord.xy, gl_FragCoord.z, gl_FragCoord.w);}";
+            + "float Bayer64(vec2 c) { return c.y; }"
+            + "void main(){"
+            + "vec3 screenPos = vec3(gl_FragCoord.xy / vec2(viewWidth, viewHeight), gl_FragCoord.z);"
+            + "float dither = Bayer64(gl_FragCoord.xy);"
+            + "float scalarY = gl_FragCoord.y;"
+            + "fragColor = vec4(screenPos.xy, dither + scalarY, gl_FragCoord.w);"
+            + "}";
 
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.contains("float viewHeight;"));
-        assertFalse(normalized.contains("vec4(gl_FragCoord.xy"));
         assertTrue(normalized.contains(
-            "vec4((vec4(gl_FragCoord.x, viewHeight - gl_FragCoord.y, gl_FragCoord.z, gl_FragCoord.w)).xy"
+            "vec3 screenPos = vec3((vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y) / vec2(viewWidth, viewHeight)), gl_FragCoord.z);"
         ));
+        assertTrue(normalized.contains("float dither = Bayer64(vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y));"));
+        assertTrue(normalized.contains("float scalarY = (viewHeight - gl_FragCoord.y);"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanKeepsFramebufferTexelCoordsNative() {
+        String source = "#version 330\n"
+            + "uniform float viewHeight;\n"
+            + "uniform float viewWidth;\n"
+            + "uniform sampler2D colortex0;\n"
+            + "uniform sampler2D depthtex0;\n"
+            + "uniform mat4 iris_ModelViewMatrix;\n"
+            + "noperspective in vec2 texCoord;\n"
+            + "out vec4 fragColor;\n"
+            + "void main(){ivec2 texelCoord = ivec2(gl_FragCoord.xy);"
+            + "ivec2 texelCoordM2 = texelCoord + ivec2(1, 0);"
+            + "vec3 color = texelFetch(colortex0, texelCoord, 0).rgb;"
+            + "float depth = texelFetch(depthtex0, texelCoord, 0).r;"
+            + "float depthNeighbour = texelFetch(depthtex0, texelCoordM2, 0).r;"
+            + "vec3 screenPos = vec3(gl_FragCoord.xy / vec2(viewWidth, viewHeight), gl_FragCoord.z);"
+            + "fragColor = vec4(color, depth + depthNeighbour + screenPos.y);}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("ivec2 texelCoord = ivec2(gl_FragCoord.xy);"));
+        assertTrue(normalized.contains("texelFetch(colortex0, texelCoord, 0).rgb"));
+        assertTrue(normalized.contains("texelFetch(depthtex0, texelCoord, 0).r"));
+        assertTrue(normalized.contains("texelFetch(depthtex0, texelCoordM2, 0).r"));
+        assertTrue(normalized.contains(
+            "vec3 screenPos = vec3((vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y) / vec2(viewWidth, viewHeight)), gl_FragCoord.z);"
+        ));
+        assertFalse(normalized.contains("ivec2((vec"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanFlipsFramebufferTextureSamplingCoords() {
+        String source = "#version 330\n"
+            + "uniform float viewHeight;\n"
+            + "uniform sampler2D colortex0;\n"
+            + "uniform sampler2D depthtex0;\n"
+            + "uniform sampler2D gaux2;\n"
+            + "uniform sampler2D noisetex;\n"
+            + "uniform sampler2D tex;\n"
+            + "noperspective in vec2 texCoord;\n"
+            + "out vec4 fragColor;\n"
+            + "void main(){"
+            + "vec2 coord1 = texCoord + vec2(0.01);"
+            + "vec3 color = texture(colortex0, texCoord).rgb;"
+            + "float depth = texture2D(depthtex0, coord1).r;"
+            + "vec3 history = texture(gaux2, vec2(0.5, 0.25), 0).rgb;"
+            + "vec3 noise = texture(noisetex, texCoord).rgb;"
+            + "vec3 atlas = texture(tex, texCoord).rgb;"
+            + "fragColor = vec4(color + history + noise + atlas, depth);"
+            + "}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("texture(colortex0, vec2((texCoord).x, 1.0f - (texCoord).y)).rgb"));
+        assertTrue(normalized.contains("texture2D(depthtex0, vec2((coord1).x, 1.0f - (coord1).y)).r"));
+        assertTrue(normalized.contains("texture(gaux2, vec2((vec2(0.5, 0.25)).x, 1.0f - (vec2(0.5, 0.25)).y), 0).rgb"));
+        assertTrue(normalized.contains("texture(noisetex, texCoord).rgb"));
+        assertTrue(normalized.contains("texture(tex, texCoord).rgb"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanKeepsIrisTaaHistoryBlend() {
+        String source = "#version 330\n"
+            + "uniform float viewHeight;\n"
+            + "uniform sampler2D colortex2;\n"
+            + "out vec4 fragColor;\n"
+            + "void DoTAA(inout vec3 color, inout vec3 temp, float z1){"
+            + "vec2 prvCoord = vec2(0.5);"
+            + "vec3 tempColor = texture(colortex2, prvCoord).rgb;"
+            + "color = mix(color, tempColor, 0.5);"
+            + "temp = color;"
+            + "}"
+            + "void main(){vec3 color = vec3(1.0); vec3 temp = vec3(0.0); float z1 = gl_FragCoord.z;"
+            + "DoTAA(color, temp, z1);"
+            + "fragColor = vec4(color + temp, 1.0);}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("DoTAA(color, temp, z1);"));
+        assertTrue(normalized.contains("texture(colortex2, vec2((prvCoord).x, 1.0f - (prvCoord).y)).rgb"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanKeepsIrisAmbientOcclusion() {
+        String source = "#version 330\n"
+            + "uniform float viewHeight;\n"
+            + "out vec4 fragColor;\n"
+            + "float DoAmbientOcclusion(float z0, float linearZ0, float dither) { return 0.25; }"
+            + "void main(){float z0 = gl_FragCoord.z; float linearZ0 = z0; float dither = 0.0;"
+            + "float ssao = DoAmbientOcclusion(z0, linearZ0, dither);"
+            + "fragColor = vec4(vec3(ssao), 1.0);}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("float ssao = DoAmbientOcclusion(z0, linearZ0, dither);"));
+        assertFalse(normalized.contains("float ssao = 1.0f;"));
     }
 
     @Test
