@@ -787,6 +787,10 @@ public class VulkanicAPI {
      * Gets the currently active backend identity.
      */
     public static GraphicsBackendType getActiveBackendType() {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directVulkanBackend.getBackendType();
+        }
         return getBackend().getBackendType();
     }
 
@@ -1718,6 +1722,11 @@ public class VulkanicAPI {
      * @param unit The texture unit to activate
      */
     public static void setActiveTextureUnit(CommandContext ctx, int unit) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setActiveTextureUnit(ctx, unit);
+            return;
+        }
         getBackend().setActiveTextureUnit(ctx, unit);
     }
 
@@ -2227,6 +2236,11 @@ public class VulkanicAPI {
      * @param v2 The third component value
      */
     public static void setUniform3f(CommandContext ctx, int location, float v0, float v1, float v2) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniform3f(ctx, location, v0, v1, v2);
+            return;
+        }
         getBackend().setUniform3f(ctx, location, v0, v1, v2);
     }
     
@@ -2619,10 +2633,24 @@ public class VulkanicAPI {
     
     public static void uploadTexture2D(CommandContext ctx, int target, int level, int internalFormat, int width, int height, 
                                         int border, int format, int type, java.nio.ByteBuffer pixels) {
-        GraphicsBackend activeBackend = getBackend();
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
 
         // Preserve exact legacy GL tuples on OpenGL to avoid any accidental
         // reinterpretation of caller-provided texture upload semantics.
+        if (directVulkanBackend != null) {
+            java.util.Optional<VulkanicTextureUploadFormat> knownFormat = VulkanicTextureUploadFormat.fromLegacyGlTuple(internalFormat, format, type);
+            java.util.Optional<VulkanicTextureTarget> knownTarget = VulkanicTextureTarget.fromLegacyGlTarget(target);
+
+            if (knownFormat.isPresent() && knownTarget.isPresent()) {
+                directVulkanBackend.uploadTexture2D(ctx, knownTarget.get(), level, knownFormat.get(), width, height, border, pixels);
+                return;
+            }
+
+            directVulkanBackend.uploadTexture2D(ctx, target, level, internalFormat, width, height, border, format, type, pixels);
+            return;
+        }
+
+        GraphicsBackend activeBackend = getBackend();
         if (activeBackend.getBackendType() == GraphicsBackendType.VULKAN) {
             java.util.Optional<VulkanicTextureUploadFormat> knownFormat = VulkanicTextureUploadFormat.fromLegacyGlTuple(internalFormat, format, type);
             java.util.Optional<VulkanicTextureTarget> knownTarget = VulkanicTextureTarget.fromLegacyGlTarget(target);
@@ -2646,6 +2674,11 @@ public class VulkanicAPI {
         int border,
         java.nio.ByteBuffer pixels
     ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.uploadTexture2D(ctx, target, level, uploadFormat, width, height, border, pixels);
+            return;
+        }
         getBackend().uploadTexture2D(ctx, target, level, uploadFormat, width, height, border, pixels);
     }
 
@@ -2662,6 +2695,11 @@ public class VulkanicAPI {
         int border,
         java.nio.ByteBuffer pixels
     ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.uploadTexture2D(ctx, VulkanicTextureTarget.TEXTURE_2D, level, uploadFormat, width, height, border, pixels);
+            return;
+        }
         getBackend().uploadTexture2D(ctx, level, uploadFormat, width, height, border, pixels);
     }
 
@@ -2670,11 +2708,16 @@ public class VulkanicAPI {
      */
     public static void uploadTexture2D(CommandContext ctx, int level, int internalFormat, int width, int height,
                                        int border, int format, int type, java.nio.ByteBuffer pixels) {
-        getBackend().uploadTexture2D(ctx, GL_TEXTURE_2D, level, internalFormat, width, height, border, format, type, pixels);
+        uploadTexture2D(ctx, GL_TEXTURE_2D, level, internalFormat, width, height, border, format, type, pixels);
     }
     
     public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
                                                 int width, int height, int format, int type, long pixels) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
+            return;
+        }
         getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
 
@@ -2688,11 +2731,21 @@ public class VulkanicAPI {
      */
     public static void uploadTexture2DSubImage(CommandContext ctx, int level, int xOffset, int yOffset,
                                                 int width, int height, int format, int type, long pixels) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.uploadTexture2DSubImage(ctx, GL_TEXTURE_2D, level, xOffset, yOffset, width, height, format, type, pixels);
+            return;
+        }
         getBackend().uploadTexture2DSubImage(ctx, GL_TEXTURE_2D, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
     public static void uploadTexture2DSubImage(CommandContext ctx, int target, int level, int xOffset, int yOffset, 
                                                 int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
+            return;
+        }
         getBackend().uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);
     }
 
@@ -2706,6 +2759,11 @@ public class VulkanicAPI {
      */
     public static void uploadTexture2DSubImage(CommandContext ctx, int level, int xOffset, int yOffset,
                                                 int width, int height, int format, int type, java.nio.ByteBuffer pixels) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.uploadTexture2DSubImage(ctx, GL_TEXTURE_2D, level, xOffset, yOffset, width, height, format, type, pixels);
+            return;
+        }
         getBackend().uploadTexture2DSubImage(ctx, GL_TEXTURE_2D, level, xOffset, yOffset, width, height, format, type, pixels);
     }
     
@@ -3069,6 +3127,10 @@ public class VulkanicAPI {
     }
     
     public static int getUniformLocation(CommandContext ctx, int program, CharSequence name) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directVulkanBackend.getUniformLocation(ctx, program, name);
+        }
         return getBackend().getUniformLocation(ctx, program, name);
     }
 
@@ -3169,6 +3231,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniform1i(CommandContext ctx, VulkanicUniformLocation location, int value) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniform1i(ctx, location.value(), value);
+            return;
+        }
         getBackend().setUniform1i(ctx, location, value);
     }
     
@@ -3177,6 +3244,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniform1f(CommandContext ctx, VulkanicUniformLocation location, float value) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniform1f(ctx, location.value(), value);
+            return;
+        }
         getBackend().setUniform1f(ctx, location, value);
     }
     
@@ -3185,6 +3257,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniform2f(CommandContext ctx, VulkanicUniformLocation location, float v0, float v1) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniform2f(ctx, location.value(), v0, v1);
+            return;
+        }
         getBackend().setUniform2f(ctx, location, v0, v1);
     }
     
@@ -3193,6 +3270,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniform3i(CommandContext ctx, VulkanicUniformLocation location, int v0, int v1, int v2) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniform3i(ctx, location.value(), v0, v1, v2);
+            return;
+        }
         getBackend().setUniform3i(ctx, location, v0, v1, v2);
     }
     
@@ -3201,6 +3283,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniform4f(CommandContext ctx, VulkanicUniformLocation location, float v0, float v1, float v2, float v3) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniform4f(ctx, location.value(), v0, v1, v2, v3);
+            return;
+        }
         getBackend().setUniform4f(ctx, location, v0, v1, v2, v3);
     }
     
@@ -3209,6 +3296,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniform4i(CommandContext ctx, VulkanicUniformLocation location, int v0, int v1, int v2, int v3) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniform4i(ctx, location.value(), v0, v1, v2, v3);
+            return;
+        }
         getBackend().setUniform4i(ctx, location, v0, v1, v2, v3);
     }
     
@@ -3217,6 +3309,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniformMatrix3fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, java.nio.FloatBuffer matrix) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniformMatrix3fv(ctx, location.value(), transpose, matrix);
+            return;
+        }
         getBackend().setUniformMatrix3fv(ctx, location, transpose, matrix);
     }
     
@@ -3225,6 +3322,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniformMatrix3fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, float[] matrix) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniformMatrix3fv(ctx, location.value(), transpose, matrix);
+            return;
+        }
         getBackend().setUniformMatrix3fv(ctx, location, transpose, matrix);
     }
     
@@ -3233,6 +3335,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniformMatrix4fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, java.nio.FloatBuffer matrix) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniformMatrix4fv(ctx, location.value(), transpose, matrix);
+            return;
+        }
         getBackend().setUniformMatrix4fv(ctx, location, transpose, matrix);
     }
     
@@ -3241,6 +3348,11 @@ public class VulkanicAPI {
     }
 
     public static void setUniformMatrix4fv(CommandContext ctx, VulkanicUniformLocation location, boolean transpose, float[] matrix) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniformMatrix4fv(ctx, location.value(), transpose, matrix);
+            return;
+        }
         getBackend().setUniformMatrix4fv(ctx, location, transpose, matrix);
     }
     
@@ -3995,7 +4107,11 @@ public class VulkanicAPI {
             return 0;
         }
 
-        return getBackend().resolveTextureHandle(getCommandContext(), target);
+        CommandContext ctx = getCommandContext();
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolveTextureHandle(ctx, target)
+            : getBackend().resolveTextureHandle(ctx, target);
     }
 
     /**
@@ -4009,7 +4125,11 @@ public class VulkanicAPI {
             return 0;
         }
 
-        return getBackend().resolveBufferHandle(getCommandContext(), buffer);
+        CommandContext ctx = getCommandContext();
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolveBufferHandle(ctx, buffer)
+            : getBackend().resolveBufferHandle(ctx, buffer);
     }
 
     /**
@@ -4025,7 +4145,11 @@ public class VulkanicAPI {
         }
 
         VulkanicTexture depthTarget = depthTexture instanceof VulkanicTexture texture ? texture : null;
-        return getBackend().resolveFramebufferForTextures(getCommandContext(), colorTarget, depthTarget);
+        CommandContext ctx = getCommandContext();
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolveFramebufferForTextures(ctx, colorTarget, depthTarget)
+            : getBackend().resolveFramebufferForTextures(ctx, colorTarget, depthTarget);
     }
     
     public static int getTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
@@ -4367,6 +4491,11 @@ public class VulkanicAPI {
      * @param ctx Command context
      */
     public static void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.drawIndexedBaseVertex(ctx, mode, count, type, indices, baseVertex);
+            return;
+        }
         getBackend().drawIndexedBaseVertex(ctx, mode, count, type, indices, baseVertex);
     }
 
@@ -4385,14 +4514,14 @@ public class VulkanicAPI {
      * Renders indexed primitives with a base vertex offset using a backend-agnostic index type.
      */
     public static void drawIndexedBaseVertex(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices, int baseVertex) {
-        getBackend().drawIndexedBaseVertex(ctx, mode, count, indexType.toGlTypeConstant(), indices, baseVertex);
+        drawIndexedBaseVertex(ctx, mode, count, indexType.toGlTypeConstant(), indices, baseVertex);
     }
 
     /**
      * Renders indexed primitives with a base vertex offset using backend-neutral primitive and index types.
      */
     public static void drawIndexedBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices, int baseVertex) {
-        getBackend().drawIndexedBaseVertex(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, baseVertex);
+        drawIndexedBaseVertex(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, baseVertex);
     }
     
     /**
@@ -4614,6 +4743,11 @@ public class VulkanicAPI {
     
     
     public static void setUniform2i(CommandContext ctx, int location, int v0, int v1) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.setUniform2i(ctx, location, v0, v1);
+            return;
+        }
         getBackend().setUniform2i(ctx, location, v0, v1);
     }
     
@@ -5581,6 +5715,11 @@ public class VulkanicAPI {
      * See {@link GraphicsBackend#bindTextureUnit(CommandContext, int, int)}
      */
     public static void bindTextureUnit(CommandContext ctx, int unit, int texture) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.bindTextureUnit(ctx, unit, texture);
+            return;
+        }
         getBackend().bindTextureUnit(ctx, unit, texture);
     }
 
@@ -5590,6 +5729,26 @@ public class VulkanicAPI {
      * See {@link GraphicsBackend#bindTextureUnit(CommandContext, int, GpuTextureView)}
      */
     public static void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            if (textureView == null) {
+                throw new IllegalArgumentException("textureView must not be null");
+            }
+            if (textureView.isClosed()) {
+                throw new IllegalStateException("Cannot bind closed texture view");
+            }
+
+            int textureHandle = directVulkanBackend.resolveTextureHandle(ctx, textureView.texture());
+            if (textureHandle <= 0) {
+                throw new IllegalStateException(
+                    "Unable to resolve backend texture handle for view texture: " + textureView.texture().getLabel());
+            }
+
+            directVulkanBackend.bindTextureUnit(ctx, unit, textureHandle);
+            net.irisshaders.iris.gl.IrisRenderSystem.setTextureBinding(unit, textureHandle);
+            return;
+        }
+
         getBackend().bindTextureUnit(ctx, unit, textureView);
 
         // Iris tracks texture-unit state in a cache used by shader/pipeline integration.
@@ -6446,6 +6605,10 @@ public class VulkanicAPI {
      * In Vulkan this acquires the next swapchain image and returns its index.
      */
     public static int beginFrame() {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directVulkanBackend.beginFrame();
+        }
         return getBackend().beginFrame();
     }
 
@@ -6456,6 +6619,11 @@ public class VulkanicAPI {
      * In Vulkan this presents the currently acquired swapchain image.
      */
     public static void endFrame() {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.endFrame();
+            return;
+        }
         getBackend().endFrame();
     }
 
@@ -6463,6 +6631,11 @@ public class VulkanicAPI {
      * Presents a color render target view to the active backend's screen/swapchain.
      */
     public static void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.presentTextureToScreen(ctx, textureView);
+            return;
+        }
         getBackend().presentTextureToScreen(ctx, textureView);
     }
 
@@ -6479,6 +6652,10 @@ public class VulkanicAPI {
      * @return a CommandContext for recording commands
      */
     public static CommandContext beginCommandBuffer() {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directVulkanBackend.beginCommandBuffer();
+        }
         return getBackend().beginCommandBuffer();
     }
 
@@ -6491,6 +6668,11 @@ public class VulkanicAPI {
      * @param ctx the command context returned by {@link #beginCommandBuffer()}
      */
     public static void submitCommandBuffer(CommandContext ctx) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            directVulkanBackend.submitCommandBuffer(ctx);
+            return;
+        }
         getBackend().submitCommandBuffer(ctx);
     }
 
@@ -6573,6 +6755,10 @@ public class VulkanicAPI {
         java.util.function.Supplier<String> label,
         int framebuffer
     ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directVulkanBackend.beginRenderPass(ctx, label, framebuffer);
+        }
         return getBackend().beginRenderPass(ctx, label, framebuffer);
     }
 
@@ -6585,6 +6771,10 @@ public class VulkanicAPI {
      */
     public static VulkanicRenderPass beginRenderPass(CommandContext ctx,
             VulkanicRenderPassDescriptor descriptor) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directVulkanBackend.beginRenderPass(ctx, descriptor);
+        }
         return getBackend().beginRenderPass(ctx, descriptor);
     }
 }

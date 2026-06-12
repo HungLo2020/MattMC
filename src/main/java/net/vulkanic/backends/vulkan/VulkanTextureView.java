@@ -25,6 +25,7 @@ public class VulkanTextureView extends VulkanicTextureView {
     private final long vkImageViewHandle;
     private final int baseMipLevel;
     private final int mipLevelCount;
+    private final int legacyTextureHandle;
     private final Runnable closeAction;
 
     private volatile boolean closed;
@@ -34,6 +35,15 @@ public class VulkanTextureView extends VulkanicTextureView {
                       int baseMipLevel,
                       int mipLevelCount,
                       Runnable closeAction) {
+        this(texture, vkImageViewHandle, baseMipLevel, mipLevelCount, 0, closeAction);
+    }
+
+    public VulkanTextureView(VulkanicTexture texture,
+                      long vkImageViewHandle,
+                      int baseMipLevel,
+                      int mipLevelCount,
+                      int legacyTextureHandle,
+                      Runnable closeAction) {
         Objects.requireNonNull(texture, "texture must not be null");
         if (baseMipLevel < 0 || mipLevelCount < 1
                 || baseMipLevel + mipLevelCount > texture.getMipLevels()) {
@@ -41,10 +51,14 @@ public class VulkanTextureView extends VulkanicTextureView {
                 "Invalid mip range [" + baseMipLevel + ", " + (baseMipLevel + mipLevelCount)
                     + ") for texture with " + texture.getMipLevels() + " mip levels");
         }
+        if (legacyTextureHandle < 0) {
+            throw new IllegalArgumentException("legacyTextureHandle must be >= 0");
+        }
         this.texture = texture;
         this.vkImageViewHandle = vkImageViewHandle;
         this.baseMipLevel = baseMipLevel;
         this.mipLevelCount = mipLevelCount;
+        this.legacyTextureHandle = legacyTextureHandle;
         this.closeAction = Objects.requireNonNull(closeAction, "closeAction must not be null");
     }
 
@@ -55,6 +69,10 @@ public class VulkanTextureView extends VulkanicTextureView {
      */
     long getVkImageViewHandle() {
         return vkImageViewHandle;
+    }
+
+    int getLegacyTextureHandle() {
+        return legacyTextureHandle;
     }
 
     @Override

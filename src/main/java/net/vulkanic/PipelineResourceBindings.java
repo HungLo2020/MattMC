@@ -75,14 +75,32 @@ public final class PipelineResourceBindings {
         return Optional.ofNullable(samplerBindings.get(name));
     }
 
+    @Nullable
+    public SamplerBinding getSamplerBindingOrNull(String name) {
+        Objects.requireNonNull(name, "name must not be null");
+        return samplerBindings.get(name);
+    }
+
     public Optional<VulkanicBufferSlice> getUniformBufferBinding(String name) {
         Objects.requireNonNull(name, "name must not be null");
         return Optional.ofNullable(uniformBufferBindings.get(name));
     }
 
+    @Nullable
+    public VulkanicBufferSlice getUniformBufferBindingOrNull(String name) {
+        Objects.requireNonNull(name, "name must not be null");
+        return uniformBufferBindings.get(name);
+    }
+
     public Optional<TexelBufferBinding> getTexelBufferBinding(String name) {
         Objects.requireNonNull(name, "name must not be null");
         return Optional.ofNullable(texelBufferBindings.get(name));
+    }
+
+    @Nullable
+    public TexelBufferBinding getTexelBufferBindingOrNull(String name) {
+        Objects.requireNonNull(name, "name must not be null");
+        return texelBufferBindings.get(name);
     }
 
     /**

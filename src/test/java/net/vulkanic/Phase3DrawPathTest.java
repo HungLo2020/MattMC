@@ -585,8 +585,9 @@ public class Phase3DrawPathTest {
         String vulkanicApiSource = Files.readString(vulkanicApiFile);
         assertFalse(vulkanicApiSource.contains("return texture.glId();"),
             "VulkanicAPI.getTextureHandle should not directly call texture.glId after backend-seam migration");
-        assertTrue(vulkanicApiSource.contains("return getBackend().resolveTextureHandle(getCommandContext(), target);"),
-            "VulkanicAPI.getTextureHandle should delegate handle extraction to GraphicsBackend.resolveTextureHandle");
+        assertTrue(vulkanicApiSource.contains("directVulkanBackend.resolveTextureHandle(ctx, target)")
+                && vulkanicApiSource.contains(": getBackend().resolveTextureHandle(ctx, target);"),
+            "VulkanicAPI.getTextureHandle should delegate texture-handle extraction to the active backend, with direct Vulkan dispatch for the hot path");
 
         Path openGlBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
         String openGlBackendSource = Files.readString(openGlBackendFile);

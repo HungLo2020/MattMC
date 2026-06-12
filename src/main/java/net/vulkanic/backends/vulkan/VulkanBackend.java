@@ -8586,32 +8586,6 @@ void main() {
             );
         }
 
-        private void validateRequiredDescriptorBindings(
-            List<PipelineDescriptor.ResourceBinding> layoutBindings,
-            PipelineResourceBindings bindings,
-            String pipelineLocation
-        ) {
-            List<String> missingBindings = new ArrayList<>();
-            for (PipelineDescriptor.ResourceBinding binding : layoutBindings) {
-                PipelineDescriptor.ResourceBinding effectiveBinding = withEffectiveBindingType(binding, bindings);
-                boolean present = switch (effectiveBinding.type()) {
-                    case SAMPLER, COMPARISON_SAMPLER -> bindings.getSamplerBinding(binding.name()).isPresent();
-                    case UNIFORM_BUFFER -> bindings.getUniformBufferBinding(binding.name()).isPresent();
-                    case TEXEL_BUFFER -> bindings.getTexelBufferBinding(binding.name()).isPresent();
-                };
-                if (!present) {
-                    missingBindings.add(binding.name() + "(" + effectiveBinding.type() + ")");
-                }
-            }
-
-            if (!missingBindings.isEmpty()) {
-                throw new DescriptorValidationException(
-                    "Descriptor validation failed for " + pipelineLocation + ": missing required bindings "
-                        + missingBindings
-                );
-            }
-        }
-
         private List<PipelineDescriptor.ResourceBinding> normalizeDescriptorLayoutBindings(
             List<PipelineDescriptor.ResourceBinding> bindings
         ) {
@@ -8634,10 +8608,10 @@ void main() {
             String pipelineLocation,
             long pipelineHandle
         ) {
-            PipelineResourceBindings.SamplerBinding samplerBinding = bindings
-                .getSamplerBinding(binding.name())
-                .orElseThrow(() -> new IllegalStateException(
-                    "Missing sampler binding for '" + binding.name() + "'"));
+            PipelineResourceBindings.SamplerBinding samplerBinding = bindings.getSamplerBindingOrNull(binding.name());
+            if (samplerBinding == null) {
+                throw new DescriptorValidationException("Missing sampler binding for '" + binding.name() + "'");
+            }
 
             if (!(samplerBinding.textureView() instanceof VulkanTextureView vulkanTextureView)) {
                 throw new IllegalArgumentException(
@@ -8645,7 +8619,7 @@ void main() {
             }
 
             VulkanTextureView resolvedTextureView = vulkanTextureView;
-            LegacyTextureObject sampledLegacyTexture = tryResolveLegacyTexture(resolvedTextureView.texture());
+            LegacyTextureObject sampledLegacyTexture = tryResolveLegacyTexture(resolvedTextureView);
 
             boolean wantsComparisonSampler = binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER;
             boolean canUseComparisonSampler = sampledLegacyTexture != null
@@ -8660,16 +8634,15 @@ void main() {
                     depthFallbackBindings = new String[]{"depthtex0", "depthtex1", "depthtex2", "dhDepthTex", "dhDepthTex1"};
                 }
                 for (String fallbackBindingName : depthFallbackBindings) {
-                    java.util.Optional<PipelineResourceBindings.SamplerBinding> fallbackBinding = bindings.getSamplerBinding(fallbackBindingName);
-                    if (fallbackBinding.isEmpty()) {
+                    PipelineResourceBindings.SamplerBinding fallbackSamplerBinding = bindings.getSamplerBindingOrNull(fallbackBindingName);
+                    if (fallbackSamplerBinding == null) {
                         continue;
                     }
-                    PipelineResourceBindings.SamplerBinding fallbackSamplerBinding = fallbackBinding.get();
                     if (!(fallbackSamplerBinding.textureView() instanceof VulkanTextureView)) {
                         continue;
                     }
                     VulkanTextureView fallbackView = (VulkanTextureView) fallbackSamplerBinding.textureView();
-                    LegacyTextureObject fallbackTexture = tryResolveLegacyTexture(fallbackView.texture());
+                    LegacyTextureObject fallbackTexture = tryResolveLegacyTexture(fallbackView);
                     if (fallbackTexture == null || fallbackTexture.aspectMask != VK10.VK_IMAGE_ASPECT_DEPTH_BIT) {
                         continue;
                     }
@@ -8750,6 +8723,7 @@ void main() {
 
             DescriptorSamplerKey samplerKey = descriptorSamplerKey(
                 resolvedTextureView,
+                sampledLegacyTexture,
                 samplerBinding.samplerObject(),
                 samplerBinding.textureUnit(),
                 binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
@@ -8855,10 +8829,10 @@ void main() {
             PipelineDescriptor.ResourceBinding binding,
             PipelineResourceBindings bindings
         ) {
-            VulkanicBufferSlice slice = bindings
-                .getUniformBufferBinding(binding.name())
-                .orElseThrow(() -> new IllegalStateException(
-                    "Missing uniform-buffer binding for '" + binding.name() + "'"));
+            VulkanicBufferSlice slice = bindings.getUniformBufferBindingOrNull(binding.name());
+            if (slice == null) {
+                throw new DescriptorValidationException("Missing uniform-buffer binding for '" + binding.name() + "'");
+            }
 
             if (!(slice.buffer() instanceof VulkanBuffer vulkanBuffer)) {
                 throw new IllegalArgumentException(
@@ -8910,10 +8884,10 @@ void main() {
             PipelineDescriptor.ResourceBinding binding,
             PipelineResourceBindings bindings
         ) {
-            PipelineResourceBindings.TexelBufferBinding texelBinding = bindings
-                .getTexelBufferBinding(binding.name())
-                .orElseThrow(() -> new IllegalStateException(
-                    "Missing texel-buffer binding for '" + binding.name() + "'"));
+            PipelineResourceBindings.TexelBufferBinding texelBinding = bindings.getTexelBufferBindingOrNull(binding.name());
+            if (texelBinding == null) {
+                throw new DescriptorValidationException("Missing texel-buffer binding for '" + binding.name() + "'");
+            }
 
             int unit = texelBinding.textureUnit();
             Integer textureId = legacyTexture2DBindingsByUnit.get(unit);
@@ -8973,8 +8947,6 @@ void main() {
                 bindPipeline(commandBufferHandle, pipeline.getVkPipelineHandle());
                 return;
             }
-
-            validateRequiredDescriptorBindings(layoutBindings, bindings, pipelineLocation);
 
             // Always bind the pipeline first so the GPU knows which shader/layout to use
             // for subsequent draw calls. vkCmdBindPipeline is valid both inside and
@@ -9085,6 +9057,14 @@ void main() {
             return legacyTextures.get(legacyTextureHandle);
         }
 
+        private LegacyTextureObject tryResolveLegacyTexture(VulkanTextureView textureView) {
+            int legacyTextureHandle = textureView.getLegacyTextureHandle();
+            if (legacyTextureHandle > 0) {
+                return legacyTextures.get(legacyTextureHandle);
+            }
+            return tryResolveLegacyTexture(textureView.texture());
+        }
+
         private void transitionLegacyTextureToSampleLayout(@Nullable LegacyTextureObject texture,
                                                            VulkanTextureView view) {
             transitionLegacyTextureToSampleLayout(
@@ -9147,7 +9127,7 @@ void main() {
         }
 
         private DescriptorSamplerKey descriptorSamplerKey(VulkanTextureView textureView) {
-            return descriptorSamplerKey(textureView, null, -1, null);
+            return descriptorSamplerKey(textureView, tryResolveLegacyTexture(textureView), null, -1, null);
         }
 
         /**
@@ -9161,11 +9141,11 @@ void main() {
          */
         private DescriptorSamplerKey descriptorSamplerKey(
             VulkanTextureView textureView,
+            @Nullable LegacyTextureObject legacyTexture,
             @Nullable Integer samplerObject,
             int textureUnit,
             @Nullable Boolean compareOverride
         ) {
-            LegacyTextureObject legacyTexture = tryResolveLegacyTexture(textureView.texture());
             if (legacyTexture == null) {
                 return null;
             }
@@ -11970,8 +11950,15 @@ void main() {
             boolean forceOwnedView = (texture.usage() & VulkanicTexture.USAGE_RENDER_ATTACHMENT) == 0;
             boolean canUseDefaultView = !forceOwnedView && baseMipLevel == 0 && mipLevelCount == texture.getMipLevels();
             if (canUseDefaultView) {
-                return new VulkanTextureView(texture, legacyTexture.defaultViewHandle, baseMipLevel, mipLevelCount, () -> {
-                });
+                return new VulkanTextureView(
+                    texture,
+                    legacyTexture.defaultViewHandle,
+                    baseMipLevel,
+                    mipLevelCount,
+                    legacyTextureHandle,
+                    () -> {
+                    }
+                );
             }
 
             try (MemoryStack stack = stackPush()) {
@@ -11996,6 +11983,7 @@ void main() {
                     finalViewHandle,
                     baseMipLevel,
                     mipLevelCount,
+                    legacyTextureHandle,
                     createLegacyManagedImageViewCloseAction(legacyTexture, finalViewHandle)
                 );
             }

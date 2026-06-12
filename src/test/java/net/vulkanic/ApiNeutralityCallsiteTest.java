@@ -21,6 +21,30 @@ public class ApiNeutralityCallsiteTest {
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
 
     @Test
+    public void testVulkanicApiHotVulkanPathsUseDirectDispatch() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
+
+        assertTrue(source.contains("directVulkanBackend.submitCommandBuffer(ctx);"),
+            "submitCommandBuffer is a render-thread hotspot and should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("return directVulkanBackend.beginCommandBuffer();"),
+            "beginCommandBuffer should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("directVulkanBackend.setActiveTextureUnit(ctx, unit);"),
+            "active texture selection should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("directVulkanBackend.resolveTextureHandle(ctx, target)"),
+            "texture handle resolution should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("directVulkanBackend.resolveBufferHandle(ctx, buffer)"),
+            "buffer handle resolution should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("directVulkanBackend.uploadTexture2DSubImage(ctx, target, level, xOffset, yOffset, width, height, format, type, pixels);"),
+            "texture sub-image uploads should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("directVulkanBackend.setUniform1f(ctx, location.value(), value);"),
+            "typed uniform wrappers should call Vulkan's concrete integer-location implementation directly");
+        assertTrue(source.contains("directVulkanBackend.drawIndexedBaseVertex(ctx, mode, count, type, indices, baseVertex);"),
+            "indexed base-vertex draws should bypass Vulkan proxy reflection");
+        assertTrue(source.contains("directVulkanBackend.beginRenderPass(ctx, descriptor);"),
+            "render-pass begin should bypass Vulkan proxy reflection");
+    }
+
+    @Test
     public void testHighTrafficRendererCallsitesAvoidConcreteBackendCastLeaks() throws IOException {
         String graphicsBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java"));
         String vulkanicApiSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
