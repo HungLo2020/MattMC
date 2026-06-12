@@ -49,6 +49,9 @@ import java.util.function.BiFunction;
 public class VulkanicAPI {
     private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
     private static final String GENERATED_STANDALONE_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
+    private static final boolean TRACE_STANDALONE_UNIFORMS = Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniforms");
+    private static final int MAX_STANDALONE_UNIFORM_TRACE_LOGS = Integer.getInteger("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
+    private static final java.util.concurrent.atomic.AtomicInteger STANDALONE_UNIFORM_TRACE_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
@@ -3117,6 +3120,22 @@ public class VulkanicAPI {
         return GENERATED_STANDALONE_UNIFORM_BLOCK_NAME;
     }
 
+    public static boolean isStandaloneUniformTracingEnabled() {
+        return TRACE_STANDALONE_UNIFORMS;
+    }
+
+    public static boolean shouldTraceStandaloneUniforms() {
+        if (!isStandaloneUniformTracingEnabled()) {
+            return false;
+        }
+        return MAX_STANDALONE_UNIFORM_TRACE_LOGS < 0
+            || STANDALONE_UNIFORM_TRACE_LOG_COUNT.incrementAndGet() <= MAX_STANDALONE_UNIFORM_TRACE_LOGS;
+    }
+
+    public static boolean shouldTraceStandaloneUniform(String name) {
+        return GENERATED_STANDALONE_UNIFORM_BLOCK_NAME.equals(name) && shouldTraceStandaloneUniforms();
+    }
+
     @Nullable
     public static VulkanicBufferSlice getStandaloneUniformBufferSlice(CommandContext ctx, int program) {
         return dispatchImplementedValue(
@@ -3132,6 +3151,9 @@ public class VulkanicAPI {
         @Nullable String programName,
         @Nullable String note
     ) {
+        if (!isStandaloneUniformTracingEnabled()) {
+            return;
+        }
         GraphicsBackend activeBackend = getBackend();
         if (activeBackend instanceof VulkanBackend vulkanBackend) {
             vulkanBackend.logStandaloneSliceTrace(ctx, stage, program, programName, note);

@@ -79,6 +79,8 @@ public class GlCommandEncoder implements CommandEncoder {
 	private static int DEBUG_PARTICLE_VULKAN_BIND_LOGS = 0;
 	private static int DEBUG_SHARED_CHUNK_LIVE_DESCRIPTOR_LOGS = 0;
 	private static final java.util.Set<String> WARNED_INCOMPLETE_CUSTOM_PASS_KEYS = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+	private static final java.util.Map<SharedChunkLiveDescriptorKey, PipelineDescriptor> SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final int MAX_SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE_ENTRIES = 256;
 
 	private CommandContext commandContext() {
 		return this.activeRenderPassContext != null ? this.activeRenderPassContext : VulkanicAPI.getCommandContext();
@@ -293,6 +295,24 @@ public class GlCommandEncoder implements CommandEncoder {
 		return handle;
 	}
 
+	private record SharedChunkLiveDescriptorKey(RenderPipeline renderPipeline, PipelineDescriptor baseDescriptor, int activeProgramHandle) {
+		@Override
+		public boolean equals(Object object) {
+			return object instanceof SharedChunkLiveDescriptorKey other
+				&& this.renderPipeline == other.renderPipeline
+				&& this.baseDescriptor == other.baseDescriptor
+				&& this.activeProgramHandle == other.activeProgramHandle;
+		}
+
+		@Override
+		public int hashCode() {
+			int result = System.identityHashCode(this.renderPipeline);
+			result = 31 * result + System.identityHashCode(this.baseDescriptor);
+			result = 31 * result + Integer.hashCode(this.activeProgramHandle);
+			return result;
+		}
+	}
+
 	@Nullable
 	private static PipelineDescriptor createSharedChunkLiveDescriptor(
 		CommandContext ctx,
@@ -304,8 +324,21 @@ public class GlCommandEncoder implements CommandEncoder {
 			return null;
 		}
 
+		SharedChunkLiveDescriptorKey cacheKey = new SharedChunkLiveDescriptorKey(renderPipeline, baseDescriptor, activeProgramHandle);
+		PipelineDescriptor cachedDescriptor = SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE.get(cacheKey);
+		if (cachedDescriptor != null) {
+			return cachedDescriptor;
+		}
+
 		PipelineDescriptor liveDescriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(ctx, baseDescriptor, activeProgramHandle);
-		return liveDescriptor != null && liveDescriptor.hasSpirvModules() ? liveDescriptor : null;
+		if (liveDescriptor != null && liveDescriptor.hasSpirvModules()) {
+			if (SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE.size() >= MAX_SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE_ENTRIES) {
+				SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE.clear();
+			}
+			SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE.put(cacheKey, liveDescriptor);
+			return liveDescriptor;
+		}
+		return null;
 	}
 
 	@Nullable
@@ -436,7 +469,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		{
 			boolean standaloneInProgram = glRenderPipeline.program().getUniform(VulkanicAPI.generatedStandaloneUniformBlockName()) instanceof Uniform.Ubo;
 			boolean isIrisPipeline = pipelineInfo.getLocation().toString().contains("iris:");
-			if (isIrisPipeline) {
+			if (isIrisPipeline && VulkanicAPI.shouldTraceStandaloneUniforms()) {
 				LOGGER.info(
 					"StandaloneInsertionTrace stage=entry renderPassId={} pipelineId={} programId={} pipelineLocation={} standaloneInProgram={}",
 					System.identityHashCode(glRenderPass),
@@ -452,7 +485,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					VulkanicAPI.getCommandContext(),
 					insertionProgramId
 				);
-				if (isIrisPipeline) {
+				if (isIrisPipeline && VulkanicAPI.shouldTraceStandaloneUniforms()) {
 					LOGGER.info(
 						"StandaloneInsertionTrace stage=slice-lookup renderPassId={} pipelineId={} programId={} sliceAvailable={} sliceId={}",
 						System.identityHashCode(glRenderPass),
@@ -555,32 +588,37 @@ public class GlCommandEncoder implements CommandEncoder {
 					if (slice == null
 						&& VulkanicAPI.generatedStandaloneUniformBlockName().equals(resourceBinding.name())) {
 						int lookupProgramId = glRenderPipeline.program().getProgramId();
-						LOGGER.info(
-							"CompositePassStandaloneLookupTrace stage=request pipeline={} framebuffer={} programId={} resourceName={} renderPassSlicePresent=no lookupUses=backend-program-id-int lookupProgramId={} lookupProgramIdHash={} pipelineLocation={} programWrapperId={}",
-							"custom-pass",
-							glRenderPass.getFramebuffer(),
-							lookupProgramId,
-							resourceBinding.name(),
-							lookupProgramId,
-							Integer.toHexString(Integer.hashCode(lookupProgramId)),
-							pipelineInfo.getLocation(),
-							System.identityHashCode(glRenderPipeline.program())
-						);
+						boolean traceStandaloneLookup = VulkanicAPI.shouldTraceStandaloneUniforms();
+						if (traceStandaloneLookup) {
+							LOGGER.info(
+								"CompositePassStandaloneLookupTrace stage=request pipeline={} framebuffer={} programId={} resourceName={} renderPassSlicePresent=no lookupUses=backend-program-id-int lookupProgramId={} lookupProgramIdHash={} pipelineLocation={} programWrapperId={}",
+								"custom-pass",
+								glRenderPass.getFramebuffer(),
+								lookupProgramId,
+								resourceBinding.name(),
+								lookupProgramId,
+								Integer.toHexString(Integer.hashCode(lookupProgramId)),
+								pipelineInfo.getLocation(),
+								System.identityHashCode(glRenderPipeline.program())
+							);
+						}
 						slice = VulkanicAPI.getStandaloneUniformBufferSlice(
 							VulkanicAPI.getCommandContext(),
 							lookupProgramId
 						);
-						LOGGER.info(
-							"CompositePassStandaloneLookupTrace stage=result pipeline={} framebuffer={} programId={} resourceName={} sliceAvailable={} lookupProgramId={} lookupProgramIdHash={} programWrapperId={}",
-							"custom-pass",
-							glRenderPass.getFramebuffer(),
-							lookupProgramId,
-							resourceBinding.name(),
-							slice != null ? "yes" : "no",
-							lookupProgramId,
-							Integer.toHexString(Integer.hashCode(lookupProgramId)),
-							System.identityHashCode(glRenderPipeline.program())
-						);
+						if (traceStandaloneLookup) {
+							LOGGER.info(
+								"CompositePassStandaloneLookupTrace stage=result pipeline={} framebuffer={} programId={} resourceName={} sliceAvailable={} lookupProgramId={} lookupProgramIdHash={} programWrapperId={}",
+								"custom-pass",
+								glRenderPass.getFramebuffer(),
+								lookupProgramId,
+								resourceBinding.name(),
+								slice != null ? "yes" : "no",
+								lookupProgramId,
+								Integer.toHexString(Integer.hashCode(lookupProgramId)),
+								System.identityHashCode(glRenderPipeline.program())
+							);
+						}
 					}
 					if (slice != null) {
 						uniformBufferBindings.put(resourceBinding.name(), slice);
@@ -664,14 +702,16 @@ public class GlCommandEncoder implements CommandEncoder {
 						slice = standaloneProgramId >= 0
 							? VulkanicAPI.getStandaloneUniformBufferSlice(VulkanicAPI.getCommandContext(), standaloneProgramId)
 							: null;
-						LOGGER.info(
-							"StandaloneCustomPassProbe stage=lookup programId={} pipelineLocation={} renderPassId={} backendLookupResult={} sliceId={} note=fallback-used-for-custom-pass-binding",
-							standaloneProgramId,
-							standalonePipelineLocation,
-							System.identityHashCode(glRenderPass),
-							slice != null ? "non-null" : "null",
-							System.identityHashCode(slice)
-						);
+						if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
+							LOGGER.info(
+								"StandaloneCustomPassProbe stage=lookup programId={} pipelineLocation={} renderPassId={} backendLookupResult={} sliceId={} note=fallback-used-for-custom-pass-binding",
+								standaloneProgramId,
+								standalonePipelineLocation,
+								System.identityHashCode(glRenderPass),
+								slice != null ? "non-null" : "null",
+								System.identityHashCode(slice)
+							);
+						}
 					}
 					if (slice != null) {
 						uniformBufferBindings.put(resourceBinding.name(), slice);
@@ -1621,21 +1661,23 @@ public class GlCommandEncoder implements CommandEncoder {
 						customPass.program()
 					);
 					if (!submission.completeCoverage()) {
-						LOGGER.info(
-							"CompositePassStandaloneLookupTrace stage=skip pipeline={} framebuffer={} programId={} boundResourceCount={} reflectedResourceCount={}",
-							renderPipeline.getLocation(),
-							glRenderPass.getFramebuffer(),
-							customPass.program().getProgramId(),
-							submission.boundResourceCount(),
-							customPipelineDescriptor.getResourceLayout().bindings().size()
-						);
-						VulkanicAPI.logStandaloneSliceTrace(
-							ctx,
-							"custom-pass-skip",
-							customPass.program().getProgramId(),
-							renderPipeline.getLocation().toString(),
-							"framebuffer=" + glRenderPass.getFramebuffer()
-						);
+						if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
+							LOGGER.info(
+								"CompositePassStandaloneLookupTrace stage=skip pipeline={} framebuffer={} programId={} boundResourceCount={} reflectedResourceCount={}",
+								renderPipeline.getLocation(),
+								glRenderPass.getFramebuffer(),
+								customPass.program().getProgramId(),
+								submission.boundResourceCount(),
+								customPipelineDescriptor.getResourceLayout().bindings().size()
+							);
+							VulkanicAPI.logStandaloneSliceTrace(
+								ctx,
+								"custom-pass-skip",
+								customPass.program().getProgramId(),
+								renderPipeline.getLocation().toString(),
+								"framebuffer=" + glRenderPass.getFramebuffer()
+							);
+						}
 						String customPassKey = renderPipeline.getLocation() + "#" + glRenderPass.getFramebuffer();
 						if (WARNED_INCOMPLETE_CUSTOM_PASS_KEYS.add(customPassKey)) {
 							java.util.List<String> missingResources = collectMissingCustomPassResources(

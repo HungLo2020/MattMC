@@ -426,12 +426,14 @@ public class CompositeRenderer {
 		centerDepthSampler.setUsage(builder.addDynamicSampler(centerDepthSampler::getCenterDepthTexture, "iris_centerDepthSmooth"));
 
 		Program build = builder.build();
-		LOGGER.info(
-			"CompositePassProgramTrace stage=createProgram passName={} programId={} programObjectId={}",
-			source.getName(),
-			build.getProgramId(),
-			System.identityHashCode(build)
-		);
+		if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
+			LOGGER.info(
+				"CompositePassProgramTrace stage=createProgram passName={} programId={} programObjectId={}",
+				source.getName(),
+				build.getProgramId(),
+				System.identityHashCode(build)
+			);
+		}
 
 		// tell the customUniforms that those locations belong to this pass
 		// this is just an object to index the internal map
@@ -557,24 +559,26 @@ public class CompositeRenderer {
 
 			this.pipelineDescriptor = descriptor;
 			this.pipelineHandle = VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
-			boolean descriptorHasStandaloneBlock = descriptor.getResourceLayout().bindings().stream()
-				.anyMatch(binding -> VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name()));
-			LOGGER.info(
-				"CompositePassProgramTrace stage=ensurePipelineState passName={} programId={} programObjectId={} descriptorStandaloneBlockPresent={} framebuffer={}",
-				this.name,
-				this.program.getProgramId(),
-				System.identityHashCode(this.program),
-				descriptorHasStandaloneBlock ? "yes" : "no",
-				this.framebuffer.getId()
-			);
-			VulkanicAPI.logStandaloneSliceTrace(
-				ctx,
-				"composite-pass-program",
-				this.program.getProgramId(),
-				this.name,
-				"programObjectId=" + System.identityHashCode(this.program)
-					+ " descriptorStandaloneBlockPresent=" + (descriptorHasStandaloneBlock ? "yes" : "no")
-			);
+			if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
+				boolean descriptorHasStandaloneBlock = descriptor.getResourceLayout().bindings().stream()
+					.anyMatch(binding -> VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name()));
+				LOGGER.info(
+					"CompositePassProgramTrace stage=ensurePipelineState passName={} programId={} programObjectId={} descriptorStandaloneBlockPresent={} framebuffer={}",
+					this.name,
+					this.program.getProgramId(),
+					System.identityHashCode(this.program),
+					descriptorHasStandaloneBlock ? "yes" : "no",
+					this.framebuffer.getId()
+				);
+				VulkanicAPI.logStandaloneSliceTrace(
+					ctx,
+					"composite-pass-program",
+					this.program.getProgramId(),
+					this.name,
+					"programObjectId=" + System.identityHashCode(this.program)
+						+ " descriptorStandaloneBlockPresent=" + (descriptorHasStandaloneBlock ? "yes" : "no")
+				);
+			}
 		}
 
 		protected void destroy() {

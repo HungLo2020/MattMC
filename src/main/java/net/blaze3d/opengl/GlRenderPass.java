@@ -179,7 +179,7 @@ public class GlRenderPass implements RenderPass {
 					gpuBufferSlice.length()
 				)
 			);
-			if (VulkanicAPI.generatedStandaloneUniformBlockName().equals(string)) {
+			if (VulkanicAPI.shouldTraceStandaloneUniform(string)) {
 				LOGGER.info(
 					"StandaloneLookupKeyTrace stage=renderpass-store lookupType=resource-name key={} keyHash={} mapSize={} containsExactKey=yes availableKeys={} note=render-pass-uniform-slice-stored",
 					string,
@@ -194,7 +194,7 @@ public class GlRenderPass implements RenderPass {
 
 	public void setUniform(String string, net.vulkanic.VulkanicBufferSlice vulkanicBufferSlice) {
 		this.uniformResourceSlices.put(string, vulkanicBufferSlice);
-		if (VulkanicAPI.generatedStandaloneUniformBlockName().equals(string)) {
+		if (VulkanicAPI.shouldTraceStandaloneUniform(string)) {
 			LOGGER.info(
 				"StandaloneLookupKeyTrace stage=renderpass-store renderPassId={} lookupType=resource-name key={} keyHash={} mapSize={} containsExactKey=yes availableKeys={} note=standalone-buffer-slice-stored",
 				System.identityHashCode(this),
@@ -210,7 +210,7 @@ public class GlRenderPass implements RenderPass {
 	@Nullable
 	net.vulkanic.VulkanicBufferSlice getUniformResourceSlice(String string) {
 		net.vulkanic.VulkanicBufferSlice slice = this.uniformResourceSlices.get(string);
-		if (VulkanicAPI.generatedStandaloneUniformBlockName().equals(string)) {
+		if (VulkanicAPI.shouldTraceStandaloneUniform(string)) {
 			LOGGER.info(
 				"StandaloneLookupKeyTrace stage=renderpass-lookup renderPassId={} lookupType=resource-name key={} keyHash={} mapSize={} containsExactKey={} availableKeys={} sliceAvailable={} note=uniformResourceSlices-get",
 				System.identityHashCode(this),

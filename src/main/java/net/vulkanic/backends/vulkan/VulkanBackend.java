@@ -172,7 +172,8 @@ public class VulkanBackend {
     private static final AtomicInteger STANDALONE_UNIFORM_STATS_LOG_COUNT = new AtomicInteger();
     private static final AtomicInteger STANDALONE_SLICE_TRACE_LOG_COUNT = new AtomicInteger();
     private static final AtomicInteger STANDALONE_LOOKUP_SAMPLE_PROGRAM = new AtomicInteger(-1);
-    private static final int MAX_STANDALONE_SLICE_TRACE_LOGS = 256;
+    private static final int MAX_STANDALONE_SLICE_TRACE_LOGS = Integer.getInteger("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
+    private static final boolean TRACE_PIPELINE_CREATION = Boolean.getBoolean("mattmc.vulkan.tracePipelineCreation");
     private static final java.util.concurrent.atomic.AtomicLong glslDumpCounter = new java.util.concurrent.atomic.AtomicLong(0);
     private static final Set<Integer> LEGACY_SAMPLER_UNSUPPORTED_FORMAT_LOGS = ConcurrentHashMap.newKeySet();
 
@@ -2440,6 +2441,9 @@ void main() {
         @Nullable String programName,
         @Nullable String note
     ) {
+        if (!VulkanicAPI.isStandaloneUniformTracingEnabled()) {
+            return;
+        }
         requireVulkanCommandBufferHandle("logStandaloneSliceTrace", ctx);
         logStandaloneSliceTraceInternal(program, stage, programName, virtualPrograms.get(program), null, true, note);
     }
@@ -2453,6 +2457,9 @@ void main() {
         boolean dedupe,
         @Nullable String note
     ) {
+        if (!VulkanicAPI.shouldTraceStandaloneUniforms()) {
+            return;
+        }
         if (STANDALONE_SLICE_TRACE_LOG_COUNT.get() >= MAX_STANDALONE_SLICE_TRACE_LOGS) {
             return;
         }
@@ -2511,6 +2518,9 @@ void main() {
     }
 
     private void logStandaloneProgramKeyTrace(String stage, int programId, @Nullable VirtualProgram virtualProgram, @Nullable String note) {
+        if (!VulkanicAPI.shouldTraceStandaloneUniforms()) {
+            return;
+        }
         java.util.ArrayList<Integer> keys = new java.util.ArrayList<>(virtualPrograms.keySet());
         java.util.Collections.sort(keys);
         LOGGER.info(
@@ -15166,11 +15176,13 @@ void main() {
                 java.util.List<PipelineDescriptor.ResourceBinding> bindings =
                     normalizeDescriptorLayoutBindings(descriptor.getResourceLayout().bindings());
 
-                LOGGER.info("createVulkanPipeline location={} hasSpirvModules={} bindingCount={} bindings={}",
-                    portableState != null ? portableState.location() : "null",
-                    descriptor.hasSpirvModules(),
-                    bindings.size(),
-                    bindings.stream().map(b -> b.binding() + ":" + b.name() + ":" + b.type()).toList());
+                if (TRACE_PIPELINE_CREATION) {
+                    LOGGER.info("createVulkanPipeline location={} hasSpirvModules={} bindingCount={} bindings={}",
+                        portableState != null ? portableState.location() : "null",
+                        descriptor.hasSpirvModules(),
+                        bindings.size(),
+                        bindings.stream().map(b -> b.binding() + ":" + b.name() + ":" + b.type()).toList());
+                }
 
                 long descriptorSetLayoutHandle;
                 if (bindings.isEmpty()) {
