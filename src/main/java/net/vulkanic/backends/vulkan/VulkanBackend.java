@@ -139,7 +139,9 @@ import org.lwjgl.vulkan.VkVertexInputAttributeDescription;
 import org.lwjgl.vulkan.VkVertexInputBindingDescription;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -7807,6 +7809,9 @@ void main() {
         private final List<StagingBuffer> transientStagingBuffers = Collections.synchronizedList(new ArrayList<>());
         private final List<VulkanBuffer> transientDescriptorBuffers = Collections.synchronizedList(new ArrayList<>());
         private final List<List<VulkanBuffer>> transientFrameDescriptorBuffers = createTransientDescriptorBufferBuckets();
+        private final Map<Integer, Deque<VulkanBuffer>> recycledDescriptorUniformBuffers = new HashMap<>();
+        private int recycledDescriptorUniformBufferCount;
+        private static final int MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS = 4096;
         private final List<PendingLegacyTextureStorageDestroy> pendingLegacyTextureStorageDestroys = Collections.synchronizedList(new ArrayList<>());
     /** Tracks {@code VkPipeline} handles owned by live {@link VulkanPipelineHandle} objects. */
     private final Set<Long> managedVkPipelineHandles = ConcurrentHashMap.newKeySet();
@@ -14874,7 +14879,7 @@ void main() {
             }
             synchronized (transientDescriptorBuffers) {
                 if (!transientDescriptorBuffers.isEmpty()) {
-                    new ArrayList<>(transientDescriptorBuffers).forEach(VulkanBuffer::close);
+                    new ArrayList<>(transientDescriptorBuffers).forEach(this::recycleDescriptorUniformBuffer);
                     transientDescriptorBuffers.clear();
                 }
             }
@@ -14904,7 +14909,7 @@ void main() {
             List<VulkanBuffer> frameBuffers = transientFrameDescriptorBuffers.get(frameIndex);
             synchronized (frameBuffers) {
                 if (!frameBuffers.isEmpty()) {
-                    new ArrayList<>(frameBuffers).forEach(VulkanBuffer::close);
+                    new ArrayList<>(frameBuffers).forEach(this::recycleDescriptorUniformBuffer);
                     frameBuffers.clear();
                 }
             }
@@ -14913,6 +14918,94 @@ void main() {
         private void destroyAllTransientFrameDescriptorBuffers() {
             for (int frameIndex = 0; frameIndex < transientFrameDescriptorBuffers.size(); frameIndex++) {
                 destroyTransientFrameDescriptorBuffers(frameIndex);
+            }
+        }
+
+        private static int descriptorUniformBufferBucketSize(int requestedSize) {
+            int size = Math.max(1, requestedSize);
+            int bucketSize = 1;
+            while (bucketSize < size && bucketSize < (1 << 30)) {
+                bucketSize <<= 1;
+            }
+            return bucketSize;
+        }
+
+        private VulkanBuffer acquireDescriptorUniformBuffer(String label, int requestedSize, java.nio.ByteBuffer initialData) {
+            int bucketSize = descriptorUniformBufferBucketSize(requestedSize);
+            VulkanBuffer buffer = null;
+            synchronized (recycledDescriptorUniformBuffers) {
+                Deque<VulkanBuffer> bucket = recycledDescriptorUniformBuffers.get(bucketSize);
+                while (bucket != null && !bucket.isEmpty()) {
+                    VulkanBuffer candidate = bucket.removeFirst();
+                    recycledDescriptorUniformBufferCount--;
+                    if (!candidate.isClosed()) {
+                        buffer = candidate;
+                        break;
+                    }
+                }
+            }
+
+            if (buffer == null) {
+                buffer = (VulkanBuffer) createManagedBuffer(
+                    label,
+                    VulkanicBuffer.USAGE_UNIFORM
+                        | VulkanicBuffer.USAGE_COPY_DST
+                        | VulkanicBuffer.USAGE_MAP_READ
+                        | VulkanicBuffer.USAGE_MAP_WRITE,
+                    bucketSize,
+                    null
+                );
+            }
+
+            writeDescriptorUniformBuffer(buffer, initialData, requestedSize);
+            return buffer;
+        }
+
+        private void writeDescriptorUniformBuffer(VulkanBuffer buffer, java.nio.ByteBuffer initialData, int requestedSize) {
+            if (initialData == null) {
+                return;
+            }
+            if (requestedSize > buffer.size()) {
+                throw new IllegalArgumentException(
+                    "Descriptor uniform upload size " + requestedSize + " exceeds pooled buffer size " + buffer.size());
+            }
+            try (VulkanicBuffer.MappedView mappedView = mapManagedBuffer(buffer, false, true)) {
+                java.nio.ByteBuffer destination = mappedView.data().duplicate();
+                java.nio.ByteBuffer source = initialData.duplicate();
+                source.clear();
+                source.limit(requestedSize);
+                destination.position(0);
+                destination.put(source);
+            }
+        }
+
+        private void recycleDescriptorUniformBuffer(VulkanBuffer buffer) {
+            if (buffer == null || buffer.isClosed()) {
+                return;
+            }
+
+            int bucketSize = descriptorUniformBufferBucketSize(buffer.size());
+            synchronized (recycledDescriptorUniformBuffers) {
+                if (recycledDescriptorUniformBufferCount >= MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS) {
+                    buffer.close();
+                    return;
+                }
+                recycledDescriptorUniformBuffers
+                    .computeIfAbsent(bucketSize, ignored -> new ArrayDeque<>())
+                    .addLast(buffer);
+                recycledDescriptorUniformBufferCount++;
+            }
+        }
+
+        private void destroyRecycledDescriptorUniformBuffers() {
+            synchronized (recycledDescriptorUniformBuffers) {
+                for (Deque<VulkanBuffer> bucket : recycledDescriptorUniformBuffers.values()) {
+                    while (!bucket.isEmpty()) {
+                        bucket.removeFirst().close();
+                    }
+                }
+                recycledDescriptorUniformBuffers.clear();
+                recycledDescriptorUniformBufferCount = 0;
             }
         }
 
@@ -14929,12 +15022,8 @@ void main() {
                 initialData.flip();
             }
 
-            VulkanBuffer transientBuffer = (VulkanBuffer) createManagedBuffer(
+            VulkanBuffer transientBuffer = acquireDescriptorUniformBuffer(
                 "DescriptorUniform-" + bindingName,
-                VulkanicBuffer.USAGE_UNIFORM
-                    | VulkanicBuffer.USAGE_COPY_DST
-                    | VulkanicBuffer.USAGE_MAP_READ
-                    | VulkanicBuffer.USAGE_MAP_WRITE,
                 slice.length(),
                 initialData
             );
@@ -14958,12 +15047,8 @@ void main() {
             initialData.put(source);
             initialData.flip();
 
-            VulkanBuffer transientBuffer = (VulkanBuffer) createManagedBuffer(
+            VulkanBuffer transientBuffer = acquireDescriptorUniformBuffer(
                 "StandaloneUniform-" + program,
-                VulkanicBuffer.USAGE_UNIFORM
-                    | VulkanicBuffer.USAGE_COPY_DST
-                    | VulkanicBuffer.USAGE_MAP_READ
-                    | VulkanicBuffer.USAGE_MAP_WRITE,
                 size,
                 initialData
             );
@@ -16115,6 +16200,7 @@ void main() {
 
                 destroyTransientRenderPassResources();
                 destroyAllTransientFrameDescriptorBuffers();
+                destroyRecycledDescriptorUniformBuffers();
 
                 if (!permanentRenderPassCache.isEmpty()) {
                     new ArrayList<>(permanentRenderPassCache.values()).forEach(rpHandle -> {

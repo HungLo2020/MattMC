@@ -36,6 +36,9 @@ Options:
   --launch-timeout-secs N  Seconds to wait for the client JVM/window. Default: 240
   --backends LIST          Comma-separated backends. Default: opengl,vulkan
   --artifact-dir PATH      Output directory. Default: logs/auto-profile/<timestamp>
+  --shaders MODE           Shader state for the run: on, off, or current. Default: current
+  --shader-pack NAME       Shaderpack to select when shaders are on.
+                          Default: current iris.properties value
   --no-profile-command     Skip in-game /profile automation even if xdotool exists.
   -h, --help               Show this help.
 
@@ -84,6 +87,8 @@ LAUNCH_TIMEOUT_SECS="${LAUNCH_TIMEOUT_SECS:-240}"
 BACKENDS_CSV="${BACKENDS:-opengl,vulkan}"
 ARTIFACT_DIR=""
 PROFILE_COMMAND_MODE="auto"
+SHADERS_MODE="${SHADERS_MODE:-current}"
+SHADER_PACK="${SHADER_PACK:-}"
 
 PERF_MODE="${PERF_MODE:-stat}"
 JFR_SETTINGS="${JFR_SETTINGS:-profile}"
@@ -130,6 +135,14 @@ while [[ $# -gt 0 ]]; do
             ARTIFACT_DIR="${2:-}"
             shift 2
             ;;
+        --shaders)
+            SHADERS_MODE="${2:-}"
+            shift 2
+            ;;
+        --shader-pack)
+            SHADER_PACK="${2:-}"
+            shift 2
+            ;;
         --no-profile-command)
             PROFILE_COMMAND_MODE="off"
             shift
@@ -159,6 +172,22 @@ if [[ "$PERF_MODE" != "off" && "$PERF_MODE" != "stat" && "$PERF_MODE" != "record
     exit 1
 fi
 
+case "$SHADERS_MODE" in
+    on|true|enabled)
+        SHADERS_MODE="on"
+        ;;
+    off|false|disabled)
+        SHADERS_MODE="off"
+        ;;
+    current|unchanged|"")
+        SHADERS_MODE="current"
+        ;;
+    *)
+        echo "--shaders must be one of: on, off, current" >&2
+        exit 1
+        ;;
+esac
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 while [[ ! -f "$PROJECT_ROOT/gradlew" && "$PROJECT_ROOT" != "/" ]]; do
@@ -174,11 +203,15 @@ cd "$PROJECT_ROOT"
 
 RUN_DIR="$PROJECT_ROOT/run"
 OPTIONS_FILE="$RUN_DIR/options.txt"
+IRIS_FILE="$RUN_DIR/config/iris.properties"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 if [[ -z "$ARTIFACT_DIR" ]]; then
     ARTIFACT_DIR="$PROJECT_ROOT/logs/auto-profile/$TIMESTAMP"
+elif [[ "$ARTIFACT_DIR" != /* ]]; then
+    ARTIFACT_DIR="$PROJECT_ROOT/$ARTIFACT_DIR"
 fi
 mkdir -p "$ARTIFACT_DIR"
+ARTIFACT_DIR="$(cd "$ARTIFACT_DIR" && pwd -P)"
 
 SUMMARY_FILE="$ARTIFACT_DIR/summary.txt"
 MANIFEST_FILE="$ARTIFACT_DIR/manifest.txt"
@@ -204,6 +237,12 @@ ORIGINAL_BACKEND=""
 if [[ -f "$OPTIONS_FILE" ]]; then
     ORIGINAL_BACKEND="$(awk -F= '/^graphics_backend=/{print $2; exit}' "$OPTIONS_FILE" || true)"
 fi
+ORIGINAL_IRIS_EXISTS="false"
+ORIGINAL_IRIS_SNAPSHOT="$ARTIFACT_DIR/original_iris.properties"
+if [[ -f "$IRIS_FILE" ]]; then
+    ORIGINAL_IRIS_EXISTS="true"
+    cp "$IRIS_FILE" "$ORIGINAL_IRIS_SNAPSHOT"
+fi
 
 ACTIVE_GRADLE_PID=""
 ACTIVE_GPU_MONITOR_PID=""
@@ -221,6 +260,15 @@ restore_backend() {
         else
             echo "graphics_backend=$ORIGINAL_BACKEND" >> "$OPTIONS_FILE"
         fi
+    fi
+}
+
+restore_iris_config() {
+    if [[ "$ORIGINAL_IRIS_EXISTS" == "true" && -f "$ORIGINAL_IRIS_SNAPSHOT" ]]; then
+        mkdir -p "$(dirname "$IRIS_FILE")"
+        cp "$ORIGINAL_IRIS_SNAPSHOT" "$IRIS_FILE"
+    elif [[ "$ORIGINAL_IRIS_EXISTS" == "false" ]]; then
+        rm -f "$IRIS_FILE"
     fi
 }
 
@@ -260,6 +308,7 @@ shutdown_active_run() {
 final_cleanup() {
     shutdown_active_run
     restore_backend
+    restore_iris_config
     if [[ -n "$METRICS_ATTACH_BUILD_DIR" && -d "$METRICS_ATTACH_BUILD_DIR" ]]; then
         rm -rf "$METRICS_ATTACH_BUILD_DIR"
     fi
@@ -410,6 +459,66 @@ set_backend() {
     else
         echo "graphics_backend=$backend" >> "$OPTIONS_FILE"
     fi
+}
+
+upsert_property() {
+    local file_path="$1"
+    local key="$2"
+    local value="$3"
+
+    if [[ ! -f "$file_path" ]]; then
+        return 1
+    fi
+
+    if grep -q "^${key}=" "$file_path"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file_path"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$file_path"
+    fi
+}
+
+read_property() {
+    local file_path="$1"
+    local key="$2"
+
+    if [[ ! -f "$file_path" ]]; then
+        return 1
+    fi
+
+    awk -F= -v wanted="$key" '$1 == wanted {print substr($0, index($0, "=") + 1); exit}' "$file_path"
+}
+
+apply_shader_config() {
+    if [[ "$SHADERS_MODE" == "current" && -z "$SHADER_PACK" ]]; then
+        return 0
+    fi
+
+    if [[ ! -f "$IRIS_FILE" ]]; then
+        echo "ERROR: Missing Iris config file: $IRIS_FILE" >&2
+        exit 1
+    fi
+
+    case "$SHADERS_MODE" in
+        on)
+            upsert_property "$IRIS_FILE" enableShaders true
+            ;;
+        off)
+            upsert_property "$IRIS_FILE" enableShaders false
+            ;;
+    esac
+
+    if [[ -n "$SHADER_PACK" ]]; then
+        upsert_property "$IRIS_FILE" shaderPack "$SHADER_PACK"
+    fi
+}
+
+effective_shader_state() {
+    local enabled="missing"
+    local pack="missing"
+
+    enabled="$(read_property "$IRIS_FILE" enableShaders || printf 'missing')"
+    pack="$(read_property "$IRIS_FILE" shaderPack || printf 'missing')"
+    printf 'enableShaders=%s\nshaderPack=%s\n' "$enabled" "$pack"
 }
 
 find_client_pid_for_group() {
@@ -902,6 +1011,9 @@ run_backend_capture() {
         echo "shutdown_grace_secs=$SHUTDOWN_GRACE_SECS"
         echo "launch_timeout_secs=$LAUNCH_TIMEOUT_SECS"
         echo "client_args=$CLIENT_ARGS"
+        echo "requested_shaders=$SHADERS_MODE"
+        echo "requested_shader_pack=${SHADER_PACK:-current}"
+        effective_shader_state
         echo "perf_mode=$PERF_MODE"
         echo "jfr_settings=$JFR_SETTINGS"
         echo "display=${DISPLAY:-unset}"
@@ -1068,12 +1180,20 @@ if [[ "${#BACKENDS[@]}" -eq 0 ]]; then
     exit 1
 fi
 
+apply_shader_config
+EFFECTIVE_ENABLE_SHADERS="$(read_property "$IRIS_FILE" enableShaders || printf 'missing')"
+EFFECTIVE_SHADER_PACK="$(read_property "$IRIS_FILE" shaderPack || printf 'missing')"
+
 {
     echo "MattMC backend performance compare"
     echo "timestamp=$TIMESTAMP"
     echo "artifact_dir=$ARTIFACT_DIR"
     echo "project_root=$PROJECT_ROOT"
     echo "client_args=$CLIENT_ARGS"
+    echo "requested_shaders=$SHADERS_MODE"
+    echo "requested_shader_pack=${SHADER_PACK:-current}"
+    echo "enableShaders=$EFFECTIVE_ENABLE_SHADERS"
+    echo "shaderPack=$EFFECTIVE_SHADER_PACK"
     echo "runs_per_backend=$RUNS_PER_BACKEND"
     echo "warmup_secs=$WARMUP_SECS"
     echo "sample_secs=$SAMPLE_SECS"
