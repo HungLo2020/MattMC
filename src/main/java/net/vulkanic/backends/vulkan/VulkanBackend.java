@@ -363,7 +363,7 @@ public class VulkanBackend {
                 && stableCacheKey != null
                 && resourceLayoutKey != null
                 && stableCacheKey.equals(descriptor.getStableCacheKey())
-                && resourceLayoutKey.equals(resourceLayoutKey(descriptor.getResourceLayout()));
+                && resourceLayoutKey.equals(descriptor.getResourceLayoutCacheKey());
         }
 
         void closeIfNeeded() {
@@ -711,7 +711,7 @@ void main() {
                 pipelineHandle,
                 descriptor,
                 descriptor.getStableCacheKey(),
-                resourceLayoutKey(descriptor.getResourceLayout())
+                descriptor.getResourceLayoutCacheKey()
             );
         } catch (RuntimeException exception) {
             LOGGER.error("Failed to precompile Vulkan pipeline {}", renderPipeline.getLocation(), exception);
@@ -972,25 +972,6 @@ void main() {
                     + ";"
             )
         );
-    }
-
-    private static String resourceLayoutKey(PipelineDescriptor.ResourceLayout layout) {
-        StringBuilder builder = new StringBuilder(256);
-        for (PipelineDescriptor.ResourceBinding binding : layout.bindings()) {
-            builder.append(binding.set()).append(':')
-                .append(binding.binding()).append(':')
-                .append(binding.name()).append(':')
-                .append(binding.type()).append(':')
-                .append(binding.textureFormat() == null ? "" : binding.textureFormat().name())
-                .append(':');
-
-            List<String> stages = binding.stages().stream()
-                .map(Enum::name)
-                .sorted()
-                .toList();
-            builder.append(String.join(",", stages)).append(';');
-        }
-        return builder.toString();
     }
 
     public GraphicsBackendType getBackendType() {
@@ -3970,7 +3951,7 @@ void main() {
 
         DescriptorPipelineKey key = new DescriptorPipelineKey(
             variantDescriptor.getStableCacheKey(),
-            resourceLayoutKey(variantDescriptor.getResourceLayout())
+            variantDescriptor.getResourceLayoutCacheKey()
         );
         PipelineHandle cached = descriptorPipelineCache.get(key);
         if (cached != null) {
@@ -4024,7 +4005,7 @@ void main() {
 
         FramebufferPipelineKey key = new FramebufferPipelineKey(
             pipelineDescriptor.getStableCacheKey(),
-            resourceLayoutKey(pipelineDescriptor.getResourceLayout()),
+            pipelineDescriptor.getResourceLayoutCacheKey(),
             framebuffer,
             targets.colorFormats(),
             targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED

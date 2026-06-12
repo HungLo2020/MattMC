@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Opaque descriptor used to create a {@link PipelineHandle} via
@@ -47,6 +48,16 @@ public final class PipelineDescriptor {
     private final ResourceLayout explicitResourceLayout;
     private final List<VulkanicSpirvModule> spirvModules;
     private final List<PushConstantRange> pushConstantRanges;
+    @Nullable
+    private volatile ResourceLayout derivedResourceLayout;
+    @Nullable
+    private volatile String stableCacheKey;
+    @Nullable
+    private volatile String pipelineCompilationKey;
+    @Nullable
+    private volatile String resourceLayoutCacheKey;
+    @Nullable
+    private volatile ConcurrentHashMap<ResourceLayout, PipelineDescriptor> resourceLayoutVariants;
 
     private PipelineDescriptor(
         @Nullable Object nativeDescriptor,
@@ -157,7 +168,16 @@ public final class PipelineDescriptor {
      * samplers first, then uniforms in declaration order.
      */
     public ResourceLayout getResourceLayout() {
-        return explicitResourceLayout != null ? explicitResourceLayout : derivePortableResourceLayout();
+        if (explicitResourceLayout != null) {
+            return explicitResourceLayout;
+        }
+
+        ResourceLayout cached = derivedResourceLayout;
+        if (cached == null) {
+            cached = derivePortableResourceLayout();
+            derivedResourceLayout = cached;
+        }
+        return cached;
     }
 
     /**
@@ -205,13 +225,24 @@ public final class PipelineDescriptor {
      * Returns a copy of this descriptor with explicit resource-layout metadata attached.
      */
     public PipelineDescriptor withResourceLayout(ResourceLayout resourceLayout) {
-        return new PipelineDescriptor(
+        ResourceLayout normalizedLayout = Objects.requireNonNull(resourceLayout, "resourceLayout must not be null");
+        if (explicitResourceLayout != null && explicitResourceLayout.equals(normalizedLayout)) {
+            return this;
+        }
+
+        ConcurrentHashMap<ResourceLayout, PipelineDescriptor> variants = resourceLayoutVariants;
+        if (variants == null) {
+            variants = new ConcurrentHashMap<>();
+            resourceLayoutVariants = variants;
+        }
+
+        return variants.computeIfAbsent(normalizedLayout, layout -> new PipelineDescriptor(
             this.nativeDescriptor,
             this.portableState,
-            Objects.requireNonNull(resourceLayout, "resourceLayout must not be null"),
+            layout,
             this.spirvModules,
             this.pushConstantRanges
-        );
+        ));
     }
 
     /**
@@ -220,7 +251,47 @@ public final class PipelineDescriptor {
      * <p>This key is backend-agnostic and intended for future pipeline cache lookup.
      */
     public String getStableCacheKey() {
-        return portableState.stableCacheKey();
+        String cached = stableCacheKey;
+        if (cached == null) {
+            cached = portableState.stableCacheKey();
+            stableCacheKey = cached;
+        }
+        return cached;
+    }
+
+    /**
+     * Returns deterministic cache key for this descriptor's resolved resource layout.
+     */
+    public String getResourceLayoutCacheKey() {
+        String cached = resourceLayoutCacheKey;
+        if (cached == null) {
+            cached = resourceLayoutCacheKey(getResourceLayout());
+            resourceLayoutCacheKey = cached;
+        }
+        return cached;
+    }
+
+    /**
+     * Returns deterministic cache key for resource-layout metadata.
+     */
+    public static String resourceLayoutCacheKey(ResourceLayout layout) {
+        Objects.requireNonNull(layout, "layout must not be null");
+        StringBuilder builder = new StringBuilder(256);
+        for (ResourceBinding binding : layout.bindings()) {
+            builder.append(binding.set()).append(':')
+                .append(binding.binding()).append(':')
+                .append(binding.name()).append(':')
+                .append(binding.type()).append(':')
+                .append(binding.textureFormat() == null ? "" : binding.textureFormat().name())
+                .append(':');
+
+            List<String> stages = binding.stages().stream()
+                .map(Enum::name)
+                .sorted()
+                .toList();
+            builder.append(String.join(",", stages)).append(';');
+        }
+        return builder.toString();
     }
 
     /**
@@ -230,6 +301,11 @@ public final class PipelineDescriptor {
      * push-constant range metadata.</p>
      */
     public String getPipelineCompilationKey() {
+        String cached = pipelineCompilationKey;
+        if (cached != null) {
+            return cached;
+        }
+
         StringBuilder canonical = new StringBuilder(1024);
         canonical.append("portable=").append(getStableCacheKey()).append(';');
         canonical.append("explicitLayout=").append(explicitResourceLayout != null).append(';');
@@ -267,7 +343,9 @@ public final class PipelineDescriptor {
             canonical.append("stages=").append(String.join(",", stageNames)).append(';');
         }
 
-        return sha256Hex(canonical.toString().getBytes(StandardCharsets.UTF_8));
+        cached = sha256Hex(canonical.toString().getBytes(StandardCharsets.UTF_8));
+        pipelineCompilationKey = cached;
+        return cached;
     }
 
     /**

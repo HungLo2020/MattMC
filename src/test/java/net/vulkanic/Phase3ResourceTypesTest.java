@@ -328,6 +328,45 @@ public class Phase3ResourceTypesTest {
     }
 
     @Test
+    public void testPipelineDescriptorCachesDerivedLayoutsAndExplicitVariants() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        assertSame(descriptor.getResourceLayout(), descriptor.getResourceLayout(),
+            "RenderPipeline-derived descriptors should reuse their derived resource layout");
+        assertSame(descriptor.getStableCacheKey(), descriptor.getStableCacheKey(),
+            "Descriptor stable cache keys should be computed once per descriptor");
+        assertSame(descriptor.getResourceLayoutCacheKey(), descriptor.getResourceLayoutCacheKey(),
+            "Descriptor resource-layout keys should be computed once per descriptor");
+
+        PipelineDescriptor.ResourceLayout explicitLayout = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "ReflectedSampler",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null
+            )
+        ));
+        PipelineDescriptor.ResourceLayout equivalentLayout = new PipelineDescriptor.ResourceLayout(java.util.List.of(
+            new PipelineDescriptor.ResourceBinding(
+                0,
+                0,
+                "ReflectedSampler",
+                PipelineDescriptor.ResourceType.SAMPLER,
+                null
+            )
+        ));
+
+        PipelineDescriptor reflectedDescriptor = descriptor.withResourceLayout(explicitLayout);
+        assertSame(reflectedDescriptor, descriptor.withResourceLayout(explicitLayout),
+            "Repeated explicit-layout variants should be reused instead of reallocated");
+        assertSame(reflectedDescriptor, descriptor.withResourceLayout(equivalentLayout),
+            "Equivalent explicit layouts should reuse the same descriptor variant");
+        assertSame(reflectedDescriptor, reflectedDescriptor.withResourceLayout(equivalentLayout),
+            "A descriptor already carrying an equivalent explicit layout should return itself");
+    }
+
+    @Test
     public void testPipelineCompilationKeyTracksExplicitResourceLayoutMetadata() {
         PipelineDescriptor base = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
 
