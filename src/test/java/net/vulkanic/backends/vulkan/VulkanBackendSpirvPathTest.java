@@ -168,12 +168,13 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
-    public void testNormalizeForVulkanKeepsFramebufferTexelCoordsNative() {
+    public void testNormalizeForVulkanKeepsFramebufferTexelFetchCoordsNative() {
         String source = "#version 330\n"
             + "uniform float viewHeight;\n"
             + "uniform float viewWidth;\n"
             + "uniform sampler2D colortex0;\n"
             + "uniform sampler2D depthtex0;\n"
+            + "uniform sampler2D noisetex;\n"
             + "uniform mat4 iris_ModelViewMatrix;\n"
             + "noperspective in vec2 texCoord;\n"
             + "out vec4 fragColor;\n"
@@ -182,8 +183,9 @@ public class VulkanBackendSpirvPathTest {
             + "vec3 color = texelFetch(colortex0, texelCoord, 0).rgb;"
             + "float depth = texelFetch(depthtex0, texelCoord, 0).r;"
             + "float depthNeighbour = texelFetch(depthtex0, texelCoordM2, 0).r;"
+            + "float noise = texelFetch(noisetex, texelCoord, 0).r;"
             + "vec3 screenPos = vec3(gl_FragCoord.xy / vec2(viewWidth, viewHeight), gl_FragCoord.z);"
-            + "fragColor = vec4(color, depth + depthNeighbour + screenPos.y);}";
+            + "fragColor = vec4(color, depth + depthNeighbour + noise + screenPos.y);}";
 
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
@@ -191,10 +193,44 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(normalized.contains("texelFetch(colortex0, texelCoord, 0).rgb"));
         assertTrue(normalized.contains("texelFetch(depthtex0, texelCoord, 0).r"));
         assertTrue(normalized.contains("texelFetch(depthtex0, texelCoordM2, 0).r"));
+        assertTrue(normalized.contains("texelFetch(noisetex, texelCoord, 0).r"));
         assertTrue(normalized.contains(
             "vec3 screenPos = vec3((vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y) / vec2(viewWidth, viewHeight)), gl_FragCoord.z);"
         ));
         assertFalse(normalized.contains("ivec2((vec"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanKeepsCompositeScreenSpaceTexCoordNative() {
+        String source = "#version 330\n"
+            + "uniform sampler2D depthtex0;\n"
+            + "uniform sampler2D dhDepthTex;\n"
+            + "uniform mat4 gbufferProjectionInverse;\n"
+            + "uniform mat4 dhProjectionInverse;\n"
+            + "noperspective in vec2 texCoord;\n"
+            + "out vec4 fragColor;\n"
+            + "void main(){"
+            + "float z0 = texelFetch(depthtex0, ivec2(gl_FragCoord.xy), 0).r;"
+            + "vec4 screenPos = vec4(texCoord, z0, 1.0);"
+            + "vec4 viewPos = gbufferProjectionInverse * (screenPos * 2.0 - 1.0);"
+            + "float z0DH = texelFetch(dhDepthTex, ivec2(gl_FragCoord.xy), 0).r;"
+            + "vec4 screenPosDH = vec4(texCoord, z0DH, 1.0);"
+            + "vec4 viewPosDH = dhProjectionInverse * (screenPosDH * 2.0 - 1.0);"
+            + "vec4 screenPos1 = vec4(texCoord, z0, 1.0);"
+            + "vec4 screenPos1DH = vec4(texCoord, z0DH, 1.0);"
+            + "fragColor = vec4(viewPos.xy + viewPosDH.xy + screenPos1.xy + screenPos1DH.xy, 0.0, 1.0);"
+            + "}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("vec4 screenPos = vec4(texCoord, z0, 1.0);"));
+        assertTrue(normalized.contains("vec4 screenPosDH = vec4(texCoord, z0DH, 1.0);"));
+        assertTrue(normalized.contains("vec4 screenPos1 = vec4(texCoord, z0, 1.0);"));
+        assertTrue(normalized.contains("vec4 screenPos1DH = vec4(texCoord, z0DH, 1.0);"));
+        assertFalse(normalized.contains("vec4 screenPos = vec4(vec2((texCoord).x, 1.0f - (texCoord).y)"));
+        assertFalse(normalized.contains("vec4 screenPosDH = vec4(vec2((texCoord).x, 1.0f - (texCoord).y)"));
+        assertTrue(normalized.contains("texelFetch(depthtex0, ivec2(gl_FragCoord.xy), 0).r"));
+        assertTrue(normalized.contains("texelFetch(dhDepthTex, ivec2(gl_FragCoord.xy), 0).r"));
     }
 
     @Test
@@ -225,6 +261,30 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(normalized.contains("texture(gaux2, vec2((vec2(0.5, 0.25)).x, 1.0f - (vec2(0.5, 0.25)).y), 0).rgb"));
         assertTrue(normalized.contains("texture(noisetex, texCoord).rgb"));
         assertTrue(normalized.contains("texture(tex, texCoord).rgb"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanKeepsShadowTextureSamplingCoordsNative() {
+        String source = "#version 330\n"
+            + "uniform sampler2DShadow shadowtex0;\n"
+            + "uniform sampler2DShadow shadowtex1;\n"
+            + "uniform sampler2D noisetex;\n"
+            + "out vec4 fragColor;\n"
+            + "void main(){"
+            + "vec3 shadowPosition = vec3(0.25, 0.75, 0.5);"
+            + "float shadow0 = texture(shadowtex0, shadowPosition).x;"
+            + "float shadow1 = texture2D(shadowtex1, vec3(shadowPosition.st, shadowPosition.z)).x;"
+            + "float noise = texture(noisetex, shadowPosition.xy).r;"
+            + "fragColor = vec4(shadow0 + shadow1 + noise);"
+            + "}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.contains("texture(shadowtex0, shadowPosition).x"));
+        assertTrue(normalized.contains("texture2D(shadowtex1, vec3(shadowPosition.st, shadowPosition.z)).x"));
+        assertTrue(normalized.contains("texture(noisetex, shadowPosition.xy).r"));
+        assertFalse(normalized.contains("texture(shadowtex0, vec3((shadowPosition).x, 1.0f - (shadowPosition).y"));
+        assertFalse(normalized.contains("texture2D(shadowtex1, vec3((vec3(shadowPosition.st, shadowPosition.z)).x, 1.0f - (vec3(shadowPosition.st, shadowPosition.z)).y"));
     }
 
     @Test

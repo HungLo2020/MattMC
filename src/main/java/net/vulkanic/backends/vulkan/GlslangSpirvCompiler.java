@@ -320,7 +320,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             return arguments;
         }
 
-        StringBuilder rewritten = new StringBuilder(arguments.length() + coord.length() + 48);
+        StringBuilder rewritten = new StringBuilder(arguments.length() + coord.length() + 64);
         rewritten.append(arguments, 0, coordRange[0]);
         rewritten.append(framebufferTextureCoordExpression(coord));
         rewritten.append(arguments, coordRange[1], arguments.length());

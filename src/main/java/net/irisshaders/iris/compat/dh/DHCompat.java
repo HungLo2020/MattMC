@@ -6,6 +6,8 @@ import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 import org.joml.Matrix4f;
 
 import java.lang.invoke.MethodHandle;
@@ -153,6 +155,11 @@ public class DHCompat {
 	public int getDepthTex() {
 		if (compatInternalInstance == null) return -1;
 
+		int vulkanCompositeFallback = getMainDepthTextureIdForVulkanCompositeFallback();
+		if (vulkanCompositeFallback > 0) {
+			return vulkanCompositeFallback;
+		}
+
 		try {
 			int texId = (int) getDepthTex.invoke(compatInternalInstance);
 			// Return -1 for invalid texture IDs to prevent GL_INVALID_OPERATION errors
@@ -166,6 +173,11 @@ public class DHCompat {
 	public int getDepthTexNoTranslucent() {
 		if (compatInternalInstance == null) return -1;
 
+		int vulkanCompositeFallback = getMainDepthTextureIdForVulkanCompositeFallback();
+		if (vulkanCompositeFallback > 0) {
+			return vulkanCompositeFallback;
+		}
+
 		try {
 			int texId = (int) getDepthTexNoTranslucent.invoke(compatInternalInstance);
 			// Return -1 for invalid texture IDs to prevent GL_INVALID_OPERATION errors
@@ -178,5 +190,21 @@ public class DHCompat {
 
 	public Object getInstance() {
 		return compatInternalInstance;
+	}
+
+	private static int getMainDepthTextureIdForVulkanCompositeFallback() {
+		if (!VulkanicAPI.isVulkanBackendSelected()) {
+			return -1;
+		}
+
+		var depthTexture = Minecraft.getInstance().getMainRenderTarget().getDepthTexture();
+		if (depthTexture == null) {
+			return -1;
+		}
+
+		// DH's Vulkan depth texture is not currently composite-safe; binding the main
+		// scene depth keeps sky-depth shader paths from treating the sky as occupied.
+		int textureId = VulkanicCoreAPI.textureId(depthTexture);
+		return textureId > 0 ? textureId : -1;
 	}
 }

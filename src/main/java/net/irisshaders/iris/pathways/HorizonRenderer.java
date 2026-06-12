@@ -2,6 +2,8 @@ package net.irisshaders.iris.pathways;
 
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.DepthTestFunction;
 import net.blaze3d.systems.RenderPass;
 import net.blaze3d.vertex.BufferBuilder;
 import net.blaze3d.vertex.DefaultVertexFormat;
@@ -14,12 +16,12 @@ import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
-import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
 /**
@@ -32,6 +34,15 @@ import java.util.OptionalInt;
  * of the octagonal prism intersect the top plane.
  */
 public class HorizonRenderer {
+	private static final RenderPipeline HORIZON_PIPELINE = RenderPipeline.builder(RenderPipelines.MATRICES_FOG_SNIPPET)
+		.withLocation(ResourceLocation.fromNamespaceAndPath("iris", "pipeline/horizon"))
+		.withVertexShader("core/sky")
+		.withFragmentShader("core/sky")
+		.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+		.withDepthWrite(false)
+		.withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.QUADS)
+		.build();
+
 	/**
 	 * The Y coordinate of the top skybox plane. Acts as the upper bound for the horizon prism, since the prism lies
 	 * between the bottom and top skybox planes.
@@ -171,11 +182,14 @@ public class HorizonRenderer {
 			rebuildBuffer();
 		}
 
+		if (VulkanicAPI.isVulkanBackendSelected()) {
+			VulkanicAPI.precompileRenderPipeline(HORIZON_PIPELINE, Minecraft.getInstance().getShaderManager()::getShader);
+		}
+
 		VulkanicAPI.AutoStorageIndexBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer indexBuffer = indices.getBuffer(indexCount);
 		GpuBufferSlice gpuBufferSlice = VulkanicAPI.getDynamicUniforms().writeTransform(modelView, fogColor, new Vector3f(), VulkanicAPI.getTextureMatrix(), VulkanicAPI.getShaderLineWidth());
-		try (RenderPass pass = VulkanicAPI.createRenderPass(() -> "Sky", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty(),
-			Minecraft.getInstance().getMainRenderTarget().getDepthTextureView(), OptionalDouble.empty())) {
+		try (RenderPass pass = VulkanicAPI.createRenderPass(() -> "Sky", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
 			VulkanicAPI.bindDefaultUniforms(pass);
 			pass.setUniform("DynamicTransforms", gpuBufferSlice);
 
@@ -191,7 +205,7 @@ public class HorizonRenderer {
 
 			pass.setVertexBuffer(0, buffer);
 			pass.setIndexBuffer(indexBuffer, indices.type());
-			pass.setPipeline(RenderPipelines.SKY);
+			pass.setPipeline(HORIZON_PIPELINE);
 			pass.drawIndexed(0, 0, indexCount, 1);
 		}
 	}

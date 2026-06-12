@@ -480,8 +480,10 @@ public class ShaderProperties {
 					return;
 				}
 
-				customTextures.computeIfAbsent(stage, _stage -> new Object2ObjectOpenHashMap<>())
-					.put(samplerName, new TextureDefinition.PNGDefinition(value));
+				String newSamplerName = "customtex" + customTexAmount;
+				customTexAmount++;
+				irisCustomTextures.put(newSamplerName, new TextureDefinition.PNGDefinition(value));
+				customTexturePatching.put(new Tri<>(samplerName, TextureType.TEXTURE_2D, stage), newSamplerName);
 			});
 
 			handlePassDirective("customTexture.", key, value, (samplerName) -> {

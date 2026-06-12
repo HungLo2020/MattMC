@@ -25,13 +25,11 @@ public class TextureTransformer {
 				// check if the declaration has the right type and rename if one is found
 				// iterates all hits of the identifier and checks the ancestors
 				for (Identifier id : root.identifierIndex.get(name)) {
-					TypeAndInitDeclaration initDeclaration = (TypeAndInitDeclaration) id.getAncestor(
-						2, 0, TypeAndInitDeclaration.class::isInstance);
+					TypeAndInitDeclaration initDeclaration = id.getAncestor(TypeAndInitDeclaration.class);
 					if (initDeclaration == null) {
 						continue;
 					}
-					DeclarationExternalDeclaration declaration = (DeclarationExternalDeclaration) initDeclaration.getAncestor(
-						1, 0, DeclarationExternalDeclaration.class::isInstance);
+					DeclarationExternalDeclaration declaration = initDeclaration.getAncestor(DeclarationExternalDeclaration.class);
 					if (declaration == null) {
 						continue;
 					}

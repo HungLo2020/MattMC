@@ -6,6 +6,7 @@ import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 
 import java.util.Objects;
 import java.util.Random;
@@ -46,6 +47,6 @@ public class NativeImageBackedNoiseTexture extends DynamicTexture implements Tex
 
 	@Override
 	public IntSupplier getTextureId() {
-		return this.getTexture()::iris$getGlId;
+		return () -> VulkanicCoreAPI.textureId(this.getTexture());
 	}
 }
