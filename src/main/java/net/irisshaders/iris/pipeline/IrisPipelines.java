@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.Function;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.pathways.HandRenderer;
+import net.irisshaders.iris.pathways.HorizonRenderer;
 import net.irisshaders.iris.pipeline.programs.ShaderKey;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -42,6 +43,7 @@ public class IrisPipelines {
 		assignToMain(RenderPipelines.STARS, p -> ShaderKey.SKY_BASIC);
 		assignToMain(RenderPipelines.SUNRISE_SUNSET, p -> ShaderKey.SKY_BASIC_COLOR);
 		assignToMain(RenderPipelines.SKY, p -> ShaderKey.SKY_BASIC);
+		assignToMain(HorizonRenderer.HORIZON_PIPELINE, p -> ShaderKey.SKY_BASIC);
 		assignToMain(RenderPipelines.CELESTIAL, p -> ShaderKey.SKY_TEXTURED);
 		assignToMain(RenderPipelines.OPAQUE_PARTICLE, p -> ShaderKey.PARTICLES);
 		assignToMain(RenderPipelines.TRANSLUCENT_PARTICLE, p -> ShaderKey.PARTICLES_TRANS);

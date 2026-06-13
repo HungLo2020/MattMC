@@ -5058,6 +5058,23 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testIrisHorizonPipelineUsesShaderpackSkyProgram() throws IOException {
+        Path horizonRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java");
+        String horizonRendererSource = Files.readString(horizonRendererFile);
+        assertTrue(horizonRendererSource.contains("public static final RenderPipeline HORIZON_PIPELINE"),
+            "HorizonRenderer should expose its custom horizon pipeline so Iris can map it to shaderpack sky programs");
+        assertTrue(horizonRendererSource.contains("pass.setPipeline(HORIZON_PIPELINE);"),
+            "HorizonRenderer should keep the custom pipeline needed by Vulkan rather than falling back to RenderPipelines.SKY");
+
+        Path irisPipelinesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisPipelines.java");
+        String irisPipelinesSource = Files.readString(irisPipelinesFile);
+        assertTrue(irisPipelinesSource.contains("import net.irisshaders.iris.pathways.HorizonRenderer;"),
+            "IrisPipelines should import HorizonRenderer so the custom horizon pipeline can be mapped explicitly");
+        assertTrue(irisPipelinesSource.contains("assignToMain(HorizonRenderer.HORIZON_PIPELINE, p -> ShaderKey.SKY_BASIC);"),
+            "IrisPipelines should map the custom horizon pipeline to SKY_BASIC so OpenGL shader mode does not fall back to vanilla core/sky");
+    }
+
+    @Test
     public void testGuiItemsBypassSodiumFastQuadPath() throws IOException {
         Path itemRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/entity/ItemRenderer.java");
         String itemRendererSource = Files.readString(itemRendererFile);

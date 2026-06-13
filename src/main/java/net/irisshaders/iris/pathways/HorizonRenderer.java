@@ -34,7 +34,7 @@ import java.util.OptionalInt;
  * of the octagonal prism intersect the top plane.
  */
 public class HorizonRenderer {
-	private static final RenderPipeline HORIZON_PIPELINE = RenderPipeline.builder(RenderPipelines.MATRICES_FOG_SNIPPET)
+	public static final RenderPipeline HORIZON_PIPELINE = RenderPipeline.builder(RenderPipelines.MATRICES_FOG_SNIPPET)
 		.withLocation(ResourceLocation.fromNamespaceAndPath("iris", "pipeline/horizon"))
 		.withVertexShader("core/sky")
 		.withFragmentShader("core/sky")
