@@ -125,6 +125,17 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan beginCommandBuffer should reuse the frame command buffer during an active frame");
         assertTrue(vulkanBackendSource.contains("if (spine.isCurrentFrameCommandBufferHandle(commandBufferHandle))"),
             "Vulkan submitCommandBuffer should avoid force-submitting the active frame command buffer per render pass");
+        assertTrue(vulkanBackendSource.contains("int submitSlot = immediateSubmitSlotForKnownCommandBuffer(commandBufferHandle);")
+                && vulkanBackendSource.contains("if (submitSlot != recordingImmediateSubmitSlot || submitSlot < 0)")
+                && vulkanBackendSource.contains("VkCommandBuffer submitCommandBuffer = immediateCommandBuffers[submitSlot];")
+                && vulkanBackendSource.contains("commandBuffers.put(0, submitCommandBuffer.address());"),
+            "Vulkan immediate submits must submit and mark the same recording ring slot to avoid fence/command-buffer mismatches");
+        assertTrue(vulkanBackendSource.contains("shouldSynchronizeImmediateSubmitCompletion()")
+                && vulkanBackendSource.contains("return true;")
+                && vulkanBackendSource.contains("awaitDeferredImmediateSubmitCompletion();")
+                && vulkanBackendSource.contains("waitForAllSwapchainFrameFences();")
+                && vulkanBackendSource.contains("vkWaitForFences(immediateSubmitComplete["),
+            "Vulkan immediate submits should keep conservative completion/lifetime rules until deferred ring reuse is proven safe");
         assertTrue(
             vulkanBackendSource.contains("vkCmdBlitImage") || vulkanBackendSource.contains("vkCmdCopyImage"),
             "Vulkan backend should blit/copy queued present textures into swapchain images before queue present"

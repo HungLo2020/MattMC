@@ -1099,7 +1099,7 @@ public class Phase3DrawPathTest {
         assertTrue(source.contains("VulkanicAPI.beginRenderPass(") && source.contains("renderPassCtx, supplier,"),
             "GlCommandEncoder should pass explicit command-buffer context into VulkanicAPI.beginRenderPass");
         assertTrue(source.contains("VulkanicAPI.submitCommandBuffer(renderPassCtx);"),
-            "GlCommandEncoder should submit command-buffer scope when finishing Vulkanic render passes");
+            "GlCommandEncoder should submit the explicit render-pass command buffer when the render pass ends");
         assertTrue(source.contains("return this.activeRenderPassContext != null ? this.activeRenderPassContext : VulkanicAPI.getCommandContext();"),
             "GlCommandEncoder should prefer the active render-pass command context over the backend-global current context");
         assertTrue(source.contains("ShadowRenderingState.areShadowsCurrentlyBeingRendered() && commandContext().isImmediate()"),
