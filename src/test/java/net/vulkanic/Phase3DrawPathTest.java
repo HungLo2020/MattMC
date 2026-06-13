@@ -5141,6 +5141,52 @@ public class Phase3DrawPathTest {
             "TrackingItemStackRenderState should return immutable identity snapshots so GUI atlas cache keys cannot be mutated after insertion");
     }
 
+    @Test
+    public void testJeiPanelDropDeletesCarriedStackInsteadOfWorldDrop() throws IOException {
+        Path jeiPanelFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/screens/inventory/JeiPanel.java");
+        String jeiPanelSource = Files.readString(jeiPanelFile);
+        assertTrue(jeiPanelSource.contains("public boolean containsMouse(double mouseX, double mouseY)"),
+            "JeiPanel should expose panel bounds so container screens can distinguish JEI drops from normal outside-inventory drops");
+        int carriedGuardIndex = jeiPanelSource.indexOf("if (!this.minecraft.player.containerMenu.getCarried().isEmpty())");
+        int addItemIndex = jeiPanelSource.indexOf("this.addItemToInventorySafe(itemToAdd);", carriedGuardIndex);
+        assertTrue(carriedGuardIndex >= 0,
+            "JEI item clicks should detect an already-carried cursor stack");
+        assertTrue(addItemIndex > carriedGuardIndex,
+            "JEI item clicks should consume carried-stack clicks before granting the hovered item");
+
+        Path containerScreenFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/screens/inventory/AbstractContainerScreen.java");
+        String containerScreenSource = Files.readString(containerScreenFile);
+        int deleteCheckIndex = containerScreenSource.indexOf("if (this.deleteCarriedItemIfReleasedOverJeiPanel(mouseButtonEvent))");
+        int panelReleaseIndex = containerScreenSource.indexOf("if (this.jeiPanel != null && this.jeiPanel.mouseReleased(mouseButtonEvent))", deleteCheckIndex);
+        int outsideClickIndex = containerScreenSource.indexOf("boolean bl = this.hasClickedOutside(mouseButtonEvent.x(), mouseButtonEvent.y(), i, j);", panelReleaseIndex);
+        assertTrue(deleteCheckIndex >= 0,
+            "AbstractContainerScreen should check for carried-stack releases over the JEI panel");
+        assertTrue(panelReleaseIndex > deleteCheckIndex,
+            "JEI carried-stack deletion should run before generic panel release handling");
+        assertTrue(outsideClickIndex > panelReleaseIndex,
+            "JEI carried-stack deletion should run before the normal outside-inventory drop path");
+        assertTrue(containerScreenSource.contains("this.minecraft.gameMode.handleJeiCarriedItemDelete(this.minecraft.player);"),
+            "Dropping a carried stack over JEI should use the explicit delete action instead of slot -999 pickup");
+
+        Path gameModeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/multiplayer/MultiPlayerGameMode.java");
+        String gameModeSource = Files.readString(gameModeFile);
+        assertTrue(gameModeSource.contains("public void handleJeiCarriedItemDelete(Player player)"),
+            "MultiPlayerGameMode should expose a dedicated JEI carried-item delete action");
+        assertTrue(gameModeSource.contains("abstractContainerMenu.setCarried(ItemStack.EMPTY);"),
+            "JEI carried-item delete should clear the client cursor immediately");
+        assertTrue(gameModeSource.contains("this.connection.send(new ServerboundSetCreativeModeSlotPacket(-1, ItemStack.EMPTY));"),
+            "JEI carried-item delete should tell the server to clear the cursor without spawning a dropped item");
+
+        Path serverListenerFile = SRC_MAIN_JAVA.resolve("net/minecraft/server/network/ServerGamePacketListenerImpl.java");
+        String serverListenerSource = Files.readString(serverListenerFile);
+        assertTrue(serverListenerSource.contains("if (bl && itemStack.isEmpty())"),
+            "Server creative-slot handler should reserve empty slot -1 for JEI carried-stack deletion");
+        assertTrue(serverListenerSource.contains("this.player.containerMenu.setCarried(ItemStack.EMPTY);"),
+            "Server JEI carried-stack deletion should clear the authoritative carried stack");
+        assertTrue(serverListenerSource.contains("this.player.containerMenu.broadcastChanges();"),
+            "Server JEI carried-stack deletion should broadcast the cursor clear back to the client");
+    }
+
     // ── Consistency: drawFromBuffers still has all instanced paths ────────────
 
     @Test

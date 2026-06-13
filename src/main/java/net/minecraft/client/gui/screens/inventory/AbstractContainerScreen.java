@@ -541,6 +541,10 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent mouseButtonEvent) {
+		if (this.deleteCarriedItemIfReleasedOverJeiPanel(mouseButtonEvent)) {
+			return true;
+		}
+
 		// Check JEI panel first
 		if (this.jeiPanel != null && this.jeiPanel.mouseReleased(mouseButtonEvent)) {
 			return true;
@@ -645,6 +649,19 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		}
 
 		this.isQuickCrafting = false;
+		return true;
+	}
+
+	private boolean deleteCarriedItemIfReleasedOverJeiPanel(MouseButtonEvent mouseButtonEvent) {
+		if (this.jeiPanel == null || this.menu.getCarried().isEmpty() || !this.jeiPanel.containsMouse(mouseButtonEvent.x(), mouseButtonEvent.y())) {
+			return false;
+		}
+
+		this.minecraft.gameMode.handleJeiCarriedItemDelete(this.minecraft.player);
+		this.clearDraggingState();
+		this.isQuickCrafting = false;
+		this.quickCraftSlots.clear();
+		this.skipNextRelease = true;
 		return true;
 	}
 

@@ -498,6 +498,16 @@ public class MultiPlayerGameMode {
 		}
 	}
 
+	public void handleJeiCarriedItemDelete(Player player) {
+		AbstractContainerMenu abstractContainerMenu = player.containerMenu;
+		if (abstractContainerMenu.getCarried().isEmpty()) {
+			return;
+		}
+
+		abstractContainerMenu.setCarried(ItemStack.EMPTY);
+		this.connection.send(new ServerboundSetCreativeModeSlotPacket(-1, ItemStack.EMPTY));
+	}
+
 	public void releaseUsingItem(Player player) {
 		this.ensureHasSentCarriedItem();
 		this.connection.send(new ServerboundPlayerActionPacket(Action.RELEASE_USE_ITEM, BlockPos.ZERO, Direction.DOWN));

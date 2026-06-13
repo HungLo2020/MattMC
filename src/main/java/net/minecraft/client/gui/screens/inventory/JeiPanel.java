@@ -375,6 +375,10 @@ public class JeiPanel {
 				if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
 					ItemStack itemStack = this.filteredTabItems.get(index);
 					if (!itemStack.isEmpty() && this.minecraft != null && this.minecraft.player != null) {
+						if (!this.minecraft.player.containerMenu.getCarried().isEmpty()) {
+							return true;
+						}
+
 						int count = isShiftDown ? itemStack.getMaxStackSize() : 1;
 						ItemStack itemToAdd = itemStack.copyWithCount(count);
 						
@@ -402,6 +406,15 @@ public class JeiPanel {
 			this.scrolling = false;
 		}
 		return false;
+	}
+
+	public boolean containsMouse(double mouseX, double mouseY) {
+		return this.columns > 0
+			&& this.rows > 0
+			&& mouseX >= this.panelX
+			&& mouseX < this.panelX + this.panelWidth
+			&& mouseY >= this.panelY
+			&& mouseY < this.panelY + this.panelHeight;
 	}
 	
 	/**

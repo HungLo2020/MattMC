@@ -1887,6 +1887,11 @@ public class ServerGamePacketListenerImpl
 
 		boolean bl2 = serverboundSetCreativeModeSlotPacket.slotNum() >= 1 && serverboundSetCreativeModeSlotPacket.slotNum() <= 45;
 		boolean bl3 = itemStack.isEmpty() || itemStack.getCount() <= itemStack.getMaxStackSize();
+		if (bl && itemStack.isEmpty()) {
+			this.player.containerMenu.setCarried(ItemStack.EMPTY);
+			this.player.containerMenu.broadcastChanges();
+			return;
+		}
 		
 		if (bl2 && bl3) {
 			
