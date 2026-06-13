@@ -49,6 +49,7 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 			options.gamma(),
 			options.cloudStatus(),
 			options.fullscreen(),
+			options.graphicsBackend(),
 			options.particles(),
 			options.mipmapLevels(),
 			options.entityShadows(),

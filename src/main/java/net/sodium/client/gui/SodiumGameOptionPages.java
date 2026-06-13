@@ -23,6 +23,7 @@ import net.minecraft.client.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.client.PanoramaTheme;
+import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.GraphicsFeature;
 
@@ -125,6 +126,17 @@ public class SodiumGameOptionPages {
                                 opts.fullscreen().set(window.isFullscreen());
                             }
                         }, (opts) -> opts.fullscreen().get())
+                        .build())
+                .add(OptionImpl.createBuilder(GraphicsBackendType.class, vanillaOpts)
+                        .setName(Component.translatable("options.graphicsBackend"))
+                        .setTooltip(Component.translatable("options.graphicsBackend.tooltip"))
+                        .setControl(option -> new CyclingControl<>(option, GraphicsBackendType.class, new Component[] {
+                                Component.translatable("options.graphicsBackend.opengl"),
+                                Component.translatable("options.graphicsBackend.vulkan")
+                        }))
+                        .setBinding((opts, value) -> opts.graphicsBackend().set(value), opts -> opts.graphicsBackend().get())
+                        .setImpact(OptionImpact.HIGH)
+                        .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
                         .build())
                 .add(OptionImpl.createBuilder(int.class, vanillaOpts)
                         .setName(Component.translatable("options.fullscreen.resolution"))

@@ -23,45 +23,45 @@
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk/linux-x64
-[18:03:11] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[18:03:11] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[18:03:11] [main/INFO]: Mappings not present!
-[18:03:11] [main/INFO]: Loading 3 mods:
+[18:15:05] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[18:15:05] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[18:15:05] [main/INFO]: Mappings not present!
+[18:15:05] [main/INFO]: Loading 3 mods:
 	- java 25
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[18:03:11] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[18:03:11] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[18:03:11] [main/INFO]: Searching for graphics cards...
-[18:03:11] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[18:03:11] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[18:03:11] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[18:15:05] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[18:15:05] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[18:15:05] [main/INFO]: Searching for graphics cards...
+[18:15:05] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[18:15:05] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[18:15:05] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
 WARNING: A restricted method in java.lang.System has been called
 WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/home/matt/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.14.0/67bf3eaea4f0718cb376a181a629e5f88fa1c9dd/jna-5.14.0.jar)
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[18:03:11] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 174 milliseconds
+[18:15:05] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 215 milliseconds
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/home/matt/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar)
 WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
 WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
-[18:03:14] [Render thread/INFO]: Setting user: HungLo
-[18:03:14] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[18:03:14] [Render thread/INFO]: Running library validation...
-[18:03:14] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
-[18:03:14] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[18:03:14] [Render thread/INFO]: Registering Fabric Client Events
-[18:03:14] [Render thread/INFO]: Registering Distant Horizons hooks
-[18:03:14] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[18:03:14] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[18:03:14] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[18:03:14] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[18:03:14] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[18:03:14] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[18:03:14] [Render thread/INFO]: [DistantHorizons] Config initialised
-[18:03:14] [Render thread/INFO]: Applying config to loggers
-[18:03:14] [Render thread/INFO]: Distant Horizons client Initialized.
+[18:15:07] [Render thread/INFO]: Setting user: HungLo
+[18:15:07] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[18:15:07] [Render thread/INFO]: Running library validation...
+[18:15:07] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
+[18:15:07] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[18:15:07] [Render thread/INFO]: Registering Fabric Client Events
+[18:15:07] [Render thread/INFO]: Registering Distant Horizons hooks
+[18:15:07] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[18:15:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[18:15:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[18:15:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[18:15:07] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[18:15:07] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[18:15:07] [Render thread/INFO]: [DistantHorizons] Config initialised
+[18:15:08] [Render thread/INFO]: Applying config to loggers
+[18:15:08] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.17.0-29-generic
 	JRE: Linux amd64 25.0.1
@@ -72,294 +72,755 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[18:03:14] [Render thread/INFO]: Queuing DH event binding...
-[18:03:14] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[18:03:14] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
-[18:03:14] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[18:15:08] [Render thread/INFO]: Queuing DH event binding...
+[18:15:08] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[18:03:14] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[18:15:08] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[18:15:08] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
+[18:15:08] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
-[LWJGL] Loading JNI library: lwjgl_opengl
-	Module: org.lwjgl.opengl
-	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_opengl.so
-[LWJGL] Loading library: libGLX.so.0
-	Module: org.lwjgl.opengl
-	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
+[LWJGL] Loading library: libvulkan.so.1
+	Module: org.lwjgl.vulkan
+	libvulkan.so.1 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
 [LWJGL] Java 9 text decoding enabled
-	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
-[18:03:15] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+	Loaded from system paths: /lib/x86_64-linux-gnu/libvulkan.so.1
 [LWJGL] Java 10 multiplyHigh enabled
-[18:03:15] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[18:03:15] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[18:03:15] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 590.48.01
-[18:03:15] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[18:03:15] [Render thread/INFO]: Debug functionality is disabled.
-[18:03:15] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[18:03:15] [Render thread/INFO]: Using optional rendering features: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[18:03:15] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
-[18:03:15] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
-[18:03:15] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
-[18:03:15] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
-[18:03:15] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[18:15:08] [Render thread/INFO]: GLFW required Vulkan instance extensions: [VK_KHR_surface, VK_KHR_xcb_surface, VK_KHR_get_physical_device_properties2]
+[18:15:08] [Render thread/INFO]: Enabled Vulkan present completion extensions: presentId=false, presentWait=false
+[18:15:08] [Render thread/INFO]: Vulkan surface formats: [format=0x2c/colorSpace=0x0, format=0x32/colorSpace=0x0]; selected=format=0x2c, colorSpace=0x0
+[18:15:08] [Render thread/INFO]: Vulkan surface present modes: [0x2, 0x3, 0x0, 0x3ba04c28]; selected=0x2
+[18:15:08] [Render thread/INFO]: Vulkan surface capabilities: minImages=3, maxImages=8, currentExtent=854x480, minExtent=854x480, maxExtent=854x480, supportedTransforms=0x1, currentTransform=0x1, supportedCompositeAlpha=0x1
+[LWJGL] Java 16 memcpy enabled
+[18:15:08] [Render thread/INFO]: Created Vulkan swapchain: extent=854x480, images=4, format=0x2c, presentMode=0x2, usage=0x12, windowHandle=0x716a66805ee0
+[18:15:08] [Render thread/INFO]: Created Vulkan compatibility bootstrap window for backend-owned renderer startup
+[18:15:09] [Render thread/INFO]: Vulkan renderer startup now uses backend-owned device creation instead of shared GlDevice construction
+[18:15:09] [Render thread/INFO]: Vulkan readiness: backend=VULKAN, vulkanSelected=true, nativeVulkanReady=true, lwjglBindings=true, glfwVulkanSupported=true
+[18:15:09] [Render thread/INFO]: Vulkan execution context: backendType=VULKAN, nativeVulkanReady=true, available=true
+[18:15:09] [Render thread/INFO]: Vulkan surface/swapchain: backendType=VULKAN, nativeVulkanReady=true, swapchainAvailable=true
+[18:15:09] [Render thread/INFO]: Debug functionality is disabled.
+[18:15:09] [Render thread/INFO]: DSA support not detected.
+[18:15:09] [Render thread/INFO]: Reasserting GLFW main window visibility/focus after Vulkan renderer startup: 0x716a66805ee0
+[18:15:09] [Render thread/INFO]: Destroyed Vulkan compatibility bootstrap window
+[18:15:09] [Render thread/INFO]: Using optional rendering features: native-vulkan-runtime, vulkan-swapchain, vulkan-command-buffer, vulkan-render-pass
+[18:15:09] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
+[18:15:09] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
+[18:15:09] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
+[18:15:09] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
+[18:15:09] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[W][18:03:15.374239] pw.conf      | [          conf.c: 1204 pw_conf_load_conf_for_context()] setting config.name to client-rt.conf is deprecated, using client.conf
-[18:03:15] [Render thread/INFO]: Hardware information:
-[18:03:15] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[18:03:15] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (OpenGL 3.3.0 NVIDIA 590.48.01)
-[18:03:15] [Render thread/INFO]: OS: Linux (6.17.0-29-generic)
-[LWJGL] Java 16 memcpy enabled
-[18:03:15] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[18:03:15] [Worker-Main-19/INFO]: Found unifont_pua-16.0.03.hex, loading
-[18:03:15] [Worker-Main-17/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[18:03:15] [Render thread/INFO]: Initializing VoxelMap...
-[18:03:15] [Render thread/INFO]: VoxelMap initialization complete
-[18:03:15] [Render thread/INFO]: LoadingOverlay tick#1 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:15] [Worker-Main-1/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[18:03:15] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
-[18:03:16] [Worker-Main-15/WARN]: Missing textures in model minecraft:block/tree_star:
+[18:15:09] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+[W][18:15:09.098528] pw.conf      | [          conf.c: 1204 pw_conf_load_conf_for_context()] setting config.name to client-rt.conf is deprecated, using client.conf
+[18:15:09] [Render thread/INFO]: Hardware information:
+[18:15:09] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[18:15:09] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti (Vulkan Vulkan 1.4.325)
+[18:15:09] [Render thread/INFO]: OS: Linux (6.17.0-29-generic)
+[18:15:09] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[18:15:09] [Worker-Main-17/INFO]: Found unifont_pua-16.0.03.hex, loading
+[18:15:09] [Worker-Main-18/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[18:15:09] [Render thread/INFO]: Initializing VoxelMap...
+[18:15:09] [Render thread/INFO]: VoxelMap initialization complete
+[18:15:09] [Render thread/INFO]: LoadingOverlay tick#1 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:09] [Worker-Main-11/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[18:15:09] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
+[18:15:10] [Worker-Main-17/WARN]: Missing textures in model minecraft:block/tree_star:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[18:03:16] [Worker-Main-15/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
+[18:15:10] [Worker-Main-17/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[18:03:16] [Worker-Main-15/WARN]: Missing texture references in model minecraft:block/fern_thatch:
+[18:15:10] [Worker-Main-17/WARN]: Missing texture references in model minecraft:block/fern_thatch:
     #missing
-[18:03:16] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[18:03:16] [Render thread/INFO]: Created: 256x256 waypoints-atlas
-[18:03:16] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
-[18:03:16] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
-[18:03:16] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
-[18:03:16] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
-[18:03:16] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
-[18:03:16] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#2 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#3 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#4 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#5 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#6 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#7 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#8 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#9 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay tick#10 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
-[18:03:16] [Render thread/INFO]: LoadingOverlay render#1 instance=1096785754 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.049967673 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=9 minFilter=9986 magFilter=9729 wrapS=10497 wrapT=10497
-[18:03:16] [Render thread/INFO]: FPS limit debug#1: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:16] [Render thread/INFO]: OpenAL initialized on device CORSAIR Slipstream Multi-Device Receiver Analog Stereo
-[18:03:16] [Render thread/INFO]: Sound engine started
-[18:03:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[18:03:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[18:03:16] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[18:03:17] [Render thread/WARN]: Type is VERTEX
-[18:03:17] [Render thread/WARN]: Type is FRAGMENT
-[18:03:17] [Render thread/WARN]: Type is VERTEX
-[18:03:17] [Render thread/WARN]: Type is FRAGMENT
-[18:03:17] [Render thread/WARN]: Type is VERTEX
-[18:03:17] [Render thread/WARN]: Type is FRAGMENT
-[18:03:18] [Render thread/INFO]: LoadingOverlay tick#11 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 reloadDone=true gameLoadFinished=true screen=TitleScreen
-[18:03:18] [Render thread/INFO]: LoadingOverlay tick#12 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 reloadDone=true gameLoadFinished=true screen=TitleScreen
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#2 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.0974693 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9986 magFilter=9729 wrapS=10497 wrapT=10497
-[18:03:18] [Render thread/INFO]: FPS limit debug#2: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#3 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.14259584 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#3: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#4 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.18546607 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#4: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#5 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.22619277 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#5: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#6 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.26488316 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#6: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#7 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.30163902 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#7: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#8 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.3365571 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#8: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#9 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.36972925 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#9: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#10 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.4012428 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#10: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#11 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.43118066 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#11: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: LoadingOverlay render#12 instance=1096785754 fadeInStart=-1 fadeOutStart=3341 alpha=1.0 progress=0.45962164 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=9 minFilter=9729 magFilter=9729 wrapS=33071 wrapT=33071
-[18:03:18] [Render thread/INFO]: FPS limit debug#12: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: FPS limit debug#13: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: FPS limit debug#14: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: FPS limit debug#15: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: FPS limit debug#16: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: FPS limit debug#17: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: FPS limit debug#18: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: FPS limit debug#19: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:18] [Render thread/INFO]: FPS limit debug#20: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=3 mainColorTexLabel=3
-[18:03:24] [Render thread/ERROR]: Couldn't load tag minecraft:resists_totem_of_possession as it is missing following references: #c:bosses (from vanilla)
-[18:03:24] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_breedables as it is missing following references: minecraft:seeds (from vanilla)
-[18:03:24] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_breedables as it is missing following references: minecraft:cosmic_cod (from vanilla)
-[18:03:24] [Render thread/ERROR]: Couldn't load tag minecraft:insect_items as it is missing following references: minecraft:maggot (from vanilla), minecraft:mosquito_larva (from vanilla)
-[18:03:24] [Render thread/ERROR]: Couldn't load tag minecraft:anteater_foodstuffs as it is missing following references: #minecraft:insect_items (from vanilla)
-[18:03:24] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_tameables as it is missing following references: minecraft:cosmic_cod (from vanilla)
-[18:03:24] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_foodstuffs as it is missing following references: #minecraft:cosmaw_breedables (from vanilla), #minecraft:cosmaw_tameables (from vanilla)
-[18:03:24] [Worker-Main-13/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[18:03:24] [Worker-Main-13/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[18:03:24] [Worker-Main-13/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a tag id; Second: Failed to parse either. First: Not a json array: "minecraft:chain"; Second: Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:chain']
-[18:03:24] [Worker-Main-13/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[18:03:24] [Render thread/INFO]: Loaded 1484 recipes
-[18:03:24] [Render thread/INFO]: Loaded 1574 advancements
-[18:03:24] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
-[18:03:24] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[18:03:24] [Server thread/INFO]: Generating keypair
-[18:03:24] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[18:03:24] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/data)]].
-[18:03:25] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[18:03:25] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data)]].
-[18:03:25] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[18:03:25] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/dimensions/minecraft/primordial_caves/data)]].
-[18:03:25] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[18:03:25] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin/dimensions/minecraft/primordial_caves/data)]].
-[18:03:25] [Server thread/INFO]: Loading 0 persistent chunks...
-[18:03:25] [Server thread/INFO]: WorldEdit initialized
-[18:03:25] [Server thread/INFO]: WorldEdit commands registered
-[18:03:25] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[18:03:25] [Server thread/INFO]: Preparing spawn area: 16%
-[18:03:25] [Server thread/INFO]: Time elapsed: 463 ms
-[18:03:25] [Server thread/INFO]: HungLo[local:E:e0dffeb7] logged in with entity id 101 at (225.2503594708098, 82.00090848869641, 502.72208135198053)
-[18:03:25] [Server thread/INFO]: Player [HungLo] joined.
-[18:03:25] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[18:03:25] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[18:03:25] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[18:03:25] [Server thread/INFO]: HungLo joined the game
-[18:03:25] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[18:03:25] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[18:03:25] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[18:03:26] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[18:03:26] [Render thread/INFO]: Started 10 worker threads
-[18:03:26] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
-[18:03:26] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
-[18:03:26] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
-[18:03:26] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
-[18:03:26] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
-[18:03:26] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
-[18:03:26] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
-[18:03:26] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[18:03:26] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
-[18:03:26] [Render thread/INFO]: Loaded 154 advancements
-[18:03:26] [Render thread/ERROR]: Invalid path voxelmap:images/backgroundmaps/Origin/overworld/map.png: Invalid segment 'Origin' in path 'images/backgroundmaps/Origin/overworld/map.png'
-[18:03:26] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[18:03:26] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[18:03:26] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[18:03:26] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[18:03:26] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[18:03:26] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[18:03:26] [Render thread/INFO]: Stopping worker threads
-[18:03:26] [Render thread/INFO]: Started 10 worker threads
-[18:03:26] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[18:03:26] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[18:03:26] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 590.48.01].
-[18:03:26] [Render thread/INFO]: minecraftGlCapabilities:
-Your OpenGL support:
-openGL version 3.2+: [true] <- REQUIRED
-Vertex Attribute Buffer Binding: [true] <- optional improvement
-Buffer Storage: [true] <- optional improvement
-
-[LWJGL] [GL] Using KHR_debug for error logging.
-[LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
-[18:03:26] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
-[18:03:26] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
-[18:03:26] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
-[18:03:26] [Render thread/INFO]: Setting up renderer
-[18:03:26] [Render thread/INFO]: Loading shader with type: [35633]
-[18:03:26] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:26] [Render thread/INFO]: Loading shader with type: [35632]
-[18:03:26] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:26] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
-[18:03:26] [Render thread/INFO]: Renderer setup complete
-[18:03:26] [Render thread/INFO]: [System] [CHAT] §ENo waypoints exist for this world/server.
-[18:03:26] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[18:03:26] [Render thread/INFO]: Loading shader with type: [35633]
-[18:03:26] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:26] [Render thread/INFO]: Loading shader with type: [35632]
-[18:03:26] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:26] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[18:03:26] [Render thread/INFO]: Loading shader with type: [35633]
-[18:03:26] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:26] [Render thread/INFO]: Loading shader with type: [35632]
-[18:03:26] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:26] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[18:03:28] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[18:03:32] [Server thread/INFO]: Saving and pausing game...
-[18:03:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:overworld
-[18:03:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_end
-[18:03:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:primordial_caves
-[18:03:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_nether
-[18:03:32] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
-[18:03:32] [level shutdown/INFO]: Shutting down ClientRenderState
-[18:03:32] [level shutdown/INFO]: Shutting down LodQuadTree...
-[18:03:32] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}].
-[18:03:32] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}].
-[18:03:32] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}].
-[18:03:32] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}
-[18:03:32] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_end}
-[18:03:32] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_nether}
-[18:03:32] [level shutdown/INFO]: Finished shutting down LodQuadTree
-[18:03:32] [level shutdown/INFO]: Closing world gen queue
-[18:03:32] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[18:03:32] [level shutdown/INFO]: Shutting down world generator thread pool...
-[18:03:32] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
-[18:03:32] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[18:03:32] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[18:03:32] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[18:03:32] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}].
-[18:03:32] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:overworld}
-[18:03:32] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[18:03:32] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_end}].
-[18:03:32] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:the_nether}].
-[18:03:32] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_end}
-[18:03:32] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:overworld}].
-[18:03:32] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}].
-[18:03:32] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:the_nether}
-[18:03:32] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:overworld}
-[18:03:32] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin]@minecraft:primordial_caves}
-[18:03:32] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[18:03:32] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[18:03:32] [Server thread/INFO]: HungLo lost connection: Disconnected
-[18:03:32] [Server thread/INFO]: HungLo left the game
-[18:03:32] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[18:03:32] [Render thread/INFO]: Closing all [4] database connections...
-[18:03:32] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM1/data/DistantHorizons.sqlite]
-[18:03:32] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[18:03:32] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/data/DistantHorizons.sqlite]
-[18:03:32] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin/DIM-1/data/DistantHorizons.sqlite]
-[18:03:32] [Server thread/INFO]: WorldEdit shutdown
-[18:03:32] [Server thread/INFO]: Stopping server
-[18:03:32] [Server thread/INFO]: Saving players
-[18:03:32] [Server thread/INFO]: Saving worlds
-[18:03:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:overworld
-[18:03:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_end
-[18:03:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:primordial_caves
-[18:03:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin]'/minecraft:the_nether
-[18:03:32] [Server thread/INFO]: ThreadedAnvilChunkStorage (Origin): All chunks are saved
-[18:03:32] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[18:03:32] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[18:03:32] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[18:03:32] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[18:03:33] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[fjnt5oq7b84se@minecraft:overworld].
-[18:03:33] [Render thread/INFO]: Stopping worker threads
-[18:03:34] [Render thread/INFO]: Stopping!
-[18:03:34] [Render thread/INFO]: Saving all world maps
-[18:03:34] [Render thread/INFO]: Save queue flushed!
+[18:15:10] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[18:15:10] [Render thread/INFO]: Created: 256x256 waypoints-atlas
+[18:15:10] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
+[18:15:10] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
+[18:15:10] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
+[18:15:10] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
+[18:15:10] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
+[18:15:10] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#2 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#3 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#4 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#5 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#6 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#7 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#8 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#9 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: LoadingOverlay tick#10 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen
+[18:15:10] [Render thread/INFO]: Vulkan beginRenderPass color#1 texId=9 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=854x480 swapchainAttachment=false
+[18:15:10] [Render thread/INFO]: LoadingOverlay render#1 instance=1579068932 fadeInStart=-1 fadeOutStart=-1 alpha=1.0 progress=0.049967673 reloadDone=false gameLoadFinished=false screen=GenericMessageScreen scissor=null logoTexId=11 minFilter=0 magFilter=0 wrapS=0 wrapT=0
+[18:15:10] [Render thread/INFO]: Vulkan beginRenderPass color#2 texId=9 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=854x480 swapchainAttachment=false
+[18:15:10] [Render thread/INFO]: Vulkan uboDescriptor#1 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=0 descriptorRange=256
+[18:15:10] [Render thread/INFO]: Vulkan uboDescriptor#2 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:10] [Render thread/INFO]: Vulkan draw#1 kind=indexed mode=4 count=36 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:10] [Render thread/INFO]: Vulkan sampler view remap#1 binding=Sampler0 texId=11 label=minecraft:textures/gui/title/mojangstudios.png usage=0x5 requestedView=0x716a6581f6f0 remappedView=0x716a679aeaa0 image=0x716a679ad150 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:10] [Render thread/INFO]: Vulkan uboDescriptor#3 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=0 descriptorRange=256
+[18:15:10] [Render thread/INFO]: Vulkan uboDescriptor#4 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:10] [Render thread/INFO]: Vulkan draw#2 kind=indexed mode=4 count=12 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:11] [Render thread/INFO]: Queueing Vulkan present source 'Main / Color' (legacyHandle=9, mip=0, extent=854x480, format=BGRA8, usage=0x15)
+[18:15:11] [Render thread/INFO]: Beginning Vulkan frame on sync slot 0 (imageAvailable=0x716a66c82a40, frameFence=0x716a66d14ea0).
+[18:15:11] [Render thread/INFO]: vkAcquireNextImageKHR succeeded for image 0 (frame acquire #1, sync slot 0)
+[18:15:11] [Render thread/INFO]: Composing Vulkan present source handle 9 format=0x2c 854x480 into swapchain format=0x2c 854x480
+[18:15:11] [Render thread/INFO]: vkQueuePresentKHR succeeded for image 0 (frame present #1, sync slot 0)
+[18:15:11] [Render thread/INFO]: Beginning Vulkan frame on sync slot 1 (imageAvailable=0x716a66c82910, frameFence=0x716a66d153f0).
+[18:15:11] [Render thread/INFO]: vkAcquireNextImageKHR succeeded for image 1 (frame acquire #2, sync slot 1)
+[18:15:11] [Render thread/WARN]: Ending Vulkan frame without a queued present texture; swapchain image will contain only its current contents.
+[18:15:11] [Render thread/INFO]: vkQueuePresentKHR succeeded for image 1 (frame present #2, sync slot 1)
+[18:15:11] [Render thread/INFO]: FPS limit debug#1: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=GenericMessageScreen overlay=LoadingOverlay mainColorTexId=36 mainColorTexLabel=Main / Color
+[18:15:16] [Render thread/WARN]: Vulkan backend received raw GLSL imports for minecraft:core/rendertype_end_portal; applying backend-side moj_import preprocessing.
+[18:15:19] [Render thread/WARN]: Vulkan backend received raw GLSL imports for minecraft:core/rendertype_end_portal; applying backend-side moj_import preprocessing.
+[18:15:21] [Render thread/INFO]: OpenAL initialized on device CORSAIR Slipstream Multi-Device Receiver Analog Stereo
+[18:15:21] [Render thread/INFO]: Sound engine started
+[18:15:21] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[18:15:21] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[18:15:21] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[18:15:21] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[18:15:21] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[18:15:21] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
+[18:15:23] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[18:15:23] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[18:15:23] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[18:15:23] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[18:15:23] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[18:15:23] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[18:15:23] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[18:15:24] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[18:15:26] [Render thread/WARN]: Type is VERTEX
+[18:15:26] [Render thread/WARN]: Type is FRAGMENT
+[18:15:26] [Render thread/WARN]: Type is VERTEX
+[18:15:26] [Render thread/WARN]: Type is FRAGMENT
+[18:15:27] [Render thread/WARN]: Type is VERTEX
+[18:15:27] [Render thread/WARN]: Type is FRAGMENT
+[18:15:48] [Render thread/WARN]: Skipping compute shader program shadowcomp because compute shaders are not supported on this runtime/backend
+[18:15:50] [Render thread/INFO]: LoadingOverlay tick#11 instance=1579068932 fadeInStart=-1 fadeOutStart=42323 reloadDone=true gameLoadFinished=true screen=TitleScreen
+[18:15:50] [Render thread/INFO]: LoadingOverlay tick#12 instance=1579068932 fadeInStart=-1 fadeOutStart=42323 reloadDone=true gameLoadFinished=true screen=TitleScreen
+[18:15:50] [Render thread/INFO]: Vulkan beginRenderPass color#3 texId=36 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=854x480 swapchainAttachment=false
+[18:15:50] [Render thread/INFO]: LoadingOverlay render#2 instance=1579068932 fadeInStart=-1 fadeOutStart=42323 alpha=1.0 progress=0.0974693 reloadDone=true gameLoadFinished=true screen=TitleScreen scissor=null logoTexId=40 minFilter=0 magFilter=0 wrapS=0 wrapT=0
+[18:15:50] [Render thread/INFO]: Vulkan surface formats: [format=0x2c/colorSpace=0x0, format=0x32/colorSpace=0x0]; selected=format=0x2c, colorSpace=0x0
+[18:15:50] [Render thread/INFO]: Vulkan surface present modes: [0x2, 0x3, 0x0, 0x3ba04c28]; selected=0x2
+[18:15:50] [Render thread/INFO]: Vulkan surface capabilities: minImages=3, maxImages=8, currentExtent=1920x1080, minExtent=1920x1080, maxExtent=1920x1080, supportedTransforms=0x1, currentTransform=0x1, supportedCompositeAlpha=0x1
+[18:15:50] [Render thread/INFO]: Created Vulkan swapchain: extent=1920x1080, images=4, format=0x2c, presentMode=0x2, usage=0x12, windowHandle=0x716a66805ee0
+[18:15:50] [Render thread/INFO]: Vulkan beginRenderPass color#4 texId=36 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=854x480 swapchainAttachment=false
+[18:15:50] [Render thread/INFO]: Vulkan uboDescriptor#5 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=0 descriptorRange=256
+[18:15:50] [Render thread/INFO]: Vulkan uboDescriptor#6 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:50] [Render thread/INFO]: Vulkan draw#3 kind=indexed mode=4 count=36 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:50] [Render thread/INFO]: Vulkan sampler view remap#2 binding=Sampler0 texId=40 label=minecraft:textures/gui/title/mojangstudios.png usage=0x5 requestedView=0x716a67837e30 remappedView=0x716a678589e0 image=0x716a64835980 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:50] [Render thread/INFO]: Vulkan uboDescriptor#7 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=0 descriptorRange=256
+[18:15:50] [Render thread/INFO]: Vulkan uboDescriptor#8 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:50] [Render thread/INFO]: Vulkan draw#4 kind=indexed mode=4 count=12 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Queueing Vulkan present source 'Main / Color' (legacyHandle=36, mip=0, extent=854x480, format=BGRA8, usage=0x15)
+[18:15:55] [Render thread/INFO]: Beginning Vulkan frame on sync slot 0 (imageAvailable=0x716a66c82a40, frameFence=0x716a66d14ea0).
+[18:15:55] [Render thread/INFO]: vkAcquireNextImageKHR succeeded for image 2 (frame acquire #3, sync slot 0)
+[18:15:55] [Render thread/INFO]: Composing Vulkan present source handle 36 format=0x2c 854x480 into swapchain format=0x2c 1920x1080
+[18:15:55] [Render thread/WARN]: Vulkan present source requires shader compose into swapchain (srcFormat=0x2c, dstFormat=0x2c, src=854x480, dst=1920x1080).
+[18:15:55] [Render thread/INFO]: vkQueuePresentKHR succeeded for image 2 (frame present #3, sync slot 0)
+[18:15:55] [Render thread/INFO]: FPS limit debug#2: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=LoadingOverlay mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#5 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#3 binding=Sampler0 texId=41 label=minecraft:textures/gui/title/background/caves/panorama usage=0x5 requestedView=0x716a66a57e20 remappedView=0x716a6591d5d0 image=0x716a6535e4d0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#9 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#10 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#5 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#7 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#4 binding=Sampler0 texId=38 label=minecraft:textures/gui/title/background/panorama_overlay.png usage=0x5 requestedView=0x716896261b20 remappedView=0x716a6581f6f0 image=0x716a641941c0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#11 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#12 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#6 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#5 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x716896261b20 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#13 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#14 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#7 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#6 binding=Sampler0 texId=114 label=minecraft:textures/gui/title/mattmc.png usage=0x5 requestedView=0x716896261b20 remappedView=0x716a66a57e20 image=0x7168961ac780 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#15 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#16 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#8 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#7 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x716896261b20 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#17 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#18 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#9 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#8 binding=Sampler0 texId=39 label=minecraft:textures/gui/title/edition.png usage=0x5 requestedView=0x716896261b20 remappedView=0x716a67876a30 image=0x716a650c3e10 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#19 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#20 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#10 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Queueing Vulkan present source 'Main / Color' (legacyHandle=110, mip=0, extent=1920x1080, format=BGRA8, usage=0x15)
+[18:15:55] [Render thread/INFO]: Beginning Vulkan frame on sync slot 1 (imageAvailable=0x716a66c82910, frameFence=0x716a66d153f0).
+[18:15:55] [Render thread/INFO]: vkAcquireNextImageKHR succeeded for image 3 (frame acquire #4, sync slot 1)
+[18:15:55] [Render thread/INFO]: Composing Vulkan present source handle 110 format=0x2c 1920x1080 into swapchain format=0x2c 1920x1080
+[18:15:55] [Render thread/INFO]: vkQueuePresentKHR succeeded for image 3 (frame present #4, sync slot 1)
+[18:15:55] [Render thread/INFO]: FPS limit debug#3: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#8 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#9 binding=Sampler0 texId=41 label=minecraft:textures/gui/title/background/caves/panorama usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6591d5d0 image=0x716a6535e4d0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#21 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#22 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#11 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#10 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#10 binding=Sampler0 texId=38 label=minecraft:textures/gui/title/background/panorama_overlay.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6581f6f0 image=0x716a641941c0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#23 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#24 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#12 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#11 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#25 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#26 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#13 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#12 binding=Sampler0 texId=114 label=minecraft:textures/gui/title/mattmc.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a66a57e20 image=0x7168961ac780 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#27 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#28 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#14 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#13 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#29 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#30 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#15 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#14 binding=Sampler0 texId=39 label=minecraft:textures/gui/title/edition.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a67876a30 image=0x716a650c3e10 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#31 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#32 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#16 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Queueing Vulkan present source 'Main / Color' (legacyHandle=110, mip=0, extent=1920x1080, format=BGRA8, usage=0x15)
+[18:15:55] [Render thread/INFO]: Beginning Vulkan frame on sync slot 0 (imageAvailable=0x716a66c82a40, frameFence=0x716a66d14ea0).
+[18:15:55] [Render thread/INFO]: vkAcquireNextImageKHR succeeded for image 0 (frame acquire #5, sync slot 0)
+[18:15:55] [Render thread/INFO]: Composing Vulkan present source handle 110 format=0x2c 1920x1080 into swapchain format=0x2c 1920x1080
+[18:15:55] [Render thread/INFO]: vkQueuePresentKHR succeeded for image 0 (frame present #5, sync slot 0)
+[18:15:55] [Render thread/INFO]: FPS limit debug#4: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#11 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#15 binding=Sampler0 texId=41 label=minecraft:textures/gui/title/background/caves/panorama usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6591d5d0 image=0x716a6535e4d0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#33 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#34 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#17 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#13 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#16 binding=Sampler0 texId=38 label=minecraft:textures/gui/title/background/panorama_overlay.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6581f6f0 image=0x716a641941c0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#35 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#36 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#18 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#17 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#37 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#38 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#19 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#18 binding=Sampler0 texId=114 label=minecraft:textures/gui/title/mattmc.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a66a57e20 image=0x7168961ac780 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#39 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#40 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#20 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#19 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#41 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#42 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#21 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#20 binding=Sampler0 texId=39 label=minecraft:textures/gui/title/edition.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a67876a30 image=0x716a650c3e10 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#43 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#44 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#22 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Queueing Vulkan present source 'Main / Color' (legacyHandle=110, mip=0, extent=1920x1080, format=BGRA8, usage=0x15)
+[18:15:55] [Render thread/INFO]: Beginning Vulkan frame on sync slot 1 (imageAvailable=0x716a66c82910, frameFence=0x716a66d153f0).
+[18:15:55] [Render thread/INFO]: Composing Vulkan present source handle 110 format=0x2c 1920x1080 into swapchain format=0x2c 1920x1080
+[18:15:55] [Render thread/INFO]: FPS limit debug#5: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#14 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#21 binding=Sampler0 texId=41 label=minecraft:textures/gui/title/background/caves/panorama usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6591d5d0 image=0x716a6535e4d0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#45 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#46 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#23 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#16 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#22 binding=Sampler0 texId=38 label=minecraft:textures/gui/title/background/panorama_overlay.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6581f6f0 image=0x716a641941c0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#47 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#48 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#24 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#23 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#49 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#50 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#25 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#24 binding=Sampler0 texId=114 label=minecraft:textures/gui/title/mattmc.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a66a57e20 image=0x7168961ac780 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#51 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#52 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#26 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#25 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#53 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#54 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#27 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#26 binding=Sampler0 texId=39 label=minecraft:textures/gui/title/edition.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a67876a30 image=0x716a650c3e10 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#55 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#56 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#28 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Queueing Vulkan present source 'Main / Color' (legacyHandle=110, mip=0, extent=1920x1080, format=BGRA8, usage=0x15)
+[18:15:55] [Render thread/INFO]: Beginning Vulkan frame on sync slot 0 (imageAvailable=0x716a66c82a40, frameFence=0x716a66d14ea0).
+[18:15:55] [Render thread/INFO]: FPS limit debug#6: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#17 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#27 binding=Sampler0 texId=41 label=minecraft:textures/gui/title/background/caves/panorama usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6591d5d0 image=0x716a6535e4d0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#57 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#58 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#29 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#19 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#28 binding=Sampler0 texId=38 label=minecraft:textures/gui/title/background/panorama_overlay.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6581f6f0 image=0x716a641941c0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#59 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#60 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#30 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#29 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#61 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#62 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#31 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#30 binding=Sampler0 texId=114 label=minecraft:textures/gui/title/mattmc.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a66a57e20 image=0x7168961ac780 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#63 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#64 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#32 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#31 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#65 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#66 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#33 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#32 binding=Sampler0 texId=39 label=minecraft:textures/gui/title/edition.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a67876a30 image=0x716a650c3e10 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#67 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#68 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#34 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Queueing Vulkan present source 'Main / Color' (legacyHandle=110, mip=0, extent=1920x1080, format=BGRA8, usage=0x15)
+[18:15:55] [Render thread/INFO]: Beginning Vulkan frame on sync slot 1 (imageAvailable=0x716a66c82910, frameFence=0x716a66d153f0).
+[18:15:55] [Render thread/INFO]: FPS limit debug#7: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#20 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#33 binding=Sampler0 texId=41 label=minecraft:textures/gui/title/background/caves/panorama usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6591d5d0 image=0x716a6535e4d0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#69 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#70 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#35 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#22 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#34 binding=Sampler0 texId=38 label=minecraft:textures/gui/title/background/panorama_overlay.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6581f6f0 image=0x716a641941c0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#71 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#72 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#36 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#35 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#73 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#74 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#37 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#36 binding=Sampler0 texId=114 label=minecraft:textures/gui/title/mattmc.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a66a57e20 image=0x7168961ac780 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#75 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#76 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#38 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#37 binding=Sampler0 texId=52 label=minecraft:textures/atlas/gui.png usage=0x7 requestedView=0x7168962609d0 remappedView=0x71689607fe10 image=0x71689607e3e0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#77 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#78 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#39 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#38 binding=Sampler0 texId=39 label=minecraft:textures/gui/title/edition.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a67876a30 image=0x716a650c3e10 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#79 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#80 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#40 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Queueing Vulkan present source 'Main / Color' (legacyHandle=110, mip=0, extent=1920x1080, format=BGRA8, usage=0x15)
+[18:15:55] [Render thread/INFO]: FPS limit debug#8: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#23 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#39 binding=Sampler0 texId=41 label=minecraft:textures/gui/title/background/caves/panorama usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6591d5d0 image=0x716a6535e4d0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#81 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#82 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#41 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#25 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan sampler view remap#40 binding=Sampler0 texId=38 label=minecraft:textures/gui/title/background/panorama_overlay.png usage=0x5 requestedView=0x7168962609d0 remappedView=0x716a6581f6f0 image=0x716a641941c0 baseMip=0 mipCount=1 textureMipLevels=1
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#83 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#84 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#42 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#85 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#86 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#43 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#87 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#88 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#44 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#89 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#90 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#45 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#91 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#92 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#46 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#9: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#26 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#93 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#94 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#47 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#28 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#95 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#96 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#48 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#97 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#98 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#49 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#99 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#100 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#50 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#101 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#102 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#51 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#103 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#104 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#52 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#10: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#29 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#105 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#106 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#53 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#31 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#107 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#108 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#54 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#109 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#110 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#55 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#111 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#112 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#56 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#113 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#114 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#57 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#115 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#116 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#58 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#11: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#32 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#117 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#118 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#59 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#34 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#119 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#120 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#60 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#121 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#122 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#61 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#123 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#124 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#62 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#125 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#126 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#63 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#127 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#128 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#64 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#12: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#35 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#129 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#130 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#65 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#37 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#131 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#132 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#66 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#133 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#134 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#67 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#135 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#136 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#68 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#137 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#138 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#69 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#139 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#140 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#70 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#13: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#38 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#141 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#142 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#71 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#40 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#143 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#144 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#72 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#145 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#146 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#73 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#147 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#148 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#74 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#149 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#150 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#75 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#151 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#152 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#76 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#14: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#41 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#153 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#154 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#77 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#43 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#155 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#156 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#78 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#157 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#158 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#79 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#159 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#160 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#80 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#161 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#162 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#81 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#163 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#164 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#82 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#15: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#44 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#165 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#166 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#83 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#46 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#167 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#168 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#84 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#169 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#170 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#85 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#171 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#172 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#86 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#173 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#174 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#87 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#175 binding=DynamicTransforms sourceBuffer=0x716a66ad1e70 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad1e70 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#176 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#88 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#16: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#47 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#177 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#178 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#89 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#49 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#179 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#180 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#90 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#181 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#182 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#91 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#183 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#184 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#92 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#185 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#186 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#93 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#187 binding=DynamicTransforms sourceBuffer=0x716a66ae1310 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ae1310 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#188 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#94 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#17: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#50 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#189 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=0 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=0 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#190 binding=Projection sourceBuffer=0x716a6790c640 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a6790c640 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#95 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#52 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#191 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#192 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#96 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#193 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#194 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#97 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#195 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#196 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#98 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#197 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#198 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#99 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#199 binding=DynamicTransforms sourceBuffer=0x716a66ad0d20 sourceOffset=256 sourceLength=256 transientCopy=false descriptorBuffer=0x716a66ad0d20 descriptorOffset=256 descriptorRange=256
+[18:15:55] [Render thread/INFO]: Vulkan uboDescriptor#200 binding=Projection sourceBuffer=0x716a67902ca0 sourceOffset=0 sourceLength=64 transientCopy=false descriptorBuffer=0x716a67902ca0 descriptorOffset=0 descriptorRange=64
+[18:15:55] [Render thread/INFO]: Vulkan draw#100 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#18: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#53 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan draw#101 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#55 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan draw#102 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#103 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#104 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#105 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#106 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#19: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#56 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan draw#107 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#58 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan draw#108 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#109 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#110 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#111 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#112 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: FPS limit debug#20: limit=60 reason=OUT_OF_LEVEL_MENU iconified=false minimized=false levelPresent=false screen=TitleScreen overlay=null mainColorTexId=110 mainColorTexLabel=Main / Color
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#59 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan draw#113 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#61 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan draw#114 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#115 kind=indexed mode=4 count=78 indexType=SHORT indexOffset=0 instances=1 baseVertex=4 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#116 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=56 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#117 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=60 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan draw#118 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=64 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#62 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:55] [Render thread/INFO]: Vulkan draw#119 kind=arrays mode=4 first=0 count=3 instances=1 renderPassRecording=true
+[18:15:55] [Render thread/INFO]: Vulkan beginRenderPass color#64 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:55] [Render thread/INFO]: Vulkan draw#120 kind=indexed mode=4 count=6 indexType=SHORT indexOffset=0 instances=1 baseVertex=0 renderPassRecording=true
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#65 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#67 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#68 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#70 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#71 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#73 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#74 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#76 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#77 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#79 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#80 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#82 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#83 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#85 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#86 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#88 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#89 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#91 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#92 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#94 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#95 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#97 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#98 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#100 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#101 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#103 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Standalone uniform stats calls=200 tokenHits=200 fallbacks=0 writes=0
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#104 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#106 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#107 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#109 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#110 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#112 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#113 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#115 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#116 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#118 texId=110 loadOp=LOAD clearColorPresent=false clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginRenderPass color#119 texId=110 loadOp=CLEAR clearColorPresent=true clearColor=0x0 extent=1920x1080 swapchainAttachment=false
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Standalone uniform stats calls=400 tokenHits=400 fallbacks=0 writes=0
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:56] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Standalone uniform stats calls=600 tokenHits=600 fallbacks=0 writes=0
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Standalone uniform stats calls=800 tokenHits=800 fallbacks=0 writes=0
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:57] [Render thread/INFO]: Vulkan beginFramebufferRenderPass colorCount=1 depthPresent=true hasFeedbackLoop=true renderPass=0x716a66d1a340
+[18:15:58] [Render thread/INFO]: Standalone uniform stats calls=1000 tokenHits=1000 fallbacks=0 writes=0
+[18:15:58] [Render thread/INFO]: Standalone uniform stats calls=1200 tokenHits=1200 fallbacks=0 writes=0
+[18:15:59] [Render thread/INFO]: Standalone uniform stats calls=1400 tokenHits=1400 fallbacks=0 writes=0
+[18:15:59] [Render thread/INFO]: Standalone uniform stats calls=1600 tokenHits=1600 fallbacks=0 writes=0
+[18:15:59] [Render thread/INFO]: Standalone uniform stats calls=1800 tokenHits=1800 fallbacks=0 writes=0
+[18:16:00] [Render thread/INFO]: Standalone uniform stats calls=2000 tokenHits=2000 fallbacks=0 writes=0
+[18:16:00] [Render thread/INFO]: Standalone uniform stats calls=2200 tokenHits=2200 fallbacks=0 writes=0
+[18:16:01] [Render thread/INFO]: Standalone uniform stats calls=2400 tokenHits=2400 fallbacks=0 writes=0
+[18:16:02] [Render thread/INFO]: Standalone uniform stats calls=2600 tokenHits=2600 fallbacks=0 writes=0
+[18:16:02] [Render thread/INFO]: Standalone uniform stats calls=2800 tokenHits=2800 fallbacks=0 writes=0
+[18:16:03] [Render thread/INFO]: Standalone uniform stats calls=3000 tokenHits=3000 fallbacks=0 writes=0
+[18:16:04] [Render thread/INFO]: Standalone uniform stats calls=3200 tokenHits=3200 fallbacks=0 writes=0
+[18:16:06] [Render thread/INFO]: Flushed changes to Minecraft configuration
+[18:16:08] [Render thread/INFO]: Stopping!
+[18:16:08] [Render thread/INFO]: Saving all world maps
+[18:16:08] [Render thread/INFO]: Save queue flushed!
 
 [Incubating] Problems report is available at: file:///home/matt/Documents/Repos/MattMC/build/reports/problems/problems-report.html
 
@@ -369,6 +830,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 1m 26s
+BUILD SUCCESSFUL in 1m 17s
 9 actionable tasks: 6 executed, 3 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html

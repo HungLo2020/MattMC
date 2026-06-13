@@ -46,6 +46,7 @@ import net.minecraft.Util.OS;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.renderer.GpuWarnlistManager;
+import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.VulkanicAPI;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.MusicManager;
@@ -201,6 +202,17 @@ public class Options {
 		),
 		GraphicsStatus.FANCY,
 		graphicsStatus -> {}
+	);
+	private static final Component GRAPHICS_BACKEND_TOOLTIP = Component.translatable("options.graphicsBackend.tooltip");
+	private final OptionInstance<GraphicsBackendType> graphicsBackend = new OptionInstance<>(
+		"options.graphicsBackend",
+		OptionInstance.cachedConstantTooltip(GRAPHICS_BACKEND_TOOLTIP),
+		(component, graphicsBackendType) -> genericValueLabel(component, graphicsBackendType == GraphicsBackendType.OPENGL
+			? Component.translatable("options.graphicsBackend.opengl")
+			: Component.translatable("options.graphicsBackend.vulkan")),
+		new OptionInstance.Enum<>(Arrays.asList(GraphicsBackendType.values()), Codec.STRING.xmap(Options::graphicsBackendTypeFromOptionValue, Options::graphicsBackendOptionValue)),
+		GraphicsBackendType.OPENGL,
+		this::setPendingGraphicsBackend
 	);
 	private final OptionInstance<Boolean> ambientOcclusion = OptionInstance.createBoolean(
 		"options.ao", true, boolean_ -> Minecraft.getInstance().levelRenderer.allChanged()
@@ -818,6 +830,10 @@ public class Options {
 
 	public OptionInstance<GraphicsStatus> graphicsMode() {
 		return this.graphicsMode;
+	}
+
+	public OptionInstance<GraphicsBackendType> graphicsBackend() {
+		return this.graphicsBackend;
 	}
 
 	public OptionInstance<Boolean> ambientOcclusion() {
@@ -1480,8 +1496,22 @@ public class Options {
 	}
 
 	private void selectGraphicsBackend(@Nullable String configuredBackendValue) {
-		this.graphicsBackendOptionValue = VulkanicAPI.normalizeBackendOptionValue(configuredBackendValue);
+		GraphicsBackendType graphicsBackendType = graphicsBackendTypeFromOptionValue(configuredBackendValue);
+		this.graphicsBackend.set(graphicsBackendType);
+		this.setPendingGraphicsBackend(graphicsBackendType);
 		VulkanicAPI.initializeFromOptionsValue(this.graphicsBackendOptionValue);
+	}
+
+	private void setPendingGraphicsBackend(GraphicsBackendType graphicsBackendType) {
+		this.graphicsBackendOptionValue = graphicsBackendOptionValue(graphicsBackendType);
+	}
+
+	private static GraphicsBackendType graphicsBackendTypeFromOptionValue(@Nullable String configuredBackendValue) {
+		return VulkanicAPI.backendTypeFromOptionsValue(configuredBackendValue);
+	}
+
+	private static String graphicsBackendOptionValue(GraphicsBackendType graphicsBackendType) {
+		return graphicsBackendType == GraphicsBackendType.OPENGL ? "opengl" : "vulkan";
 	}
 
 	static boolean isTrue(String string) {

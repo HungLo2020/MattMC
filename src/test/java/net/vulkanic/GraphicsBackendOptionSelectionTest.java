@@ -74,12 +74,44 @@ public class GraphicsBackendOptionSelectionTest {
 
         assertTrue(source.contains("private static final String GRAPHICS_BACKEND_OPTION_KEY = \"graphics_backend\";"),
             "Options should define hidden graphics backend key name");
+        assertTrue(source.contains("private final OptionInstance<GraphicsBackendType> graphicsBackend"),
+            "Options should expose graphics backend as a normal UI option while keeping the hidden options.txt key");
+        assertTrue(source.contains("public OptionInstance<GraphicsBackendType> graphicsBackend()"),
+            "Options should expose the graphics backend option for video settings screens");
         assertTrue(source.contains("if (string.startsWith(GRAPHICS_BACKEND_OPTION_KEY + \"=\"))"),
             "Options.load should parse graphics_backend=value lines from options.txt");
         assertTrue(source.contains("VulkanicAPI.initializeFromOptionsValue(this.graphicsBackendOptionValue);"),
             "Options.load should initialize backend routing from the hidden option at launch");
+        assertTrue(source.contains("private void setPendingGraphicsBackend(GraphicsBackendType graphicsBackendType)"),
+            "Options should provide a pending-value setter for UI changes that does not reinitialize the renderer live");
         assertTrue(source.contains("printWriter.println(GRAPHICS_BACKEND_OPTION_KEY + \"=\" + this.graphicsBackendOptionValue);"),
             "Options.save should persist the hidden graphics_backend option for manual editing");
+    }
+
+    @Test
+    public void testVideoSettingsScreensExposeGraphicsBackendRestartOption() throws IOException {
+        Path sodiumOptionsFile = PROJECT_ROOT.resolve("src/main/java/net/sodium/client/gui/SodiumGameOptionPages.java");
+        String sodiumSource = Files.readString(sodiumOptionsFile);
+        assertTrue(sodiumSource.contains("OptionImpl.createBuilder(GraphicsBackendType.class, vanillaOpts)"),
+            "Sodium video settings should expose the graphics backend selector");
+        assertTrue(sodiumSource.contains(".setBinding((opts, value) -> opts.graphicsBackend().set(value), opts -> opts.graphicsBackend().get())"),
+            "Sodium graphics backend selector should write through Minecraft Options so graphics_backend remains authoritative");
+        assertTrue(sodiumSource.contains(".setFlags(OptionFlag.REQUIRES_GAME_RESTART)"),
+            "Sodium graphics backend selector should warn that a restart is required");
+
+        Path vanillaVideoSettingsFile = PROJECT_ROOT.resolve("src/main/java/net/minecraft/client/gui/screens/options/VideoSettingsScreen.java");
+        String vanillaVideoSettingsSource = Files.readString(vanillaVideoSettingsFile);
+        int fullscreenIndex = vanillaVideoSettingsSource.indexOf("options.fullscreen()");
+        int backendIndex = vanillaVideoSettingsSource.indexOf("options.graphicsBackend()", fullscreenIndex);
+        assertTrue(backendIndex > fullscreenIndex,
+            "Vanilla video settings fallback should place the graphics backend selector near fullscreen");
+
+        Path minecraftLangFile = PROJECT_ROOT.resolve("src/main/resources/assets/minecraft/lang/en_us.json");
+        String minecraftLangSource = Files.readString(minecraftLangFile);
+        assertTrue(minecraftLangSource.contains("\"options.graphicsBackend\": \"Graphics Backend\""),
+            "Minecraft lang should define the graphics backend option label");
+        assertTrue(minecraftLangSource.contains("Changing this requires restarting the game."),
+            "Graphics backend tooltip should communicate the restart requirement");
     }
 
     @Test
