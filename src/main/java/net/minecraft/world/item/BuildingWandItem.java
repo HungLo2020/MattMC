@@ -12,6 +12,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -108,7 +109,12 @@ public class BuildingWandItem extends Item {
 
 	private int placePlane(Level level, Player player, UseOnContext context, BlockItem blockItem, Block sourceBlock, BlockPos clickedPos, Direction face) {
 		return this.visitMatchingPlane(
-			level, sourceBlock, clickedPos, face, (sourcePos, sourceState) -> true, sourcePos -> this.tryPlaceFromSource(level, player, context, blockItem, sourcePos, face)
+			level,
+			sourceBlock,
+			clickedPos,
+			face,
+			(sourcePos, sourceState) -> canPlaceFromSource(level, player, context, blockItem, sourcePos, face),
+			sourcePos -> this.tryPlaceFromSource(level, player, context, blockItem, sourcePos, face)
 		);
 	}
 
@@ -168,6 +174,17 @@ public class BuildingWandItem extends Item {
 		}
 
 		return true;
+	}
+
+	private static boolean canPlaceFromSource(Level level, Player player, UseOnContext context, BlockItem blockItem, BlockPos sourcePos, Direction face) {
+		BlockPos targetPos = sourcePos.relative(face);
+		if (!level.mayInteract(player, targetPos)) {
+			return false;
+		}
+
+		BlockHitResult hitResult = new BlockHitResult(hitLocationForFace(sourcePos, face), face, sourcePos, false);
+		UseOnContext placementContext = new UseOnContext(level, player, context.getHand(), new ItemStack(blockItem), hitResult);
+		return new BlockPlaceContext(placementContext).canPlace();
 	}
 
 	private static void playPlaceSoundForPlayer(ServerPlayer player, Level level, BlockPos targetPos) {

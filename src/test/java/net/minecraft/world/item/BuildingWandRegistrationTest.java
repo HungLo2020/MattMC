@@ -35,6 +35,8 @@ class BuildingWandRegistrationTest {
         assertTrue(source.contains("level.mayInteract(player, targetPos)"));
         assertTrue(source.contains("player.hasInfiniteMaterials()"));
         assertTrue(source.contains("placementStack.useOn(placementContext)"));
+        assertTrue(source.contains("(sourcePos, sourceState) -> canPlaceFromSource(level, player, context, blockItem, sourcePos, face)"));
+        assertTrue(source.contains("new BlockPlaceContext(placementContext).canPlace()"));
         assertTrue(source.contains("serverPlayer.inventoryMenu.sendAllDataToRemote()"));
         assertTrue(source.contains("playPlaceSoundForPlayer(serverPlayer, level, targetPos)"));
         assertTrue(source.contains("new ClientboundSoundPacket"));
