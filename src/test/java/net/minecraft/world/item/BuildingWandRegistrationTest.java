@@ -22,9 +22,29 @@ class BuildingWandRegistrationTest {
         String declaration = source.substring(declarationStart, declarationEnd);
 
         assertTrue(source.contains("public static final Item BUILDING_WAND"));
-        assertTrue(source.contains("registerItem(\"building_wand\", new Item.Properties().stacksTo(1))"));
+        assertTrue(source.contains("registerItem(\"building_wand\", BuildingWandItem::new, new Item.Properties().stacksTo(1))"));
         assertFalse(declaration.contains("durability("), "Building Wand should not have durability");
         assertFalse(declaration.contains("MAX_DAMAGE"), "Building Wand should not have damage components");
+    }
+
+    @Test
+    void buildingWandHasExpectedPlacementGuardrails() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/world/item/BuildingWandItem.java"));
+
+        assertTrue(source.contains("static final int MAX_BLOCKS = 128"));
+        assertTrue(source.contains("level.mayInteract(player, targetPos)"));
+        assertTrue(source.contains("player.hasInfiniteMaterials()"));
+        assertTrue(source.contains("placementStack.useOn(placementContext)"));
+        assertTrue(source.contains("serverPlayer.inventoryMenu.sendAllDataToRemote()"));
+    }
+
+    @Test
+    void buildingWandPlaneOffsetsIncludeDiagonalConnectionsWithinClickedFaceAxis() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/world/item/BuildingWandItem.java"));
+
+        assertTrue(source.contains("case X -> new int[][]{{0, 1, 0}, {0, -1, 0}, {0, 0, -1}, {0, 0, 1}, {0, 1, -1}, {0, 1, 1}, {0, -1, -1}, {0, -1, 1}}"));
+        assertTrue(source.contains("case Y -> new int[][]{{0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}, {-1, 0, -1}, {1, 0, -1}, {-1, 0, 1}, {1, 0, 1}}"));
+        assertTrue(source.contains("case Z -> new int[][]{{0, 1, 0}, {0, -1, 0}, {-1, 0, 0}, {1, 0, 0}, {-1, 1, 0}, {1, 1, 0}, {-1, -1, 0}, {1, -1, 0}}"));
     }
 
     @Test
