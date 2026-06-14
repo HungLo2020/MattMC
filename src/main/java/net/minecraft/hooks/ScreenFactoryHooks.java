@@ -6,18 +6,18 @@ import java.util.function.Supplier;
 
 /**
  * Hook interface for screen factory modifications.
- * Allows mods to replace or wrap screen creation logic.
+ * Allows integrated mods to replace or wrap screen creation logic.
  */
 public interface ScreenFactoryHooks {
     /**
-     * Called when creating the video settings screen from the options menu.
-     * Allows mods to replace the default video settings screen with a custom one.
+     * Called when creating the bundled video settings screen from the options menu.
+     * Allows integrations to replace the default screen factory with a custom one.
      * 
-     * @param original The original screen factory
+     * @param current The current screen factory
      * @param parent The parent screen
-     * @return A replacement screen factory, or null to use the original
+     * @return A replacement screen factory, or null to use the current factory
      */
-    default Supplier<Screen> getVideoSettingsScreenFactory(Supplier<Screen> original, Screen parent) {
+    default Supplier<Screen> getVideoSettingsScreenFactory(Supplier<Screen> current, Screen parent) {
         return null;
     }
 }

@@ -25,7 +25,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.WinScreen;
 import net.minecraft.client.gui.screens.debug.DebugOptionsScreen;
 import net.minecraft.client.gui.screens.debug.GameModeSwitcherScreen;
-import net.minecraft.client.gui.screens.options.VideoSettingsScreen;
 import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -466,9 +465,6 @@ public class KeyboardHandler {
 					boolean bl2 = window.isFullscreen();
 					this.minecraft.options.fullscreen().set(bl2);
 					this.minecraft.options.save();
-					if (this.minecraft.screen instanceof VideoSettingsScreen videoSettingsScreen) {
-						videoSettingsScreen.updateFullscreenButton(bl2);
-					}
 
 					return;
 				}

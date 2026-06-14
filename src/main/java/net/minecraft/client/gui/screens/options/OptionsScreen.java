@@ -28,6 +28,7 @@ import net.minecraft.network.protocol.game.ServerboundChangeDifficultyPacket;
 import net.minecraft.network.protocol.game.ServerboundLockDifficultyPacket;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.world.Difficulty;
+import net.sodium.client.gui.SodiumOptionsGUI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -69,8 +70,8 @@ public class OptionsScreen extends Screen {
 		rowHelper.addChild(this.openScreenButton(SKIN_CUSTOMIZATION, () -> new SkinCustomizationScreen(this, this.options)));
 		rowHelper.addChild(this.openScreenButton(SOUNDS, () -> new SoundOptionsScreen(this, this.options)));
 		
-		// Allow mods to override the video settings screen factory
-		java.util.function.Supplier<Screen> videoSettingsFactory = () -> new VideoSettingsScreen(this, this.minecraft, this.options);
+		// Sodium owns the video settings UI in MattMC; hooks may still replace it for integrated mods.
+		java.util.function.Supplier<Screen> videoSettingsFactory = () -> SodiumOptionsGUI.createScreen(this);
 		for (net.minecraft.hooks.ScreenFactoryHooks hook : net.minecraft.hooks.HookRegistry.getScreenFactoryHooks()) {
 			java.util.function.Supplier<Screen> override = hook.getVideoSettingsScreenFactory(videoSettingsFactory, this);
 			if (override != null) {

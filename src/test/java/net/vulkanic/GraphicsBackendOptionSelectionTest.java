@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class GraphicsBackendOptionSelectionTest {
@@ -89,7 +90,7 @@ public class GraphicsBackendOptionSelectionTest {
     }
 
     @Test
-    public void testVideoSettingsScreensExposeGraphicsBackendRestartOption() throws IOException {
+    public void testSodiumVideoSettingsExposeGraphicsBackendRestartOption() throws IOException {
         Path sodiumOptionsFile = PROJECT_ROOT.resolve("src/main/java/net/sodium/client/gui/SodiumGameOptionPages.java");
         String sodiumSource = Files.readString(sodiumOptionsFile);
         assertTrue(sodiumSource.contains("OptionImpl.createBuilder(GraphicsBackendType.class, vanillaOpts)"),
@@ -99,19 +100,27 @@ public class GraphicsBackendOptionSelectionTest {
         assertTrue(sodiumSource.contains(".setFlags(OptionFlag.REQUIRES_GAME_RESTART)"),
             "Sodium graphics backend selector should warn that a restart is required");
 
-        Path vanillaVideoSettingsFile = PROJECT_ROOT.resolve("src/main/java/net/minecraft/client/gui/screens/options/VideoSettingsScreen.java");
-        String vanillaVideoSettingsSource = Files.readString(vanillaVideoSettingsFile);
-        int fullscreenIndex = vanillaVideoSettingsSource.indexOf("options.fullscreen()");
-        int backendIndex = vanillaVideoSettingsSource.indexOf("options.graphicsBackend()", fullscreenIndex);
-        assertTrue(backendIndex > fullscreenIndex,
-            "Vanilla video settings fallback should place the graphics backend selector near fullscreen");
-
         Path minecraftLangFile = PROJECT_ROOT.resolve("src/main/resources/assets/minecraft/lang/en_us.json");
         String minecraftLangSource = Files.readString(minecraftLangFile);
         assertTrue(minecraftLangSource.contains("\"options.graphicsBackend\": \"Graphics Backend\""),
             "Minecraft lang should define the graphics backend option label");
         assertTrue(minecraftLangSource.contains("Changing this requires restarting the game."),
             "Graphics backend tooltip should communicate the restart requirement");
+    }
+
+    @Test
+    public void testVideoSettingsMenuUsesBundledSodiumScreen() throws IOException {
+        Path optionsScreenFile = PROJECT_ROOT.resolve("src/main/java/net/minecraft/client/gui/screens/options/OptionsScreen.java");
+        String optionsScreenSource = Files.readString(optionsScreenFile);
+        assertTrue(optionsScreenSource.contains("SodiumOptionsGUI.createScreen(this)"),
+            "OptionsScreen should route the video settings button to the bundled Sodium options screen");
+        assertFalse(optionsScreenSource.contains("new VideoSettingsScreen"),
+            "OptionsScreen should not retain the removed vanilla video settings fallback");
+
+        Path sodiumGuiFile = PROJECT_ROOT.resolve("src/main/java/net/sodium/client/gui/SodiumOptionsGUI.java");
+        String sodiumGuiSource = Files.readString(sodiumGuiFile);
+        assertFalse(sodiumGuiSource.contains("VideoSettingsScreen"),
+            "SodiumOptionsGUI should not expose an escape hatch back to the removed vanilla video settings screen");
     }
 
     @Test
