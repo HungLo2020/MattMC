@@ -5,13 +5,18 @@ import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.GameMasterBlock;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -41,12 +46,21 @@ public class BuildingWandItem extends Item {
 
 		BlockPos clickedPos = context.getClickedPos();
 		BlockState clickedState = level.getBlockState(clickedPos);
+		if (clickedState.isAir()) {
+			return InteractionResult.PASS;
+		}
+
 		Block sourceBlock = clickedState.getBlock();
+		Direction face = context.getClickedFace();
+		if (context.isSecondaryUseActive()) {
+			int broken = this.breakPlane(level, player, sourceBlock, clickedPos, face);
+			return broken == 0 ? InteractionResult.PASS : InteractionResult.SUCCESS_SERVER;
+		}
+
 		if (!(sourceBlock.asItem() instanceof BlockItem blockItem)) {
 			return InteractionResult.PASS;
 		}
 
-		Direction face = context.getClickedFace();
 		int placed = this.placePlane(level, player, context, blockItem, sourceBlock, clickedPos, face);
 		if (placed == 0) {
 			return InteractionResult.PASS;
@@ -59,18 +73,61 @@ public class BuildingWandItem extends Item {
 		return InteractionResult.SUCCESS_SERVER;
 	}
 
+	private int breakPlane(Level level, Player player, Block sourceBlock, BlockPos clickedPos, Direction face) {
+		if (!player.mayBuild()) {
+			return 0;
+		}
+
+		return this.visitMatchingPlane(level, sourceBlock, clickedPos, face, (sourcePos, sourceState) -> isBreakFaceExposed(level, sourcePos, sourceState, face), sourcePos -> {
+			if (!level.mayInteract(player, sourcePos)) {
+				return false;
+			}
+
+			BlockState sourceState = level.getBlockState(sourcePos);
+			if (!canBreakSourceBlock(level, player, sourcePos, sourceState)) {
+				return false;
+			}
+
+			return level.destroyBlock(sourcePos, false, player);
+		});
+	}
+
+	private static boolean canBreakSourceBlock(Level level, Player player, BlockPos sourcePos, BlockState sourceState) {
+		Block block = sourceState.getBlock();
+		if (sourceState.getDestroySpeed(level, sourcePos) < 0.0F) {
+			return false;
+		}
+
+		return !(block instanceof GameMasterBlock) || player.canUseGameMasterBlocks();
+	}
+
+	private static boolean isBreakFaceExposed(Level level, BlockPos sourcePos, BlockState sourceState, Direction face) {
+		BlockState adjacentState = level.getBlockState(sourcePos.relative(face));
+		return Block.shouldRenderFace(sourceState, adjacentState, face);
+	}
+
 	private int placePlane(Level level, Player player, UseOnContext context, BlockItem blockItem, Block sourceBlock, BlockPos clickedPos, Direction face) {
+		return this.visitMatchingPlane(
+			level, sourceBlock, clickedPos, face, (sourcePos, sourceState) -> true, sourcePos -> this.tryPlaceFromSource(level, player, context, blockItem, sourcePos, face)
+		);
+	}
+
+	private int visitMatchingPlane(Level level, Block sourceBlock, BlockPos clickedPos, Direction face, PlaneSourceFilter sourceFilter, PlaneAction action) {
 		ArrayDeque<BlockPos> queue = new ArrayDeque<>();
 		Set<BlockPos> visited = new HashSet<>();
 		int[][] planeOffsets = planeOffsets(face);
 		queue.add(clickedPos);
 		visited.add(clickedPos);
 
-		int placed = 0;
-		while (!queue.isEmpty() && placed < MAX_BLOCKS && visited.size() <= MAX_VISITED_SOURCE_BLOCKS) {
+		int changed = 0;
+		while (!queue.isEmpty() && changed < MAX_BLOCKS && visited.size() <= MAX_VISITED_SOURCE_BLOCKS) {
 			BlockPos sourcePos = queue.removeFirst();
 			BlockState sourceState = level.getBlockState(sourcePos);
 			if (!sourceState.is(sourceBlock)) {
+				continue;
+			}
+
+			if (!sourceFilter.test(sourcePos, sourceState)) {
 				continue;
 			}
 
@@ -81,12 +138,12 @@ public class BuildingWandItem extends Item {
 				}
 			}
 
-			if (this.tryPlaceFromSource(level, player, context, blockItem, sourcePos, face)) {
-				placed++;
+			if (action.apply(sourcePos)) {
+				changed++;
 			}
 		}
 
-		return placed;
+		return changed;
 	}
 
 	private boolean tryPlaceFromSource(Level level, Player player, UseOnContext context, BlockItem blockItem, BlockPos sourcePos, Direction face) {
@@ -102,7 +159,33 @@ public class BuildingWandItem extends Item {
 
 		BlockHitResult hitResult = new BlockHitResult(hitLocationForFace(sourcePos, face), face, sourcePos, false);
 		UseOnContext placementContext = new UseOnContext(level, player, context.getHand(), placementStack, hitResult);
-		return placementStack.useOn(placementContext).consumesAction();
+		if (!placementStack.useOn(placementContext).consumesAction()) {
+			return false;
+		}
+
+		if (player instanceof ServerPlayer serverPlayer) {
+			playPlaceSoundForPlayer(serverPlayer, level, targetPos);
+		}
+
+		return true;
+	}
+
+	private static void playPlaceSoundForPlayer(ServerPlayer player, Level level, BlockPos targetPos) {
+		BlockState placedState = level.getBlockState(targetPos);
+		SoundType soundType = placedState.getSoundType();
+		player.connection
+			.send(
+				new ClientboundSoundPacket(
+					BuiltInRegistries.SOUND_EVENT.wrapAsHolder(soundType.getPlaceSound()),
+					SoundSource.BLOCKS,
+					targetPos.getX() + 0.5,
+					targetPos.getY() + 0.5,
+					targetPos.getZ() + 0.5,
+					(soundType.getVolume() + 1.0F) / 2.0F,
+					soundType.getPitch() * 0.8F,
+					level.random.nextLong()
+				)
+			);
 	}
 
 	private ItemStack findPlacementStack(Player player, BlockItem blockItem) {
@@ -141,5 +224,15 @@ public class BuildingWandItem extends Item {
 			sourcePos.getY() + 0.5 + face.getStepY() * 0.5,
 			sourcePos.getZ() + 0.5 + face.getStepZ() * 0.5
 		);
+	}
+
+	@FunctionalInterface
+	private interface PlaneAction {
+		boolean apply(BlockPos sourcePos);
+	}
+
+	@FunctionalInterface
+	private interface PlaneSourceFilter {
+		boolean test(BlockPos sourcePos, BlockState sourceState);
 	}
 }

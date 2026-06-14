@@ -36,6 +36,29 @@ class BuildingWandRegistrationTest {
         assertTrue(source.contains("player.hasInfiniteMaterials()"));
         assertTrue(source.contains("placementStack.useOn(placementContext)"));
         assertTrue(source.contains("serverPlayer.inventoryMenu.sendAllDataToRemote()"));
+        assertTrue(source.contains("playPlaceSoundForPlayer(serverPlayer, level, targetPos)"));
+        assertTrue(source.contains("new ClientboundSoundPacket"));
+        assertTrue(source.contains("BuiltInRegistries.SOUND_EVENT.wrapAsHolder(soundType.getPlaceSound())"));
+        assertTrue(source.contains("(soundType.getVolume() + 1.0F) / 2.0F"));
+        assertTrue(source.contains("soundType.getPitch() * 0.8F"));
+    }
+
+    @Test
+    void buildingWandSneakModeDeletesPlaneWithoutDrops() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/world/item/BuildingWandItem.java"));
+
+        assertTrue(source.contains("context.isSecondaryUseActive()"));
+        assertTrue(source.contains("this.breakPlane(level, player, sourceBlock, clickedPos, face)"));
+        assertTrue(source.contains("(sourcePos, sourceState) -> isBreakFaceExposed(level, sourcePos, sourceState, face)"));
+        assertTrue(source.contains("player.mayBuild()"));
+        assertTrue(source.contains("level.mayInteract(player, sourcePos)"));
+        assertTrue(source.contains("canBreakSourceBlock(level, player, sourcePos, sourceState)"));
+        assertTrue(source.contains("level.destroyBlock(sourcePos, false, player)"));
+        assertTrue(source.contains("sourceState.getDestroySpeed(level, sourcePos) < 0.0F"));
+        assertTrue(source.contains("block instanceof GameMasterBlock"));
+        assertTrue(source.contains("Block.shouldRenderFace(sourceState, adjacentState, face)"));
+        assertFalse(source.contains("dropResources(sourceState"));
+        assertFalse(source.contains("placeItemBackInInventory"));
     }
 
     @Test
