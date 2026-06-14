@@ -1426,6 +1426,7 @@ public class CreativeModeTabs {
 						output.accept(Items.NETHERITE_AXE);
 						output.accept(Items.NETHERITE_HOE);
 						output.accept(Items.TROWEL); // Trowel: randomly places a hotbar block on right-click
+						output.accept(Items.BUILDING_WAND);
 						output.accept(Items.BUCKET);
 						output.accept(Items.WATER_BUCKET);
 						output.accept(Items.BLOBFISH_BUCKET);
