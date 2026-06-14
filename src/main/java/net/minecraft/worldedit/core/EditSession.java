@@ -6,7 +6,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.worldedit.extent.Extent;
 import net.minecraft.worldedit.history.ChangeSet;
 import net.minecraft.worldedit.history.ArrayListHistory;
+import net.minecraft.worldedit.mask.Mask;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.pattern.Pattern;
 import net.minecraft.worldedit.region.Region;
 
 /**
@@ -79,6 +81,23 @@ public class EditSession implements Extent {
         }
         return count;
     }
+
+    /**
+     * Set all blocks in a region to blocks selected by a pattern.
+     */
+    public int setBlocks(Region region, Pattern pattern) {
+        int count = 0;
+        for (BlockVector3 pos : region) {
+            BlockState block = pattern.apply(pos);
+            if (block != null && setBlock(pos, block)) {
+                count++;
+            }
+            if (maxBlocks >= 0 && count >= maxBlocks) {
+                break;
+            }
+        }
+        return count;
+    }
     
     /**
      * Replace blocks in a region.
@@ -88,6 +107,44 @@ public class EditSession implements Extent {
         for (BlockVector3 pos : region) {
             if (getBlock(pos).equals(from)) {
                 if (setBlock(pos, to)) {
+                    count++;
+                }
+            }
+            if (maxBlocks >= 0 && count >= maxBlocks) {
+                break;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Replace blocks in a region with blocks selected by a pattern.
+     */
+    public int replaceBlocks(Region region, BlockState from, Pattern to) {
+        int count = 0;
+        for (BlockVector3 pos : region) {
+            if (getBlock(pos).equals(from)) {
+                BlockState replacement = to.apply(pos);
+                if (replacement != null && setBlock(pos, replacement)) {
+                    count++;
+                }
+            }
+            if (maxBlocks >= 0 && count >= maxBlocks) {
+                break;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Replace blocks matching a mask with blocks selected by a pattern.
+     */
+    public int replaceBlocks(Region region, Mask from, Pattern to) {
+        int count = 0;
+        for (BlockVector3 pos : region) {
+            if (from.test(this, pos)) {
+                BlockState replacement = to.apply(pos);
+                if (replacement != null && setBlock(pos, replacement)) {
                     count++;
                 }
             }

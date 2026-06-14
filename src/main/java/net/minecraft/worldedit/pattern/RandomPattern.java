@@ -38,6 +38,14 @@ public class RandomPattern implements Pattern {
         blocks.add(new WeightedBlock(state, weight));
         totalWeight += weight;
     }
+
+    int getEntryCount() {
+        return blocks.size();
+    }
+
+    double getTotalWeight() {
+        return totalWeight;
+    }
     
     @Override
     public BlockState apply(BlockVector3 position) {

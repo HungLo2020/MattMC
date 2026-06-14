@@ -20,8 +20,9 @@ import net.minecraft.world.level.material.Fluids;
 import net.minecraft.worldedit.core.EditSession;
 import net.minecraft.worldedit.core.WorldEdit;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.pattern.BlockPatternParser;
+import net.minecraft.worldedit.pattern.BlockPatternParser.ReplacementPatterns;
 import net.minecraft.worldedit.platform.MattMCPlatform;
-import net.minecraft.worldedit.region.Region;
 import net.minecraft.worldedit.session.LocalSession;
 
 /**
@@ -79,12 +80,10 @@ public class UtilityCommands {
         dispatcher.register(Commands.literal("/replacenear")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.replacenear"))
             .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
-                .then(Commands.argument("from", StringArgumentType.word())
-                    .then(Commands.argument("to", StringArgumentType.word())
-                        .executes(ctx -> replaceNear(ctx,
-                            IntegerArgumentType.getInteger(ctx, "radius"),
-                            StringArgumentType.getString(ctx, "from"),
-                            StringArgumentType.getString(ctx, "to")))))));
+                .then(Commands.argument("patterns", StringArgumentType.greedyString())
+                    .executes(ctx -> replaceNear(ctx,
+                        IntegerArgumentType.getInteger(ctx, "radius"),
+                        StringArgumentType.getString(ctx, "patterns"))))));
     }
     
     /**
@@ -278,30 +277,18 @@ public class UtilityCommands {
     /**
      * Replace blocks near the player.
      */
-    private static int replaceNear(CommandContext<CommandSourceStack> context, int radius, String fromName, String toName) throws CommandSyntaxException {
+    private static int replaceNear(CommandContext<CommandSourceStack> context, int radius, String patterns) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
-        // Parse blocks
-        ResourceLocation fromId = parseBlockId(fromName);
-        ResourceLocation toId = parseBlockId(toName);
-        
-        if (fromId == null || toId == null) {
-            player.sendSystemMessage(Component.literal("Invalid block name"));
+        ReplacementPatterns replacementPatterns;
+        try {
+            replacementPatterns = BlockPatternParser.parseReplacementPatterns(patterns);
+        } catch (IllegalArgumentException e) {
+            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
-        
-        Block from = BuiltInRegistries.BLOCK.getValue(fromId);
-        Block to = BuiltInRegistries.BLOCK.getValue(toId);
-        
-        if (from == null || to == null) {
-            player.sendSystemMessage(Component.literal("Unknown block"));
-            return 0;
-        }
-        
-        BlockState fromState = from.defaultBlockState();
-        BlockState toState = to.defaultBlockState();
         
         // Create edit session
         EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
@@ -318,8 +305,9 @@ public class UtilityCommands {
                         BlockVector3 pos = center.add(x, y, z);
                         BlockState current = editSession.getBlock(pos);
                         
-                        if (current.equals(fromState)) {
-                            if (editSession.setBlock(pos, toState)) {
+                        if (replacementPatterns.from().test(current)) {
+                            BlockState replacement = replacementPatterns.to().apply(pos);
+                            if (replacement != null && editSession.setBlock(pos, replacement)) {
                                 count++;
                             }
                         }

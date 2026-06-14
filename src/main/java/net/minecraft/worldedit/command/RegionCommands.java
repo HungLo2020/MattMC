@@ -7,15 +7,17 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.worldedit.core.WorldEdit;
+import net.minecraft.worldedit.mask.ExistingBlockMask;
+import net.minecraft.worldedit.mask.Mask;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.pattern.BlockPatternParser;
+import net.minecraft.worldedit.pattern.BlockPatternParser.ReplacementPatterns;
+import net.minecraft.worldedit.pattern.Pattern;
 import net.minecraft.worldedit.platform.MattMCPlatform;
 import net.minecraft.worldedit.region.Region;
 import net.minecraft.worldedit.session.LocalSession;
@@ -33,34 +35,31 @@ public class RegionCommands {
         // //set command
         dispatcher.register(Commands.literal("/set")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.set"))
-            .then(Commands.argument("block", StringArgumentType.word())
+            .then(Commands.argument("block", StringArgumentType.greedyString())
                 .executes(ctx -> set(ctx, StringArgumentType.getString(ctx, "block")))));
         
         // //replace command
         dispatcher.register(Commands.literal("/replace")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.replace"))
-            .then(Commands.argument("from", StringArgumentType.word())
-                .then(Commands.argument("to", StringArgumentType.word())
-                    .executes(ctx -> replace(ctx, 
-                        StringArgumentType.getString(ctx, "from"),
-                        StringArgumentType.getString(ctx, "to"))))));
+            .then(Commands.argument("patterns", StringArgumentType.greedyString())
+                .executes(ctx -> replace(ctx, StringArgumentType.getString(ctx, "patterns")))));
         
         // //walls command
         dispatcher.register(Commands.literal("/walls")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.walls"))
-            .then(Commands.argument("block", StringArgumentType.word())
+            .then(Commands.argument("block", StringArgumentType.greedyString())
                 .executes(ctx -> walls(ctx, StringArgumentType.getString(ctx, "block")))));
         
         // //faces command
         dispatcher.register(Commands.literal("/faces")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.faces"))
-            .then(Commands.argument("block", StringArgumentType.word())
+            .then(Commands.argument("block", StringArgumentType.greedyString())
                 .executes(ctx -> faces(ctx, StringArgumentType.getString(ctx, "block")))));
         
         // //overlay command
         dispatcher.register(Commands.literal("/overlay")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.overlay"))
-            .then(Commands.argument("block", StringArgumentType.word())
+            .then(Commands.argument("block", StringArgumentType.greedyString())
                 .executes(ctx -> overlay(ctx, StringArgumentType.getString(ctx, "block")))));
         
         // //move command (stubbed - to be fully implemented)
@@ -126,20 +125,13 @@ public class RegionCommands {
             return 0;
         }
         
-        // Parse block type
-        ResourceLocation blockId = parseBlockId(blockName);
-        if (blockId == null) {
-            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+        Pattern pattern;
+        try {
+            pattern = BlockPatternParser.parse(blockName);
+        } catch (IllegalArgumentException e) {
+            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
-        
-        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
-        if (block == null) {
-            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
-            return 0;
-        }
-        
-        BlockState state = block.defaultBlockState();
         
         // Create edit session
         net.minecraft.worldedit.core.EditSession editSession = 
@@ -147,7 +139,7 @@ public class RegionCommands {
         editSession.setFastMode(session.isFastMode());
         
         // Set blocks
-        int count = editSession.setBlocks(region, state);
+        int count = editSession.setBlocks(region, pattern);
         
         // Remember for undo
         session.remember(editSession);
@@ -160,7 +152,7 @@ public class RegionCommands {
     /**
      * Replace blocks in selection.
      */
-    private static int replace(CommandContext<CommandSourceStack> context, String fromBlock, String toBlock) throws CommandSyntaxException {
+    private static int replace(CommandContext<CommandSourceStack> context, String patterns) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
         
@@ -172,33 +164,29 @@ public class RegionCommands {
             return 0;
         }
         
-        // Parse block types
-        ResourceLocation fromId = parseBlockId(fromBlock);
-        ResourceLocation toId = parseBlockId(toBlock);
-        
-        if (fromId == null || toId == null) {
-            player.sendSystemMessage(Component.literal("Invalid block name"));
-            return 0;
-        }
-        
-        Block from = BuiltInRegistries.BLOCK.getValue(fromId);
-        Block to = BuiltInRegistries.BLOCK.getValue(toId);
-        
-        if (from == null || to == null) {
-            player.sendSystemMessage(Component.literal("Unknown block"));
-            return 0;
-        }
-        
-        BlockState fromState = from.defaultBlockState();
-        BlockState toState = to.defaultBlockState();
-        
         // Create edit session
         net.minecraft.worldedit.core.EditSession editSession = 
             new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
         editSession.setFastMode(session.isFastMode());
+
+        Mask fromMask;
+        Pattern toPattern;
+        try {
+            try {
+                toPattern = BlockPatternParser.parse(patterns);
+                fromMask = new ExistingBlockMask(editSession);
+            } catch (IllegalArgumentException singlePatternError) {
+                ReplacementPatterns replacementPatterns = BlockPatternParser.parseReplacementPatterns(patterns);
+                fromMask = replacementPatterns.from();
+                toPattern = replacementPatterns.to();
+            }
+        } catch (IllegalArgumentException e) {
+            player.sendSystemMessage(Component.literal(e.getMessage()));
+            return 0;
+        }
         
         // Replace blocks
-        int count = editSession.replaceBlocks(region, fromState, toState);
+        int count = editSession.replaceBlocks(region, fromMask, toPattern);
         
         // Remember for undo
         session.remember(editSession);
@@ -223,20 +211,13 @@ public class RegionCommands {
             return 0;
         }
         
-        // Parse block
-        ResourceLocation blockId = parseBlockId(blockName);
-        if (blockId == null) {
-            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+        Pattern pattern;
+        try {
+            pattern = BlockPatternParser.parse(blockName);
+        } catch (IllegalArgumentException e) {
+            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
-        
-        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
-        if (block == null) {
-            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
-            return 0;
-        }
-        
-        BlockState state = block.defaultBlockState();
         
         // Create edit session
         net.minecraft.worldedit.core.EditSession editSession = 
@@ -252,9 +233,11 @@ public class RegionCommands {
         for (int x = min.getX(); x <= max.getX(); x++) {
             for (int y = min.getY(); y <= max.getY(); y++) {
                 // South wall (min Z)
-                if (editSession.setBlock(BlockVector3.at(x, y, min.getZ()), state)) count++;
+                BlockVector3 south = BlockVector3.at(x, y, min.getZ());
+                if (editSession.setBlock(south, pattern.apply(south))) count++;
                 // North wall (max Z)
-                if (editSession.setBlock(BlockVector3.at(x, y, max.getZ()), state)) count++;
+                BlockVector3 north = BlockVector3.at(x, y, max.getZ());
+                if (editSession.setBlock(north, pattern.apply(north))) count++;
             }
         }
         
@@ -262,9 +245,11 @@ public class RegionCommands {
         for (int z = min.getZ() + 1; z < max.getZ(); z++) {
             for (int y = min.getY(); y <= max.getY(); y++) {
                 // West wall (min X)
-                if (editSession.setBlock(BlockVector3.at(min.getX(), y, z), state)) count++;
+                BlockVector3 west = BlockVector3.at(min.getX(), y, z);
+                if (editSession.setBlock(west, pattern.apply(west))) count++;
                 // East wall (max X)
-                if (editSession.setBlock(BlockVector3.at(max.getX(), y, z), state)) count++;
+                BlockVector3 east = BlockVector3.at(max.getX(), y, z);
+                if (editSession.setBlock(east, pattern.apply(east))) count++;
             }
         }
         
@@ -291,20 +276,13 @@ public class RegionCommands {
             return 0;
         }
         
-        // Parse block
-        ResourceLocation blockId = parseBlockId(blockName);
-        if (blockId == null) {
-            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+        Pattern pattern;
+        try {
+            pattern = BlockPatternParser.parse(blockName);
+        } catch (IllegalArgumentException e) {
+            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
-        
-        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
-        if (block == null) {
-            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
-            return 0;
-        }
-        
-        BlockState state = block.defaultBlockState();
         
         // Create edit session
         net.minecraft.worldedit.core.EditSession editSession = 
@@ -320,9 +298,11 @@ public class RegionCommands {
         for (int x = min.getX(); x <= max.getX(); x++) {
             for (int z = min.getZ(); z <= max.getZ(); z++) {
                 // Bottom
-                if (editSession.setBlock(BlockVector3.at(x, min.getY(), z), state)) count++;
+                BlockVector3 bottom = BlockVector3.at(x, min.getY(), z);
+                if (editSession.setBlock(bottom, pattern.apply(bottom))) count++;
                 // Top
-                if (editSession.setBlock(BlockVector3.at(x, max.getY(), z), state)) count++;
+                BlockVector3 top = BlockVector3.at(x, max.getY(), z);
+                if (editSession.setBlock(top, pattern.apply(top))) count++;
             }
         }
         
@@ -330,13 +310,17 @@ public class RegionCommands {
         for (int y = min.getY() + 1; y < max.getY(); y++) {
             for (int x = min.getX(); x <= max.getX(); x++) {
                 // South and north
-                if (editSession.setBlock(BlockVector3.at(x, y, min.getZ()), state)) count++;
-                if (editSession.setBlock(BlockVector3.at(x, y, max.getZ()), state)) count++;
+                BlockVector3 south = BlockVector3.at(x, y, min.getZ());
+                if (editSession.setBlock(south, pattern.apply(south))) count++;
+                BlockVector3 north = BlockVector3.at(x, y, max.getZ());
+                if (editSession.setBlock(north, pattern.apply(north))) count++;
             }
             for (int z = min.getZ() + 1; z < max.getZ(); z++) {
                 // West and east
-                if (editSession.setBlock(BlockVector3.at(min.getX(), y, z), state)) count++;
-                if (editSession.setBlock(BlockVector3.at(max.getX(), y, z), state)) count++;
+                BlockVector3 west = BlockVector3.at(min.getX(), y, z);
+                if (editSession.setBlock(west, pattern.apply(west))) count++;
+                BlockVector3 east = BlockVector3.at(max.getX(), y, z);
+                if (editSession.setBlock(east, pattern.apply(east))) count++;
             }
         }
         
@@ -363,20 +347,13 @@ public class RegionCommands {
             return 0;
         }
         
-        // Parse block
-        ResourceLocation blockId = parseBlockId(blockName);
-        if (blockId == null) {
-            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+        Pattern pattern;
+        try {
+            pattern = BlockPatternParser.parse(blockName);
+        } catch (IllegalArgumentException e) {
+            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
-        
-        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
-        if (block == null) {
-            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
-            return 0;
-        }
-        
-        BlockState state = block.defaultBlockState();
         
         // Create edit session
         net.minecraft.worldedit.core.EditSession editSession = 
@@ -399,7 +376,7 @@ public class RegionCommands {
                         // Place overlay block on top
                         BlockVector3 above = pos.add(0, 1, 0);
                         if (above.getY() <= world.getMaxY()) {
-                            if (editSession.setBlock(above, state)) {
+                            if (editSession.setBlock(above, pattern.apply(above))) {
                                 count++;
                             }
                         }
@@ -415,17 +392,6 @@ public class RegionCommands {
         player.sendSystemMessage(Component.literal(String.format("Created overlay: %d blocks", count)));
         
         return Command.SINGLE_SUCCESS;
-    }
-    
-    /**
-     * Parse a block ID from a string.
-     */
-    private static ResourceLocation parseBlockId(String name) {
-        if (name.contains(":")) {
-            return ResourceLocation.tryParse(name);
-        } else {
-            return ResourceLocation.withDefaultNamespace(name);
-        }
     }
     
     /**
