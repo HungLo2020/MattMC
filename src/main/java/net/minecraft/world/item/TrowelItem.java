@@ -2,12 +2,19 @@ package net.minecraft.world.item;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
@@ -69,6 +76,29 @@ public class TrowelItem extends Item {
             hitResult
         );
 
-        return blockItem.place(placeContext);
+        InteractionResult result = blockItem.place(placeContext);
+        if (result.consumesAction() && player instanceof ServerPlayer serverPlayer) {
+            playPlaceSoundForPlayer(serverPlayer, level, placeContext.getClickedPos());
+        }
+
+        return result;
+    }
+
+    private static void playPlaceSoundForPlayer(ServerPlayer player, Level level, BlockPos targetPos) {
+        BlockState placedState = level.getBlockState(targetPos);
+        SoundType soundType = placedState.getSoundType();
+        player.connection
+            .send(
+                new ClientboundSoundPacket(
+                    BuiltInRegistries.SOUND_EVENT.wrapAsHolder(soundType.getPlaceSound()),
+                    SoundSource.BLOCKS,
+                    targetPos.getX() + 0.5,
+                    targetPos.getY() + 0.5,
+                    targetPos.getZ() + 0.5,
+                    (soundType.getVolume() + 1.0F) / 2.0F,
+                    soundType.getPitch() * 0.8F,
+                    level.random.nextLong()
+                )
+            );
     }
 }
