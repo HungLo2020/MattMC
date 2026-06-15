@@ -140,6 +140,8 @@ public class VulkanFramePresentationLifecycleTest {
             vulkanBackendSource.contains("vkCmdBlitImage") || vulkanBackendSource.contains("vkCmdCopyImage"),
             "Vulkan backend should blit/copy queued present textures into swapchain images before queue present"
         );
+        assertTrue(vulkanBackendSource.contains("int composeSourceLayout = requiresShaderCompose\n                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL\n                : VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;"),
+            "Vulkan shader present compose must sample the source image from SHADER_READ_ONLY_OPTIMAL to match descriptor layout");
 
         assertTrue(renderSystemSource.contains("VulkanicAPI.beginFrame()"),
             "RenderSystem flip path should begin Vulkan frame lifecycle when Vulkan routing is selected");

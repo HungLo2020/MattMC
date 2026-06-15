@@ -7816,7 +7816,12 @@ void main() {
         private final Map<Integer, Deque<VulkanBuffer>> recycledDescriptorUniformBuffers = new HashMap<>();
         private int recycledDescriptorUniformBufferCount;
         private static final int MAX_RECYCLED_DESCRIPTOR_UNIFORM_BUFFERS = 4096;
-        private final List<PendingLegacyTextureStorageDestroy> pendingLegacyTextureStorageDestroys = Collections.synchronizedList(new ArrayList<>());
+        private final Map<Long, Long> submittedWorkGenerationByFence = new ConcurrentHashMap<>();
+        private final List<PendingVulkanResourceDestroy> pendingVulkanResourceDestroys = Collections.synchronizedList(new ArrayList<>());
+        private final long[] reservedFrameWorkGenerations = new long[MAX_FRAMES_IN_FLIGHT];
+        private final long[] reservedImmediateWorkGenerations = new long[IMMEDIATE_SUBMIT_SLOTS];
+        private long submittedWorkGeneration;
+        private long completedWorkGeneration;
     /** Tracks {@code VkPipeline} handles owned by live {@link VulkanPipelineHandle} objects. */
     private final Set<Long> managedVkPipelineHandles = ConcurrentHashMap.newKeySet();
     /** Tracks {@code VkPipelineLayout} handles owned by live {@link VulkanPipelineHandle} objects. */
@@ -9413,7 +9418,7 @@ void main() {
                 LegacyTexelBufferBinding texelBinding = entry.getValue();
                 if (texelBinding.legacyBufferId == bufferId) {
                     if (texelBinding.vkBufferViewHandle != VK10.VK_NULL_HANDLE && logicalDevice != null) {
-                        VK10.vkDestroyBufferView(logicalDevice, texelBinding.vkBufferViewHandle, null);
+                        destroyBufferView(texelBinding.vkBufferViewHandle);
                     }
                     legacyTexelBufferBindingsByTextureId.remove(entry.getKey());
                 }
@@ -9444,7 +9449,7 @@ void main() {
 
             LegacyTexelBufferBinding texelBinding = legacyTexelBufferBindingsByTextureId.remove(textureId);
             if (texelBinding != null && texelBinding.vkBufferViewHandle != VK10.VK_NULL_HANDLE && logicalDevice != null) {
-                VK10.vkDestroyBufferView(logicalDevice, texelBinding.vkBufferViewHandle, null);
+                destroyBufferView(texelBinding.vkBufferViewHandle);
             }
 
             LegacyTextureObject texture = legacyTextures.remove(textureId);
@@ -9525,7 +9530,7 @@ void main() {
 
             LegacyTexelBufferBinding previous = legacyTexelBufferBindingsByTextureId.remove(textureId);
             if (previous != null && previous.vkBufferViewHandle != VK10.VK_NULL_HANDLE) {
-                VK10.vkDestroyBufferView(logicalDevice, previous.vkBufferViewHandle, null);
+                destroyBufferView(previous.vkBufferViewHandle);
             }
 
             if (bufferId == 0) {
@@ -9955,17 +9960,13 @@ void main() {
             }
         }
 
-        private static final class PendingLegacyTextureStorageDestroy {
-            private final int textureId;
-            private final long viewHandle;
-            private final long imageHandle;
-            private final long memoryHandle;
+        private static final class PendingVulkanResourceDestroy {
+            private final long retireAfterGeneration;
+            private final Runnable destroyAction;
 
-            private PendingLegacyTextureStorageDestroy(int textureId, long viewHandle, long imageHandle, long memoryHandle) {
-                this.textureId = textureId;
-                this.viewHandle = viewHandle;
-                this.imageHandle = imageHandle;
-                this.memoryHandle = memoryHandle;
+            private PendingVulkanResourceDestroy(long retireAfterGeneration, Runnable destroyAction) {
+                this.retireAfterGeneration = retireAfterGeneration;
+                this.destroyAction = destroyAction;
             }
         }
 
@@ -10137,11 +10138,12 @@ void main() {
         private void destroyLegacyTextureStorage(LegacyTextureObject texture) {
             destroyLegacyManagedImageViews(texture);
             if (logicalDevice != null) {
-                if (shouldDeferLegacyTextureStorageDestroy()) {
-                    enqueueLegacyTextureStorageDestroy(texture);
-                } else {
-                    destroyLegacyTextureStorageHandles(texture.defaultViewHandle, texture.imageHandle, texture.memoryHandle);
-                }
+                long defaultViewHandle = texture.defaultViewHandle;
+                long imageHandle = texture.imageHandle;
+                long memoryHandle = texture.memoryHandle;
+                enqueueVulkanResourceDestroy(
+                    () -> destroyLegacyTextureStorageHandles(defaultViewHandle, imageHandle, memoryHandle)
+                );
             }
 
             texture.imageHandle = VK10.VK_NULL_HANDLE;
@@ -10152,7 +10154,10 @@ void main() {
             texture.levelLayouts.clear();
         }
 
-        private boolean shouldDeferLegacyTextureStorageDestroy() {
+        private boolean hasPotentiallyPendingGpuWork() {
+            if (submittedWorkGeneration > completedWorkGeneration) {
+                return true;
+            }
             if (renderPassRecording || commandBufferRecording || immediateSubmitInFlight || frameInProgress) {
                 return true;
             }
@@ -10169,20 +10174,59 @@ void main() {
             return false;
         }
 
-        private void enqueueLegacyTextureStorageDestroy(LegacyTextureObject texture) {
-            if (texture.defaultViewHandle == VK10.VK_NULL_HANDLE
-                && texture.imageHandle == VK10.VK_NULL_HANDLE
-                && texture.memoryHandle == VK10.VK_NULL_HANDLE) {
+        private long retireAfterGeneration() {
+            long retireAfterGeneration = submittedWorkGeneration;
+            if (frameInProgress) {
+                retireAfterGeneration = Math.max(retireAfterGeneration, reservedFrameWorkGenerations[currentFrameSyncIndex]);
+            }
+            if (commandBufferRecording && recordingImmediateSubmitSlot >= 0) {
+                retireAfterGeneration = Math.max(retireAfterGeneration, reservedImmediateWorkGenerations[recordingImmediateSubmitSlot]);
+            }
+            return retireAfterGeneration;
+        }
+
+        private void enqueueVulkanResourceDestroy(Runnable destroyAction) {
+            if (logicalDevice == null) {
                 return;
             }
-            pendingLegacyTextureStorageDestroys.add(
-                new PendingLegacyTextureStorageDestroy(
-                    texture.id,
-                    texture.defaultViewHandle,
-                    texture.imageHandle,
-                    texture.memoryHandle
-                )
-            );
+            if (!hasPotentiallyPendingGpuWork()) {
+                destroyAction.run();
+                return;
+            }
+            pendingVulkanResourceDestroys.add(new PendingVulkanResourceDestroy(retireAfterGeneration(), destroyAction));
+        }
+
+        private long reserveWorkGeneration() {
+            return ++submittedWorkGeneration;
+        }
+
+        private void registerSubmittedWork(long fenceHandle, long generation) {
+            if (fenceHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+            if (generation <= 0) {
+                generation = reserveWorkGeneration();
+            }
+            submittedWorkGenerationByFence.put(fenceHandle, generation);
+        }
+
+        private void markFenceComplete(long fenceHandle) {
+            if (fenceHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+            Long generation = submittedWorkGenerationByFence.remove(fenceHandle);
+            if (generation != null && generation > completedWorkGeneration) {
+                completedWorkGeneration = generation;
+            }
+            flushPendingVulkanResourceDestroys(false);
+        }
+
+        private void markAllSubmittedWorkComplete() {
+            completedWorkGeneration = submittedWorkGeneration;
+            submittedWorkGenerationByFence.clear();
+            java.util.Arrays.fill(reservedFrameWorkGenerations, 0L);
+            java.util.Arrays.fill(reservedImmediateWorkGenerations, 0L);
+            flushPendingVulkanResourceDestroys(false);
         }
 
         private void destroyLegacyTextureStorageHandles(long viewHandle, long imageHandle, long memoryHandle) {
@@ -10200,26 +10244,33 @@ void main() {
             }
         }
 
-        private void flushPendingLegacyTextureStorageDestroys(boolean force) {
+        private void flushPendingVulkanResourceDestroys(boolean force) {
             if (logicalDevice == null) {
-                pendingLegacyTextureStorageDestroys.clear();
+                pendingVulkanResourceDestroys.clear();
                 return;
             }
-            if (!force && shouldDeferLegacyTextureStorageDestroy()) {
-                return;
+            if (force) {
+                completedWorkGeneration = submittedWorkGeneration;
+                submittedWorkGenerationByFence.clear();
             }
 
-            java.util.List<PendingLegacyTextureStorageDestroy> pending;
-            synchronized (pendingLegacyTextureStorageDestroys) {
-                if (pendingLegacyTextureStorageDestroys.isEmpty()) {
+            java.util.List<PendingVulkanResourceDestroy> ready = new ArrayList<>();
+            synchronized (pendingVulkanResourceDestroys) {
+                if (pendingVulkanResourceDestroys.isEmpty()) {
                     return;
                 }
-                pending = new ArrayList<>(pendingLegacyTextureStorageDestroys);
-                pendingLegacyTextureStorageDestroys.clear();
+                java.util.Iterator<PendingVulkanResourceDestroy> iterator = pendingVulkanResourceDestroys.iterator();
+                while (iterator.hasNext()) {
+                    PendingVulkanResourceDestroy pending = iterator.next();
+                    if (force || pending.retireAfterGeneration <= completedWorkGeneration) {
+                        ready.add(pending);
+                        iterator.remove();
+                    }
+                }
             }
 
-            for (PendingLegacyTextureStorageDestroy entry : pending) {
-                destroyLegacyTextureStorageHandles(entry.viewHandle, entry.imageHandle, entry.memoryHandle);
+            for (PendingVulkanResourceDestroy pending : ready) {
+                pending.destroyAction.run();
             }
         }
 
@@ -12114,6 +12165,13 @@ void main() {
             if (logicalDevice == null) {
                 return;
             }
+            enqueueVulkanResourceDestroy(() -> destroyManagedTextureHandles(imageHandle, memoryHandle, defaultViewHandle));
+        }
+
+        private void destroyManagedTextureHandles(long imageHandle, long memoryHandle, long defaultViewHandle) {
+            if (logicalDevice == null) {
+                return;
+            }
             if (defaultViewHandle != VK10.VK_NULL_HANDLE) {
                 VK10.vkDestroyImageView(logicalDevice, defaultViewHandle, null);
             }
@@ -12129,9 +12187,29 @@ void main() {
             if (!managedExtraImageViews.remove(viewHandle)) {
                 return;
             }
-            if (logicalDevice != null && viewHandle != VK10.VK_NULL_HANDLE) {
-                VK10.vkDestroyImageView(logicalDevice, viewHandle, null);
+            destroyImageView(viewHandle);
+        }
+
+        private void destroyImageView(long viewHandle) {
+            if (logicalDevice == null || viewHandle == VK10.VK_NULL_HANDLE) {
+                return;
             }
+            enqueueVulkanResourceDestroy(() -> {
+                if (logicalDevice != null) {
+                    VK10.vkDestroyImageView(logicalDevice, viewHandle, null);
+                }
+            });
+        }
+
+        private void destroyBufferView(long bufferViewHandle) {
+            if (logicalDevice == null || bufferViewHandle == VK10.VK_NULL_HANDLE) {
+                return;
+            }
+            enqueueVulkanResourceDestroy(() -> {
+                if (logicalDevice != null) {
+                    VK10.vkDestroyBufferView(logicalDevice, bufferViewHandle, null);
+                }
+            });
         }
 
         private void createSwapchain() {
@@ -12946,6 +13024,7 @@ void main() {
                     );
                 }
                 checkVk("vkWaitForFences(allSwapchainFrames)", waitResult);
+                markAllSubmittedWorkComplete();
                 destroyAllTransientFrameDescriptorBuffers();
                 consecutivePrimaryCommandFenceTimeouts = 0;
             }
@@ -12966,7 +13045,7 @@ void main() {
             if (!immediateSubmitInFlight) {
                 consecutiveImmediateSubmitTimeouts = 0;
                 lastImmediateSubmitTimeoutLogNanos = 0L;
-                flushPendingLegacyTextureStorageDestroys(false);
+                flushPendingVulkanResourceDestroys(false);
             }
         }
 
@@ -13017,6 +13096,8 @@ void main() {
                 checkVk("vkWaitForFences(immediateSubmit)", waitResult);
             }
 
+            markFenceComplete(fence);
+            reservedImmediateWorkGenerations[slot] = 0L;
             immediateSubmitSlotsInFlight[slot] = false;
             immediateSubmitInFlight = anyImmediateSubmitSlotInFlight();
             consecutiveImmediateSubmitTimeouts = 0;
@@ -13119,6 +13200,8 @@ void main() {
                 }
 
                 checkVk("vkWaitForFences(swapchainFrame)", frameFenceWaitResult);
+                markFenceComplete(frameFence);
+                reservedFrameWorkGenerations[currentFrameSyncIndex] = 0L;
                 destroyTransientFrameDescriptorBuffers(currentFrameSyncIndex);
                 consecutiveFrameFenceTimeouts = 0;
 
@@ -13241,11 +13324,13 @@ void main() {
                         "vkWaitForFences(imageInFlight[" + imageIndex + "])",
                         VK10.vkWaitForFences(logicalDevice, stack.longs(imageInFlightFence), true, Long.MAX_VALUE)
                     );
+                    markFenceComplete(imageInFlightFence);
                 }
                 swapchainImagesInFlight[imageIndex] = frameFence;
 
                 acquiredSwapchainImageIndex = imageIndex;
                 frameInProgress = true;
+                reservedFrameWorkGenerations[currentFrameSyncIndex] = reserveWorkGeneration();
                 successfulFrameAcquireCount++;
                 VulkanPerfAudit.recordBeginFrameAcquireSuccess();
                 if (successfulFrameAcquireCount <= 5) {
@@ -13457,7 +13542,7 @@ void main() {
                 ? preferredIdleLayout(sourceTexture)
                 : trackedSourceLayout;
             int composeSourceLayout = requiresShaderCompose
-                ? preferredIdleLayout(sourceTexture)
+                ? VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                 : VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
             if (!DEBUG_CLEAR_SWAPCHAIN_PRESENT_EXPERIMENT) {
@@ -13736,11 +13821,7 @@ void main() {
                     );
                 }
                 long finalImageViewHandle = imageViewHandle;
-                closeAction = () -> {
-                    if (logicalDevice != null && finalImageViewHandle != VK10.VK_NULL_HANDLE) {
-                        VK10.vkDestroyImageView(logicalDevice, finalImageViewHandle, null);
-                    }
-                };
+                closeAction = () -> destroyImageView(finalImageViewHandle);
             }
 
             return new VulkanTextureView(wrapperTexture, imageViewHandle, mipLevel, 1, closeAction);
@@ -13920,7 +14001,7 @@ void main() {
                 descriptorPool = immediateDescriptorPools[currentImmediateSubmitSlot];
                 immediateSubmitFence = immediateSubmitFences[currentImmediateSubmitSlot];
                 primaryCommandBuffer = nextCommandBuffer;
-                flushPendingLegacyTextureStorageDestroys(false);
+                flushPendingVulkanResourceDestroys(false);
                 checkVk("vkResetCommandPool", VK10.vkResetCommandPool(logicalDevice, commandPool, 0));
                 resetSharedDescriptorPool();
 
@@ -13932,6 +14013,7 @@ void main() {
                 clearTrackedCommandBufferState(primaryCommandBuffer.address());
                 commandBufferRecording = true;
                 recordingImmediateSubmitSlot = currentImmediateSubmitSlot;
+                reservedImmediateWorkGenerations[currentImmediateSubmitSlot] = reserveWorkGeneration();
                 renderPassRecording = false;
                 return primaryCommandBuffer.address();
             }
@@ -13975,6 +14057,7 @@ void main() {
                     "vkWaitForFences(frameCommandBuffer[" + currentFrameSyncIndex + "])",
                     VK10.vkWaitForFences(logicalDevice, frameFenceBuffer, true, Long.MAX_VALUE)
                 );
+                markFenceComplete(currentSwapchainFrameFence());
                 checkVk(
                     "vkResetCommandPool(frame[" + currentFrameSyncIndex + "])",
                     VK10.vkResetCommandPool(logicalDevice, frameCommandPools[currentFrameSyncIndex], 0)
@@ -14055,6 +14138,7 @@ void main() {
                 long queueSubmitStartNanos = totalStartNanos != 0L ? System.nanoTime() : 0L;
                 checkVk("vkQueueSubmit(immediate)",
                     VK10.vkQueueSubmit(graphicsQueue, submitInfos, submitFence));
+                registerSubmittedWork(submitFence, reservedImmediateWorkGenerations[submitSlot]);
                 immediateSubmitSlotsInFlight[submitSlot] = true;
                 immediateSubmitInFlight = true;
                 commandBufferRecording = false;
@@ -14091,12 +14175,14 @@ void main() {
                         return;
                     }
                     checkVk("vkWaitForFences(immediateSubmitComplete[" + submitSlot + "])", waitAfterResult);
+                    markFenceComplete(submitFence);
+                    reservedImmediateWorkGenerations[submitSlot] = 0L;
                     immediateSubmitSlotsInFlight[submitSlot] = false;
                     immediateSubmitInFlight = anyImmediateSubmitSlotInFlight();
                     consecutiveImmediateSubmitTimeouts = 0;
                     lastImmediateSubmitTimeoutLogNanos = 0L;
                     destroyTransientRenderPassResources(submitSlot);
-                    flushPendingLegacyTextureStorageDestroys(false);
+                    flushPendingVulkanResourceDestroys(false);
                 }
 
                 currentImmediateSubmitSlot = (submitSlot + 1) % IMMEDIATE_SUBMIT_SLOTS;
@@ -14138,6 +14224,7 @@ void main() {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
                 checkVk("vkQueueSubmit(frameBridge)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
+                registerSubmittedWork(frameFence, reservedFrameWorkGenerations[currentFrameSyncIndex]);
             }
         }
 
@@ -14172,6 +14259,7 @@ void main() {
                 java.nio.LongBuffer frameFenceBuffer = stack.longs(frameFence);
                 checkVk("vkResetFences(swapchainFrame)", VK10.vkResetFences(logicalDevice, frameFenceBuffer));
                 checkVk("vkQueueSubmit(frame)", VK10.vkQueueSubmit(graphicsQueue, submitInfos, frameFence));
+                registerSubmittedWork(frameFence, reservedFrameWorkGenerations[currentFrameSyncIndex]);
 
                 frameCommandBufferRecording[currentFrameSyncIndex] = false;
                 clearTrackedCommandBufferState(frameCommandBuffer.address());
@@ -16344,7 +16432,7 @@ void main() {
                 } catch (Throwable ignored) {
                 }
 
-                flushPendingLegacyTextureStorageDestroys(true);
+                flushPendingVulkanResourceDestroys(true);
 
                 if (!managedBufferAllocations.isEmpty()) {
                     java.util.List<Map.Entry<Long, Long>> allocations = new ArrayList<>(managedBufferAllocations.entrySet());
@@ -16358,7 +16446,7 @@ void main() {
                     new ArrayList<>(legacyTextures.values()).forEach(this::destroyLegacyTextureStorage);
                     legacyTextures.clear();
                 }
-                flushPendingLegacyTextureStorageDestroys(true);
+                flushPendingVulkanResourceDestroys(true);
                 legacyTexture2DBindingsByUnit.clear();
                 if (!legacyTexelBufferBindingsByTextureId.isEmpty()) {
                     new ArrayList<>(legacyTexelBufferBindingsByTextureId.values()).forEach(texelBinding -> {

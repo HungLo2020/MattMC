@@ -285,6 +285,35 @@ public class VulkanManagedTextureLifecycleTest {
             "Vulkan backend should preserve six-layer legacy cubemap storage instead of collapsing it to a single 2D layer");
     }
 
+    @Test
+    public void testVulkanImageAndViewDestructionIsFenceDeferred() throws Exception {
+        Path backendFile = PROJECT_ROOT.resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String source = Files.readString(backendFile);
+
+        assertTrue(source.contains("pendingVulkanResourceDestroys"),
+            "Vulkan backend should centralize native resource retirement behind a pending destroy queue");
+        assertTrue(source.contains("submittedWorkGenerationByFence"),
+            "Vulkan backend should associate submitted work generations with Vulkan fences");
+        assertTrue(source.contains("reservedFrameWorkGenerations[currentFrameSyncIndex] = reserveWorkGeneration()"),
+            "Frame command recording should reserve a generation before resources can be closed during that frame");
+        assertTrue(source.contains("reservedImmediateWorkGenerations[currentImmediateSubmitSlot] = reserveWorkGeneration()"),
+            "Immediate command recording should reserve a generation before resources can be closed during that submit");
+        assertTrue(source.contains("registerSubmittedWork(frameFence, reservedFrameWorkGenerations[currentFrameSyncIndex])"),
+            "Frame submits should publish their reserved generation to the submitted fence map");
+        assertTrue(source.contains("registerSubmittedWork(submitFence, reservedImmediateWorkGenerations[submitSlot])"),
+            "Immediate submits should publish their reserved generation to the submitted fence map");
+        assertTrue(source.contains("markFenceComplete(frameFence)") && source.contains("markFenceComplete(submitFence)"),
+            "Fence waits should mark submitted generations complete before native resources are retired");
+        assertTrue(source.contains("enqueueVulkanResourceDestroy(() -> destroyManagedTextureHandles(imageHandle, memoryHandle, defaultViewHandle))"),
+            "Managed textures should defer VkImage/VkImageView destruction until submitted GPU work has completed");
+        assertTrue(source.contains("destroyImageView(finalImageViewHandle)"),
+            "Temporary present-source image views should use deferred image-view retirement");
+        assertTrue(source.contains("destroyBufferView(previous.vkBufferViewHandle)"),
+            "Descriptor-backed buffer views should use the same deferred retirement path");
+        assertTrue(source.contains("flushPendingVulkanResourceDestroys(true)"),
+            "Device shutdown should force-flush pending destroys after waiting for the device to idle");
+    }
+
     // =========================================================================
     // Helper
     // =========================================================================
