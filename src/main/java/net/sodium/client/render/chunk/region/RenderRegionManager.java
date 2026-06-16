@@ -162,6 +162,7 @@ public class RenderRegionManager {
 
         profiler.popPush("upload_indices");
         var indexBufferChanged = false;
+        var indexMetadataChanged = false;
 
         if (!indexUploads.isEmpty()) {
             var arena = resources.getIndexArena();
@@ -171,15 +172,20 @@ public class RenderRegionManager {
             for (PendingSectionIndexBufferUpload upload : indexUploads) {
                 var storage = region.createStorage(DefaultTerrainRenderPasses.TRANSLUCENT);
                 storage.setIndexData(upload.section.getSectionIndex(), upload.indexBufferUpload.getResult());
+                indexMetadataChanged = true;
             }
         }
 
         if (needsSharedIndexUpdate) {
+            indexMetadataChanged = true;
             indexBufferChanged |= translucentStorage.updateSharedIndexData(commandList, resources.getIndexArena());
         }
 
         if (indexBufferChanged) {
             region.refreshIndexedTesselation(commandList);
+        }
+
+        if (indexBufferChanged || indexMetadataChanged) {
             region.clearCachedBatchFor(DefaultTerrainRenderPasses.TRANSLUCENT);
         }
 

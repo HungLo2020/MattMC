@@ -1186,8 +1186,51 @@ public class Phase3DrawPathTest {
             "The Vulkan chunk renderer should mirror chunk-program sampler state into the render pass before drawing");
         assertTrue(rendererSource.contains("setModelMatrixUniforms(shader, preparedDraw.region(), camera);"),
             "The Vulkan chunk renderer should keep per-region translation updates on the shared chunk shader interface");
+        assertTrue(rendererSource.contains("final boolean useIndexedTessellation = terrainPass.isTranslucent() && indexedRenderingEnabled;"),
+            "Vulkan shader terrain should keep Sodium's sorted translucent local-index path enabled");
+        assertTrue(rendererSource.contains("if (useIndexedTessellation && SectionRenderDataUnsafe.isLocalIndex(pMeshData))"),
+            "Local sorted translucent sections should use their region-local sorted index data instead of an unsorted shared fallback");
         assertTrue(rendererSource.contains("super.end(terrainPass);"),
             "The Vulkan chunk renderer should close the shared chunk program path after terrain submission");
+    }
+
+    @Test
+    public void testSortedTranslucentIndexUploadsInvalidateCachedDrawBatches() throws IOException {
+        Path worldRendererFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/SodiumWorldRenderer.java");
+        String worldRendererSource = Files.readString(worldRendererFile);
+        Path sectionManagerFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/RenderSectionManager.java");
+        String sectionManagerSource = Files.readString(sectionManagerFile);
+        Path regionManagerFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/region/RenderRegionManager.java");
+        String regionManagerSource = Files.readString(regionManagerFile);
+
+        assertFalse(worldRendererSource.contains("VulkanicAPI.isVulkanBackendSelected() && Iris.getIrisConfig().areShadersEnabled()"),
+            "Vulkan+shaders should not paper over water artifacts by disabling Sodium translucent sorting");
+        assertTrue(regionManagerSource.contains("var indexMetadataChanged = false;"),
+            "RenderRegionManager should track sorted translucent index metadata changes separately from buffer resizes");
+        assertTrue(regionManagerSource.contains("indexMetadataChanged = true;")
+                && regionManagerSource.contains("if (indexBufferChanged || indexMetadataChanged)"),
+            "Sorted translucent index uploads must clear cached draw batches even when the backing index buffer object did not resize");
+        assertTrue(sectionManagerSource.contains("this.sortBehavior != SortBehavior.OFF")
+                && sectionManagerSource.contains(": importantRebuildQueueType"),
+            "SortBehavior.OFF should not dereference a null translucent-sort defer mode while building render lists");
+        assertTrue(sectionManagerSource.contains("if (this.sortBehavior == SortBehavior.OFF)") && sectionManagerSource.contains("return;"),
+            "SortBehavior.OFF should ignore dynamic sort scheduling requests");
+    }
+
+    @Test
+    public void testVulkanIrisRenderProgramsUseLiveDescriptorsBeforeBindingResources() throws IOException {
+        Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        String encoderSource = Files.readString(encoderFile);
+
+        assertTrue(encoderSource.contains("createIrisProgramLiveDescriptor"),
+            "Vulkan should build live descriptors for generic Iris render programs, not only shared terrain programs");
+        assertTrue(encoderSource.contains("program instanceof net.irisshaders.iris.pipeline.programs.IrisProgram"),
+            "The generic live descriptor path should be scoped to actual Iris shaderpack programs");
+        assertTrue(encoderSource.contains("VulkanicAPI.getLinkedProgramSpirvModules(ctx, programHandle).isEmpty()"),
+            "The generic live descriptor path should require linked SPIR-V modules before replacing the base descriptor");
+        assertTrue(encoderSource.indexOf("this.setupIrisProgramStateIfNeeded(glRenderPass);")
+                < encoderSource.indexOf("PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass, selectedDescriptor);"),
+            "Vulkan should run Iris setup before collecting descriptor resources so shaderpack sampler state is current");
     }
 
     @Test
@@ -5268,10 +5311,16 @@ public class Phase3DrawPathTest {
             "VulkanBackend should retain a dedicated key for framebuffer-compatible pipeline variants");
         assertTrue(source.contains("List<Integer> colorFormats,"),
             "Framebuffer pipeline variants must be keyed by the resolved color attachment formats, not only the FBO id");
+        assertTrue(source.contains("String indexedBlendKey,"),
+            "Framebuffer pipeline variants must be keyed by per-attachment blend state for Iris MRT blend overrides");
         assertTrue(source.contains("int depthFormat"),
             "Framebuffer pipeline variants must include the resolved depth attachment format");
         assertTrue(source.contains("colorFormats = List.copyOf(colorFormats);"),
             "Framebuffer pipeline keys should defensively snapshot the color format list");
+        assertTrue(source.contains("indexedBlendStateCacheKey(targets.colorFormats().size())"),
+            "Framebuffer pipeline resolution should rebuild variants when per-attachment blend state changes");
+        assertTrue(source.contains("backend.blendStateForAttachment(portableState, colorIndex)"),
+            "Vulkan pipeline creation should apply blend state independently for each color attachment");
         assertTrue(source.contains("targets.colorFormats(),"),
             "Framebuffer pipeline resolution should key variants from the current resolved framebuffer color formats");
         assertTrue(source.contains("targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED"),

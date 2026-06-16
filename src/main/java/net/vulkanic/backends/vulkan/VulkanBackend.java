@@ -240,6 +240,7 @@ public class VulkanBackend {
     private volatile int  pendingBlendDstAlpha = 0 /* GL_ZERO */;
     private volatile int  pendingBlendEquation  = 0x8006 /* GL_FUNC_ADD */;
     private volatile int  pendingBlendEquationAlpha = 0x8006 /* GL_FUNC_ADD */;
+    private final ConcurrentHashMap<Integer, IndexedBlendState> indexedBlendStates = new ConcurrentHashMap<>();
 
     private volatile boolean pendingDepthTestEnabled  = false;
     private volatile int     pendingDepthFunc         = 0x0201 /* GL_LESS */;
@@ -377,6 +378,7 @@ public class VulkanBackend {
         String stableCacheKey,
         String resourceLayoutKey,
         int framebuffer,
+        String indexedBlendKey,
         List<Integer> colorFormats,
         int depthFormat
     ) {
@@ -389,6 +391,22 @@ public class VulkanBackend {
         String stableCacheKey,
         String resourceLayoutKey
     ) {
+    }
+
+    private record IndexedBlendState(
+        boolean enabled,
+        int srcRgb,
+        int dstRgb,
+        int srcAlpha,
+        int dstAlpha
+    ) {
+        private String cacheKey() {
+            return enabled
+                + ":" + srcRgb
+                + ":" + dstRgb
+                + ":" + srcAlpha
+                + ":" + dstAlpha;
+        }
     }
 
     private record FramebufferTexturePairKey(
@@ -4007,6 +4025,7 @@ void main() {
             pipelineDescriptor.getStableCacheKey(),
             pipelineDescriptor.getResourceLayoutCacheKey(),
             framebuffer,
+            indexedBlendStateCacheKey(targets.colorFormats().size()),
             targets.colorFormats(),
             targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED
         );
@@ -4035,6 +4054,119 @@ void main() {
             framebufferPipelineCache.put(key, framebufferCompatible);
         }
         return framebufferCompatible;
+    }
+
+    private String indexedBlendStateCacheKey(int colorAttachmentCount) {
+        if (colorAttachmentCount <= 0) {
+            return "";
+        }
+
+        StringBuilder key = new StringBuilder(colorAttachmentCount * 24);
+        for (int index = 0; index < colorAttachmentCount; index++) {
+            IndexedBlendState state = indexedBlendStates.get(index);
+            if (state == null) {
+                key.append("default");
+            } else {
+                key.append(state.cacheKey());
+            }
+            key.append(';');
+        }
+        return key.toString();
+    }
+
+    private java.util.Optional<PipelineDescriptor.BlendState> blendStateForAttachment(
+        PipelineDescriptor.PortableState portableState,
+        int colorAttachmentIndex
+    ) {
+        IndexedBlendState indexedState = indexedBlendStates.get(colorAttachmentIndex);
+        if (indexedState == null) {
+            return portableState.blendState();
+        }
+        if (!indexedState.enabled()) {
+            return java.util.Optional.empty();
+        }
+
+        SourceFactor srcRgb = sourceFactorFromLegacyGl(indexedState.srcRgb());
+        DestFactor dstRgb = destFactorFromLegacyGl(indexedState.dstRgb());
+        SourceFactor srcAlpha = sourceFactorFromLegacyGl(indexedState.srcAlpha());
+        DestFactor dstAlpha = destFactorFromLegacyGl(indexedState.dstAlpha());
+        if (srcRgb == null || dstRgb == null || srcAlpha == null || dstAlpha == null) {
+            return portableState.blendState();
+        }
+
+        return java.util.Optional.of(new PipelineDescriptor.BlendState(srcRgb, dstRgb, srcAlpha, dstAlpha));
+    }
+
+    private static SourceFactor sourceFactorFromLegacyGl(int factor) {
+        return net.vulkanic.VulkanicBlendFactor.fromLegacyGlConstant(factor)
+            .map(VulkanBackend::toSourceFactor)
+            .orElse(null);
+    }
+
+    private static DestFactor destFactorFromLegacyGl(int factor) {
+        return net.vulkanic.VulkanicBlendFactor.fromLegacyGlConstant(factor)
+            .flatMap(VulkanBackend::toDestFactor)
+            .orElse(null);
+    }
+
+    private static SourceFactor toSourceFactor(net.vulkanic.VulkanicBlendFactor factor) {
+        return switch (factor) {
+            case ZERO -> SourceFactor.ZERO;
+            case ONE -> SourceFactor.ONE;
+            case SRC_COLOR -> SourceFactor.SRC_COLOR;
+            case ONE_MINUS_SRC_COLOR -> SourceFactor.ONE_MINUS_SRC_COLOR;
+            case DST_COLOR -> SourceFactor.DST_COLOR;
+            case ONE_MINUS_DST_COLOR -> SourceFactor.ONE_MINUS_DST_COLOR;
+            case SRC_ALPHA -> SourceFactor.SRC_ALPHA;
+            case ONE_MINUS_SRC_ALPHA -> SourceFactor.ONE_MINUS_SRC_ALPHA;
+            case DST_ALPHA -> SourceFactor.DST_ALPHA;
+            case ONE_MINUS_DST_ALPHA -> SourceFactor.ONE_MINUS_DST_ALPHA;
+            case SRC_ALPHA_SATURATE -> SourceFactor.SRC_ALPHA_SATURATE;
+            case CONSTANT_COLOR -> SourceFactor.CONSTANT_COLOR;
+            case ONE_MINUS_CONSTANT_COLOR -> SourceFactor.ONE_MINUS_CONSTANT_COLOR;
+            case CONSTANT_ALPHA -> SourceFactor.CONSTANT_ALPHA;
+            case ONE_MINUS_CONSTANT_ALPHA -> SourceFactor.ONE_MINUS_CONSTANT_ALPHA;
+        };
+    }
+
+    private static java.util.Optional<DestFactor> toDestFactor(net.vulkanic.VulkanicBlendFactor factor) {
+        return switch (factor) {
+            case ZERO -> java.util.Optional.of(DestFactor.ZERO);
+            case ONE -> java.util.Optional.of(DestFactor.ONE);
+            case SRC_COLOR -> java.util.Optional.of(DestFactor.SRC_COLOR);
+            case ONE_MINUS_SRC_COLOR -> java.util.Optional.of(DestFactor.ONE_MINUS_SRC_COLOR);
+            case DST_COLOR -> java.util.Optional.of(DestFactor.DST_COLOR);
+            case ONE_MINUS_DST_COLOR -> java.util.Optional.of(DestFactor.ONE_MINUS_DST_COLOR);
+            case SRC_ALPHA -> java.util.Optional.of(DestFactor.SRC_ALPHA);
+            case ONE_MINUS_SRC_ALPHA -> java.util.Optional.of(DestFactor.ONE_MINUS_SRC_ALPHA);
+            case DST_ALPHA -> java.util.Optional.of(DestFactor.DST_ALPHA);
+            case ONE_MINUS_DST_ALPHA -> java.util.Optional.of(DestFactor.ONE_MINUS_DST_ALPHA);
+            case CONSTANT_COLOR -> java.util.Optional.of(DestFactor.CONSTANT_COLOR);
+            case ONE_MINUS_CONSTANT_COLOR -> java.util.Optional.of(DestFactor.ONE_MINUS_CONSTANT_COLOR);
+            case CONSTANT_ALPHA -> java.util.Optional.of(DestFactor.CONSTANT_ALPHA);
+            case ONE_MINUS_CONSTANT_ALPHA -> java.util.Optional.of(DestFactor.ONE_MINUS_CONSTANT_ALPHA);
+            case SRC_ALPHA_SATURATE -> java.util.Optional.empty();
+        };
+    }
+
+    private static int toLegacyGlBlendFactor(net.vulkanic.VulkanicBlendFactor factor) {
+        return switch (factor) {
+            case ZERO -> VulkanicAPI.GL_ZERO;
+            case ONE -> VulkanicAPI.GL_ONE;
+            case SRC_COLOR -> VulkanicAPI.GL_SRC_COLOR;
+            case ONE_MINUS_SRC_COLOR -> VulkanicAPI.GL_ONE_MINUS_SRC_COLOR;
+            case DST_COLOR -> VulkanicAPI.GL_DST_COLOR;
+            case ONE_MINUS_DST_COLOR -> VulkanicAPI.GL_ONE_MINUS_DST_COLOR;
+            case SRC_ALPHA -> VulkanicAPI.GL_SRC_ALPHA;
+            case ONE_MINUS_SRC_ALPHA -> VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA;
+            case DST_ALPHA -> VulkanicAPI.GL_DST_ALPHA;
+            case ONE_MINUS_DST_ALPHA -> VulkanicAPI.GL_ONE_MINUS_DST_ALPHA;
+            case SRC_ALPHA_SATURATE -> VulkanicAPI.GL_SRC_ALPHA_SATURATE;
+            case CONSTANT_COLOR -> VulkanicAPI.GL_CONSTANT_COLOR;
+            case ONE_MINUS_CONSTANT_COLOR -> VulkanicAPI.GL_ONE_MINUS_CONSTANT_COLOR;
+            case CONSTANT_ALPHA -> VulkanicAPI.GL_CONSTANT_ALPHA;
+            case ONE_MINUS_CONSTANT_ALPHA -> VulkanicAPI.GL_ONE_MINUS_CONSTANT_ALPHA;
+        };
     }
 
     private static @Nullable PipelineDescriptor descriptorVariantDescriptor(PrecompiledPipelineState state, PipelineDescriptor descriptor) {
@@ -4932,6 +5064,7 @@ void main() {
     public void setBlendEnabled(CommandContext ctx, boolean enabled) {
         requireVulkanCommandBufferHandle("setBlendEnabled", ctx);
         this.pendingBlendEnabled = enabled;
+        updateIndexedBlendEnabled(0, enabled);
     }
 
     /** Caches blend function (applied at pipeline creation). */
@@ -4941,6 +5074,7 @@ void main() {
         this.pendingBlendDstRgb   = dstRgb;
         this.pendingBlendSrcAlpha = srcAlpha;
         this.pendingBlendDstAlpha = dstAlpha;
+        indexedBlendStates.put(0, new IndexedBlendState(pendingBlendEnabled, srcRgb, dstRgb, srcAlpha, dstAlpha));
     }
 
     /** Caches blend function — typed overload (applied at pipeline creation). */
@@ -4949,13 +5083,13 @@ void main() {
                                  net.vulkanic.VulkanicBlendFactor dstRgb,
                                  net.vulkanic.VulkanicBlendFactor srcAlpha,
                                  net.vulkanic.VulkanicBlendFactor dstAlpha) {
-        requireVulkanCommandBufferHandle("setBlendFunction", ctx);
-        // Store ordinals as int stand-ins for logging/diagnostics; Vulkan pipeline
-        // uses the typed enum directly at pipeline creation time.
-        this.pendingBlendSrcRgb   = srcRgb.ordinal();
-        this.pendingBlendDstRgb   = dstRgb.ordinal();
-        this.pendingBlendSrcAlpha = srcAlpha.ordinal();
-        this.pendingBlendDstAlpha = dstAlpha.ordinal();
+        setBlendFunction(
+            ctx,
+            toLegacyGlBlendFactor(srcRgb),
+            toLegacyGlBlendFactor(dstRgb),
+            toLegacyGlBlendFactor(srcAlpha),
+            toLegacyGlBlendFactor(dstAlpha)
+        );
     }
 
     /** Caches blend equation (applied at pipeline creation). */
@@ -5093,6 +5227,7 @@ void main() {
         final int GL_SCISSOR_TEST = 0x0C11;
         if (cap == GL_BLEND) {
             this.pendingBlendEnabled = enabled;
+            updateIndexedBlendEnabled(0, enabled);
         } else if (cap == GL_DEPTH_TEST) {
             this.pendingDepthTestEnabled = enabled;
         } else if (cap == GL_SCISSOR_TEST) {
@@ -5113,10 +5248,23 @@ void main() {
     public void setIndexedEnabled(CommandContext ctx, int capability, int index, boolean enabled) {
         requireVulkanCommandBufferHandle("setIndexedEnabled", ctx);
         final int GL_BLEND = 0x0BE2;
-        if (capability == GL_BLEND && index == 0) {
-            this.pendingBlendEnabled = enabled;
+        if (capability == GL_BLEND) {
+            if (index == 0) {
+                this.pendingBlendEnabled = enabled;
+            }
+            updateIndexedBlendEnabled(index, enabled);
         }
-        // Per-attachment blend state beyond index 0 is tracked at pipeline creation time when needed.
+    }
+
+    private void updateIndexedBlendEnabled(int index, boolean enabled) {
+        IndexedBlendState previous = indexedBlendStates.get(index);
+        indexedBlendStates.put(index, new IndexedBlendState(
+            enabled,
+            index == 0 ? pendingBlendSrcRgb : (previous != null ? previous.srcRgb() : VulkanicAPI.GL_ONE),
+            index == 0 ? pendingBlendDstRgb : (previous != null ? previous.dstRgb() : VulkanicAPI.GL_ZERO),
+            index == 0 ? pendingBlendSrcAlpha : (previous != null ? previous.srcAlpha() : VulkanicAPI.GL_ONE),
+            index == 0 ? pendingBlendDstAlpha : (previous != null ? previous.dstAlpha() : VulkanicAPI.GL_ZERO)
+        ));
     }
 
     // =====================================================================
@@ -5775,14 +5923,18 @@ void main() {
     public void blendFunc(CommandContext ctx, net.vulkanic.VulkanicBlendFactor sfactor,
                           net.vulkanic.VulkanicBlendFactor dfactor) {
         requireVulkanCommandBufferHandle("blendFunc", ctx);
-        blendFunc(ctx, sfactor.ordinal(), dfactor.ordinal());
+        blendFunc(ctx, toLegacyGlBlendFactor(sfactor), toLegacyGlBlendFactor(dfactor));
     }
 
     public void blendFuncSeparatei(CommandContext ctx, int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
         requireVulkanCommandBufferHandle("blendFuncSeparatei", ctx);
         if (buffer == 0) {
             setBlendFunction(ctx, srcRGB, dstRGB, srcAlpha, dstAlpha);
+            return;
         }
+        IndexedBlendState previous = indexedBlendStates.get(buffer);
+        boolean enabled = previous == null || previous.enabled();
+        indexedBlendStates.put(buffer, new IndexedBlendState(enabled, srcRGB, dstRGB, srcAlpha, dstAlpha));
     }
 
     public void blendFuncSeparatei(CommandContext ctx, int buffer,
@@ -5791,7 +5943,14 @@ void main() {
                                    net.vulkanic.VulkanicBlendFactor srcAlpha,
                                    net.vulkanic.VulkanicBlendFactor dstAlpha) {
         requireVulkanCommandBufferHandle("blendFuncSeparatei", ctx);
-        blendFuncSeparatei(ctx, buffer, srcRGB.ordinal(), dstRGB.ordinal(), srcAlpha.ordinal(), dstAlpha.ordinal());
+        blendFuncSeparatei(
+            ctx,
+            buffer,
+            toLegacyGlBlendFactor(srcRGB),
+            toLegacyGlBlendFactor(dstRGB),
+            toLegacyGlBlendFactor(srcAlpha),
+            toLegacyGlBlendFactor(dstAlpha)
+        );
     }
 
     public void blitFramebuffer(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1,
@@ -15650,11 +15809,11 @@ void main() {
                     colorWriteMask |= VK10.VK_COLOR_COMPONENT_A_BIT;
                 }
 
-                java.util.Optional<PipelineDescriptor.BlendState> blendState =
-                    portableState.blendState();
                 VkPipelineColorBlendAttachmentState.Buffer colorBlendAttachment =
                     VkPipelineColorBlendAttachmentState.calloc(colorFormats.size(), stack);
                 for (int colorIndex = 0; colorIndex < colorFormats.size(); colorIndex++) {
+                    java.util.Optional<PipelineDescriptor.BlendState> blendState =
+                        backend.blendStateForAttachment(portableState, colorIndex);
                     colorBlendAttachment.get(colorIndex)
                         .colorWriteMask(colorWriteMask)
                         .blendEnable(blendState.isPresent());

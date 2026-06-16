@@ -59,7 +59,7 @@ public class VulkanFullContractCoverageTest {
 
         assertEquals(program, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.CURRENT_PROGRAM));
         assertEquals(vao, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.VERTEX_ARRAY_BINDING));
-        assertEquals(VulkanicBlendFactor.SRC_ALPHA.ordinal(),
+        assertEquals(VulkanicAPI.GL_SRC_ALPHA,
             vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.BLEND_SRC_RGB));
         assertEquals(3, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_REF));
         assertEquals(0x7F, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_VALUE_MASK));

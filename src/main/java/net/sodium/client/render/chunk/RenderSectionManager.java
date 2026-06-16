@@ -230,8 +230,10 @@ public class RenderSectionManager {
         final var searchDistance = this.getSearchDistance(fogParameters);
         final var useOcclusionCulling = this.shouldUseOcclusionCulling(camera, spectator);
 
-        var importantRebuildQueueType = SodiumClientMod.options().performance.chunkBuildDeferMode.getImportantRebuildQueueType();
-        var importantSortQueueType = this.sortBehavior.getDeferMode().getImportantRebuildQueueType();
+	    var importantRebuildQueueType = SodiumClientMod.options().performance.chunkBuildDeferMode.getImportantRebuildQueueType();
+	    var importantSortQueueType = this.sortBehavior != SortBehavior.OFF
+	        ? this.sortBehavior.getDeferMode().getImportantRebuildQueueType()
+	        : importantRebuildQueueType;
         
         // Iris: Disable occlusion culling for shadows
         boolean iris$disableOcclusion = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered();
@@ -1128,8 +1130,12 @@ public class RenderSectionManager {
         return true;
     }
 
-    public void scheduleSort(long sectionPos, boolean isDirectTrigger) {
-        RenderSection section = this.sectionByPosition.get(sectionPos);
+	public void scheduleSort(long sectionPos, boolean isDirectTrigger) {
+	    if (this.sortBehavior == SortBehavior.OFF) {
+	        return;
+	    }
+
+	    RenderSection section = this.sectionByPosition.get(sectionPos);
 
         if (section != null) {
             int pendingUpdate = ChunkUpdateTypes.SORT;

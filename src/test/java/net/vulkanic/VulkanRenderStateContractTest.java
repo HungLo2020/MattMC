@@ -71,6 +71,34 @@ public class VulkanRenderStateContractTest {
     }
 
     @Test
+    public void testTypedBlendFunctionCachesLegacyGlConstants() {
+        vulkanBackend.setBlendFunction(stubCtx,
+            VulkanicBlendFactor.SRC_ALPHA, VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+            VulkanicBlendFactor.ONE, VulkanicBlendFactor.ZERO);
+
+        assertEquals(VulkanicAPI.GL_SRC_ALPHA,
+            vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.BLEND_SRC_RGB));
+        assertEquals(VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA,
+            vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.BLEND_DST_RGB));
+    }
+
+    @Test
+    public void testIndexedBlendFunctionCachesNonzeroDrawBufferState() throws Exception {
+        vulkanBackend.setIndexedEnabled(stubCtx, VulkanicAPI.GL_BLEND, 1, true);
+        vulkanBackend.blendFuncSeparatei(stubCtx, 1,
+            VulkanicBlendFactor.SRC_ALPHA, VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+            VulkanicBlendFactor.ONE, VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA);
+
+        Object state = indexedBlendState(1);
+        assertNotNull(state, "Vulkan should retain per-attachment blend state beyond draw buffer 0");
+        assertEquals(true, indexedBlendStateValue(state, "enabled"));
+        assertEquals(VulkanicAPI.GL_SRC_ALPHA, indexedBlendStateValue(state, "srcRgb"));
+        assertEquals(VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, indexedBlendStateValue(state, "dstRgb"));
+        assertEquals(VulkanicAPI.GL_ONE, indexedBlendStateValue(state, "srcAlpha"));
+        assertEquals(VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, indexedBlendStateValue(state, "dstAlpha"));
+    }
+
+    @Test
     public void testSetBlendEquationAcceptsBothOverloads() {
         assertDoesNotThrow(() -> vulkanBackend.setBlendEquation(stubCtx, 0x8006));
         assertDoesNotThrow(() -> vulkanBackend.setBlendEquation(stubCtx, VulkanicBlendEquation.ADD));
@@ -160,6 +188,15 @@ public class VulkanRenderStateContractTest {
         final int GL_BLEND = 0x0BE2;
         assertDoesNotThrow(() -> vulkanBackend.setIndexedEnabled(stubCtx, GL_BLEND, 0, true));
         assertDoesNotThrow(() -> vulkanBackend.setIndexedEnabled(stubCtx, GL_BLEND, 0, false));
+    }
+
+    @Test
+    public void testSetBlendEnabledMirrorsAttachmentZeroState() throws Exception {
+        vulkanBackend.setBlendEnabled(stubCtx, true);
+        assertEquals(true, indexedBlendStateValue(indexedBlendState(0), "enabled"));
+
+        vulkanBackend.setBlendEnabled(stubCtx, false);
+        assertEquals(false, indexedBlendStateValue(indexedBlendState(0), "enabled"));
     }
 
     // ================================================================
@@ -411,6 +448,20 @@ public class VulkanRenderStateContractTest {
         } catch (NoSuchFieldException ignored) {
             // Field may not exist in headless test configs.
         }
+    }
+
+    private Object indexedBlendState(int index) throws Exception {
+        Field field = VulkanBackend.class.getDeclaredField("indexedBlendStates");
+        field.setAccessible(true);
+        java.util.Map<?, ?> states = (java.util.Map<?, ?>) field.get(vulkanBackend);
+        return states.get(index);
+    }
+
+    private static Object indexedBlendStateValue(Object state, String accessorName) throws Exception {
+        assertNotNull(state, "Indexed blend state must exist before reading " + accessorName);
+        java.lang.reflect.Method accessor = state.getClass().getDeclaredMethod(accessorName);
+        accessor.setAccessible(true);
+        return accessor.invoke(state);
     }
 
 }

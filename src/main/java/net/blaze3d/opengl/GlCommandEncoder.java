@@ -80,7 +80,9 @@ public class GlCommandEncoder implements CommandEncoder {
 	private static int DEBUG_SHARED_CHUNK_LIVE_DESCRIPTOR_LOGS = 0;
 	private static final java.util.Set<String> WARNED_INCOMPLETE_CUSTOM_PASS_KEYS = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 	private static final java.util.Map<SharedChunkLiveDescriptorKey, PipelineDescriptor> SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final java.util.Map<IrisProgramLiveDescriptorKey, PipelineDescriptor> IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 	private static final int MAX_SHARED_CHUNK_LIVE_DESCRIPTOR_CACHE_ENTRIES = 256;
+	private static final int MAX_IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE_ENTRIES = 512;
 
 	private CommandContext commandContext() {
 		return this.activeRenderPassContext != null ? this.activeRenderPassContext : VulkanicAPI.getCommandContext();
@@ -313,6 +315,24 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 	}
 
+	private record IrisProgramLiveDescriptorKey(RenderPipeline renderPipeline, PipelineDescriptor baseDescriptor, int programHandle) {
+		@Override
+		public boolean equals(Object object) {
+			return object instanceof IrisProgramLiveDescriptorKey other
+				&& this.renderPipeline == other.renderPipeline
+				&& this.baseDescriptor == other.baseDescriptor
+				&& this.programHandle == other.programHandle;
+		}
+
+		@Override
+		public int hashCode() {
+			int result = System.identityHashCode(this.renderPipeline);
+			result = 31 * result + System.identityHashCode(this.baseDescriptor);
+			result = 31 * result + Integer.hashCode(this.programHandle);
+			return result;
+		}
+	}
+
 	@Nullable
 	private static PipelineDescriptor createSharedChunkLiveDescriptor(
 		CommandContext ctx,
@@ -339,6 +359,50 @@ public class GlCommandEncoder implements CommandEncoder {
 			return liveDescriptor;
 		}
 		return null;
+	}
+
+	@Nullable
+	private static PipelineDescriptor createIrisProgramLiveDescriptor(
+		CommandContext ctx,
+		RenderPipeline renderPipeline,
+		PipelineDescriptor baseDescriptor,
+		GlProgram program
+	) {
+		if (!(program instanceof net.irisshaders.iris.pipeline.programs.IrisProgram) || program == GlProgram.INVALID_PROGRAM) {
+			return null;
+		}
+
+		int programHandle = program.getProgramId();
+		if (programHandle <= 0 || VulkanicAPI.getLinkedProgramSpirvModules(ctx, programHandle).isEmpty()) {
+			return null;
+		}
+
+		IrisProgramLiveDescriptorKey cacheKey = new IrisProgramLiveDescriptorKey(renderPipeline, baseDescriptor, programHandle);
+		PipelineDescriptor cachedDescriptor = IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE.get(cacheKey);
+		if (cachedDescriptor != null) {
+			return cachedDescriptor;
+		}
+
+		PipelineDescriptor liveDescriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(ctx, baseDescriptor, programHandle);
+		if (liveDescriptor != null && liveDescriptor.hasSpirvModules()) {
+			if (IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE.size() >= MAX_IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE_ENTRIES) {
+				IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE.clear();
+			}
+			IRIS_PROGRAM_LIVE_DESCRIPTOR_CACHE.put(cacheKey, liveDescriptor);
+			return liveDescriptor;
+		}
+		return null;
+	}
+
+	private void setupIrisProgramStateIfNeeded(GlRenderPass glRenderPass) {
+		if (glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.IrisProgram is && !is.iris$isSetUp()) {
+			GpuTextureView sam = glRenderPass.samplers.get("Sampler0");
+			if (sam != null) {
+				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.onSetShaderTexture(0, sam);
+			}
+			is.iris$setupState();
+			iris$programsToClear.add(is);
+		}
 	}
 
 	@Nullable
@@ -1809,6 +1873,10 @@ public class GlCommandEncoder implements CommandEncoder {
 			this.lastProgram = glProgram;
 		}
 
+		if (!ctx.isImmediate()) {
+			this.setupIrisProgramStateIfNeeded(glRenderPass);
+		}
+
 		boolean immediateSeamHasCompleteCoverage = false;
 		if (!ctx.isImmediate()) {
 			this.prepareTexelBufferBindingsForVulkanDescriptors(glRenderPass, ctx);
@@ -1818,6 +1886,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		PipelineDescriptor selectedDescriptor = baseDescriptor;
 		String descriptorSource = "precompiled RenderPipeline";
 		String fallbackReason = "";
+		boolean selectedLiveDescriptor = false;
 		int activeSharedChunkProgramHandle = !ctx.isImmediate()
 			? SharedChunkProgramOverrides.activeProgramHandle(renderPipeline)
 			: -1;
@@ -1832,11 +1901,26 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (liveDescriptor != null) {
 					selectedDescriptor = liveDescriptor;
 					descriptorSource = "live active Iris program";
+					selectedLiveDescriptor = true;
 				} else {
 					fallbackReason = "live descriptor unavailable";
 				}
 			} catch (RuntimeException exception) {
 				fallbackReason = "live descriptor failed: " + exception.getClass().getSimpleName() + ": " + exception.getMessage();
+			}
+		}
+		if (!ctx.isImmediate() && !selectedLiveDescriptor) {
+			try {
+				PipelineDescriptor liveDescriptor = createIrisProgramLiveDescriptor(ctx, renderPipeline, baseDescriptor, glProgram);
+				if (liveDescriptor != null) {
+					selectedDescriptor = liveDescriptor;
+					descriptorSource = "live Iris render program";
+					selectedLiveDescriptor = true;
+				}
+			} catch (RuntimeException exception) {
+				fallbackReason = fallbackReason.isEmpty()
+					? "Iris render descriptor failed: " + exception.getClass().getSimpleName() + ": " + exception.getMessage()
+					: fallbackReason + "; Iris render descriptor failed: " + exception.getClass().getSimpleName() + ": " + exception.getMessage();
 			}
 		}
 		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass, selectedDescriptor);
@@ -1870,11 +1954,12 @@ public class GlCommandEncoder implements CommandEncoder {
 					)
 					: VulkanicAPI.resolvePipelineHandle(
 						glRenderPass.pipeline.info(), submissionDescriptor);
-				if (pipelineHandle == null && "live active Iris program".equals(descriptorSource)) {
+				if (pipelineHandle == null && selectedLiveDescriptor) {
 					fallbackReason = fallbackReason.isEmpty()
 						? "live pipeline handle resolution failed"
 						: fallbackReason + "; live pipeline handle resolution failed";
 					descriptorSource = "precompiled RenderPipeline";
+					selectedLiveDescriptor = false;
 					submission = this.buildPipelineResourceBindings(glRenderPass, baseDescriptor);
 					if (submission != null) {
 						submissionDescriptor = submission.descriptor();
@@ -1954,11 +2039,11 @@ public class GlCommandEncoder implements CommandEncoder {
 					if (!immediateSeamHasCompleteCoverage && (bl || bl2)) {
 						VulkanicAPI.setUniform1i(ctx, var41, var42);
 					}
-						net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var42);
-						VulkanicAPI.bindTextureBuffer(ctx, var44);
+					net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(var42);
+					VulkanicAPI.bindTextureBuffer(ctx, var44);
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice3 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-							VulkanicAPI.bindTextureBufferData(ctx, GlConst.toGlInternalId(var43), requireBufferHandle(gpuBufferSlice3.buffer()));
+						VulkanicAPI.bindTextureBufferData(ctx, GlConst.toGlInternalId(var43), requireBufferHandle(gpuBufferSlice3.buffer()));
 					}
 					break;
 				case Uniform.Sampler(int glTextureView2, int var51):
@@ -2003,14 +2088,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		// Iris: From MixinGlCommandEncoder - Setup IrisProgram state if needed
-		if (glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.IrisProgram is && !is.iris$isSetUp()) {
-			GpuTextureView sam = glRenderPass.samplers.get("Sampler0");
-			if (sam != null) {
-				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.onSetShaderTexture(0, sam);
-			}
-			is.iris$setupState();
-			iris$programsToClear.add(is);
-		}
+		this.setupIrisProgramStateIfNeeded(glRenderPass);
 
 		return true;
 	}

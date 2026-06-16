@@ -538,7 +538,8 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         final var pBaseVertex = batch.pBaseVertex;
         final var pElementCount = batch.pElementCount;
 
-        // this is either zero (global shared index buffer) or the offset to the location of the shared element buffer (region shared index buffer)
+        // This is either zero (global shared index buffer) or the offset to the location of the shared element buffer
+        // (region shared index buffer).
         final var elementOffsetBytes = SectionRenderDataUnsafe.getBaseElement(pMeshData) << 2;
         final var facingList = SectionRenderDataUnsafe.getFacingList(pMeshData);
 
