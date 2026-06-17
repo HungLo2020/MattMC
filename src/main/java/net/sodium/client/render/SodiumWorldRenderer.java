@@ -38,6 +38,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.Entity;
+import net.vulkanic.VulkanicAPI;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -326,7 +327,9 @@ public class SodiumWorldRenderer {
         // translucency sorting can be disabled in development environments by setting the debug option in the config file
         var sortBehavior = SortBehavior.DYNAMIC_DEFER_NEARBY_ZERO_FRAMES;
 
-        if (PlatformRuntimeInformation.getInstance().isDevelopmentEnvironment()
+        if (VulkanicAPI.isVulkanBackendSelected()) {
+            sortBehavior = SortBehavior.OFF;
+        } else if (PlatformRuntimeInformation.getInstance().isDevelopmentEnvironment()
                 && !SodiumClientMod.options().debug.terrainSortingEnabled) {
             sortBehavior = SortBehavior.OFF;
         }

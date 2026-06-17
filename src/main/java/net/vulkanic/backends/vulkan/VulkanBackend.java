@@ -4025,7 +4025,7 @@ void main() {
             pipelineDescriptor.getStableCacheKey(),
             pipelineDescriptor.getResourceLayoutCacheKey(),
             framebuffer,
-            indexedBlendStateCacheKey(targets.colorFormats().size()),
+            indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), targets.colorFormats().size()),
             targets.colorFormats(),
             targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED
         );
@@ -4056,18 +4056,22 @@ void main() {
         return framebufferCompatible;
     }
 
-    private String indexedBlendStateCacheKey(int colorAttachmentCount) {
+    private String indexedBlendStateCacheKey(PipelineDescriptor.PortableState portableState, int colorAttachmentCount) {
         if (colorAttachmentCount <= 0) {
             return "";
         }
 
         StringBuilder key = new StringBuilder(colorAttachmentCount * 24);
         for (int index = 0; index < colorAttachmentCount; index++) {
-            IndexedBlendState state = indexedBlendStates.get(index);
-            if (state == null) {
-                key.append("default");
+            if (portableState.blendState().isPresent()) {
+                key.append("portable");
             } else {
-                key.append(state.cacheKey());
+                IndexedBlendState state = indexedBlendStates.get(index);
+                if (state == null) {
+                    key.append("default");
+                } else {
+                    key.append(state.cacheKey());
+                }
             }
             key.append(';');
         }
@@ -4078,9 +4082,13 @@ void main() {
         PipelineDescriptor.PortableState portableState,
         int colorAttachmentIndex
     ) {
+        if (portableState.blendState().isPresent()) {
+            return portableState.blendState();
+        }
+
         IndexedBlendState indexedState = indexedBlendStates.get(colorAttachmentIndex);
         if (indexedState == null) {
-            return portableState.blendState();
+            return java.util.Optional.empty();
         }
         if (!indexedState.enabled()) {
             return java.util.Optional.empty();
@@ -4091,7 +4099,7 @@ void main() {
         SourceFactor srcAlpha = sourceFactorFromLegacyGl(indexedState.srcAlpha());
         DestFactor dstAlpha = destFactorFromLegacyGl(indexedState.dstAlpha());
         if (srcRgb == null || dstRgb == null || srcAlpha == null || dstAlpha == null) {
-            return portableState.blendState();
+            return java.util.Optional.empty();
         }
 
         return java.util.Optional.of(new PipelineDescriptor.BlendState(srcRgb, dstRgb, srcAlpha, dstAlpha));
