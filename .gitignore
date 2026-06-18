@@ -21,6 +21,7 @@ Thumbs.db
 
 # Misc
 *.log
+ERROR-LOG.txt
 *.tmp
 
 # JDK (too large to commit)
