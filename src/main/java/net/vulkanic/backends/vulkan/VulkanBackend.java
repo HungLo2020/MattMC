@@ -288,7 +288,7 @@ public class VulkanBackend {
     /** Per-unit sampler binding cache: texture-unit → bound sampler handle */
     private final ConcurrentHashMap<Integer, Integer> boundSamplerPerUnit = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<DescriptorPipelineKey, PipelineHandle> descriptorPipelineCache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<FramebufferPipelineKey, PipelineHandle> framebufferPipelineCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<RenderTargetPipelineKey, PipelineHandle> renderTargetPipelineCache = new ConcurrentHashMap<>();
 
     // Virtual query/sync tracking for GL-compat control flow on the Vulkan path
     private final AtomicInteger nextVirtualQueryId = new AtomicInteger(1);
@@ -374,16 +374,31 @@ public class VulkanBackend {
         }
     }
 
-    private record FramebufferPipelineKey(
+    private record RenderTargetPipelineKey(
         String stableCacheKey,
         String resourceLayoutKey,
-        int framebuffer,
         String indexedBlendKey,
         List<Integer> colorFormats,
-        int depthFormat
+        int depthFormat,
+        boolean feedbackLoopCompatible
     ) {
-        private FramebufferPipelineKey {
+        private RenderTargetPipelineKey {
             colorFormats = List.copyOf(colorFormats);
+        }
+
+        private static RenderTargetPipelineKey from(
+            PipelineDescriptor descriptor,
+            ResolvedFramebufferTargets targets,
+            String indexedBlendKey
+        ) {
+            return new RenderTargetPipelineKey(
+                descriptor.getStableCacheKey(),
+                descriptor.getResourceLayoutCacheKey(),
+                indexedBlendKey,
+                targets.colorFormats(),
+                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+                targets.hasFeedbackLoopTarget()
+            );
         }
     }
 
@@ -630,12 +645,12 @@ void main() {
             }
         }
         descriptorPipelineCache.clear();
-        for (PipelineHandle pipelineHandle : new ArrayList<>(framebufferPipelineCache.values())) {
+        for (PipelineHandle pipelineHandle : new ArrayList<>(renderTargetPipelineCache.values())) {
             if (pipelineHandle != null) {
                 pipelineHandle.close();
             }
         }
-        framebufferPipelineCache.clear();
+        renderTargetPipelineCache.clear();
     }
 
     private PrecompiledPipelineState compilePrecompiledPipeline(
@@ -4031,20 +4046,17 @@ void main() {
             return null;
         }
 
-        FramebufferPipelineKey key = new FramebufferPipelineKey(
-            pipelineDescriptor.getStableCacheKey(),
-            pipelineDescriptor.getResourceLayoutCacheKey(),
-            framebuffer,
-            indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), targets.colorFormats().size()),
-            targets.colorFormats(),
-            targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED
+        RenderTargetPipelineKey key = RenderTargetPipelineKey.from(
+            pipelineDescriptor,
+            targets,
+            indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), targets.colorFormats().size())
         );
-        PipelineHandle cached = framebufferPipelineCache.get(key);
+        PipelineHandle cached = renderTargetPipelineCache.get(key);
         if (cached != null) {
             if (cached.isValid()) {
                 return cached;
             }
-            framebufferPipelineCache.remove(key, cached);
+            renderTargetPipelineCache.remove(key, cached);
         }
 
         PipelineHandle framebufferCompatible = createPipeline(pipelineDescriptor, targets);
@@ -4055,13 +4067,13 @@ void main() {
             return null;
         }
 
-        PipelineHandle raced = framebufferPipelineCache.putIfAbsent(key, framebufferCompatible);
+        PipelineHandle raced = renderTargetPipelineCache.putIfAbsent(key, framebufferCompatible);
         if (raced != null) {
             if (raced.isValid()) {
                 framebufferCompatible.close();
                 return raced;
             }
-            framebufferPipelineCache.put(key, framebufferCompatible);
+            renderTargetPipelineCache.put(key, framebufferCompatible);
         }
         return framebufferCompatible;
     }

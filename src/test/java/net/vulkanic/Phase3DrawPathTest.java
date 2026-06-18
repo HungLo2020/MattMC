@@ -5366,30 +5366,40 @@ public class Phase3DrawPathTest {
     }
 
     @Test
-    public void testVulkanFramebufferPipelineCacheKeyIncludesAttachmentFormats() throws IOException {
+    public void testVulkanRenderTargetPipelineCacheKeyIncludesAttachmentContract() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = Files.readString(vulkanBackendFile);
 
-        assertTrue(source.contains("private record FramebufferPipelineKey("),
-            "VulkanBackend should retain a dedicated key for framebuffer-compatible pipeline variants");
+        assertTrue(source.contains("private record RenderTargetPipelineKey("),
+            "VulkanBackend should retain a dedicated key for render-target-compatible pipeline variants");
+        assertFalse(source.contains("private record FramebufferPipelineKey("),
+            "Vulkan pipeline variants should no longer be keyed by a GL-style framebuffer identity");
+        assertFalse(source.contains("int framebuffer,\n        String indexedBlendKey,"),
+            "Render-target pipeline variants must not include the virtual framebuffer id in the compatibility key");
         assertTrue(source.contains("List<Integer> colorFormats,"),
-            "Framebuffer pipeline variants must be keyed by the resolved color attachment formats, not only the FBO id");
+            "Render-target pipeline variants must be keyed by the resolved color attachment formats");
         assertTrue(source.contains("String indexedBlendKey,"),
-            "Framebuffer pipeline variants must be keyed by per-attachment blend state for Iris MRT blend overrides");
+            "Render-target pipeline variants must be keyed by per-attachment blend state for Iris MRT blend overrides");
         assertTrue(source.contains("int depthFormat"),
-            "Framebuffer pipeline variants must include the resolved depth attachment format");
+            "Render-target pipeline variants must include the resolved depth attachment format");
+        assertTrue(source.contains("boolean feedbackLoopCompatible"),
+            "Render-target pipeline variants must include feedback-loop compatibility because it changes render-pass layouts");
         assertTrue(source.contains("colorFormats = List.copyOf(colorFormats);"),
-            "Framebuffer pipeline keys should defensively snapshot the color format list");
+            "Render-target pipeline keys should defensively snapshot the color format list");
+        assertTrue(source.contains("RenderTargetPipelineKey.from("),
+            "Framebuffer-backed pipeline resolution should derive a render-target compatibility key from resolved attachments");
         assertTrue(source.contains("indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), targets.colorFormats().size())"),
-            "Framebuffer pipeline resolution should include portable blend ownership when deriving blend cache keys");
+            "Render-target pipeline resolution should include portable blend ownership when deriving blend cache keys");
         assertTrue(source.contains("if (portableState.blendState().isPresent()) {\n                key.append(\"portable\");"),
             "Portable pipeline blend state should not be overridden by stale legacy indexed blend state");
         assertTrue(source.contains("backend.blendStateForAttachment(portableState, colorIndex)"),
             "Vulkan pipeline creation should apply blend state independently for each color attachment");
         assertTrue(source.contains("targets.colorFormats(),"),
-            "Framebuffer pipeline resolution should key variants from the current resolved framebuffer color formats");
+            "Render-target pipeline resolution should key variants from the current resolved framebuffer color formats");
         assertTrue(source.contains("targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED"),
-            "Framebuffer pipeline resolution should key variants from the current resolved framebuffer depth format");
+            "Render-target pipeline resolution should key variants from the current resolved framebuffer depth format");
+        assertTrue(source.contains("targets.hasFeedbackLoopTarget()"),
+            "Render-target pipeline resolution should key variants from the current target feedback-loop contract");
     }
 
     @Test
