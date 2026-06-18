@@ -146,17 +146,26 @@ public class ProgramSamplers {
 			}
 
 			if (textureView != null) {
-				renderPass.bindSampler(
-					Objects.requireNonNull(binding.name(), "sampler name"),
-					Objects.requireNonNull(textureView, "sampler texture view")
-				);
+				String name = Objects.requireNonNull(binding.name(), "sampler name");
+				if (renderPass instanceof net.vulkanic.RenderPassResourceBinder resourceBinder) {
+					resourceBinder.bindSampler(
+						name,
+						Objects.requireNonNull(textureView, "sampler texture view"),
+						binding.textureUnit()
+					);
+				} else {
+					renderPass.bindSampler(name, Objects.requireNonNull(textureView, "sampler texture view"));
+				}
 				continue;
 			}
 
-			if (textureId > 0
-				&& VulkanicAPI.isVulkanBackendSelected()
-				&& renderPass instanceof GlRenderPass glRenderPass) {
-				glRenderPass.bindLegacySampler(Objects.requireNonNull(binding.name(), "sampler name"), textureId);
+			if (textureId > 0 && VulkanicAPI.isVulkanBackendSelected()) {
+				String name = Objects.requireNonNull(binding.name(), "sampler name");
+				if (renderPass instanceof GlRenderPass glRenderPass) {
+					glRenderPass.bindLegacySampler(name, textureId);
+				} else if (renderPass instanceof net.vulkanic.RenderPassResourceBinder resourceBinder) {
+					resourceBinder.bindLegacySampler(name, textureId, binding.textureUnit());
+				}
 			}
 		}
 	}

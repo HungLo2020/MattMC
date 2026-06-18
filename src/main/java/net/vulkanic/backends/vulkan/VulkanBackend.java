@@ -1087,6 +1087,16 @@ void main() {
         return device.createCommandEncoder();
     }
 
+    public CommandEncoder createNativeTerrainCommandEncoder() {
+        return new VulkanNativeTerrainCommandEncoder(this);
+    }
+
+    @Nullable
+    PipelineDescriptor resolvePrecompiledPipelineDescriptor(RenderPipeline renderPipeline) {
+        PrecompiledPipelineState state = precompiledPipelineCache.get(renderPipeline);
+        return state != null && state.isValid() ? state.descriptor : null;
+    }
+
     void releaseCompatibilityDevice(net.blaze3d.opengl.GlDevice device) {
         if (this.compatibilityDevice == device) {
             this.compatibilityDevice = null;

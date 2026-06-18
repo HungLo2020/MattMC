@@ -193,7 +193,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             );
         }
 
-        CommandEncoder commandEncoder = VulkanicAPI.createCommandEncoder();
+        CommandEncoder commandEncoder = VulkanicAPI.createNativeTerrainCommandEncoder();
         GpuBufferSlice chunkParams = this.writeChunkParams(commandEncoder);
         List<PreparedRegionDraw> preparedDraws = new ArrayList<>();
         double nearestRegionDistanceSq = Double.POSITIVE_INFINITY;

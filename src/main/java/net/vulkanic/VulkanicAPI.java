@@ -3570,6 +3570,19 @@ public class VulkanicAPI {
     }
 
     /**
+     * Creates a native Vulkan command encoder for the Sodium chunk-terrain vertical slice.
+     *
+     * <p>The general {@link #createCommandEncoder()} path intentionally remains unchanged while
+     * renderer workloads are migrated one at a time.</p>
+     */
+    public static CommandEncoder createNativeTerrainCommandEncoder() {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createNativeTerrainCommandEncoder()
+            : getBackend().createCommandEncoder();
+    }
+
+    /**
      * Creates a backend-owned render pass targeting a color attachment.
      */
     public static RenderPass createRenderPass(
