@@ -1207,6 +1207,8 @@ public class Phase3DrawPathTest {
             "Vulkan should avoid Sodium's sorted local translucent index path until that path is correct on Vulkan");
         assertTrue(worldRendererSource.contains("} else if (PlatformRuntimeInformation.getInstance().isDevelopmentEnvironment()"),
             "OpenGL should keep the existing development-only terrain sorting debug override behavior");
+        assertFalse(regionManagerSource.contains("reverseSortedQuadUploadOrder"),
+            "Vulkan should not apply ad-hoc index-order rewrites to Sodium's sorted translucent uploads");
         assertTrue(regionManagerSource.contains("var indexMetadataChanged = false;"),
             "RenderRegionManager should track sorted translucent index metadata changes separately from buffer resizes");
         assertTrue(regionManagerSource.contains("indexMetadataChanged = true;")
