@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,17 +22,24 @@ public final class SharedChunkProgramOverrides {
 	private static final Logger LOGGER = LoggerFactory.getLogger(SharedChunkProgramOverrides.class);
 	private static final AtomicInteger DEBUG_CREATE_OVERRIDE_LOG_COUNT = new AtomicInteger();
 	private static final Set<RenderPipeline> TRACKED_PIPELINES = ConcurrentHashMap.newKeySet();
+	private static final Map<RenderPipeline, Set<String>> BINDABLE_SAMPLERS = new ConcurrentHashMap<>();
 	private static final ThreadLocal<net.sodium.client.gl.shader.GlProgram<? extends ChunkShaderInterface>> ACTIVE_CHUNK_PROGRAM = new ThreadLocal<>();
 
 	private SharedChunkProgramOverrides() {
 	}
 
 	public static void register(RenderPipeline pipeline) {
+		register(pipeline, Set.of());
+	}
+
+	public static void register(RenderPipeline pipeline, Collection<String> bindableSamplers) {
 		TRACKED_PIPELINES.add(pipeline);
+		BINDABLE_SAMPLERS.put(pipeline, Set.copyOf(bindableSamplers));
 	}
 
 	public static void unregister(RenderPipeline pipeline) {
 		TRACKED_PIPELINES.remove(pipeline);
+		BINDABLE_SAMPLERS.remove(pipeline);
 	}
 
 	public static void unregisterAll(Collection<RenderPipeline> pipelines) {
@@ -62,6 +71,11 @@ public final class SharedChunkProgramOverrides {
 
 		var activeProgram = ACTIVE_CHUNK_PROGRAM.get();
 		return activeProgram == null ? -1 : activeProgram.handle();
+	}
+
+	public static Set<String> bindableSamplers(RenderPipeline pipeline) {
+		Set<String> samplers = BINDABLE_SAMPLERS.get(pipeline);
+		return samplers == null ? Collections.emptySet() : samplers;
 	}
 
 	@Nullable

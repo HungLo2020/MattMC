@@ -16,6 +16,26 @@ public class DepthColorStorage {
 		return depthColorLocked;
 	}
 
+	public static boolean isDepthMaskEnabled() {
+		return currentDepthEnable;
+	}
+
+	public static boolean isRedMaskEnabled() {
+		return currentRedMask;
+	}
+
+	public static boolean isGreenMaskEnabled() {
+		return currentGreenMask;
+	}
+
+	public static boolean isBlueMaskEnabled() {
+		return currentBlueMask;
+	}
+
+	public static boolean isAlphaMaskEnabled() {
+		return currentAlphaMask;
+	}
+
 	public static void disableDepthColor() {
 		if (!depthColorLocked) {
 			// Only save the previous state if the depth and color mask wasn't already locked

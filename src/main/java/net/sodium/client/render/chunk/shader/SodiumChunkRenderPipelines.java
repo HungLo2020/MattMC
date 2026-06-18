@@ -3,10 +3,15 @@ package net.sodium.client.render.chunk.shader;
 import net.blaze3d.pipeline.BlendFunction;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.DepthTestFunction;
+import net.blaze3d.platform.DestFactor;
+import net.blaze3d.platform.PolygonMode;
+import net.blaze3d.platform.SourceFactor;
 import net.blaze3d.shaders.UniformType;
 import net.blaze3d.vertex.VertexFormat;
 import net.blaze3d.vertex.VertexFormatElement;
 import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.blending.BlendModeStorage;
+import net.irisshaders.iris.gl.blending.DepthColorStorage;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -15,18 +20,19 @@ import net.sodium.client.gl.attribute.GlVertexAttributeBinding;
 import net.sodium.client.gl.attribute.GlVertexFormat;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.gl.device.RenderDevice;
+import net.vulkanic.VulkanicBlendFactor;
 import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class SodiumChunkRenderPipelines {
@@ -82,34 +88,27 @@ public final class SodiumChunkRenderPipelines {
         VertexFormatElement.Usage.GENERIC,
         4
     );
-    private static final Map<PipelineKey, Pipelines> PIPELINES = new ConcurrentHashMap<>();
+    private static final Map<PipelineKey, RenderPipeline> PIPELINES = new ConcurrentHashMap<>();
     private static volatile int cachedShaderReloadVersion = Integer.MIN_VALUE;
 
     private SodiumChunkRenderPipelines() {
     }
 
     public static RenderPipeline forPass(TerrainRenderPass pass, RenderPassChunkShaderInterface shaderInterface) {
-		int shaderReloadVersion = Iris.getPipelineManager().getVersionCounterForSodiumShaderReload();
-		clearStalePipelines(shaderReloadVersion);
-		VertexFormat vertexFormat = createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat());
-		List<String> samplerNames = collectSamplerNames(shaderInterface);
-		PipelineKey key = new PipelineKey(
-			shaderReloadVersion,
-			net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered(),
-			vertexFormat,
-			samplerNames
-		);
-		Pipelines pipelines = PIPELINES.computeIfAbsent(key, SodiumChunkRenderPipelines::createPipelines);
-
-        if (pass.isTranslucent()) {
-            return pipelines.translucent();
-        }
-
-        if (pass.supportsFragmentDiscard()) {
-            return pipelines.cutout();
-        }
-
-        return pipelines.solid();
+        int shaderReloadVersion = Iris.getPipelineManager().getVersionCounterForSodiumShaderReload();
+        clearStalePipelines(shaderReloadVersion);
+        VertexFormat vertexFormat = createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat());
+        List<String> bindableSamplers = collectSamplerNames(shaderInterface);
+        PassState passState = PassState.from(pass.getPipeline());
+        PipelineKey key = new PipelineKey(
+            shaderReloadVersion,
+            net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered(),
+            vertexFormat,
+            bindableSamplers,
+            PassKind.from(pass),
+            passState
+        );
+        return PIPELINES.computeIfAbsent(key, SodiumChunkRenderPipelines::createPipeline);
     }
 
     private static synchronized void clearStalePipelines(int shaderReloadVersion) {
@@ -117,19 +116,21 @@ public final class SodiumChunkRenderPipelines {
             return;
         }
 
-        for (Pipelines pipelines : PIPELINES.values()) {
-            SharedChunkProgramOverrides.unregisterAll(pipelines.asList());
+        for (RenderPipeline pipeline : PIPELINES.values()) {
+            SharedChunkProgramOverrides.unregister(pipeline);
         }
         PIPELINES.clear();
         cachedShaderReloadVersion = shaderReloadVersion;
     }
 
-    private static Pipelines createPipelines(PipelineKey key) {
+    private static RenderPipeline createPipeline(PipelineKey key) {
         LOGGER.info(
-            "Creating shared Sodium chunk pipelines reloadVersion={} shadow={} vertexSize={} samplers={}",
+            "Creating shared Sodium chunk pipeline reloadVersion={} shadow={} pass={} vertexSize={} state={} samplers={}",
             key.shaderReloadVersion(),
             key.shadowPass(),
+            key.passKind(),
             key.vertexFormat().getVertexSize(),
+            key.passState(),
             key.samplerNames()
         );
         RenderPipeline.Snippet snippet = RenderPipeline.builder(RenderPipelines.MATRICES_FOG_SNIPPET)
@@ -145,37 +146,39 @@ public final class SodiumChunkRenderPipelines {
             snippetBuilder.withSampler(samplerName);
         }
         snippet = snippetBuilder.buildSnippet();
-        String signature = Integer.toUnsignedString(Objects.hash(key.vertexFormat(), key.samplerNames(), key.shadowPass()), 36);
+        String signature = Integer.toUnsignedString(Objects.hash(
+            key.vertexFormat(),
+            key.samplerNames(),
+            key.shadowPass(),
+            key.passKind(),
+            key.passState()
+        ), 36);
 
-        RenderPipeline solid = RenderPipeline.builder(snippet)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/shared_chunk_solid_v" + key.shaderReloadVersion() + "_" + signature))
+        RenderPipeline.Builder builder = RenderPipeline.builder(snippet)
+            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/shared_chunk_" + key.passKind().id() + "_v" + key.shaderReloadVersion() + "_" + signature))
             .withShaderDefine("VULKAN_DISABLE_TERRAIN_FOG")
-			.withCull(false)
-            .build();
-        RenderPipeline cutout = RenderPipeline.builder(snippet)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/shared_chunk_cutout_v" + key.shaderReloadVersion() + "_" + signature))
-            .withShaderDefine("USE_FRAGMENT_DISCARD")
-            .withShaderDefine("VULKAN_DISABLE_TERRAIN_FOG")
-			.withCull(false)
-            .build();
-        RenderPipeline translucent = RenderPipeline.builder(snippet)
-            .withLocation(ResourceLocation.fromNamespaceAndPath("sodium", "pipeline/shared_chunk_translucent_v" + key.shaderReloadVersion() + "_" + signature))
-            .withShaderDefine("VULKAN_DISABLE_TERRAIN_FOG")
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthWrite(false)
-            .withCull(false)
-            .build();
+            .withDepthTestFunction(key.passState().depthTest())
+            .withPolygonMode(key.passState().polygonMode())
+            .withCull(key.passState().cull())
+            .withColorWrite(key.passState().writeColor(), key.passState().writeAlpha())
+            .withDepthWrite(key.passState().writeDepth())
+            .withDepthBias(key.passState().depthBiasScaleFactor(), key.passState().depthBiasConstant());
 
-        SharedChunkProgramOverrides.register(solid);
-        SharedChunkProgramOverrides.register(cutout);
-        SharedChunkProgramOverrides.register(translucent);
+        if (key.passKind().fragmentDiscard()) {
+            builder.withShaderDefine("USE_FRAGMENT_DISCARD");
+        }
+
+        key.passState().blend().ifPresent(builder::withBlend);
+
+        RenderPipeline pipeline = builder.build();
+
+        SharedChunkProgramOverrides.register(pipeline, key.samplerNames());
+        VulkanTerrainPipelineDiagnostics.logPipeline(pipeline, key.samplerNames());
 
         Minecraft minecraft = Minecraft.getInstance();
-        VulkanicAPI.precompileRenderPipeline(solid, minecraft.getShaderManager()::getShader);
-        VulkanicAPI.precompileRenderPipeline(cutout, minecraft.getShaderManager()::getShader);
-        VulkanicAPI.precompileRenderPipeline(translucent, minecraft.getShaderManager()::getShader);
+        VulkanicAPI.precompileRenderPipeline(pipeline, minecraft.getShaderManager()::getShader);
 
-        return new Pipelines(solid, cutout, translucent);
+        return pipeline;
     }
 
     private static VertexFormat createVertexFormat(GlVertexFormat sourceFormat) {
@@ -254,12 +257,101 @@ public final class SodiumChunkRenderPipelines {
         throw new IllegalStateException("No free vertex format element ids remain for Sodium Vulkan chunk attributes");
     }
 
-    private record PipelineKey(int shaderReloadVersion, boolean shadowPass, VertexFormat vertexFormat, List<String> samplerNames) {
+	private static Optional<BlendFunction> currentBlend(RenderPipeline pipeline) {
+		if (!BlendModeStorage.isBlendEnabled()) {
+			return Optional.empty();
+		}
+
+		Optional<SourceFactor> sourceColor = toSourceFactor(BlendModeStorage.getBlendSrcRgb());
+		Optional<DestFactor> destColor = toDestFactor(BlendModeStorage.getBlendDstRgb());
+		Optional<SourceFactor> sourceAlpha = toSourceFactor(BlendModeStorage.getBlendSrcAlpha());
+		Optional<DestFactor> destAlpha = toDestFactor(BlendModeStorage.getBlendDstAlpha());
+		if (sourceColor.isPresent() && destColor.isPresent() && sourceAlpha.isPresent() && destAlpha.isPresent()) {
+			return Optional.of(new BlendFunction(sourceColor.get(), destColor.get(), sourceAlpha.get(), destAlpha.get()));
+		}
+
+		return pipeline.getBlendFunction();
+	}
+
+	private static Optional<SourceFactor> toSourceFactor(int glFactor) {
+		return VulkanicBlendFactor.fromLegacyGlConstant(glFactor)
+			.map(factor -> SourceFactor.valueOf(factor.name()));
+	}
+
+	private static Optional<DestFactor> toDestFactor(int glFactor) {
+		return VulkanicBlendFactor.fromLegacyGlConstant(glFactor)
+			.flatMap(factor -> {
+				try {
+					return Optional.of(DestFactor.valueOf(factor.name()));
+				} catch (IllegalArgumentException e) {
+					return Optional.empty();
+				}
+			});
+	}
+
+    private record PipelineKey(
+		int shaderReloadVersion,
+		boolean shadowPass,
+		VertexFormat vertexFormat,
+		List<String> samplerNames,
+		PassKind passKind,
+		PassState passState
+	) {
     }
 
-    private record Pipelines(RenderPipeline solid, RenderPipeline cutout, RenderPipeline translucent) {
-        private Collection<RenderPipeline> asList() {
-            return List.of(this.solid, this.cutout, this.translucent);
-        }
-    }
+	private record PassState(
+		Optional<BlendFunction> blend,
+		DepthTestFunction depthTest,
+		PolygonMode polygonMode,
+		boolean cull,
+		boolean writeColor,
+		boolean writeAlpha,
+		boolean writeDepth,
+		float depthBiasScaleFactor,
+		float depthBiasConstant
+	) {
+		private static PassState from(RenderPipeline pipeline) {
+			return new PassState(
+				currentBlend(pipeline),
+				pipeline.getDepthTestFunction(),
+				pipeline.getPolygonMode(),
+				// Sodium chunk meshes already encode visible block faces; Vulkan backface culling can remove valid terrain.
+				false,
+				DepthColorStorage.isRedMaskEnabled() || DepthColorStorage.isGreenMaskEnabled() || DepthColorStorage.isBlueMaskEnabled(),
+				DepthColorStorage.isAlphaMaskEnabled(),
+				DepthColorStorage.isDepthMaskEnabled(),
+				pipeline.getDepthBiasScaleFactor(),
+				pipeline.getDepthBiasConstant()
+			);
+		}
+	}
+
+	private enum PassKind {
+		SOLID("solid", false),
+		CUTOUT("cutout", true),
+		TRANSLUCENT("translucent", false);
+
+		private final String id;
+		private final boolean fragmentDiscard;
+
+		PassKind(String id, boolean fragmentDiscard) {
+			this.id = id;
+			this.fragmentDiscard = fragmentDiscard;
+		}
+
+		private static PassKind from(TerrainRenderPass pass) {
+			if (pass.isTranslucent()) {
+				return TRANSLUCENT;
+			}
+			return pass.supportsFragmentDiscard() ? CUTOUT : SOLID;
+		}
+
+		private String id() {
+			return this.id;
+		}
+
+		private boolean fragmentDiscard() {
+			return this.fragmentDiscard;
+		}
+	}
 }

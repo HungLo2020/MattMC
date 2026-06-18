@@ -13,6 +13,7 @@ import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.pbr.TextureTracker;
 import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
+import net.sodium.client.render.chunk.shader.VulkanTerrainPipelineDiagnostics;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
@@ -28,8 +29,10 @@ import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -496,7 +499,16 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
             }
 
             try {
-                PipelineDescriptor liveDescriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(this.ctx, baseDescriptor, activeProgram);
+                java.util.Set<String> bindableSamplers = SharedChunkProgramOverrides.bindableSamplers(pipeline);
+                PipelineDescriptor liveDescriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(
+                    this.ctx,
+                    baseDescriptor,
+                    activeProgram,
+                    binding -> switch (binding.type()) {
+                        case SAMPLER, COMPARISON_SAMPLER -> bindableSamplers.contains(binding.name());
+                        case UNIFORM_BUFFER, TEXEL_BUFFER -> true;
+                    }
+                );
                 if (liveDescriptor != null && liveDescriptor.hasSpirvModules()) {
                     return liveDescriptor;
                 }
@@ -512,6 +524,7 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
             Map<String, VulkanicBufferSlice> uniformBindings = new HashMap<>();
             Map<String, PipelineResourceBindings.TexelBufferBinding> texelBindings = new HashMap<>();
             java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>();
+            List<String> missingResources = VulkanTerrainPipelineDiagnostics.enabled() ? new ArrayList<>() : List.of();
 
             for (PipelineDescriptor.ResourceBinding binding : descriptor.getResourceLayout().bindings()) {
                 switch (binding.type()) {
@@ -522,6 +535,8 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
                             Integer samplerObject = currentBoundSamplerObject(unit);
                             samplerBindings.put(binding.name(), new PipelineResourceBindings.SamplerBinding(unit, samplerObject, view));
                             boundResources.add(binding);
+                        } else if (VulkanTerrainPipelineDiagnostics.enabled()) {
+                            missingResources.add(binding.name() + "(" + binding.type() + ")");
                         }
                     }
                     case UNIFORM_BUFFER -> {
@@ -537,9 +552,14 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
                         if (slice != null) {
                             uniformBindings.put(binding.name(), slice);
                             boundResources.add(binding);
+                        } else if (VulkanTerrainPipelineDiagnostics.enabled()) {
+                            missingResources.add(binding.name() + "(" + binding.type() + ")");
                         }
                     }
                     case TEXEL_BUFFER -> {
+                        if (VulkanTerrainPipelineDiagnostics.enabled()) {
+                            missingResources.add(binding.name() + "(" + binding.type() + ")");
+                        }
                     }
                 }
             }
@@ -551,6 +571,15 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
             PipelineDescriptor submissionDescriptor = boundResources.size() == descriptor.getResourceLayout().bindings().size()
                 ? descriptor
                 : descriptor.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
+
+            if (this.renderPipeline != null) {
+                VulkanTerrainPipelineDiagnostics.logResourceSubmission(
+                    this.renderPipeline,
+                    descriptor,
+                    submissionDescriptor,
+                    missingResources
+                );
+            }
 
             return new PipelineResourceBindingSubmission(
                 submissionDescriptor,

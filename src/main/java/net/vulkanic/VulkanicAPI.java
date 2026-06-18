@@ -5150,9 +5150,22 @@ public class VulkanicAPI {
         int maxNameLength,
         java.util.Set<VulkanicShaderStage> stages
     ) {
+        return withMergedReflectedResourceLayout(ctx, descriptor, program, maxNameLength, stages, binding -> true);
+    }
+
+    public static PipelineDescriptor withMergedReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages,
+        java.util.function.Predicate<PipelineDescriptor.ResourceBinding> reflectedResourceFilter
+    ) {
         Objects.requireNonNull(descriptor, "descriptor must not be null");
+        Objects.requireNonNull(reflectedResourceFilter, "reflectedResourceFilter must not be null");
         PipelineDescriptor.ResourceLayout reflectedLayout =
             deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength, stages);
+        reflectedLayout = filterResourceLayout(reflectedLayout, reflectedResourceFilter);
         PipelineDescriptor.ResourceLayout mergedLayout = mergeResourceLayouts(
             descriptor.getResourceLayout(),
             reflectedLayout
@@ -5238,6 +5251,28 @@ public class VulkanicAPI {
         }
 
         return new PipelineDescriptor.ResourceLayout(merged);
+    }
+
+    private static PipelineDescriptor.ResourceLayout filterResourceLayout(
+        PipelineDescriptor.ResourceLayout layout,
+        java.util.function.Predicate<PipelineDescriptor.ResourceBinding> filter
+    ) {
+        java.util.List<PipelineDescriptor.ResourceBinding> filtered = new java.util.ArrayList<>(layout.bindings().size());
+        for (PipelineDescriptor.ResourceBinding binding : layout.bindings()) {
+            if (!filter.test(binding)) {
+                continue;
+            }
+
+            filtered.add(new PipelineDescriptor.ResourceBinding(
+                binding.set(),
+                binding.binding(),
+                binding.name(),
+                binding.type(),
+                binding.textureFormat(),
+                binding.stages()
+            ));
+        }
+        return new PipelineDescriptor.ResourceLayout(filtered);
     }
 
     /**
@@ -6457,12 +6492,29 @@ public class VulkanicAPI {
         PipelineDescriptor baseDescriptor,
         int program
     ) {
+        return createLiveProgramPipelineDescriptor(ctx, baseDescriptor, program, binding -> true);
+    }
+
+    public static PipelineDescriptor createLiveProgramPipelineDescriptor(
+        CommandContext ctx,
+        PipelineDescriptor baseDescriptor,
+        int program,
+        java.util.function.Predicate<PipelineDescriptor.ResourceBinding> reflectedResourceFilter
+    ) {
         Objects.requireNonNull(ctx, "ctx must not be null");
         Objects.requireNonNull(baseDescriptor, "baseDescriptor must not be null");
+        Objects.requireNonNull(reflectedResourceFilter, "reflectedResourceFilter must not be null");
 
         java.util.List<VulkanicSpirvModule> linkedModules = getLinkedProgramSpirvModules(ctx, program);
         if (linkedModules.isEmpty()) {
-            return withMergedReflectedResourceLayout(ctx, baseDescriptor, program);
+            return withMergedReflectedResourceLayout(
+                ctx,
+                baseDescriptor,
+                program,
+                256,
+                defaultReflectedResourceStages(),
+                reflectedResourceFilter
+            );
         }
 
         PipelineDescriptor descriptorWithModules = PipelineDescriptor
@@ -6474,10 +6526,24 @@ public class VulkanicAPI {
             .map(VulkanicSpirvModule::stage)
             .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
         if (stages.isEmpty()) {
-            return withMergedReflectedResourceLayout(ctx, descriptorWithModules, program);
+            return withMergedReflectedResourceLayout(
+                ctx,
+                descriptorWithModules,
+                program,
+                256,
+                defaultReflectedResourceStages(),
+                reflectedResourceFilter
+            );
         }
 
-        return withMergedReflectedResourceLayout(ctx, descriptorWithModules, program, 256, java.util.Set.copyOf(stages));
+        return withMergedReflectedResourceLayout(
+            ctx,
+            descriptorWithModules,
+            program,
+            256,
+            java.util.Set.copyOf(stages),
+            reflectedResourceFilter
+        );
     }
 
     /**

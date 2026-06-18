@@ -1226,8 +1226,10 @@ public class Phase3DrawPathTest {
             "The native terrain encoder should begin native Vulkan render passes directly instead of routing through GlCommandEncoder");
         assertTrue(encoderSource.contains("this.pass.drawIndexed(firstIndex, indexCount, baseVertex, instanceCount);"),
             "The Mojang RenderPass drawIndexed argument order must be translated to VulkanicRenderPass order");
-        assertTrue(encoderSource.contains("VulkanicAPI.createLiveProgramPipelineDescriptor(this.ctx, baseDescriptor, activeProgram)"),
-            "The native terrain pass should preserve Iris live shared-chunk descriptor selection for shaders");
+        assertTrue(encoderSource.contains("VulkanicAPI.createLiveProgramPipelineDescriptor(")
+                && encoderSource.contains("SharedChunkProgramOverrides.bindableSamplers(pipeline)")
+                && encoderSource.contains("case SAMPLER, COMPARISON_SAMPLER -> bindableSamplers.contains(binding.name())"),
+            "The native terrain pass should preserve Iris live shared-chunk descriptor selection while filtering reflected terrain samplers to the Iris bindable set");
         assertTrue(encoderSource.contains("implements RenderPass, RenderPassResourceBinder"),
             "The native terrain pass should accept unit-aware Iris render-pass resource bindings");
         assertTrue(encoderSource.contains("public boolean bindLegacySampler(String name, int textureId, int textureUnit)")
@@ -1317,10 +1319,15 @@ public class Phase3DrawPathTest {
 
         assertTrue(pipelineSource.contains("createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat())"),
             "Shared Sodium chunk pipelines should derive their vertex ABI from the active WorldRenderingSettings format, not just the base stride");
-        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.register(solid);"),
-            "Shared Sodium chunk pipelines should register tracked terrain pipelines for active-program overrides");
-        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.unregisterAll(pipelines.asList());"),
+        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.register(pipeline, key.samplerNames());"),
+            "Shared Sodium chunk pipelines should register tracked terrain pipelines with their pass-bindable sampler contract for active-program overrides");
+        assertTrue(pipelineSource.contains("for (RenderPipeline pipeline : PIPELINES.values())")
+                && pipelineSource.contains("SharedChunkProgramOverrides.unregister(pipeline);"),
             "Shared Sodium chunk pipeline cache should clean up tracked override entries when shader reloads invalidate cached pipelines");
+        assertTrue(pipelineSource.contains("PassState.from(pass.getPipeline())")
+                && pipelineSource.contains("currentBlend(pipeline)")
+                && pipelineSource.contains("DepthColorStorage.isDepthMaskEnabled()"),
+            "Shared Sodium chunk pipelines should derive Vulkan terrain depth, blend, and write-mask state from the active Iris pass state");
         assertTrue(pipelineSource.contains("case 10 -> \"iris_Normal\";"),
             "Shared Sodium chunk pipelines should carry Iris terrain attribute locations into the Vulkan terrain ABI");
         assertFalse(pipelineSource.contains("RenderPipelines.register("),
