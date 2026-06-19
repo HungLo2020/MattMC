@@ -3627,6 +3627,16 @@ public class VulkanicAPI {
     }
 
     /**
+     * Creates a backend-owned render pass from an explicit multi-attachment render-target contract.
+     */
+    public static RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.createRenderPass(descriptor)
+            : getBackend().createRenderPass(descriptor);
+    }
+
+    /**
      * Creates a backend-owned GPU texture with supplier-based debug label.
      */
     public static GpuTexture createTexture(
@@ -6461,6 +6471,13 @@ public class VulkanicAPI {
     }
 
     /**
+     * Creates a pipeline handle compatible with an explicit render-target attachment contract.
+     */
+    public static PipelineHandle createPipeline(PipelineDescriptor descriptor, VulkanicRenderTargetDescriptor renderTarget) {
+        return getBackend().createPipeline(descriptor, renderTarget);
+    }
+
+    /**
      * Convenience overload: creates a pipeline directly from a Blaze3D RenderPipeline.
      *
      * @param pipeline the RenderPipeline to compile
@@ -6673,6 +6690,20 @@ public class VulkanicAPI {
             : getBackend().resolvePipelineHandle(renderPipeline, descriptor, framebuffer);
     }
 
+    /**
+     * Returns a compiled pipeline handle compatible with an explicit render-target contract,
+     * or {@code null} if the active backend has not compiled one yet.
+     */
+    @Nullable
+    public static PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                       PipelineDescriptor descriptor,
+                                                       VulkanicRenderTargetDescriptor renderTarget) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.resolvePipelineHandle(renderPipeline, descriptor, renderTarget)
+            : getBackend().resolvePipelineHandle(renderPipeline, descriptor, renderTarget);
+    }
+
     // =========================================================================
     // Phase 3e: Frame Lifecycle + Presentation
     // =========================================================================
@@ -6839,6 +6870,20 @@ public class VulkanicAPI {
             return directVulkanBackend.beginRenderPass(ctx, label, framebuffer);
         }
         return getBackend().beginRenderPass(ctx, label, framebuffer);
+    }
+
+    /**
+     * Begins a render pass using an explicit multi-attachment render-target contract.
+     */
+    public static VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        if (directVulkanBackend != null) {
+            return directVulkanBackend.beginRenderPass(ctx, descriptor);
+        }
+        return getBackend().beginRenderPass(ctx, descriptor);
     }
 
     /**

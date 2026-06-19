@@ -24,6 +24,7 @@ import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicBufferSlice;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicRenderPass;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
@@ -75,7 +76,7 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
             VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, colorView, clearColor, depthView, clearDepth);
             renderPassStarted = true;
             this.inRenderPass = true;
-            return new TerrainRenderPass(ctx, pass, 0, colorView, depthView);
+            return new TerrainRenderPass(ctx, pass, 0, null, colorView, depthView);
         } finally {
             if (!renderPassStarted) {
                 colorView.close();
@@ -92,7 +93,16 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, framebuffer);
         this.inRenderPass = true;
-        return new TerrainRenderPass(ctx, pass, framebuffer, null, null);
+        return new TerrainRenderPass(ctx, pass, framebuffer, null, null, null);
+    }
+
+    @Override
+    public RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
+        this.ensureNoRenderPass();
+        CommandContext ctx = this.backend.beginCommandBuffer();
+        VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);
+        this.inRenderPass = true;
+        return new TerrainRenderPass(ctx, pass, 0, descriptor, null, null);
     }
 
     @Override
@@ -265,6 +275,8 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
         private final VulkanicRenderPass pass;
         private final int framebuffer;
         @Nullable
+        private final VulkanicRenderTargetDescriptor renderTargetDescriptor;
+        @Nullable
         private final VulkanicTextureView colorView;
         @Nullable
         private final VulkanicTextureView depthView;
@@ -285,12 +297,14 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
             CommandContext ctx,
             VulkanicRenderPass pass,
             int framebuffer,
+            @Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor,
             @Nullable VulkanicTextureView colorView,
             @Nullable VulkanicTextureView depthView
         ) {
             this.ctx = ctx;
             this.pass = pass;
             this.framebuffer = framebuffer;
+            this.renderTargetDescriptor = renderTargetDescriptor;
             this.colorView = colorView;
             this.depthView = depthView;
         }
@@ -481,9 +495,18 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
                 throw new IllegalStateException("No Vulkan resource bindings available for terrain pipeline " + pipeline.getLocation());
             }
 
-            PipelineHandle handle = this.framebuffer != 0
-                ? VulkanNativeTerrainCommandEncoder.this.backend.resolvePipelineHandle(pipeline, submission.descriptor(), this.framebuffer)
-                : VulkanNativeTerrainCommandEncoder.this.backend.resolvePipelineHandle(pipeline, submission.descriptor());
+            PipelineHandle handle = this.renderTargetDescriptor != null
+                ? VulkanNativeTerrainCommandEncoder.this.backend.resolvePipelineHandle(pipeline, submission.descriptor(), this.renderTargetDescriptor)
+                : this.framebuffer != 0
+                    ? VulkanNativeTerrainCommandEncoder.this.backend.resolvePipelineHandle(pipeline, submission.descriptor(), this.framebuffer)
+                    : this.colorView != null
+                        ? VulkanNativeTerrainCommandEncoder.this.backend.resolvePipelineHandle(
+                            pipeline,
+                            submission.descriptor(),
+                            this.colorView,
+                            this.depthView
+                        )
+                        : VulkanNativeTerrainCommandEncoder.this.backend.resolvePipelineHandle(pipeline, submission.descriptor());
             if (handle == null || !handle.isValid()) {
                 throw new IllegalStateException("Unable to resolve native Vulkan terrain pipeline handle for " + pipeline.getLocation());
             }

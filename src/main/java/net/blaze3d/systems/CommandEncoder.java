@@ -7,6 +7,7 @@ import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.NativeImage;
 import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import java.nio.ByteBuffer;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -25,6 +26,10 @@ public interface CommandEncoder {
 
 	default RenderPass createRenderPass(Supplier<String> supplier, int framebuffer, boolean hasDepthTexture) {
 		throw new UnsupportedOperationException("This command encoder does not support framebuffer-backed render-pass creation.");
+	}
+
+	default RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
+		throw new UnsupportedOperationException("This command encoder does not support descriptor-backed render-pass creation.");
 	}
 
 	void clearColorTexture(GpuTexture gpuTexture, int i);

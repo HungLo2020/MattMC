@@ -227,6 +227,13 @@ public interface GraphicsBackend {
     }
 
     /**
+     * Creates a backend-owned render pass from an explicit multi-attachment render-target contract.
+     */
+    default RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
+        return createCommandEncoder().createRenderPass(descriptor);
+    }
+
+    /**
      * Begins a render pass that targets an existing framebuffer contract.
      */
     default VulkanicRenderPass beginRenderPass(
@@ -236,6 +243,18 @@ public interface GraphicsBackend {
     ) {
         throw new UnsupportedOperationException(
             "Backend " + getBackendType() + " does not support framebuffer-backed beginRenderPass."
+        );
+    }
+
+    /**
+     * Begins a render pass from an explicit multi-attachment render-target contract.
+     */
+    default VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
+        throw new UnsupportedOperationException(
+            "Backend " + getBackendType() + " does not support descriptor-backed beginRenderPass."
         );
     }
 
@@ -3838,6 +3857,13 @@ public interface GraphicsBackend {
     }
 
     /**
+     * Creates a pipeline compatible with an explicit render-target attachment contract.
+     */
+    default PipelineHandle createPipeline(PipelineDescriptor descriptor, VulkanicRenderTargetDescriptor renderTarget) {
+        return createPipeline(descriptor);
+    }
+
+    /**
      * Returns linked SPIR-V modules associated with a live backend-neutral program handle.
      */
     default List<VulkanicSpirvModule> getLinkedProgramSpirvModules(CommandContext ctx, int program) {
@@ -3894,6 +3920,16 @@ public interface GraphicsBackend {
     default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
                                                           PipelineDescriptor descriptor,
                                                           int framebuffer) {
+        return resolvePipelineHandle(renderPipeline, descriptor);
+    }
+
+    /**
+     * Returns a compiled pipeline handle compatible with an explicit render-target contract,
+     * or {@code null} if the active backend has not compiled one.
+     */
+    default @Nullable PipelineHandle resolvePipelineHandle(RenderPipeline renderPipeline,
+                                                          PipelineDescriptor descriptor,
+                                                          VulkanicRenderTargetDescriptor renderTarget) {
         return resolvePipelineHandle(renderPipeline, descriptor);
     }
 

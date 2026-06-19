@@ -16,6 +16,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -29,6 +30,8 @@ public class GlRenderPass implements RenderPass {
 	private final GlCommandEncoder encoder;
 	private final boolean hasDepthTexture;
 	private final int framebuffer;
+	@Nullable
+	private final VulkanicRenderTargetDescriptor renderTargetDescriptor;
 	private boolean closed;
 	@Nullable
 	public GlRenderPipeline pipeline;
@@ -45,9 +48,14 @@ public class GlRenderPass implements RenderPass {
 	protected int pushedDebugGroups;
 
 	public GlRenderPass(GlCommandEncoder glCommandEncoder, boolean bl, int framebuffer) {
+		this(glCommandEncoder, bl, framebuffer, null);
+	}
+
+	public GlRenderPass(GlCommandEncoder glCommandEncoder, boolean bl, int framebuffer, @Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
 		this.encoder = glCommandEncoder;
 		this.hasDepthTexture = bl;
 		this.framebuffer = framebuffer;
+		this.renderTargetDescriptor = renderTargetDescriptor;
 	}
 
 	public boolean hasDepthTexture() {
@@ -56,6 +64,11 @@ public class GlRenderPass implements RenderPass {
 
 	public int getFramebuffer() {
 		return this.framebuffer;
+	}
+
+	@Nullable
+	public VulkanicRenderTargetDescriptor getRenderTargetDescriptor() {
+		return this.renderTargetDescriptor;
 	}
 
 	@Override

@@ -48,6 +48,8 @@ import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.VulkanicRenderPassDescriptor;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicTextureParameterName;
@@ -257,15 +259,14 @@ public class FinalPassRenderer {
 
 			GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
 			VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
-
-			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Final pass", Minecraft.getInstance().getMainRenderTarget().getColorTextureView(), OptionalInt.empty())) {
+			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Final pass", main.getColorTextureView(), OptionalInt.empty())) {
 				renderPass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
 				VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setIndexBuffer(indices, type);
 				renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
 				VulkanicAPI.setDynamicViewport(ctx, 0, 0, baseWidth, baseHeight);
 
-				finalPass.ensurePipelineState();
+				finalPass.ensurePipelineState(null);
 				renderPass.iris$setCustomPass(finalPass);
 
 				finalPass.program.use();
@@ -333,6 +334,21 @@ public class FinalPassRenderer {
 		}
 
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
+	}
+
+	private VulkanicRenderTargetDescriptor createFinalRenderTargetDescriptor(Supplier<String> label, int width, int height) {
+		return new VulkanicRenderTargetDescriptor(
+			label,
+			java.util.List.of(new VulkanicRenderTargetDescriptor.ColorAttachment(
+				this.lastColorTextureId,
+				VulkanicRenderPassDescriptor.LoadOp.LOAD,
+				VulkanicRenderPassDescriptor.StoreOp.STORE,
+				OptionalInt.empty()
+			)),
+			null,
+			width,
+			height
+		);
 	}
 
 	public void recalculateSwapPassSize() {
@@ -485,10 +501,12 @@ public class FinalPassRenderer {
 		GlFramebuffer colorHolder;
 		@Nullable net.vulkanic.PipelineDescriptor pipelineDescriptor;
 		@Nullable net.vulkanic.PipelineHandle pipelineHandle;
+		@Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor;
 		final java.util.Map<net.vulkanic.PipelineDescriptor.ResourceLayout, net.vulkanic.PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
 
-		void ensurePipelineState() {
+		void ensurePipelineState(@Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
 			var ctx = VulkanicAPI.getCommandContext();
+			this.renderTargetDescriptor = renderTargetDescriptor;
 			if (ctx.isImmediate()) return;
 			if (this.pipelineHandle != null && this.pipelineHandle.isValid() && this.pipelineDescriptor != null) return;
 			net.vulkanic.PipelineDescriptor descriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(
@@ -498,7 +516,9 @@ public class FinalPassRenderer {
 			closePipelineVariants();
 			if (this.pipelineHandle != null) this.pipelineHandle.close();
 			this.pipelineDescriptor = descriptor;
-			this.pipelineHandle = VulkanicAPI.createPipeline(descriptor, colorHolder.getId());
+			this.pipelineHandle = renderTargetDescriptor != null
+				? VulkanicAPI.createPipeline(descriptor, renderTargetDescriptor)
+				: VulkanicAPI.createPipeline(descriptor, colorHolder.getId());
 		}
 
 		private void closePipelineVariants() {
@@ -541,7 +561,9 @@ public class FinalPassRenderer {
 			net.vulkanic.PipelineHandle variant = pipelineLayoutVariants.get(descriptor.getResourceLayout());
 			if (variant != null && variant.isValid()) return variant;
 			if (variant != null) variant.close();
-			net.vulkanic.PipelineHandle created = VulkanicAPI.createPipeline(descriptor, colorHolder.getId());
+			net.vulkanic.PipelineHandle created = this.renderTargetDescriptor != null
+				? VulkanicAPI.createPipeline(descriptor, this.renderTargetDescriptor)
+				: VulkanicAPI.createPipeline(descriptor, colorHolder.getId());
 			pipelineLayoutVariants.put(descriptor.getResourceLayout(), created);
 			return created;
 		}

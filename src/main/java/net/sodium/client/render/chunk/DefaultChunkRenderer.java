@@ -263,11 +263,11 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         int submittedDrawCommands = 0;
         long submittedIndexCount = 0L;
         try (RenderPass renderPass = shaderFramebuffer != null
-            ? commandEncoder.createRenderPass(
-                () -> "Sodium chunk terrain",
-                shaderFramebuffer.getId(),
-                shaderFramebuffer.hasDepthAttachment()
-            )
+                ? commandEncoder.createRenderPass(
+                    () -> "Sodium chunk terrain",
+                    shaderFramebuffer.getId(),
+                    shaderFramebuffer.hasDepthAttachment()
+                )
             : commandEncoder.createRenderPass(
                 () -> "Sodium chunk terrain",
                 colorTargetView,

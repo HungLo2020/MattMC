@@ -25,6 +25,7 @@ import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderPassDescriptor;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureFormat;
 import net.vulkanic.VulkanicTextureUploadFormat;
@@ -148,6 +149,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.nio.ByteOrder;
@@ -391,13 +393,29 @@ public class VulkanBackend {
             ResolvedFramebufferTargets targets,
             String indexedBlendKey
         ) {
+            return from(
+                descriptor,
+                targets.colorFormats(),
+                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+                targets.hasFeedbackLoopTarget(),
+                indexedBlendKey
+            );
+        }
+
+        private static RenderTargetPipelineKey from(
+            PipelineDescriptor descriptor,
+            List<Integer> colorFormats,
+            int depthFormat,
+            boolean feedbackLoopCompatible,
+            String indexedBlendKey
+        ) {
             return new RenderTargetPipelineKey(
                 descriptor.getStableCacheKey(),
                 descriptor.getResourceLayoutCacheKey(),
                 indexedBlendKey,
-                targets.colorFormats(),
-                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
-                targets.hasFeedbackLoopTarget()
+                colorFormats,
+                depthFormat,
+                feedbackLoopCompatible
             );
         }
     }
@@ -1142,6 +1160,10 @@ void main() {
         boolean hasDepthTexture
     ) {
         return createCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);
+    }
+
+    public net.blaze3d.systems.RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
+        return createCommandEncoder().createRenderPass(descriptor);
     }
 
     public GpuTexture createTexture(
@@ -3791,7 +3813,28 @@ void main() {
         return createPipeline(descriptor, resolveFramebufferTargets(framebuffer));
     }
 
+    public PipelineHandle createPipeline(PipelineDescriptor descriptor, VulkanicRenderTargetDescriptor renderTarget) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+        return createPipeline(descriptor, resolveRenderTargetDescriptor(renderTarget));
+    }
+
     private PipelineHandle createPipeline(PipelineDescriptor descriptor, ResolvedFramebufferTargets targets) {
+        return createPipeline(
+            descriptor,
+            targets.colorFormats(),
+            targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+            targets.hasFeedbackLoopTarget()
+        );
+    }
+
+    private PipelineHandle createPipeline(
+        PipelineDescriptor descriptor,
+        List<Integer> colorFormats,
+        int depthFormat,
+        boolean feedbackLoopCompatible
+    ) {
         ensureNativeReady("createPipeline(framebuffer)");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -3838,9 +3881,9 @@ void main() {
                 vertModuleHandle,
                 geomModuleHandle,
                 fragModuleHandle,
-                targets.colorFormats(),
-                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
-                targets.hasFeedbackLoopTarget(),
+                colorFormats,
+                depthFormat,
+                feedbackLoopCompatible,
                 false
             );
         } finally {
@@ -4034,6 +4077,66 @@ void main() {
             return null;
         }
         ResolvedFramebufferTargets targets = resolveFramebufferTargets(framebuffer);
+        return resolvePipelineHandle(renderPipeline, descriptor, targets);
+    }
+
+    public net.vulkanic.PipelineHandle resolvePipelineHandle(
+            net.blaze3d.pipeline.RenderPipeline renderPipeline,
+            net.vulkanic.PipelineDescriptor descriptor,
+            VulkanicRenderTargetDescriptor renderTarget) {
+        if (renderPipeline == null) {
+            return null;
+        }
+        ResolvedFramebufferTargets targets = resolveRenderTargetDescriptor(renderTarget);
+        return resolvePipelineHandle(renderPipeline, descriptor, targets);
+    }
+
+    public net.vulkanic.PipelineHandle resolvePipelineHandle(
+            net.blaze3d.pipeline.RenderPipeline renderPipeline,
+            net.vulkanic.PipelineDescriptor descriptor,
+            VulkanicTextureView colorTarget,
+            @Nullable VulkanicTextureView depthTarget) {
+        if (renderPipeline == null) {
+            return null;
+        }
+
+        ResolvedRenderTargets targets = resolveRenderTargets(
+            VulkanicRenderPassDescriptor.colorAndDepth(
+                () -> "Pipeline-compatible texture-view target",
+                colorTarget,
+                OptionalInt.empty(),
+                depthTarget,
+                OptionalDouble.empty()
+            )
+        );
+        return resolvePipelineHandle(
+            renderPipeline,
+            descriptor,
+            List.of(NativeSpine.toVkFormat(targets.colorTexture.getVulkanicFormat())),
+            targets.hasDepthTarget() ? NativeSpine.toVkFormat(targets.depthTexture.getVulkanicFormat()) : VK10.VK_FORMAT_UNDEFINED,
+            false
+        );
+    }
+
+    private net.vulkanic.PipelineHandle resolvePipelineHandle(
+            net.blaze3d.pipeline.RenderPipeline renderPipeline,
+            net.vulkanic.PipelineDescriptor descriptor,
+            ResolvedFramebufferTargets targets) {
+        return resolvePipelineHandle(
+            renderPipeline,
+            descriptor,
+            targets.colorFormats(),
+            targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+            targets.hasFeedbackLoopTarget()
+        );
+    }
+
+    private net.vulkanic.PipelineHandle resolvePipelineHandle(
+            net.blaze3d.pipeline.RenderPipeline renderPipeline,
+            net.vulkanic.PipelineDescriptor descriptor,
+            List<Integer> colorFormats,
+            int depthFormat,
+            boolean feedbackLoopCompatible) {
         PrecompiledPipelineState state = precompiledPipelineCache.get(renderPipeline);
         if (state == null || !state.isValid()) {
             return null;
@@ -4048,8 +4151,10 @@ void main() {
 
         RenderTargetPipelineKey key = RenderTargetPipelineKey.from(
             pipelineDescriptor,
-            targets,
-            indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), targets.colorFormats().size())
+            colorFormats,
+            depthFormat,
+            feedbackLoopCompatible,
+            indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), colorFormats.size())
         );
         PipelineHandle cached = renderTargetPipelineCache.get(key);
         if (cached != null) {
@@ -4059,7 +4164,7 @@ void main() {
             renderTargetPipelineCache.remove(key, cached);
         }
 
-        PipelineHandle framebufferCompatible = createPipeline(pipelineDescriptor, targets);
+        PipelineHandle framebufferCompatible = createPipeline(pipelineDescriptor, colorFormats, depthFormat, feedbackLoopCompatible);
         if (framebufferCompatible == null || !framebufferCompatible.isValid()) {
             if (framebufferCompatible != null) {
                 framebufferCompatible.close();
@@ -4454,6 +4559,12 @@ void main() {
         private final long depthViewHandle;
         private final int width;
         private final int height;
+        private final List<VulkanicRenderPassDescriptor.LoadOp> colorLoadOps;
+        private final List<VulkanicRenderPassDescriptor.StoreOp> colorStoreOps;
+        private final List<OptionalInt> colorClearColors;
+        private final VulkanicRenderPassDescriptor.LoadOp depthLoadOp;
+        private final VulkanicRenderPassDescriptor.StoreOp depthStoreOp;
+        private final OptionalDouble depthClearValue;
 
         private ResolvedFramebufferTargets(
             List<NativeSpine.LegacyTextureObject> colorTextures,
@@ -4463,12 +4574,53 @@ void main() {
             int width,
             int height
         ) {
+            this(
+                colorTextures,
+                colorViewHandles,
+                depthTexture,
+                depthViewHandle,
+                width,
+                height,
+                java.util.Collections.nCopies(colorTextures.size(), VulkanicRenderPassDescriptor.LoadOp.LOAD),
+                java.util.Collections.nCopies(colorTextures.size(), VulkanicRenderPassDescriptor.StoreOp.STORE),
+                java.util.Collections.nCopies(colorTextures.size(), OptionalInt.empty()),
+                VulkanicRenderPassDescriptor.LoadOp.LOAD,
+                VulkanicRenderPassDescriptor.StoreOp.STORE,
+                OptionalDouble.empty()
+            );
+        }
+
+        private ResolvedFramebufferTargets(
+            List<NativeSpine.LegacyTextureObject> colorTextures,
+            List<Long> colorViewHandles,
+            @Nullable NativeSpine.LegacyTextureObject depthTexture,
+            long depthViewHandle,
+            int width,
+            int height,
+            List<VulkanicRenderPassDescriptor.LoadOp> colorLoadOps,
+            List<VulkanicRenderPassDescriptor.StoreOp> colorStoreOps,
+            List<OptionalInt> colorClearColors,
+            VulkanicRenderPassDescriptor.LoadOp depthLoadOp,
+            VulkanicRenderPassDescriptor.StoreOp depthStoreOp,
+            OptionalDouble depthClearValue
+        ) {
             this.colorTextures = List.copyOf(colorTextures);
             this.colorViewHandles = List.copyOf(colorViewHandles);
             this.depthTexture = depthTexture;
             this.depthViewHandle = depthViewHandle;
             this.width = width;
             this.height = height;
+            this.colorLoadOps = List.copyOf(colorLoadOps);
+            this.colorStoreOps = List.copyOf(colorStoreOps);
+            this.colorClearColors = List.copyOf(colorClearColors);
+            this.depthLoadOp = Objects.requireNonNull(depthLoadOp, "depthLoadOp must not be null");
+            this.depthStoreOp = Objects.requireNonNull(depthStoreOp, "depthStoreOp must not be null");
+            this.depthClearValue = Objects.requireNonNull(depthClearValue, "depthClearValue must not be null");
+            if (this.colorLoadOps.size() != this.colorTextures.size()
+                || this.colorStoreOps.size() != this.colorTextures.size()
+                || this.colorClearColors.size() != this.colorTextures.size()) {
+                throw new IllegalArgumentException("Color attachment metadata must match color attachment count");
+            }
         }
 
         private int colorAttachmentCount() {
@@ -4490,6 +4642,30 @@ void main() {
                 formats.add(colorTexture.vkFormat);
             }
             return List.copyOf(formats);
+        }
+
+        private VulkanicRenderPassDescriptor.LoadOp colorLoadOp(int index) {
+            return colorLoadOps.get(index);
+        }
+
+        private VulkanicRenderPassDescriptor.StoreOp colorStoreOp(int index) {
+            return colorStoreOps.get(index);
+        }
+
+        private OptionalInt colorClearColor(int index) {
+            return colorClearColors.get(index);
+        }
+
+        private VulkanicRenderPassDescriptor.LoadOp depthLoadOp() {
+            return depthLoadOp;
+        }
+
+        private VulkanicRenderPassDescriptor.StoreOp depthStoreOp() {
+            return depthStoreOp;
+        }
+
+        private OptionalDouble depthClearValue() {
+            return depthClearValue;
         }
     }
 
@@ -4613,6 +4789,89 @@ void main() {
         }
 
         return new ResolvedFramebufferTargets(colorTextures, colorViewHandles, depthTexture, depthViewHandle, width, height);
+    }
+
+    private ResolvedFramebufferTargets resolveRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor) {
+        ensureNativeReady("resolveRenderTargetDescriptor");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        VulkanicRenderTargetDescriptor safeDescriptor =
+            Objects.requireNonNull(descriptor, "descriptor must not be null");
+
+        List<VulkanicRenderTargetDescriptor.ColorAttachment> colorAttachments = safeDescriptor.colorAttachments();
+        List<NativeSpine.LegacyTextureObject> colorTextures = new ArrayList<>(colorAttachments.size());
+        List<Long> colorViewHandles = new ArrayList<>(colorAttachments.size());
+	        List<VulkanicRenderPassDescriptor.LoadOp> colorLoadOps = new ArrayList<>(colorAttachments.size());
+	        List<VulkanicRenderPassDescriptor.StoreOp> colorStoreOps = new ArrayList<>(colorAttachments.size());
+	        List<OptionalInt> colorClearColors = new ArrayList<>(colorAttachments.size());
+	        int width = safeDescriptor.hasExplicitExtent() ? safeDescriptor.width() : -1;
+	        int height = safeDescriptor.hasExplicitExtent() ? safeDescriptor.height() : -1;
+
+        for (int colorIndex = 0; colorIndex < colorAttachments.size(); colorIndex++) {
+            VulkanicRenderTargetDescriptor.ColorAttachment attachment = colorAttachments.get(colorIndex);
+            NativeSpine.LegacyTextureObject legacyTexture = spine.requireLegacyTexture(attachment.textureId());
+            if (legacyTexture.imageHandle == VK10.VK_NULL_HANDLE || legacyTexture.defaultViewHandle == VK10.VK_NULL_HANDLE) {
+                throw new IllegalStateException(
+                    "Render-target color attachment texId=" + attachment.textureId()
+                        + " is missing Vulkan image/view state"
+                );
+            }
+            if (width < 0) {
+                width = legacyTexture.width;
+                height = legacyTexture.height;
+            } else if (legacyTexture.width != width || legacyTexture.height != height) {
+                throw new IllegalStateException("Render-target descriptor has mismatched color attachment dimensions");
+            }
+
+            colorTextures.add(legacyTexture);
+            colorViewHandles.add(legacyTexture.defaultViewHandle);
+            colorLoadOps.add(attachment.loadOp());
+            colorStoreOps.add(attachment.storeOp());
+            colorClearColors.add(attachment.clearColor());
+        }
+
+        VulkanicRenderTargetDescriptor.DepthAttachment depthAttachment = safeDescriptor.depthAttachment();
+        NativeSpine.LegacyTextureObject depthTexture = null;
+        long depthViewHandle = VK10.VK_NULL_HANDLE;
+        VulkanicRenderPassDescriptor.LoadOp depthLoadOp = VulkanicRenderPassDescriptor.LoadOp.LOAD;
+        VulkanicRenderPassDescriptor.StoreOp depthStoreOp = VulkanicRenderPassDescriptor.StoreOp.STORE;
+        OptionalDouble depthClearValue = OptionalDouble.empty();
+	        if (depthAttachment != null) {
+	            depthTexture = spine.requireLegacyTexture(depthAttachment.textureId());
+	            if (depthTexture.imageHandle == VK10.VK_NULL_HANDLE || depthTexture.defaultViewHandle == VK10.VK_NULL_HANDLE) {
+	                throw new IllegalStateException(
+	                    "Render-target depth attachment texId=" + depthAttachment.textureId()
+	                        + " is missing Vulkan image/view state"
+	                );
+	            }
+	            if (width < 0) {
+	                width = depthTexture.width;
+	                height = depthTexture.height;
+	            } else if (depthTexture.width != width || depthTexture.height != height) {
+	                throw new IllegalStateException("Render-target descriptor depth dimensions must match color attachments");
+	            }
+	            depthViewHandle = depthTexture.defaultViewHandle;
+	            depthLoadOp = depthAttachment.loadOp();
+	            depthStoreOp = depthAttachment.storeOp();
+            depthClearValue = depthAttachment.clearDepth();
+        }
+
+        return new ResolvedFramebufferTargets(
+            colorTextures,
+            colorViewHandles,
+            depthTexture,
+            depthViewHandle,
+            width,
+            height,
+            colorLoadOps,
+            colorStoreOps,
+            colorClearColors,
+            depthLoadOp,
+            depthStoreOp,
+            depthClearValue
+        );
     }
 
     private static VulkanTextureView requireVulkanTextureView(VulkanicTextureView view, String fieldName) {
@@ -5007,6 +5266,23 @@ void main() {
         ResolvedFramebufferTargets resolvedTargets = resolveFramebufferTargets(framebuffer);
 
         ensureNativeReady("beginRenderPass(framebuffer)");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        spine.beginFramebufferRenderPass(commandBufferHandle, resolvedTargets);
+        return new VulkanBackedRenderPass(spine, commandBufferHandle);
+    }
+
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("beginRenderPass(renderTargetDescriptor)", ctx);
+        ResolvedFramebufferTargets resolvedTargets = resolveRenderTargetDescriptor(descriptor);
+
+        ensureNativeReady("beginRenderPass(renderTargetDescriptor)");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
@@ -14569,7 +14845,9 @@ void main() {
             long framebufferHandle = VK10.VK_NULL_HANDLE;
             try (MemoryStack stack = stackPush()) {
                 int attachmentCount = targets.hasDepthTarget() ? 2 : 1;
-                VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.calloc(attachmentCount, stack);
+	                VkAttachmentDescription.Buffer attachments = attachmentCount == 0
+	                    ? null
+	                    : VkAttachmentDescription.calloc(attachmentCount, stack);
                 boolean swapchainColorAttachment = isSwapchainImageViewHandle(colorView.getVkImageViewHandle());
                 int swapchainColorImageIndex = swapchainColorAttachment
                     ? swapchainImageIndexForViewHandle(colorView.getVkImageViewHandle())
@@ -14734,7 +15012,7 @@ void main() {
                 // in the same subpass may sample from the current attachment.
                 boolean needsFeedbackDep = (!swapchainColorAttachment && legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable)
                     || (legacyDepthTexture != null && legacyDepthTexture.feedbackLoopCapable);
-                int dependencyCount = needsFeedbackDep ? 2 : 1;
+                int dependencyCount = needsFeedbackDep ? 3 : 2;
                 VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(dependencyCount, stack);
                 dependencies.get(0)
                     .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
@@ -14747,11 +15025,23 @@ void main() {
                         | VK10.VK_ACCESS_SHADER_READ_BIT)
                     .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
                         | VK10.VK_ACCESS_SHADER_READ_BIT);
+                dependencies.get(1)
+                    .srcSubpass(0)
+                    .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT)
+                    .dstStageMask(swapchainColorAttachment
+                        ? VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+                        : VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
+                    .dstAccessMask(swapchainColorAttachment ? 0 : VK10.VK_ACCESS_SHADER_READ_BIT);
                 if (needsFeedbackDep) {
                     // Self-dependency required by VK_EXT_attachment_feedback_loop_layout spec.
                     // Without this, the driver won't guarantee read-after-write ordering for
                     // ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT layout accesses.
-                    dependencies.get(1)
+                    dependencies.get(2)
                         .srcSubpass(0)
                         .dstSubpass(0)
                         .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
@@ -14926,19 +15216,21 @@ void main() {
                     attachments.get(colorIndex)
                         .format(colorTexture.vkFormat)
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
-                        .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_LOAD)
-                        .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
+                        .loadOp(toVkLoadOp(targets.colorLoadOp(colorIndex)))
+                        .storeOp(toVkStoreOp(targets.colorStoreOp(colorIndex)))
                         .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                         .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
                         .initialLayout(initialLayout)
                         .finalLayout(colorFinalLayout);
                 }
 
-                VkAttachmentReference.Buffer colorReferences = VkAttachmentReference.calloc(colorAttachmentCount, stack);
-                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
-                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
-                    int colorSubpassLayout = colorTexture.feedbackLoopCapable
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                VkAttachmentReference.Buffer colorReferences = colorAttachmentCount == 0
+	                    ? null
+	                    : VkAttachmentReference.calloc(colorAttachmentCount, stack);
+	                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+	                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
+	                    int colorSubpassLayout = colorTexture.feedbackLoopCapable
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                         : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     colorReferences.get(colorIndex)
                         .attachment(colorIndex)
@@ -14964,8 +15256,8 @@ void main() {
                     attachments.get(depthAttachmentIndex)
                         .format(depthTexture.vkFormat)
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
-                        .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_LOAD)
-                        .storeOp(VK10.VK_ATTACHMENT_STORE_OP_STORE)
+                        .loadOp(toVkLoadOp(targets.depthLoadOp()))
+                        .storeOp(toVkStoreOp(targets.depthStoreOp()))
                         .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                         .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
                         .initialLayout(depthInitialLayout2)
@@ -14982,32 +15274,75 @@ void main() {
                     .pColorAttachments(colorReferences)
                     .pDepthStencilAttachment(depthReference);
 
-                // Base external→subpass dependency + optional feedback loop self-dependency.
+                // Base external→subpass and subpass→external dependencies plus optional feedback loop self-dependency.
                 boolean hasFeedbackLoop = targets.colorTextures.stream().anyMatch(t -> t.feedbackLoopCapable)
                     || (targets.hasDepthTarget() && targets.depthTexture.feedbackLoopCapable);
-                int dependencyCount2 = hasFeedbackLoop ? 2 : 1;
+                int dependencyCount2 = hasFeedbackLoop ? 3 : 2;
                 VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(dependencyCount2, stack);
-                dependencies.get(0)
-                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
-                    .dstSubpass(0)
-                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                    .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_SHADER_READ_BIT)
-                    .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_SHADER_READ_BIT);
-                if (hasFeedbackLoop) {
-                    dependencies.get(1)
-                        .srcSubpass(0)
-                        .dstSubpass(0)
-                        .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                        .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
-                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
-                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
-                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
+	                int srcStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	                int dstStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	                int srcAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
+	                int dstAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
+	                if (colorAttachmentCount > 0) {
+	                    srcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	                    dstStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	                    srcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	                    dstAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	                }
+	                if (targets.hasDepthTarget()) {
+	                    srcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	                    dstStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	                    srcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	                    dstAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	                }
+	                dependencies.get(0)
+	                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
+	                    .dstSubpass(0)
+	                    .srcStageMask(srcStageMask)
+	                    .dstStageMask(dstStageMask)
+	                    .srcAccessMask(srcAccessMask)
+	                    .dstAccessMask(dstAccessMask);
+	                int exitSrcStageMask = 0;
+	                int exitSrcAccessMask = 0;
+	                if (colorAttachmentCount > 0) {
+	                    exitSrcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	                    exitSrcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	                }
+	                if (targets.hasDepthTarget()) {
+	                    exitSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	                    exitSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	                }
+	                dependencies.get(1)
+	                    .srcSubpass(0)
+	                    .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
+	                    .srcStageMask(exitSrcStageMask)
+	                    .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+	                    .srcAccessMask(exitSrcAccessMask)
+	                    .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT);
+	                if (hasFeedbackLoop) {
+	                    int feedbackSrcStageMask = 0;
+	                    int feedbackSrcAccessMask = 0;
+	                    if (colorAttachmentCount > 0) {
+	                        feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	                        feedbackSrcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	                    }
+	                    if (targets.hasDepthTarget()) {
+	                        feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+	                            | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	                        feedbackSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	                    }
+	                    dependencies.get(2)
+	                        .srcSubpass(0)
+	                        .dstSubpass(0)
+	                        .srcStageMask(feedbackSrcStageMask)
+	                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+	                        .srcAccessMask(feedbackSrcAccessMask)
+	                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
+	                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
+	                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
                 }
 
                 // Build a stable typed cache key from the render pass configuration. For
@@ -15067,12 +15402,14 @@ void main() {
                     );
                 }
 
-                java.nio.LongBuffer pAttachments = stack.mallocLong(attachmentCount);
-                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
-                    pAttachments.put(colorIndex, targets.colorViewHandles.get(colorIndex));
-                }
-                if (targets.hasDepthTarget()) {
-                    pAttachments.put(colorAttachmentCount, targets.depthViewHandle);
+	                java.nio.LongBuffer pAttachments = attachmentCount == 0
+	                    ? null
+	                    : stack.mallocLong(attachmentCount);
+	                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+	                    pAttachments.put(colorIndex, targets.colorViewHandles.get(colorIndex));
+	                }
+	                if (targets.hasDepthTarget()) {
+	                    pAttachments.put(colorAttachmentCount, targets.depthViewHandle);
                 }
 
                 VkFramebufferCreateInfo framebufferCreateInfo = VkFramebufferCreateInfo.calloc(stack)
@@ -15090,7 +15427,25 @@ void main() {
                 );
                 framebufferHandle = pFramebuffer.get(0);
 
-                VkClearValue.Buffer clearValues = VkClearValue.calloc(attachmentCount, stack);
+	                VkClearValue.Buffer clearValues = attachmentCount == 0
+	                    ? null
+	                    : VkClearValue.calloc(attachmentCount, stack);
+	                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+	                    OptionalInt clearColor = targets.colorClearColor(colorIndex);
+	                    if (clearColor.isPresent()) {
+                        int argb = clearColor.getAsInt();
+                        clearValues.get(colorIndex).color().float32(0, ((argb >> 16) & 0xFF) / 255.0f);
+                        clearValues.get(colorIndex).color().float32(1, ((argb >> 8) & 0xFF) / 255.0f);
+                        clearValues.get(colorIndex).color().float32(2, (argb & 0xFF) / 255.0f);
+                        clearValues.get(colorIndex).color().float32(3, ((argb >>> 24) & 0xFF) / 255.0f);
+                    }
+                }
+                if (targets.hasDepthTarget() && targets.depthClearValue().isPresent()) {
+                    clearValues.get(colorAttachmentCount)
+                        .depthStencil()
+                        .depth((float) targets.depthClearValue().getAsDouble())
+                        .stencil(0);
+                }
                 VkRenderPassBeginInfo beginInfo = VkRenderPassBeginInfo.calloc(stack)
                     .sType$Default()
                     .renderPass(renderPassHandle)
@@ -15654,22 +16009,17 @@ void main() {
             Objects.requireNonNull(descriptor, "descriptor must not be null");
             if (logicalDevice == null) {
                 throw new IllegalStateException("Cannot create pipeline: Vulkan logical device is unavailable.");
-            }
-            Objects.requireNonNull(colorFormats, "colorFormats must not be null");
-            if (colorFormats.isEmpty()) {
-                throw new IllegalArgumentException("Cannot create Vulkan pipeline without at least one color attachment format");
-            }
-            for (int colorFormat : colorFormats) {
-                if (colorFormat == VK10.VK_FORMAT_UNDEFINED) {
-                    throw new IllegalArgumentException("Cannot create Vulkan pipeline with VK_FORMAT_UNDEFINED color attachment format");
-                }
-            }
+	            }
+	            Objects.requireNonNull(colorFormats, "colorFormats must not be null");
+	            for (int colorFormat : colorFormats) {
+	                if (colorFormat == VK10.VK_FORMAT_UNDEFINED) {
+	                    throw new IllegalArgumentException("Cannot create Vulkan pipeline with VK_FORMAT_UNDEFINED color attachment format");
+	                }
+	            }
 
             PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
-            boolean includeDepth = depthFormat != VK10.VK_FORMAT_UNDEFINED
-                || portableState.depthTestFunction() != DepthTestFunction.NO_DEPTH_TEST
-                || portableState.writeDepth();
-            int pipelineDepthFormat = depthFormat != VK10.VK_FORMAT_UNDEFINED ? depthFormat : VK10.VK_FORMAT_D32_SFLOAT;
+	            boolean includeDepth = depthFormat != VK10.VK_FORMAT_UNDEFINED;
+	            int pipelineDepthFormat = depthFormat != VK10.VK_FORMAT_UNDEFINED ? depthFormat : VK10.VK_FORMAT_D32_SFLOAT;
 
             try (MemoryStack stack = stackPush()) {
 
@@ -15859,25 +16209,26 @@ void main() {
                     colorWriteMask |= VK10.VK_COLOR_COMPONENT_A_BIT;
                 }
 
-                VkPipelineColorBlendAttachmentState.Buffer colorBlendAttachment =
-                    VkPipelineColorBlendAttachmentState.calloc(colorFormats.size(), stack);
-                for (int colorIndex = 0; colorIndex < colorFormats.size(); colorIndex++) {
-                    java.util.Optional<PipelineDescriptor.BlendState> blendState =
-                        backend.blendStateForAttachment(portableState, colorIndex);
-                    colorBlendAttachment.get(colorIndex)
-                        .colorWriteMask(colorWriteMask)
-                        .blendEnable(blendState.isPresent());
-                    if (blendState.isPresent()) {
-                        PipelineDescriptor.BlendState blend = blendState.get();
-                        colorBlendAttachment.get(colorIndex)
-                            .srcColorBlendFactor(toVkBlendFactor(blend.sourceColor()))
-                            .dstColorBlendFactor(toVkBlendFactor(blend.destColor()))
-                            .colorBlendOp(VK10.VK_BLEND_OP_ADD)
-                            .srcAlphaBlendFactor(toVkBlendFactor(blend.sourceAlpha()))
-                            .dstAlphaBlendFactor(toVkBlendFactor(blend.destAlpha()))
-                            .alphaBlendOp(VK10.VK_BLEND_OP_ADD);
-                    }
-                }
+	                VkPipelineColorBlendAttachmentState.Buffer colorBlendAttachment = colorFormats.isEmpty()
+	                    ? null
+	                    : VkPipelineColorBlendAttachmentState.calloc(colorFormats.size(), stack);
+	                for (int colorIndex = 0; colorIndex < colorFormats.size(); colorIndex++) {
+	                    java.util.Optional<PipelineDescriptor.BlendState> blendState =
+	                        backend.blendStateForAttachment(portableState, colorIndex);
+	                    colorBlendAttachment.get(colorIndex)
+	                        .colorWriteMask(colorWriteMask)
+	                        .blendEnable(blendState.isPresent());
+	                    if (blendState.isPresent()) {
+	                        PipelineDescriptor.BlendState blend = blendState.get();
+	                        colorBlendAttachment.get(colorIndex)
+	                            .srcColorBlendFactor(toVkBlendFactor(blend.sourceColor()))
+	                            .dstColorBlendFactor(toVkBlendFactor(blend.destColor()))
+	                            .colorBlendOp(VK10.VK_BLEND_OP_ADD)
+	                            .srcAlphaBlendFactor(toVkBlendFactor(blend.sourceAlpha()))
+	                            .dstAlphaBlendFactor(toVkBlendFactor(blend.destAlpha()))
+	                            .alphaBlendOp(VK10.VK_BLEND_OP_ADD);
+	                    }
+	                }
 
                 boolean logicOpEnabled = portableState.colorLogic() != LogicOp.NONE;
                 VkPipelineColorBlendStateCreateInfo colorBlending =
@@ -16036,13 +16387,13 @@ void main() {
             boolean feedbackLoopCompatible,
             boolean swapchainPresentCompatible
         ) {
-            Objects.requireNonNull(colorFormats, "colorFormats must not be null");
-            if (colorFormats.isEmpty()) {
-                throw new IllegalArgumentException("Pipeline-compatible render pass requires at least one color attachment");
-            }
-            if (includeDepth && depthFormat == VK10.VK_FORMAT_UNDEFINED) {
-                throw new IllegalArgumentException("Depth-enabled pipeline-compatible render pass requires a defined depth format");
-            }
+	            Objects.requireNonNull(colorFormats, "colorFormats must not be null");
+	            if (includeDepth && depthFormat == VK10.VK_FORMAT_UNDEFINED) {
+	                throw new IllegalArgumentException("Depth-enabled pipeline-compatible render pass requires a defined depth format");
+	            }
+	            if (swapchainPresentCompatible && colorFormats.isEmpty()) {
+	                throw new IllegalArgumentException("Swapchain-present-compatible render pass requires a color attachment");
+	            }
 
             if (feedbackLoopCompatible && swapchainPresentCompatible) {
                 throw new IllegalArgumentException("A pipeline-compatible render pass cannot be both feedback-loop and swapchain-present compatible");
@@ -16064,8 +16415,9 @@ void main() {
             int colorAttachmentCount = colorFormats.size();
             int attachmentCount = colorAttachmentCount + (includeDepth ? 1 : 0);
 
-            VkAttachmentDescription.Buffer attachments =
-                VkAttachmentDescription.calloc(attachmentCount, stack);
+	            VkAttachmentDescription.Buffer attachments = attachmentCount == 0
+	                ? null
+	                : VkAttachmentDescription.calloc(attachmentCount, stack);
             for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
                 attachments.get(colorIndex)
                     .format(colorFormats.get(colorIndex))
@@ -16078,12 +16430,14 @@ void main() {
                     .finalLayout(colorAttachmentImageLayout);
             }
 
-            VkAttachmentReference.Buffer colorRef = VkAttachmentReference.calloc(colorAttachmentCount, stack);
-            for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
-                colorRef.get(colorIndex)
-                    .attachment(colorIndex)
-                    .layout(colorAttachmentRefLayout);
-            }
+	            VkAttachmentReference.Buffer colorRef = colorAttachmentCount == 0
+	                ? null
+	                : VkAttachmentReference.calloc(colorAttachmentCount, stack);
+	            for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+	                colorRef.get(colorIndex)
+	                    .attachment(colorIndex)
+	                    .layout(colorAttachmentRefLayout);
+	            }
 
             VkAttachmentReference depthRef = null;
             if (includeDepth) {
@@ -16104,9 +16458,9 @@ void main() {
             VkSubpassDescription.Buffer subpass = VkSubpassDescription.calloc(1, stack);
             subpass.get(0)
                 .pipelineBindPoint(VK10.VK_PIPELINE_BIND_POINT_GRAPHICS)
-                .colorAttachmentCount(colorAttachmentCount)
-                .pColorAttachments(colorRef)
-                .pDepthStencilAttachment(depthRef);
+	                .colorAttachmentCount(colorAttachmentCount)
+	                .pColorAttachments(colorRef)
+	                .pDepthStencilAttachment(depthRef);
 
             int placeholderDependencyCount = feedbackLoopCompatible || swapchainPresentCompatible ? 2 : 1;
             VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(placeholderDependencyCount, stack);
@@ -16126,27 +16480,52 @@ void main() {
                     .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
                     .dstAccessMask(0);
             } else {
-                dependencies.get(0)
-                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
-                    .dstSubpass(0)
-                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                    .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_SHADER_READ_BIT)
-                    .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_SHADER_READ_BIT);
-                if (feedbackLoopCompatible) {
-                    dependencies.get(1)
-                        .srcSubpass(0)
-                        .dstSubpass(0)
-                        .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                        .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
-                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
-                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
-                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
+	                int srcStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	                int dstStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	                int srcAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
+	                int dstAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
+	                if (colorAttachmentCount > 0) {
+	                    srcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	                    dstStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	                    srcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	                    dstAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	                }
+	                if (includeDepth) {
+	                    srcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	                    dstStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	                    srcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	                    dstAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	                }
+	                dependencies.get(0)
+	                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
+	                    .dstSubpass(0)
+	                    .srcStageMask(srcStageMask)
+	                    .dstStageMask(dstStageMask)
+	                    .srcAccessMask(srcAccessMask)
+	                    .dstAccessMask(dstAccessMask);
+	                if (feedbackLoopCompatible) {
+	                    int feedbackSrcStageMask = 0;
+	                    int feedbackSrcAccessMask = 0;
+	                    if (colorAttachmentCount > 0) {
+	                        feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	                        feedbackSrcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	                    }
+	                    if (includeDepth) {
+	                        feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+	                            | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	                        feedbackSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	                    }
+	                    dependencies.get(1)
+	                        .srcSubpass(0)
+	                        .dstSubpass(0)
+	                        .srcStageMask(feedbackSrcStageMask)
+	                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+	                        .srcAccessMask(feedbackSrcAccessMask)
+	                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
+	                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
+	                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
                 }
             }
 

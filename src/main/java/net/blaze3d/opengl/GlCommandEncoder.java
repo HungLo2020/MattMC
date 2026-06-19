@@ -41,6 +41,7 @@ import net.vulkanic.VulkanicLogicOp;
 import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicBufferTarget;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureTarget;
 import org.jetbrains.annotations.Nullable;
@@ -217,6 +218,27 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		return new GlRenderPass(this, hasDepthTexture, framebuffer);
+	}
+
+	@Override
+	public RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
+		if (this.inRenderPass) {
+			throw new IllegalStateException("Close the existing render pass before creating a new one!");
+		}
+
+		this.inRenderPass = true;
+		this.device.debugLabels().pushDebugGroup(descriptor.label());
+		this.lastPipeline = null;
+
+		CommandContext ctx = commandContext();
+		if (ctx.isImmediate()) {
+			throw new UnsupportedOperationException("Descriptor-backed GlCommandEncoder render passes require a recorded Vulkan command context");
+		}
+
+		CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
+		this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(renderPassCtx, descriptor);
+		this.activeRenderPassContext = renderPassCtx;
+		return new GlRenderPass(this, descriptor.hasDepthAttachment(), 0, descriptor);
 	}
 
 	/**
@@ -414,6 +436,17 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 
 		return null;
+	}
+
+	private static String describeSpirvModules(java.util.List<net.vulkanic.VulkanicSpirvModule> modules) {
+		if (modules.isEmpty()) {
+			return "[]";
+		}
+
+		return modules.stream()
+			.map(module -> module.stage() + ":" + module.sourceName() + ":" + module.byteSize())
+			.toList()
+			.toString();
 	}
 
 	private static void logSharedChunkLiveDescriptorSelection(
@@ -1725,6 +1758,19 @@ public class GlCommandEncoder implements CommandEncoder {
 						customPass.program()
 					);
 					if (!submission.completeCoverage()) {
+						if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_CUSTOM_PASS_BIND_LOGS < 80) {
+							DEBUG_CUSTOM_PASS_BIND_LOGS++;
+							LOGGER.info(
+								"Vulkan customPass skip#{} pipeline={} framebuffer={} descriptorTarget={} programId={} baseLayoutBindings={} submissionBindings={} missingCoverage=true",
+								DEBUG_CUSTOM_PASS_BIND_LOGS,
+								renderPipeline.getLocation(),
+								glRenderPass.getFramebuffer(),
+								glRenderPass.getRenderTargetDescriptor() != null,
+								customPass.program().getProgramId(),
+								customPipelineDescriptor.getResourceLayout().bindings().size(),
+								submission.boundResourceCount()
+							);
+						}
 						if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
 							LOGGER.info(
 								"CompositePassStandaloneLookupTrace stage=skip pipeline={} framebuffer={} programId={} boundResourceCount={} reflectedResourceCount={}",
@@ -1765,11 +1811,17 @@ public class GlCommandEncoder implements CommandEncoder {
 					boolean resolvedPipelineHandle = customPipelineHandle != null && customPipelineHandle.isValid();
 					if (DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_CUSTOM_PASS_BIND_LOGS < 40) {
 						DEBUG_CUSTOM_PASS_BIND_LOGS++;
+						java.util.List<net.vulkanic.VulkanicSpirvModule> programModules =
+							VulkanicAPI.getLinkedProgramSpirvModules(ctx, customPass.program().getProgramId());
 						LOGGER.info(
-							"Vulkan customPass bind#{} pipeline={} framebuffer={} baseLayoutBindings={} submissionBindings={} completeCoverage={} variantLayout={} resolvedPipelineHandle={}",
+							"Vulkan customPass bind#{} pipeline={} framebuffer={} descriptorTarget={} programId={} linkedProgramModules={} descriptorModules={} baseLayoutBindings={} submissionBindings={} completeCoverage={} variantLayout={} resolvedPipelineHandle={}",
 							DEBUG_CUSTOM_PASS_BIND_LOGS,
 							renderPipeline.getLocation(),
 							glRenderPass.getFramebuffer(),
+							glRenderPass.getRenderTargetDescriptor() != null,
+							customPass.program().getProgramId(),
+							describeSpirvModules(programModules),
+							describeSpirvModules(submission.descriptor().getSpirvModules()),
 							customPipelineDescriptor.getResourceLayout().bindings().size(),
 							submission.boundResourceCount(),
 							submission.completeCoverage(),
@@ -1945,15 +1997,23 @@ public class GlCommandEncoder implements CommandEncoder {
 			if (ctx.isImmediate()) {
 				pipelineHandle = new net.vulkanic.backends.opengl.OpenGLPipelineHandle(glRenderPass.pipeline);
 			} else {
-				boolean useFramebufferCompatiblePipeline = glRenderPass.getFramebuffer() != 0;
-				pipelineHandle = useFramebufferCompatiblePipeline
+				VulkanicRenderTargetDescriptor renderTargetDescriptor = glRenderPass.getRenderTargetDescriptor();
+				boolean useDescriptorCompatiblePipeline = renderTargetDescriptor != null;
+				boolean useFramebufferCompatiblePipeline = !useDescriptorCompatiblePipeline && glRenderPass.getFramebuffer() != 0;
+				pipelineHandle = useDescriptorCompatiblePipeline
 					? VulkanicAPI.resolvePipelineHandle(
+						glRenderPass.pipeline.info(),
+						submissionDescriptor,
+						renderTargetDescriptor
+					)
+					: useFramebufferCompatiblePipeline
+						? VulkanicAPI.resolvePipelineHandle(
 						glRenderPass.pipeline.info(),
 						submissionDescriptor,
 						glRenderPass.getFramebuffer()
 					)
-					: VulkanicAPI.resolvePipelineHandle(
-						glRenderPass.pipeline.info(), submissionDescriptor);
+						: VulkanicAPI.resolvePipelineHandle(
+							glRenderPass.pipeline.info(), submissionDescriptor);
 				if (pipelineHandle == null && selectedLiveDescriptor) {
 					fallbackReason = fallbackReason.isEmpty()
 						? "live pipeline handle resolution failed"
@@ -1963,14 +2023,20 @@ public class GlCommandEncoder implements CommandEncoder {
 					submission = this.buildPipelineResourceBindings(glRenderPass, baseDescriptor);
 					if (submission != null) {
 						submissionDescriptor = submission.descriptor();
-						pipelineHandle = useFramebufferCompatiblePipeline
+						pipelineHandle = useDescriptorCompatiblePipeline
 							? VulkanicAPI.resolvePipelineHandle(
+								glRenderPass.pipeline.info(),
+								submissionDescriptor,
+								renderTargetDescriptor
+							)
+							: useFramebufferCompatiblePipeline
+								? VulkanicAPI.resolvePipelineHandle(
 								glRenderPass.pipeline.info(),
 								submissionDescriptor,
 								glRenderPass.getFramebuffer()
 							)
-							: VulkanicAPI.resolvePipelineHandle(
-								glRenderPass.pipeline.info(), submissionDescriptor);
+								: VulkanicAPI.resolvePipelineHandle(
+									glRenderPass.pipeline.info(), submissionDescriptor);
 					}
 				}
 				if (submission != null) {

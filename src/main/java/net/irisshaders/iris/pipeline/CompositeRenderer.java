@@ -187,6 +187,11 @@ public class CompositeRenderer {
 			});
 
 			pass.drawBuffers = directives.getDrawBuffers();
+			if (passWidth <= 0 || passHeight <= 0) {
+				net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+				passWidth = main.width;
+				passHeight = main.height;
+			}
 			pass.viewWidth = passWidth;
 			pass.viewHeight = passHeight;
 			pass.stageReadsFromAlt = flipped;
@@ -265,6 +270,11 @@ public class CompositeRenderer {
 				passWidth = target.getWidth();
 				passHeight = target.getHeight();
 			}
+			if (passWidth <= 0 || passHeight <= 0) {
+				net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+				passWidth = main.width;
+				passHeight = main.height;
+			}
 			renderTargets.destroyFramebuffer(pass.framebuffer);
 			pass.framebuffer = renderTargets.createColorFramebuffer(pass.stageReadsFromAlt, pass.drawBuffers);
 			pass.viewWidth = passWidth;
@@ -316,11 +326,7 @@ public class CompositeRenderer {
 
 			compositePass.ensurePipelineState();
 
-			try (RenderPass renderPass = VulkanicAPI.createRenderPass(
-				() -> "Composites",
-				compositePass.framebuffer.getId(),
-				compositePass.framebuffer.hasDepthAttachment()
-			)) {
+			try (RenderPass renderPass = compositePass.createRenderPass(() -> "Composites")) {
 				renderPass.setPipeline(COMPOSITE_PIPELINE);
 				VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setIndexBuffer(indices, type);
@@ -535,6 +541,18 @@ public class CompositeRenderer {
 			this.pipelineLayoutVariants.clear();
 		}
 
+		private net.vulkanic.VulkanicRenderTargetDescriptor renderTargetDescriptor() {
+			return this.framebuffer.createRenderTargetDescriptor(() -> this.name, this.viewWidth, this.viewHeight);
+		}
+
+		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor) {
+			return VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+		}
+
+		private RenderPass createRenderPass(Supplier<String> label) {
+			return VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment());
+		}
+
 		private void ensurePipelineState() {
 			var ctx = VulkanicAPI.getCommandContext();
 			if (ctx.isImmediate()) {
@@ -558,7 +576,7 @@ public class CompositeRenderer {
 			}
 
 			this.pipelineDescriptor = descriptor;
-			this.pipelineHandle = VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+			this.pipelineHandle = this.createCompatiblePipeline(descriptor);
 			if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
 				boolean descriptorHasStandaloneBlock = descriptor.getResourceLayout().bindings().stream()
 					.anyMatch(binding -> VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name()));
@@ -644,7 +662,7 @@ public class CompositeRenderer {
 				pipelineVariant.close();
 			}
 
-			PipelineHandle createdVariant = VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+			PipelineHandle createdVariant = this.createCompatiblePipeline(descriptor);
 			this.pipelineLayoutVariants.put(descriptor.getResourceLayout(), createdVariant);
 			return createdVariant;
 		}

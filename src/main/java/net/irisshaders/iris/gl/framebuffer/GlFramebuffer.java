@@ -7,12 +7,23 @@ import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicIntegerQuery;
+import net.vulkanic.VulkanicRenderPassDescriptor;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.function.Supplier;
 
 public class GlFramebuffer extends GlResource {
 	private final Int2IntMap attachments;
 	private final int maxDrawBuffers;
 	private final int maxColorAttachments;
 	private boolean hasDepthAttachment;
+	private int depthAttachmentTexture;
+	private int[] drawBuffers;
 
 	public GlFramebuffer() {
 		super(IrisRenderSystem.createFramebuffer());
@@ -21,6 +32,8 @@ public class GlFramebuffer extends GlResource {
 		this.maxDrawBuffers = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_DRAW_BUFFERS);
 		this.maxColorAttachments = VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_COLOR_ATTACHMENTS);
 		this.hasDepthAttachment = false;
+		this.depthAttachmentTexture = 0;
+		this.drawBuffers = new int[0];
 	}
 
 	public void addDepthAttachment(GpuTexture texture) {
@@ -34,6 +47,7 @@ public class GlFramebuffer extends GlResource {
 		//}
 
 		this.hasDepthAttachment = true;
+		this.depthAttachmentTexture = net.vulkanic.VulkanicCoreAPI.textureId(texture);
 	}
 
 	public void addDepthAttachmentBypass(int texture) {
@@ -42,6 +56,7 @@ public class GlFramebuffer extends GlResource {
 		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_DEPTH_ATTACHMENT, texture, 0);
 
 		this.hasDepthAttachment = true;
+		this.depthAttachmentTexture = texture;
 	}
 
 	public void addColorAttachment(int index, int texture) {
@@ -53,6 +68,7 @@ public class GlFramebuffer extends GlResource {
 
 	public void noDrawBuffers() {
 		IrisRenderSystem.drawBuffers(getGlId(), new int[]{VulkanicAPI.GL_NONE});
+		this.drawBuffers = new int[]{VulkanicAPI.GL_NONE};
 	}
 
 	public void drawBuffers(int[] buffers) {
@@ -72,6 +88,7 @@ public class GlFramebuffer extends GlResource {
 		}
 
 		IrisRenderSystem.drawBuffers(getGlId(), glBuffers);
+		this.drawBuffers = Arrays.copyOf(buffers, buffers.length);
 	}
 
 	public void readBuffer(int buffer) {
@@ -84,6 +101,45 @@ public class GlFramebuffer extends GlResource {
 
 	public boolean hasDepthAttachment() {
 		return hasDepthAttachment;
+	}
+
+	public VulkanicRenderTargetDescriptor createRenderTargetDescriptor(Supplier<String> label) {
+		return createRenderTargetDescriptor(label, -1, -1);
+	}
+
+	public VulkanicRenderTargetDescriptor createRenderTargetDescriptor(Supplier<String> label, int width, int height) {
+		int[] activeDrawBuffers = this.drawBuffers.length > 0 ? this.drawBuffers : new int[]{0};
+		List<VulkanicRenderTargetDescriptor.ColorAttachment> colors = new ArrayList<>(activeDrawBuffers.length);
+		for (int drawBuffer : activeDrawBuffers) {
+			if (drawBuffer == VulkanicAPI.GL_NONE) {
+				continue;
+			}
+			int texture = attachments.get(drawBuffer);
+			if (texture <= 0) {
+				throw new IllegalStateException("Iris framebuffer draw buffer " + drawBuffer + " has no color attachment");
+			}
+			colors.add(new VulkanicRenderTargetDescriptor.ColorAttachment(
+				texture,
+				VulkanicRenderPassDescriptor.LoadOp.LOAD,
+				VulkanicRenderPassDescriptor.StoreOp.STORE,
+				OptionalInt.empty()
+			));
+		}
+
+		VulkanicRenderTargetDescriptor.DepthAttachment depth = null;
+		if (hasDepthAttachment) {
+			if (depthAttachmentTexture <= 0) {
+				throw new IllegalStateException("Iris framebuffer has depth enabled but no depth texture");
+			}
+			depth = new VulkanicRenderTargetDescriptor.DepthAttachment(
+				depthAttachmentTexture,
+				VulkanicRenderPassDescriptor.LoadOp.LOAD,
+				VulkanicRenderPassDescriptor.StoreOp.STORE,
+				OptionalDouble.empty()
+			);
+		}
+
+		return new VulkanicRenderTargetDescriptor(label, colors, depth, width, height);
 	}
 
 	public void bind() {

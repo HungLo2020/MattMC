@@ -79,11 +79,26 @@ public class VulkanImageStateTrackerTest {
         );
         VulkanRenderPassKey key = VulkanRenderPassKey.framebuffer(List.of(color), null, false);
 
-        assertEquals(List.of(color), key.colorAttachments());
-        assertNull(key.depthAttachment());
-        assertFalse(key.feedbackLoop());
-        assertThrows(IllegalArgumentException.class, () -> VulkanRenderPassKey.framebuffer(List.of(), null, false));
-    }
+	        assertEquals(List.of(color), key.colorAttachments());
+	        assertNull(key.depthAttachment());
+	        assertFalse(key.feedbackLoop());
+	        VulkanRenderPassKey attachmentlessKey = VulkanRenderPassKey.framebuffer(List.of(), null, false);
+	        assertTrue(attachmentlessKey.colorAttachments().isEmpty());
+	        assertNull(attachmentlessKey.depthAttachment());
+
+	        VulkanRenderPassKey.Attachment depth = new VulkanRenderPassKey.Attachment(
+	            VK10.VK_FORMAT_D32_SFLOAT,
+	            VK10.VK_ATTACHMENT_LOAD_OP_LOAD,
+	            VK10.VK_ATTACHMENT_STORE_OP_STORE,
+	            VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	            VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+	            VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	        );
+	        VulkanRenderPassKey depthOnlyKey = VulkanRenderPassKey.framebuffer(List.of(), depth, false);
+
+	        assertTrue(depthOnlyKey.colorAttachments().isEmpty());
+	        assertEquals(depth, depthOnlyKey.depthAttachment());
+	    }
 
     @Test
     public void testImageUseMapsKnownLayouts() {

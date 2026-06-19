@@ -10,9 +10,6 @@ record VulkanRenderPassKey(
 ) {
     VulkanRenderPassKey {
         colorAttachments = List.copyOf(colorAttachments);
-        if (colorAttachments.isEmpty()) {
-            throw new IllegalArgumentException("Render pass key requires at least one color attachment");
-        }
         if (feedbackLoop && swapchainPresentCompatible) {
             throw new IllegalArgumentException("A render pass key cannot be both feedback-loop and swapchain-present compatible");
         }
