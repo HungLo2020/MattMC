@@ -5410,8 +5410,9 @@ public class Phase3DrawPathTest {
             "Render-target pipeline resolution should include portable blend ownership when deriving blend cache keys");
         assertTrue(source.contains("if (portableState.blendState().isPresent()) {\n                key.append(\"portable\");"),
             "Portable pipeline blend state should not be overridden by stale legacy indexed blend state");
-        assertTrue(source.contains("backend.blendStateForAttachment(portableState, colorIndex)"),
-            "Vulkan pipeline creation should apply blend state independently for each color attachment");
+        assertTrue(source.contains("VulkanPipelineState.from(")
+                && source.contains("backend::blendStateForAttachment"),
+            "Vulkan pipeline creation should apply blend state independently for each color attachment through the shared state translator");
         assertTrue(source.contains("targets.colorFormats(),"),
             "Render-target pipeline resolution should key variants from the current resolved framebuffer color formats");
         assertTrue(source.contains("targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED"),

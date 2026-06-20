@@ -114,9 +114,7 @@ import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import org.lwjgl.vulkan.VkRect2D;
 import org.lwjgl.vulkan.VkViewport;
 import org.lwjgl.vulkan.VkWriteDescriptorSet;
-import net.blaze3d.platform.DepthTestFunction;
 import net.blaze3d.platform.DestFactor;
-import net.blaze3d.platform.LogicOp;
 import net.blaze3d.platform.PolygonMode;
 import net.blaze3d.platform.SourceFactor;
 import net.blaze3d.vertex.VertexFormat;
@@ -16162,21 +16160,26 @@ void main() {
                         .viewportCount(1)
                         .scissorCount(1);
 
+                VulkanPipelineState pipelineState = VulkanPipelineState.from(
+                    portableState,
+                    colorFormats.size(),
+                    mode -> toVkPolygonMode(mode, portableState.location().toString()),
+                    backend::blendStateForAttachment
+                );
+
                 // --- 7. Rasterization ---
-                boolean hasBias = portableState.depthBiasConstant() != 0.0f
-                    || portableState.depthBiasScaleFactor() != 0.0f;
                 VkPipelineRasterizationStateCreateInfo rasterizer =
                     VkPipelineRasterizationStateCreateInfo.calloc(stack)
                         .sType$Default()
                         .depthClampEnable(false)
                         .rasterizerDiscardEnable(false)
-                        .polygonMode(toVkPolygonMode(portableState.polygonMode(), portableState.location().toString()))
+                        .polygonMode(pipelineState.polygonMode())
                         .lineWidth(1.0f)
-                        .cullMode(VK10.VK_CULL_MODE_NONE)
-                        .frontFace(VK10.VK_FRONT_FACE_CLOCKWISE)
-                        .depthBiasEnable(hasBias)
-                        .depthBiasConstantFactor(portableState.depthBiasConstant())
-                        .depthBiasSlopeFactor(portableState.depthBiasScaleFactor())
+                        .cullMode(pipelineState.cullMode())
+                        .frontFace(pipelineState.frontFace())
+                        .depthBiasEnable(pipelineState.depthBiasEnabled())
+                        .depthBiasConstantFactor(pipelineState.depthBiasConstantFactor())
+                        .depthBiasSlopeFactor(pipelineState.depthBiasSlopeFactor())
                         .depthBiasClamp(0.0f);
 
                 // --- 8. Multisample ---
@@ -16187,55 +16190,38 @@ void main() {
                         .rasterizationSamples(VK10.VK_SAMPLE_COUNT_1_BIT);
 
                 // --- 9. Depth/stencil ---
-                boolean depthTestEnabled =
-                    portableState.depthTestFunction() != DepthTestFunction.NO_DEPTH_TEST;
                 VkPipelineDepthStencilStateCreateInfo depthStencil =
                     VkPipelineDepthStencilStateCreateInfo.calloc(stack)
                         .sType$Default()
-                        .depthTestEnable(depthTestEnabled)
-                        .depthWriteEnable(portableState.writeDepth())
-                        .depthCompareOp(toVkDepthCompareOp(portableState.depthTestFunction()))
+                        .depthTestEnable(pipelineState.depthTestEnabled())
+                        .depthWriteEnable(pipelineState.depthWriteEnabled())
+                        .depthCompareOp(pipelineState.depthCompareOp())
                         .depthBoundsTestEnable(false)
                         .stencilTestEnable(false);
 
                 // --- 10. Color blend ---
-                int colorWriteMask = 0;
-                if (portableState.writeColor()) {
-                    colorWriteMask |= VK10.VK_COLOR_COMPONENT_R_BIT
-                        | VK10.VK_COLOR_COMPONENT_G_BIT
-                        | VK10.VK_COLOR_COMPONENT_B_BIT;
-                }
-                if (portableState.writeAlpha()) {
-                    colorWriteMask |= VK10.VK_COLOR_COMPONENT_A_BIT;
+                VkPipelineColorBlendAttachmentState.Buffer colorBlendAttachment = colorFormats.isEmpty()
+                    ? null
+                    : VkPipelineColorBlendAttachmentState.calloc(colorFormats.size(), stack);
+                for (int colorIndex = 0; colorIndex < colorFormats.size(); colorIndex++) {
+                    VulkanPipelineState.ColorBlendAttachment blendAttachment =
+                        pipelineState.colorBlendAttachments().get(colorIndex);
+                    colorBlendAttachment.get(colorIndex)
+                        .colorWriteMask(blendAttachment.colorWriteMask())
+                        .blendEnable(blendAttachment.blendEnabled())
+                        .srcColorBlendFactor(blendAttachment.sourceColorBlendFactor())
+                        .dstColorBlendFactor(blendAttachment.destColorBlendFactor())
+                        .colorBlendOp(blendAttachment.colorBlendOp())
+                        .srcAlphaBlendFactor(blendAttachment.sourceAlphaBlendFactor())
+                        .dstAlphaBlendFactor(blendAttachment.destAlphaBlendFactor())
+                        .alphaBlendOp(blendAttachment.alphaBlendOp());
                 }
 
-	                VkPipelineColorBlendAttachmentState.Buffer colorBlendAttachment = colorFormats.isEmpty()
-	                    ? null
-	                    : VkPipelineColorBlendAttachmentState.calloc(colorFormats.size(), stack);
-	                for (int colorIndex = 0; colorIndex < colorFormats.size(); colorIndex++) {
-	                    java.util.Optional<PipelineDescriptor.BlendState> blendState =
-	                        backend.blendStateForAttachment(portableState, colorIndex);
-	                    colorBlendAttachment.get(colorIndex)
-	                        .colorWriteMask(colorWriteMask)
-	                        .blendEnable(blendState.isPresent());
-	                    if (blendState.isPresent()) {
-	                        PipelineDescriptor.BlendState blend = blendState.get();
-	                        colorBlendAttachment.get(colorIndex)
-	                            .srcColorBlendFactor(toVkBlendFactor(blend.sourceColor()))
-	                            .dstColorBlendFactor(toVkBlendFactor(blend.destColor()))
-	                            .colorBlendOp(VK10.VK_BLEND_OP_ADD)
-	                            .srcAlphaBlendFactor(toVkBlendFactor(blend.sourceAlpha()))
-	                            .dstAlphaBlendFactor(toVkBlendFactor(blend.destAlpha()))
-	                            .alphaBlendOp(VK10.VK_BLEND_OP_ADD);
-	                    }
-	                }
-
-                boolean logicOpEnabled = portableState.colorLogic() != LogicOp.NONE;
                 VkPipelineColorBlendStateCreateInfo colorBlending =
                     VkPipelineColorBlendStateCreateInfo.calloc(stack)
                         .sType$Default()
-                        .logicOpEnable(logicOpEnabled)
-                        .logicOp(toVkLogicOp(portableState.colorLogic()))
+                        .logicOpEnable(pipelineState.logicOpEnabled())
+                        .logicOp(pipelineState.logicOp())
                         .pAttachments(colorBlendAttachment)
                         .blendConstants(stack.floats(0f, 0f, 0f, 0f));
 
@@ -16694,62 +16680,6 @@ void main() {
                     }
                     yield VK10.VK_POLYGON_MODE_FILL;
                 }
-            };
-        }
-
-        private static int toVkDepthCompareOp(DepthTestFunction func) {
-            return switch (func) {
-                case NO_DEPTH_TEST -> VK10.VK_COMPARE_OP_ALWAYS;
-                case EQUAL_DEPTH_TEST -> VK10.VK_COMPARE_OP_EQUAL;
-                case LEQUAL_DEPTH_TEST -> VK10.VK_COMPARE_OP_LESS_OR_EQUAL;
-                case LESS_DEPTH_TEST -> VK10.VK_COMPARE_OP_LESS;
-                case GREATER_DEPTH_TEST -> VK10.VK_COMPARE_OP_GREATER;
-            };
-        }
-
-        private static int toVkBlendFactor(SourceFactor factor) {
-            return switch (factor) {
-                case ZERO -> VK10.VK_BLEND_FACTOR_ZERO;
-                case ONE -> VK10.VK_BLEND_FACTOR_ONE;
-                case SRC_COLOR -> VK10.VK_BLEND_FACTOR_SRC_COLOR;
-                case ONE_MINUS_SRC_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-                case DST_COLOR -> VK10.VK_BLEND_FACTOR_DST_COLOR;
-                case ONE_MINUS_DST_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-                case SRC_ALPHA -> VK10.VK_BLEND_FACTOR_SRC_ALPHA;
-                case ONE_MINUS_SRC_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-                case DST_ALPHA -> VK10.VK_BLEND_FACTOR_DST_ALPHA;
-                case ONE_MINUS_DST_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-                case CONSTANT_COLOR -> VK10.VK_BLEND_FACTOR_CONSTANT_COLOR;
-                case ONE_MINUS_CONSTANT_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
-                case CONSTANT_ALPHA -> VK10.VK_BLEND_FACTOR_CONSTANT_ALPHA;
-                case ONE_MINUS_CONSTANT_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
-                case SRC_ALPHA_SATURATE -> VK10.VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
-            };
-        }
-
-        private static int toVkBlendFactor(DestFactor factor) {
-            return switch (factor) {
-                case ZERO -> VK10.VK_BLEND_FACTOR_ZERO;
-                case ONE -> VK10.VK_BLEND_FACTOR_ONE;
-                case SRC_COLOR -> VK10.VK_BLEND_FACTOR_SRC_COLOR;
-                case ONE_MINUS_SRC_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-                case DST_COLOR -> VK10.VK_BLEND_FACTOR_DST_COLOR;
-                case ONE_MINUS_DST_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-                case SRC_ALPHA -> VK10.VK_BLEND_FACTOR_SRC_ALPHA;
-                case ONE_MINUS_SRC_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-                case DST_ALPHA -> VK10.VK_BLEND_FACTOR_DST_ALPHA;
-                case ONE_MINUS_DST_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-                case CONSTANT_COLOR -> VK10.VK_BLEND_FACTOR_CONSTANT_COLOR;
-                case ONE_MINUS_CONSTANT_COLOR -> VK10.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
-                case CONSTANT_ALPHA -> VK10.VK_BLEND_FACTOR_CONSTANT_ALPHA;
-                case ONE_MINUS_CONSTANT_ALPHA -> VK10.VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
-            };
-        }
-
-        private static int toVkLogicOp(LogicOp op) {
-            return switch (op) {
-                case NONE -> VK10.VK_LOGIC_OP_NO_OP;   // logicOpEnable=false when NONE; safe default
-                case OR_REVERSE -> VK10.VK_LOGIC_OP_OR_REVERSE;
             };
         }
 

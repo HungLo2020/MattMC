@@ -113,7 +113,7 @@ public class VulkanFramePresentationLifecycleTest {
             "Vulkan backend should enable fillModeNonSolid when the selected device supports it");
         assertTrue(vulkanBackendSource.contains(".pEnabledFeatures(enabledFeatures)"),
             "Vulkan backend should pass requested core features to vkCreateDevice");
-        assertTrue(vulkanBackendSource.contains("toVkPolygonMode(portableState.polygonMode(), portableState.location().toString())"),
+        assertTrue(vulkanBackendSource.contains("mode -> toVkPolygonMode(mode, portableState.location().toString())"),
             "Vulkan backend should map polygon mode with pipeline context for diagnostics");
         assertTrue(vulkanBackendSource.contains("fillModeNonSolidEnabled"),
             "Vulkan backend should track whether non-solid fill mode was actually enabled");
