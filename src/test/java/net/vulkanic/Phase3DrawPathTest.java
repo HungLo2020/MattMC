@@ -5482,6 +5482,7 @@ public class Phase3DrawPathTest {
         String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
         String terrainSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java"));
         String compositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+        String finalPassSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java"));
         String shadowCompositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
         String vulkanBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
@@ -5506,6 +5507,16 @@ public class Phase3DrawPathTest {
             "Iris composite passes should remain on the framebuffer-compatible path until descriptor-backed MRT parity is proven visually safe");
         assertFalse(compositeSource.contains("VulkanicAPI.createRenderPass(this.framebuffer.createRenderTargetDescriptor(label, this.viewWidth, this.viewHeight))"),
             "Iris composite passes should not use descriptor-backed render targets while that path can black-frame Vulkan shaders");
+        assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),
+            "FinalPassRenderer should snapshot the final pass target before pipeline/render-pass creation");
+        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = VulkanicAPI.isVulkanBackendSelected() && !ctx.isImmediate()"),
+            "FinalPassRenderer should only use descriptor-backed final-pass rendering on recorded Vulkan command contexts");
+        assertTrue(finalPassSource.contains("useDescriptorBackedFinalPass\n\t\t\t\t\t? VulkanicAPI.createRenderPass(renderTargetDescriptor)"),
+            "FinalPassRenderer should actively migrate Vulkan final-pass rendering to descriptor-backed render targets");
+        assertTrue(finalPassSource.contains("VulkanicAPI.createRenderPass(() -> \"Final pass\", main.getColorTextureView(), OptionalInt.empty())"),
+            "FinalPassRenderer should preserve the existing OpenGL texture-view render-pass path");
+        assertTrue(finalPassSource.contains("finalPass.ensurePipelineState(useDescriptorBackedFinalPass ? renderTargetDescriptor : null)"),
+            "FinalPassRenderer should create the final-pass pipeline against the same descriptor used to begin the Vulkan render pass");
         assertTrue(shadowCompositeSource.contains("VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),
             "Iris shadow composite passes should remain on the framebuffer-compatible path until descriptor-backed MRT parity is proven visually safe");
         assertFalse(shadowCompositeSource.contains("VulkanicAPI.createRenderPass(this.framebuffer.createRenderTargetDescriptor(label, this.viewWidth, this.viewHeight))"),

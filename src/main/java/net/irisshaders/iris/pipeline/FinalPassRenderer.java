@@ -259,14 +259,18 @@ public class FinalPassRenderer {
 
 			GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
 			VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
-			try (RenderPass renderPass = VulkanicAPI.createRenderPass(() -> "Final pass", main.getColorTextureView(), OptionalInt.empty())) {
+			VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> "Final pass", baseWidth, baseHeight);
+			boolean useDescriptorBackedFinalPass = VulkanicAPI.isVulkanBackendSelected() && !ctx.isImmediate();
+			try (RenderPass renderPass = useDescriptorBackedFinalPass
+					? VulkanicAPI.createRenderPass(renderTargetDescriptor)
+					: VulkanicAPI.createRenderPass(() -> "Final pass", main.getColorTextureView(), OptionalInt.empty())) {
 				renderPass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
 				VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setIndexBuffer(indices, type);
 				renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
 				VulkanicAPI.setDynamicViewport(ctx, 0, 0, baseWidth, baseHeight);
 
-				finalPass.ensurePipelineState(null);
+				finalPass.ensurePipelineState(useDescriptorBackedFinalPass ? renderTargetDescriptor : null);
 				renderPass.iris$setCustomPass(finalPass);
 
 				finalPass.program.use();
