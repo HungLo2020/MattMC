@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,output=left,powered=false": {
+      "model": "minecraft:block/redstone_randomizer",
+      "y": 270
+    },
+    "facing=east,output=left,powered=true": {
+      "model": "minecraft:block/redstone_randomizer_on",
+      "y": 270
+    },
+    "facing=east,output=right,powered=false": {
+      "model": "minecraft:block/redstone_randomizer",
+      "y": 270
+    },
+    "facing=east,output=right,powered=true": {
+      "model": "minecraft:block/redstone_randomizer_on",
+      "y": 270
+    },
+    "facing=north,output=left,powered=false": {
+      "model": "minecraft:block/redstone_randomizer",
+      "y": 180
+    },
+    "facing=north,output=left,powered=true": {
+      "model": "minecraft:block/redstone_randomizer_on",
+      "y": 180
+    },
+    "facing=north,output=right,powered=false": {
+      "model": "minecraft:block/redstone_randomizer",
+      "y": 180
+    },
+    "facing=north,output=right,powered=true": {
+      "model": "minecraft:block/redstone_randomizer_on",
+      "y": 180
+    },
+    "facing=south,output=left,powered=false": {
+      "model": "minecraft:block/redstone_randomizer"
+    },
+    "facing=south,output=left,powered=true": {
+      "model": "minecraft:block/redstone_randomizer_on"
+    },
+    "facing=south,output=right,powered=false": {
+      "model": "minecraft:block/redstone_randomizer"
+    },
+    "facing=south,output=right,powered=true": {
+      "model": "minecraft:block/redstone_randomizer_on"
+    },
+    "facing=west,output=left,powered=false": {
+      "model": "minecraft:block/redstone_randomizer",
+      "y": 90
+    },
+    "facing=west,output=left,powered=true": {
+      "model": "minecraft:block/redstone_randomizer_on",
+      "y": 90
+    },
+    "facing=west,output=right,powered=false": {
+      "model": "minecraft:block/redstone_randomizer",
+      "y": 90
+    },
+    "facing=west,output=right,powered=true": {
+      "model": "minecraft:block/redstone_randomizer_on",
+      "y": 90
+    }
+  }
+}

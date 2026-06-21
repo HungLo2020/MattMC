@@ -996,6 +996,7 @@ public class Items {
 	public static final Item REDSTONE_BLOCK = registerBlock(Blocks.REDSTONE_BLOCK);
 	public static final Item REPEATER = registerBlock(Blocks.REPEATER);
 	public static final Item COMPARATOR = registerBlock(Blocks.COMPARATOR);
+	public static final Item REDSTONE_RANDOMIZER = registerBlock(Blocks.REDSTONE_RANDOMIZER);
 	public static final Item PISTON = registerBlock(Blocks.PISTON);
 	public static final Item STICKY_PISTON = registerBlock(Blocks.STICKY_PISTON);
 	public static final Item SLIME_BLOCK = registerBlock(Blocks.SLIME_BLOCK);

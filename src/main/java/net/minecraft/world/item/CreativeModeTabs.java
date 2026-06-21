@@ -1289,6 +1289,7 @@ public class CreativeModeTabs {
 					output.accept(Items.REDSTONE_BLOCK);
 					output.accept(Items.REPEATER);
 					output.accept(Items.COMPARATOR);
+					output.accept(Items.REDSTONE_RANDOMIZER);
 					output.accept(Items.TARGET);
 					output.accept(Items.WAXED_COPPER_BULB);
 					output.accept(Items.WAXED_EXPOSED_COPPER_BULB);

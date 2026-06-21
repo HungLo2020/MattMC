@@ -2129,6 +2129,7 @@
   "block.minecraft.redstone_block": "Block of Redstone",
   "block.minecraft.redstone_lamp": "Redstone Lamp",
   "block.minecraft.redstone_ore": "Redstone Ore",
+  "block.minecraft.redstone_randomizer": "Redstone Randomizer",
   "block.minecraft.redstone_torch": "Redstone Torch",
   "block.minecraft.redstone_wall_torch": "Redstone Wall Torch",
   "block.minecraft.redstone_wire": "Redstone Wire",

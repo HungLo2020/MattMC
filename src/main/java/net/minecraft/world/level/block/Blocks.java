@@ -2849,6 +2849,9 @@ public class Blocks {
 	public static final Block COMPARATOR = register(
 		"comparator", ComparatorBlock::new, BlockBehaviour.Properties.of().instabreak().sound(SoundType.STONE).pushReaction(PushReaction.DESTROY)
 	);
+	public static final Block REDSTONE_RANDOMIZER = register(
+		"redstone_randomizer", RedstoneRandomizerBlock::new, BlockBehaviour.Properties.of().instabreak().sound(SoundType.STONE).pushReaction(PushReaction.DESTROY)
+	);
 	public static final Block DAYLIGHT_DETECTOR = register(
 		"daylight_detector",
 		DaylightDetectorBlock::new,

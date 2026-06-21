@@ -65,6 +65,7 @@ public class BlockTypes {
 		Registry.register(registry, "command", CommandBlock.CODEC);
 		Registry.register(registry, "comparator", ComparatorBlock.CODEC);
 		Registry.register(registry, "composter", ComposterBlock.CODEC);
+		Registry.register(registry, "redstone_randomizer", RedstoneRandomizerBlock.CODEC);
 		Registry.register(registry, "concrete_powder", ConcretePowderBlock.CODEC);
 		Registry.register(registry, "conduit", ConduitBlock.CODEC);
 		Registry.register(registry, "copper_bulb_block", CopperBulbBlock.CODEC);
