@@ -15,8 +15,8 @@ import net.minecraft.worldedit.core.WorldEdit;
 import net.minecraft.worldedit.mask.ExistingBlockMask;
 import net.minecraft.worldedit.mask.Mask;
 import net.minecraft.worldedit.math.BlockVector3;
-import net.minecraft.worldedit.pattern.BlockPatternParser;
-import net.minecraft.worldedit.pattern.BlockPatternParser.ReplacementPatterns;
+import net.minecraft.worldedit.command.argument.WorldEditPatternArgument;
+import net.minecraft.worldedit.command.argument.WorldEditReplacementArgument;
 import net.minecraft.worldedit.pattern.Pattern;
 import net.minecraft.worldedit.platform.MattMCPlatform;
 import net.minecraft.worldedit.region.Region;
@@ -35,32 +35,32 @@ public class RegionCommands {
         // //set command
         dispatcher.register(Commands.literal("/set")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.set"))
-            .then(Commands.argument("block", StringArgumentType.greedyString())
-                .executes(ctx -> set(ctx, StringArgumentType.getString(ctx, "block")))));
+            .then(Commands.argument("block", WorldEditPatternArgument.pattern())
+                .executes(ctx -> set(ctx, WorldEditPatternArgument.getPattern(ctx, "block")))));
         
         // //replace command
         dispatcher.register(Commands.literal("/replace")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.replace"))
-            .then(Commands.argument("patterns", StringArgumentType.greedyString())
-                .executes(ctx -> replace(ctx, StringArgumentType.getString(ctx, "patterns")))));
+            .then(Commands.argument("patterns", WorldEditReplacementArgument.replacement())
+                .executes(ctx -> replace(ctx, WorldEditReplacementArgument.getReplacement(ctx, "patterns")))));
         
         // //walls command
         dispatcher.register(Commands.literal("/walls")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.walls"))
-            .then(Commands.argument("block", StringArgumentType.greedyString())
-                .executes(ctx -> walls(ctx, StringArgumentType.getString(ctx, "block")))));
+            .then(Commands.argument("block", WorldEditPatternArgument.pattern())
+                .executes(ctx -> walls(ctx, WorldEditPatternArgument.getPattern(ctx, "block")))));
         
         // //faces command
         dispatcher.register(Commands.literal("/faces")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.faces"))
-            .then(Commands.argument("block", StringArgumentType.greedyString())
-                .executes(ctx -> faces(ctx, StringArgumentType.getString(ctx, "block")))));
+            .then(Commands.argument("block", WorldEditPatternArgument.pattern())
+                .executes(ctx -> faces(ctx, WorldEditPatternArgument.getPattern(ctx, "block")))));
         
         // //overlay command
         dispatcher.register(Commands.literal("/overlay")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.overlay"))
-            .then(Commands.argument("block", StringArgumentType.greedyString())
-                .executes(ctx -> overlay(ctx, StringArgumentType.getString(ctx, "block")))));
+            .then(Commands.argument("block", WorldEditPatternArgument.pattern())
+                .executes(ctx -> overlay(ctx, WorldEditPatternArgument.getPattern(ctx, "block")))));
         
         // //move command (stubbed - to be fully implemented)
         dispatcher.register(Commands.literal("/move")
@@ -113,7 +113,7 @@ public class RegionCommands {
     /**
      * Set all blocks in selection to a block type.
      */
-    private static int set(CommandContext<CommandSourceStack> context, String blockName) throws CommandSyntaxException {
+    private static int set(CommandContext<CommandSourceStack> context, Pattern pattern) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
         
@@ -122,14 +122,6 @@ public class RegionCommands {
         
         if (region == null) {
             player.sendSystemMessage(Component.literal("No selection defined"));
-            return 0;
-        }
-        
-        Pattern pattern;
-        try {
-            pattern = BlockPatternParser.parse(blockName);
-        } catch (IllegalArgumentException e) {
-            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
         
@@ -152,7 +144,7 @@ public class RegionCommands {
     /**
      * Replace blocks in selection.
      */
-    private static int replace(CommandContext<CommandSourceStack> context, String patterns) throws CommandSyntaxException {
+    private static int replace(CommandContext<CommandSourceStack> context, WorldEditReplacementArgument.Result replacement) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
         
@@ -171,18 +163,12 @@ public class RegionCommands {
 
         Mask fromMask;
         Pattern toPattern;
-        try {
-            try {
-                toPattern = BlockPatternParser.parse(patterns);
-                fromMask = new ExistingBlockMask(editSession);
-            } catch (IllegalArgumentException singlePatternError) {
-                ReplacementPatterns replacementPatterns = BlockPatternParser.parseReplacementPatterns(patterns);
-                fromMask = replacementPatterns.from();
-                toPattern = replacementPatterns.to();
-            }
-        } catch (IllegalArgumentException e) {
-            player.sendSystemMessage(Component.literal(e.getMessage()));
-            return 0;
+        if (replacement.replacementPatterns().isPresent()) {
+            fromMask = replacement.replacementPatterns().get().from();
+            toPattern = replacement.toPattern();
+        } else {
+            fromMask = new ExistingBlockMask(editSession);
+            toPattern = replacement.toPattern();
         }
         
         // Replace blocks
@@ -199,7 +185,7 @@ public class RegionCommands {
     /**
      * Create walls around selection.
      */
-    private static int walls(CommandContext<CommandSourceStack> context, String blockName) throws CommandSyntaxException {
+    private static int walls(CommandContext<CommandSourceStack> context, Pattern pattern) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
         
@@ -208,14 +194,6 @@ public class RegionCommands {
         
         if (region == null) {
             player.sendSystemMessage(Component.literal("No selection defined"));
-            return 0;
-        }
-        
-        Pattern pattern;
-        try {
-            pattern = BlockPatternParser.parse(blockName);
-        } catch (IllegalArgumentException e) {
-            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
         
@@ -264,7 +242,7 @@ public class RegionCommands {
     /**
      * Create faces of selection.
      */
-    private static int faces(CommandContext<CommandSourceStack> context, String blockName) throws CommandSyntaxException {
+    private static int faces(CommandContext<CommandSourceStack> context, Pattern pattern) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
         
@@ -273,14 +251,6 @@ public class RegionCommands {
         
         if (region == null) {
             player.sendSystemMessage(Component.literal("No selection defined"));
-            return 0;
-        }
-        
-        Pattern pattern;
-        try {
-            pattern = BlockPatternParser.parse(blockName);
-        } catch (IllegalArgumentException e) {
-            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
         
@@ -335,7 +305,7 @@ public class RegionCommands {
     /**
      * Overlay blocks on top surface.
      */
-    private static int overlay(CommandContext<CommandSourceStack> context, String blockName) throws CommandSyntaxException {
+    private static int overlay(CommandContext<CommandSourceStack> context, Pattern pattern) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
         
@@ -344,14 +314,6 @@ public class RegionCommands {
         
         if (region == null) {
             player.sendSystemMessage(Component.literal("No selection defined"));
-            return 0;
-        }
-        
-        Pattern pattern;
-        try {
-            pattern = BlockPatternParser.parse(blockName);
-        } catch (IllegalArgumentException e) {
-            player.sendSystemMessage(Component.literal(e.getMessage()));
             return 0;
         }
         

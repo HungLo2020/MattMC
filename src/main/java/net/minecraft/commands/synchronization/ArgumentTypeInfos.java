@@ -63,6 +63,9 @@ import net.minecraft.commands.synchronization.brigadier.IntegerArgumentInfo;
 import net.minecraft.commands.synchronization.brigadier.LongArgumentInfo;
 import net.minecraft.commands.synchronization.brigadier.StringArgumentSerializer;
 import net.minecraft.core.Registry;
+import net.minecraft.worldedit.command.argument.WorldEditMaskArgument;
+import net.minecraft.worldedit.command.argument.WorldEditPatternArgument;
+import net.minecraft.worldedit.command.argument.WorldEditReplacementArgument;
 
 public class ArgumentTypeInfos {
 	private static final Map<Class<?>, ArgumentTypeInfo<?, ?>> BY_CLASS = Maps.<Class<?>, ArgumentTypeInfo<?, ?>>newHashMap();
@@ -138,6 +141,9 @@ public class ArgumentTypeInfos {
 		);
 		register(registry, "loot_modifier", ResourceOrIdArgument.LootModifierArgument.class, SingletonArgumentInfo.contextAware(ResourceOrIdArgument::lootModifier));
 		register(registry, "dialog", ResourceOrIdArgument.DialogArgument.class, SingletonArgumentInfo.contextAware(ResourceOrIdArgument::dialog));
+		register(registry, "worldedit:mask", WorldEditMaskArgument.class, SingletonArgumentInfo.contextFree(WorldEditMaskArgument::mask));
+		register(registry, "worldedit:pattern", WorldEditPatternArgument.class, SingletonArgumentInfo.contextFree(WorldEditPatternArgument::pattern));
+		register(registry, "worldedit:replacement", WorldEditReplacementArgument.class, new WorldEditReplacementArgument.Info());
 		return register(registry, "uuid", UuidArgument.class, SingletonArgumentInfo.contextFree(UuidArgument::uuid));
 	}
 

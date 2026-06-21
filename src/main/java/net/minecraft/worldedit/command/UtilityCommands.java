@@ -19,9 +19,11 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.worldedit.core.EditSession;
 import net.minecraft.worldedit.core.WorldEdit;
+import net.minecraft.worldedit.command.argument.WorldEditMaskArgument;
+import net.minecraft.worldedit.command.argument.WorldEditPatternArgument;
+import net.minecraft.worldedit.mask.Mask;
 import net.minecraft.worldedit.math.BlockVector3;
-import net.minecraft.worldedit.pattern.BlockPatternParser;
-import net.minecraft.worldedit.pattern.BlockPatternParser.ReplacementPatterns;
+import net.minecraft.worldedit.pattern.Pattern;
 import net.minecraft.worldedit.platform.MattMCPlatform;
 import net.minecraft.worldedit.session.LocalSession;
 
@@ -80,10 +82,13 @@ public class UtilityCommands {
         dispatcher.register(Commands.literal("/replacenear")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.replacenear"))
             .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
-                .then(Commands.argument("patterns", StringArgumentType.greedyString())
-                    .executes(ctx -> replaceNear(ctx,
-                        IntegerArgumentType.getInteger(ctx, "radius"),
-                        StringArgumentType.getString(ctx, "patterns"))))));
+                .then(Commands.argument("from", WorldEditMaskArgument.mask())
+                    .executes(ctx -> missingReplaceNearOutput(ctx))
+                    .then(Commands.argument("to", WorldEditPatternArgument.pattern())
+                        .executes(ctx -> replaceNear(ctx,
+                            IntegerArgumentType.getInteger(ctx, "radius"),
+                            WorldEditMaskArgument.getMask(ctx, "from"),
+                            WorldEditPatternArgument.getPattern(ctx, "to")))))));
     }
     
     /**
@@ -277,18 +282,16 @@ public class UtilityCommands {
     /**
      * Replace blocks near the player.
      */
-    private static int replaceNear(CommandContext<CommandSourceStack> context, int radius, String patterns) throws CommandSyntaxException {
+    private static int missingReplaceNearOutput(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        player.sendSystemMessage(Component.literal("Usage: //replacenear <radius> <from-blocks> <to-blocks>"));
+        return 0;
+    }
+
+    private static int replaceNear(CommandContext<CommandSourceStack> context, int radius, Mask fromMask, Pattern toPattern) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel world = player.level();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
-        
-        ReplacementPatterns replacementPatterns;
-        try {
-            replacementPatterns = BlockPatternParser.parseReplacementPatterns(patterns);
-        } catch (IllegalArgumentException e) {
-            player.sendSystemMessage(Component.literal(e.getMessage()));
-            return 0;
-        }
         
         // Create edit session
         EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
@@ -305,8 +308,8 @@ public class UtilityCommands {
                         BlockVector3 pos = center.add(x, y, z);
                         BlockState current = editSession.getBlock(pos);
                         
-                        if (replacementPatterns.from().test(current)) {
-                            BlockState replacement = replacementPatterns.to().apply(pos);
+                        if (fromMask.test(current)) {
+                            BlockState replacement = toPattern.apply(pos);
                             if (replacement != null && editSession.setBlock(pos, replacement)) {
                                 count++;
                             }

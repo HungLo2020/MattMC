@@ -17,20 +17,20 @@ public interface StringReaderTerms {
 		return new StringReaderTerms.TerminalWord(string);
 	}
 
-	static Term<StringReader> character(char c) {
-		return new StringReaderTerms.TerminalCharacters(CharList.of(c)) {
+	static Term<StringReader> character(char expected) {
+		return new StringReaderTerms.TerminalCharacters(CharList.of(expected)) {
 			@Override
-			protected boolean isAccepted(char c) {
-				return c == c;
+			protected boolean isAccepted(char actual) {
+				return actual == expected;
 			}
 		};
 	}
 
-	static Term<StringReader> characters(char c, char d) {
-		return new StringReaderTerms.TerminalCharacters(CharList.of(c, d)) {
+	static Term<StringReader> characters(char first, char second) {
+		return new StringReaderTerms.TerminalCharacters(CharList.of(first, second)) {
 			@Override
-			protected boolean isAccepted(char c) {
-				return c == c || c == d;
+			protected boolean isAccepted(char actual) {
+				return actual == first || actual == second;
 			}
 		};
 	}
