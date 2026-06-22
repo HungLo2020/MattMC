@@ -1209,11 +1209,13 @@ public class Phase3DrawPathTest {
         Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeTerrainCommandEncoder.java");
+        Path nativeEncoderFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java");
 
         String rendererSource = Files.readString(rendererFile);
         String apiSource = Files.readString(apiFile);
         String backendSource = Files.readString(backendFile);
         String encoderSource = Files.readString(encoderFile);
+        String nativeEncoderSource = Files.readString(nativeEncoderFile);
 
         assertTrue(rendererSource.contains("CommandEncoder commandEncoder = VulkanicAPI.createNativeTerrainCommandEncoder();"),
             "Sodium's Vulkan chunk terrain branch should use the native terrain encoder seam instead of the general compatibility encoder");
@@ -1226,16 +1228,19 @@ public class Phase3DrawPathTest {
         assertTrue(backendSource.contains("public CommandEncoder createNativeTerrainCommandEncoder()")
                 && backendSource.contains("return new VulkanNativeTerrainCommandEncoder(this);"),
             "VulkanBackend should own construction of the native terrain command encoder");
-        assertTrue(encoderSource.contains("final class VulkanNativeTerrainCommandEncoder implements CommandEncoder"),
-            "The terrain slice should still satisfy the Mojang CommandEncoder contract used by Sodium");
-        assertTrue(encoderSource.contains("private final class TerrainRenderPass implements RenderPass"),
+        assertTrue(encoderSource.contains("final class VulkanNativeTerrainCommandEncoder extends VulkanNativeCommandEncoder")
+                && encoderSource.contains("super(backend, ResourceMode.TERRAIN);"),
+            "The terrain slice should use the shared native CommandEncoder implementation in terrain resource mode");
+        assertTrue(nativeEncoderSource.contains("class VulkanNativeCommandEncoder implements CommandEncoder"),
+            "The shared native encoder should satisfy the Mojang CommandEncoder contract used by Sodium");
+        assertTrue(nativeEncoderSource.contains("private final class NativeRenderPass implements RenderPass"),
             "The native terrain encoder should provide a Mojang RenderPass adapter for existing Sodium draw code");
-        assertTrue(encoderSource.contains("this.backend.beginRenderPass(ctx, label, colorView, clearColor, depthView, clearDepth)")
-                && encoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer)"),
+        assertTrue(nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, colorView, clearColor, depthView, clearDepth)")
+                && nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer)"),
             "The native terrain encoder should begin native Vulkan render passes directly instead of routing through GlCommandEncoder");
-        assertTrue(encoderSource.contains("this.colorView != null")
-                && encoderSource.contains("this.colorView,")
-                && encoderSource.contains("this.depthView"),
+        assertTrue(nativeEncoderSource.contains("this.colorView != null")
+                && nativeEncoderSource.contains("this.colorView,")
+                && nativeEncoderSource.contains("this.depthView"),
             "Texture-view terrain passes must resolve target-compatible pipelines using their actual color/depth views");
         assertTrue(backendSource.contains("VulkanicTextureView colorTarget")
                 && backendSource.contains("@Nullable VulkanicTextureView depthTarget")
@@ -1244,23 +1249,23 @@ public class Phase3DrawPathTest {
         assertTrue(backendSource.contains("NativeSpine.toVkFormat(targets.colorTexture.getVulkanicFormat())")
                 && backendSource.contains("NativeSpine.toVkFormat(targets.depthTexture.getVulkanicFormat())"),
             "Texture-view pipeline resolution should key variants from the actual color/depth attachment formats");
-        assertTrue(encoderSource.contains("this.pass.drawIndexed(firstIndex, indexCount, baseVertex, instanceCount);"),
+        assertTrue(nativeEncoderSource.contains("this.pass.drawIndexed(firstIndex, indexCount, baseVertex, instanceCount);"),
             "The Mojang RenderPass drawIndexed argument order must be translated to VulkanicRenderPass order");
-        assertTrue(encoderSource.contains("VulkanicAPI.createLiveProgramPipelineDescriptor(")
-                && encoderSource.contains("SharedChunkProgramOverrides.bindableSamplers(pipeline)")
-                && encoderSource.contains("case SAMPLER, COMPARISON_SAMPLER -> bindableSamplers.contains(binding.name())"),
+        assertTrue(nativeEncoderSource.contains("VulkanicAPI.createLiveProgramPipelineDescriptor(")
+                && nativeEncoderSource.contains("SharedChunkProgramOverrides.bindableSamplers(pipeline)")
+                && nativeEncoderSource.contains("case SAMPLER, COMPARISON_SAMPLER -> bindableSamplers.contains(binding.name())"),
             "The native terrain pass should preserve Iris live shared-chunk descriptor selection while filtering reflected terrain samplers to the Iris bindable set");
-        assertTrue(encoderSource.contains("implements RenderPass, RenderPassResourceBinder"),
+        assertTrue(nativeEncoderSource.contains("implements RenderPass, RenderPassResourceBinder"),
             "The native terrain pass should accept unit-aware Iris render-pass resource bindings");
-        assertTrue(encoderSource.contains("public boolean bindLegacySampler(String name, int textureId, int textureUnit)")
-                && encoderSource.contains("VulkanicAPI.createManagedLegacyTextureView(textureId)"),
+        assertTrue(nativeEncoderSource.contains("public boolean bindLegacySampler(String name, int textureId, int textureUnit)")
+                && nativeEncoderSource.contains("VulkanicAPI.createManagedLegacyTextureView(textureId)"),
             "The native terrain pass should recover shaderpack samplers that Iris exposes only as legacy texture IDs");
-        assertTrue(encoderSource.contains("int unit = this.resolveSamplerUnit(binding);"),
+        assertTrue(nativeEncoderSource.contains("int unit = this.resolveSamplerUnit(binding);"),
             "The native terrain pass should bind descriptors using Iris sampler units, not descriptor binding indices");
-        assertTrue(encoderSource.contains("PipelineResourcePlanner.buildPlan(")
-                && encoderSource.contains("submission.missingResources()"),
+        assertTrue(nativeEncoderSource.contains("PipelineResourcePlanner.buildPlan(")
+                && nativeEncoderSource.contains("submission.missingResources()"),
             "The native terrain pass should share Vulkanic's resource planner instead of carrying a local descriptor walk");
-        assertFalse(encoderSource.contains("private record PipelineResourceBindingSubmission"),
+        assertFalse(nativeEncoderSource.contains("private record PipelineResourceBindingSubmission"),
             "The native terrain pass should not keep a separate local resource-submission model once Vulkanic owns the shared plan");
 
         Path programSamplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");

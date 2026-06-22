@@ -114,6 +114,43 @@ public class ApiNeutralityCallsiteTest {
     }
 
     @Test
+    public void testVulkanTextureViewRenderPassesUseNativeEncoderConservatively() throws IOException {
+        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String nativeEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+        String terrainEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeTerrainCommandEncoder.java"));
+
+        assertTrue(nativeEncoderSource.contains("class VulkanNativeCommandEncoder implements CommandEncoder"),
+            "Vulkan should have a reusable native command encoder separate from GlCommandEncoder");
+        assertTrue(nativeEncoderSource.contains("enum ResourceMode"),
+            "Native command encoder should distinguish general render passes from terrain-specialized resource binding");
+        assertTrue(nativeEncoderSource.contains("ResourceMode.TERRAIN"),
+            "Native command encoder should preserve the existing terrain-specific Iris/Sodium descriptor behavior");
+        assertTrue(nativeEncoderSource.contains("options = options.requireAtLeastOneBinding(false);"),
+            "General native render passes should allow pipelines with no descriptor resources");
+        assertTrue(nativeEncoderSource.contains("public <T> void drawMultipleIndexed(")
+                && nativeEncoderSource.contains("draw.uniformUploaderConsumer()")
+                && nativeEncoderSource.contains("this.setVertexBuffer(draw.slot(), draw.vertexBuffer())"),
+            "General native render passes should support batched indexed draws used by non-terrain callsites");
+
+        assertTrue(terrainEncoderSource.contains("extends VulkanNativeCommandEncoder"),
+            "The Sodium terrain entry point should remain stable while reusing the native encoder implementation");
+        assertTrue(terrainEncoderSource.contains("super(backend, ResourceMode.TERRAIN);"),
+            "Terrain encoder should opt into terrain-specific descriptor recovery");
+
+        assertTrue(backendSource.contains("return new VulkanNativeCommandEncoder(this).createRenderPass(supplier, colorTextureView, clearColor);"),
+            "Vulkan color-only texture-view render passes should bypass the compatibility GlCommandEncoder");
+        assertTrue(backendSource.contains("return new VulkanNativeCommandEncoder(this).createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);"),
+            "Vulkan color-depth texture-view render passes should bypass the compatibility GlCommandEncoder");
+        assertFalse(backendSource.contains("createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);"),
+            "Vulkan texture-view render-pass overloads should no longer bounce through createCommandEncoder()");
+
+        assertTrue(backendSource.contains("return createCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);"),
+            "Framebuffer Iris/custom passes should remain on the compatibility path until framebuffer resource parity is proven");
+        assertTrue(backendSource.contains("return createCommandEncoder().createRenderPass(descriptor);"),
+            "Descriptor-backed MRT passes should remain on the compatibility path until MRT parity is proven");
+    }
+
+    @Test
     public void testHighTrafficRendererCallsitesAvoidConcreteBackendCastLeaks() throws IOException {
         String graphicsBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java"));
         String vulkanicApiSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));

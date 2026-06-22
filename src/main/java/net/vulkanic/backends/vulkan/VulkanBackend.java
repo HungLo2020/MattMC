@@ -1143,7 +1143,7 @@ void main() {
         GpuTextureView colorTextureView,
         java.util.OptionalInt clearColor
     ) {
-        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);
+        return new VulkanNativeCommandEncoder(this).createRenderPass(supplier, colorTextureView, clearColor);
     }
 
     public net.blaze3d.systems.RenderPass createRenderPass(
@@ -1153,7 +1153,7 @@ void main() {
         @Nullable GpuTextureView depthTextureView,
         java.util.OptionalDouble clearDepth
     ) {
-        return createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
+        return new VulkanNativeCommandEncoder(this).createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);
     }
 
     public net.blaze3d.systems.RenderPass createRenderPass(
@@ -1161,10 +1161,15 @@ void main() {
         int framebuffer,
         boolean hasDepthTexture
     ) {
+        // Iris custom/composite passes still depend on the framebuffer-aware compatibility
+        // resource recovery path. Keep this route unchanged until MRT/framebuffer parity is
+        // explicitly migrated and verified.
         return createCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);
     }
 
     public net.blaze3d.systems.RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
+        // Descriptor-backed Iris render targets remain on the compatibility path until native
+        // MRT resource coverage and framebuffer layout parity are proven for those passes.
         return createCommandEncoder().createRenderPass(descriptor);
     }
 
