@@ -18,6 +18,7 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.PipelineResourceBindings;
+import net.vulkanic.PipelineResourcePlanner;
 import net.vulkanic.RenderPassResourceBinder;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
@@ -30,10 +31,8 @@ import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -490,7 +489,7 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
             RenderPipeline pipeline = this.requirePipeline();
             PipelineDescriptor baseDescriptor = this.requirePipelineDescriptor();
             PipelineDescriptor selectedDescriptor = this.selectDescriptor(pipeline, baseDescriptor);
-            PipelineResourceBindingSubmission submission = this.buildResourceBindings(selectedDescriptor);
+            PipelineResourcePlanner.Plan submission = this.buildResourceBindings(selectedDescriptor);
             if (submission == null) {
                 throw new IllegalStateException("No Vulkan resource bindings available for terrain pipeline " + pipeline.getLocation());
             }
@@ -542,72 +541,58 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
         }
 
         @Nullable
-        private PipelineResourceBindingSubmission buildResourceBindings(PipelineDescriptor descriptor) {
-            Map<String, PipelineResourceBindings.SamplerBinding> samplerBindings = new HashMap<>();
-            Map<String, VulkanicBufferSlice> uniformBindings = new HashMap<>();
-            Map<String, PipelineResourceBindings.TexelBufferBinding> texelBindings = new HashMap<>();
-            java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>();
-            List<String> missingResources = VulkanTerrainPipelineDiagnostics.enabled() ? new ArrayList<>() : List.of();
-
-            for (PipelineDescriptor.ResourceBinding binding : descriptor.getResourceLayout().bindings()) {
-                switch (binding.type()) {
-                    case SAMPLER, COMPARISON_SAMPLER -> {
-                        VulkanicTextureView view = this.getSamplerView(binding.name());
-                        if (view != null) {
-                            int unit = this.resolveSamplerUnit(binding);
-                            Integer samplerObject = currentBoundSamplerObject(unit);
-                            samplerBindings.put(binding.name(), new PipelineResourceBindings.SamplerBinding(unit, samplerObject, view));
-                            boundResources.add(binding);
-                        } else if (VulkanTerrainPipelineDiagnostics.enabled()) {
-                            missingResources.add(binding.name() + "(" + binding.type() + ")");
-                        }
-                    }
-                    case UNIFORM_BUFFER -> {
-                        VulkanicBufferSlice slice = this.uniforms.get(binding.name());
-                        if (slice == null && VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
-                            int activeProgram = this.renderPipeline != null
-                                ? SharedChunkProgramOverrides.activeProgramHandle(this.renderPipeline)
-                                : -1;
-                            if (activeProgram > 0) {
-                                slice = VulkanicAPI.getStandaloneUniformBufferSlice(this.ctx, activeProgram);
+        private PipelineResourcePlanner.Plan buildResourceBindings(PipelineDescriptor descriptor) {
+            PipelineResourcePlanner.Plan submission = PipelineResourcePlanner.buildPlan(
+                descriptor,
+                binding -> {
+                    switch (binding.type()) {
+                        case SAMPLER, COMPARISON_SAMPLER -> {
+                            VulkanicTextureView view = this.getSamplerView(binding.name());
+                            if (view != null) {
+                                int unit = this.resolveSamplerUnit(binding);
+                                Integer samplerObject = currentBoundSamplerObject(unit);
+                                return PipelineResourcePlanner.ResolvedResource.sampler(
+                                    new PipelineResourceBindings.SamplerBinding(unit, samplerObject, view)
+                                );
                             }
                         }
-                        if (slice != null) {
-                            uniformBindings.put(binding.name(), slice);
-                            boundResources.add(binding);
-                        } else if (VulkanTerrainPipelineDiagnostics.enabled()) {
-                            missingResources.add(binding.name() + "(" + binding.type() + ")");
+                        case UNIFORM_BUFFER -> {
+                            VulkanicBufferSlice slice = this.uniforms.get(binding.name());
+                            if (slice == null && VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
+                                int activeProgram = this.renderPipeline != null
+                                    ? SharedChunkProgramOverrides.activeProgramHandle(this.renderPipeline)
+                                    : -1;
+                                if (activeProgram > 0) {
+                                    slice = VulkanicAPI.getStandaloneUniformBufferSlice(this.ctx, activeProgram);
+                                }
+                            }
+                            if (slice != null) {
+                                return PipelineResourcePlanner.ResolvedResource.uniformBuffer(slice);
+                            }
+                        }
+                        case TEXEL_BUFFER -> {
                         }
                     }
-                    case TEXEL_BUFFER -> {
-                        if (VulkanTerrainPipelineDiagnostics.enabled()) {
-                            missingResources.add(binding.name() + "(" + binding.type() + ")");
-                        }
-                    }
-                }
-            }
+                    return null;
+                },
+                PipelineResourcePlanner.options()
+                    .missingResourceDescriber(
+                        VulkanTerrainPipelineDiagnostics.enabled()
+                            ? PipelineResourcePlanner.MissingResourceDescriber.DEFAULT
+                            : PipelineResourcePlanner.MissingResourceDescriber.NONE
+                    )
+            );
 
-            if (boundResources.isEmpty()) {
-                return null;
-            }
-
-            PipelineDescriptor submissionDescriptor = boundResources.size() == descriptor.getResourceLayout().bindings().size()
-                ? descriptor
-                : descriptor.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
-
-            if (this.renderPipeline != null) {
+            if (submission != null && this.renderPipeline != null) {
                 VulkanTerrainPipelineDiagnostics.logResourceSubmission(
                     this.renderPipeline,
                     descriptor,
-                    submissionDescriptor,
-                    missingResources
+                    submission.descriptor(),
+                    submission.missingResources()
                 );
             }
 
-            return new PipelineResourceBindingSubmission(
-                submissionDescriptor,
-                PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBindings, texelBindings)
-            );
+            return submission;
         }
 
         @Nullable
@@ -686,12 +671,6 @@ final class VulkanNativeTerrainCommandEncoder implements CommandEncoder {
                 throw new IllegalStateException("Can't use a closed render pass");
             }
         }
-    }
-
-    private record PipelineResourceBindingSubmission(
-        PipelineDescriptor descriptor,
-        PipelineResourceBindings bindings
-    ) {
     }
 
     private static VulkanicIndexType toVulkanicIndexType(VertexFormat.IndexType type) {

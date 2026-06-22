@@ -32,6 +32,7 @@ import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineResourceBindings;
+import net.vulkanic.PipelineResourcePlanner;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanPerfAudit;
@@ -483,14 +484,6 @@ public class GlCommandEncoder implements CommandEncoder {
 		);
 	}
 
-	private record PipelineResourceBindingSubmission(
-		PipelineDescriptor descriptor,
-		PipelineResourceBindings bindings,
-		boolean completeCoverage,
-		int boundResourceCount
-	) {
-	}
-
 	private static java.util.List<String> collectMissingCustomPassResources(
 		GlRenderPass glRenderPass,
 		PipelineDescriptor descriptor,
@@ -547,22 +540,17 @@ public class GlCommandEncoder implements CommandEncoder {
 	}
 
 	@Nullable
-	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass) {
+	private PipelineResourcePlanner.Plan buildPipelineResourceBindings(GlRenderPass glRenderPass) {
 		return this.buildPipelineResourceBindings(glRenderPass, glRenderPass.pipeline.descriptor());
 	}
 
 	@Nullable
-	private PipelineResourceBindingSubmission buildPipelineResourceBindings(GlRenderPass glRenderPass, PipelineDescriptor descriptor) {
+	private PipelineResourcePlanner.Plan buildPipelineResourceBindings(GlRenderPass glRenderPass, PipelineDescriptor descriptor) {
 		long auditStartNanos = VulkanPerfAudit.isEnabled() ? System.nanoTime() : 0L;
 		GlRenderPipeline glRenderPipeline = glRenderPass.pipeline;
 		RenderPipeline pipelineInfo = glRenderPipeline.info();
 		PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
 		java.util.List<PipelineDescriptor.ResourceBinding> layoutBindings = layout.bindings();
-		int layoutBindingCount = layoutBindings.size();
-		java.util.Map<String, PipelineResourceBindings.SamplerBinding> samplerBindings = new java.util.HashMap<>(layoutBindingCount);
-		java.util.Map<String, net.vulkanic.VulkanicBufferSlice> uniformBufferBindings = new java.util.HashMap<>(layoutBindingCount);
-		java.util.Map<String, PipelineResourceBindings.TexelBufferBinding> texelBufferBindings = new java.util.HashMap<>(layoutBindingCount);
-		java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>(layoutBindingCount);
 		{
 			boolean standaloneInProgram = glRenderPipeline.program().getUniform(VulkanicAPI.generatedStandaloneUniformBlockName()) instanceof Uniform.Ubo;
 			boolean isIrisPipeline = pipelineInfo.getLocation().toString().contains("iris:");
@@ -634,203 +622,195 @@ public class GlCommandEncoder implements CommandEncoder {
 			);
 		}
 
-		for (PipelineDescriptor.ResourceBinding resourceBinding : layoutBindings) {
-			switch (resourceBinding.type()) {
-				case SAMPLER, COMPARISON_SAMPLER -> {
-					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
-					net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
-					boolean uniformPresent = uniform instanceof Uniform.Sampler;
-					int samplerIndex = resolveSamplerIndex(resourceBinding.name(), uniform, resourceBinding);
-					if (logSodiumChunkSamplers) {
-						LOGGER.info(
-							"Sodium Vulkan sampler resource pipeline={} binding={} uniformPresent={} textureViewPresent={} boundSamplerKeys={} resourceSamplerKeys={}",
-							pipelineInfo.getLocation(),
-							resourceBinding.name(),
-							uniform instanceof Uniform.Sampler,
-							textureView != null,
-							glRenderPass.samplers.keySet(),
-							layoutBindings.stream()
-								.filter(binding -> binding.type() == PipelineDescriptor.ResourceType.SAMPLER
-									|| binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER)
-								.map(PipelineDescriptor.ResourceBinding::name)
-								.toList()
-						);
-					}
-					if (logParticleSamplers) {
-						GpuTextureView boundView = glRenderPass.samplers.get(resourceBinding.name());
-						GpuTexture boundTexture = boundView != null ? boundView.texture() : null;
-						GpuTexture resourceTexture = textureView != null && textureView.texture() instanceof GpuTexture gpuTexture ? gpuTexture : null;
-						LOGGER.info(
-							"Particle Vulkan sampler binding pipeline={} binding={} uniformPresent={} reflectedUnit={} boundViewPresent={} boundTexId={} boundLabel={} resourceViewPresent={} resourceViewTexId={} resourceViewLabel={}",
-							pipelineInfo.getLocation(),
-							resourceBinding.name(),
-							uniform instanceof Uniform.Sampler,
-							samplerIndex,
-							boundView != null,
-							boundTexture != null ? VulkanicCoreAPI.textureId(boundTexture) : 0,
-							boundTexture != null ? boundTexture.getLabel() : "null",
-							textureView != null,
-							resourceTexture != null ? VulkanicCoreAPI.textureId(resourceTexture) : 0,
-							resourceTexture != null ? resourceTexture.getLabel() : "null"
-						);
-					}
-					if (uniformPresent && textureView != null) {
-						Integer samplerObject = currentBoundSamplerObject(samplerIndex);
-						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerIndex, samplerObject, textureView));
-						boundResources.add(resourceBinding);
-					}
-				}
-				case UNIFORM_BUFFER -> {
-					net.vulkanic.VulkanicBufferSlice slice = glRenderPass.getUniformResourceSlice(resourceBinding.name());
-					if (slice == null
-						&& VulkanicAPI.generatedStandaloneUniformBlockName().equals(resourceBinding.name())) {
-						int lookupProgramId = glRenderPipeline.program().getProgramId();
-						boolean traceStandaloneLookup = VulkanicAPI.shouldTraceStandaloneUniforms();
-						if (traceStandaloneLookup) {
+		PipelineResourcePlanner.Plan submission = PipelineResourcePlanner.buildPlan(
+			descriptor,
+			resourceBinding -> {
+				switch (resourceBinding.type()) {
+					case SAMPLER, COMPARISON_SAMPLER -> {
+						Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
+						net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
+						boolean uniformPresent = uniform instanceof Uniform.Sampler;
+						int samplerIndex = resolveSamplerIndex(resourceBinding.name(), uniform, resourceBinding);
+						if (logSodiumChunkSamplers) {
 							LOGGER.info(
-								"CompositePassStandaloneLookupTrace stage=request pipeline={} framebuffer={} programId={} resourceName={} renderPassSlicePresent=no lookupUses=backend-program-id-int lookupProgramId={} lookupProgramIdHash={} pipelineLocation={} programWrapperId={}",
-								"custom-pass",
-								glRenderPass.getFramebuffer(),
-								lookupProgramId,
-								resourceBinding.name(),
-								lookupProgramId,
-								Integer.toHexString(Integer.hashCode(lookupProgramId)),
+								"Sodium Vulkan sampler resource pipeline={} binding={} uniformPresent={} textureViewPresent={} boundSamplerKeys={} resourceSamplerKeys={}",
 								pipelineInfo.getLocation(),
-								System.identityHashCode(glRenderPipeline.program())
-							);
-						}
-						slice = VulkanicAPI.getStandaloneUniformBufferSlice(
-							VulkanicAPI.getCommandContext(),
-							lookupProgramId
-						);
-						if (traceStandaloneLookup) {
-							LOGGER.info(
-								"CompositePassStandaloneLookupTrace stage=result pipeline={} framebuffer={} programId={} resourceName={} sliceAvailable={} lookupProgramId={} lookupProgramIdHash={} programWrapperId={}",
-								"custom-pass",
-								glRenderPass.getFramebuffer(),
-								lookupProgramId,
 								resourceBinding.name(),
-								slice != null ? "yes" : "no",
-								lookupProgramId,
-								Integer.toHexString(Integer.hashCode(lookupProgramId)),
-								System.identityHashCode(glRenderPipeline.program())
+								uniform instanceof Uniform.Sampler,
+								textureView != null,
+								glRenderPass.samplers.keySet(),
+								layoutBindings.stream()
+									.filter(binding -> binding.type() == PipelineDescriptor.ResourceType.SAMPLER
+										|| binding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER)
+									.map(PipelineDescriptor.ResourceBinding::name)
+									.toList()
+							);
+						}
+						if (logParticleSamplers) {
+							GpuTextureView boundView = glRenderPass.samplers.get(resourceBinding.name());
+							GpuTexture boundTexture = boundView != null ? boundView.texture() : null;
+							GpuTexture resourceTexture = textureView != null && textureView.texture() instanceof GpuTexture gpuTexture ? gpuTexture : null;
+							LOGGER.info(
+								"Particle Vulkan sampler binding pipeline={} binding={} uniformPresent={} reflectedUnit={} boundViewPresent={} boundTexId={} boundLabel={} resourceViewPresent={} resourceViewTexId={} resourceViewLabel={}",
+								pipelineInfo.getLocation(),
+								resourceBinding.name(),
+								uniform instanceof Uniform.Sampler,
+								samplerIndex,
+								boundView != null,
+								boundTexture != null ? VulkanicCoreAPI.textureId(boundTexture) : 0,
+								boundTexture != null ? boundTexture.getLabel() : "null",
+								textureView != null,
+								resourceTexture != null ? VulkanicCoreAPI.textureId(resourceTexture) : 0,
+								resourceTexture != null ? resourceTexture.getLabel() : "null"
+							);
+						}
+						if (uniformPresent && textureView != null) {
+							Integer samplerObject = currentBoundSamplerObject(samplerIndex);
+							return PipelineResourcePlanner.ResolvedResource.sampler(
+								new PipelineResourceBindings.SamplerBinding(samplerIndex, samplerObject, textureView)
 							);
 						}
 					}
-					if (slice != null) {
-						uniformBufferBindings.put(resourceBinding.name(), slice);
-						boundResources.add(resourceBinding);
+					case UNIFORM_BUFFER -> {
+						net.vulkanic.VulkanicBufferSlice slice = glRenderPass.getUniformResourceSlice(resourceBinding.name());
+						if (slice == null
+							&& VulkanicAPI.generatedStandaloneUniformBlockName().equals(resourceBinding.name())) {
+							int lookupProgramId = glRenderPipeline.program().getProgramId();
+							boolean traceStandaloneLookup = VulkanicAPI.shouldTraceStandaloneUniforms();
+							if (traceStandaloneLookup) {
+								LOGGER.info(
+									"CompositePassStandaloneLookupTrace stage=request pipeline={} framebuffer={} programId={} resourceName={} renderPassSlicePresent=no lookupUses=backend-program-id-int lookupProgramId={} lookupProgramIdHash={} pipelineLocation={} programWrapperId={}",
+									"custom-pass",
+									glRenderPass.getFramebuffer(),
+									lookupProgramId,
+									resourceBinding.name(),
+									lookupProgramId,
+									Integer.toHexString(Integer.hashCode(lookupProgramId)),
+									pipelineInfo.getLocation(),
+									System.identityHashCode(glRenderPipeline.program())
+								);
+							}
+							slice = VulkanicAPI.getStandaloneUniformBufferSlice(
+								VulkanicAPI.getCommandContext(),
+								lookupProgramId
+							);
+							if (traceStandaloneLookup) {
+								LOGGER.info(
+									"CompositePassStandaloneLookupTrace stage=result pipeline={} framebuffer={} programId={} resourceName={} sliceAvailable={} lookupProgramId={} lookupProgramIdHash={} programWrapperId={}",
+									"custom-pass",
+									glRenderPass.getFramebuffer(),
+									lookupProgramId,
+									resourceBinding.name(),
+									slice != null ? "yes" : "no",
+									lookupProgramId,
+									Integer.toHexString(Integer.hashCode(lookupProgramId)),
+									System.identityHashCode(glRenderPipeline.program())
+								);
+							}
+						}
+						if (slice != null) {
+							return PipelineResourcePlanner.ResolvedResource.uniformBuffer(slice);
+						}
+					}
+					case TEXEL_BUFFER -> {
+						Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
+						if (uniform instanceof Uniform.Utb(int location, int samplerIndex, TextureFormat format, int texture)) {
+							return PipelineResourcePlanner.ResolvedResource.texelBuffer(
+								new PipelineResourceBindings.TexelBufferBinding(samplerIndex)
+							);
+						}
 					}
 				}
-				case TEXEL_BUFFER -> {
-					Uniform uniform = glRenderPipeline.program().getUniform(resourceBinding.name());
-					if (uniform instanceof Uniform.Utb(int location, int samplerIndex, TextureFormat format, int texture)) {
-						texelBufferBindings.put(resourceBinding.name(), new PipelineResourceBindings.TexelBufferBinding(samplerIndex));
-						boundResources.add(resourceBinding);
-					}
-				}
-			}
-		}
+				return null;
+			},
+			PipelineResourcePlanner.options()
+				.missingResourceDescriber(PipelineResourcePlanner.MissingResourceDescriber.NONE)
+		);
 
-		if (boundResources.isEmpty()) {
+		if (submission == null) {
 			if (auditStartNanos != 0L) {
 				VulkanPerfAudit.recordBindingBuild(System.nanoTime() - auditStartNanos, false);
 			}
 			return null;
 		}
 
-		boolean completeCoverage = boundResources.size() == layout.bindings().size();
-		PipelineDescriptor submissionDescriptor = completeCoverage
-			? descriptor
-			: descriptor.withResourceLayout(new PipelineDescriptor.ResourceLayout(boundResources));
 		if (logParticleSamplers) {
 			LOGGER.info(
 				"Particle Vulkan sampler submission pipeline={} boundResources={} totalBindings={} completeCoverage={}",
 				pipelineInfo.getLocation(),
-				boundResources.stream().map(PipelineDescriptor.ResourceBinding::name).toList(),
-				layoutBindingCount,
-				completeCoverage
+				submission.descriptor().getResourceLayout().bindings().stream().map(PipelineDescriptor.ResourceBinding::name).toList(),
+				layoutBindings.size(),
+				submission.completeCoverage()
 			);
 		}
 
-		PipelineResourceBindingSubmission submission = new PipelineResourceBindingSubmission(
-			submissionDescriptor,
-			PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBufferBindings, texelBufferBindings),
-			completeCoverage,
-			boundResources.size()
-		);
 		if (auditStartNanos != 0L) {
-			VulkanPerfAudit.recordBindingBuild(System.nanoTime() - auditStartNanos, completeCoverage);
+			VulkanPerfAudit.recordBindingBuild(System.nanoTime() - auditStartNanos, submission.completeCoverage());
 		}
 		return submission;
 	}
 
-	private PipelineResourceBindingSubmission buildCustomPassPipelineResourceBindings(
+	private PipelineResourcePlanner.Plan buildCustomPassPipelineResourceBindings(
 		GlRenderPass glRenderPass,
 		PipelineDescriptor descriptor,
 		@Nullable net.irisshaders.iris.gl.program.Program program
 	) {
-		java.util.List<PipelineDescriptor.ResourceBinding> layoutBindings = descriptor.getResourceLayout().bindings();
-		int layoutBindingCount = layoutBindings.size();
 		java.util.Map<String, Integer> samplerUnits = program != null ? program.getRenderPassSamplerUnits() : java.util.Map.of();
-		java.util.Map<String, PipelineResourceBindings.SamplerBinding> samplerBindings = new java.util.HashMap<>(layoutBindingCount);
-		java.util.Map<String, net.vulkanic.VulkanicBufferSlice> uniformBufferBindings = new java.util.HashMap<>(layoutBindingCount);
-		java.util.Map<String, PipelineResourceBindings.TexelBufferBinding> texelBufferBindings = new java.util.HashMap<>(layoutBindingCount);
-		java.util.List<PipelineDescriptor.ResourceBinding> boundResources = new java.util.ArrayList<>(layoutBindingCount);
 
-		for (PipelineDescriptor.ResourceBinding resourceBinding : layoutBindings) {
-			switch (resourceBinding.type()) {
-				case SAMPLER, COMPARISON_SAMPLER -> {
-					Integer samplerUnit = samplerUnits.get(resourceBinding.name());
-					net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
-					if (samplerUnit != null && textureView != null) {
-						Integer samplerObject = currentBoundSamplerObject(samplerUnit);
-						samplerBindings.put(resourceBinding.name(), new PipelineResourceBindings.SamplerBinding(samplerUnit, samplerObject, textureView));
-						boundResources.add(resourceBinding);
-					}
-				}
-				case UNIFORM_BUFFER -> {
-					net.vulkanic.VulkanicBufferSlice slice = glRenderPass.getUniformResourceSlice(resourceBinding.name());
-					if (slice == null && VulkanicAPI.generatedStandaloneUniformBlockName().equals(resourceBinding.name())) {
-						int standaloneProgramId = program != null ? program.getProgramId() : -1;
-						Object standalonePipelineLocation = glRenderPass.pipeline != null
-							? glRenderPass.pipeline.info().getLocation()
-							: "null";
-						slice = standaloneProgramId >= 0
-							? VulkanicAPI.getStandaloneUniformBufferSlice(VulkanicAPI.getCommandContext(), standaloneProgramId)
-							: null;
-						if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
-							LOGGER.info(
-								"StandaloneCustomPassProbe stage=lookup programId={} pipelineLocation={} renderPassId={} backendLookupResult={} sliceId={} note=fallback-used-for-custom-pass-binding",
-								standaloneProgramId,
-								standalonePipelineLocation,
-								System.identityHashCode(glRenderPass),
-								slice != null ? "non-null" : "null",
-								System.identityHashCode(slice)
+		return PipelineResourcePlanner.buildPlan(
+			descriptor,
+			resourceBinding -> {
+				switch (resourceBinding.type()) {
+					case SAMPLER, COMPARISON_SAMPLER -> {
+						Integer samplerUnit = samplerUnits.get(resourceBinding.name());
+						net.vulkanic.VulkanicTextureView textureView = glRenderPass.getSamplerResourceView(resourceBinding.name());
+						if (samplerUnit != null && textureView != null) {
+							Integer samplerObject = currentBoundSamplerObject(samplerUnit);
+							return PipelineResourcePlanner.ResolvedResource.sampler(
+								new PipelineResourceBindings.SamplerBinding(samplerUnit, samplerObject, textureView)
 							);
 						}
 					}
-					if (slice != null) {
-						uniformBufferBindings.put(resourceBinding.name(), slice);
-						boundResources.add(resourceBinding);
+					case UNIFORM_BUFFER -> {
+						net.vulkanic.VulkanicBufferSlice slice = glRenderPass.getUniformResourceSlice(resourceBinding.name());
+						if (slice == null && VulkanicAPI.generatedStandaloneUniformBlockName().equals(resourceBinding.name())) {
+							int standaloneProgramId = program != null ? program.getProgramId() : -1;
+							Object standalonePipelineLocation = glRenderPass.pipeline != null
+								? glRenderPass.pipeline.info().getLocation()
+								: "null";
+							slice = standaloneProgramId >= 0
+								? VulkanicAPI.getStandaloneUniformBufferSlice(VulkanicAPI.getCommandContext(), standaloneProgramId)
+								: null;
+							if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
+								LOGGER.info(
+									"StandaloneCustomPassProbe stage=lookup programId={} pipelineLocation={} renderPassId={} backendLookupResult={} sliceId={} note=fallback-used-for-custom-pass-binding",
+									standaloneProgramId,
+									standalonePipelineLocation,
+									System.identityHashCode(glRenderPass),
+									slice != null ? "non-null" : "null",
+									System.identityHashCode(slice)
+								);
+							}
+						}
+						if (slice != null) {
+							return PipelineResourcePlanner.ResolvedResource.uniformBuffer(slice);
+						}
+					}
+					case TEXEL_BUFFER -> {
+						Integer samplerUnit = samplerUnits.get(resourceBinding.name());
+						if (samplerUnit != null) {
+							return PipelineResourcePlanner.ResolvedResource.texelBuffer(
+								new PipelineResourceBindings.TexelBufferBinding(samplerUnit)
+							);
+						}
 					}
 				}
-				case TEXEL_BUFFER -> {
-					Integer samplerUnit = samplerUnits.get(resourceBinding.name());
-					if (samplerUnit != null) {
-						texelBufferBindings.put(resourceBinding.name(), new PipelineResourceBindings.TexelBufferBinding(samplerUnit));
-						boundResources.add(resourceBinding);
-					}
-				}
-			}
-		}
-
-		boolean completeCoverage = boundResources.size() == layoutBindings.size();
-		return new PipelineResourceBindingSubmission(
-			descriptor,
-			PipelineResourceBindings.ofResolvedBindings(samplerBindings, uniformBufferBindings, texelBufferBindings),
-			completeCoverage,
-			boundResources.size()
+				return null;
+			},
+			PipelineResourcePlanner.options()
+				.requireAtLeastOneBinding(false)
+				.filterIncompleteLayout(false)
+				.missingResourceDescriber(PipelineResourcePlanner.MissingResourceDescriber.NONE)
 		);
 	}
 
@@ -1752,7 +1732,7 @@ public class GlCommandEncoder implements CommandEncoder {
 						return false;
 					}
 
-					PipelineResourceBindingSubmission submission = this.buildCustomPassPipelineResourceBindings(
+					PipelineResourcePlanner.Plan submission = this.buildCustomPassPipelineResourceBindings(
 						glRenderPass,
 						customPipelineDescriptor,
 						customPass.program()
@@ -1975,7 +1955,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					: fallbackReason + "; Iris render descriptor failed: " + exception.getClass().getSimpleName() + ": " + exception.getMessage();
 			}
 		}
-		PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass, selectedDescriptor);
+		PipelineResourcePlanner.Plan submission = this.buildPipelineResourceBindings(glRenderPass, selectedDescriptor);
 		if (!ctx.isImmediate() && DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS && DEBUG_PIPELINE_BIND_LOGS < 80) {
 			DEBUG_PIPELINE_BIND_LOGS++;
 			LOGGER.info(

@@ -332,6 +332,7 @@ public class Phase3DrawPathTest {
         assertTrue(irisRenderSystemSource.contains("public static int getBoundSamplerOnUnit(int unit)"),
             "Iris should expose the cached sampler object per texture unit so Vulkan descriptor binding can snapshot it");
         assertTrue(commandEncoderSource.contains("currentBoundSamplerObject(samplerIndex)")
+                && commandEncoderSource.contains("PipelineResourcePlanner.ResolvedResource.sampler(")
                 && commandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding(samplerIndex, samplerObject, textureView)"),
             "Regular Vulkan descriptor bindings should carry the captured Iris sampler object, not only the texture unit");
         assertTrue(commandEncoderSource.contains("currentBoundSamplerObject(samplerUnit)")
@@ -444,7 +445,8 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should let Iris custom passes contribute sampler resources to the active render pass");
         assertTrue(commandEncoderSource.contains("customPass.pipelineHandle(submission.descriptor())")
                 && commandEncoderSource.contains("customPass.pipelineDescriptor()")
-                && commandEncoderSource.contains("buildCustomPassPipelineResourceBindings("),
+                && commandEncoderSource.contains("buildCustomPassPipelineResourceBindings(")
+                && commandEncoderSource.contains("PipelineResourcePlanner.buildPlan("),
             "GlCommandEncoder should bind descriptor-matched live-program pipelines and descriptor resources for custom passes on Vulkan");
         assertTrue(commandEncoderSource.contains("if (!submission.completeCoverage())")
                 && commandEncoderSource.contains("Skipping Vulkan custom pass"),
@@ -1255,6 +1257,11 @@ public class Phase3DrawPathTest {
             "The native terrain pass should recover shaderpack samplers that Iris exposes only as legacy texture IDs");
         assertTrue(encoderSource.contains("int unit = this.resolveSamplerUnit(binding);"),
             "The native terrain pass should bind descriptors using Iris sampler units, not descriptor binding indices");
+        assertTrue(encoderSource.contains("PipelineResourcePlanner.buildPlan(")
+                && encoderSource.contains("submission.missingResources()"),
+            "The native terrain pass should share Vulkanic's resource planner instead of carrying a local descriptor walk");
+        assertFalse(encoderSource.contains("private record PipelineResourceBindingSubmission"),
+            "The native terrain pass should not keep a separate local resource-submission model once Vulkanic owns the shared plan");
 
         Path programSamplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
         String programSamplersSource = Files.readString(programSamplersFile);
@@ -1305,7 +1312,7 @@ public class Phase3DrawPathTest {
         assertTrue(encoderSource.contains("VulkanicAPI.getLinkedProgramSpirvModules(ctx, programHandle).isEmpty()"),
             "The generic live descriptor path should require linked SPIR-V modules before replacing the base descriptor");
         assertTrue(encoderSource.indexOf("this.setupIrisProgramStateIfNeeded(glRenderPass);")
-                < encoderSource.indexOf("PipelineResourceBindingSubmission submission = this.buildPipelineResourceBindings(glRenderPass, selectedDescriptor);"),
+                < encoderSource.indexOf("PipelineResourcePlanner.Plan submission = this.buildPipelineResourceBindings(glRenderPass, selectedDescriptor);"),
             "Vulkan should run Iris setup before collecting descriptor resources so shaderpack sampler state is current");
     }
 

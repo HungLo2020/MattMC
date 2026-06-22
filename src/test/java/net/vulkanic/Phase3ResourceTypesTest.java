@@ -737,6 +737,72 @@ public class Phase3ResourceTypesTest {
     }
 
     @Test
+    public void testPipelineResourcePlannerBuildsFilteredPartialPlan() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+        OpenGLTexture texture = OpenGLTexture.nonOwning(
+            34,
+            VulkanicTexture.USAGE_TEXTURE_BINDING,
+            VulkanicTextureFormat.RGBA8,
+            16,
+            16,
+            1,
+            1,
+            "planner-sampler-test"
+        );
+        OpenGLTextureView textureView = new OpenGLTextureView(texture, 0, 1);
+        OpenGLBuffer uniformBuffer = new OpenGLBuffer(11, VulkanicBuffer.USAGE_UNIFORM, 256);
+        VulkanicBufferSlice uniformSlice = new VulkanicBufferSlice(uniformBuffer, 0, 256);
+
+        PipelineResourcePlanner.Plan plan = PipelineResourcePlanner.buildPlan(
+            descriptor,
+            binding -> switch (binding.type()) {
+                case SAMPLER, COMPARISON_SAMPLER -> PipelineResourcePlanner.ResolvedResource.sampler(
+                    new PipelineResourceBindings.SamplerBinding(5, 44, textureView));
+                case UNIFORM_BUFFER -> PipelineResourcePlanner.ResolvedResource.uniformBuffer(uniformSlice);
+                case TEXEL_BUFFER -> null;
+            },
+            PipelineResourcePlanner.options()
+        );
+
+        assertNotNull(plan);
+        assertFalse(plan.completeCoverage());
+        assertEquals(2, plan.boundResourceCount());
+        assertNotSame(descriptor, plan.descriptor(),
+            "Partial resource plans should submit a descriptor variant with only bound resources");
+        assertTrue(plan.descriptor().getResourceLayout().findByName("Sampler0").isPresent());
+        assertTrue(plan.descriptor().getResourceLayout().findByName("Globals").isPresent());
+        assertTrue(plan.descriptor().getResourceLayout().findByName("CloudFaces").isEmpty());
+        assertTrue(plan.missingResources().contains("CloudFaces(TEXEL_BUFFER)"));
+
+        PipelineResourceBindings.SamplerBinding samplerBinding = plan.bindings().getSamplerBinding("Sampler0")
+            .orElseThrow(() -> new IllegalStateException("Sampler0 missing from planned bindings"));
+        assertEquals(5, samplerBinding.textureUnit());
+        assertEquals(44, samplerBinding.samplerObject());
+        assertSame(textureView, samplerBinding.textureView());
+        assertSame(uniformSlice, plan.bindings().getUniformBufferBinding("Globals").orElseThrow());
+    }
+
+    @Test
+    public void testPipelineResourcePlannerCanRepresentEmptyIncompleteCustomPassPlan() {
+        PipelineDescriptor descriptor = PipelineDescriptor.fromRenderPipeline(buildTestPipeline());
+
+        PipelineResourcePlanner.Plan plan = PipelineResourcePlanner.buildPlan(
+            descriptor,
+            binding -> null,
+            PipelineResourcePlanner.options()
+                .requireAtLeastOneBinding(false)
+                .filterIncompleteLayout(false)
+        );
+
+        assertNotNull(plan);
+        assertFalse(plan.completeCoverage());
+        assertEquals(0, plan.boundResourceCount());
+        assertSame(descriptor, plan.descriptor(),
+            "Custom-pass callers that fail open should be able to inspect incomplete coverage without changing descriptor identity");
+        assertEquals(descriptor.getResourceLayout().bindings().size(), plan.missingResources().size());
+    }
+
+    @Test
     public void testPipelineDescriptorFromPortableStateNull() {
         assertThrows(IllegalArgumentException.class,
             () -> PipelineDescriptor.fromPortableState(null));
