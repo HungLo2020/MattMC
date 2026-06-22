@@ -2883,6 +2883,10 @@ public interface GraphicsBackend {
     
     // Multi-draw operations
     void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
+
+    default void multiDrawElementsBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, long pCount, VulkanicIndexType type, long pIndices, int drawCount, long pBaseVertex) {
+        multiDrawElementsBaseVertex(ctx, mode.toGlModeConstant(), pCount, type.toGlTypeConstant(), pIndices, drawCount, pBaseVertex);
+    }
     
     // Texture operations
     

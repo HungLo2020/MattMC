@@ -23,6 +23,7 @@ import net.vulkanic.VulkanReadinessReport;
 import net.vulkanic.VulkanicBufferSlice;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
@@ -7021,10 +7022,27 @@ void main() {
 
     public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type,
                                             long pIndices, int drawCount, long pBaseVertex) {
-        long commandBufferHandle = requireVulkanCommandBufferHandle("multiDrawElementsBaseVertex", ctx);
         VulkanicIndexType indexType = VulkanicIndexType.fromLegacyGlConstant(type)
             .orElseThrow(() -> new IllegalArgumentException(
                 "Unsupported multiDrawElementsBaseVertex index type constant: " + type));
+
+        multiDrawElementsBaseVertex(
+            ctx,
+            VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Unsupported multiDrawElementsBaseVertex primitive mode constant: " + mode)),
+            pCount,
+            indexType,
+            pIndices,
+            drawCount,
+            pBaseVertex
+        );
+    }
+
+    public void multiDrawElementsBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, long pCount,
+                                            VulkanicIndexType indexType, long pIndices, int drawCount,
+                                            long pBaseVertex) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("multiDrawElementsBaseVertex", ctx);
 
         if (drawCount < 0 || pCount == 0L || pIndices == 0L || pBaseVertex == 0L) {
             throw new IllegalArgumentException(
@@ -7056,7 +7074,7 @@ void main() {
                     "Index offset must align to index type size. offset=" + indices + ", bytesPerIndex=" + indexType.bytesPerIndex());
             }
 
-            spine.drawLegacyElements(commandBufferHandle, mode, count, indexType, indices, 1, baseVertex);
+            spine.drawLegacyElements(commandBufferHandle, mode.toGlModeConstant(), count, indexType, indices, 1, baseVertex);
         }
     }
 

@@ -39,8 +39,10 @@ public class ApiNeutralityCallsiteTest {
             "Sodium RenderDevice selection should follow the already-initialized Vulkanic backend without forcing OpenGL bootstrap");
         assertTrue(renderDeviceHolderSource.contains("new VulkanicRenderDevice()"),
             "Vulkan backend selection should have a distinct render-device adapter seam");
-        assertTrue(vulkanicRenderDeviceSource.contains("extends GLRenderDevice"),
-            "The first Vulkan render-device seam should preserve legacy compatibility behavior while ownership migrates");
+        assertFalse(vulkanicRenderDeviceSource.contains("extends GLRenderDevice"),
+            "VulkanicRenderDevice should no longer inherit the OpenGL Sodium render device implementation");
+        assertTrue(vulkanicRenderDeviceSource.contains("implements RenderDevice"),
+            "VulkanicRenderDevice should own the selected Sodium render-device implementation directly");
 
         assertTrue(commandListSource.contains("RenderTessellation createTessellation(VulkanicPrimitiveMode primitiveMode"),
             "CommandList should expose backend-neutral tessellation creation for terrain callsites");
@@ -48,6 +50,18 @@ public class ApiNeutralityCallsiteTest {
             "CommandList should expose backend-neutral tessellation binding for terrain callsites");
         assertTrue(drawCommandListSource.contains("multiDrawElementsBaseVertex(MultiDrawBatch batch, VulkanicIndexType indexType)"),
             "DrawCommandList should expose backend-neutral index-type draw calls");
+        assertFalse(commandListSource.contains("default RenderTessellation createTessellation(VulkanicPrimitiveMode primitiveMode"),
+            "CommandList should not hide Vulkan terrain tessellation behind a default GL conversion");
+        assertFalse(commandListSource.contains("Current Sodium command list can only tessellate legacy-backed tessellations"),
+            "Backend-selected command lists should decide which RenderTessellation implementation they accept");
+        assertFalse(drawCommandListSource.contains("GlIndexType.fromVulkanicIndexType(indexType)"),
+            "DrawCommandList should not hide Vulkan terrain draws behind a default GL index conversion");
+        assertTrue(vulkanicRenderDeviceSource.contains("new VulkanicTessellation(primitiveMode, bindings)"),
+            "VulkanicRenderDevice should create a Vulkan-owned terrain tessellation for backend-neutral terrain calls");
+        assertTrue(vulkanicRenderDeviceSource.contains("VulkanicAPI.multiDrawElementsBaseVertex(")
+                && vulkanicRenderDeviceSource.contains("primitiveMode")
+                && vulkanicRenderDeviceSource.contains("indexType"),
+            "VulkanicRenderDevice should submit typed primitive and index state to VulkanicAPI");
 
         assertFalse(defaultChunkRendererSource.contains("import net.sodium.client.gl.tessellation.GlTessellation;"),
             "DefaultChunkRenderer should not own GL tessellation types directly");

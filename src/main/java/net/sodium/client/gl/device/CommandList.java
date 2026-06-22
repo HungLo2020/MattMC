@@ -7,6 +7,7 @@ import net.sodium.client.gl.sync.GlFence;
 import net.sodium.client.gl.tessellation.GlPrimitiveType;
 import net.sodium.client.gl.tessellation.GlTessellation;
 import net.sodium.client.gl.tessellation.TessellationBinding;
+import net.sodium.client.render.device.RenderBufferTarget;
 import net.sodium.client.render.device.RenderTessellation;
 import net.sodium.client.render.device.RenderTessellationBinding;
 import net.vulkanic.VulkanicPrimitiveMode;
@@ -21,12 +22,7 @@ public interface CommandList extends AutoCloseable {
 
     GlTessellation createTessellation(GlPrimitiveType primitiveType, TessellationBinding[] bindings);
 
-    default RenderTessellation createTessellation(VulkanicPrimitiveMode primitiveMode, RenderTessellationBinding[] bindings) {
-        return this.createTessellation(
-            GlPrimitiveType.fromVulkanicPrimitiveMode(primitiveMode),
-            RenderTessellationBinding.toLegacyGlBindings(bindings)
-        );
-    }
+    RenderTessellation createTessellation(VulkanicPrimitiveMode primitiveMode, RenderTessellationBinding[] bindings);
 
     void bindVertexArray(GlVertexArray array);
 
@@ -35,6 +31,8 @@ public interface CommandList extends AutoCloseable {
     void copyBufferSubData(GlBuffer src, GlBuffer dst, long readOffset, long writeOffset, long bytes);
 
     void bindBuffer(GlBufferTarget target, GlBuffer buffer);
+
+    void bindBuffer(RenderBufferTarget target, GlBuffer buffer);
 
     void unbindVertexArray();
 
@@ -48,13 +46,7 @@ public interface CommandList extends AutoCloseable {
 
     DrawCommandList beginTessellating(GlTessellation tessellation);
 
-    default DrawCommandList beginTessellating(RenderTessellation tessellation) {
-        if (!(tessellation instanceof GlTessellation legacyTessellation)) {
-            throw new IllegalArgumentException("Current Sodium command list can only tessellate legacy-backed tessellations");
-        }
-
-        return this.beginTessellating(legacyTessellation);
-    }
+    DrawCommandList beginTessellating(RenderTessellation tessellation);
 
     void deleteTessellation(GlTessellation tessellation);
 

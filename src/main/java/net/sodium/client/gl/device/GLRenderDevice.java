@@ -9,10 +9,15 @@ import net.sodium.client.gl.state.GlStateTracker;
 import net.sodium.client.gl.sync.GlFence;
 import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.tessellation.*;
+import net.sodium.client.render.device.RenderBufferTarget;
+import net.sodium.client.render.device.RenderTessellation;
+import net.sodium.client.render.device.RenderTessellationBinding;
 import net.sodium.client.gl.util.EnumBitField;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicIntegerQuery;
+import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPrimitiveMode;
 import java.nio.ByteBuffer;
 
 public class GLRenderDevice implements RenderDevice {
@@ -127,6 +132,11 @@ public class GLRenderDevice implements RenderDevice {
         }
 
         @Override
+        public void bindBuffer(RenderBufferTarget target, GlBuffer buffer) {
+            this.bindBuffer(target.toGlBufferTarget(), buffer);
+        }
+
+        @Override
         public void unbindVertexArray() {
             if (this.stateTracker.makeVertexArrayActive(null)) {
                 CommandContext ctx = VulkanicAPI.getCommandContext();
@@ -178,6 +188,15 @@ public class GLRenderDevice implements RenderDevice {
             GLRenderDevice.this.activeTessellation.bind(GLRenderDevice.this.commandList);
 
             return GLRenderDevice.this.drawCommandList;
+        }
+
+        @Override
+        public DrawCommandList beginTessellating(RenderTessellation tessellation) {
+            if (!(tessellation instanceof GlTessellation legacyTessellation)) {
+                throw new IllegalArgumentException("GL render device can only tessellate legacy-backed tessellations");
+            }
+
+            return this.beginTessellating(legacyTessellation);
         }
 
         @Override
@@ -284,6 +303,14 @@ public class GLRenderDevice implements RenderDevice {
 
             return tessellation;
         }
+
+        @Override
+        public RenderTessellation createTessellation(VulkanicPrimitiveMode primitiveMode, RenderTessellationBinding[] bindings) {
+            return this.createTessellation(
+                GlPrimitiveType.fromVulkanicPrimitiveMode(primitiveMode),
+                RenderTessellationBinding.toLegacyGlBindings(bindings)
+            );
+        }
     }
 
     private class ImmediateDrawCommandList implements DrawCommandList {
@@ -293,16 +320,19 @@ public class GLRenderDevice implements RenderDevice {
 
         @Override
         public void multiDrawElementsBaseVertex(MultiDrawBatch batch, GlIndexType indexType) {
-            GlPrimitiveType primitiveType = GLRenderDevice.this.activeTessellation.getPrimitiveType();
-            
-            // Iris: Use GL_PATCHES when tessellation is active
-            int primitiveId = net.irisshaders.iris.vertices.ImmediateState.usingTessellation 
-                ? VulkanicAPI.GL_PATCHES
-                : primitiveType.getId();
+            this.multiDrawElementsBaseVertex(batch, indexType.toVulkanicIndexType());
+        }
 
-            VulkanicAPI.multiDrawElementsBaseVertex(VulkanicAPI.getCommandContext(), primitiveId,
+        @Override
+        public void multiDrawElementsBaseVertex(MultiDrawBatch batch, VulkanicIndexType indexType) {
+            VulkanicPrimitiveMode primitiveMode = GLRenderDevice.this.activeTessellation.getPrimitiveMode();
+            if (net.irisshaders.iris.vertices.ImmediateState.usingTessellation) {
+                primitiveMode = VulkanicPrimitiveMode.PATCHES;
+            }
+
+            VulkanicAPI.multiDrawElementsBaseVertex(VulkanicAPI.getCommandContext(), primitiveMode,
                     batch.pElementCount,
-                    indexType.getFormatId(),
+                    indexType,
                     batch.pElementPointer,
                     batch.size,
                     batch.pBaseVertex);

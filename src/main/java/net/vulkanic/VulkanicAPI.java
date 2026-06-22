@@ -4710,6 +4710,10 @@ public class VulkanicAPI {
         getBackend().multiDrawElementsBaseVertex(ctx, mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
 
+    public static void multiDrawElementsBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, long pCount, VulkanicIndexType type, long pIndices, int drawCount, long pBaseVertex) {
+        getBackend().multiDrawElementsBaseVertex(ctx, mode, pCount, type, pIndices, drawCount, pBaseVertex);
+    }
+
     
     
     // Additional methods for IrisRenderSystem migration

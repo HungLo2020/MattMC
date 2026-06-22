@@ -6,9 +6,7 @@ import net.vulkanic.VulkanicIndexType;
 public interface DrawCommandList extends AutoCloseable {
     void multiDrawElementsBaseVertex(MultiDrawBatch batch, GlIndexType indexType);
 
-    default void multiDrawElementsBaseVertex(MultiDrawBatch batch, VulkanicIndexType indexType) {
-        this.multiDrawElementsBaseVertex(batch, GlIndexType.fromVulkanicIndexType(indexType));
-    }
+    void multiDrawElementsBaseVertex(MultiDrawBatch batch, VulkanicIndexType indexType);
 
     void endTessellating();
 
