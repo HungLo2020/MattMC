@@ -73,12 +73,12 @@ final class VulkanCompatibilityGpuDevice implements GpuDevice {
 
 	@Override
 	public List<String> getLastDebugMessages() {
-		return this.compatibilityDevice.getLastDebugMessages();
+		return this.backend.getBackendLastDebugMessages();
 	}
 
 	@Override
 	public boolean isDebuggingEnabled() {
-		return this.compatibilityDevice.isDebuggingEnabled();
+		return this.backend.isBackendDebuggingEnabled();
 	}
 
 	@Override

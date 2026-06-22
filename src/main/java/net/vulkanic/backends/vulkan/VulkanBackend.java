@@ -217,6 +217,7 @@ public class VulkanBackend {
     private volatile CommandContext currentCommandContext;
     private volatile long auxiliaryOpenGlContextWindow = MemoryUtil.NULL;
     private volatile net.blaze3d.opengl.GlDevice compatibilityDevice;
+    private volatile boolean rendererDebuggingEnabled;
 
     private final SpirvCompiler spirvCompiler;
     private final Map<RenderPipeline, PrecompiledPipelineState> precompiledPipelineCache = new ConcurrentHashMap<>();
@@ -1105,6 +1106,7 @@ void main() {
             debugLabelsEnabled
         );
         this.compatibilityDevice = compatibilityDevice;
+        this.rendererDebuggingEnabled = debugEnabled;
         return new VulkanCompatibilityGpuDevice(this, compatibilityDevice);
     }
 
@@ -1132,6 +1134,7 @@ void main() {
     void releaseCompatibilityDevice(net.blaze3d.opengl.GlDevice device) {
         if (this.compatibilityDevice == device) {
             this.compatibilityDevice = null;
+            this.rendererDebuggingEnabled = false;
         }
     }
 
@@ -6817,24 +6820,25 @@ void main() {
         );
     }
 
+    public java.util.List<String> getBackendLastDebugMessages() {
+        // Vulkan validation/debug callbacks are backend-owned; until they are
+        // plumbed into this diagnostic surface, do not borrow OpenGL messages.
+        return java.util.List.of();
+    }
+
+    public boolean isBackendDebuggingEnabled() {
+        return rendererDebuggingEnabled;
+    }
+
     public int getBackendMaxTextureSize() {
-        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
-        if (device == null) {
-            throw new IllegalStateException(
-                "Vulkan compatibility device has not been created yet. "
-                    + "Ensure renderer startup calls createRendererDevice() before querying max texture size.");
-        }
-        return device.getMaxTextureSize();
+        NativeSpine spine = nativeSpine;
+        return spine != null ? spine.maxImageDimension2D : 16384;
     }
 
     public int getBackendUniformOffsetAlignment() {
-        net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
-        if (device == null) {
-            throw new IllegalStateException(
-                "Vulkan compatibility device has not been created yet. "
-                    + "Ensure renderer startup calls createRendererDevice() before querying uniform alignment.");
-        }
-        return device.getUniformOffsetAlignment();
+        NativeSpine spine = nativeSpine;
+        long alignment = spine != null ? spine.minUniformBufferOffsetAlignment : 256L;
+        return alignment > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(1, (int) alignment);
     }
 
     public net.blaze3d.systems.GpuDevice.GpuDeviceInfo getBackendDeviceInfo() {
@@ -7973,12 +7977,15 @@ void main() {
             case STENCIL_WRITEMASK -> pendingStencilWriteMask;
             case CULL_FACE_MODE -> pendingCullFaceMode;
             case POLYGON_MODE -> pendingPolygonMode;
-            case MAX_TEXTURE_SIZE -> 16384;
+            case MAX_TEXTURE_SIZE -> spine != null ? spine.maxImageDimension2D : 16384;
             case MAX_TEXTURE_IMAGE_UNITS -> spine != null ? spine.maxTextureImageUnits : 32;
             case MAX_COLOR_ATTACHMENTS -> 16;
             case MAX_DRAW_BUFFERS -> 8;
             case MAX_SHADER_STORAGE_BUFFER_BINDINGS -> 8;
-            case UNIFORM_BUFFER_OFFSET_ALIGNMENT -> 256;
+            case UNIFORM_BUFFER_OFFSET_ALIGNMENT -> {
+                long alignment = spine != null ? spine.minUniformBufferOffsetAlignment : 256L;
+                yield alignment > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(1, (int) alignment);
+            }
             case TEXTURE_BINDING_2D -> spine != null
                 ? spine.legacyTexture2DBindingsByUnit.getOrDefault(spine.activeTextureUnitIndex, 0)
                 : 0;
@@ -8266,6 +8273,7 @@ void main() {
         private int currentImmediateSubmitSlot;
         private int recordingImmediateSubmitSlot = -1;
         private long minUniformBufferOffsetAlignment = 1L;
+        private int maxImageDimension2D = 16384;
         private int maxTextureImageUnits = 32;
 
         private final Map<Long, Long> managedBufferAllocations = new ConcurrentHashMap<>();
@@ -8737,6 +8745,7 @@ void main() {
                 physicalDeviceApiVersion = properties.apiVersion();
                 fillModeNonSolidSupported = features.fillModeNonSolid();
                 minUniformBufferOffsetAlignment = Math.max(1L, properties.limits().minUniformBufferOffsetAlignment());
+                maxImageDimension2D = Math.max(1024, properties.limits().maxImageDimension2D());
                 int maxPerStageSamplers = properties.limits().maxPerStageDescriptorSamplers();
                 int maxPerStageSampledImages = properties.limits().maxPerStageDescriptorSampledImages();
                 int combinedImageSamplerBudget = Math.min(maxPerStageSamplers, maxPerStageSampledImages);

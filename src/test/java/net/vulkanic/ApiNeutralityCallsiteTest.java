@@ -322,12 +322,20 @@ public class ApiNeutralityCallsiteTest {
             "VulkanCompatibilityGpuDevice should route max texture size queries through backend seam");
         assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.getBackendUniformOffsetAlignment();"),
             "VulkanCompatibilityGpuDevice should route uniform offset alignment queries through backend seam");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.getBackendLastDebugMessages();"),
+            "VulkanCompatibilityGpuDevice should route debug-message diagnostics through backend seam");
+        assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.isBackendDebuggingEnabled();"),
+            "VulkanCompatibilityGpuDevice should route debug-enabled diagnostics through backend seam");
         assertTrue(vulkanCompatibilityGpuDeviceSource.contains("return this.backend.getBackendDeviceInfo();"),
             "VulkanCompatibilityGpuDevice should route device info through backend seam");
         assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.getMaxTextureSize();"),
             "VulkanCompatibilityGpuDevice should avoid direct compatibility-device max texture size queries");
         assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.getUniformOffsetAlignment();"),
             "VulkanCompatibilityGpuDevice should avoid direct compatibility-device uniform alignment queries");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.getLastDebugMessages();"),
+            "VulkanCompatibilityGpuDevice should avoid direct compatibility-device debug-message queries");
+        assertFalse(vulkanCompatibilityGpuDeviceSource.contains("return this.compatibilityDevice.isDebuggingEnabled();"),
+            "VulkanCompatibilityGpuDevice should avoid direct compatibility-device debug-enabled queries");
         assertTrue(renderTargetSource.contains("VulkanicAPI.createCommandEncoder()"),
             "RenderTarget should acquire command encoders via backend-owned VulkanicAPI seam");
         assertFalse(renderTargetSource.contains("VulkanicAPI.getDevice().createCommandEncoder()"),
@@ -1003,6 +1011,16 @@ public class ApiNeutralityCallsiteTest {
             "Vulkan backend should only clear its cached compatibility device when the closed device still matches: " + vulkanBackendRelative);
         assertTrue(vulkanBackendSource.contains("this.compatibilityDevice = null;"),
             "Vulkan backend should drop stale compatibility-device references after close: " + vulkanBackendRelative);
+        assertTrue(vulkanBackendSource.contains("properties.limits().maxImageDimension2D()"),
+            "Vulkan backend should source max texture size from Vulkan physical-device limits: " + vulkanBackendRelative);
+        assertTrue(vulkanBackendSource.contains("properties.limits().minUniformBufferOffsetAlignment()"),
+            "Vulkan backend should source uniform alignment from Vulkan physical-device limits: " + vulkanBackendRelative);
+        assertTrue(vulkanBackendSource.contains("return spine != null ? spine.maxImageDimension2D : 16384;"),
+            "Vulkan backend max texture size seam should not require the compatibility GlDevice: " + vulkanBackendRelative);
+        assertFalse(vulkanBackendSource.contains("return device.getMaxTextureSize();"),
+            "Vulkan backend should avoid compatibility-device max texture size queries: " + vulkanBackendRelative);
+        assertFalse(vulkanBackendSource.contains("return device.getUniformOffsetAlignment();"),
+            "Vulkan backend should avoid compatibility-device uniform alignment queries: " + vulkanBackendRelative);
     }
 
     @Test
