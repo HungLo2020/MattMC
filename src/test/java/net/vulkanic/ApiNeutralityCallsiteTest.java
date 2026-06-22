@@ -150,11 +150,11 @@ public class ApiNeutralityCallsiteTest {
 
         assertTrue(backendSource.contains("return createCompatibilityCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);"),
             "Framebuffer Iris/custom passes should remain on the compatibility path until framebuffer resource parity is proven");
-        assertTrue(backendSource.contains("return createCompatibilityCommandEncoder().createRenderPass(descriptor);"),
-            "Descriptor-backed MRT passes should remain on the compatibility path until MRT parity is proven");
+        assertTrue(backendSource.contains("return new VulkanNativeCommandEncoder(this).createRenderPass(descriptor);"),
+            "Descriptor-backed MRT passes should now use the native Vulkan encoder once explicit target descriptors are available");
         assertTrue(nativeEncoderSource.contains("this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture)")
-                && nativeEncoderSource.contains("this.backend.createCompatibilityCommandEncoder().createRenderPass(descriptor)"),
-            "General native encoders should preserve the explicit compatibility boundary for framebuffer/MRT render-pass shapes");
+                && nativeEncoderSource.contains("VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);"),
+            "General native encoders should keep framebuffer fallback explicit while accepting descriptor-backed MRT render-pass shapes natively");
         assertFalse(nativeEncoderSource.contains("this.unsupported(\"copyToBuffer\")")
                 || nativeEncoderSource.contains("this.unsupported(\"clearColorTexture\")")
                 || nativeEncoderSource.contains("this.unsupported(\"clearColorAndDepthTextures\")")

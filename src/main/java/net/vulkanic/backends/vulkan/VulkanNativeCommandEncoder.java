@@ -12,10 +12,13 @@ import net.blaze3d.textures.GpuTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.program.Program;
+import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pbr.TextureTracker;
 import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.sodium.client.render.chunk.shader.VulkanTerrainPipelineDiagnostics;
 import net.minecraft.util.ARGB;
+import net.logging.LogUtils;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
@@ -40,6 +43,7 @@ import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
 
 /**
  * Native Vulkan command encoder for migrated render-pass slices.
@@ -51,6 +55,10 @@ import java.util.function.Supplier;
  * compatibility encoder until they have equivalent native state coverage.</p>
  */
 class VulkanNativeCommandEncoder implements CommandEncoder {
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final java.util.Set<String> WARNED_INCOMPLETE_CUSTOM_PASS_KEYS =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
     enum ResourceMode {
         GENERAL,
         TERRAIN
@@ -117,9 +125,6 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     @Override
     public RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
         this.ensureNoRenderPass();
-        if (this.resourceMode == ResourceMode.GENERAL) {
-            return this.backend.createCompatibilityCommandEncoder().createRenderPass(descriptor);
-        }
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);
         this.inRenderPass = true;
@@ -782,6 +787,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Nullable
         private PipelineDescriptor pipelineDescriptor;
         @Nullable
+        private CustomPass customPass;
+        @Nullable
         private GpuBuffer indexBuffer;
         private VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
         private boolean closed;
@@ -801,6 +808,17 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             this.renderTargetDescriptor = renderTargetDescriptor;
             this.colorView = colorView;
             this.depthView = depthView;
+        }
+
+        @Override
+        public void iris$setCustomPass(CustomPass pass) {
+            this.checkOpen();
+            this.customPass = pass;
+        }
+
+        @Override
+        public CustomPass iris$getCustomPass() {
+            return this.customPass;
         }
 
         @Override
@@ -997,6 +1015,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         }
 
         private void bindPipelineAndResources() {
+            if (this.customPass != null) {
+                this.bindCustomPassPipelineAndResources(this.customPass);
+                return;
+            }
+
             RenderPipeline pipeline = this.requirePipeline();
             PipelineDescriptor baseDescriptor = this.requirePipelineDescriptor();
             PipelineDescriptor selectedDescriptor = this.selectDescriptor(pipeline, baseDescriptor);
@@ -1023,6 +1046,47 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
             this.pass.setPipeline(handle);
             VulkanNativeCommandEncoder.this.backend.bindPipelineResources(this.ctx, handle, submission.descriptor(), submission.bindings());
+        }
+
+        private void bindCustomPassPipelineAndResources(CustomPass pass) {
+            RenderPipeline pipeline = this.requirePipeline();
+            pass.bindRenderPassResources(this);
+            pass.setupState();
+
+            PipelineDescriptor customDescriptor = pass.pipelineDescriptor();
+            if (customDescriptor == null) {
+                throw new IllegalStateException("No Vulkan custom-pass pipeline descriptor is available for " + pipeline.getLocation());
+            }
+
+            PipelineResourcePlanner.Plan submission = this.buildCustomPassResourceBindings(customDescriptor, pass.program());
+            if (!submission.completeCoverage()) {
+                String key = pipeline.getLocation() + "#" + this.framebuffer + "#"
+                    + (this.renderTargetDescriptor != null ? this.renderTargetDescriptor.label().get() : "no-descriptor");
+                if (WARNED_INCOMPLETE_CUSTOM_PASS_KEYS.add(key)) {
+                    LOGGER.warn(
+                        "Skipping Vulkan native custom pass {} because only {} of {} reflected resources were available; missingResources={}",
+                        pipeline.getLocation(),
+                        submission.boundResourceCount(),
+                        customDescriptor.getResourceLayout().bindings().size(),
+                        this.collectMissingCustomPassResources(customDescriptor, pass.program())
+                    );
+                }
+                throw new IllegalStateException(
+                    "Incomplete Vulkan native custom-pass resource coverage for " + pipeline.getLocation());
+            }
+
+            PipelineHandle handle = pass.pipelineHandle(submission.descriptor());
+            if (handle == null || !handle.isValid()) {
+                throw new IllegalStateException("Unable to resolve native Vulkan custom-pass pipeline handle for " + pipeline.getLocation());
+            }
+
+            this.pass.setPipeline(handle);
+            VulkanNativeCommandEncoder.this.backend.bindPipelineResources(
+                this.ctx,
+                handle,
+                submission.descriptor(),
+                submission.bindings()
+            );
         }
 
         private PipelineDescriptor selectDescriptor(RenderPipeline pipeline, PipelineDescriptor baseDescriptor) {
@@ -1112,6 +1176,100 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             }
 
             return submission;
+        }
+
+        private PipelineResourcePlanner.Plan buildCustomPassResourceBindings(
+            PipelineDescriptor descriptor,
+            @Nullable Program program
+        ) {
+            Map<String, Integer> renderPassSamplerUnits =
+                program != null ? program.getRenderPassSamplerUnits() : Map.of();
+
+            return PipelineResourcePlanner.buildPlan(
+                descriptor,
+                binding -> {
+                    switch (binding.type()) {
+                        case SAMPLER, COMPARISON_SAMPLER -> {
+                            Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
+                            VulkanicTextureView view = this.getSamplerView(binding.name());
+                            if (samplerUnit != null && view != null) {
+                                Integer samplerObject = currentBoundSamplerObject(samplerUnit);
+                                return PipelineResourcePlanner.ResolvedResource.sampler(
+                                    new PipelineResourceBindings.SamplerBinding(samplerUnit, samplerObject, view)
+                                );
+                            }
+                        }
+                        case UNIFORM_BUFFER -> {
+                            VulkanicBufferSlice slice = this.uniforms.get(binding.name());
+                            if (slice == null && VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
+                                int programId = program != null ? program.getProgramId() : -1;
+                                if (programId >= 0) {
+                                    slice = VulkanicAPI.getStandaloneUniformBufferSlice(this.ctx, programId);
+                                }
+                            }
+                            if (slice != null) {
+                                return PipelineResourcePlanner.ResolvedResource.uniformBuffer(slice);
+                            }
+                        }
+                        case TEXEL_BUFFER -> {
+                            Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
+                            if (samplerUnit != null) {
+                                return PipelineResourcePlanner.ResolvedResource.texelBuffer(
+                                    new PipelineResourceBindings.TexelBufferBinding(samplerUnit)
+                                );
+                            }
+                        }
+                    }
+                    return null;
+                },
+                PipelineResourcePlanner.options()
+                    .requireAtLeastOneBinding(false)
+                    .filterIncompleteLayout(false)
+                    .missingResourceDescriber(PipelineResourcePlanner.MissingResourceDescriber.NONE)
+            );
+        }
+
+        private java.util.List<String> collectMissingCustomPassResources(
+            PipelineDescriptor descriptor,
+            @Nullable Program program
+        ) {
+            Map<String, Integer> renderPassSamplerUnits =
+                program != null ? program.getRenderPassSamplerUnits() : Map.of();
+            java.util.List<String> missing = new java.util.ArrayList<>();
+
+            for (PipelineDescriptor.ResourceBinding binding : descriptor.getResourceLayout().bindings()) {
+                switch (binding.type()) {
+                    case SAMPLER, COMPARISON_SAMPLER -> {
+                        Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
+                        VulkanicTextureView view = this.getSamplerView(binding.name());
+                        if (samplerUnit == null || view == null) {
+                            missing.add(binding.name() + "(" + binding.type()
+                                + ",unit=" + (samplerUnit != null)
+                                + ",view=" + (view != null) + ")");
+                        }
+                    }
+                    case UNIFORM_BUFFER -> {
+                        VulkanicBufferSlice slice = this.uniforms.get(binding.name());
+                        if (slice == null && VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
+                            int programId = program != null ? program.getProgramId() : -1;
+                            if (programId >= 0) {
+                                slice = VulkanicAPI.getStandaloneUniformBufferSlice(this.ctx, programId);
+                            }
+                        }
+                        if (slice == null) {
+                            missing.add(binding.name() + "(UNIFORM_BUFFER)");
+                        }
+                    }
+                    case TEXEL_BUFFER -> {
+                        Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
+                        if (samplerUnit == null) {
+                            missing.add(binding.name() + "(TEXEL_BUFFER,unit=false)");
+                        }
+                    }
+                }
+            }
+
+            return missing;
         }
 
         @Nullable

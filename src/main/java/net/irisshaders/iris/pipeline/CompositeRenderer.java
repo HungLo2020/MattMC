@@ -58,6 +58,7 @@ import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBlendFactor;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
 
@@ -324,9 +325,11 @@ public class CompositeRenderer {
 				}
 			}
 
-			compositePass.ensurePipelineState();
+			VulkanicRenderTargetDescriptor renderTargetDescriptor =
+				compositePass.vulkanRenderTargetDescriptor(() -> "Composites");
+			compositePass.ensurePipelineState(renderTargetDescriptor);
 
-			try (RenderPass renderPass = compositePass.createRenderPass(() -> "Composites")) {
+			try (RenderPass renderPass = compositePass.createRenderPass(() -> "Composites", renderTargetDescriptor)) {
 				renderPass.setPipeline(COMPOSITE_PIPELINE);
 				VulkanicAPI.bindDefaultUniforms(renderPass);
 				renderPass.setIndexBuffer(indices, type);
@@ -541,19 +544,29 @@ public class CompositeRenderer {
 			this.pipelineLayoutVariants.clear();
 		}
 
-		private net.vulkanic.VulkanicRenderTargetDescriptor renderTargetDescriptor() {
-			return this.framebuffer.createRenderTargetDescriptor(() -> this.name, this.viewWidth, this.viewHeight);
+		private VulkanicRenderTargetDescriptor renderTargetDescriptor(Supplier<String> label) {
+			return this.framebuffer.createRenderTargetDescriptor(label, this.viewWidth, this.viewHeight);
 		}
 
-		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor) {
-			return VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+		private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label) {
+			return VulkanicAPI.isVulkanBackendSelected() && !VulkanicAPI.getCommandContext().isImmediate()
+				? this.renderTargetDescriptor(label)
+				: null;
 		}
 
-		private RenderPass createRenderPass(Supplier<String> label) {
-			return VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment());
+		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor, @org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
+			return renderTargetDescriptor != null
+				? VulkanicAPI.createPipeline(descriptor, renderTargetDescriptor)
+				: VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
 		}
 
-		private void ensurePipelineState() {
+		private RenderPass createRenderPass(Supplier<String> label, @org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
+			return renderTargetDescriptor != null
+				? VulkanicAPI.createRenderPass(renderTargetDescriptor)
+				: VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment());
+		}
+
+		private void ensurePipelineState(@org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
 			var ctx = VulkanicAPI.getCommandContext();
 			if (ctx.isImmediate()) {
 				return;
@@ -576,7 +589,7 @@ public class CompositeRenderer {
 			}
 
 			this.pipelineDescriptor = descriptor;
-			this.pipelineHandle = this.createCompatiblePipeline(descriptor);
+			this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor);
 			if (VulkanicAPI.shouldTraceStandaloneUniforms()) {
 				boolean descriptorHasStandaloneBlock = descriptor.getResourceLayout().bindings().stream()
 					.anyMatch(binding -> VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name()));
@@ -662,7 +675,9 @@ public class CompositeRenderer {
 				pipelineVariant.close();
 			}
 
-			PipelineHandle createdVariant = this.createCompatiblePipeline(descriptor);
+			VulkanicRenderTargetDescriptor renderTargetDescriptor =
+				this.vulkanRenderTargetDescriptor(() -> this.name);
+			PipelineHandle createdVariant = this.createCompatiblePipeline(descriptor, renderTargetDescriptor);
 			this.pipelineLayoutVariants.put(descriptor.getResourceLayout(), createdVariant);
 			return createdVariant;
 		}
