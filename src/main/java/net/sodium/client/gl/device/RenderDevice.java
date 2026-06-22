@@ -4,16 +4,18 @@ import net.sodium.client.gl.functions.DeviceFunctions;
 import net.vulkanic.GraphicsCapabilities;
 
 public interface RenderDevice {
-    RenderDevice INSTANCE = new GLRenderDevice();
+    static RenderDevice instance() {
+        return RenderDeviceHolder.instance();
+    }
 
     CommandList createCommandList();
 
     static void enterManagedCode() {
-        RenderDevice.INSTANCE.makeActive();
+        RenderDevice.instance().makeActive();
     }
 
     static void exitManagedCode() {
-        RenderDevice.INSTANCE.makeInactive();
+        RenderDevice.instance().makeInactive();
     }
 
     void makeActive();

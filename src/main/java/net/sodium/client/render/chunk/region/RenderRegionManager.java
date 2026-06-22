@@ -39,7 +39,7 @@ public class RenderRegionManager {
     public void update() {
         this.stagingBuffer.flip();
 
-        try (CommandList commandList = RenderDevice.INSTANCE.createCommandList()) {
+        try (CommandList commandList = RenderDevice.instance().createCommandList()) {
             Iterator<RenderRegion> it = this.regions.values()
                     .iterator();
 
@@ -245,7 +245,7 @@ public class RenderRegionManager {
     }
 
     private static StagingBuffer createStagingBuffer(CommandList commandList) {
-        if (SodiumClientMod.options().advanced.useAdvancedStagingBuffers && MappedStagingBuffer.isSupported(RenderDevice.INSTANCE)) {
+        if (SodiumClientMod.options().advanced.useAdvancedStagingBuffers && MappedStagingBuffer.isSupported(RenderDevice.instance())) {
             return new MappedStagingBuffer(commandList);
         }
 

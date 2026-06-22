@@ -123,7 +123,7 @@ public class SodiumWorldRenderer {
     private void loadLevel(ClientLevel level) {
         this.level = level;
 
-        try (CommandList commandList = RenderDevice.INSTANCE.createCommandList()) {
+        try (CommandList commandList = RenderDevice.instance().createCommandList()) {
             this.initRenderer(commandList);
         }
     }
@@ -313,7 +313,7 @@ public class SodiumWorldRenderer {
             return;
         }
 
-        try (CommandList commandList = RenderDevice.INSTANCE.createCommandList()) {
+        try (CommandList commandList = RenderDevice.instance().createCommandList()) {
             this.initRenderer(commandList);
         }
     }

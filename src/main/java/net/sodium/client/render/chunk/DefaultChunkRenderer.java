@@ -18,11 +18,9 @@ import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.DrawCommandList;
 import net.sodium.client.gl.device.MultiDrawBatch;
 import net.sodium.client.gl.device.RenderDevice;
-import net.sodium.client.gl.tessellation.GlIndexType;
-import net.sodium.client.gl.tessellation.GlPrimitiveType;
-import net.sodium.client.gl.tessellation.GlTessellation;
-import net.sodium.client.gl.tessellation.TessellationBinding;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.device.RenderTessellation;
+import net.sodium.client.render.device.RenderTessellationBinding;
 import net.sodium.client.render.chunk.data.SectionRenderDataStorage;
 import net.sodium.client.render.chunk.data.SectionRenderDataUnsafe;
 import net.sodium.client.render.chunk.lists.ChunkRenderList;
@@ -39,6 +37,8 @@ import net.sodium.client.util.BitwiseMath;
 import net.sodium.client.util.FogParameters;
 import net.sodium.client.util.UInt32;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPrimitiveMode;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -131,7 +131,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 this.sharedIndexBuffer.ensureCapacity(commandList, batch.getIndexBufferSize());
             }
 
-            GlTessellation tessellation;
+            RenderTessellation tessellation;
 
             if (useIndexedTessellation) {
                 tessellation = this.prepareIndexedTessellation(commandList, region);
@@ -352,7 +352,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 .getTextureManager()
                 .getTexture(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
 
-            double subTexelPrecision = (1 << RenderDevice.INSTANCE.getSubTexelPrecisionBits());
+            double subTexelPrecision = (1 << RenderDevice.instance().getSubTexelPrecisionBits());
             double subTexelOffset = 1.0f / net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex.TEXTURE_MAX_VALUE;
             float shrinkX = (float) (subTexelOffset - (((1.0D / textureAtlas.width) / subTexelPrecision)));
             float shrinkY = (float) (subTexelOffset - (((1.0D / textureAtlas.height) / subTexelPrecision)));
@@ -650,10 +650,10 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         return (chunkBlockPos - cameraBlockPos) - cameraPos;
     }
 
-    private GlTessellation prepareTessellation(CommandList commandList, RenderRegion region) {
+    private RenderTessellation prepareTessellation(CommandList commandList, RenderRegion region) {
         var resources = region.getResources();
 
-        GlTessellation tessellation = resources.getTessellation();
+        RenderTessellation tessellation = resources.getTessellation();
         if (tessellation == null) {
             tessellation = this.createRegionTessellation(commandList, resources, true);
             resources.updateTessellation(commandList, tessellation);
@@ -662,10 +662,10 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         return tessellation;
     }
 
-    private GlTessellation prepareIndexedTessellation(CommandList commandList, RenderRegion region) {
+    private RenderTessellation prepareIndexedTessellation(CommandList commandList, RenderRegion region) {
         var resources = region.getResources();
 
-        GlTessellation tessellation = resources.getIndexedTessellation();
+        RenderTessellation tessellation = resources.getIndexedTessellation();
         if (tessellation == null) {
             // Iris: From MixinDefaultChunkRenderer - don't use shared index buffer in shadow pass
             boolean useSharedIndexBuffer = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() 
@@ -678,18 +678,18 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         return tessellation;
     }
 
-    private GlTessellation createRegionTessellation(CommandList commandList, RenderRegion.DeviceResources resources, boolean useSharedIndexBuffer) {
-        return commandList.createTessellation(GlPrimitiveType.TRIANGLES, new TessellationBinding[] {
-                TessellationBinding.forVertexBuffer(resources.getGeometryBuffer(), this.vertexFormat.getShaderBindings()),
-                TessellationBinding.forElementBuffer(useSharedIndexBuffer
+    private RenderTessellation createRegionTessellation(CommandList commandList, RenderRegion.DeviceResources resources, boolean useSharedIndexBuffer) {
+        return commandList.createTessellation(VulkanicPrimitiveMode.TRIANGLES, new RenderTessellationBinding[] {
+                RenderTessellationBinding.forVertexBuffer(resources.getGeometryBuffer(), this.vertexFormat.getShaderBindings()),
+                RenderTessellationBinding.forElementBuffer(useSharedIndexBuffer
                         ? this.sharedIndexBuffer.getBufferObject()
                         : resources.getIndexBuffer())
         });
     }
 
-    private static void executeDrawBatch(CommandList commandList, GlTessellation tessellation, MultiDrawBatch batch) {
+    private static void executeDrawBatch(CommandList commandList, RenderTessellation tessellation, MultiDrawBatch batch) {
         try (DrawCommandList drawCommandList = commandList.beginTessellating(tessellation)) {
-            drawCommandList.multiDrawElementsBaseVertex(batch, GlIndexType.UNSIGNED_INT);
+            drawCommandList.multiDrawElementsBaseVertex(batch, VulkanicIndexType.INT);
         }
     }
 

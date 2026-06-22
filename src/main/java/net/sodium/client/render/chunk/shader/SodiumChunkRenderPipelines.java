@@ -138,7 +138,7 @@ public final class SodiumChunkRenderPipelines {
             .withFragmentShader(ResourceLocation.fromNamespaceAndPath("sodium", "core/vulkan_chunk"))
             .withUniform("SodiumChunkParams", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(key.vertexFormat(), VertexFormat.Mode.TRIANGLES)
-            .withShaderDefine("MAX_TEXTURE_LOD_BIAS", RenderDevice.INSTANCE.getMaxTextureLodBias())
+            .withShaderDefine("MAX_TEXTURE_LOD_BIAS", RenderDevice.instance().getMaxTextureLodBias())
             .buildSnippet();
 
         RenderPipeline.Builder snippetBuilder = RenderPipeline.builder(snippet);

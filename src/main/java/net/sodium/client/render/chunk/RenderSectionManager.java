@@ -142,7 +142,7 @@ public class RenderSectionManager {
         this.meshTaskSizeEstimator = new MeshTaskSizeEstimator(level);
 
         // Iris: From MixinRenderSectionManager - use extended vertex format
-        this.chunkRenderer = new DefaultChunkRenderer(RenderDevice.INSTANCE, net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat());
+        this.chunkRenderer = new DefaultChunkRenderer(RenderDevice.instance(), net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat());
 
         this.level = level;
         // Iris: From MixinRenderSectionManager - use extended vertex format for builder
@@ -652,7 +652,7 @@ public class RenderSectionManager {
     }
 
     public void renderLayer(ChunkRenderMatrices matrices, TerrainRenderPass pass, double x, double y, double z, FogParameters fogParameters) {
-        RenderDevice device = RenderDevice.INSTANCE;
+        RenderDevice device = RenderDevice.instance();
         CommandList commandList = device.createCommandList();
 
         // Iris: Use shadow or regular render lists based on current state
@@ -764,7 +764,7 @@ public class RenderSectionManager {
         var filtered = filterChunkBuildResults(results);
 
         var start = System.nanoTime();
-        this.regions.uploadResults(RenderDevice.INSTANCE.createCommandList(), filtered);
+        this.regions.uploadResults(RenderDevice.instance().createCommandList(), filtered);
         var uploadDuration = System.nanoTime() - start;
 
         boolean touchedSectionInfo = false;
@@ -1084,7 +1084,7 @@ public class RenderSectionManager {
         this.sectionsWithGlobalEntities.clear();
         this.resetRenderLists();
 
-        try (CommandList commandList = RenderDevice.INSTANCE.createCommandList()) {
+        try (CommandList commandList = RenderDevice.instance().createCommandList()) {
             this.regions.delete(commandList);
             this.chunkRenderer.delete(commandList);
         }

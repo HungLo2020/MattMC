@@ -2,7 +2,7 @@ package net.sodium.client.render.chunk.shader;
 
 import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.systems.RenderPass;
-import net.sodium.client.gl.device.GLRenderDevice;
+import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat2v;
 import net.sodium.client.gl.shader.uniform.GlUniformFloat3v;
 import net.sodium.client.gl.shader.uniform.GlUniformInt;
@@ -66,7 +66,7 @@ public class DefaultShaderInterface implements RenderPassChunkShaderInterface {
         // There is a limited amount of sub-texel precision when using hardware texture sampling. The mapped texture
         // area must be "shrunk" by at least one sub-texel to avoid bleed between textures in the atlas. And since we
         // offset texture coordinates in the vertex format by one texel, we also need to undo that here.
-        double subTexelPrecision = (1 << GLRenderDevice.INSTANCE.getSubTexelPrecisionBits());
+        double subTexelPrecision = (1 << RenderDevice.instance().getSubTexelPrecisionBits());
         double subTexelOffset = 1.0f / CompactChunkVertex.TEXTURE_MAX_VALUE;
 
         this.uniformTexCoordShrink.set(

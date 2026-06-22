@@ -76,7 +76,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         }
 
         builder.add("USE_VERTEX_COMPRESSION"); // TODO: allow compact vertex format to be disabled
-        builder.add("MAX_TEXTURE_LOD_BIAS", String.valueOf(RenderDevice.INSTANCE.getMaxTextureLodBias()));
+        builder.add("MAX_TEXTURE_LOD_BIAS", String.valueOf(RenderDevice.instance().getMaxTextureLodBias()));
 
         return builder.build();
     }

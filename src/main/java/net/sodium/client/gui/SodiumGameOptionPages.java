@@ -459,7 +459,7 @@ public class SodiumGameOptionPages {
     public static OptionPage advanced() {
         List<OptionGroup> groups = new ArrayList<>();
 
-        boolean isPersistentMappingSupported = MappedStagingBuffer.isSupported(RenderDevice.INSTANCE);
+        boolean isPersistentMappingSupported = MappedStagingBuffer.isSupported(RenderDevice.instance());
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)

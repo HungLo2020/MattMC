@@ -21,6 +21,61 @@ public class ApiNeutralityCallsiteTest {
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
 
     @Test
+    public void testSodiumChunkRenderDeviceSelectionAndTessellationUseBackendNeutralSeams() throws IOException {
+        String renderDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/RenderDevice.java"));
+        String renderDeviceHolderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/RenderDeviceHolder.java"));
+        String vulkanicRenderDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/VulkanicRenderDevice.java"));
+        String commandListSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/CommandList.java"));
+        String drawCommandListSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/DrawCommandList.java"));
+        String defaultChunkRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java"));
+        String renderRegionSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/region/RenderRegion.java"));
+        String sharedQuadIndexBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/SharedQuadIndexBuffer.java"));
+
+        assertFalse(renderDeviceSource.contains("RenderDevice INSTANCE = new GLRenderDevice()"),
+            "Sodium RenderDevice should not be hardcoded to the GL adapter singleton");
+        assertTrue(renderDeviceSource.contains("static RenderDevice instance()"),
+            "Sodium RenderDevice should expose a selected-device accessor");
+        assertTrue(renderDeviceHolderSource.contains("VulkanicAPI.isVulkanBackendInitializedAndSelected() ? VULKAN_DEVICE : OPENGL_DEVICE"),
+            "Sodium RenderDevice selection should follow the already-initialized Vulkanic backend without forcing OpenGL bootstrap");
+        assertTrue(renderDeviceHolderSource.contains("new VulkanicRenderDevice()"),
+            "Vulkan backend selection should have a distinct render-device adapter seam");
+        assertTrue(vulkanicRenderDeviceSource.contains("extends GLRenderDevice"),
+            "The first Vulkan render-device seam should preserve legacy compatibility behavior while ownership migrates");
+
+        assertTrue(commandListSource.contains("RenderTessellation createTessellation(VulkanicPrimitiveMode primitiveMode"),
+            "CommandList should expose backend-neutral tessellation creation for terrain callsites");
+        assertTrue(commandListSource.contains("DrawCommandList beginTessellating(RenderTessellation tessellation)"),
+            "CommandList should expose backend-neutral tessellation binding for terrain callsites");
+        assertTrue(drawCommandListSource.contains("multiDrawElementsBaseVertex(MultiDrawBatch batch, VulkanicIndexType indexType)"),
+            "DrawCommandList should expose backend-neutral index-type draw calls");
+
+        assertFalse(defaultChunkRendererSource.contains("import net.sodium.client.gl.tessellation.GlTessellation;"),
+            "DefaultChunkRenderer should not own GL tessellation types directly");
+        assertFalse(defaultChunkRendererSource.contains("import net.sodium.client.gl.tessellation.GlPrimitiveType;"),
+            "DefaultChunkRenderer should not choose terrain primitive topology through GL enums");
+        assertFalse(defaultChunkRendererSource.contains("import net.sodium.client.gl.tessellation.GlIndexType;"),
+            "DefaultChunkRenderer should not choose terrain index type through GL enums");
+        assertTrue(defaultChunkRendererSource.contains("RenderTessellation tessellation"),
+            "DefaultChunkRenderer should store prepared terrain tessellation through the backend-neutral contract");
+        assertTrue(defaultChunkRendererSource.contains("VulkanicPrimitiveMode.TRIANGLES"),
+            "DefaultChunkRenderer should describe terrain topology through VulkanicPrimitiveMode");
+        assertTrue(defaultChunkRendererSource.contains("VulkanicIndexType.INT"),
+            "DefaultChunkRenderer should describe terrain indices through VulkanicIndexType");
+
+        assertFalse(renderRegionSource.contains("import net.sodium.client.gl.tessellation.GlTessellation;"),
+            "RenderRegion device resources should not cache GL tessellation types directly");
+        assertTrue(renderRegionSource.contains("private RenderTessellation tessellation;"),
+            "RenderRegion should cache regular terrain tessellation through the backend-neutral contract");
+        assertTrue(renderRegionSource.contains("private RenderTessellation indexedTessellation;"),
+            "RenderRegion should cache indexed terrain tessellation through the backend-neutral contract");
+
+        assertFalse(sharedQuadIndexBufferSource.contains("GlIndexType"),
+            "Shared quad index buffers should expose index format through VulkanicIndexType instead of GL enums");
+        assertTrue(sharedQuadIndexBufferSource.contains("VulkanicIndexType.INT"),
+            "Shared quad index buffers should still use 32-bit indices through the backend-neutral type");
+    }
+
+    @Test
     public void testVulkanicApiHotVulkanPathsUseDirectDispatch() throws IOException {
         String source = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
 

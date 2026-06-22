@@ -5,9 +5,9 @@ import net.sodium.client.gl.buffer.GlBufferMapFlags;
 import net.sodium.client.gl.buffer.GlBufferUsage;
 import net.sodium.client.gl.buffer.GlMutableBuffer;
 import net.sodium.client.gl.device.CommandList;
-import net.sodium.client.gl.tessellation.GlIndexType;
 import net.sodium.client.gl.util.EnumBitField;
 import net.sodium.client.util.NativeBuffer;
+import net.vulkanic.VulkanicIndexType;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -75,7 +75,7 @@ public class SharedQuadIndexBuffer {
     }
 
     public enum IndexType {
-        SHORT(GlIndexType.UNSIGNED_SHORT, 64 * 1024) {
+        SHORT(VulkanicIndexType.SHORT, 64 * 1024) {
             @Override
             public void createIndexBuffer(ByteBuffer byteBuffer, int primitiveCount) {
                 byteBuffer.order(ByteOrder.nativeOrder());
@@ -95,7 +95,7 @@ public class SharedQuadIndexBuffer {
                 }
             }
         },
-        INTEGER(GlIndexType.UNSIGNED_INT, Integer.MAX_VALUE) {
+        INTEGER(VulkanicIndexType.INT, Integer.MAX_VALUE) {
             @Override
             public void createIndexBuffer(ByteBuffer byteBuffer, int primitiveCount) {
                 byteBuffer.order(ByteOrder.nativeOrder());
@@ -118,10 +118,10 @@ public class SharedQuadIndexBuffer {
 
         public static final IndexType[] VALUES = IndexType.values();
 
-        private final GlIndexType format;
+        private final VulkanicIndexType format;
         private final int maxElementCount;
 
-        IndexType(GlIndexType format, int maxElementCount) {
+        IndexType(VulkanicIndexType format, int maxElementCount) {
             this.format = format;
             this.maxElementCount = maxElementCount;
         }
@@ -129,10 +129,10 @@ public class SharedQuadIndexBuffer {
         public abstract void createIndexBuffer(ByteBuffer buffer, int primitiveCount);
 
         public int getBytesPerElement() {
-            return this.format.getStride();
+            return this.format.bytesPerIndex();
         }
 
-        public GlIndexType getFormat() {
+        public VulkanicIndexType getFormat() {
             return this.format;
         }
 

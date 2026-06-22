@@ -6,7 +6,7 @@ import net.sodium.client.gl.arena.staging.StagingBuffer;
 import net.sodium.client.gl.buffer.GlBuffer;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.MultiDrawBatch;
-import net.sodium.client.gl.tessellation.GlTessellation;
+import net.sodium.client.render.device.RenderTessellation;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.data.SectionRenderDataStorage;
@@ -271,8 +271,8 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
     public static class DeviceResources {
         private final GlBufferArena geometryArena;
         private final GlBufferArena indexArena;
-        private GlTessellation tessellation;
-        private GlTessellation indexedTessellation;
+        private RenderTessellation tessellation;
+        private RenderTessellation indexedTessellation;
 
         /**
          * The buffer arenas return offsets in terms of how many stride units big things
@@ -290,7 +290,7 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
             this.indexArena = new GlBufferArena(commandList, REGION_SIZE * SECTION_INDEX_COUNT_ESTIMATE, Integer.BYTES, stagingBuffer);
         }
 
-        public void updateTessellation(CommandList commandList, GlTessellation tessellation) {
+        public void updateTessellation(CommandList commandList, RenderTessellation tessellation) {
             if (this.tessellation != null) {
                 this.tessellation.delete(commandList);
             }
@@ -298,7 +298,7 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
             this.tessellation = tessellation;
         }
 
-        public void updateIndexedTessellation(CommandList commandList, GlTessellation tessellation) {
+        public void updateIndexedTessellation(CommandList commandList, RenderTessellation tessellation) {
             if (this.indexedTessellation != null) {
                 this.indexedTessellation.delete(commandList);
             }
@@ -306,11 +306,11 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
             this.indexedTessellation = tessellation;
         }
 
-        public GlTessellation getTessellation() {
+        public RenderTessellation getTessellation() {
             return this.tessellation;
         }
 
-        public GlTessellation getIndexedTessellation() {
+        public RenderTessellation getIndexedTessellation() {
             return this.indexedTessellation;
         }
 
