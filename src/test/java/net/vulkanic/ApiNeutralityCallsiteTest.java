@@ -141,13 +141,29 @@ public class ApiNeutralityCallsiteTest {
             "Vulkan color-only texture-view render passes should bypass the compatibility GlCommandEncoder");
         assertTrue(backendSource.contains("return new VulkanNativeCommandEncoder(this).createRenderPass(supplier, colorTextureView, clearColor, depthTextureView, clearDepth);"),
             "Vulkan color-depth texture-view render passes should bypass the compatibility GlCommandEncoder");
+        assertTrue(backendSource.contains("public CommandEncoder createCommandEncoder() {\n        return new VulkanNativeCommandEncoder(this);\n    }"),
+            "Vulkan's shared command encoder should now default to the native Vulkan encoder");
+        assertTrue(backendSource.contains("CommandEncoder createCompatibilityCommandEncoder()"),
+            "Vulkan should keep framebuffer/MRT compatibility fallback explicit instead of hiding it in createCommandEncoder()");
         assertFalse(backendSource.contains("createCommandEncoder().createRenderPass(supplier, colorTextureView, clearColor);"),
             "Vulkan texture-view render-pass overloads should no longer bounce through createCommandEncoder()");
 
-        assertTrue(backendSource.contains("return createCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);"),
+        assertTrue(backendSource.contains("return createCompatibilityCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);"),
             "Framebuffer Iris/custom passes should remain on the compatibility path until framebuffer resource parity is proven");
-        assertTrue(backendSource.contains("return createCommandEncoder().createRenderPass(descriptor);"),
+        assertTrue(backendSource.contains("return createCompatibilityCommandEncoder().createRenderPass(descriptor);"),
             "Descriptor-backed MRT passes should remain on the compatibility path until MRT parity is proven");
+        assertTrue(nativeEncoderSource.contains("this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture)")
+                && nativeEncoderSource.contains("this.backend.createCompatibilityCommandEncoder().createRenderPass(descriptor)"),
+            "General native encoders should preserve the explicit compatibility boundary for framebuffer/MRT render-pass shapes");
+        assertFalse(nativeEncoderSource.contains("this.unsupported(\"copyToBuffer\")")
+                || nativeEncoderSource.contains("this.unsupported(\"clearColorTexture\")")
+                || nativeEncoderSource.contains("this.unsupported(\"clearColorAndDepthTextures\")")
+                || nativeEncoderSource.contains("this.unsupported(\"writeToTexture\")")
+                || nativeEncoderSource.contains("this.unsupported(\"copyTextureToBuffer\")")
+                || nativeEncoderSource.contains("this.unsupported(\"copyTextureToTexture\")")
+                || nativeEncoderSource.contains("this.unsupported(\"presentTexture\")")
+                || nativeEncoderSource.contains("this.unsupported(\"createFence\")"),
+            "Default Vulkan command encoder resource operations should no longer throw unsupported placeholders");
     }
 
     @Test

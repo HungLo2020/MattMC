@@ -1111,6 +1111,10 @@ void main() {
     }
 
     public CommandEncoder createCommandEncoder() {
+        return new VulkanNativeCommandEncoder(this);
+    }
+
+    CommandEncoder createCompatibilityCommandEncoder() {
         net.blaze3d.opengl.GlDevice device = this.compatibilityDevice;
         if (device == null) {
             throw new IllegalStateException(
@@ -1164,13 +1168,13 @@ void main() {
         // Iris custom/composite passes still depend on the framebuffer-aware compatibility
         // resource recovery path. Keep this route unchanged until MRT/framebuffer parity is
         // explicitly migrated and verified.
-        return createCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);
+        return createCompatibilityCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);
     }
 
     public net.blaze3d.systems.RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
         // Descriptor-backed Iris render targets remain on the compatibility path until native
         // MRT resource coverage and framebuffer layout parity are proven for those passes.
-        return createCommandEncoder().createRenderPass(descriptor);
+        return createCompatibilityCommandEncoder().createRenderPass(descriptor);
     }
 
     public GpuTexture createTexture(

@@ -3,6 +3,7 @@ package net.vulkanic.backends.vulkan;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuFence;
 import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.opengl.GlConst;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.NativeImage;
 import net.blaze3d.systems.CommandEncoder;
@@ -14,6 +15,7 @@ import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.pbr.TextureTracker;
 import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.sodium.client.render.chunk.shader.VulkanTerrainPipelineDiagnostics;
+import net.minecraft.util.ARGB;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
@@ -23,6 +25,7 @@ import net.vulkanic.RenderPassResourceBinder;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicBufferSlice;
+import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
@@ -102,6 +105,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     @Override
     public RenderPass createRenderPass(Supplier<String> label, int framebuffer, boolean hasDepthTexture) {
         this.ensureNoRenderPass();
+        if (this.resourceMode == ResourceMode.GENERAL) {
+            return this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture);
+        }
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, framebuffer);
         this.inRenderPass = true;
@@ -111,6 +117,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     @Override
     public RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
         this.ensureNoRenderPass();
+        if (this.resourceMode == ResourceMode.GENERAL) {
+            return this.backend.createCompatibilityCommandEncoder().createRenderPass(descriptor);
+        }
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);
         this.inRenderPass = true;
@@ -119,9 +128,33 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void writeToBuffer(GpuBufferSlice slice, ByteBuffer data) {
-        this.ensureNoRenderPass();
-        int handle = this.requireBufferHandle(slice.buffer(), "writeToBuffer");
-        VulkanicAPI.namedBufferSubDataDSA(VulkanicAPI.getCommandContext(), handle, slice.offset(), data);
+        if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass) {
+            this.ensureNoRenderPass();
+        }
+        GpuBuffer buffer = slice.buffer();
+        if (buffer.isClosed()) {
+            throw new IllegalStateException("Buffer already closed");
+        }
+        if ((buffer.usage() & GpuBuffer.USAGE_COPY_DST) == 0) {
+            throw new IllegalStateException("Buffer needs USAGE_COPY_DST to be a destination for a copy");
+        }
+
+        int bytes = data.remaining();
+        if (bytes > slice.length()) {
+            throw new IllegalArgumentException(
+                "Cannot write more data than the slice allows (attempting to write "
+                    + bytes + " bytes into a slice of length " + slice.length() + ")"
+            );
+        }
+        if (slice.offset() + slice.length() > buffer.size()) {
+            throw new IllegalArgumentException(
+                "Cannot write more data than this buffer can hold (attempting to write "
+                    + bytes + " bytes at offset " + slice.offset() + " to " + buffer.size() + " size buffer)"
+            );
+        }
+
+        int handle = this.requireBufferHandle(buffer, "writeToBuffer");
+        VulkanicAPI.namedBufferSubDataDSA(this.commandContext(), handle, slice.offset(), data);
     }
 
     @Override
@@ -135,11 +168,20 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         if (slice.buffer().isClosed()) {
             throw new IllegalStateException("Buffer already closed");
         }
+        if (!read && !write) {
+            throw new IllegalArgumentException("At least read or write must be true");
+        }
         if (read && (slice.buffer().usage() & GpuBuffer.USAGE_MAP_READ) == 0) {
             throw new IllegalStateException("Buffer is not readable");
         }
         if (write && (slice.buffer().usage() & GpuBuffer.USAGE_MAP_WRITE) == 0) {
             throw new IllegalStateException("Buffer is not writable");
+        }
+        if (slice.offset() + slice.length() > slice.buffer().size()) {
+            throw new IllegalArgumentException(
+                "Cannot map more data than this buffer can hold (attempting to map "
+                    + slice.length() + " bytes at offset " + slice.offset() + " from " + slice.buffer().size() + " size buffer)"
+            );
         }
 
         int access = 0;
@@ -151,8 +193,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         }
 
         int handle = this.requireBufferHandle(slice.buffer(), "mapBuffer");
+        CommandContext ctx = this.commandContext();
         ByteBuffer mapped = VulkanicAPI.mapNamedBufferRangeDSA(
-            VulkanicAPI.getCommandContext(),
+            ctx,
             handle,
             slice.offset(),
             slice.length(),
@@ -174,7 +217,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             public void close() {
                 if (!this.closed) {
                     this.closed = true;
-                    VulkanicAPI.unmapNamedBufferDSA(VulkanicAPI.getCommandContext(), handle);
+                    VulkanicAPI.unmapNamedBufferDSA(ctx, handle);
                 }
             }
         };
@@ -182,57 +225,253 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void copyToBuffer(GpuBufferSlice source, GpuBufferSlice target) {
-        this.unsupported("copyToBuffer");
+        this.ensureNoRenderPass();
+        GpuBuffer sourceBuffer = source.buffer();
+        GpuBuffer targetBuffer = target.buffer();
+        if (sourceBuffer.isClosed()) {
+            throw new IllegalStateException("Source buffer already closed");
+        }
+        if ((sourceBuffer.usage() & GpuBuffer.USAGE_COPY_SRC) == 0) {
+            throw new IllegalStateException("Source buffer needs USAGE_COPY_SRC to be a source for a copy");
+        }
+        if (targetBuffer.isClosed()) {
+            throw new IllegalStateException("Target buffer already closed");
+        }
+        if ((targetBuffer.usage() & GpuBuffer.USAGE_COPY_DST) == 0) {
+            throw new IllegalStateException("Target buffer needs USAGE_COPY_DST to be a destination for a copy");
+        }
+        if (source.length() != target.length()) {
+            throw new IllegalArgumentException(
+                "Cannot copy from slice of size " + source.length() + " to slice of size " + target.length() + ", they must be equal"
+            );
+        }
+        if (source.offset() + source.length() > sourceBuffer.size()) {
+            throw new IllegalArgumentException(
+                "Cannot copy more data than the source buffer holds (attempting to copy "
+                    + source.length() + " bytes at offset " + source.offset() + " from " + sourceBuffer.size() + " size buffer)"
+            );
+        }
+        if (target.offset() + target.length() > targetBuffer.size()) {
+            throw new IllegalArgumentException(
+                "Cannot copy more data than the target buffer can hold (attempting to copy "
+                    + target.length() + " bytes at offset " + target.offset() + " to " + targetBuffer.size() + " size buffer)"
+            );
+        }
+
+        this.backend.copyNamedBufferSubDataDSA(
+            this.commandContext(),
+            this.requireBufferHandle(sourceBuffer, "copyToBuffer(source)"),
+            this.requireBufferHandle(targetBuffer, "copyToBuffer(target)"),
+            source.offset(),
+            target.offset(),
+            source.length()
+        );
     }
 
     @Override
     public void clearColorTexture(GpuTexture texture, int clearColor) {
-        this.unsupported("clearColorTexture");
+        this.ensureNoRenderPass();
+        this.verifyColorTexture(texture);
+        CommandContext ctx = this.backend.beginCommandBuffer();
+        try (VulkanicTextureView colorView = this.createTextureView(texture);
+             VulkanicRenderPass ignored = this.backend.beginRenderPass(
+                 ctx,
+                 () -> "Clear color texture",
+                 colorView,
+                 OptionalInt.of(clearColor)
+             )) {
+        } finally {
+            this.backend.submitCommandBuffer(ctx);
+        }
     }
 
     @Override
     public void clearColorAndDepthTextures(GpuTexture colorTexture, int clearColor, GpuTexture depthTexture, double clearDepth) {
-        this.unsupported("clearColorAndDepthTextures");
+        this.ensureNoRenderPass();
+        this.verifyColorTexture(colorTexture);
+        this.verifyDepthTexture(depthTexture);
+        CommandContext ctx = this.backend.beginCommandBuffer();
+        try (VulkanicTextureView colorView = this.createTextureView(colorTexture);
+             VulkanicTextureView depthView = this.createTextureView(depthTexture);
+             VulkanicRenderPass ignored = this.backend.beginRenderPass(
+                 ctx,
+                 () -> "Clear color/depth textures",
+                 colorView,
+                 OptionalInt.of(clearColor),
+                 depthView,
+                 OptionalDouble.of(clearDepth)
+             )) {
+        } finally {
+            this.backend.submitCommandBuffer(ctx);
+        }
     }
 
     @Override
     public void clearColorAndDepthTextures(GpuTexture colorTexture, int clearColor, GpuTexture depthTexture, double clearDepth, int x, int y, int width, int height) {
-        this.unsupported("clearColorAndDepthTextures(region)");
+        this.ensureNoRenderPass();
+        this.verifyColorTexture(colorTexture);
+        this.verifyDepthTexture(depthTexture);
+        this.verifyRegion(colorTexture, x, y, width, height);
+        CommandContext ctx = this.backend.beginCommandBuffer();
+        try (VulkanicTextureView colorView = this.createTextureView(colorTexture);
+             VulkanicTextureView depthView = this.createTextureView(depthTexture);
+             VulkanicRenderPass ignored = this.backend.beginRenderPass(
+                 ctx,
+                 () -> "Clear color/depth texture region",
+                 colorView,
+                 OptionalInt.empty(),
+                 depthView,
+                 OptionalDouble.empty()
+             )) {
+            VulkanicAPI.setDynamicScissor(ctx, x, y, width, height);
+            VulkanicAPI.setScissorTestEnabled(ctx, true);
+            VulkanicAPI.setClearDepth(ctx, clearDepth);
+            VulkanicAPI.setClearColor(ctx, ARGB.redFloat(clearColor), ARGB.greenFloat(clearColor), ARGB.blueFloat(clearColor), ARGB.alphaFloat(clearColor));
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setColorMask(true, true, true, true);
+            VulkanicAPI.clearColorAndDepthBuffersWithMacosWorkaround(ctx);
+            VulkanicAPI.setScissorTestEnabled(ctx, false);
+        } finally {
+            this.backend.submitCommandBuffer(ctx);
+        }
     }
 
     @Override
     public void clearDepthTexture(GpuTexture texture, double clearDepth) {
-        this.unsupported("clearDepthTexture");
+        this.ensureNoRenderPass();
+        this.verifyDepthTexture(texture);
+        CommandContext ctx = this.commandContext();
+        int framebuffer = VulkanicAPI.createFramebuffer(ctx);
+        try {
+            VulkanicAPI.bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+            VulkanicAPI.framebufferDepthAttachmentTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, VulkanicCoreAPI.textureId(texture), 0);
+            VulkanicAPI.setDrawBufferNone(ctx);
+            VulkanicAPI.setClearDepth(ctx, clearDepth);
+            net.irisshaders.iris.gl.blending.DepthColorStorage.setDepthMask(true);
+            VulkanicAPI.setScissorTestEnabled(ctx, false);
+            VulkanicAPI.clearDepthBufferWithMacosWorkaround(ctx);
+            VulkanicAPI.framebufferDepthAttachmentTexture2D(ctx, VulkanicAPI.GL_FRAMEBUFFER, 0, 0);
+        } finally {
+            VulkanicAPI.setDrawBufferColorAttachment0(ctx);
+            VulkanicAPI.bindDefaultFramebuffer(ctx);
+            VulkanicAPI.deleteFramebuffer(ctx, framebuffer);
+        }
     }
 
     @Override
     public void writeToTexture(GpuTexture texture, NativeImage image) {
-        this.unsupported("writeToTexture");
+        int width = texture.getWidth(0);
+        int height = texture.getHeight(0);
+        if (image.getWidth() != width || image.getHeight() != height) {
+            throw new IllegalArgumentException(
+                "Cannot replace texture of size " + width + "x" + height + " with image of size " + image.getWidth() + "x" + image.getHeight()
+            );
+        }
+        if (texture.isClosed()) {
+            throw new IllegalStateException("Destination texture is closed");
+        }
+        if ((texture.usage() & GpuTexture.USAGE_COPY_DST) == 0) {
+            throw new IllegalStateException("Color texture must have USAGE_COPY_DST to be a destination for a write");
+        }
+        this.writeToTexture(texture, image, 0, 0, 0, 0, width, height, 0, 0);
     }
 
     @Override
-    public void writeToTexture(GpuTexture texture, NativeImage image, int mipLevel, int sourceX, int sourceY, int targetX, int targetY, int width, int height, int depth) {
-        this.unsupported("writeToTexture(region)");
+    public void writeToTexture(GpuTexture texture, NativeImage image, int mipLevel, int depth, int targetX, int targetY, int width, int height, int sourceX, int sourceY) {
+        if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass) {
+            this.ensureNoRenderPass();
+        }
+        this.verifyTextureWrite(texture, mipLevel, sourceX, sourceY, targetX, targetY, width, height, depth);
+        if (sourceX + width > image.getWidth() || sourceY + height > image.getHeight()) {
+            throw new IllegalArgumentException(
+                "Copy source (" + image.getWidth() + "x" + image.getHeight() + ") is not large enough to read a rectangle of "
+                    + width + "x" + height + " from " + sourceX + "x" + sourceY
+            );
+        }
+
+        CommandContext ctx = this.commandContext();
+        int textureHandle = VulkanicCoreAPI.textureId(texture);
+        boolean cubemap = (texture.usage() & GpuTexture.USAGE_CUBEMAP_COMPATIBLE) != 0;
+        int uploadTarget = this.bindTextureForUpload(ctx, texture, textureHandle, depth, cubemap);
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ROW_LENGTH, image.getWidth());
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_PIXELS, sourceX);
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_ROWS, sourceY);
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ALIGNMENT, image.format().components());
+        this.uploadTextureSubImage(ctx, cubemap, uploadTarget, mipLevel, targetX, targetY, width, height, GlConst.toGl(image.format()), image.getPointer());
     }
 
     @Override
     public void writeToTexture(GpuTexture texture, ByteBuffer data, NativeImage.Format format, int mipLevel, int targetX, int targetY, int width, int height, int depth) {
-        this.unsupported("writeToTexture(buffer)");
+        if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass) {
+            this.ensureNoRenderPass();
+        }
+        this.verifyTextureWrite(texture, mipLevel, 0, 0, targetX, targetY, width, height, depth);
+        if (width * height * format.components() > data.remaining()) {
+            throw new IllegalArgumentException(
+                "Copy would overrun the source buffer (remaining length of " + data.remaining() + ", but copy is "
+                    + width + "x" + height + " of format " + format + ")"
+            );
+        }
+
+        CommandContext ctx = this.commandContext();
+        int textureHandle = VulkanicCoreAPI.textureId(texture);
+        boolean cubemap = (texture.usage() & GpuTexture.USAGE_CUBEMAP_COMPATIBLE) != 0;
+        int uploadTarget = this.bindTextureForUpload(ctx, texture, textureHandle, depth, cubemap);
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ROW_LENGTH, width);
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_PIXELS, 0);
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_SKIP_ROWS, 0);
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_UNPACK_ALIGNMENT, format.components());
+        this.uploadTextureSubImage(ctx, cubemap, uploadTarget, mipLevel, targetX, targetY, width, height, GlConst.toGl(format), data);
     }
 
     @Override
-    public void copyTextureToBuffer(GpuTexture texture, GpuBuffer buffer, int mipLevel, Runnable callback, int alignment) {
-        this.unsupported("copyTextureToBuffer");
+    public void copyTextureToBuffer(GpuTexture texture, GpuBuffer buffer, int offset, Runnable callback, int mipLevel) {
+        this.ensureNoRenderPass();
+        this.copyTextureToBuffer(texture, buffer, offset, callback, mipLevel, 0, 0, texture.getWidth(mipLevel), texture.getHeight(mipLevel));
     }
 
     @Override
-    public void copyTextureToBuffer(GpuTexture texture, GpuBuffer buffer, int mipLevel, Runnable callback, int x, int y, int width, int height, int alignment) {
-        this.unsupported("copyTextureToBuffer(region)");
+    public void copyTextureToBuffer(GpuTexture texture, GpuBuffer buffer, int offset, Runnable callback, int mipLevel, int x, int y, int width, int height) {
+        this.ensureNoRenderPass();
+        this.verifyTextureCopyToBuffer(texture, buffer, mipLevel, x, y, width, height, offset);
+        CommandContext ctx = this.commandContext();
+        while (VulkanicAPI.getError(ctx) != 0) {
+        }
+        int framebuffer = VulkanicAPI.resolveFramebufferForTextures(texture, null);
+        VulkanicAPI.bindReadFramebuffer(ctx, framebuffer);
+        VulkanicAPI.bindPixelPackBuffer(ctx, this.requireBufferHandle(buffer, "copyTextureToBuffer"));
+        VulkanicAPI.setPixelStore(ctx, VulkanicAPI.GL_PACK_ROW_LENGTH, width);
+        VulkanicAPI.readPixels(ctx, x, y, width, height, GlConst.toGlExternalId(texture.getFormat()), GlConst.toGlType(texture.getFormat()), offset);
+        VulkanicAPI.queueFencedTask(callback);
+        VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_READ_FRAMEBUFFER, 0, mipLevel);
+        VulkanicAPI.bindReadFramebuffer(ctx, 0);
+        VulkanicAPI.bindPixelPackBuffer(ctx, 0);
+        int error = VulkanicAPI.getError(ctx);
+        if (error != 0) {
+            throw new IllegalStateException("Couldn't perform copyToBuffer for texture " + texture.getLabel() + ": GL error " + error);
+        }
     }
 
     @Override
-    public void copyTextureToTexture(GpuTexture source, GpuTexture target, int sourceMip, int targetMip, int sourceX, int sourceY, int targetX, int targetY, int width) {
-        this.unsupported("copyTextureToTexture");
+    public void copyTextureToTexture(GpuTexture source, GpuTexture target, int mipLevel, int targetX, int targetY, int sourceX, int sourceY, int width, int height) {
+        this.ensureNoRenderPass();
+        this.verifyTextureCopyToTexture(source, target, mipLevel, targetX, targetY, sourceX, sourceY, width, height);
+        VulkanicAPI.copyImageSubData2D(
+            this.commandContext(),
+            VulkanicCoreAPI.textureId(source),
+            mipLevel,
+            sourceX,
+            sourceY,
+            0,
+            VulkanicCoreAPI.textureId(target),
+            mipLevel,
+            targetX,
+            targetY,
+            0,
+            width,
+            height,
+            1
+        );
     }
 
     @Override
@@ -245,13 +484,27 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
     @Override
     public void presentTexture(GpuTextureView textureView) {
-        this.unsupported("presentTexture");
+        this.ensureNoRenderPass();
+        if (!textureView.texture().getFormat().hasColorAspect()) {
+            throw new IllegalStateException("Cannot present a non-color texture!");
+        }
+        if ((textureView.texture().usage() & GpuTexture.USAGE_RENDER_ATTACHMENT) == 0) {
+            throw new IllegalStateException("Color texture must have USAGE_RENDER_ATTACHMENT to presented to the screen");
+        }
+        if (textureView.texture().getDepthOrLayers() > 1) {
+            throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for presentation");
+        }
+        this.backend.presentTextureToScreen(this.commandContext(), textureView);
     }
 
     @Override
     public GpuFence createFence() {
-        this.unsupported("createFence");
-        throw new AssertionError("unreachable");
+        this.ensureNoRenderPass();
+        return new NativeFence(this.commandContext());
+    }
+
+    private CommandContext commandContext() {
+        return this.backend.getCurrentCommandContext();
     }
 
     private VulkanicTextureView createTextureView(GpuTextureView view) {
@@ -259,6 +512,13 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             throw new IllegalArgumentException("Render-pass texture is not VulkanicTexture: " + view.texture().getClass().getName());
         }
         return VulkanicAPI.createManagedTextureView(texture, view.baseMipLevel(), view.mipLevels());
+    }
+
+    private VulkanicTextureView createTextureView(GpuTexture texture) {
+        if (!(texture instanceof VulkanicTexture vulkanicTexture)) {
+            throw new IllegalArgumentException("Texture is not VulkanicTexture: " + texture.getClass().getName());
+        }
+        return VulkanicAPI.createManagedTextureView(vulkanicTexture, 0, 1);
     }
 
     private int requireBufferHandle(GpuBuffer buffer, String operation) {
@@ -275,11 +535,233 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         }
     }
 
+    private void verifyColorTexture(GpuTexture texture) {
+        if (!texture.getFormat().hasColorAspect()) {
+            throw new IllegalStateException("Trying to clear a non-color texture as color");
+        }
+        if (texture.isClosed()) {
+            throw new IllegalStateException("Color texture is closed");
+        }
+        if ((texture.usage() & GpuTexture.USAGE_RENDER_ATTACHMENT) == 0) {
+            throw new IllegalStateException("Color texture must have USAGE_RENDER_ATTACHMENT");
+        }
+        if (texture.getDepthOrLayers() > 1) {
+            throw new UnsupportedOperationException("Clearing a texture with multiple layers or depths is not yet supported");
+        }
+    }
+
+    private void verifyDepthTexture(GpuTexture texture) {
+        if (!texture.getFormat().hasDepthAspect()) {
+            throw new IllegalStateException("Trying to clear a non-depth texture as depth");
+        }
+        if (texture.isClosed()) {
+            throw new IllegalStateException("Depth texture is closed");
+        }
+        if ((texture.usage() & GpuTexture.USAGE_RENDER_ATTACHMENT) == 0) {
+            throw new IllegalStateException("Depth texture must have USAGE_RENDER_ATTACHMENT");
+        }
+        if (texture.getDepthOrLayers() > 1) {
+            throw new UnsupportedOperationException("Clearing a texture with multiple layers or depths is not yet supported");
+        }
+    }
+
+    private void verifyRegion(GpuTexture texture, int x, int y, int width, int height) {
+        if (x < 0 || x >= texture.getWidth(0)) {
+            throw new IllegalArgumentException("regionX should not be outside of the texture");
+        }
+        if (y < 0 || y >= texture.getHeight(0)) {
+            throw new IllegalArgumentException("regionY should not be outside of the texture");
+        }
+        if (width <= 0) {
+            throw new IllegalArgumentException("regionWidth should be greater than 0");
+        }
+        if (x + width > texture.getWidth(0)) {
+            throw new IllegalArgumentException("regionWidth + regionX should be less than the texture width");
+        }
+        if (height <= 0) {
+            throw new IllegalArgumentException("regionHeight should be greater than 0");
+        }
+        if (y + height > texture.getHeight(0)) {
+            throw new IllegalArgumentException("regionWidth + regionX should be less than the texture height");
+        }
+    }
+
+    private void verifyTextureWrite(GpuTexture texture, int mipLevel, int sourceX, int sourceY, int targetX, int targetY, int width, int height, int depth) {
+        if (mipLevel < 0 || mipLevel >= texture.getMipLevels()) {
+            throw new IllegalArgumentException("Invalid mipLevel " + mipLevel + ", must be >= 0 and < " + texture.getMipLevels());
+        }
+        if (targetX + width > texture.getWidth(mipLevel) || targetY + height > texture.getHeight(mipLevel)) {
+            throw new IllegalArgumentException(
+                "Dest texture (" + texture.getWidth(mipLevel) + "x" + texture.getHeight(mipLevel)
+                    + ") is not large enough to write a rectangle of " + width + "x" + height + " at " + targetX + "x" + targetY
+            );
+        }
+        if (texture.isClosed()) {
+            throw new IllegalStateException("Destination texture is closed");
+        }
+        if ((texture.usage() & GpuTexture.USAGE_COPY_DST) == 0) {
+            throw new IllegalStateException("Color texture must have USAGE_COPY_DST to be a destination for a write");
+        }
+        if (depth >= texture.getDepthOrLayers()) {
+            throw new UnsupportedOperationException("Depth or layer is out of range, must be >= 0 and < " + texture.getDepthOrLayers());
+        }
+        if (sourceX < 0 || sourceY < 0 || targetX < 0 || targetY < 0 || width <= 0 || height <= 0 || depth < 0) {
+            throw new IllegalArgumentException("Invalid texture write region");
+        }
+    }
+
+    private int bindTextureForUpload(CommandContext ctx, GpuTexture texture, int textureHandle, int depth, boolean cubemap) {
+        if (cubemap) {
+            VulkanicAPI.bindCubemapTexture(ctx, textureHandle);
+            return GlConst.CUBEMAP_TARGETS[depth % 6];
+        }
+        VulkanicAPI.bindTexture2D(ctx, textureHandle);
+        return VulkanicAPI.GL_TEXTURE_2D;
+    }
+
+    private void uploadTextureSubImage(
+        CommandContext ctx,
+        boolean cubemap,
+        int uploadTarget,
+        int mipLevel,
+        int targetX,
+        int targetY,
+        int width,
+        int height,
+        int format,
+        long pixels
+    ) {
+        if (cubemap) {
+            VulkanicAPI.uploadTexture2DSubImage(ctx, uploadTarget, mipLevel, targetX, targetY, width, height, format, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
+        } else {
+            VulkanicAPI.uploadTexture2DSubImage(ctx, mipLevel, targetX, targetY, width, height, format, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
+        }
+    }
+
+    private void uploadTextureSubImage(
+        CommandContext ctx,
+        boolean cubemap,
+        int uploadTarget,
+        int mipLevel,
+        int targetX,
+        int targetY,
+        int width,
+        int height,
+        int format,
+        ByteBuffer pixels
+    ) {
+        if (cubemap) {
+            VulkanicAPI.uploadTexture2DSubImage(ctx, uploadTarget, mipLevel, targetX, targetY, width, height, format, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
+        } else {
+            VulkanicAPI.uploadTexture2DSubImage(ctx, mipLevel, targetX, targetY, width, height, format, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
+        }
+    }
+
+    private void verifyTextureCopyToBuffer(GpuTexture texture, GpuBuffer buffer, int mipLevel, int x, int y, int width, int height, int alignment) {
+        if (mipLevel < 0 || mipLevel >= texture.getMipLevels()) {
+            throw new IllegalArgumentException("Invalid mipLevel " + mipLevel + ", must be >= 0 and < " + texture.getMipLevels());
+        }
+        if (texture.getWidth(mipLevel) * texture.getHeight(mipLevel) * texture.getFormat().pixelSize() + alignment > buffer.size()) {
+            throw new IllegalArgumentException(
+                "Buffer of size " + buffer.size() + " is not large enough to hold " + width + "x" + height
+                    + " pixels (" + texture.getFormat().pixelSize() + " bytes each) starting from offset " + alignment
+            );
+        }
+        if ((texture.usage() & GpuTexture.USAGE_COPY_SRC) == 0) {
+            throw new IllegalArgumentException("Texture needs USAGE_COPY_SRC to be a source for a copy");
+        }
+        if ((buffer.usage() & GpuBuffer.USAGE_COPY_DST) == 0) {
+            throw new IllegalArgumentException("Buffer needs USAGE_COPY_DST to be a destination for a copy");
+        }
+        if (x + width > texture.getWidth(mipLevel) || y + height > texture.getHeight(mipLevel)) {
+            throw new IllegalArgumentException(
+                "Copy source texture (" + texture.getWidth(mipLevel) + "x" + texture.getHeight(mipLevel)
+                    + ") is not large enough to read a rectangle of " + width + "x" + height + " from " + x + "," + y
+            );
+        }
+        if (texture.isClosed()) {
+            throw new IllegalStateException("Source texture is closed");
+        }
+        if (buffer.isClosed()) {
+            throw new IllegalStateException("Destination buffer is closed");
+        }
+        if (texture.getDepthOrLayers() > 1) {
+            throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for copying");
+        }
+    }
+
+    private void verifyTextureCopyToTexture(GpuTexture source, GpuTexture target, int mipLevel, int targetX, int targetY, int sourceX, int sourceY, int width, int height) {
+        if (mipLevel < 0 || mipLevel >= source.getMipLevels() || mipLevel >= target.getMipLevels()) {
+            throw new IllegalArgumentException("Invalid mipLevel " + mipLevel + ", must be >= 0 and < " + source.getMipLevels() + " and < " + target.getMipLevels());
+        }
+        if (targetX + width > target.getWidth(mipLevel) || targetY + height > target.getHeight(mipLevel)) {
+            throw new IllegalArgumentException(
+                "Dest texture (" + target.getWidth(mipLevel) + "x" + target.getHeight(mipLevel)
+                    + ") is not large enough to write a rectangle of " + width + "x" + height + " at " + targetX + "x" + targetY
+            );
+        }
+        if (sourceX + width > source.getWidth(mipLevel) || sourceY + height > source.getHeight(mipLevel)) {
+            throw new IllegalArgumentException(
+                "Source texture (" + source.getWidth(mipLevel) + "x" + source.getHeight(mipLevel)
+                    + ") is not large enough to read a rectangle of " + width + "x" + height + " at " + sourceX + "x" + sourceY
+            );
+        }
+        if (source.isClosed()) {
+            throw new IllegalStateException("Source texture is closed");
+        }
+        if (target.isClosed()) {
+            throw new IllegalStateException("Destination texture is closed");
+        }
+        if ((source.usage() & GpuTexture.USAGE_COPY_SRC) == 0) {
+            throw new IllegalArgumentException("Texture needs USAGE_COPY_SRC to be a source for a copy");
+        }
+        if ((target.usage() & GpuTexture.USAGE_COPY_DST) == 0) {
+            throw new IllegalArgumentException("Texture needs USAGE_COPY_DST to be a destination for a copy");
+        }
+        if (source.getDepthOrLayers() > 1 || target.getDepthOrLayers() > 1) {
+            throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for copying");
+        }
+    }
+
     private void unsupported(String operation) {
         throw new UnsupportedOperationException(
             "Vulkan native command encoder does not support " + operation
                 + "; migrate that callsite through an explicit native Vulkan encoder slice first."
         );
+    }
+
+    private static final class NativeFence implements GpuFence {
+        private final CommandContext ctx;
+        private long handle;
+
+        private NativeFence(CommandContext ctx) {
+            this.ctx = ctx;
+            this.handle = VulkanicAPI.createGpuCompletionFence(ctx);
+        }
+
+        @Override
+        public void close() {
+            if (this.handle != 0L) {
+                VulkanicAPI.destroySync(this.ctx, this.handle);
+                this.handle = 0L;
+            }
+        }
+
+        @Override
+        public boolean awaitCompletion(long timeoutNanos) {
+            if (this.handle == 0L) {
+                return true;
+            }
+
+            int result = VulkanicAPI.waitForSync(this.ctx, this.handle, 0, timeoutNanos);
+            if (VulkanicAPI.isSyncWaitTimeout(result)) {
+                return false;
+            }
+            if (VulkanicAPI.isSyncWaitFailed(result)) {
+                throw new IllegalStateException("Failed to complete gpu fence");
+            }
+            return true;
+        }
     }
 
     private final class NativeRenderPass implements RenderPass, RenderPassResourceBinder {
