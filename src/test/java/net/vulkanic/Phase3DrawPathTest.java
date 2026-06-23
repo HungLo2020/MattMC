@@ -5542,14 +5542,17 @@ public class Phase3DrawPathTest {
 	            "Iris composite passes should create pipelines through the same descriptor/fallback seam used to begin the render pass");
         assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),
             "FinalPassRenderer should snapshot the final pass target before pipeline/render-pass creation");
-	        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = false"),
-	            "FinalPassRenderer should keep the final fullscreen pass on the framebuffer-compatible path until descriptor-backed final output is visually correct");
-	        assertTrue(finalPassSource.contains("useDescriptorBackedFinalPass")
-	                && finalPassSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)"),
-	            "FinalPassRenderer should keep the descriptor-backed seam available for a future parity-proven final-pass migration");
+	        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = shouldUseDescriptorBackedFinalPass(renderTargetDescriptor)")
+	                && finalPassSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(this.colorHolder.getId(), descriptor)")
+	                && finalPassSource.contains("IrisShaderRenderTargetContract stage=final"),
+	            "FinalPassRenderer should use descriptor-backed final-pass rendering only after proving framebuffer/descriptor parity");
+	        assertTrue(finalPassSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)"),
+	            "FinalPassRenderer should route parity-proven Vulkan final passes through the descriptor-backed render-pass path");
         assertTrue(finalPassSource.contains("VulkanicAPI.createRenderPass(() -> \"Final pass\", main.getColorTextureView(), OptionalInt.empty())"),
             "FinalPassRenderer should preserve the existing OpenGL texture-view render-pass path");
-        assertTrue(finalPassSource.contains("finalPass.ensurePipelineState(useDescriptorBackedFinalPass ? renderTargetDescriptor : null)"),
+        assertTrue(finalPassSource.contains("finalPass.ensurePipelineState(useDescriptorBackedFinalPass ? renderTargetDescriptor : null)")
+	                && finalPassSource.contains("renderTargetContractKey")
+	                && finalPassSource.contains("targetContractChanged"),
             "FinalPassRenderer should create the final-pass pipeline against the same descriptor used to begin the Vulkan render pass");
 	        assertTrue(shadowCompositeSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
 	                && shadowCompositeSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),

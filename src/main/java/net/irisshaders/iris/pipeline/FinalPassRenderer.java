@@ -48,6 +48,7 @@ import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
+import net.logging.LogUtils;
 import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicAPI;
@@ -55,6 +56,7 @@ import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.util.Map;
 import java.util.Objects;
@@ -63,6 +65,10 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 public class FinalPassRenderer {
+	private static final Logger LOGGER = LogUtils.getLogger();
+	private static final boolean TRACE_SHADER_RENDER_TARGETS =
+		Boolean.getBoolean("mattmc.vulkan.traceShaderRenderTargets");
+
 	private static final CustomPass STATE = new CustomPass() {
 		@Override
 		public void setupState() {
@@ -260,7 +266,7 @@ public class FinalPassRenderer {
 			GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
 			VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 			VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> "Final pass", baseWidth, baseHeight);
-			boolean useDescriptorBackedFinalPass = false;
+			boolean useDescriptorBackedFinalPass = shouldUseDescriptorBackedFinalPass(renderTargetDescriptor);
 			try (RenderPass renderPass = useDescriptorBackedFinalPass
 					? VulkanicAPI.createRenderPass(renderTargetDescriptor)
 					: VulkanicAPI.createRenderPass(() -> "Final pass", main.getColorTextureView(), OptionalInt.empty())) {
@@ -338,6 +344,25 @@ public class FinalPassRenderer {
 		}
 
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
+	}
+
+	private boolean shouldUseDescriptorBackedFinalPass(VulkanicRenderTargetDescriptor descriptor) {
+		var ctx = VulkanicAPI.getCommandContext();
+		if (!VulkanicAPI.isVulkanBackendSelected() || ctx.isImmediate()) {
+			return false;
+		}
+
+		boolean descriptorMatchesFramebuffer =
+			VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(this.colorHolder.getId(), descriptor);
+		if (TRACE_SHADER_RENDER_TARGETS) {
+			LOGGER.info(
+				"IrisShaderRenderTargetContract stage=final framebuffer={} descriptorMatchesFramebuffer={} {}",
+				this.colorHolder.getId(),
+				descriptorMatchesFramebuffer ? "yes" : "no",
+				descriptor.debugSignature()
+			);
+		}
+		return descriptorMatchesFramebuffer;
 	}
 
 	private VulkanicRenderTargetDescriptor createFinalRenderTargetDescriptor(Supplier<String> label, int width, int height) {
@@ -506,11 +531,26 @@ public class FinalPassRenderer {
 		@Nullable net.vulkanic.PipelineDescriptor pipelineDescriptor;
 		@Nullable net.vulkanic.PipelineHandle pipelineHandle;
 		@Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor;
+		@Nullable String renderTargetContractKey;
 		final java.util.Map<net.vulkanic.PipelineDescriptor.ResourceLayout, net.vulkanic.PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
 
 		void ensurePipelineState(@Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
 			var ctx = VulkanicAPI.getCommandContext();
+			String targetContractKey = renderTargetDescriptor != null
+				? renderTargetDescriptor.debugSignature()
+				: "framebuffer:" + colorHolder.getId();
+			boolean targetContractChanged = this.renderTargetContractKey != null
+				&& !this.renderTargetContractKey.equals(targetContractKey);
+			if (targetContractChanged) {
+				closePipelineVariants();
+				if (this.pipelineHandle != null) {
+					this.pipelineHandle.close();
+					this.pipelineHandle = null;
+				}
+				this.pipelineDescriptor = null;
+			}
 			this.renderTargetDescriptor = renderTargetDescriptor;
+			this.renderTargetContractKey = targetContractKey;
 			if (ctx.isImmediate()) return;
 			if (this.pipelineHandle != null && this.pipelineHandle.isValid() && this.pipelineDescriptor != null) return;
 			net.vulkanic.PipelineDescriptor descriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(
