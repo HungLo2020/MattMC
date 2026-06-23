@@ -80,13 +80,36 @@ public record VulkanicRenderPassDescriptor(
         VulkanicTextureView target,
         LoadOp loadOp,
         StoreOp storeOp,
-        OptionalInt clearColor
+        OptionalInt clearColor,
+        VulkanicResourceUsage initialUsage,
+        VulkanicResourceUsage passUsage,
+        VulkanicResourceUsage finalUsage
     ) {
+        public ColorAttachment(
+            VulkanicTextureView target,
+            LoadOp loadOp,
+            StoreOp storeOp,
+            OptionalInt clearColor
+        ) {
+            this(
+                target,
+                loadOp,
+                storeOp,
+                clearColor,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED
+            );
+        }
+
         public ColorAttachment {
             target = Objects.requireNonNull(target, "target must not be null");
             loadOp = Objects.requireNonNull(loadOp, "loadOp must not be null");
             storeOp = Objects.requireNonNull(storeOp, "storeOp must not be null");
             clearColor = Objects.requireNonNull(clearColor, "clearColor must not be null");
+            initialUsage = Objects.requireNonNull(initialUsage, "initialUsage must not be null");
+            passUsage = Objects.requireNonNull(passUsage, "passUsage must not be null");
+            finalUsage = Objects.requireNonNull(finalUsage, "finalUsage must not be null");
 
             if (loadOp == LoadOp.CLEAR && clearColor.isEmpty()) {
                 throw new IllegalArgumentException("ColorAttachment loadOp=CLEAR requires clearColor");
@@ -103,13 +126,36 @@ public record VulkanicRenderPassDescriptor(
         VulkanicTextureView target,
         LoadOp loadOp,
         StoreOp storeOp,
-        OptionalDouble clearDepth
+        OptionalDouble clearDepth,
+        VulkanicResourceUsage initialUsage,
+        VulkanicResourceUsage passUsage,
+        VulkanicResourceUsage finalUsage
     ) {
+        public DepthAttachment(
+            VulkanicTextureView target,
+            LoadOp loadOp,
+            StoreOp storeOp,
+            OptionalDouble clearDepth
+        ) {
+            this(
+                target,
+                loadOp,
+                storeOp,
+                clearDepth,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED
+            );
+        }
+
         public DepthAttachment {
             target = Objects.requireNonNull(target, "target must not be null");
             loadOp = Objects.requireNonNull(loadOp, "loadOp must not be null");
             storeOp = Objects.requireNonNull(storeOp, "storeOp must not be null");
             clearDepth = Objects.requireNonNull(clearDepth, "clearDepth must not be null");
+            initialUsage = Objects.requireNonNull(initialUsage, "initialUsage must not be null");
+            passUsage = Objects.requireNonNull(passUsage, "passUsage must not be null");
+            finalUsage = Objects.requireNonNull(finalUsage, "finalUsage must not be null");
 
             if (loadOp == LoadOp.CLEAR && clearDepth.isEmpty()) {
                 throw new IllegalArgumentException("DepthAttachment loadOp=CLEAR requires clearDepth");

@@ -57,6 +57,25 @@ public class Phase3SynchronizationTest {
     }
 
     @Test
+    public void testOpenGLBarrierBitsMapBackToTypedBarrierSet() {
+        int bits = VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT
+            | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT;
+
+        java.util.Optional<VulkanicResourceBarriers> parsed = VulkanicResourceBarriers.fromOpenGLBits(bits);
+
+        assertTrue(parsed.isPresent());
+        assertTrue(parsed.get().barriers().contains(VulkanicResourceBarriers.Barrier.SHADER_IMAGE_ACCESS));
+        assertTrue(parsed.get().barriers().contains(VulkanicResourceBarriers.Barrier.TEXTURE_FETCH));
+        assertEquals(bits, parsed.get().toOpenGLBarrierBits());
+    }
+
+    @Test
+    public void testUnknownOpenGLBarrierBitsAreNotMisclassified() {
+        assertTrue(VulkanicResourceBarriers.fromOpenGLBits(0).isEmpty());
+        assertTrue(VulkanicResourceBarriers.fromOpenGLBits(0x40000000).isEmpty());
+    }
+
+    @Test
     public void testBarrierSetDeduplicatesEntries() {
         VulkanicResourceBarriers barriers = VulkanicResourceBarriers.of(
             VulkanicResourceBarriers.Barrier.TEXTURE_FETCH,
@@ -143,6 +162,10 @@ public class Phase3SynchronizationTest {
 
         assertTrue(source.contains("spine.applyResourceBarriers(commandBufferHandle, safeBarriers);"),
             "Vulkan backend should delegate barrier application to native spine");
+        assertTrue(source.contains("VulkanicResourceBarriers.fromOpenGLBits(barriers)"),
+            "Vulkan raw memoryBarrier calls should be translated into typed barriers when possible");
+        assertTrue(source.contains("spine.applyConservativeMemoryBarrier(commandBufferHandle);"),
+            "Vulkan raw memoryBarrier calls with unsupported bits should still emit a conservative native barrier");
         assertTrue(source.contains("VK10.vkCmdPipelineBarrier("),
             "Vulkan native barrier path should use vkCmdPipelineBarrier");
         assertFalse(source.contains("Vulkan-native resource barrier mapping is not implemented yet."),

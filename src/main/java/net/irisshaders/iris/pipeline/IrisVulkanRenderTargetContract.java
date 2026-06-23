@@ -38,7 +38,7 @@ public final class IrisVulkanRenderTargetContract {
 
 		VulkanicRenderTargetDescriptor descriptor = descriptorSupplier.get();
 		boolean descriptorMatchesFramebuffer =
-			VulkanicAPI.isRenderTargetDescriptorCompatibleWithFramebuffer(framebuffer, descriptor);
+			VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(framebuffer, descriptor);
 		if (TRACE_SHADER_RENDER_TARGETS) {
 			LOGGER.info(
 				"IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorMatchesFramebuffer={} {}",

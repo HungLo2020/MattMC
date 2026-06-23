@@ -65,7 +65,10 @@ public record VulkanicRenderTargetDescriptor(
             builder.append(" c").append(i)
                 .append("{tex=").append(attachment.textureId())
                 .append(",load=").append(attachment.loadOp())
-                .append(",store=").append(attachment.storeOp());
+                .append(",store=").append(attachment.storeOp())
+                .append(",initialUsage=").append(attachment.initialUsage())
+                .append(",passUsage=").append(attachment.passUsage())
+                .append(",finalUsage=").append(attachment.finalUsage());
             attachment.clearColor().ifPresent(clearColor -> builder.append(",clear=").append(clearColor));
             builder.append('}');
         }
@@ -73,7 +76,10 @@ public record VulkanicRenderTargetDescriptor(
         if (depthAttachment != null) {
             builder.append(" depth{tex=").append(depthAttachment.textureId())
                 .append(",load=").append(depthAttachment.loadOp())
-                .append(",store=").append(depthAttachment.storeOp());
+                .append(",store=").append(depthAttachment.storeOp())
+                .append(",initialUsage=").append(depthAttachment.initialUsage())
+                .append(",passUsage=").append(depthAttachment.passUsage())
+                .append(",finalUsage=").append(depthAttachment.finalUsage());
             depthAttachment.clearDepth().ifPresent(clearDepth -> builder.append(",clear=").append(clearDepth));
             builder.append('}');
         } else {
@@ -87,8 +93,28 @@ public record VulkanicRenderTargetDescriptor(
         int textureId,
         VulkanicRenderPassDescriptor.LoadOp loadOp,
         VulkanicRenderPassDescriptor.StoreOp storeOp,
-        OptionalInt clearColor
+        OptionalInt clearColor,
+        VulkanicResourceUsage initialUsage,
+        VulkanicResourceUsage passUsage,
+        VulkanicResourceUsage finalUsage
     ) {
+        public ColorAttachment(
+            int textureId,
+            VulkanicRenderPassDescriptor.LoadOp loadOp,
+            VulkanicRenderPassDescriptor.StoreOp storeOp,
+            OptionalInt clearColor
+        ) {
+            this(
+                textureId,
+                loadOp,
+                storeOp,
+                clearColor,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED
+            );
+        }
+
         public ColorAttachment {
             if (textureId <= 0) {
                 throw new IllegalArgumentException("Color attachment texture id must be positive");
@@ -96,6 +122,9 @@ public record VulkanicRenderTargetDescriptor(
             loadOp = Objects.requireNonNull(loadOp, "loadOp must not be null");
             storeOp = Objects.requireNonNull(storeOp, "storeOp must not be null");
             clearColor = Objects.requireNonNull(clearColor, "clearColor must not be null");
+            initialUsage = Objects.requireNonNull(initialUsage, "initialUsage must not be null");
+            passUsage = Objects.requireNonNull(passUsage, "passUsage must not be null");
+            finalUsage = Objects.requireNonNull(finalUsage, "finalUsage must not be null");
             if (loadOp == VulkanicRenderPassDescriptor.LoadOp.CLEAR && clearColor.isEmpty()) {
                 throw new IllegalArgumentException("Color attachment loadOp=CLEAR requires clearColor");
             }
@@ -109,8 +138,28 @@ public record VulkanicRenderTargetDescriptor(
         int textureId,
         VulkanicRenderPassDescriptor.LoadOp loadOp,
         VulkanicRenderPassDescriptor.StoreOp storeOp,
-        OptionalDouble clearDepth
+        OptionalDouble clearDepth,
+        VulkanicResourceUsage initialUsage,
+        VulkanicResourceUsage passUsage,
+        VulkanicResourceUsage finalUsage
     ) {
+        public DepthAttachment(
+            int textureId,
+            VulkanicRenderPassDescriptor.LoadOp loadOp,
+            VulkanicRenderPassDescriptor.StoreOp storeOp,
+            OptionalDouble clearDepth
+        ) {
+            this(
+                textureId,
+                loadOp,
+                storeOp,
+                clearDepth,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED
+            );
+        }
+
         public DepthAttachment {
             if (textureId <= 0) {
                 throw new IllegalArgumentException("Depth attachment texture id must be positive");
@@ -118,6 +167,9 @@ public record VulkanicRenderTargetDescriptor(
             loadOp = Objects.requireNonNull(loadOp, "loadOp must not be null");
             storeOp = Objects.requireNonNull(storeOp, "storeOp must not be null");
             clearDepth = Objects.requireNonNull(clearDepth, "clearDepth must not be null");
+            initialUsage = Objects.requireNonNull(initialUsage, "initialUsage must not be null");
+            passUsage = Objects.requireNonNull(passUsage, "passUsage must not be null");
+            finalUsage = Objects.requireNonNull(finalUsage, "finalUsage must not be null");
             if (loadOp == VulkanicRenderPassDescriptor.LoadOp.CLEAR && clearDepth.isEmpty()) {
                 throw new IllegalArgumentException("Depth attachment loadOp=CLEAR requires clearDepth");
             }

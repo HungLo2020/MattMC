@@ -56,6 +56,9 @@ import org.slf4j.Logger;
  */
 class VulkanNativeCommandEncoder implements CommandEncoder {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final boolean DEBUG_DESCRIPTOR_BINDINGS =
+        Boolean.getBoolean("mattmc.vulkan.debugDescriptorBindingSeam");
+    private static int debugCustomPassLogs;
     private static final java.util.Set<String> WARNED_INCOMPLETE_CUSTOM_PASS_KEYS =
         java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
@@ -138,7 +141,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         boolean preferDescriptor
     ) {
         this.ensureNoRenderPass();
-        if (preferDescriptor && this.backend.isRenderTargetDescriptorCompatibleWithFramebuffer(fallbackFramebuffer, descriptor)) {
+        if (preferDescriptor && this.backend.isRenderTargetDescriptorEquivalentToFramebuffer(fallbackFramebuffer, descriptor)) {
             return this.createRenderPass(descriptor);
         }
 
@@ -1073,6 +1076,27 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             }
 
             PipelineResourcePlanner.Plan submission = this.buildCustomPassResourceBindings(customDescriptor, pass.program());
+            if (DEBUG_DESCRIPTOR_BINDINGS && debugCustomPassLogs < 160) {
+                debugCustomPassLogs++;
+                Program program = pass.program();
+                LOGGER.info(
+                    "Vulkan native customPass plan#{} pipeline={} framebuffer={} descriptorTarget={} programId={} baseBindings={} boundResourceCount={} completeCoverage={} samplerNames={} samplerUnits={} uniformNames={} missingResources={}",
+                    debugCustomPassLogs,
+                    pipeline.getLocation(),
+                    this.framebuffer,
+                    this.renderTargetDescriptor != null,
+                    program != null ? program.getProgramId() : -1,
+                    customDescriptor.getResourceLayout().bindings().stream().map(PipelineDescriptor.ResourceBinding::name).toList(),
+                    submission.boundResourceCount(),
+                    submission.completeCoverage(),
+                    this.describeSamplerTextures(),
+                    this.samplerUnits,
+                    this.uniforms.keySet(),
+                    submission.completeCoverage()
+                        ? java.util.List.of()
+                        : this.collectMissingCustomPassResources(customDescriptor, program)
+                );
+            }
             if (!submission.completeCoverage()) {
                 String key = pipeline.getLocation() + "#" + this.framebuffer + "#"
                     + (this.renderTargetDescriptor != null ? this.renderTargetDescriptor.label().get() : "no-descriptor");
@@ -1090,6 +1114,20 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             }
 
             PipelineHandle handle = pass.pipelineHandle(submission.descriptor());
+            if (DEBUG_DESCRIPTOR_BINDINGS && debugCustomPassLogs < 160) {
+                debugCustomPassLogs++;
+                Program program = pass.program();
+                LOGGER.info(
+                    "Vulkan native customPass pipeline#{} pipeline={} framebuffer={} descriptorTarget={} programId={} variantLayout={} resolvedPipelineHandle={}",
+                    debugCustomPassLogs,
+                    pipeline.getLocation(),
+                    this.framebuffer,
+                    this.renderTargetDescriptor != null,
+                    program != null ? program.getProgramId() : -1,
+                    !submission.descriptor().getResourceLayout().equals(customDescriptor.getResourceLayout()),
+                    handle != null && handle.isValid()
+                );
+            }
             if (handle == null || !handle.isValid()) {
                 throw new IllegalStateException("Unable to resolve native Vulkan custom-pass pipeline handle for " + pipeline.getLocation());
             }
@@ -1101,6 +1139,25 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 submission.descriptor(),
                 submission.bindings()
             );
+        }
+
+        private Map<String, String> describeSamplerTextures() {
+            Map<String, String> descriptions = new java.util.TreeMap<>();
+            for (Map.Entry<String, VulkanicTextureView> entry : this.samplers.entrySet()) {
+                VulkanicTextureView view = entry.getValue();
+                if (view == null || view.texture() == null) {
+                    descriptions.put(entry.getKey(), "null");
+                    continue;
+                }
+                descriptions.put(
+                    entry.getKey(),
+                    "texId=" + VulkanNativeCommandEncoder.this.backend.resolveTextureHandle(this.ctx, view.texture())
+                        + ",label=" + view.texture().getLabel()
+                        + ",baseMip=" + view.getBaseMipLevel()
+                        + ",mips=" + view.getMipLevelCount()
+                );
+            }
+            return descriptions;
         }
 
         private PipelineDescriptor selectDescriptor(RenderPipeline pipeline, PipelineDescriptor baseDescriptor) {

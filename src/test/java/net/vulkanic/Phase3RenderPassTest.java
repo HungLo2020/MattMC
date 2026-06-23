@@ -211,6 +211,68 @@ public class Phase3RenderPassTest {
             colorAndDepth.depthAttachment().loadOp());
     }
 
+    @Test
+    public void testRenderPassDescriptorDefaultResourceUsagesPreserveLegacySemantics() {
+        OpenGLTexture colorTexture = OpenGLTexture.nonOwning(
+            15, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.RGBA8, 32, 32, 1, 1, "color3");
+        OpenGLTexture depthTexture = OpenGLTexture.nonOwning(
+            16, VulkanicTexture.USAGE_RENDER_ATTACHMENT,
+            VulkanicTextureFormat.DEPTH32, 32, 32, 1, 1, "depth3");
+        OpenGLTextureView colorView = new OpenGLTextureView(colorTexture, 0, 1);
+        OpenGLTextureView depthView = new OpenGLTextureView(depthTexture, 0, 1);
+
+        VulkanicRenderPassDescriptor descriptor = VulkanicRenderPassDescriptor.colorAndDepth(
+            () -> "usage-defaults",
+            colorView,
+            OptionalInt.empty(),
+            depthView,
+            OptionalDouble.empty());
+
+        assertEquals(VulkanicResourceUsage.INFERRED, descriptor.colorAttachment().initialUsage());
+        assertEquals(VulkanicResourceUsage.INFERRED, descriptor.colorAttachment().passUsage());
+        assertEquals(VulkanicResourceUsage.INFERRED, descriptor.colorAttachment().finalUsage());
+        assertEquals(VulkanicResourceUsage.INFERRED, descriptor.depthAttachment().initialUsage());
+        assertEquals(VulkanicResourceUsage.INFERRED, descriptor.depthAttachment().passUsage());
+        assertEquals(VulkanicResourceUsage.INFERRED, descriptor.depthAttachment().finalUsage());
+    }
+
+    @Test
+    public void testRenderTargetDescriptorAttachmentsCarryExplicitResourceUsages() {
+        VulkanicRenderTargetDescriptor.ColorAttachment color =
+            new VulkanicRenderTargetDescriptor.ColorAttachment(
+                21,
+                VulkanicRenderPassDescriptor.LoadOp.LOAD,
+                VulkanicRenderPassDescriptor.StoreOp.STORE,
+                OptionalInt.empty(),
+                VulkanicResourceUsage.SAMPLED_READ,
+                VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP,
+                VulkanicResourceUsage.SAMPLED_READ);
+        VulkanicRenderTargetDescriptor.DepthAttachment depth =
+            new VulkanicRenderTargetDescriptor.DepthAttachment(
+                22,
+                VulkanicRenderPassDescriptor.LoadOp.LOAD,
+                VulkanicRenderPassDescriptor.StoreOp.STORE,
+                OptionalDouble.empty(),
+                VulkanicResourceUsage.SAMPLED_READ,
+                VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE,
+                VulkanicResourceUsage.SAMPLED_READ);
+
+        VulkanicRenderTargetDescriptor descriptor = new VulkanicRenderTargetDescriptor(
+            () -> "usage-explicit",
+            java.util.List.of(color),
+            depth,
+            64,
+            64);
+
+        assertEquals(VulkanicResourceUsage.SAMPLED_READ, descriptor.colorAttachments().getFirst().initialUsage());
+        assertEquals(VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP, descriptor.colorAttachments().getFirst().passUsage());
+        assertEquals(VulkanicResourceUsage.SAMPLED_READ, descriptor.colorAttachments().getFirst().finalUsage());
+        assertEquals(VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE, descriptor.depthAttachment().passUsage());
+        assertTrue(descriptor.debugSignature().contains("initialUsage=SAMPLED_READ"));
+        assertTrue(descriptor.debugSignature().contains("passUsage=ATTACHMENT_FEEDBACK_LOOP"));
+    }
+
     // ---- OpenGLRenderPass basic structural tests ----------------------------
 
     @Test

@@ -3,6 +3,7 @@ package net.vulkanic;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -62,6 +63,26 @@ public final class VulkanicResourceBarriers {
             bits |= barrier.openGLBit();
         }
         return bits;
+    }
+
+    /**
+     * Converts legacy OpenGL barrier bits into the typed subset currently understood by Vulkanic.
+     */
+    public static Optional<VulkanicResourceBarriers> fromOpenGLBits(int bits) {
+        EnumSet<Barrier> values = EnumSet.noneOf(Barrier.class);
+        int remainingBits = bits;
+        for (Barrier barrier : Barrier.values()) {
+            if ((bits & barrier.openGLBit()) != 0) {
+                values.add(barrier);
+                remainingBits &= ~barrier.openGLBit();
+            }
+        }
+
+        if (remainingBits != 0 || values.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new VulkanicResourceBarriers(values));
     }
 
     /**

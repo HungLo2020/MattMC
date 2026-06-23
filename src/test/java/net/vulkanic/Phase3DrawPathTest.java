@@ -5540,10 +5540,10 @@ public class Phase3DrawPathTest {
 	        assertTrue(compositeSource.contains("USE_DESCRIPTOR_COMPOSITE_RENDER_PASS")
 	                && compositeSource.contains("this.renderTargetDescriptor(label)")
 	                && compositeSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
-		                && shaderTargetContractSource.contains("VulkanicAPI.isRenderTargetDescriptorCompatibleWithFramebuffer(framebuffer, descriptor)")
+		                && shaderTargetContractSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(framebuffer, descriptor)")
 		                && shaderTargetContractSource.contains("IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorMatchesFramebuffer={} {}")
 		                && shaderTargetContractSource.contains("return descriptorMatchesFramebuffer ? descriptor : null"),
-		            "Iris composite passes should use the shared explicit Vulkan render-target compatibility contract instead of relying on framebuffer inference");
+		            "Iris composite passes should use the shared explicit Vulkan render-target equivalence contract instead of relying on framebuffer inference");
 	        assertTrue(compositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor)"),
 	            "Iris composite passes should create pipelines through the same descriptor/fallback seam used to begin the render pass");
         assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),

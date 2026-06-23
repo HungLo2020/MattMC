@@ -27,6 +27,7 @@ import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
+import net.vulkanic.VulkanicResourceUsage;
 import net.vulkanic.VulkanicTexture;
 import net.vulkanic.VulkanicTextureFormat;
 import net.vulkanic.VulkanicTextureUploadFormat;
@@ -4573,9 +4574,15 @@ void main() {
         private final List<VulkanicRenderPassDescriptor.LoadOp> colorLoadOps;
         private final List<VulkanicRenderPassDescriptor.StoreOp> colorStoreOps;
         private final List<OptionalInt> colorClearColors;
+        private final List<VulkanicResourceUsage> colorInitialUsages;
+        private final List<VulkanicResourceUsage> colorPassUsages;
+        private final List<VulkanicResourceUsage> colorFinalUsages;
         private final VulkanicRenderPassDescriptor.LoadOp depthLoadOp;
         private final VulkanicRenderPassDescriptor.StoreOp depthStoreOp;
         private final OptionalDouble depthClearValue;
+        private final VulkanicResourceUsage depthInitialUsage;
+        private final VulkanicResourceUsage depthPassUsage;
+        private final VulkanicResourceUsage depthFinalUsage;
 
         private ResolvedFramebufferTargets(
             List<NativeSpine.LegacyTextureObject> colorTextures,
@@ -4595,9 +4602,15 @@ void main() {
                 java.util.Collections.nCopies(colorTextures.size(), VulkanicRenderPassDescriptor.LoadOp.LOAD),
                 java.util.Collections.nCopies(colorTextures.size(), VulkanicRenderPassDescriptor.StoreOp.STORE),
                 java.util.Collections.nCopies(colorTextures.size(), OptionalInt.empty()),
+                java.util.Collections.nCopies(colorTextures.size(), VulkanicResourceUsage.INFERRED),
+                java.util.Collections.nCopies(colorTextures.size(), VulkanicResourceUsage.INFERRED),
+                java.util.Collections.nCopies(colorTextures.size(), VulkanicResourceUsage.INFERRED),
                 VulkanicRenderPassDescriptor.LoadOp.LOAD,
                 VulkanicRenderPassDescriptor.StoreOp.STORE,
-                OptionalDouble.empty()
+                OptionalDouble.empty(),
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED,
+                VulkanicResourceUsage.INFERRED
             );
         }
 
@@ -4611,9 +4624,15 @@ void main() {
             List<VulkanicRenderPassDescriptor.LoadOp> colorLoadOps,
             List<VulkanicRenderPassDescriptor.StoreOp> colorStoreOps,
             List<OptionalInt> colorClearColors,
+            List<VulkanicResourceUsage> colorInitialUsages,
+            List<VulkanicResourceUsage> colorPassUsages,
+            List<VulkanicResourceUsage> colorFinalUsages,
             VulkanicRenderPassDescriptor.LoadOp depthLoadOp,
             VulkanicRenderPassDescriptor.StoreOp depthStoreOp,
-            OptionalDouble depthClearValue
+            OptionalDouble depthClearValue,
+            VulkanicResourceUsage depthInitialUsage,
+            VulkanicResourceUsage depthPassUsage,
+            VulkanicResourceUsage depthFinalUsage
         ) {
             this.colorTextures = List.copyOf(colorTextures);
             this.colorViewHandles = List.copyOf(colorViewHandles);
@@ -4624,12 +4643,21 @@ void main() {
             this.colorLoadOps = List.copyOf(colorLoadOps);
             this.colorStoreOps = List.copyOf(colorStoreOps);
             this.colorClearColors = List.copyOf(colorClearColors);
+            this.colorInitialUsages = List.copyOf(colorInitialUsages);
+            this.colorPassUsages = List.copyOf(colorPassUsages);
+            this.colorFinalUsages = List.copyOf(colorFinalUsages);
             this.depthLoadOp = Objects.requireNonNull(depthLoadOp, "depthLoadOp must not be null");
             this.depthStoreOp = Objects.requireNonNull(depthStoreOp, "depthStoreOp must not be null");
             this.depthClearValue = Objects.requireNonNull(depthClearValue, "depthClearValue must not be null");
+            this.depthInitialUsage = Objects.requireNonNull(depthInitialUsage, "depthInitialUsage must not be null");
+            this.depthPassUsage = Objects.requireNonNull(depthPassUsage, "depthPassUsage must not be null");
+            this.depthFinalUsage = Objects.requireNonNull(depthFinalUsage, "depthFinalUsage must not be null");
             if (this.colorLoadOps.size() != this.colorTextures.size()
                 || this.colorStoreOps.size() != this.colorTextures.size()
-                || this.colorClearColors.size() != this.colorTextures.size()) {
+                || this.colorClearColors.size() != this.colorTextures.size()
+                || this.colorInitialUsages.size() != this.colorTextures.size()
+                || this.colorPassUsages.size() != this.colorTextures.size()
+                || this.colorFinalUsages.size() != this.colorTextures.size()) {
                 throw new IllegalArgumentException("Color attachment metadata must match color attachment count");
             }
         }
@@ -4676,7 +4704,10 @@ void main() {
                 && thisTexture.feedbackLoopCapable == otherTexture.feedbackLoopCapable
                 && colorLoadOps.get(thisIndex) == other.colorLoadOps.get(otherIndex)
                 && colorStoreOps.get(thisIndex) == other.colorStoreOps.get(otherIndex)
-                && colorClearColors.get(thisIndex).equals(other.colorClearColors.get(otherIndex));
+                && colorClearColors.get(thisIndex).equals(other.colorClearColors.get(otherIndex))
+                && colorInitialUsages.get(thisIndex) == other.colorInitialUsages.get(otherIndex)
+                && colorPassUsages.get(thisIndex) == other.colorPassUsages.get(otherIndex)
+                && colorFinalUsages.get(thisIndex) == other.colorFinalUsages.get(otherIndex);
         }
 
         private boolean depthAttachmentMatches(ResolvedFramebufferTargets other) {
@@ -4693,7 +4724,10 @@ void main() {
                 && depthTexture.feedbackLoopCapable == other.depthTexture.feedbackLoopCapable
                 && depthLoadOp == other.depthLoadOp
                 && depthStoreOp == other.depthStoreOp
-                && depthClearValue.equals(other.depthClearValue);
+                && depthClearValue.equals(other.depthClearValue)
+                && depthInitialUsage == other.depthInitialUsage
+                && depthPassUsage == other.depthPassUsage
+                && depthFinalUsage == other.depthFinalUsage;
         }
 
         private VulkanicRenderPassDescriptor.LoadOp depthLoadOp() {
@@ -4706,6 +4740,30 @@ void main() {
 
         private OptionalDouble depthClearValue() {
             return depthClearValue;
+        }
+
+        private VulkanicResourceUsage colorInitialUsage(int index) {
+            return colorInitialUsages.get(index);
+        }
+
+        private VulkanicResourceUsage colorPassUsage(int index) {
+            return colorPassUsages.get(index);
+        }
+
+        private VulkanicResourceUsage colorFinalUsage(int index) {
+            return colorFinalUsages.get(index);
+        }
+
+        private VulkanicResourceUsage depthInitialUsage() {
+            return depthInitialUsage;
+        }
+
+        private VulkanicResourceUsage depthPassUsage() {
+            return depthPassUsage;
+        }
+
+        private VulkanicResourceUsage depthFinalUsage() {
+            return depthFinalUsage;
         }
 
         private String compatibilitySignature() {
@@ -4721,6 +4779,9 @@ void main() {
                     .append(",feedback=").append(texture.feedbackLoopCapable)
                     .append(",load=").append(colorLoadOps.get(index))
                     .append(",store=").append(colorStoreOps.get(index))
+                    .append(",initialUsage=").append(colorInitialUsages.get(index))
+                    .append(",passUsage=").append(colorPassUsages.get(index))
+                    .append(",finalUsage=").append(colorFinalUsages.get(index))
                     .append(",clear=").append(optionalIntToString(colorClearColors.get(index)))
                     .append('}');
             }
@@ -4732,6 +4793,9 @@ void main() {
                     .append(",feedback=").append(depthTexture.feedbackLoopCapable)
                     .append(",load=").append(depthLoadOp)
                     .append(",store=").append(depthStoreOp)
+                    .append(",initialUsage=").append(depthInitialUsage)
+                    .append(",passUsage=").append(depthPassUsage)
+                    .append(",finalUsage=").append(depthFinalUsage)
                     .append(",clear=").append(optionalDoubleToString(depthClearValue))
                     .append('}');
             } else {
@@ -4888,11 +4952,14 @@ void main() {
             Objects.requireNonNull(descriptor, "descriptor must not be null");
 
         List<VulkanicRenderTargetDescriptor.ColorAttachment> colorAttachments = safeDescriptor.colorAttachments();
-        List<NativeSpine.LegacyTextureObject> colorTextures = new ArrayList<>(colorAttachments.size());
-        List<Long> colorViewHandles = new ArrayList<>(colorAttachments.size());
+	        List<NativeSpine.LegacyTextureObject> colorTextures = new ArrayList<>(colorAttachments.size());
+	        List<Long> colorViewHandles = new ArrayList<>(colorAttachments.size());
 	        List<VulkanicRenderPassDescriptor.LoadOp> colorLoadOps = new ArrayList<>(colorAttachments.size());
 	        List<VulkanicRenderPassDescriptor.StoreOp> colorStoreOps = new ArrayList<>(colorAttachments.size());
 	        List<OptionalInt> colorClearColors = new ArrayList<>(colorAttachments.size());
+	        List<VulkanicResourceUsage> colorInitialUsages = new ArrayList<>(colorAttachments.size());
+	        List<VulkanicResourceUsage> colorPassUsages = new ArrayList<>(colorAttachments.size());
+	        List<VulkanicResourceUsage> colorFinalUsages = new ArrayList<>(colorAttachments.size());
 	        int width = safeDescriptor.hasExplicitExtent() ? safeDescriptor.width() : -1;
 	        int height = safeDescriptor.hasExplicitExtent() ? safeDescriptor.height() : -1;
 
@@ -4913,11 +4980,14 @@ void main() {
             }
 
             colorTextures.add(legacyTexture);
-            colorViewHandles.add(legacyTexture.defaultViewHandle);
-            colorLoadOps.add(attachment.loadOp());
-            colorStoreOps.add(attachment.storeOp());
-            colorClearColors.add(attachment.clearColor());
-        }
+	            colorViewHandles.add(legacyTexture.defaultViewHandle);
+	            colorLoadOps.add(attachment.loadOp());
+	            colorStoreOps.add(attachment.storeOp());
+	            colorClearColors.add(attachment.clearColor());
+	            colorInitialUsages.add(attachment.initialUsage());
+	            colorPassUsages.add(attachment.passUsage());
+	            colorFinalUsages.add(attachment.finalUsage());
+	        }
 
         VulkanicRenderTargetDescriptor.DepthAttachment depthAttachment = safeDescriptor.depthAttachment();
         NativeSpine.LegacyTextureObject depthTexture = null;
@@ -4925,6 +4995,9 @@ void main() {
         VulkanicRenderPassDescriptor.LoadOp depthLoadOp = VulkanicRenderPassDescriptor.LoadOp.LOAD;
         VulkanicRenderPassDescriptor.StoreOp depthStoreOp = VulkanicRenderPassDescriptor.StoreOp.STORE;
         OptionalDouble depthClearValue = OptionalDouble.empty();
+        VulkanicResourceUsage depthInitialUsage = VulkanicResourceUsage.INFERRED;
+        VulkanicResourceUsage depthPassUsage = VulkanicResourceUsage.INFERRED;
+        VulkanicResourceUsage depthFinalUsage = VulkanicResourceUsage.INFERRED;
 	        if (depthAttachment != null) {
 	            depthTexture = spine.requireLegacyTexture(depthAttachment.textureId());
 	            if (depthTexture.imageHandle == VK10.VK_NULL_HANDLE || depthTexture.defaultViewHandle == VK10.VK_NULL_HANDLE) {
@@ -4939,10 +5012,13 @@ void main() {
 	            } else if (depthTexture.width != width || depthTexture.height != height) {
 	                throw new IllegalStateException("Render-target descriptor depth dimensions must match color attachments");
 	            }
-	            depthViewHandle = depthTexture.defaultViewHandle;
-	            depthLoadOp = depthAttachment.loadOp();
-	            depthStoreOp = depthAttachment.storeOp();
+		            depthViewHandle = depthTexture.defaultViewHandle;
+		            depthLoadOp = depthAttachment.loadOp();
+		            depthStoreOp = depthAttachment.storeOp();
             depthClearValue = depthAttachment.clearDepth();
+            depthInitialUsage = depthAttachment.initialUsage();
+            depthPassUsage = depthAttachment.passUsage();
+            depthFinalUsage = depthAttachment.finalUsage();
         }
 
         return new ResolvedFramebufferTargets(
@@ -4955,9 +5031,15 @@ void main() {
             colorLoadOps,
             colorStoreOps,
             colorClearColors,
+            colorInitialUsages,
+            colorPassUsages,
+            colorFinalUsages,
             depthLoadOp,
             depthStoreOp,
-            depthClearValue
+            depthClearValue,
+            depthInitialUsage,
+            depthPassUsage,
+            depthFinalUsage
         );
     }
 
@@ -7313,9 +7395,26 @@ void main() {
         requireVulkanCommandBufferHandle("labelObjectExt", ctx);
     }
 
-    public void memoryBarrier(CommandContext ctx, int barriers) {
-        requireVulkanCommandBufferHandle("memoryBarrier", ctx);
-    }
+        public void memoryBarrier(CommandContext ctx, int barriers) {
+            long commandBufferHandle = requireVulkanCommandBufferHandle("memoryBarrier", ctx);
+            if (barriers == 0) {
+                return;
+            }
+
+            java.util.Optional<VulkanicResourceBarriers> typedBarriers =
+                VulkanicResourceBarriers.fromOpenGLBits(barriers);
+            if (typedBarriers.isPresent()) {
+                applyResourceBarriers(ctx, typedBarriers.get());
+                return;
+            }
+
+            ensureNativeReady("memoryBarrier");
+            NativeSpine spine = nativeSpine;
+            if (spine == null) {
+                throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+            }
+            spine.applyConservativeMemoryBarrier(commandBufferHandle);
+        }
 
     public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type,
                                             long pIndices, int drawCount, long pBaseVertex) {
@@ -8656,7 +8755,9 @@ void main() {
         private final boolean[] frameCommandBufferRecording = new boolean[MAX_FRAMES_IN_FLIGHT];
         private boolean renderPassRecording;
         private final java.util.ArrayList<LegacyTextureObject> activeRenderPassColorTextures = new java.util.ArrayList<>();
+        private final java.util.ArrayList<Integer> activeRenderPassColorFinalLayouts = new java.util.ArrayList<>();
         @Nullable private LegacyTextureObject activeRenderPassDepthTexture;
+        private int activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
         private boolean frameInProgress;
         private int acquiredSwapchainImageIndex = -1;
         private int renderPassSwapchainImageIndex = -1;
@@ -11298,6 +11399,60 @@ void main() {
                     yield VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
                 }
             };
+        }
+
+        private static int imageLayoutForUsage(
+            VulkanicResourceUsage usage,
+            boolean depth,
+            boolean feedbackLoopCapable,
+            int inferredLayout
+        ) {
+            Objects.requireNonNull(usage, "usage must not be null");
+            if (usage == VulkanicResourceUsage.INFERRED) {
+                return inferredLayout;
+            }
+
+            if (feedbackLoopCapable
+                && (usage == VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE
+                    || usage == VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE
+                    || usage == VulkanicResourceUsage.SAMPLED_READ
+                    || usage == VulkanicResourceUsage.ATTACHMENT_FEEDBACK_LOOP)) {
+                return EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+            }
+
+            return switch (usage) {
+                case COLOR_ATTACHMENT_WRITE -> VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                case DEPTH_ATTACHMENT_WRITE -> VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                case SAMPLED_READ -> depth
+                    ? VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                case TRANSFER_SRC -> VK10.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                case TRANSFER_DST -> VK10.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                case STORAGE_READ_WRITE -> VK10.VK_IMAGE_LAYOUT_GENERAL;
+                case PRESENT -> KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+                case ATTACHMENT_FEEDBACK_LOOP -> EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+                case INFERRED -> inferredLayout;
+            };
+        }
+
+        private void ensureTextureLayoutBeforeRenderPass(
+            LegacyTextureObject texture,
+            int targetLayout,
+            VulkanicResourceUsage usage
+        ) {
+            if (usage == VulkanicResourceUsage.INFERRED
+                || texture == null
+                || targetLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED) {
+                return;
+            }
+
+            int trackedLayout = trackedLayoutForLevel(texture, 0);
+            if (trackedLayout == VK10.VK_IMAGE_LAYOUT_UNDEFINED || trackedLayout == targetLayout) {
+                return;
+            }
+
+            transitionImageLayout(texture, trackedLayout, targetLayout, 0, 1);
+            trackLayoutForLevel(texture, 0, targetLayout);
         }
 
         private void uploadToLegacyTextureRegion(long commandBufferHandle,
@@ -15064,8 +15219,8 @@ void main() {
             }
         }
 
-        private void applyResourceBarriers(long commandBufferHandle, VulkanicResourceBarriers barriers) {
-            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "applyResourceBarriers");
+	        private void applyResourceBarriers(long commandBufferHandle, VulkanicResourceBarriers barriers) {
+	            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "applyResourceBarriers");
 
             BarrierMasks masks = toVkBarrierMasks(barriers);
             try (MemoryStack stack = stackPush()) {
@@ -15083,11 +15238,32 @@ void main() {
                     memoryBarriers,
                     null,
                     null
-                );
-            }
-        }
+	                );
+	            }
+	        }
 
-        private VkCommandBuffer requireRecordingCommandBuffer(long commandBufferHandle, String operation) {
+	        private void applyConservativeMemoryBarrier(long commandBufferHandle) {
+	            VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "memoryBarrier");
+	            try (MemoryStack stack = stackPush()) {
+	                VkMemoryBarrier.Buffer memoryBarriers = VkMemoryBarrier.calloc(1, stack);
+	                memoryBarriers.get(0)
+	                    .sType$Default()
+	                    .srcAccessMask(VK10.VK_ACCESS_MEMORY_WRITE_BIT)
+	                    .dstAccessMask(VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT);
+
+	                VK10.vkCmdPipelineBarrier(
+	                    activeCommandBuffer,
+	                    VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+	                    VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+	                    0,
+	                    memoryBarriers,
+	                    null,
+	                    null
+	                );
+	            }
+	        }
+
+	        private VkCommandBuffer requireRecordingCommandBuffer(long commandBufferHandle, String operation) {
             if (primaryCommandBuffer == null) {
                 throw new IllegalStateException("Primary Vulkan command buffer has not been allocated.");
             }
@@ -15246,10 +15422,12 @@ void main() {
                     cachedScissorWidth = width;
                     cachedScissorHeight = height;
 
-                    if (legacyColorTexture != null) {
-                        trackLayoutForLevel(legacyColorTexture, 0, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-                    }
-                    trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	                    if (legacyColorTexture != null) {
+	                        trackLayoutForLevel(legacyColorTexture, 0, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	                    }
+	                    activeRenderPassColorTextures.clear();
+	                    activeRenderPassColorFinalLayouts.clear();
+	                    trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
                     renderPassSwapchainImageIndex = swapchainColorImageIndex;
                     activeRenderPassTargetsSwapchain = true;
                     renderPassRecording = true;
@@ -15263,11 +15441,29 @@ void main() {
                     : legacyColorTexture != null && trackedLayoutForLevel(legacyColorTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
                         ? trackedLayoutForLevel(legacyColorTexture, 0)
                         : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                if (!swapchainColorAttachment && legacyColorTexture != null) {
+                    colorInitialLayout = imageLayoutForUsage(
+                        descriptor.colorAttachment().initialUsage(),
+                        false,
+                        legacyColorTexture.feedbackLoopCapable,
+                        colorInitialLayout
+                    );
+                    ensureTextureLayoutBeforeRenderPass(
+                        legacyColorTexture,
+                        colorInitialLayout,
+                        descriptor.colorAttachment().initialUsage()
+                    );
+                }
                 int colorFinalLayout = swapchainColorAttachment
                     ? KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-                    : (legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable)
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    : imageLayoutForUsage(
+                        descriptor.colorAttachment().finalUsage(),
+                        false,
+                        legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable,
+                        legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable
+                            ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                            : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                    );
 
                 attachments.get(0)
                     .format(swapchainColorAttachment
@@ -15285,12 +15481,21 @@ void main() {
                 int colorSubpassLayoutSingle = (!swapchainColorAttachment && legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable)
                     ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                     : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                if (!swapchainColorAttachment) {
+                    colorSubpassLayoutSingle = imageLayoutForUsage(
+                        descriptor.colorAttachment().passUsage(),
+                        false,
+                        legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable,
+                        colorSubpassLayoutSingle
+                    );
+                }
                 colorReference.get(0)
                     .attachment(0)
                     .layout(colorSubpassLayoutSingle);
 
-                VkAttachmentReference depthReference = null;
-                if (targets.hasDepthTarget()) {
+	                VkAttachmentReference depthReference = null;
+	                int depthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+	                if (targets.hasDepthTarget()) {
                     boolean depthFeedback = legacyDepthTexture != null && legacyDepthTexture.feedbackLoopCapable;
                     int depthSubpassLayout = depthFeedback
                         ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
@@ -15299,9 +15504,28 @@ void main() {
                         && trackedLayoutForLevel(legacyDepthTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
                             ? trackedLayoutForLevel(legacyDepthTexture, 0)
                             : depthSubpassLayout;
-                    int depthFinalLayout = depthFeedback
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                    if (legacyDepthTexture != null) {
+                        depthInitialLayout = imageLayoutForUsage(
+                            depthAttachment.initialUsage(),
+                            true,
+                            legacyDepthTexture.feedbackLoopCapable,
+                            depthInitialLayout
+                        );
+                        ensureTextureLayoutBeforeRenderPass(
+                            legacyDepthTexture,
+                            depthInitialLayout,
+                            depthAttachment.initialUsage()
+                        );
+                    }
+	                    depthFinalLayout = depthFeedback
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                    depthFinalLayout = imageLayoutForUsage(
+                        depthAttachment.finalUsage(),
+                        true,
+                        depthFeedback,
+                        depthFinalLayout
+                    );
                     attachments.get(1)
                         .format(toVkFormat(depthTexture.getVulkanicFormat()))
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
@@ -15314,7 +15538,12 @@ void main() {
 
                     depthReference = VkAttachmentReference.calloc(stack)
                         .attachment(1)
-                        .layout(depthSubpassLayout);
+                        .layout(imageLayoutForUsage(
+                            depthAttachment.passUsage(),
+                            true,
+                            depthFeedback,
+                            depthSubpassLayout
+                        ));
                 }
 
                 VkSubpassDescription.Buffer subpasses = VkSubpassDescription.calloc(1, stack);
@@ -15461,8 +15690,11 @@ void main() {
                     trackLayoutForLevel(legacyColorTexture, 0, colorActiveLayout);
                     activeRenderPassColorTextures.clear();
                     activeRenderPassColorTextures.add(legacyColorTexture);
+                    activeRenderPassColorFinalLayouts.clear();
+                    activeRenderPassColorFinalLayouts.add(colorFinalLayout);
                 } else {
                     activeRenderPassColorTextures.clear();
+                    activeRenderPassColorFinalLayouts.clear();
                 }
                 if (swapchainColorAttachment && swapchainColorImageIndex >= 0) {
                     trackSwapchainImageLayout(swapchainColorImageIndex, VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -15477,8 +15709,10 @@ void main() {
                         : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                     trackLayoutForLevel(legacyDepthTexture, 0, depthActiveLayout);
                     activeRenderPassDepthTexture = legacyDepthTexture;
+                    activeRenderPassDepthFinalLayout = depthFinalLayout;
                 } else {
                     activeRenderPassDepthTexture = null;
+                    activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
                 }
 
                 renderPassRecording = true;
@@ -15513,25 +15747,48 @@ void main() {
             long framebufferHandle = VK10.VK_NULL_HANDLE;
             try (MemoryStack stack = stackPush()) {
                 VkAttachmentDescription.Buffer attachments = VkAttachmentDescription.calloc(attachmentCount, stack);
-                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
-                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
-                    boolean colorFeedback = colorTexture.feedbackLoopCapable;
-                    int colorSubpassLayout = colorFeedback
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                    int colorFinalLayout = colorFeedback
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	                for (int colorIndex = 0; colorIndex < colorAttachmentCount; colorIndex++) {
+	                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
+	                    boolean colorFeedback = colorTexture.feedbackLoopCapable;
+	                    int colorSubpassLayout = colorFeedback
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	                    colorSubpassLayout = imageLayoutForUsage(
+	                        targets.colorPassUsage(colorIndex),
+	                        false,
+	                        colorFeedback,
+	                        colorSubpassLayout
+	                    );
+	                    int colorFinalLayout = colorFeedback
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	                    colorFinalLayout = imageLayoutForUsage(
+	                        targets.colorFinalUsage(colorIndex),
+	                        false,
+	                        colorFeedback,
+	                        colorFinalLayout
+	                    );
                     // For feedbackLoopCapable textures, always use the subpass layout as
                     // initialLayout so the render pass structure is identical each frame and
                     // can be permanently cached. An explicit pre-barrier (below) ensures the
                     // image is already in this layout before the render pass begins.
-                    int initialLayout = colorFeedback
-                        ? colorSubpassLayout
-                        : (trackedLayoutForLevel(colorTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                            ? trackedLayoutForLevel(colorTexture, 0)
-                            : colorSubpassLayout);
-                    attachments.get(colorIndex)
+	                    int initialLayout = colorFeedback
+	                        ? colorSubpassLayout
+	                        : (trackedLayoutForLevel(colorTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+	                            ? trackedLayoutForLevel(colorTexture, 0)
+	                            : colorSubpassLayout);
+	                    initialLayout = imageLayoutForUsage(
+	                        targets.colorInitialUsage(colorIndex),
+	                        false,
+	                        colorFeedback,
+	                        initialLayout
+	                    );
+	                    ensureTextureLayoutBeforeRenderPass(
+	                        colorTexture,
+	                        initialLayout,
+	                        targets.colorInitialUsage(colorIndex)
+	                    );
+	                    attachments.get(colorIndex)
                         .format(colorTexture.vkFormat)
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
                         .loadOp(toVkLoadOp(targets.colorLoadOp(colorIndex)))
@@ -15549,8 +15806,14 @@ void main() {
 	                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
 	                    int colorSubpassLayout = colorTexture.feedbackLoopCapable
 	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                    colorReferences.get(colorIndex)
+	                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	                    colorSubpassLayout = imageLayoutForUsage(
+	                        targets.colorPassUsage(colorIndex),
+	                        false,
+	                        colorTexture.feedbackLoopCapable,
+	                        colorSubpassLayout
+	                    );
+	                    colorReferences.get(colorIndex)
                         .attachment(colorIndex)
                         .layout(colorSubpassLayout);
                 }
@@ -15560,17 +15823,40 @@ void main() {
                     int depthAttachmentIndex = colorAttachmentCount;
                     LegacyTextureObject depthTexture = targets.depthTexture;
                     boolean depthFeedback2 = depthTexture.feedbackLoopCapable;
-                    int depthSubpassLayout2 = depthFeedback2
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-                    int depthInitialLayout2 = depthFeedback2
-                        ? depthSubpassLayout2
-                        : (trackedLayoutForLevel(depthTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
-                            ? trackedLayoutForLevel(depthTexture, 0)
-                            : depthSubpassLayout2);
-                    int depthFinalLayout2 = depthFeedback2
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	                    int depthSubpassLayout2 = depthFeedback2
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	                    depthSubpassLayout2 = imageLayoutForUsage(
+	                        targets.depthPassUsage(),
+	                        true,
+	                        depthFeedback2,
+	                        depthSubpassLayout2
+	                    );
+	                    int depthInitialLayout2 = depthFeedback2
+	                        ? depthSubpassLayout2
+	                        : (trackedLayoutForLevel(depthTexture, 0) != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+	                            ? trackedLayoutForLevel(depthTexture, 0)
+	                            : depthSubpassLayout2);
+	                    depthInitialLayout2 = imageLayoutForUsage(
+	                        targets.depthInitialUsage(),
+	                        true,
+	                        depthFeedback2,
+	                        depthInitialLayout2
+	                    );
+	                    ensureTextureLayoutBeforeRenderPass(
+	                        depthTexture,
+	                        depthInitialLayout2,
+	                        targets.depthInitialUsage()
+	                    );
+	                    int depthFinalLayout2 = depthFeedback2
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	                    depthFinalLayout2 = imageLayoutForUsage(
+	                        targets.depthFinalUsage(),
+	                        true,
+	                        depthFeedback2,
+	                        depthFinalLayout2
+	                    );
                     attachments.get(depthAttachmentIndex)
                         .format(depthTexture.vkFormat)
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
@@ -15712,11 +15998,17 @@ void main() {
                 if (debugColorAttachmentLogCount < 200) {
                     debugColorAttachmentLogCount++;
                     LOGGER.info(
-                        "Vulkan beginFramebufferRenderPass colorCount={} depthPresent={} hasFeedbackLoop={} renderPass=0x{}",
+                        "Vulkan beginFramebufferRenderPass colorCount={} depthPresent={} hasFeedbackLoop={} renderPass=0x{} colorTargets={} depthTarget={}",
                         colorAttachmentCount,
                         targets.hasDepthTarget(),
                         hasFeedbackLoop,
-                        Long.toHexString(renderPassHandle)
+                        Long.toHexString(renderPassHandle),
+                        targets.colorTextures.stream()
+                            .map(texture -> texture.id + ":" + texture.width + "x" + texture.height + ":feedback=" + texture.feedbackLoopCapable)
+                            .toList(),
+                        targets.hasDepthTarget()
+                            ? targets.depthTexture.id + ":" + targets.depthTexture.width + "x" + targets.depthTexture.height + ":feedback=" + targets.depthTexture.feedbackLoopCapable
+                            : "none"
                     );
                 }
 
@@ -15798,25 +16090,61 @@ void main() {
                 cachedScissorWidth = targets.width;
                 cachedScissorHeight = targets.height;
 
-                for (LegacyTextureObject colorTexture : targets.colorTextures) {
-                    int colorActiveLayout2 = colorTexture.feedbackLoopCapable
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                    trackLayoutForLevel(colorTexture, 0, colorActiveLayout2);
-                }
-                activeRenderPassColorTextures.clear();
-                activeRenderPassColorTextures.addAll(targets.colorTextures);
+	                for (int colorIndex = 0; colorIndex < targets.colorTextures.size(); colorIndex++) {
+	                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
+	                    int colorActiveLayout2 = colorTexture.feedbackLoopCapable
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	                    colorActiveLayout2 = imageLayoutForUsage(
+	                        targets.colorPassUsage(colorIndex),
+	                        false,
+	                        colorTexture.feedbackLoopCapable,
+	                        colorActiveLayout2
+	                    );
+	                    trackLayoutForLevel(colorTexture, 0, colorActiveLayout2);
+	                }
+	                activeRenderPassColorTextures.clear();
+	                activeRenderPassColorTextures.addAll(targets.colorTextures);
+	                activeRenderPassColorFinalLayouts.clear();
+	                for (int colorIndex = 0; colorIndex < targets.colorTextures.size(); colorIndex++) {
+	                    LegacyTextureObject colorTexture = targets.colorTextures.get(colorIndex);
+	                    int postLayout = colorTexture.feedbackLoopCapable
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	                    activeRenderPassColorFinalLayouts.add(imageLayoutForUsage(
+	                        targets.colorFinalUsage(colorIndex),
+	                        false,
+	                        colorTexture.feedbackLoopCapable,
+	                        postLayout
+	                    ));
+	                }
                 activeRenderPassTargetsSwapchain = false;
                 renderPassSwapchainImageIndex = -1;
                 if (targets.hasDepthTarget()) {
-                    int depthActiveLayout2 = targets.depthTexture.feedbackLoopCapable
-                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-                    trackLayoutForLevel(targets.depthTexture, 0, depthActiveLayout2);
-                    activeRenderPassDepthTexture = targets.depthTexture;
-                } else {
-                    activeRenderPassDepthTexture = null;
-                }
+	                    int depthActiveLayout2 = targets.depthTexture.feedbackLoopCapable
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	                    depthActiveLayout2 = imageLayoutForUsage(
+	                        targets.depthPassUsage(),
+	                        true,
+	                        targets.depthTexture.feedbackLoopCapable,
+	                        depthActiveLayout2
+	                    );
+	                    trackLayoutForLevel(targets.depthTexture, 0, depthActiveLayout2);
+	                    activeRenderPassDepthTexture = targets.depthTexture;
+	                    int depthPostLayout = targets.depthTexture.feedbackLoopCapable
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	                    activeRenderPassDepthFinalLayout = imageLayoutForUsage(
+	                        targets.depthFinalUsage(),
+	                        true,
+	                        targets.depthTexture.feedbackLoopCapable,
+	                        depthPostLayout
+	                    );
+	                } else {
+	                    activeRenderPassDepthTexture = null;
+	                    activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+	                }
 
                 renderPassRecording = true;
                 activeRenderPassWidth = targets.width;
@@ -15855,20 +16183,27 @@ void main() {
             activeRenderPassWidth = 0;
             activeRenderPassHeight = 0;
             activeRenderPassTargetsSwapchain = false;
-            for (LegacyTextureObject colorTexture : activeRenderPassColorTextures) {
-                int postLayout = colorTexture.feedbackLoopCapable
-                    ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                    : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                trackLayoutForLevel(colorTexture, 0, postLayout);
-            }
-            activeRenderPassColorTextures.clear();
-            if (activeRenderPassDepthTexture != null) {
-                int depthPostLayout = activeRenderPassDepthTexture.feedbackLoopCapable
-                    ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
-                    : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-                trackLayoutForLevel(activeRenderPassDepthTexture, 0, depthPostLayout);
-                activeRenderPassDepthTexture = null;
-            }
+	            for (int colorIndex = 0; colorIndex < activeRenderPassColorTextures.size(); colorIndex++) {
+	                LegacyTextureObject colorTexture = activeRenderPassColorTextures.get(colorIndex);
+	                int postLayout = colorIndex >= 0 && colorIndex < activeRenderPassColorFinalLayouts.size()
+	                    ? activeRenderPassColorFinalLayouts.get(colorIndex)
+	                    : (colorTexture.feedbackLoopCapable
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	                trackLayoutForLevel(colorTexture, 0, postLayout);
+	            }
+	            activeRenderPassColorTextures.clear();
+	            activeRenderPassColorFinalLayouts.clear();
+	            if (activeRenderPassDepthTexture != null) {
+	                int depthPostLayout = activeRenderPassDepthFinalLayout != VK10.VK_IMAGE_LAYOUT_UNDEFINED
+	                    ? activeRenderPassDepthFinalLayout
+	                    : (activeRenderPassDepthTexture.feedbackLoopCapable
+	                        ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+	                        : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+	                trackLayoutForLevel(activeRenderPassDepthTexture, 0, depthPostLayout);
+	                activeRenderPassDepthTexture = null;
+	            }
+	            activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
             if (renderPassSwapchainImageIndex >= 0) {
                 trackSwapchainImageLayout(renderPassSwapchainImageIndex, KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
                 renderPassSwapchainImageIndex = -1;
