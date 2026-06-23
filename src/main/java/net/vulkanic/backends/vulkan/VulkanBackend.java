@@ -157,6 +157,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -4088,8 +4089,8 @@ void main() {
         if (renderPipeline == null) {
             return null;
         }
-        ResolvedFramebufferTargets targets = resolveFramebufferTargets(framebuffer);
-        return resolvePipelineHandle(renderPipeline, descriptor, targets);
+        VulkanRenderTargetPlan plan = resolveFramebufferRenderTargetPlan(() -> "Pipeline-compatible framebuffer target", framebuffer);
+        return resolvePipelineHandle(renderPipeline, descriptor, plan);
     }
 
     public net.vulkanic.PipelineHandle resolvePipelineHandle(
@@ -4099,8 +4100,8 @@ void main() {
         if (renderPipeline == null) {
             return null;
         }
-        ResolvedFramebufferTargets targets = resolveRenderTargetDescriptor(renderTarget);
-        return resolvePipelineHandle(renderPipeline, descriptor, targets);
+        VulkanRenderTargetPlan plan = resolveRenderTargetDescriptorPlan(renderTarget);
+        return resolvePipelineHandle(renderPipeline, descriptor, plan);
     }
 
     public net.vulkanic.PipelineHandle resolvePipelineHandle(
@@ -4112,7 +4113,7 @@ void main() {
             return null;
         }
 
-        ResolvedRenderTargets targets = resolveRenderTargets(
+        VulkanRenderTargetPlan plan = resolveRenderPassDescriptorPlan(
             VulkanicRenderPassDescriptor.colorAndDepth(
                 () -> "Pipeline-compatible texture-view target",
                 colorTarget,
@@ -4121,13 +4122,7 @@ void main() {
                 OptionalDouble.empty()
             )
         );
-        return resolvePipelineHandle(
-            renderPipeline,
-            descriptor,
-            List.of(NativeSpine.toVkFormat(targets.colorTexture.getVulkanicFormat())),
-            targets.hasDepthTarget() ? NativeSpine.toVkFormat(targets.depthTexture.getVulkanicFormat()) : VK10.VK_FORMAT_UNDEFINED,
-            false
-        );
+        return resolvePipelineHandle(renderPipeline, descriptor, plan);
     }
 
     private net.vulkanic.PipelineHandle resolvePipelineHandle(
@@ -4137,9 +4132,20 @@ void main() {
         return resolvePipelineHandle(
             renderPipeline,
             descriptor,
-            targets.colorFormats(),
-            targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
-            targets.hasFeedbackLoopTarget()
+            VulkanRenderTargetPlan.framebuffer(() -> "Pipeline-compatible framebuffer target", targets)
+        );
+    }
+
+    private net.vulkanic.PipelineHandle resolvePipelineHandle(
+            net.blaze3d.pipeline.RenderPipeline renderPipeline,
+            net.vulkanic.PipelineDescriptor descriptor,
+            VulkanRenderTargetPlan plan) {
+        return resolvePipelineHandle(
+            renderPipeline,
+            descriptor,
+            plan.colorFormats(),
+            plan.depthFormat(),
+            plan.feedbackLoopCompatible()
         );
     }
 
@@ -4564,6 +4570,180 @@ void main() {
         }
     }
 
+    private enum VulkanRenderTargetPlanSource {
+        TEXTURE_VIEW,
+        FRAMEBUFFER,
+        RENDER_TARGET_DESCRIPTOR
+    }
+
+    /**
+     * Normalized Vulkan render-target contract for every render-pass entrypoint.
+     *
+     * <p>The source-specific resolved targets are retained so existing native
+     * behavior stays stable, but callers must pass through this object before
+     * creating a render pass or a target-specific pipeline. That gives Vulkan a
+     * single place to compare attachment order, formats, usage intent, and
+     * feedback-loop requirements.</p>
+     */
+    private static final class VulkanRenderTargetPlan {
+        private final VulkanRenderTargetPlanSource source;
+        private final String label;
+        @Nullable
+        private final VulkanicRenderPassDescriptor renderPassDescriptor;
+        @Nullable
+        private final ResolvedRenderTargets textureViewTargets;
+        @Nullable
+        private final ResolvedFramebufferTargets framebufferTargets;
+
+        private VulkanRenderTargetPlan(
+            VulkanRenderTargetPlanSource source,
+            String label,
+            @Nullable VulkanicRenderPassDescriptor renderPassDescriptor,
+            @Nullable ResolvedRenderTargets textureViewTargets,
+            @Nullable ResolvedFramebufferTargets framebufferTargets
+        ) {
+            this.source = Objects.requireNonNull(source, "source must not be null");
+            this.label = Objects.requireNonNull(label, "label must not be null");
+            this.renderPassDescriptor = renderPassDescriptor;
+            this.textureViewTargets = textureViewTargets;
+            this.framebufferTargets = framebufferTargets;
+
+            boolean textureViewPlan = renderPassDescriptor != null && textureViewTargets != null && framebufferTargets == null;
+            boolean framebufferPlan = renderPassDescriptor == null && textureViewTargets == null && framebufferTargets != null;
+            if (source == VulkanRenderTargetPlanSource.TEXTURE_VIEW) {
+                if (!textureViewPlan) {
+                    throw new IllegalArgumentException("Texture-view render target plans require texture-view targets");
+                }
+            } else if (!framebufferPlan) {
+                throw new IllegalArgumentException("Framebuffer-style render target plans require framebuffer targets");
+            }
+        }
+
+        private static VulkanRenderTargetPlan textureView(
+            VulkanicRenderPassDescriptor descriptor,
+            ResolvedRenderTargets targets
+        ) {
+            return new VulkanRenderTargetPlan(
+                VulkanRenderTargetPlanSource.TEXTURE_VIEW,
+                descriptor.label().get(),
+                descriptor,
+                targets,
+                null
+            );
+        }
+
+        private static VulkanRenderTargetPlan framebuffer(Supplier<String> label, ResolvedFramebufferTargets targets) {
+            return new VulkanRenderTargetPlan(
+                VulkanRenderTargetPlanSource.FRAMEBUFFER,
+                label.get(),
+                null,
+                null,
+                targets
+            );
+        }
+
+        private static VulkanRenderTargetPlan renderTargetDescriptor(
+            VulkanicRenderTargetDescriptor descriptor,
+            ResolvedFramebufferTargets targets
+        ) {
+            return new VulkanRenderTargetPlan(
+                VulkanRenderTargetPlanSource.RENDER_TARGET_DESCRIPTOR,
+                descriptor.label().get(),
+                null,
+                null,
+                targets
+            );
+        }
+
+        private VulkanicRenderPassDescriptor requireRenderPassDescriptor() {
+            if (renderPassDescriptor == null) {
+                throw new IllegalStateException("Render target plan " + source + " has no texture-view render pass descriptor");
+            }
+            return renderPassDescriptor;
+        }
+
+        private ResolvedRenderTargets requireTextureViewTargets() {
+            if (textureViewTargets == null) {
+                throw new IllegalStateException("Render target plan " + source + " has no texture-view targets");
+            }
+            return textureViewTargets;
+        }
+
+        private ResolvedFramebufferTargets requireFramebufferTargets() {
+            if (framebufferTargets == null) {
+                throw new IllegalStateException("Render target plan " + source + " has no framebuffer targets");
+            }
+            return framebufferTargets;
+        }
+
+        private List<Integer> colorFormats() {
+            if (framebufferTargets != null) {
+                return framebufferTargets.colorFormats();
+            }
+            return List.of(NativeSpine.toVkFormat(requireTextureViewTargets().colorTexture.getVulkanicFormat()));
+        }
+
+        private int depthFormat() {
+            if (framebufferTargets != null) {
+                return framebufferTargets.hasDepthTarget() ? framebufferTargets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED;
+            }
+            ResolvedRenderTargets targets = requireTextureViewTargets();
+            return targets.hasDepthTarget()
+                ? NativeSpine.toVkFormat(targets.depthTexture.getVulkanicFormat())
+                : VK10.VK_FORMAT_UNDEFINED;
+        }
+
+        private boolean feedbackLoopCompatible() {
+            return framebufferTargets != null && framebufferTargets.hasFeedbackLoopTarget();
+        }
+
+        private String compatibilitySignature() {
+            if (framebufferTargets != null) {
+                return source + ":" + framebufferTargets.compatibilitySignature();
+            }
+
+            ResolvedRenderTargets targets = requireTextureViewTargets();
+            VulkanicRenderPassDescriptor descriptor = requireRenderPassDescriptor();
+            StringBuilder builder = new StringBuilder(160);
+            builder.append(source)
+                .append(":extent=").append(targets.width).append('x').append(targets.height)
+                .append(";colors=1")
+                .append(";c0{format=0x")
+                .append(Integer.toHexString(NativeSpine.toVkFormat(targets.colorTexture.getVulkanicFormat())))
+                .append(",load=").append(descriptor.colorAttachment().loadOp())
+                .append(",store=").append(descriptor.colorAttachment().storeOp())
+                .append(",initialUsage=").append(descriptor.colorAttachment().initialUsage())
+                .append(",passUsage=").append(descriptor.colorAttachment().passUsage())
+                .append(",finalUsage=").append(descriptor.colorAttachment().finalUsage())
+                .append(",clear=").append(optionalIntToString(descriptor.colorAttachment().clearColor()))
+                .append('}')
+                .append(";depth=");
+            if (targets.hasDepthTarget()) {
+                VulkanicRenderPassDescriptor.DepthAttachment depth = descriptor.depthAttachment();
+                builder.append("{format=0x")
+                    .append(Integer.toHexString(NativeSpine.toVkFormat(targets.depthTexture.getVulkanicFormat())))
+                    .append(",load=").append(depth.loadOp())
+                    .append(",store=").append(depth.storeOp())
+                    .append(",initialUsage=").append(depth.initialUsage())
+                    .append(",passUsage=").append(depth.passUsage())
+                    .append(",finalUsage=").append(depth.finalUsage())
+                    .append(",clear=").append(optionalDoubleToString(depth.clearDepth()))
+                    .append('}');
+            } else {
+                builder.append("none");
+            }
+            return builder.toString();
+        }
+
+        private static String optionalIntToString(OptionalInt value) {
+            return value.isPresent() ? "0x" + Integer.toHexString(value.getAsInt()) : "empty";
+        }
+
+        private static String optionalDoubleToString(OptionalDouble value) {
+            return value.isPresent() ? Double.toString(value.getAsDouble()) : "empty";
+        }
+    }
+
     private static final class ResolvedFramebufferTargets {
         private final List<NativeSpine.LegacyTextureObject> colorTextures;
         private final List<Long> colorViewHandles;
@@ -4820,6 +5000,12 @@ void main() {
         MISMATCH
     }
 
+    private static VulkanRenderTargetPlan resolveRenderPassDescriptorPlan(VulkanicRenderPassDescriptor descriptor) {
+        VulkanicRenderPassDescriptor safeDescriptor =
+            Objects.requireNonNull(descriptor, "descriptor must not be null");
+        return VulkanRenderTargetPlan.textureView(safeDescriptor, resolveRenderTargets(safeDescriptor));
+    }
+
     private static ResolvedRenderTargets resolveRenderTargets(VulkanicRenderPassDescriptor descriptor) {
         VulkanTextureView colorView = requireVulkanTextureView(descriptor.colorAttachment().target(), "colorAttachment.target");
         VulkanicTexture colorTexture = requireRenderPassTexture(colorView.texture(), "colorAttachment.texture");
@@ -4854,6 +5040,11 @@ void main() {
         }
 
         return new ResolvedRenderTargets(colorView, colorTexture, depthView, depthTexture, width, height);
+    }
+
+    private VulkanRenderTargetPlan resolveFramebufferRenderTargetPlan(Supplier<String> label, int framebuffer) {
+        Objects.requireNonNull(label, "label must not be null");
+        return VulkanRenderTargetPlan.framebuffer(label, resolveFramebufferTargets(framebuffer));
     }
 
     private ResolvedFramebufferTargets resolveFramebufferTargets(int framebuffer) {
@@ -4940,6 +5131,12 @@ void main() {
         }
 
         return new ResolvedFramebufferTargets(colorTextures, colorViewHandles, depthTexture, depthViewHandle, width, height);
+    }
+
+    private VulkanRenderTargetPlan resolveRenderTargetDescriptorPlan(VulkanicRenderTargetDescriptor descriptor) {
+        VulkanicRenderTargetDescriptor safeDescriptor =
+            Objects.requireNonNull(descriptor, "descriptor must not be null");
+        return VulkanRenderTargetPlan.renderTargetDescriptor(safeDescriptor, resolveRenderTargetDescriptor(safeDescriptor));
     }
 
     private ResolvedFramebufferTargets resolveRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor) {
@@ -5050,10 +5247,11 @@ void main() {
         Objects.requireNonNull(descriptor, "descriptor must not be null");
 
         try {
-            ResolvedFramebufferTargets framebufferTargets = resolveFramebufferTargets(framebuffer);
-            ResolvedFramebufferTargets descriptorTargets = resolveRenderTargetDescriptor(descriptor);
-            String framebufferSignature = framebufferTargets.compatibilitySignature();
-            String descriptorSignature = descriptorTargets.compatibilitySignature();
+            VulkanRenderTargetPlan framebufferPlan =
+                resolveFramebufferRenderTargetPlan(() -> "framebuffer:" + framebuffer, framebuffer);
+            VulkanRenderTargetPlan descriptorPlan = resolveRenderTargetDescriptorPlan(descriptor);
+            String framebufferSignature = framebufferPlan.requireFramebufferTargets().compatibilitySignature();
+            String descriptorSignature = descriptorPlan.requireFramebufferTargets().compatibilitySignature();
             boolean equivalent = framebufferSignature.equals(descriptorSignature);
             if (TRACE_RENDER_TARGET_PARITY) {
                 logRenderTargetParity(
@@ -5088,8 +5286,11 @@ void main() {
         Objects.requireNonNull(descriptor, "descriptor must not be null");
 
         try {
-            ResolvedFramebufferTargets framebufferTargets = resolveFramebufferTargets(framebuffer);
-            ResolvedFramebufferTargets descriptorTargets = resolveRenderTargetDescriptor(descriptor);
+            VulkanRenderTargetPlan framebufferPlan =
+                resolveFramebufferRenderTargetPlan(() -> "framebuffer:" + framebuffer, framebuffer);
+            VulkanRenderTargetPlan descriptorPlan = resolveRenderTargetDescriptorPlan(descriptor);
+            ResolvedFramebufferTargets framebufferTargets = framebufferPlan.requireFramebufferTargets();
+            ResolvedFramebufferTargets descriptorTargets = descriptorPlan.requireFramebufferTargets();
             RenderTargetCompatibility compatibility =
                 classifyRenderTargetCompatibility(framebufferTargets, descriptorTargets);
             boolean compatible = compatibility != RenderTargetCompatibility.MISMATCH;
@@ -5620,8 +5821,7 @@ void main() {
     public net.vulkanic.VulkanicRenderPass beginRenderPass(CommandContext ctx,
             net.vulkanic.VulkanicRenderPassDescriptor descriptor) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("beginRenderPass", ctx);
-        VulkanicRenderPassDescriptor safeDescriptor = Objects.requireNonNull(descriptor, "descriptor must not be null");
-        ResolvedRenderTargets resolvedTargets = resolveRenderTargets(safeDescriptor);
+        VulkanRenderTargetPlan plan = resolveRenderPassDescriptorPlan(descriptor);
 
         ensureNativeReady("beginRenderPass");
         NativeSpine spine = nativeSpine;
@@ -5629,7 +5829,7 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        spine.beginRenderPass(commandBufferHandle, safeDescriptor, resolvedTargets);
+        spine.beginRenderPass(commandBufferHandle, plan);
         return new VulkanBackedRenderPass(spine, commandBufferHandle);
     }
 
@@ -5639,8 +5839,7 @@ void main() {
         int framebuffer
     ) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("beginRenderPass(framebuffer)", ctx);
-        Objects.requireNonNull(label, "label must not be null");
-        ResolvedFramebufferTargets resolvedTargets = resolveFramebufferTargets(framebuffer);
+        VulkanRenderTargetPlan plan = resolveFramebufferRenderTargetPlan(label, framebuffer);
 
         ensureNativeReady("beginRenderPass(framebuffer)");
         NativeSpine spine = nativeSpine;
@@ -5648,7 +5847,7 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        spine.beginFramebufferRenderPass(commandBufferHandle, resolvedTargets);
+        spine.beginFramebufferRenderPass(commandBufferHandle, plan);
         return new VulkanBackedRenderPass(spine, commandBufferHandle);
     }
 
@@ -5657,7 +5856,7 @@ void main() {
         VulkanicRenderTargetDescriptor descriptor
     ) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("beginRenderPass(renderTargetDescriptor)", ctx);
-        ResolvedFramebufferTargets resolvedTargets = resolveRenderTargetDescriptor(descriptor);
+        VulkanRenderTargetPlan plan = resolveRenderTargetDescriptorPlan(descriptor);
 
         ensureNativeReady("beginRenderPass(renderTargetDescriptor)");
         NativeSpine spine = nativeSpine;
@@ -5665,7 +5864,7 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        spine.beginFramebufferRenderPass(commandBufferHandle, resolvedTargets);
+        spine.beginFramebufferRenderPass(commandBufferHandle, plan);
         return new VulkanBackedRenderPass(spine, commandBufferHandle);
     }
 
@@ -14642,7 +14841,7 @@ void main() {
                     java.util.OptionalInt.of(0xFF000000)
                 );
 
-                beginRenderPass(commandBuffer.address(), descriptor, swapchainTargets);
+                beginRenderPass(commandBuffer.address(), VulkanRenderTargetPlan.textureView(descriptor, swapchainTargets));
                 passStarted = true;
                 bindPipeline(commandBuffer.address(), composePipeline.getVkPipelineHandle());
 
@@ -15314,9 +15513,9 @@ void main() {
             requireRecordingCommandBuffer(commandBufferHandle, operation);
         }
 
-        private void beginRenderPass(long commandBufferHandle,
-                                     VulkanicRenderPassDescriptor descriptor,
-                                     ResolvedRenderTargets targets) {
+        private void beginRenderPass(long commandBufferHandle, VulkanRenderTargetPlan plan) {
+            VulkanicRenderPassDescriptor descriptor = plan.requireRenderPassDescriptor();
+            ResolvedRenderTargets targets = plan.requireTextureViewTargets();
             VulkanPerfAudit.recordRenderPassBegin();
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "beginRenderPass");
             if (renderPassRecording) {
@@ -15731,10 +15930,8 @@ void main() {
             }
         }
 
-        private void beginFramebufferRenderPass(
-            long commandBufferHandle,
-            ResolvedFramebufferTargets targets
-        ) {
+        private void beginFramebufferRenderPass(long commandBufferHandle, VulkanRenderTargetPlan plan) {
+            ResolvedFramebufferTargets targets = plan.requireFramebufferTargets();
             VulkanPerfAudit.recordRenderPassBegin();
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "beginFramebufferRenderPass");
             if (renderPassRecording) {

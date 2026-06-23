@@ -5573,6 +5573,13 @@ public class Phase3DrawPathTest {
             "Iris composite and shadow composite passes should invalidate cached pipelines when the descriptor/framebuffer target contract changes");
         assertTrue(vulkanBackendSource.contains("resolveRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor)"),
             "VulkanBackend should resolve explicit render-target descriptors without relying on a framebuffer id");
+        assertTrue(vulkanBackendSource.contains("private static final class VulkanRenderTargetPlan")
+                && vulkanBackendSource.contains("resolveRenderPassDescriptorPlan(")
+                && vulkanBackendSource.contains("resolveFramebufferRenderTargetPlan(")
+                && vulkanBackendSource.contains("resolveRenderTargetDescriptorPlan(")
+                && vulkanBackendSource.contains("spine.beginRenderPass(commandBufferHandle, plan)")
+                && vulkanBackendSource.contains("spine.beginFramebufferRenderPass(commandBufferHandle, plan)"),
+            "Vulkan render-pass and pipeline paths should normalize texture-view, framebuffer, and descriptor targets through one render-target plan");
         assertTrue(vulkanBackendSource.contains("isRenderTargetDescriptorEquivalentToFramebuffer")
                 && vulkanBackendSource.contains("isRenderTargetDescriptorCompatibleWithFramebuffer")
                 && vulkanBackendSource.contains("DESCRIPTOR_SUFFIX")
