@@ -5540,10 +5540,10 @@ public class Phase3DrawPathTest {
 	        assertTrue(compositeSource.contains("USE_DESCRIPTOR_COMPOSITE_RENDER_PASS")
 	                && compositeSource.contains("this.renderTargetDescriptor(label)")
 	                && compositeSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
-	                && shaderTargetContractSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(framebuffer, descriptor)")
-	                && shaderTargetContractSource.contains("IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorMatchesFramebuffer={} {}")
-	                && shaderTargetContractSource.contains("return descriptorMatchesFramebuffer ? descriptor : null"),
-	            "Iris composite passes should use the shared explicit Vulkan render-target contract instead of relying on framebuffer inference");
+		                && shaderTargetContractSource.contains("VulkanicAPI.isRenderTargetDescriptorCompatibleWithFramebuffer(framebuffer, descriptor)")
+		                && shaderTargetContractSource.contains("IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorMatchesFramebuffer={} {}")
+		                && shaderTargetContractSource.contains("return descriptorMatchesFramebuffer ? descriptor : null"),
+		            "Iris composite passes should use the shared explicit Vulkan render-target compatibility contract instead of relying on framebuffer inference");
 	        assertTrue(compositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor)"),
 	            "Iris composite passes should create pipelines through the same descriptor/fallback seam used to begin the render pass");
         assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),
@@ -5574,9 +5574,12 @@ public class Phase3DrawPathTest {
         assertTrue(vulkanBackendSource.contains("resolveRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor)"),
             "VulkanBackend should resolve explicit render-target descriptors without relying on a framebuffer id");
         assertTrue(vulkanBackendSource.contains("isRenderTargetDescriptorEquivalentToFramebuffer")
+                && vulkanBackendSource.contains("isRenderTargetDescriptorCompatibleWithFramebuffer")
+                && vulkanBackendSource.contains("DESCRIPTOR_SUFFIX")
+                && vulkanBackendSource.contains("DESCRIPTOR_ATTACHMENTLESS")
                 && vulkanBackendSource.contains("compatibilitySignature()")
                 && vulkanBackendSource.contains("TRACE_RENDER_TARGET_PARITY"),
-            "VulkanBackend should be able to prove descriptor/framebuffer render-target parity before using descriptor terrain paths");
+            "VulkanBackend should keep exact parity diagnostics while allowing narrowly compatible explicit descriptor shader paths");
         assertTrue(vulkanBackendSource.contains("boolean includeDepth = depthFormat != VK10.VK_FORMAT_UNDEFINED"),
             "Vulkan target-specific pipelines should match the actual descriptor depth attachment contract");
     }

@@ -4667,6 +4667,35 @@ void main() {
             return colorClearColors.get(index);
         }
 
+        private boolean colorAttachmentMatches(ResolvedFramebufferTargets other, int thisIndex, int otherIndex) {
+            NativeSpine.LegacyTextureObject thisTexture = colorTextures.get(thisIndex);
+            NativeSpine.LegacyTextureObject otherTexture = other.colorTextures.get(otherIndex);
+            return thisTexture.id == otherTexture.id
+                && colorViewHandles.get(thisIndex).equals(other.colorViewHandles.get(otherIndex))
+                && thisTexture.vkFormat == otherTexture.vkFormat
+                && thisTexture.feedbackLoopCapable == otherTexture.feedbackLoopCapable
+                && colorLoadOps.get(thisIndex) == other.colorLoadOps.get(otherIndex)
+                && colorStoreOps.get(thisIndex) == other.colorStoreOps.get(otherIndex)
+                && colorClearColors.get(thisIndex).equals(other.colorClearColors.get(otherIndex));
+        }
+
+        private boolean depthAttachmentMatches(ResolvedFramebufferTargets other) {
+            if (hasDepthTarget() != other.hasDepthTarget()) {
+                return false;
+            }
+            if (!hasDepthTarget()) {
+                return true;
+            }
+
+            return depthTexture.id == other.depthTexture.id
+                && depthViewHandle == other.depthViewHandle
+                && depthTexture.vkFormat == other.depthTexture.vkFormat
+                && depthTexture.feedbackLoopCapable == other.depthTexture.feedbackLoopCapable
+                && depthLoadOp == other.depthLoadOp
+                && depthStoreOp == other.depthStoreOp
+                && depthClearValue.equals(other.depthClearValue);
+        }
+
         private VulkanicRenderPassDescriptor.LoadOp depthLoadOp() {
             return depthLoadOp;
         }
@@ -4718,6 +4747,13 @@ void main() {
         private static String optionalDoubleToString(OptionalDouble value) {
             return value.isPresent() ? Double.toString(value.getAsDouble()) : "empty";
         }
+    }
+
+    private enum RenderTargetCompatibility {
+        EXACT,
+        DESCRIPTOR_SUFFIX,
+        DESCRIPTOR_ATTACHMENTLESS,
+        MISMATCH
     }
 
     private static ResolvedRenderTargets resolveRenderTargets(VulkanicRenderPassDescriptor descriptor) {
@@ -4963,6 +4999,89 @@ void main() {
         }
     }
 
+    public boolean isRenderTargetDescriptorCompatibleWithFramebuffer(
+        int framebuffer,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
+        Objects.requireNonNull(descriptor, "descriptor must not be null");
+
+        try {
+            ResolvedFramebufferTargets framebufferTargets = resolveFramebufferTargets(framebuffer);
+            ResolvedFramebufferTargets descriptorTargets = resolveRenderTargetDescriptor(descriptor);
+            RenderTargetCompatibility compatibility =
+                classifyRenderTargetCompatibility(framebufferTargets, descriptorTargets);
+            boolean compatible = compatibility != RenderTargetCompatibility.MISMATCH;
+            if (TRACE_RENDER_TARGET_PARITY) {
+                logRenderTargetCompatibility(
+                    compatible,
+                    compatibility,
+                    framebuffer,
+                    descriptor.label().get(),
+                    framebufferTargets.compatibilitySignature(),
+                    descriptorTargets.compatibilitySignature(),
+                    null
+                );
+            }
+            return compatible;
+        } catch (RuntimeException exception) {
+            if (TRACE_RENDER_TARGET_PARITY) {
+                logRenderTargetCompatibility(
+                    false,
+                    RenderTargetCompatibility.MISMATCH,
+                    framebuffer,
+                    descriptor.label().get(),
+                    "unresolved",
+                    "unresolved",
+                    exception
+                );
+            }
+            return false;
+        }
+    }
+
+    private static RenderTargetCompatibility classifyRenderTargetCompatibility(
+        ResolvedFramebufferTargets framebufferTargets,
+        ResolvedFramebufferTargets descriptorTargets
+    ) {
+        if (framebufferTargets.width != descriptorTargets.width || framebufferTargets.height != descriptorTargets.height) {
+            return RenderTargetCompatibility.MISMATCH;
+        }
+        if (!descriptorTargets.depthAttachmentMatches(framebufferTargets)) {
+            return RenderTargetCompatibility.MISMATCH;
+        }
+
+        int framebufferColorCount = framebufferTargets.colorAttachmentCount();
+        int descriptorColorCount = descriptorTargets.colorAttachmentCount();
+        if (descriptorColorCount > framebufferColorCount) {
+            return RenderTargetCompatibility.MISMATCH;
+        }
+
+        boolean exactColorMatch = framebufferColorCount == descriptorColorCount;
+        if (exactColorMatch) {
+            for (int colorIndex = 0; colorIndex < descriptorColorCount; colorIndex++) {
+                if (!descriptorTargets.colorAttachmentMatches(framebufferTargets, colorIndex, colorIndex)) {
+                    exactColorMatch = false;
+                    break;
+                }
+            }
+            if (exactColorMatch) {
+                return RenderTargetCompatibility.EXACT;
+            }
+        }
+
+        if (descriptorColorCount == 0) {
+            return RenderTargetCompatibility.DESCRIPTOR_ATTACHMENTLESS;
+        }
+
+        int suffixStart = framebufferColorCount - descriptorColorCount;
+        for (int descriptorIndex = 0; descriptorIndex < descriptorColorCount; descriptorIndex++) {
+            if (!descriptorTargets.colorAttachmentMatches(framebufferTargets, descriptorIndex, suffixStart + descriptorIndex)) {
+                return RenderTargetCompatibility.MISMATCH;
+            }
+        }
+        return RenderTargetCompatibility.DESCRIPTOR_SUFFIX;
+    }
+
     private static void logRenderTargetParity(
         boolean equivalent,
         int framebuffer,
@@ -5005,6 +5124,46 @@ void main() {
             logIndex,
             label,
             framebuffer,
+            framebufferSignature,
+            descriptorSignature
+        );
+    }
+
+    private static void logRenderTargetCompatibility(
+        boolean compatible,
+        RenderTargetCompatibility compatibility,
+        int framebuffer,
+        String label,
+        String framebufferSignature,
+        String descriptorSignature,
+        @Nullable RuntimeException exception
+    ) {
+        int logIndex = RENDER_TARGET_PARITY_LOG_COUNT.incrementAndGet();
+        if (logIndex > MAX_RENDER_TARGET_PARITY_LOGS) {
+            return;
+        }
+
+        if (exception != null) {
+            LOGGER.warn(
+                "Vulkan render-target compatibility#{} label={} framebuffer={} compatible=false relation={} reason={} framebufferSignature={} descriptorSignature={}",
+                logIndex,
+                label,
+                framebuffer,
+                compatibility,
+                exception.getClass().getSimpleName() + ": " + exception.getMessage(),
+                framebufferSignature,
+                descriptorSignature
+            );
+            return;
+        }
+
+        LOGGER.info(
+            "Vulkan render-target compatibility#{} label={} framebuffer={} compatible={} relation={} framebufferSignature={} descriptorSignature={}",
+            logIndex,
+            label,
+            framebuffer,
+            compatible,
+            compatibility,
             framebufferSignature,
             descriptorSignature
         );

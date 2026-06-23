@@ -3651,6 +3651,22 @@ public class VulkanicAPI {
     }
 
     /**
+     * Checks whether an explicit render-target descriptor is safe to use for a
+     * pass currently associated with a tracked framebuffer. This is intentionally
+     * broader than exact equivalence: shader-pack framebuffers can carry stale
+     * leading GL attachments while the explicit descriptor contains the active
+     * Vulkan render-target contract.
+     */
+    public static boolean isRenderTargetDescriptorCompatibleWithFramebuffer(
+        int framebuffer,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            && directVulkanBackend.isRenderTargetDescriptorCompatibleWithFramebuffer(framebuffer, descriptor);
+    }
+
+    /**
      * Creates a backend-owned GPU texture with supplier-based debug label.
      */
     public static GpuTexture createTexture(
