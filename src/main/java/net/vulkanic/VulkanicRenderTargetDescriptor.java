@@ -50,6 +50,39 @@ public record VulkanicRenderTargetDescriptor(
         return width > 0 && height > 0;
     }
 
+    public String debugSignature() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("extent=");
+        if (hasExplicitExtent()) {
+            builder.append(width).append('x').append(height);
+        } else {
+            builder.append("implicit");
+        }
+        builder.append(" colors=").append(colorAttachments.size());
+
+        for (int i = 0; i < colorAttachments.size(); i++) {
+            ColorAttachment attachment = colorAttachments.get(i);
+            builder.append(" c").append(i)
+                .append("{tex=").append(attachment.textureId())
+                .append(",load=").append(attachment.loadOp())
+                .append(",store=").append(attachment.storeOp());
+            attachment.clearColor().ifPresent(clearColor -> builder.append(",clear=").append(clearColor));
+            builder.append('}');
+        }
+
+        if (depthAttachment != null) {
+            builder.append(" depth{tex=").append(depthAttachment.textureId())
+                .append(",load=").append(depthAttachment.loadOp())
+                .append(",store=").append(depthAttachment.storeOp());
+            depthAttachment.clearDepth().ifPresent(clearDepth -> builder.append(",clear=").append(clearDepth));
+            builder.append('}');
+        } else {
+            builder.append(" depth=none");
+        }
+
+        return builder.toString();
+    }
+
     public record ColorAttachment(
         int textureId,
         VulkanicRenderPassDescriptor.LoadOp loadOp,

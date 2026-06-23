@@ -73,6 +73,10 @@ import org.slf4j.Logger;
 
 public class CompositeRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
+	private static final boolean USE_DESCRIPTOR_COMPOSITE_RENDER_PASS =
+		Boolean.parseBoolean(System.getProperty("mattmc.vulkan.useDescriptorCompositeRenderPass", "true"));
+	private static final boolean TRACE_SHADER_RENDER_TARGETS =
+		Boolean.getBoolean("mattmc.vulkan.traceShaderRenderTargets");
 	public static final RenderPipeline COMPOSITE_PIPELINE = RenderPipeline.builder()
 		.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 		.withDepthWrite(false)
@@ -549,7 +553,23 @@ public class CompositeRenderer {
 		}
 
 		private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label) {
-			return null;
+			if (!USE_DESCRIPTOR_COMPOSITE_RENDER_PASS || !VulkanicAPI.isVulkanBackendSelected() || VulkanicAPI.getCommandContext().isImmediate()) {
+				return null;
+			}
+
+			VulkanicRenderTargetDescriptor descriptor = this.renderTargetDescriptor(label);
+			boolean descriptorMatchesFramebuffer =
+				VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(this.framebuffer.getId(), descriptor);
+			if (TRACE_SHADER_RENDER_TARGETS) {
+				LOGGER.info(
+					"IrisShaderRenderTargetContract stage=composite passName={} framebuffer={} descriptorMatchesFramebuffer={} {}",
+					this.name,
+					this.framebuffer.getId(),
+					descriptorMatchesFramebuffer ? "yes" : "no",
+					descriptor.debugSignature()
+				);
+			}
+			return descriptorMatchesFramebuffer ? descriptor : null;
 		}
 
 		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor, @org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {

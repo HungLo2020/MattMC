@@ -3637,6 +3637,20 @@ public class VulkanicAPI {
     }
 
     /**
+     * Checks whether an explicit render-target descriptor matches the currently
+     * tracked framebuffer contract closely enough to use native descriptor-backed
+     * rendering without changing the pass' attachment shape.
+     */
+    public static boolean isRenderTargetDescriptorEquivalentToFramebuffer(
+        int framebuffer,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            && directVulkanBackend.isRenderTargetDescriptorEquivalentToFramebuffer(framebuffer, descriptor);
+    }
+
+    /**
      * Creates a backend-owned GPU texture with supplier-based debug label.
      */
     public static GpuTexture createTexture(

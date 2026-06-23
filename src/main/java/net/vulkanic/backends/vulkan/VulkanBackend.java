@@ -4925,7 +4925,7 @@ void main() {
         );
     }
 
-    boolean isRenderTargetDescriptorEquivalentToFramebuffer(
+    public boolean isRenderTargetDescriptorEquivalentToFramebuffer(
         int framebuffer,
         VulkanicRenderTargetDescriptor descriptor
     ) {

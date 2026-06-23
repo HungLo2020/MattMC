@@ -422,9 +422,13 @@ public class Phase3DrawPathTest {
 
 	        assertTrue(compositeRendererSource.contains("compositePass.ensurePipelineState(renderTargetDescriptor);"),
 	            "CompositeRenderer should precompute a render-target-compatible pipeline for custom passes before opening the render pass");
-	        assertTrue(compositeRendererSource.contains("private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label)")
-	                && compositeRendererSource.contains("return null;"),
-	            "CompositeRenderer should keep main Iris composite passes on framebuffer-compatible rendering until descriptor-backed MRT parity is visually proven");
+	        assertTrue(compositeRendererSource.contains("USE_DESCRIPTOR_COMPOSITE_RENDER_PASS")
+	                && compositeRendererSource.contains("VulkanicAPI.isVulkanBackendSelected()")
+	                && compositeRendererSource.contains("VulkanicAPI.getCommandContext().isImmediate()")
+	                && compositeRendererSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(this.framebuffer.getId(), descriptor)")
+	                && compositeRendererSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
+	                && compositeRendererSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),
+	            "CompositeRenderer should migrate main Iris composite passes to descriptor-backed Vulkan render targets while preserving framebuffer-compatible fallback paths");
 	        assertTrue(compositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(renderPass);"),
 	            "CompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
 	        assertFalse(compositeRendererSource.contains("framebuffer.bind();"),
@@ -5529,11 +5533,13 @@ public class Phase3DrawPathTest {
         assertTrue(terrainSource.contains("shaderFramebuffer.getId()")
                 && commandEncoderSource.contains("descriptor.hasDepthAttachment()"),
             "Sodium shader terrain should pass the framebuffer fallback id while CommandEncoder owns the fallback depth contract");
-	        assertTrue(compositeSource.contains("private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label)")
-	                && compositeSource.contains("return null;"),
-	            "Iris composite passes should keep using framebuffer-compatible rendering while descriptor-backed MRT custom passes produce black frames on Vulkan");
+	        assertTrue(compositeSource.contains("USE_DESCRIPTOR_COMPOSITE_RENDER_PASS")
+	                && compositeSource.contains("this.renderTargetDescriptor(label)")
+	                && compositeSource.contains("descriptorMatchesFramebuffer ? descriptor : null")
+	                && compositeSource.contains("descriptor.debugSignature()"),
+	            "Iris composite passes should use an explicit Vulkan render-target contract with a debug signature instead of relying on framebuffer inference");
 	        assertTrue(compositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor)"),
-	            "Iris composite passes should keep the descriptor-capable pipeline seam even when the current safe path supplies null");
+	            "Iris composite passes should create pipelines through the same descriptor/fallback seam used to begin the render pass");
         assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),
             "FinalPassRenderer should snapshot the final pass target before pipeline/render-pass creation");
 	        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = false"),
