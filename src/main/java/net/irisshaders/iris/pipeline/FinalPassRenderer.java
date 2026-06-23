@@ -48,7 +48,6 @@ import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
-import net.logging.LogUtils;
 import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicAPI;
@@ -56,7 +55,6 @@ import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 
 import java.util.Map;
 import java.util.Objects;
@@ -65,10 +63,6 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 public class FinalPassRenderer {
-	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final boolean TRACE_SHADER_RENDER_TARGETS =
-		Boolean.getBoolean("mattmc.vulkan.traceShaderRenderTargets");
-
 	private static final CustomPass STATE = new CustomPass() {
 		@Override
 		public void setupState() {
@@ -347,22 +341,13 @@ public class FinalPassRenderer {
 	}
 
 	private boolean shouldUseDescriptorBackedFinalPass(VulkanicRenderTargetDescriptor descriptor) {
-		var ctx = VulkanicAPI.getCommandContext();
-		if (!VulkanicAPI.isVulkanBackendSelected() || ctx.isImmediate()) {
-			return false;
-		}
-
-		boolean descriptorMatchesFramebuffer =
-			VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(this.colorHolder.getId(), descriptor);
-		if (TRACE_SHADER_RENDER_TARGETS) {
-			LOGGER.info(
-				"IrisShaderRenderTargetContract stage=final framebuffer={} descriptorMatchesFramebuffer={} {}",
-				this.colorHolder.getId(),
-				descriptorMatchesFramebuffer ? "yes" : "no",
-				descriptor.debugSignature()
-			);
-		}
-		return descriptorMatchesFramebuffer;
+		return IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(
+			"final",
+			null,
+			this.colorHolder.getId(),
+			true,
+			() -> descriptor
+		) != null;
 	}
 
 	private VulkanicRenderTargetDescriptor createFinalRenderTargetDescriptor(Supplier<String> label, int width, int height) {
@@ -536,9 +521,8 @@ public class FinalPassRenderer {
 
 		void ensurePipelineState(@Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
 			var ctx = VulkanicAPI.getCommandContext();
-			String targetContractKey = renderTargetDescriptor != null
-				? renderTargetDescriptor.debugSignature()
-				: "framebuffer:" + colorHolder.getId();
+			String targetContractKey =
+				IrisVulkanRenderTargetContract.targetContractKey(colorHolder.getId(), renderTargetDescriptor);
 			boolean targetContractChanged = this.renderTargetContractKey != null
 				&& !this.renderTargetContractKey.equals(targetContractKey);
 			if (targetContractChanged) {

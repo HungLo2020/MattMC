@@ -25,6 +25,7 @@ import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pathways.FullScreenQuadRenderer;
 import net.irisshaders.iris.pipeline.CompositeRenderer;
+import net.irisshaders.iris.pipeline.IrisVulkanRenderTargetContract;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.irisshaders.iris.pipeline.transform.PatchShaderType;
 import net.irisshaders.iris.pipeline.transform.ShaderPrinter;
@@ -384,6 +385,8 @@ public class ShadowCompositeRenderer {
 		int viewHeight;
 		PipelineDescriptor pipelineDescriptor;
 		PipelineHandle pipelineHandle;
+		VulkanicRenderTargetDescriptor renderTargetDescriptor;
+		String renderTargetContractKey;
 		final java.util.Map<PipelineDescriptor.ResourceLayout, PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
 		ImmutableSet<Integer> flippedAtLeastOnce;
 		ImmutableSet<Integer> stageReadsFromAlt;
@@ -403,9 +406,13 @@ public class ShadowCompositeRenderer {
 		}
 
 		private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label) {
-			return VulkanicAPI.isVulkanBackendSelected() && !VulkanicAPI.getCommandContext().isImmediate()
-				? this.renderTargetDescriptor(label)
-				: null;
+			return IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(
+				"shadowComposite",
+				this.name,
+				this.framebuffer.getId(),
+				true,
+				() -> this.renderTargetDescriptor(label)
+			);
 		}
 
 		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor, @org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
@@ -422,6 +429,21 @@ public class ShadowCompositeRenderer {
 
 		private void ensurePipelineState(@org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
 			var ctx = VulkanicAPI.getCommandContext();
+			String targetContractKey =
+				IrisVulkanRenderTargetContract.targetContractKey(this.framebuffer.getId(), renderTargetDescriptor);
+			boolean targetContractChanged = this.renderTargetContractKey != null
+				&& !this.renderTargetContractKey.equals(targetContractKey);
+			if (targetContractChanged) {
+				this.closePipelineVariants();
+				if (this.pipelineHandle != null) {
+					this.pipelineHandle.close();
+					this.pipelineHandle = null;
+				}
+				this.pipelineDescriptor = null;
+			}
+			this.renderTargetDescriptor = renderTargetDescriptor;
+			this.renderTargetContractKey = targetContractKey;
+
 			if (ctx.isImmediate()) {
 				return;
 			}
@@ -510,7 +532,7 @@ public class ShadowCompositeRenderer {
 			}
 
 			VulkanicRenderTargetDescriptor renderTargetDescriptor =
-				this.vulkanRenderTargetDescriptor(() -> this.name);
+				this.renderTargetDescriptor;
 			PipelineHandle createdVariant = this.createCompatiblePipeline(descriptor, renderTargetDescriptor);
 			this.pipelineLayoutVariants.put(descriptor.getResourceLayout(), createdVariant);
 			return createdVariant;

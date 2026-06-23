@@ -75,8 +75,6 @@ public class CompositeRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final boolean USE_DESCRIPTOR_COMPOSITE_RENDER_PASS =
 		Boolean.parseBoolean(System.getProperty("mattmc.vulkan.useDescriptorCompositeRenderPass", "true"));
-	private static final boolean TRACE_SHADER_RENDER_TARGETS =
-		Boolean.getBoolean("mattmc.vulkan.traceShaderRenderTargets");
 	public static final RenderPipeline COMPOSITE_PIPELINE = RenderPipeline.builder()
 		.withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
 		.withDepthWrite(false)
@@ -535,6 +533,8 @@ public class CompositeRenderer {
 		GlFramebuffer framebuffer;
 		PipelineDescriptor pipelineDescriptor;
 		PipelineHandle pipelineHandle;
+		VulkanicRenderTargetDescriptor renderTargetDescriptor;
+		String renderTargetContractKey;
 		final java.util.Map<PipelineDescriptor.ResourceLayout, PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
 		ImmutableSet<Integer> flippedAtLeastOnce;
 		ImmutableSet<Integer> stageReadsFromAlt;
@@ -553,23 +553,13 @@ public class CompositeRenderer {
 		}
 
 		private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label) {
-			if (!USE_DESCRIPTOR_COMPOSITE_RENDER_PASS || !VulkanicAPI.isVulkanBackendSelected() || VulkanicAPI.getCommandContext().isImmediate()) {
-				return null;
-			}
-
-			VulkanicRenderTargetDescriptor descriptor = this.renderTargetDescriptor(label);
-			boolean descriptorMatchesFramebuffer =
-				VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(this.framebuffer.getId(), descriptor);
-			if (TRACE_SHADER_RENDER_TARGETS) {
-				LOGGER.info(
-					"IrisShaderRenderTargetContract stage=composite passName={} framebuffer={} descriptorMatchesFramebuffer={} {}",
-					this.name,
-					this.framebuffer.getId(),
-					descriptorMatchesFramebuffer ? "yes" : "no",
-					descriptor.debugSignature()
-				);
-			}
-			return descriptorMatchesFramebuffer ? descriptor : null;
+			return IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(
+				"composite",
+				this.name,
+				this.framebuffer.getId(),
+				USE_DESCRIPTOR_COMPOSITE_RENDER_PASS,
+				() -> this.renderTargetDescriptor(label)
+			);
 		}
 
 		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor, @org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
@@ -586,6 +576,21 @@ public class CompositeRenderer {
 
 		private void ensurePipelineState(@org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
 			var ctx = VulkanicAPI.getCommandContext();
+			String targetContractKey =
+				IrisVulkanRenderTargetContract.targetContractKey(this.framebuffer.getId(), renderTargetDescriptor);
+			boolean targetContractChanged = this.renderTargetContractKey != null
+				&& !this.renderTargetContractKey.equals(targetContractKey);
+			if (targetContractChanged) {
+				this.closePipelineVariants();
+				if (this.pipelineHandle != null) {
+					this.pipelineHandle.close();
+					this.pipelineHandle = null;
+				}
+				this.pipelineDescriptor = null;
+			}
+			this.renderTargetDescriptor = renderTargetDescriptor;
+			this.renderTargetContractKey = targetContractKey;
+
 			if (ctx.isImmediate()) {
 				return;
 			}
@@ -694,7 +699,7 @@ public class CompositeRenderer {
 			}
 
 			VulkanicRenderTargetDescriptor renderTargetDescriptor =
-				this.vulkanRenderTargetDescriptor(() -> this.name);
+				this.renderTargetDescriptor;
 			PipelineHandle createdVariant = this.createCompatiblePipeline(descriptor, renderTargetDescriptor);
 			this.pipelineLayoutVariants.put(descriptor.getResourceLayout(), createdVariant);
 			return createdVariant;

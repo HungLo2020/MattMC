@@ -423,9 +423,7 @@ public class Phase3DrawPathTest {
 	        assertTrue(compositeRendererSource.contains("compositePass.ensurePipelineState(renderTargetDescriptor);"),
 	            "CompositeRenderer should precompute a render-target-compatible pipeline for custom passes before opening the render pass");
 	        assertTrue(compositeRendererSource.contains("USE_DESCRIPTOR_COMPOSITE_RENDER_PASS")
-	                && compositeRendererSource.contains("VulkanicAPI.isVulkanBackendSelected()")
-	                && compositeRendererSource.contains("VulkanicAPI.getCommandContext().isImmediate()")
-	                && compositeRendererSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(this.framebuffer.getId(), descriptor)")
+	                && compositeRendererSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
 	                && compositeRendererSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
 	                && compositeRendererSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),
 	            "CompositeRenderer should migrate main Iris composite passes to descriptor-backed Vulkan render targets while preserving framebuffer-compatible fallback paths");
@@ -437,8 +435,9 @@ public class Phase3DrawPathTest {
 	        assertTrue(shadowCompositeRendererSource.contains("renderPass.ensurePipelineState(renderTargetDescriptor);"),
 	            "ShadowCompositeRenderer should precompute a render-target-compatible pipeline for custom passes before opening the render pass");
 	        assertTrue(shadowCompositeRendererSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
-	                && shadowCompositeRendererSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),
-	            "ShadowCompositeRenderer should use descriptor-backed native render targets on Vulkan while preserving framebuffer-compatible rendering for OpenGL/immediate paths");
+	                && shadowCompositeRendererSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())")
+	                && shadowCompositeRendererSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget("),
+	            "ShadowCompositeRenderer should use parity-proven descriptor-backed native render targets on Vulkan while preserving framebuffer-compatible rendering for OpenGL/immediate paths");
 	        assertTrue(shadowCompositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(pass);"),
 	            "ShadowCompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
 	        assertFalse(shadowCompositeRendererSource.contains("framebuffer.bind();"),
@@ -456,11 +455,15 @@ public class Phase3DrawPathTest {
 	            "GlCommandEncoder should fail open instead of submitting underbound Vulkan custom passes");
 	        assertTrue(compositeRendererSource.contains("pipelineLayoutVariants")
 	                && compositeRendererSource.contains("? VulkanicAPI.createPipeline(descriptor, renderTargetDescriptor)")
-	                && compositeRendererSource.contains(": VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())"),
+	                && compositeRendererSource.contains(": VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())")
+	                && compositeRendererSource.contains("renderTargetContractKey")
+	                && compositeRendererSource.contains("targetContractChanged"),
 	            "CompositeRenderer custom passes should cache descriptor-layout pipeline variants against the active render-target contract");
 	        assertTrue(shadowCompositeRendererSource.contains("pipelineLayoutVariants")
 	                && shadowCompositeRendererSource.contains("? VulkanicAPI.createPipeline(descriptor, renderTargetDescriptor)")
-	                && shadowCompositeRendererSource.contains(": VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())"),
+	                && shadowCompositeRendererSource.contains(": VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())")
+	                && shadowCompositeRendererSource.contains("renderTargetContractKey")
+	                && shadowCompositeRendererSource.contains("targetContractChanged"),
 	            "ShadowCompositeRenderer custom passes should cache descriptor-layout pipeline variants against the active render-target contract");
 	        assertTrue(nativeCommandEncoderSource.contains("pass.bindRenderPassResources(this);")
 	                && nativeCommandEncoderSource.contains("PipelineDescriptor customDescriptor = pass.pipelineDescriptor();")
@@ -5506,9 +5509,10 @@ public class Phase3DrawPathTest {
         String glFramebufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java"));
         String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
         String terrainSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java"));
-        String compositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+	        String compositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
         String finalPassSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java"));
         String shadowCompositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+        String shaderTargetContractSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisVulkanRenderTargetContract.java"));
         String vulkanBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
         assertTrue(commandEncoderSource.contains("createRenderPass(VulkanicRenderTargetDescriptor descriptor)"),
@@ -5535,16 +5539,18 @@ public class Phase3DrawPathTest {
             "Sodium shader terrain should pass the framebuffer fallback id while CommandEncoder owns the fallback depth contract");
 	        assertTrue(compositeSource.contains("USE_DESCRIPTOR_COMPOSITE_RENDER_PASS")
 	                && compositeSource.contains("this.renderTargetDescriptor(label)")
-	                && compositeSource.contains("descriptorMatchesFramebuffer ? descriptor : null")
-	                && compositeSource.contains("descriptor.debugSignature()"),
-	            "Iris composite passes should use an explicit Vulkan render-target contract with a debug signature instead of relying on framebuffer inference");
+	                && compositeSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
+	                && shaderTargetContractSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(framebuffer, descriptor)")
+	                && shaderTargetContractSource.contains("IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorMatchesFramebuffer={} {}")
+	                && shaderTargetContractSource.contains("return descriptorMatchesFramebuffer ? descriptor : null"),
+	            "Iris composite passes should use the shared explicit Vulkan render-target contract instead of relying on framebuffer inference");
 	        assertTrue(compositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor)"),
 	            "Iris composite passes should create pipelines through the same descriptor/fallback seam used to begin the render pass");
         assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),
             "FinalPassRenderer should snapshot the final pass target before pipeline/render-pass creation");
 	        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = shouldUseDescriptorBackedFinalPass(renderTargetDescriptor)")
-	                && finalPassSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(this.colorHolder.getId(), descriptor)")
-	                && finalPassSource.contains("IrisShaderRenderTargetContract stage=final"),
+	                && finalPassSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
+	                && shaderTargetContractSource.contains("IrisShaderRenderTargetContract"),
 	            "FinalPassRenderer should use descriptor-backed final-pass rendering only after proving framebuffer/descriptor parity");
 	        assertTrue(finalPassSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)"),
 	            "FinalPassRenderer should route parity-proven Vulkan final passes through the descriptor-backed render-pass path");
@@ -5555,10 +5561,16 @@ public class Phase3DrawPathTest {
 	                && finalPassSource.contains("targetContractChanged"),
             "FinalPassRenderer should create the final-pass pipeline against the same descriptor used to begin the Vulkan render pass");
 	        assertTrue(shadowCompositeSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
-	                && shadowCompositeSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),
-	            "Iris shadow composite passes should use descriptor-backed native render targets on Vulkan while preserving framebuffer rendering for OpenGL/immediate paths");
+	                && shadowCompositeSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())")
+	                && shadowCompositeSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget("),
+	            "Iris shadow composite passes should use the shared parity-proven descriptor contract while preserving framebuffer rendering for OpenGL/immediate paths");
 	        assertTrue(shadowCompositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor)"),
 	            "Iris shadow composite passes should create the custom-pass pipeline against the same descriptor used to begin the Vulkan render pass");
+        assertTrue(compositeSource.contains("IrisVulkanRenderTargetContract.targetContractKey(this.framebuffer.getId(), renderTargetDescriptor)")
+                && compositeSource.contains("targetContractChanged")
+                && shadowCompositeSource.contains("IrisVulkanRenderTargetContract.targetContractKey(this.framebuffer.getId(), renderTargetDescriptor)")
+                && shadowCompositeSource.contains("targetContractChanged"),
+            "Iris composite and shadow composite passes should invalidate cached pipelines when the descriptor/framebuffer target contract changes");
         assertTrue(vulkanBackendSource.contains("resolveRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor)"),
             "VulkanBackend should resolve explicit render-target descriptors without relying on a framebuffer id");
         assertTrue(vulkanBackendSource.contains("isRenderTargetDescriptorEquivalentToFramebuffer")
