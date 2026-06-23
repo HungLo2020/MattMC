@@ -39,6 +39,7 @@ import net.sodium.client.util.UInt32;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicPrimitiveMode;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -51,6 +52,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -58,6 +60,9 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     private static final int SODIUM_CHUNK_PARAMS_UBO_SIZE = new Std140SizeCalculator().putVec2().get();
     private static final Logger LOGGER = LoggerFactory.getLogger("Sodium-VulkanTerrain");
     private static final int MAX_VULKAN_RENDER_PROBES = 48;
+    private static final boolean TRACE_VULKAN_TERRAIN_RENDER_TARGETS = Boolean.getBoolean("mattmc.vulkan.traceTerrainRenderTargets");
+    private static final boolean USE_DESCRIPTOR_TERRAIN_RENDER_PASS =
+        Boolean.getBoolean("mattmc.vulkan.useDescriptorTerrainRenderPass");
 
     private static int vulkanRenderProbeCount;
 
@@ -262,20 +267,12 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
         int submittedDrawCommands = 0;
         long submittedIndexCount = 0L;
-        try (RenderPass renderPass = shaderFramebuffer != null
-                ? commandEncoder.createRenderPass(
-                    () -> "Sodium chunk terrain",
-                    shaderFramebuffer.getId(),
-                    shaderFramebuffer.hasDepthAttachment()
-                )
-            : commandEncoder.createRenderPass(
-                () -> "Sodium chunk terrain",
-                colorTargetView,
-                OptionalInt.empty(),
-                depthTargetView,
-                OptionalDouble.empty()
-            )
-        ) {
+        try (RenderPass renderPass = this.createVulkanTerrainRenderPass(
+            commandEncoder,
+            shaderFramebuffer,
+            colorTargetView,
+            depthTargetView
+        )) {
             VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setPipeline(SodiumChunkRenderPipelines.forPass(terrainPass, renderPassShader));
             renderPass.bindSampler("Sampler0", terrainPass.getAtlas());
@@ -340,6 +337,56 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         }
 
         return irisRenderingPipeline.getSodiumPrograms().getFramebuffer(terrainPass);
+    }
+
+    private RenderPass createVulkanTerrainRenderPass(
+        CommandEncoder commandEncoder,
+        GlFramebuffer shaderFramebuffer,
+        GpuTextureView colorTargetView,
+        GpuTextureView depthTargetView
+    ) {
+        if (shaderFramebuffer == null) {
+            return commandEncoder.createRenderPass(
+                () -> "Sodium chunk terrain",
+                colorTargetView,
+                OptionalInt.empty(),
+                depthTargetView,
+                OptionalDouble.empty()
+            );
+        }
+
+        VulkanicRenderTargetDescriptor descriptor =
+            shaderFramebuffer.createRenderTargetDescriptor(() -> "Sodium chunk terrain");
+        this.traceVulkanTerrainRenderTargetDescriptor(descriptor);
+        if (USE_DESCRIPTOR_TERRAIN_RENDER_PASS) {
+            return commandEncoder.createRenderPass(descriptor);
+        }
+
+        return commandEncoder.createRenderPass(
+            () -> "Sodium chunk terrain",
+            shaderFramebuffer.getId(),
+            shaderFramebuffer.hasDepthAttachment()
+        );
+    }
+
+    private void traceVulkanTerrainRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor) {
+        if (!TRACE_VULKAN_TERRAIN_RENDER_TARGETS) {
+            return;
+        }
+
+        LOGGER.info(
+            "Sodium Vulkan terrain render target descriptor label={} colors={} colorTextureIds={} depth={} depthTextureId={} explicitExtent={}x{}",
+            descriptor.label().get(),
+            descriptor.colorAttachments().size(),
+            descriptor.colorAttachments()
+                .stream()
+                .map(attachment -> Integer.toString(attachment.textureId()))
+                .collect(Collectors.joining(",")),
+            descriptor.hasDepthAttachment(),
+            descriptor.depthAttachment() != null ? descriptor.depthAttachment().textureId() : 0,
+            descriptor.width(),
+            descriptor.height()
+        );
     }
 
     @Override

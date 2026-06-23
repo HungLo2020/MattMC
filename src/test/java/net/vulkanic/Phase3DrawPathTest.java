@@ -5519,11 +5519,13 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should begin Vulkan render passes from explicit render-target descriptors");
         assertTrue(glCommandEncoderSource.contains("glRenderPass.getRenderTargetDescriptor()"),
             "GlCommandEncoder pipeline resolution should prefer explicit render-target descriptors when present");
+        assertTrue(terrainSource.contains("shaderFramebuffer.createRenderTargetDescriptor(() -> \"Sodium chunk terrain\")")
+                && terrainSource.contains("USE_DESCRIPTOR_TERRAIN_RENDER_PASS")
+                && terrainSource.contains("commandEncoder.createRenderPass(descriptor)"),
+            "Sodium shader terrain should keep the explicit descriptor snapshot and opt-in descriptor render-pass seam for parity work");
         assertTrue(terrainSource.contains("shaderFramebuffer.getId()")
                 && terrainSource.contains("shaderFramebuffer.hasDepthAttachment()"),
-            "Sodium shader terrain should stay on the framebuffer-compatible path until descriptor-backed MRT parity is proven visually safe");
-        assertFalse(terrainSource.contains("shaderFramebuffer.createRenderTargetDescriptor(() -> \"Sodium chunk terrain\")"),
-            "Sodium shader terrain should not use descriptor-backed render targets while that path can regress Vulkan shader terrain output");
+            "Sodium shader terrain should keep the framebuffer-backed native pass as the default until descriptor-backed terrain is visually safe");
 	        assertTrue(compositeSource.contains("private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label)")
 	                && compositeSource.contains("return null;"),
 	            "Iris composite passes should keep using framebuffer-compatible rendering while descriptor-backed MRT custom passes produce black frames on Vulkan");
