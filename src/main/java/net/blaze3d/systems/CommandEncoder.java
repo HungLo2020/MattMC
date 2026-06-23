@@ -32,6 +32,12 @@ public interface CommandEncoder {
 		throw new UnsupportedOperationException("This command encoder does not support descriptor-backed render-pass creation.");
 	}
 
+	default RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor, int fallbackFramebuffer, boolean preferDescriptor) {
+		return preferDescriptor
+			? this.createRenderPass(descriptor)
+			: this.createRenderPass(descriptor.label(), fallbackFramebuffer, descriptor.hasDepthAttachment());
+	}
+
 	void clearColorTexture(GpuTexture gpuTexture, int i);
 
 	void clearColorAndDepthTextures(GpuTexture gpuTexture, int i, GpuTexture gpuTexture2, double d);

@@ -175,6 +175,9 @@ public class VulkanBackend {
     private static final AtomicInteger STANDALONE_LOOKUP_SAMPLE_PROGRAM = new AtomicInteger(-1);
     private static final int MAX_STANDALONE_SLICE_TRACE_LOGS = Integer.getInteger("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
     private static final boolean TRACE_PIPELINE_CREATION = Boolean.getBoolean("mattmc.vulkan.tracePipelineCreation");
+    private static final boolean TRACE_RENDER_TARGET_PARITY = Boolean.getBoolean("mattmc.vulkan.traceRenderTargetParity");
+    private static final int MAX_RENDER_TARGET_PARITY_LOGS = Integer.getInteger("mattmc.vulkan.traceRenderTargetParity.maxLogs", 160);
+    private static final AtomicInteger RENDER_TARGET_PARITY_LOG_COUNT = new AtomicInteger();
     private static final java.util.concurrent.atomic.AtomicLong glslDumpCounter = new java.util.concurrent.atomic.AtomicLong(0);
     private static final Set<Integer> LEGACY_SAMPLER_UNSUPPORTED_FORMAT_LOGS = ConcurrentHashMap.newKeySet();
 
@@ -4675,6 +4678,46 @@ void main() {
         private OptionalDouble depthClearValue() {
             return depthClearValue;
         }
+
+        private String compatibilitySignature() {
+            StringBuilder builder = new StringBuilder(160 + colorTextures.size() * 80);
+            builder.append("extent=").append(width).append('x').append(height);
+            builder.append(";colors=").append(colorTextures.size());
+            for (int index = 0; index < colorTextures.size(); index++) {
+                NativeSpine.LegacyTextureObject texture = colorTextures.get(index);
+                builder.append(";c").append(index)
+                    .append("{id=").append(texture.id)
+                    .append(",view=0x").append(Long.toHexString(colorViewHandles.get(index)))
+                    .append(",format=0x").append(Integer.toHexString(texture.vkFormat))
+                    .append(",feedback=").append(texture.feedbackLoopCapable)
+                    .append(",load=").append(colorLoadOps.get(index))
+                    .append(",store=").append(colorStoreOps.get(index))
+                    .append(",clear=").append(optionalIntToString(colorClearColors.get(index)))
+                    .append('}');
+            }
+            builder.append(";depth=");
+            if (hasDepthTarget()) {
+                builder.append("{id=").append(depthTexture.id)
+                    .append(",view=0x").append(Long.toHexString(depthViewHandle))
+                    .append(",format=0x").append(Integer.toHexString(depthTexture.vkFormat))
+                    .append(",feedback=").append(depthTexture.feedbackLoopCapable)
+                    .append(",load=").append(depthLoadOp)
+                    .append(",store=").append(depthStoreOp)
+                    .append(",clear=").append(optionalDoubleToString(depthClearValue))
+                    .append('}');
+            } else {
+                builder.append("none");
+            }
+            return builder.toString();
+        }
+
+        private static String optionalIntToString(OptionalInt value) {
+            return value.isPresent() ? "0x" + Integer.toHexString(value.getAsInt()) : "empty";
+        }
+
+        private static String optionalDoubleToString(OptionalDouble value) {
+            return value.isPresent() ? Double.toString(value.getAsDouble()) : "empty";
+        }
     }
 
     private static ResolvedRenderTargets resolveRenderTargets(VulkanicRenderPassDescriptor descriptor) {
@@ -4879,6 +4922,91 @@ void main() {
             depthLoadOp,
             depthStoreOp,
             depthClearValue
+        );
+    }
+
+    boolean isRenderTargetDescriptorEquivalentToFramebuffer(
+        int framebuffer,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
+        Objects.requireNonNull(descriptor, "descriptor must not be null");
+
+        try {
+            ResolvedFramebufferTargets framebufferTargets = resolveFramebufferTargets(framebuffer);
+            ResolvedFramebufferTargets descriptorTargets = resolveRenderTargetDescriptor(descriptor);
+            String framebufferSignature = framebufferTargets.compatibilitySignature();
+            String descriptorSignature = descriptorTargets.compatibilitySignature();
+            boolean equivalent = framebufferSignature.equals(descriptorSignature);
+            if (TRACE_RENDER_TARGET_PARITY) {
+                logRenderTargetParity(
+                    equivalent,
+                    framebuffer,
+                    descriptor.label().get(),
+                    framebufferSignature,
+                    descriptorSignature,
+                    null
+                );
+            }
+            return equivalent;
+        } catch (RuntimeException exception) {
+            if (TRACE_RENDER_TARGET_PARITY) {
+                logRenderTargetParity(
+                    false,
+                    framebuffer,
+                    descriptor.label().get(),
+                    "unresolved",
+                    "unresolved",
+                    exception
+                );
+            }
+            return false;
+        }
+    }
+
+    private static void logRenderTargetParity(
+        boolean equivalent,
+        int framebuffer,
+        String label,
+        String framebufferSignature,
+        String descriptorSignature,
+        @Nullable RuntimeException exception
+    ) {
+        int logIndex = RENDER_TARGET_PARITY_LOG_COUNT.incrementAndGet();
+        if (logIndex > MAX_RENDER_TARGET_PARITY_LOGS) {
+            return;
+        }
+
+        if (equivalent) {
+            LOGGER.info(
+                "Vulkan render-target parity#{} label={} framebuffer={} equivalent=true signature={}",
+                logIndex,
+                label,
+                framebuffer,
+                framebufferSignature
+            );
+            return;
+        }
+
+        if (exception != null) {
+            LOGGER.warn(
+                "Vulkan render-target parity#{} label={} framebuffer={} equivalent=false reason={} framebufferSignature={} descriptorSignature={}",
+                logIndex,
+                label,
+                framebuffer,
+                exception.getClass().getSimpleName() + ": " + exception.getMessage(),
+                framebufferSignature,
+                descriptorSignature
+            );
+            return;
+        }
+
+        LOGGER.warn(
+            "Vulkan render-target parity#{} label={} framebuffer={} equivalent=false framebufferSignature={} descriptorSignature={}",
+            logIndex,
+            label,
+            framebuffer,
+            framebufferSignature,
+            descriptorSignature
         );
     }
 

@@ -5509,6 +5509,8 @@ public class Phase3DrawPathTest {
 
         assertTrue(commandEncoderSource.contains("createRenderPass(VulkanicRenderTargetDescriptor descriptor)"),
             "CommandEncoder should expose descriptor-backed render-pass creation for migrated Vulkan shader paths");
+        assertTrue(commandEncoderSource.contains("createRenderPass(VulkanicRenderTargetDescriptor descriptor, int fallbackFramebuffer, boolean preferDescriptor)"),
+            "CommandEncoder should expose fallback-aware descriptor render-pass creation for parity-proven Vulkan migrations");
         assertTrue(glFramebufferSource.contains("createRenderTargetDescriptor"),
             "Iris GlFramebuffer should expose an explicit render-target descriptor snapshot");
         assertTrue(glFramebufferSource.contains("List<VulkanicRenderTargetDescriptor.ColorAttachment>"),
@@ -5521,11 +5523,12 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder pipeline resolution should prefer explicit render-target descriptors when present");
         assertTrue(terrainSource.contains("shaderFramebuffer.createRenderTargetDescriptor(() -> \"Sodium chunk terrain\")")
                 && terrainSource.contains("USE_DESCRIPTOR_TERRAIN_RENDER_PASS")
-                && terrainSource.contains("commandEncoder.createRenderPass(descriptor)"),
-            "Sodium shader terrain should keep the explicit descriptor snapshot and opt-in descriptor render-pass seam for parity work");
+                && terrainSource.contains("VulkanicAPI.isVulkanBackendInitializedAndSelected()")
+                && terrainSource.contains("commandEncoder.createRenderPass(descriptor, shaderFramebuffer.getId(), preferDescriptor)"),
+            "Sodium shader terrain should keep the explicit descriptor snapshot and route descriptor terrain through a Vulkan-only parity fallback seam");
         assertTrue(terrainSource.contains("shaderFramebuffer.getId()")
-                && terrainSource.contains("shaderFramebuffer.hasDepthAttachment()"),
-            "Sodium shader terrain should keep the framebuffer-backed native pass as the default until descriptor-backed terrain is visually safe");
+                && commandEncoderSource.contains("descriptor.hasDepthAttachment()"),
+            "Sodium shader terrain should pass the framebuffer fallback id while CommandEncoder owns the fallback depth contract");
 	        assertTrue(compositeSource.contains("private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label)")
 	                && compositeSource.contains("return null;"),
 	            "Iris composite passes should keep using framebuffer-compatible rendering while descriptor-backed MRT custom passes produce black frames on Vulkan");
@@ -5549,6 +5552,10 @@ public class Phase3DrawPathTest {
 	            "Iris shadow composite passes should create the custom-pass pipeline against the same descriptor used to begin the Vulkan render pass");
         assertTrue(vulkanBackendSource.contains("resolveRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor)"),
             "VulkanBackend should resolve explicit render-target descriptors without relying on a framebuffer id");
+        assertTrue(vulkanBackendSource.contains("isRenderTargetDescriptorEquivalentToFramebuffer")
+                && vulkanBackendSource.contains("compatibilitySignature()")
+                && vulkanBackendSource.contains("TRACE_RENDER_TARGET_PARITY"),
+            "VulkanBackend should be able to prove descriptor/framebuffer render-target parity before using descriptor terrain paths");
         assertTrue(vulkanBackendSource.contains("boolean includeDepth = depthFormat != VK10.VK_FORMAT_UNDEFINED"),
             "Vulkan target-specific pipelines should match the actual descriptor depth attachment contract");
     }

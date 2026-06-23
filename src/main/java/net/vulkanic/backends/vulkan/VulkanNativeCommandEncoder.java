@@ -132,6 +132,20 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     }
 
     @Override
+    public RenderPass createRenderPass(
+        VulkanicRenderTargetDescriptor descriptor,
+        int fallbackFramebuffer,
+        boolean preferDescriptor
+    ) {
+        this.ensureNoRenderPass();
+        if (preferDescriptor && this.backend.isRenderTargetDescriptorEquivalentToFramebuffer(fallbackFramebuffer, descriptor)) {
+            return this.createRenderPass(descriptor);
+        }
+
+        return this.createRenderPass(descriptor.label(), fallbackFramebuffer, descriptor.hasDepthAttachment());
+    }
+
+    @Override
     public void writeToBuffer(GpuBufferSlice slice, ByteBuffer data) {
         if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass) {
             this.ensureNoRenderPass();

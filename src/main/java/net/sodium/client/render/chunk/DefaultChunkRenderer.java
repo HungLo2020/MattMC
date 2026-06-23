@@ -62,7 +62,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     private static final int MAX_VULKAN_RENDER_PROBES = 48;
     private static final boolean TRACE_VULKAN_TERRAIN_RENDER_TARGETS = Boolean.getBoolean("mattmc.vulkan.traceTerrainRenderTargets");
     private static final boolean USE_DESCRIPTOR_TERRAIN_RENDER_PASS =
-        Boolean.getBoolean("mattmc.vulkan.useDescriptorTerrainRenderPass");
+        Boolean.parseBoolean(System.getProperty("mattmc.vulkan.useDescriptorTerrainRenderPass", "true"));
 
     private static int vulkanRenderProbeCount;
 
@@ -358,15 +358,9 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         VulkanicRenderTargetDescriptor descriptor =
             shaderFramebuffer.createRenderTargetDescriptor(() -> "Sodium chunk terrain");
         this.traceVulkanTerrainRenderTargetDescriptor(descriptor);
-        if (USE_DESCRIPTOR_TERRAIN_RENDER_PASS) {
-            return commandEncoder.createRenderPass(descriptor);
-        }
-
-        return commandEncoder.createRenderPass(
-            () -> "Sodium chunk terrain",
-            shaderFramebuffer.getId(),
-            shaderFramebuffer.hasDepthAttachment()
-        );
+        boolean preferDescriptor = USE_DESCRIPTOR_TERRAIN_RENDER_PASS
+            && VulkanicAPI.isVulkanBackendInitializedAndSelected();
+        return commandEncoder.createRenderPass(descriptor, shaderFramebuffer.getId(), preferDescriptor);
     }
 
     private void traceVulkanTerrainRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor) {
