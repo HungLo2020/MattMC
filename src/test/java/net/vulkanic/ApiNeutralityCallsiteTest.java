@@ -296,7 +296,7 @@ public class ApiNeutralityCallsiteTest {
             "GlRenderPass should cache backend-neutral uniform buffer slices alongside Blaze3D buffer slices");
         assertTrue(glRenderPassSource.contains("VulkanicAPI.resolveVulkanicBuffer(gpuBufferSlice.buffer())"),
             "GlRenderPass should resolve uniform buffers through VulkanicAPI when the binding is set, not during per-batch descriptor assembly");
-        assertTrue(glCommandEncoderSource.contains("glRenderPass.getUniformResourceSlice(resourceBinding.name())"),
+        assertTrue(glCommandEncoderSource.contains("glRenderPass.getUniformResourceSlice(binding.name())"),
             "GlCommandEncoder should consume pre-resolved uniform buffer slices from GlRenderPass during descriptor assembly");
         assertFalse(glCommandEncoderSource.contains("new net.vulkanic.backends.opengl.OpenGLBuffer("),
             "GlCommandEncoder should not construct OpenGLBuffer directly in shared draw setup logic");

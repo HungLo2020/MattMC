@@ -22,7 +22,6 @@ import net.logging.LogUtils;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
-import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.PipelineResourcePlanner;
 import net.vulkanic.RenderPassResourceBinder;
 import net.vulkanic.VulkanicAPI;
@@ -30,6 +29,7 @@ import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicBufferSlice;
 import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicIndexType;
+import net.vulkanic.VulkanicPipelineResourceResolver;
 import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicTexture;
@@ -1135,41 +1135,10 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
         @Nullable
         private PipelineResourcePlanner.Plan buildResourceBindings(PipelineDescriptor descriptor) {
-            PipelineResourcePlanner.Plan submission = PipelineResourcePlanner.buildPlan(
+            PipelineResourcePlanner.Plan submission = VulkanicPipelineResourceResolver.buildPlan(
+                this.ctx,
                 descriptor,
-                binding -> {
-                    switch (binding.type()) {
-                        case SAMPLER, COMPARISON_SAMPLER -> {
-                            VulkanicTextureView view = this.getSamplerView(binding.name());
-                            if (view != null) {
-                                int unit = this.resolveSamplerUnit(binding);
-                                Integer samplerObject = currentBoundSamplerObject(unit);
-                                return PipelineResourcePlanner.ResolvedResource.sampler(
-                                    new PipelineResourceBindings.SamplerBinding(unit, samplerObject, view)
-                                );
-                            }
-                        }
-                        case UNIFORM_BUFFER -> {
-                            VulkanicBufferSlice slice = this.uniforms.get(binding.name());
-                            if (slice == null
-                                && VulkanNativeCommandEncoder.this.resourceMode == ResourceMode.TERRAIN
-                                && VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
-                                int activeProgram = this.renderPipeline != null
-                                    ? SharedChunkProgramOverrides.activeProgramHandle(this.renderPipeline)
-                                    : -1;
-                                if (activeProgram > 0) {
-                                    slice = VulkanicAPI.getStandaloneUniformBufferSlice(this.ctx, activeProgram);
-                                }
-                            }
-                            if (slice != null) {
-                                return PipelineResourcePlanner.ResolvedResource.uniformBuffer(slice);
-                            }
-                        }
-                        case TEXEL_BUFFER -> {
-                        }
-                    }
-                    return null;
-                },
+                this.pipelineResourceLookup(),
                 resourcePlannerOptions()
                     .missingResourceDescriber(
                         VulkanNativeCommandEncoder.this.resourceMode == ResourceMode.TERRAIN && VulkanTerrainPipelineDiagnostics.enabled()
@@ -1196,46 +1165,10 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             PipelineDescriptor descriptor,
             @Nullable Program program
         ) {
-            Map<String, Integer> renderPassSamplerUnits =
-                program != null ? program.getRenderPassSamplerUnits() : Map.of();
-
-            return PipelineResourcePlanner.buildPlan(
+            return VulkanicPipelineResourceResolver.buildPlan(
+                this.ctx,
                 descriptor,
-                binding -> {
-                    switch (binding.type()) {
-                        case SAMPLER, COMPARISON_SAMPLER -> {
-                            Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
-                            VulkanicTextureView view = this.getSamplerView(binding.name());
-                            if (samplerUnit != null && view != null) {
-                                Integer samplerObject = currentBoundSamplerObject(samplerUnit);
-                                return PipelineResourcePlanner.ResolvedResource.sampler(
-                                    new PipelineResourceBindings.SamplerBinding(samplerUnit, samplerObject, view)
-                                );
-                            }
-                        }
-                        case UNIFORM_BUFFER -> {
-                            VulkanicBufferSlice slice = this.uniforms.get(binding.name());
-                            if (slice == null && VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
-                                int programId = program != null ? program.getProgramId() : -1;
-                                if (programId >= 0) {
-                                    slice = VulkanicAPI.getStandaloneUniformBufferSlice(this.ctx, programId);
-                                }
-                            }
-                            if (slice != null) {
-                                return PipelineResourcePlanner.ResolvedResource.uniformBuffer(slice);
-                            }
-                        }
-                        case TEXEL_BUFFER -> {
-                            Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
-                            if (samplerUnit != null) {
-                                return PipelineResourcePlanner.ResolvedResource.texelBuffer(
-                                    new PipelineResourceBindings.TexelBufferBinding(samplerUnit)
-                                );
-                            }
-                        }
-                    }
-                    return null;
-                },
+                this.customPassResourceLookup(program),
                 PipelineResourcePlanner.options()
                     .requireAtLeastOneBinding(false)
                     .filterIncompleteLayout(false)
@@ -1247,43 +1180,104 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             PipelineDescriptor descriptor,
             @Nullable Program program
         ) {
+            return VulkanicPipelineResourceResolver.collectMissingResources(
+                this.ctx,
+                descriptor,
+                this.customPassResourceLookup(program)
+            );
+        }
+
+        private VulkanicPipelineResourceResolver.ResourceLookup pipelineResourceLookup() {
+            return new VulkanicPipelineResourceResolver.ResourceLookup() {
+                @Override
+                @Nullable
+                public VulkanicTextureView samplerView(PipelineDescriptor.ResourceBinding binding) {
+                    return NativeRenderPass.this.getSamplerView(binding.name());
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return NativeRenderPass.this.getSamplerView(binding.name()) != null
+                        ? NativeRenderPass.this.resolveSamplerUnit(binding)
+                        : null;
+                }
+
+                @Override
+                @Nullable
+                public VulkanicBufferSlice uniformBufferSlice(PipelineDescriptor.ResourceBinding binding) {
+                    return NativeRenderPass.this.uniforms.get(binding.name());
+                }
+
+                @Override
+                @Nullable
+                public Integer texelBufferUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return null;
+                }
+
+                @Override
+                @Nullable
+                public Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding) {
+                    if (VulkanNativeCommandEncoder.this.resourceMode != ResourceMode.TERRAIN
+                        || !VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
+                        return -1;
+                    }
+                    return NativeRenderPass.this.renderPipeline != null
+                        ? SharedChunkProgramOverrides.activeProgramHandle(NativeRenderPass.this.renderPipeline)
+                        : -1;
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerObject(int samplerUnit) {
+                    return currentBoundSamplerObject(samplerUnit);
+                }
+            };
+        }
+
+        private VulkanicPipelineResourceResolver.ResourceLookup customPassResourceLookup(@Nullable Program program) {
             Map<String, Integer> renderPassSamplerUnits =
                 program != null ? program.getRenderPassSamplerUnits() : Map.of();
-            java.util.List<String> missing = new java.util.ArrayList<>();
 
-            for (PipelineDescriptor.ResourceBinding binding : descriptor.getResourceLayout().bindings()) {
-                switch (binding.type()) {
-                    case SAMPLER, COMPARISON_SAMPLER -> {
-                        Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
-                        VulkanicTextureView view = this.getSamplerView(binding.name());
-                        if (samplerUnit == null || view == null) {
-                            missing.add(binding.name() + "(" + binding.type()
-                                + ",unit=" + (samplerUnit != null)
-                                + ",view=" + (view != null) + ")");
-                        }
-                    }
-                    case UNIFORM_BUFFER -> {
-                        VulkanicBufferSlice slice = this.uniforms.get(binding.name());
-                        if (slice == null && VulkanicAPI.generatedStandaloneUniformBlockName().equals(binding.name())) {
-                            int programId = program != null ? program.getProgramId() : -1;
-                            if (programId >= 0) {
-                                slice = VulkanicAPI.getStandaloneUniformBufferSlice(this.ctx, programId);
-                            }
-                        }
-                        if (slice == null) {
-                            missing.add(binding.name() + "(UNIFORM_BUFFER)");
-                        }
-                    }
-                    case TEXEL_BUFFER -> {
-                        Integer samplerUnit = renderPassSamplerUnits.get(binding.name());
-                        if (samplerUnit == null) {
-                            missing.add(binding.name() + "(TEXEL_BUFFER,unit=false)");
-                        }
-                    }
+            return new VulkanicPipelineResourceResolver.ResourceLookup() {
+                @Override
+                @Nullable
+                public VulkanicTextureView samplerView(PipelineDescriptor.ResourceBinding binding) {
+                    return renderPassSamplerUnits.containsKey(binding.name())
+                        ? NativeRenderPass.this.getSamplerView(binding.name())
+                        : null;
                 }
-            }
 
-            return missing;
+                @Override
+                @Nullable
+                public Integer samplerUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return renderPassSamplerUnits.get(binding.name());
+                }
+
+                @Override
+                @Nullable
+                public VulkanicBufferSlice uniformBufferSlice(PipelineDescriptor.ResourceBinding binding) {
+                    return NativeRenderPass.this.uniforms.get(binding.name());
+                }
+
+                @Override
+                @Nullable
+                public Integer texelBufferUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return renderPassSamplerUnits.get(binding.name());
+                }
+
+                @Override
+                @Nullable
+                public Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding) {
+                    return program != null ? program.getProgramId() : -1;
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerObject(int samplerUnit) {
+                    return currentBoundSamplerObject(samplerUnit);
+                }
+            };
         }
 
         @Nullable

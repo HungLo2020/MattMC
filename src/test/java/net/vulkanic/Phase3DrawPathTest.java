@@ -326,18 +326,18 @@ public class Phase3DrawPathTest {
     @Test
     public void testVulkanDescriptorSamplersUseCapturedIrisSamplerObjectState() throws IOException {
         String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String resourceResolverSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicPipelineResourceResolver.java"));
         String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
         String irisRenderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java"));
 
         assertTrue(irisRenderSystemSource.contains("public static int getBoundSamplerOnUnit(int unit)"),
             "Iris should expose the cached sampler object per texture unit so Vulkan descriptor binding can snapshot it");
-        assertTrue(commandEncoderSource.contains("currentBoundSamplerObject(samplerIndex)")
-                && commandEncoderSource.contains("PipelineResourcePlanner.ResolvedResource.sampler(")
-                && commandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding(samplerIndex, samplerObject, textureView)"),
-            "Regular Vulkan descriptor bindings should carry the captured Iris sampler object, not only the texture unit");
         assertTrue(commandEncoderSource.contains("currentBoundSamplerObject(samplerUnit)")
-                && commandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding(samplerUnit, samplerObject, textureView)"),
-            "Iris custom/fullscreen pass descriptor bindings should carry the captured sampler object for colortex/depthtex inputs");
+                && commandEncoderSource.contains("samplerObject(int samplerUnit)")
+                && resourceResolverSource.contains("lookup.samplerObject(samplerUnit)")
+                && resourceResolverSource.contains("PipelineResourcePlanner.ResolvedResource.sampler(")
+                && resourceResolverSource.contains("new PipelineResourceBindings.SamplerBinding("),
+            "Shared Vulkan descriptor resolution should carry the captured Iris sampler object, not only the texture unit");
         assertTrue(backendSource.contains("samplerBinding.samplerObject()"),
             "Vulkan descriptor resolution should consume the captured sampler object from PipelineResourceBindings");
         assertTrue(backendSource.contains("VirtualSamplerState samplerState = samplerObject != null")
@@ -449,7 +449,7 @@ public class Phase3DrawPathTest {
         assertTrue(commandEncoderSource.contains("customPass.pipelineHandle(submission.descriptor())")
                 && commandEncoderSource.contains("customPass.pipelineDescriptor()")
                 && commandEncoderSource.contains("buildCustomPassPipelineResourceBindings(")
-                && commandEncoderSource.contains("PipelineResourcePlanner.buildPlan("),
+                && commandEncoderSource.contains("VulkanicPipelineResourceResolver.buildPlan("),
             "GlCommandEncoder should bind descriptor-matched live-program pipelines and descriptor resources for custom passes on Vulkan");
 	        assertTrue(commandEncoderSource.contains("if (!submission.completeCoverage())")
 	                && commandEncoderSource.contains("Skipping Vulkan custom pass"),
@@ -1269,9 +1269,9 @@ public class Phase3DrawPathTest {
         assertTrue(nativeEncoderSource.contains("public boolean bindLegacySampler(String name, int textureId, int textureUnit)")
                 && nativeEncoderSource.contains("VulkanicAPI.createManagedLegacyTextureView(textureId)"),
             "The native terrain pass should recover shaderpack samplers that Iris exposes only as legacy texture IDs");
-        assertTrue(nativeEncoderSource.contains("int unit = this.resolveSamplerUnit(binding);"),
+        assertTrue(nativeEncoderSource.contains("resolveSamplerUnit(binding)"),
             "The native terrain pass should bind descriptors using Iris sampler units, not descriptor binding indices");
-        assertTrue(nativeEncoderSource.contains("PipelineResourcePlanner.buildPlan(")
+        assertTrue(nativeEncoderSource.contains("VulkanicPipelineResourceResolver.buildPlan(")
                 && nativeEncoderSource.contains("submission.missingResources()"),
             "The native terrain pass should share Vulkanic's resource planner instead of carrying a local descriptor walk");
         assertFalse(nativeEncoderSource.contains("private record PipelineResourceBindingSubmission"),
@@ -5595,5 +5595,28 @@ public class Phase3DrawPathTest {
         assertTrue(source.contains(".dstSubpass(VK10.VK_SUBPASS_EXTERNAL)")
                 && source.contains(".dstStageMask(VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)"),
             "Swapchain-present-compatible placeholder render passes should match the persistent swapchain present render pass dependencies");
+    }
+
+    @Test
+    public void testVulkanRenderPassResourceResolutionUsesSharedContract() throws IOException {
+        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String nativeCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+        String resolverSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicPipelineResourceResolver.java"));
+
+        assertTrue(resolverSource.contains("public final class VulkanicPipelineResourceResolver")
+                && resolverSource.contains("PipelineResourcePlanner.buildPlan(")
+                && resolverSource.contains("PipelineResourceBindings.SamplerBinding")
+                && resolverSource.contains("PipelineResourceBindings.TexelBufferBinding"),
+            "Shared resource resolver should own descriptor binding construction for sampler, UBO, and texel-buffer resources");
+        assertTrue(commandEncoderSource.contains("VulkanicPipelineResourceResolver.buildPlan(")
+                && commandEncoderSource.contains("VulkanicPipelineResourceResolver.collectMissingResources("),
+            "Compatibility command encoder should use the shared Vulkanic resource resolver for render-pass submissions");
+        assertTrue(nativeCommandEncoderSource.contains("VulkanicPipelineResourceResolver.buildPlan(")
+                && nativeCommandEncoderSource.contains("VulkanicPipelineResourceResolver.collectMissingResources("),
+            "Native Vulkan command encoder should use the shared Vulkanic resource resolver for render-pass submissions");
+        assertFalse(commandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding"),
+            "Compatibility command encoder should not construct descriptor sampler bindings through a private resolver");
+        assertFalse(nativeCommandEncoderSource.contains("new PipelineResourceBindings.SamplerBinding"),
+            "Native Vulkan command encoder should not construct descriptor sampler bindings through a private resolver");
     }
 }
