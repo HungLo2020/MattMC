@@ -549,9 +549,7 @@ public class CompositeRenderer {
 		}
 
 		private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label) {
-			return VulkanicAPI.isVulkanBackendSelected() && !VulkanicAPI.getCommandContext().isImmediate()
-				? this.renderTargetDescriptor(label)
-				: null;
+			return null;
 		}
 
 		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor, @org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {

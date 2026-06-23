@@ -99,7 +99,7 @@ public final class SodiumChunkRenderPipelines {
         clearStalePipelines(shaderReloadVersion);
         VertexFormat vertexFormat = createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat());
         List<String> bindableSamplers = collectSamplerNames(shaderInterface);
-        PassState passState = PassState.from(pass.getPipeline());
+        PassState passState = PassState.from(pass);
         PipelineKey key = new PipelineKey(
             shaderReloadVersion,
             net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered(),
@@ -257,9 +257,11 @@ public final class SodiumChunkRenderPipelines {
         throw new IllegalStateException("No free vertex format element ids remain for Sodium Vulkan chunk attributes");
     }
 
-	private static Optional<BlendFunction> currentBlend(RenderPipeline pipeline) {
+	private static Optional<BlendFunction> currentBlend(RenderPipeline pipeline, boolean translucentPass) {
 		if (!BlendModeStorage.isBlendEnabled()) {
-			return Optional.empty();
+			return translucentPass
+				? Optional.of(pipeline.getBlendFunction().orElse(BlendFunction.TRANSLUCENT))
+				: pipeline.getBlendFunction();
 		}
 
 		Optional<SourceFactor> sourceColor = toSourceFactor(BlendModeStorage.getBlendSrcRgb());
@@ -310,16 +312,17 @@ public final class SodiumChunkRenderPipelines {
 		float depthBiasScaleFactor,
 		float depthBiasConstant
 	) {
-		private static PassState from(RenderPipeline pipeline) {
+		private static PassState from(TerrainRenderPass pass) {
+			RenderPipeline pipeline = pass.getPipeline();
 			return new PassState(
-				currentBlend(pipeline),
+				currentBlend(pipeline, pass.isTranslucent()),
 				pipeline.getDepthTestFunction(),
 				pipeline.getPolygonMode(),
 				// Sodium chunk meshes already encode visible block faces; Vulkan backface culling can remove valid terrain.
 				false,
 				DepthColorStorage.isRedMaskEnabled() || DepthColorStorage.isGreenMaskEnabled() || DepthColorStorage.isBlueMaskEnabled(),
 				DepthColorStorage.isAlphaMaskEnabled(),
-				DepthColorStorage.isDepthMaskEnabled(),
+				!pass.isTranslucent() && DepthColorStorage.isDepthMaskEnabled(),
 				pipeline.getDepthBiasScaleFactor(),
 				pipeline.getDepthBiasConstant()
 			);

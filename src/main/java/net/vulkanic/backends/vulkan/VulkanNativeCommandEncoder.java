@@ -406,7 +406,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     }
 
     @Override
-    public void writeToTexture(GpuTexture texture, ByteBuffer data, NativeImage.Format format, int mipLevel, int targetX, int targetY, int width, int height, int depth) {
+    public void writeToTexture(GpuTexture texture, ByteBuffer data, NativeImage.Format format, int mipLevel, int depth, int targetX, int targetY, int width, int height) {
         if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass) {
             this.ensureNoRenderPass();
         }

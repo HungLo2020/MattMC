@@ -118,6 +118,7 @@ public class ApiNeutralityCallsiteTest {
         String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
         String nativeEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
         String terrainEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeTerrainCommandEncoder.java"));
+        String unihexProviderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/UnihexProvider.java"));
 
         assertTrue(nativeEncoderSource.contains("class VulkanNativeCommandEncoder implements CommandEncoder"),
             "Vulkan should have a reusable native command encoder separate from GlCommandEncoder");
@@ -164,6 +165,10 @@ public class ApiNeutralityCallsiteTest {
                 || nativeEncoderSource.contains("this.unsupported(\"presentTexture\")")
                 || nativeEncoderSource.contains("this.unsupported(\"createFence\")"),
             "Default Vulkan command encoder resource operations should no longer throw unsupported placeholders");
+        assertTrue(unihexProviderSource.contains("writeToTexture(gpuTexture, MemoryUtil.memByteBuffer(intBuffer), NativeImage.Format.RGBA, 0, 0, i, j, Glyph.this.width(), 16)"),
+            "UnihexProvider should upload byte-buffer glyphs through the shared CommandEncoder order: mip=0, depth/layer=0, targetX=i, targetY=j, width=glyphWidth, height=16");
+        assertTrue(nativeEncoderSource.contains("writeToTexture(GpuTexture texture, ByteBuffer data, NativeImage.Format format, int mipLevel, int depth, int targetX, int targetY, int width, int height)"),
+            "VulkanNativeCommandEncoder should implement the byte-buffer upload overload with the same argument order as CommandEncoder and GlCommandEncoder");
     }
 
     @Test

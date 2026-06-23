@@ -422,9 +422,9 @@ public class Phase3DrawPathTest {
 
 	        assertTrue(compositeRendererSource.contains("compositePass.ensurePipelineState(renderTargetDescriptor);"),
 	            "CompositeRenderer should precompute a render-target-compatible pipeline for custom passes before opening the render pass");
-	        assertTrue(compositeRendererSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
-	                && compositeRendererSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),
-	            "CompositeRenderer should use descriptor-backed native render targets on Vulkan while preserving framebuffer-compatible rendering for OpenGL/immediate paths");
+	        assertTrue(compositeRendererSource.contains("private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label)")
+	                && compositeRendererSource.contains("return null;"),
+	            "CompositeRenderer should keep main Iris composite passes on framebuffer-compatible rendering until descriptor-backed MRT parity is visually proven");
 	        assertTrue(compositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(renderPass);"),
 	            "CompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
 	        assertFalse(compositeRendererSource.contains("framebuffer.bind();"),
@@ -1359,10 +1359,13 @@ public class Phase3DrawPathTest {
         assertTrue(pipelineSource.contains("for (RenderPipeline pipeline : PIPELINES.values())")
                 && pipelineSource.contains("SharedChunkProgramOverrides.unregister(pipeline);"),
             "Shared Sodium chunk pipeline cache should clean up tracked override entries when shader reloads invalidate cached pipelines");
-        assertTrue(pipelineSource.contains("PassState.from(pass.getPipeline())")
-                && pipelineSource.contains("currentBlend(pipeline)")
-                && pipelineSource.contains("DepthColorStorage.isDepthMaskEnabled()"),
-            "Shared Sodium chunk pipelines should derive Vulkan terrain depth, blend, and write-mask state from the active Iris pass state");
+        assertTrue(pipelineSource.contains("PassState.from(pass)")
+                && pipelineSource.contains("currentBlend(pipeline, pass.isTranslucent())")
+                && pipelineSource.contains("!pass.isTranslucent() && DepthColorStorage.isDepthMaskEnabled()"),
+            "Shared Sodium chunk pipelines should derive Vulkan terrain depth, blend, and write-mask state from the terrain pass while keeping translucent water from writing depth");
+        assertTrue(pipelineSource.contains("if (!BlendModeStorage.isBlendEnabled())")
+                && pipelineSource.contains("Optional.of(pipeline.getBlendFunction().orElse(BlendFunction.TRANSLUCENT))"),
+            "Shared Sodium chunk pipelines should preserve declared translucent blending when Iris has no active legacy blend override");
         assertTrue(pipelineSource.contains("case 10 -> \"iris_Normal\";"),
             "Shared Sodium chunk pipelines should carry Iris terrain attribute locations into the Vulkan terrain ABI");
         assertFalse(pipelineSource.contains("RenderPipelines.register("),
@@ -5521,17 +5524,18 @@ public class Phase3DrawPathTest {
             "Sodium shader terrain should stay on the framebuffer-compatible path until descriptor-backed MRT parity is proven visually safe");
         assertFalse(terrainSource.contains("shaderFramebuffer.createRenderTargetDescriptor(() -> \"Sodium chunk terrain\")"),
             "Sodium shader terrain should not use descriptor-backed render targets while that path can regress Vulkan shader terrain output");
-	        assertTrue(compositeSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
-	                && compositeSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),
-	            "Iris composite passes should use descriptor-backed native render targets on Vulkan while preserving framebuffer rendering for OpenGL/immediate paths");
+	        assertTrue(compositeSource.contains("private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label)")
+	                && compositeSource.contains("return null;"),
+	            "Iris composite passes should keep using framebuffer-compatible rendering while descriptor-backed MRT custom passes produce black frames on Vulkan");
 	        assertTrue(compositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor)"),
-	            "Iris composite passes should create the custom-pass pipeline against the same descriptor used to begin the Vulkan render pass");
+	            "Iris composite passes should keep the descriptor-capable pipeline seam even when the current safe path supplies null");
         assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),
             "FinalPassRenderer should snapshot the final pass target before pipeline/render-pass creation");
-        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = VulkanicAPI.isVulkanBackendSelected() && !ctx.isImmediate()"),
-            "FinalPassRenderer should only use descriptor-backed final-pass rendering on recorded Vulkan command contexts");
-        assertTrue(finalPassSource.contains("useDescriptorBackedFinalPass\n\t\t\t\t\t? VulkanicAPI.createRenderPass(renderTargetDescriptor)"),
-            "FinalPassRenderer should actively migrate Vulkan final-pass rendering to descriptor-backed render targets");
+	        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = false"),
+	            "FinalPassRenderer should keep the final fullscreen pass on the framebuffer-compatible path until descriptor-backed final output is visually correct");
+	        assertTrue(finalPassSource.contains("useDescriptorBackedFinalPass")
+	                && finalPassSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)"),
+	            "FinalPassRenderer should keep the descriptor-backed seam available for a future parity-proven final-pass migration");
         assertTrue(finalPassSource.contains("VulkanicAPI.createRenderPass(() -> \"Final pass\", main.getColorTextureView(), OptionalInt.empty())"),
             "FinalPassRenderer should preserve the existing OpenGL texture-view render-pass path");
         assertTrue(finalPassSource.contains("finalPass.ensurePipelineState(useDescriptorBackedFinalPass ? renderTargetDescriptor : null)"),
