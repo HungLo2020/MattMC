@@ -34,6 +34,8 @@ import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineResourcePlanner;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicCoreAPI;
+import net.vulkanic.VulkanicDrawStateDiagnostics;
+import net.vulkanic.VulkanicDrawStateSnapshot;
 import net.vulkanic.VulkanPerfAudit;
 import net.vulkanic.VulkanicPipelineResourceResolver;
 import net.vulkanic.VulkanicDepthCompareOp;
@@ -1562,6 +1564,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		}
 		int glPrimitiveMode = GlConst.toGl(glRenderPipeline.info().getVertexFormatMode());
 		java.util.Optional<VulkanicPrimitiveMode> typedPrimitiveMode = VulkanicPrimitiveMode.fromLegacyGlConstant(glPrimitiveMode);
+		this.logDrawState(glRenderPass, glRenderPipeline.info(), i, j, k, indexType, l);
 		if (indexType != null) {
 			// Route index buffer bind through VulkanicAPI rather than the GlStateManager wrapper.
 			VulkanicAPI.bindIndexBuffer(ctx, requireBufferHandle(glRenderPass.indexBuffer));
@@ -1613,6 +1616,66 @@ public class GlCommandEncoder implements CommandEncoder {
 				() -> VulkanicAPI.drawArrays(ctx, glPrimitiveMode, i, k)
 			);
 		}
+	}
+
+	private void logDrawState(
+		GlRenderPass glRenderPass,
+		RenderPipeline renderPipeline,
+		int baseOrFirstVertex,
+		int firstIndex,
+		int count,
+		@Nullable VertexFormat.IndexType indexType,
+		int instanceCount
+	) {
+		if (!VulkanicDrawStateDiagnostics.enabled()) {
+			return;
+		}
+
+		VulkanicRenderTargetDescriptor descriptor = glRenderPass.getRenderTargetDescriptor();
+		int colorAttachmentCount = descriptor != null ? descriptor.colorAttachments().size() : 1;
+		String renderTarget = descriptor != null ? descriptor.debugSignature() : "framebuffer";
+		int reflectedResources = renderPipeline.getSamplers().size() + renderPipeline.getUniforms().size();
+		int submittedResources = glRenderPass.samplers.size() + glRenderPass.uniforms.size();
+		VulkanicDrawStateSnapshot.ScissorStateSnapshot scissor = glRenderPass.isScissorEnabled()
+			? new VulkanicDrawStateSnapshot.ScissorStateSnapshot(
+				true,
+				glRenderPass.getScissorX(),
+				glRenderPass.getScissorY(),
+				glRenderPass.getScissorWidth(),
+				glRenderPass.getScissorHeight()
+			)
+			: VulkanicDrawStateSnapshot.ScissorStateSnapshot.disabled();
+		VulkanicDrawStateSnapshot.DrawCall draw = new VulkanicDrawStateSnapshot.DrawCall(
+			indexType != null,
+			indexType == null ? baseOrFirstVertex : 0,
+			indexType != null ? baseOrFirstVertex : 0,
+			indexType != null ? firstIndex : 0,
+			indexType != null ? count : 0,
+			indexType == null ? count : 0,
+			instanceCount,
+			indexType
+		);
+		VulkanicDrawStateSnapshot.ResourceState resources = new VulkanicDrawStateSnapshot.ResourceState(
+			reflectedResources,
+			submittedResources,
+			glRenderPass.samplers.size(),
+			glRenderPass.uniforms.size(),
+			java.util.List.of()
+		);
+
+		VulkanicDrawStateDiagnostics.log(VulkanicDrawStateSnapshot.create(
+			"opengl",
+			"GlCommandEncoder",
+			renderPipeline,
+			renderTarget,
+			glRenderPass.getFramebuffer(),
+			glRenderPass.hasDepthTexture(),
+			colorAttachmentCount,
+			VulkanicDrawStateSnapshot.TranslatedPipelineState.opengl(renderPipeline),
+			scissor,
+			draw,
+			resources
+		));
 	}
 
 	private static VulkanicIndexType toVulkanicIndexType(VertexFormat.IndexType indexType) {

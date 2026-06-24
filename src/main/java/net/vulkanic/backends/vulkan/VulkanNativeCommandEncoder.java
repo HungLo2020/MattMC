@@ -28,6 +28,8 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicBufferSlice;
 import net.vulkanic.VulkanicCoreAPI;
+import net.vulkanic.VulkanicDrawStateDiagnostics;
+import net.vulkanic.VulkanicDrawStateSnapshot;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicPipelineResourceResolver;
 import net.vulkanic.VulkanicRenderPass;
@@ -102,7 +104,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, colorView, clearColor, depthView, clearDepth);
             renderPassStarted = true;
             this.inRenderPass = true;
-            return new NativeRenderPass(ctx, pass, 0, null, colorView, depthView);
+            return new NativeRenderPass(ctx, pass, 0, depthView != null, null, colorView, depthView);
         } finally {
             if (!renderPassStarted) {
                 colorView.close();
@@ -122,7 +124,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, framebuffer);
         this.inRenderPass = true;
-        return new NativeRenderPass(ctx, pass, framebuffer, null, null, null);
+        return new NativeRenderPass(ctx, pass, framebuffer, hasDepthTexture, null, null, null);
     }
 
     @Override
@@ -131,7 +133,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         CommandContext ctx = this.backend.beginCommandBuffer();
         VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, descriptor);
         this.inRenderPass = true;
-        return new NativeRenderPass(ctx, pass, 0, descriptor, null, null);
+        return new NativeRenderPass(ctx, pass, 0, descriptor.hasDepthAttachment(), descriptor, null, null);
     }
 
     @Override
@@ -790,6 +792,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         private final CommandContext ctx;
         private final VulkanicRenderPass pass;
         private final int framebuffer;
+        private final boolean hasDepthAttachment;
         @Nullable
         private final VulkanicRenderTargetDescriptor renderTargetDescriptor;
         @Nullable
@@ -808,6 +811,17 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Nullable
         private GpuBuffer indexBuffer;
         private VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
+        @Nullable
+        private PipelineDescriptor lastSubmittedDescriptor;
+        @Nullable
+        private PipelineResourcePlanner.Plan lastSubmittedPlan;
+        @Nullable
+        private PipelineHandle lastPipelineHandle;
+        private boolean scissorEnabled;
+        private int scissorX;
+        private int scissorY;
+        private int scissorWidth;
+        private int scissorHeight;
         private boolean closed;
         private int debugGroups;
 
@@ -815,6 +829,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             CommandContext ctx,
             VulkanicRenderPass pass,
             int framebuffer,
+            boolean hasDepthAttachment,
             @Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor,
             @Nullable VulkanicTextureView colorView,
             @Nullable VulkanicTextureView depthView
@@ -822,6 +837,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             this.ctx = ctx;
             this.pass = pass;
             this.framebuffer = framebuffer;
+            this.hasDepthAttachment = hasDepthAttachment;
             this.renderTargetDescriptor = renderTargetDescriptor;
             this.colorView = colorView;
             this.depthView = depthView;
@@ -935,6 +951,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void enableScissor(int x, int y, int width, int height) {
             this.checkOpen();
+            this.scissorEnabled = true;
+            this.scissorX = x;
+            this.scissorY = y;
+            this.scissorWidth = width;
+            this.scissorHeight = height;
             VulkanicAPI.setScissorTestEnabled(this.ctx, true);
             VulkanicAPI.setDynamicScissor(this.ctx, x, y, width, height);
         }
@@ -942,6 +963,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void disableScissor() {
             this.checkOpen();
+            this.scissorEnabled = false;
             VulkanicAPI.setScissorTestEnabled(this.ctx, false);
         }
 
@@ -969,6 +991,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 throw new IllegalStateException("Can't draw indexed without an index buffer");
             }
             this.bindPipelineAndResources();
+            this.logDrawState(true, 0, baseVertex, firstIndex, indexCount, 0, instanceCount, this.indexType);
             this.pass.drawIndexed(firstIndex, indexCount, baseVertex, instanceCount);
         }
 
@@ -1001,6 +1024,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         public void draw(int firstVertex, int vertexCount) {
             this.checkOpen();
             this.bindPipelineAndResources();
+            this.logDrawState(false, firstVertex, 0, 0, 0, vertexCount, 1, null);
             this.pass.draw(firstVertex, vertexCount);
         }
 
@@ -1063,6 +1087,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
 
             this.pass.setPipeline(handle);
             VulkanNativeCommandEncoder.this.backend.bindPipelineResources(this.ctx, handle, submission.descriptor(), submission.bindings());
+            this.lastPipelineHandle = handle;
+            this.lastSubmittedDescriptor = submission.descriptor();
+            this.lastSubmittedPlan = submission;
         }
 
         private void bindCustomPassPipelineAndResources(CustomPass pass) {
@@ -1139,6 +1166,88 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 submission.descriptor(),
                 submission.bindings()
             );
+            this.lastPipelineHandle = handle;
+            this.lastSubmittedDescriptor = submission.descriptor();
+            this.lastSubmittedPlan = submission;
+        }
+
+        private void logDrawState(
+            boolean indexed,
+            int firstVertex,
+            int baseVertex,
+            int firstIndex,
+            int indexCount,
+            int vertexCount,
+            int instanceCount,
+            @Nullable VertexFormat.IndexType drawIndexType
+        ) {
+            if (!VulkanicDrawStateDiagnostics.enabled()) {
+                return;
+            }
+
+            RenderPipeline pipeline = this.requirePipeline();
+            PipelineDescriptor submittedDescriptor = this.lastSubmittedDescriptor != null
+                ? this.lastSubmittedDescriptor
+                : this.requirePipelineDescriptor();
+            PipelineResourcePlanner.Plan plan = this.lastSubmittedPlan;
+            int colorAttachmentCount = this.colorAttachmentCount();
+            VulkanicDrawStateSnapshot.TranslatedPipelineState translatedState =
+                VulkanNativeCommandEncoder.this.backend.describeTranslatedPipelineState(
+                    submittedDescriptor,
+                    colorAttachmentCount
+                );
+            VulkanicDrawStateSnapshot.ScissorStateSnapshot scissor = this.scissorEnabled
+                ? new VulkanicDrawStateSnapshot.ScissorStateSnapshot(
+                    true,
+                    this.scissorX,
+                    this.scissorY,
+                    this.scissorWidth,
+                    this.scissorHeight
+                )
+                : VulkanicDrawStateSnapshot.ScissorStateSnapshot.disabled();
+            VulkanicDrawStateSnapshot.DrawCall draw = new VulkanicDrawStateSnapshot.DrawCall(
+                indexed,
+                firstVertex,
+                baseVertex,
+                firstIndex,
+                indexCount,
+                vertexCount,
+                instanceCount,
+                drawIndexType
+            );
+            VulkanicDrawStateSnapshot.ResourceState resources = new VulkanicDrawStateSnapshot.ResourceState(
+                submittedDescriptor.getResourceLayout().bindings().size(),
+                plan != null ? plan.boundResourceCount() : 0,
+                this.samplers.size(),
+                this.uniforms.size(),
+                plan != null ? plan.missingResources() : java.util.List.of()
+            );
+
+            VulkanicDrawStateDiagnostics.log(VulkanicDrawStateSnapshot.create(
+                "vulkan",
+                VulkanNativeCommandEncoder.this.resourceMode == ResourceMode.TERRAIN
+                    ? "VulkanNativeTerrainCommandEncoder"
+                    : "VulkanNativeCommandEncoder",
+                pipeline,
+                this.renderTargetDescriptor != null ? this.renderTargetDescriptor.debugSignature() : "framebuffer-or-texture-view",
+                this.framebuffer,
+                this.hasDepthAttachment,
+                colorAttachmentCount,
+                translatedState,
+                scissor,
+                draw,
+                resources
+            ));
+        }
+
+        private int colorAttachmentCount() {
+            if (this.renderTargetDescriptor != null) {
+                return this.renderTargetDescriptor.colorAttachments().size();
+            }
+            if (this.colorView != null) {
+                return 1;
+            }
+            return this.framebuffer != 0 ? 1 : 0;
         }
 
         private Map<String, String> describeSamplerTextures() {

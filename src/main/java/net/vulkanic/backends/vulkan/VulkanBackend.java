@@ -4,6 +4,7 @@ import net.blaze3d.GpuOutOfMemoryException;
 import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
 import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.PolygonMode;
 import net.blaze3d.preprocessor.GlslPreprocessor;
 import net.blaze3d.shaders.ShaderType;
 import net.blaze3d.systems.CommandEncoder;
@@ -4248,6 +4249,88 @@ void main() {
         }
 
         return java.util.Optional.of(new PipelineDescriptor.BlendState(srcRgb, dstRgb, srcAlpha, dstAlpha));
+    }
+
+    public net.vulkanic.VulkanicDrawStateSnapshot.TranslatedPipelineState describeTranslatedPipelineState(
+        PipelineDescriptor descriptor,
+        int colorAttachmentCount
+    ) {
+        if (descriptor == null) {
+            throw new IllegalArgumentException("descriptor must not be null");
+        }
+
+        VulkanPipelineState pipelineState = VulkanPipelineState.from(
+            descriptor.getPortableState(),
+            Math.max(0, colorAttachmentCount),
+            VulkanBackend::toDiagnosticVkPolygonMode,
+            this::blendStateForAttachment
+        );
+
+        return new net.vulkanic.VulkanicDrawStateSnapshot.TranslatedPipelineState(
+            vkCullModeName(pipelineState.cullMode()),
+            vkFrontFaceName(pipelineState.frontFace()),
+            pipelineState.depthTestEnabled(),
+            pipelineState.depthWriteEnabled(),
+            vkCompareOpName(pipelineState.depthCompareOp()),
+            vkColorWriteMaskName(pipelineState.colorWriteMask()),
+            pipelineState.colorBlendAttachments().size()
+        );
+    }
+
+    private static String vkCullModeName(int cullMode) {
+        return switch (cullMode) {
+            case VK10.VK_CULL_MODE_NONE -> "VK_CULL_MODE_NONE";
+            case VK10.VK_CULL_MODE_FRONT_BIT -> "VK_CULL_MODE_FRONT_BIT";
+            case VK10.VK_CULL_MODE_BACK_BIT -> "VK_CULL_MODE_BACK_BIT";
+            case VK10.VK_CULL_MODE_FRONT_AND_BACK -> "VK_CULL_MODE_FRONT_AND_BACK";
+            default -> "VK_CULL_MODE_UNKNOWN(" + cullMode + ")";
+        };
+    }
+
+    private static String vkFrontFaceName(int frontFace) {
+        return switch (frontFace) {
+            case VK10.VK_FRONT_FACE_COUNTER_CLOCKWISE -> "VK_FRONT_FACE_COUNTER_CLOCKWISE";
+            case VK10.VK_FRONT_FACE_CLOCKWISE -> "VK_FRONT_FACE_CLOCKWISE";
+            default -> "VK_FRONT_FACE_UNKNOWN(" + frontFace + ")";
+        };
+    }
+
+    private static String vkCompareOpName(int compareOp) {
+        return switch (compareOp) {
+            case VK10.VK_COMPARE_OP_NEVER -> "VK_COMPARE_OP_NEVER";
+            case VK10.VK_COMPARE_OP_LESS -> "VK_COMPARE_OP_LESS";
+            case VK10.VK_COMPARE_OP_EQUAL -> "VK_COMPARE_OP_EQUAL";
+            case VK10.VK_COMPARE_OP_LESS_OR_EQUAL -> "VK_COMPARE_OP_LESS_OR_EQUAL";
+            case VK10.VK_COMPARE_OP_GREATER -> "VK_COMPARE_OP_GREATER";
+            case VK10.VK_COMPARE_OP_NOT_EQUAL -> "VK_COMPARE_OP_NOT_EQUAL";
+            case VK10.VK_COMPARE_OP_GREATER_OR_EQUAL -> "VK_COMPARE_OP_GREATER_OR_EQUAL";
+            case VK10.VK_COMPARE_OP_ALWAYS -> "VK_COMPARE_OP_ALWAYS";
+            default -> "VK_COMPARE_OP_UNKNOWN(" + compareOp + ")";
+        };
+    }
+
+    private static String vkColorWriteMaskName(int mask) {
+        StringBuilder builder = new StringBuilder(4);
+        if ((mask & VK10.VK_COLOR_COMPONENT_R_BIT) != 0) {
+            builder.append('R');
+        }
+        if ((mask & VK10.VK_COLOR_COMPONENT_G_BIT) != 0) {
+            builder.append('G');
+        }
+        if ((mask & VK10.VK_COLOR_COMPONENT_B_BIT) != 0) {
+            builder.append('B');
+        }
+        if ((mask & VK10.VK_COLOR_COMPONENT_A_BIT) != 0) {
+            builder.append('A');
+        }
+        return builder.isEmpty() ? "NONE" : builder.toString();
+    }
+
+    private static int toDiagnosticVkPolygonMode(PolygonMode mode) {
+        return switch (mode) {
+            case FILL -> VK10.VK_POLYGON_MODE_FILL;
+            case WIREFRAME -> VK10.VK_POLYGON_MODE_LINE;
+        };
     }
 
     private static SourceFactor sourceFactorFromLegacyGl(int factor) {

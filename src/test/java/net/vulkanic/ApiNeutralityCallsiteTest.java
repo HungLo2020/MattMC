@@ -172,6 +172,24 @@ public class ApiNeutralityCallsiteTest {
     }
 
     @Test
+    public void testDrawStateParityDiagnosticsAreHookedIntoOpenGlAndVulkanDrawPaths() throws IOException {
+        String glEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String vulkanEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+        assertTrue(glEncoderSource.contains("VulkanicDrawStateDiagnostics.log(VulkanicDrawStateSnapshot.create("),
+            "OpenGL draw path should emit backend-neutral draw-state snapshots when diagnostics are enabled");
+        assertTrue(vulkanEncoderSource.contains("VulkanicDrawStateDiagnostics.log(VulkanicDrawStateSnapshot.create("),
+            "Vulkan native draw path should emit backend-neutral draw-state snapshots when diagnostics are enabled");
+        assertTrue(vulkanEncoderSource.contains("describeTranslatedPipelineState("),
+            "Vulkan draw snapshots should include the actual translated Vulkan pipeline state");
+        assertTrue(backendSource.contains("describeTranslatedPipelineState("),
+            "Vulkan backend should expose a read-only translated pipeline-state diagnostic helper");
+        assertTrue(backendSource.contains("VulkanPipelineState.from("),
+            "Translated draw-state diagnostics should reuse the same translation path as native Vulkan pipeline creation");
+    }
+
+    @Test
     public void testHighTrafficRendererCallsitesAvoidConcreteBackendCastLeaks() throws IOException {
         String graphicsBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java"));
         String vulkanicApiSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
