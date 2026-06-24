@@ -15,7 +15,7 @@ public class PendingUpload {
         return this.data;
     }
 
-    protected void setResult(ChunkBufferAllocation result) {
+    public void setResult(ChunkBufferAllocation result) {
         if (this.result != null) {
             throw new IllegalStateException("Result already provided");
         }

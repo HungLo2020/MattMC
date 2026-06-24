@@ -1,5 +1,6 @@
 package net.sodium.client.gl.device;
 
+import net.blaze3d.buffers.GpuBuffer;
 import net.sodium.client.gl.array.GlVertexArray;
 import net.sodium.client.gl.attribute.GlVertexAttributeBinding;
 import net.sodium.client.gl.buffer.GlBuffer;
@@ -25,6 +26,7 @@ import net.sodium.client.render.device.RenderTessellationBinding;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicIntegerQuery;
 import net.vulkanic.VulkanicPrimitiveMode;
@@ -389,7 +391,8 @@ public class VulkanicRenderDevice implements RenderDevice {
         public void bind(CommandList commandList) {
             CommandContext ctx = VulkanicAPI.getCommandContext();
             for (RenderTessellationBinding binding : this.bindings) {
-                commandList.bindBuffer(binding.target(), binding.buffer());
+                GpuBuffer buffer = binding.requireGpuBuffer();
+                VulkanicAPI.bindBuffer(ctx, binding.target().toVulkanicBufferTarget(), VulkanicCoreAPI.bufferId(buffer));
 
                 for (GlVertexAttributeBinding attrib : binding.attributeBindings()) {
                     if (attrib.isIntType()) {

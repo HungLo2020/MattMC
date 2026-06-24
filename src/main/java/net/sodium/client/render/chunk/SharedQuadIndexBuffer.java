@@ -20,13 +20,16 @@ public class SharedQuadIndexBuffer {
     private static final int ELEMENTS_PER_PRIMITIVE = 6;
     private static final int VERTICES_PER_PRIMITIVE = 4;
 
+    private final boolean nativeGpuBuffer;
     private final GlMutableBuffer buffer;
     private final IndexType indexType;
+    private GpuBuffer gpuBuffer;
 
     private int maxPrimitives;
 
     public SharedQuadIndexBuffer(CommandList commandList, IndexType indexType) {
-        this.buffer = commandList.createMutableBuffer();
+        this.nativeGpuBuffer = net.vulkanic.VulkanicAPI.isVulkanBackendInitializedAndSelected();
+        this.buffer = this.nativeGpuBuffer ? null : commandList.createMutableBuffer();
         this.indexType = indexType;
     }
 
@@ -49,12 +52,26 @@ public class SharedQuadIndexBuffer {
     private void grow(CommandList commandList, int primitiveCount) {
         var bufferSize = primitiveCount * this.indexType.getBytesPerElement() * ELEMENTS_PER_PRIMITIVE;
 
-        commandList.allocateStorage(this.buffer, bufferSize, GlBufferUsage.STATIC_DRAW);
+        if (this.nativeGpuBuffer) {
+            NativeBuffer indexBuffer = createIndexBuffer(this.indexType, primitiveCount);
+            GpuBuffer previous = this.gpuBuffer;
+            this.gpuBuffer = net.vulkanic.VulkanicAPI.createBuffer(
+                    () -> "Shared quad index buffer",
+                    GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST,
+                    indexBuffer.getDirectBuffer());
+            indexBuffer.free();
 
-        var mapped = commandList.mapBuffer(this.buffer, 0, bufferSize, EnumBitField.of(GlBufferMapFlags.INVALIDATE_BUFFER, GlBufferMapFlags.WRITE, GlBufferMapFlags.UNSYNCHRONIZED));
-        this.indexType.createIndexBuffer(mapped.getMemoryBuffer(), primitiveCount);
+            if (previous != null) {
+                previous.close();
+            }
+        } else {
+            commandList.allocateStorage(this.buffer, bufferSize, GlBufferUsage.STATIC_DRAW);
 
-        commandList.unmap(mapped);
+            var mapped = commandList.mapBuffer(this.buffer, 0, bufferSize, EnumBitField.of(GlBufferMapFlags.INVALIDATE_BUFFER, GlBufferMapFlags.WRITE, GlBufferMapFlags.UNSYNCHRONIZED));
+            this.indexType.createIndexBuffer(mapped.getMemoryBuffer(), primitiveCount);
+
+            commandList.unmap(mapped);
+        }
 
         this.maxPrimitives = primitiveCount;
     }
@@ -69,15 +86,27 @@ public class SharedQuadIndexBuffer {
     }
 
     public GlBuffer getBufferObject() {
+        if (this.buffer == null) {
+            throw new UnsupportedOperationException("Native shared quad index buffer does not expose a legacy GL buffer");
+        }
         return this.buffer;
     }
 
     public GpuBuffer gpuBufferView(int usage) {
+        if (this.gpuBuffer != null) {
+            return this.gpuBuffer;
+        }
         return new LegacyHandleGlBuffer(() -> "Shared quad index buffer", usage, Math.toIntExact(this.buffer.getSize()), this.buffer.handle());
     }
 
     public void delete(CommandList commandList) {
-        commandList.deleteBuffer(this.buffer);
+        if (this.gpuBuffer != null) {
+            this.gpuBuffer.close();
+            this.gpuBuffer = null;
+        }
+        if (this.buffer != null) {
+            commandList.deleteBuffer(this.buffer);
+        }
     }
 
     public enum IndexType {

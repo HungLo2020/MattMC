@@ -15,11 +15,13 @@ public class SodiumChunkBufferContractTest {
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
 
     @Test
-    public void testChunkArenaContractExistsAndGlArenaImplementsIt() throws IOException {
+    public void testChunkArenaContractExistsAndBackendsImplementIt() throws IOException {
         String arenaContract = Files.readString(SRC_MAIN_JAVA.resolve(
             "net/sodium/client/render/chunk/buffer/ChunkBufferArena.java"));
         String allocationContract = Files.readString(SRC_MAIN_JAVA.resolve(
             "net/sodium/client/render/chunk/buffer/ChunkBufferAllocation.java"));
+        String gpuArena = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/render/chunk/buffer/GpuChunkBufferArena.java"));
         String glArena = Files.readString(SRC_MAIN_JAVA.resolve(
             "net/sodium/client/gl/arena/GlBufferArena.java"));
         String glSegment = Files.readString(SRC_MAIN_JAVA.resolve(
@@ -37,6 +39,12 @@ public class SodiumChunkBufferContractTest {
             "The current GL arena should be only one implementation of the neutral arena contract");
         assertTrue(glSegment.contains("implements ChunkBufferAllocation"),
             "The current GL segment should be only one implementation of the neutral allocation contract");
+        assertTrue(gpuArena.contains("implements ChunkBufferArena"),
+            "Vulkan terrain should have a backend-owned GpuBuffer arena implementation");
+        assertTrue(gpuArena.contains("VulkanicAPI.createBuffer"),
+            "The Vulkan chunk arena should allocate backend-owned GpuBuffer storage");
+        assertFalse(gpuArena.contains("GlMutableBuffer"),
+            "The Vulkan chunk arena should not allocate Sodium GL mutable buffers");
     }
 
     @Test
@@ -80,9 +88,42 @@ public class SodiumChunkBufferContractTest {
 
         assertTrue(region.contains("legacyGlBuffer()"),
             "RenderRegion should keep the legacy GL buffer view explicit for the OpenGL tessellation path");
+        assertTrue(renderer.contains("VulkanicAPI.isVulkanBackendInitializedAndSelected()"),
+            "Terrain tessellation creation should select Vulkan or OpenGL buffer bindings explicitly");
         assertTrue(renderer.contains("RenderTessellationBinding.forVertexBuffer(resources.getGeometryBuffer()"),
             "OpenGL tessellation should continue using the existing GL buffer path");
         assertTrue(renderer.contains(": resources.getIndexBuffer())"),
             "OpenGL indexed tessellation should continue using the existing GL index buffer path");
+    }
+
+    @Test
+    public void testVulkanTessellationBindsGpuBuffersWithoutLegacyGlBuffers() throws IOException {
+        String renderBinding = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/render/device/RenderTessellationBinding.java"));
+        String vulkanDevice = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/gl/device/VulkanicRenderDevice.java"));
+        String region = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/render/chunk/region/RenderRegion.java"));
+        String regionManager = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/render/chunk/region/RenderRegionManager.java"));
+        String sharedIndex = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/render/chunk/SharedQuadIndexBuffer.java"));
+
+        assertTrue(renderBinding.contains("@Nullable GpuBuffer gpuBuffer"),
+            "Backend-neutral tessellation bindings should carry a GpuBuffer for Vulkan");
+        assertTrue(renderBinding.contains("@Nullable GlBuffer legacyBuffer"),
+            "Backend-neutral tessellation bindings should keep the legacy OpenGL buffer explicit");
+        assertTrue(vulkanDevice.contains("binding.requireGpuBuffer()"),
+            "Vulkan terrain tessellation should require a backend-owned GpuBuffer");
+        assertFalse(vulkanDevice.contains("commandList.bindBuffer(binding.target(), binding.buffer())"),
+            "Vulkan terrain tessellation should not bind Sodium GL buffers");
+        assertTrue(region.contains("new GpuChunkBufferArena("),
+            "Vulkan regions should allocate native GpuBuffer chunk arenas");
+        assertTrue(region.contains("new GlBufferArena("),
+            "OpenGL regions should retain the existing GL arena path");
+        assertTrue(regionManager.contains("new NoopStagingBuffer()"),
+            "Vulkan chunk uploads should not allocate legacy GL staging buffers");
+        assertTrue(sharedIndex.contains("VulkanicAPI.createBuffer"),
+            "Vulkan shared quad indices should use backend-owned GpuBuffer storage");
     }
 }

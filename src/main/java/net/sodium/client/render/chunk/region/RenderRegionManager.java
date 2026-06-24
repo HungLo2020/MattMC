@@ -7,6 +7,7 @@ import net.sodium.client.SodiumClientMod;
 import net.sodium.client.gl.arena.PendingUpload;
 import net.sodium.client.gl.arena.staging.FallbackStagingBuffer;
 import net.sodium.client.gl.arena.staging.MappedStagingBuffer;
+import net.sodium.client.gl.arena.staging.NoopStagingBuffer;
 import net.sodium.client.gl.arena.staging.StagingBuffer;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.RenderDevice;
@@ -20,6 +21,7 @@ import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.translucent_sorting.data.SharedIndexSorter;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -245,6 +247,10 @@ public class RenderRegionManager {
     }
 
     private static StagingBuffer createStagingBuffer(CommandList commandList) {
+        if (VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+            return new NoopStagingBuffer();
+        }
+
         if (SodiumClientMod.options().advanced.useAdvancedStagingBuffers && MappedStagingBuffer.isSupported(RenderDevice.instance())) {
             return new MappedStagingBuffer(commandList);
         }

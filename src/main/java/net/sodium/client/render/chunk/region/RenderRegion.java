@@ -8,6 +8,7 @@ import net.sodium.client.gl.buffer.GlBuffer;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.MultiDrawBatch;
 import net.sodium.client.render.chunk.buffer.ChunkBufferArena;
+import net.sodium.client.render.chunk.buffer.GpuChunkBufferArena;
 import net.sodium.client.render.device.RenderTessellation;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.RenderSection;
@@ -19,6 +20,7 @@ import net.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
 import net.sodium.api.util.MathUtil;
 import net.minecraft.core.SectionPos;
 import org.apache.commons.lang3.Validate;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -288,8 +290,23 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
             // Iris: From MixinRenderRegionArenas - use extended vertex format from WorldRenderingSettings
             int stride = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat().getStride();
 
-            this.geometryArena = new GlBufferArena(commandList, REGION_SIZE * SECTION_VERTEX_COUNT_ESTIMATE, stride, stagingBuffer);
-            this.indexArena = new GlBufferArena(commandList, REGION_SIZE * SECTION_INDEX_COUNT_ESTIMATE, Integer.BYTES, stagingBuffer);
+            if (VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+                this.geometryArena = new GpuChunkBufferArena(
+                    () -> "Sodium chunk geometry arena",
+                    GpuBuffer.USAGE_VERTEX,
+                    REGION_SIZE * SECTION_VERTEX_COUNT_ESTIMATE,
+                    stride
+                );
+                this.indexArena = new GpuChunkBufferArena(
+                    () -> "Sodium chunk index arena",
+                    GpuBuffer.USAGE_INDEX,
+                    REGION_SIZE * SECTION_INDEX_COUNT_ESTIMATE,
+                    Integer.BYTES
+                );
+            } else {
+                this.geometryArena = new GlBufferArena(commandList, REGION_SIZE * SECTION_VERTEX_COUNT_ESTIMATE, stride, stagingBuffer);
+                this.indexArena = new GlBufferArena(commandList, REGION_SIZE * SECTION_INDEX_COUNT_ESTIMATE, Integer.BYTES, stagingBuffer);
+            }
         }
 
         public void updateTessellation(CommandList commandList, RenderTessellation tessellation) {

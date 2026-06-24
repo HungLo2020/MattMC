@@ -715,11 +715,26 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     }
 
     private RenderTessellation createRegionTessellation(CommandList commandList, RenderRegion.DeviceResources resources, boolean useSharedIndexBuffer) {
+        RenderTessellationBinding vertexBinding;
+        RenderTessellationBinding indexBinding;
+
+        if (VulkanicAPI.isVulkanBackendInitializedAndSelected()) {
+            vertexBinding = RenderTessellationBinding.forVertexBuffer(
+                    resources.getGeometryGpuBuffer(GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST),
+                    this.vertexFormat.getShaderBindings());
+            indexBinding = RenderTessellationBinding.forElementBuffer(useSharedIndexBuffer
+                    ? this.sharedIndexBuffer.gpuBufferView(GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST)
+                    : resources.getIndexGpuBuffer(GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST));
+        } else {
+            vertexBinding = RenderTessellationBinding.forVertexBuffer(resources.getGeometryBuffer(), this.vertexFormat.getShaderBindings());
+            indexBinding = RenderTessellationBinding.forElementBuffer(useSharedIndexBuffer
+                    ? this.sharedIndexBuffer.getBufferObject()
+                    : resources.getIndexBuffer());
+        }
+
         return commandList.createTessellation(VulkanicPrimitiveMode.TRIANGLES, new RenderTessellationBinding[] {
-                RenderTessellationBinding.forVertexBuffer(resources.getGeometryBuffer(), this.vertexFormat.getShaderBindings()),
-                RenderTessellationBinding.forElementBuffer(useSharedIndexBuffer
-                        ? this.sharedIndexBuffer.getBufferObject()
-                        : resources.getIndexBuffer())
+                vertexBinding,
+                indexBinding
         });
     }
 
