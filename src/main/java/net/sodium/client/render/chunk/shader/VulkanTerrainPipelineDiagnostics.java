@@ -5,7 +5,6 @@ import net.vulkanic.PipelineDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -28,21 +27,25 @@ public final class VulkanTerrainPipelineDiagnostics {
         return ENABLED;
     }
 
-    public static void logPipeline(RenderPipeline pipeline, Collection<String> bindableSamplers) {
+    public static void logPipeline(RenderPipeline pipeline, TerrainPipelineContract contract) {
         if (!ENABLED || PIPELINE_LOGS.getAndIncrement() >= MAX_LOGS) {
             return;
         }
 
         LOGGER.info(
-            "pipeline location={} depthWrite={} cull={} blendPresent={} colorWrite={} alphaWrite={} depthTest={} samplers={}",
+            "pipeline location={} source={} pass={} reloadVersion={} shadow={} depthWrite={} cull={} blendPresent={} colorWrite={} alphaWrite={} depthTest={} samplers={}",
             pipeline.getLocation(),
+            contract.sourcePipelineLocation(),
+            contract.passKind(),
+            contract.shaderReloadVersion(),
+            contract.shadowPass(),
             pipeline.isWriteDepth(),
             pipeline.isCull(),
             pipeline.getBlendFunction().isPresent(),
             pipeline.isWriteColor(),
             pipeline.isWriteAlpha(),
             pipeline.getDepthTestFunction(),
-            bindableSamplers
+            contract.samplerNames()
         );
     }
 

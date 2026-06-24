@@ -1201,8 +1201,9 @@ public class Phase3DrawPathTest {
             "The Vulkan chunk renderer should update the shared chunk shader projection matrix through the same interface used by OpenGL terrain");
         assertTrue(rendererSource.contains("shader.setModelViewMatrix(matrices.modelView());"),
             "The Vulkan chunk renderer should update the shared chunk shader model-view matrix through the same interface used by OpenGL terrain");
-        assertTrue(rendererSource.contains("renderPass.setPipeline(SodiumChunkRenderPipelines.forPass(terrainPass, renderPassShader));"),
-            "The Vulkan chunk renderer should choose its terrain pipeline from the active shared chunk shader contract");
+        assertTrue(rendererSource.contains("TerrainPipelineContract pipelineContract = SodiumChunkRenderPipelines.createContract(terrainPass, renderPassShader);")
+                && rendererSource.contains("renderPass.setPipeline(SodiumChunkRenderPipelines.forContract(pipelineContract));"),
+            "The Vulkan chunk renderer should create an explicit terrain pipeline contract before choosing the shared terrain pipeline");
         assertTrue(rendererSource.contains("renderPassShader.bindRenderPassResources(renderPass, terrainPass);"),
             "The Vulkan chunk renderer should mirror chunk-program sampler state into the render pass before drawing");
         assertTrue(rendererSource.contains("setModelMatrixUniforms(shader, preparedDraw.region(), camera);"),
@@ -1361,18 +1362,21 @@ public class Phase3DrawPathTest {
 
         assertTrue(pipelineSource.contains("createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat())"),
             "Shared Sodium chunk pipelines should derive their vertex ABI from the active WorldRenderingSettings format, not just the base stride");
-        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.register(pipeline, key.samplerNames());"),
-            "Shared Sodium chunk pipelines should register tracked terrain pipelines with their pass-bindable sampler contract for active-program overrides");
+        assertTrue(pipelineSource.contains("SharedChunkProgramOverrides.register(pipeline, key.contract());"),
+            "Shared Sodium chunk pipelines should register tracked terrain pipelines with their typed terrain contract for active-program overrides");
         assertTrue(pipelineSource.contains("for (RenderPipeline pipeline : PIPELINES.values())")
                 && pipelineSource.contains("SharedChunkProgramOverrides.unregister(pipeline);"),
             "Shared Sodium chunk pipeline cache should clean up tracked override entries when shader reloads invalidate cached pipelines");
-        assertTrue(pipelineSource.contains("PassState.from(pass)")
-                && pipelineSource.contains("currentBlend(pipeline, pass.isTranslucent())")
-                && pipelineSource.contains("!pass.isTranslucent() && DepthColorStorage.isDepthMaskEnabled()"),
-            "Shared Sodium chunk pipelines should derive Vulkan terrain depth, blend, and write-mask state from the terrain pass while keeping translucent water from writing depth");
-        assertTrue(pipelineSource.contains("if (!BlendModeStorage.isBlendEnabled())")
-                && pipelineSource.contains("Optional.of(pipeline.getBlendFunction().orElse(BlendFunction.TRANSLUCENT))"),
-            "Shared Sodium chunk pipelines should preserve declared translucent blending when Iris has no active legacy blend override");
+        Path contractFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/TerrainPipelineContract.java");
+        String contractSource = Files.readString(contractFile);
+
+        assertTrue(contractSource.contains("PassState.from(pipeline, pass.isTranslucent())")
+                && contractSource.contains("currentBlend(pipeline, translucentPass)")
+                && contractSource.contains("!translucentPass && DepthColorStorage.isDepthMaskEnabled()"),
+            "Shared Sodium chunk pipelines should derive Vulkan terrain depth, blend, and write-mask state from the explicit terrain contract while keeping translucent water from writing depth");
+        assertTrue(contractSource.contains("if (!BlendModeStorage.isBlendEnabled())")
+                && contractSource.contains("Optional.of(pipeline.getBlendFunction().orElse(BlendFunction.TRANSLUCENT))"),
+            "The terrain pipeline contract should preserve declared translucent blending when Iris has no active legacy blend override");
         assertTrue(pipelineSource.contains("case 10 -> \"iris_Normal\";"),
             "Shared Sodium chunk pipelines should carry Iris terrain attribute locations into the Vulkan terrain ABI");
         assertFalse(pipelineSource.contains("RenderPipelines.register("),

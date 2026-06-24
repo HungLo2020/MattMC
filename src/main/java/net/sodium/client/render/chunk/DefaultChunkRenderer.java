@@ -30,6 +30,7 @@ import net.sodium.client.render.chunk.shader.ChunkShaderInterface;
 import net.sodium.client.render.chunk.shader.RenderPassChunkShaderInterface;
 import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.sodium.client.render.chunk.shader.SodiumChunkRenderPipelines;
+import net.sodium.client.render.chunk.shader.TerrainPipelineContract;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.sodium.client.render.viewport.CameraTransform;
@@ -171,6 +172,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         RenderPassChunkShaderInterface renderPassShader = shadersEnabled && shader instanceof RenderPassChunkShaderInterface sharedShader
             ? sharedShader
             : null;
+        TerrainPipelineContract pipelineContract = SodiumChunkRenderPipelines.createContract(terrainPass, renderPassShader);
 		shader.setProjectionMatrix(matrices.projection());
 		shader.setModelViewMatrix(matrices.modelView());
 
@@ -274,7 +276,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             depthTargetView
         )) {
             VulkanicAPI.bindDefaultUniforms(renderPass);
-			renderPass.setPipeline(SodiumChunkRenderPipelines.forPass(terrainPass, renderPassShader));
+			renderPass.setPipeline(SodiumChunkRenderPipelines.forContract(pipelineContract));
             renderPass.bindSampler("Sampler0", terrainPass.getAtlas());
             renderPass.bindSampler("Sampler2", net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 			if (renderPassShader != null) {

@@ -22,24 +22,20 @@ public final class SharedChunkProgramOverrides {
 	private static final Logger LOGGER = LoggerFactory.getLogger(SharedChunkProgramOverrides.class);
 	private static final AtomicInteger DEBUG_CREATE_OVERRIDE_LOG_COUNT = new AtomicInteger();
 	private static final Set<RenderPipeline> TRACKED_PIPELINES = ConcurrentHashMap.newKeySet();
-	private static final Map<RenderPipeline, Set<String>> BINDABLE_SAMPLERS = new ConcurrentHashMap<>();
+	private static final Map<RenderPipeline, TerrainPipelineContract> CONTRACTS = new ConcurrentHashMap<>();
 	private static final ThreadLocal<net.sodium.client.gl.shader.GlProgram<? extends ChunkShaderInterface>> ACTIVE_CHUNK_PROGRAM = new ThreadLocal<>();
 
 	private SharedChunkProgramOverrides() {
 	}
 
-	public static void register(RenderPipeline pipeline) {
-		register(pipeline, Set.of());
-	}
-
-	public static void register(RenderPipeline pipeline, Collection<String> bindableSamplers) {
+	public static void register(RenderPipeline pipeline, TerrainPipelineContract contract) {
 		TRACKED_PIPELINES.add(pipeline);
-		BINDABLE_SAMPLERS.put(pipeline, Set.copyOf(bindableSamplers));
+		CONTRACTS.put(pipeline, contract);
 	}
 
 	public static void unregister(RenderPipeline pipeline) {
 		TRACKED_PIPELINES.remove(pipeline);
-		BINDABLE_SAMPLERS.remove(pipeline);
+		CONTRACTS.remove(pipeline);
 	}
 
 	public static void unregisterAll(Collection<RenderPipeline> pipelines) {
@@ -74,8 +70,13 @@ public final class SharedChunkProgramOverrides {
 	}
 
 	public static Set<String> bindableSamplers(RenderPipeline pipeline) {
-		Set<String> samplers = BINDABLE_SAMPLERS.get(pipeline);
-		return samplers == null ? Collections.emptySet() : samplers;
+		TerrainPipelineContract contract = CONTRACTS.get(pipeline);
+		return contract == null ? Collections.emptySet() : Set.copyOf(contract.samplerNames());
+	}
+
+	@Nullable
+	public static TerrainPipelineContract contract(RenderPipeline pipeline) {
+		return CONTRACTS.get(pipeline);
 	}
 
 	@Nullable
