@@ -1,10 +1,10 @@
 package net.sodium.client.render.chunk.data;
 
-import net.sodium.client.gl.arena.GlBufferArena;
-import net.sodium.client.gl.arena.GlBufferSegment;
 import net.sodium.client.gl.arena.PendingUpload;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.chunk.buffer.ChunkBufferAllocation;
+import net.sodium.client.render.chunk.buffer.ChunkBufferArena;
 import net.sodium.client.render.chunk.SharedQuadIndexBuffer;
 import net.sodium.client.render.chunk.region.RenderRegion;
 import net.sodium.client.util.UInt32;
@@ -15,15 +15,15 @@ import java.util.Arrays;
 import java.util.stream.Stream;
 
 /**
- * The section render data storage stores the gl buffer segments of uploaded
+ * The section render data storage stores the chunk buffer allocations of uploaded
  * data on the gpu. There's one storage object per region. It stores information
- * about vertex and optionally index buffer data. The array of buffer segment is
+ * about vertex and optionally index buffer data. The array of buffer allocations is
  * indexed by the region-local section index. The data about the contents of
  * buffer segments is stored in a natively allocated piece of memory referenced
  * by {@code pMeshDataArray} and accessed through
  * {@link SectionRenderDataUnsafe}.
  * <p>
- * When the backing buffer (from the gl buffer arena) is resized, the storage
+ * When the backing buffer (from the chunk buffer arena) is resized, the storage
  * object is notified, and then it updates the changed offsets of the buffer
  * segments. Since the index data's size and alignment directly corresponds to
  * that of the vertex data except for the vertex/index scaling of two thirds,
@@ -34,9 +34,9 @@ import java.util.stream.Stream;
  * updated independently of each other (in both directions).
  */
 public class SectionRenderDataStorage {
-    private final @Nullable GlBufferSegment[] vertexAllocations;
-    private final @Nullable GlBufferSegment @Nullable [] elementAllocations;
-    private @Nullable GlBufferSegment sharedIndexAllocation;
+    private final @Nullable ChunkBufferAllocation[] vertexAllocations;
+    private final @Nullable ChunkBufferAllocation @Nullable [] elementAllocations;
+    private @Nullable ChunkBufferAllocation sharedIndexAllocation;
     private int sharedIndexCapacity = 0;
     private boolean needsSharedIndexUpdate = false;
     private final int[] sharedIndexUsage = new int[RenderRegion.REGION_SIZE];
@@ -44,10 +44,10 @@ public class SectionRenderDataStorage {
     private final long pMeshDataArray;
 
     public SectionRenderDataStorage(boolean storesIndices) {
-        this.vertexAllocations = new GlBufferSegment[RenderRegion.REGION_SIZE];
+        this.vertexAllocations = new ChunkBufferAllocation[RenderRegion.REGION_SIZE];
 
         if (storesIndices) {
-            this.elementAllocations = new GlBufferSegment[RenderRegion.REGION_SIZE];
+            this.elementAllocations = new ChunkBufferAllocation[RenderRegion.REGION_SIZE];
         } else {
             this.elementAllocations = null;
         }
@@ -55,8 +55,8 @@ public class SectionRenderDataStorage {
         this.pMeshDataArray = SectionRenderDataUnsafe.allocateHeap(RenderRegion.REGION_SIZE);
     }
 
-    public void setVertexData(int localSectionIndex, GlBufferSegment allocation, int[] vertexSegments) {
-        GlBufferSegment prev = this.vertexAllocations[localSectionIndex];
+    public void setVertexData(int localSectionIndex, ChunkBufferAllocation allocation, int[] vertexSegments) {
+        ChunkBufferAllocation prev = this.vertexAllocations[localSectionIndex];
 
         if (prev != null) {
             prev.delete();
@@ -88,12 +88,12 @@ public class SectionRenderDataStorage {
         SectionRenderDataUnsafe.setFacingList(pMeshData, facingList);
     }
 
-    public void setIndexData(int localSectionIndex, GlBufferSegment allocation) {
+    public void setIndexData(int localSectionIndex, ChunkBufferAllocation allocation) {
         if (this.elementAllocations == null) {
             throw new IllegalStateException("Cannot set index data on a render data storage that does not store indices");
         }
 
-        GlBufferSegment prev = this.elementAllocations[localSectionIndex];
+        ChunkBufferAllocation prev = this.elementAllocations[localSectionIndex];
 
         if (prev != null) {
             prev.delete();
@@ -145,7 +145,7 @@ public class SectionRenderDataStorage {
      * @param arena The buffer arena to allocate the new buffer from
      * @return true if the arena resized itself
      */
-    public boolean updateSharedIndexData(CommandList commandList, GlBufferArena arena) {
+    public boolean updateSharedIndexData(CommandList commandList, ChunkBufferArena arena) {
         // assumes this.needsSharedIndexUpdate is true when this is called
         this.needsSharedIndexUpdate = false;
 
@@ -215,14 +215,14 @@ public class SectionRenderDataStorage {
 
     private void removeData(int localSectionIndex, boolean removeVertexData, boolean removeIndexData) {
         if (removeVertexData) {
-            GlBufferSegment prev = this.vertexAllocations[localSectionIndex];
+            ChunkBufferAllocation prev = this.vertexAllocations[localSectionIndex];
             if (prev != null) {
                 prev.delete();
                 this.vertexAllocations[localSectionIndex] = null;
             }
         }
         if (removeIndexData && this.storesIndexData()) {
-            GlBufferSegment prev = this.elementAllocations[localSectionIndex];
+            ChunkBufferAllocation prev = this.elementAllocations[localSectionIndex];
 
             if (prev != null) {
                 prev.delete();
@@ -299,7 +299,7 @@ public class SectionRenderDataStorage {
         SectionRenderDataUnsafe.freeHeap(this.pMeshDataArray);
     }
 
-    private static void deleteAllocations(GlBufferSegment @NotNull [] allocations) {
+    private static void deleteAllocations(ChunkBufferAllocation @NotNull [] allocations) {
         for (var allocation : allocations) {
             if (allocation != null) {
                 allocation.delete();

@@ -1,8 +1,9 @@
 package net.sodium.client.gl.arena;
 
+import net.sodium.client.render.chunk.buffer.ChunkBufferAllocation;
 import net.sodium.client.util.UInt32;
 
-public class GlBufferSegment {
+public class GlBufferSegment implements ChunkBufferAllocation {
     private final GlBufferArena arena;
 
     private boolean free = false;
@@ -25,11 +26,13 @@ public class GlBufferSegment {
     }
 
     /* Uint32 */
+    @Override
     public long getOffset() {
         return UInt32.upcast(this.offset);
     }
 
     /* Uint32 */
+    @Override
     public long getLength() {
         return UInt32.upcast(this.length);
     }
@@ -66,6 +69,7 @@ public class GlBufferSegment {
         this.prev = prev;
     }
 
+    @Override
     public void delete() {
         this.arena.free(this);
     }

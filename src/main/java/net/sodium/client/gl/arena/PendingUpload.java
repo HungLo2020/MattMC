@@ -1,10 +1,11 @@
 package net.sodium.client.gl.arena;
 
 import net.sodium.client.util.NativeBuffer;
+import net.sodium.client.render.chunk.buffer.ChunkBufferAllocation;
 
 public class PendingUpload {
     private final NativeBuffer data;
-    private GlBufferSegment result;
+    private ChunkBufferAllocation result;
 
     public PendingUpload(NativeBuffer data) {
         this.data = data;
@@ -14,7 +15,7 @@ public class PendingUpload {
         return this.data;
     }
 
-    protected void setResult(GlBufferSegment result) {
+    protected void setResult(ChunkBufferAllocation result) {
         if (this.result != null) {
             throw new IllegalStateException("Result already provided");
         }
@@ -22,7 +23,7 @@ public class PendingUpload {
         this.result = result;
     }
 
-    public GlBufferSegment getResult() {
+    public ChunkBufferAllocation getResult() {
         if (this.result == null) {
             throw new IllegalStateException("Result not computed");
         }

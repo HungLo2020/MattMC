@@ -1,11 +1,13 @@
 package net.sodium.client.render.chunk.region;
 
+import net.blaze3d.buffers.GpuBuffer;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import net.sodium.client.gl.arena.GlBufferArena;
 import net.sodium.client.gl.arena.staging.StagingBuffer;
 import net.sodium.client.gl.buffer.GlBuffer;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.MultiDrawBatch;
+import net.sodium.client.render.chunk.buffer.ChunkBufferArena;
 import net.sodium.client.render.device.RenderTessellation;
 import net.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.client.render.chunk.RenderSection;
@@ -269,8 +271,8 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
     }
 
     public static class DeviceResources {
-        private final GlBufferArena geometryArena;
-        private final GlBufferArena indexArena;
+        private final ChunkBufferArena geometryArena;
+        private final ChunkBufferArena indexArena;
         private RenderTessellation tessellation;
         private RenderTessellation indexedTessellation;
 
@@ -329,11 +331,19 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
         }
 
         public GlBuffer getGeometryBuffer() {
-            return this.geometryArena.getBufferObject();
+            return this.geometryArena.legacyGlBuffer();
         }
 
         public GlBuffer getIndexBuffer() {
-            return this.indexArena.getBufferObject();
+            return this.indexArena.legacyGlBuffer();
+        }
+
+        public GpuBuffer getGeometryGpuBuffer(int usage) {
+            return this.geometryArena.gpuBufferView(() -> "Chunk geometry buffer", usage);
+        }
+
+        public GpuBuffer getIndexGpuBuffer(int usage) {
+            return this.indexArena.gpuBufferView(() -> "Chunk index buffer", usage);
         }
 
         public void delete(CommandList commandList) {
@@ -343,11 +353,11 @@ public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRen
             this.indexArena.delete(commandList);
         }
 
-        public GlBufferArena getGeometryArena() {
+        public ChunkBufferArena getGeometryArena() {
             return this.geometryArena;
         }
 
-        public GlBufferArena getIndexArena() {
+        public ChunkBufferArena getIndexArena() {
             return this.indexArena;
         }
 

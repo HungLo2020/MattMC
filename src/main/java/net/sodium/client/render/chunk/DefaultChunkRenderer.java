@@ -4,7 +4,6 @@ import net.blaze3d.buffers.GpuBuffer;
 import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
-import net.blaze3d.opengl.LegacyHandleGlBuffer;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.systems.RenderPass;
@@ -13,7 +12,6 @@ import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.sodium.client.SodiumClientMod;
-import net.sodium.client.gl.buffer.GlMutableBuffer;
 import net.sodium.client.gl.device.CommandList;
 import net.sodium.client.gl.device.DrawCommandList;
 import net.sodium.client.gl.device.MultiDrawBatch;
@@ -233,13 +231,13 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
             totalBatchDrawCommands += batch.size;
 
-            GpuBuffer vertexBuffer = this.wrapLegacyBuffer(region.getResources().getGeometryBuffer(), GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST);
+            GpuBuffer vertexBuffer = region.getResources().getGeometryGpuBuffer(GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST);
             GpuBuffer indexBuffer;
             if (useIndexedTessellation) {
-                indexBuffer = this.wrapLegacyBuffer(region.getResources().getIndexBuffer(), GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST);
+                indexBuffer = region.getResources().getIndexGpuBuffer(GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST);
             } else {
                 this.sharedIndexBuffer.ensureCapacity(commandList, batch.getIndexBufferSize());
-                indexBuffer = this.wrapLegacyBuffer(this.sharedIndexBuffer.getBufferObject(), GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST);
+                indexBuffer = this.sharedIndexBuffer.gpuBufferView(GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST);
             }
 
             float modelOffsetX = getCameraTranslation(region.getOriginX(), camera.intX, camera.fracX);
@@ -419,11 +417,6 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
             VulkanicAPI.getTextureMatrix(),
             1.0F
         );
-    }
-
-    private GpuBuffer wrapLegacyBuffer(net.sodium.client.gl.buffer.GlBuffer buffer, int usage) {
-        int size = buffer instanceof GlMutableBuffer mutableBuffer ? Math.toIntExact(mutableBuffer.getSize()) : 0;
-        return new LegacyHandleGlBuffer(() -> "Legacy chunk buffer", usage, size, buffer.handle());
     }
 
     private void logVulkanRenderProbe(

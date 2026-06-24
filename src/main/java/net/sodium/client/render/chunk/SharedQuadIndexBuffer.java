@@ -1,5 +1,7 @@
 package net.sodium.client.render.chunk;
 
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.opengl.LegacyHandleGlBuffer;
 import net.sodium.client.gl.buffer.GlBuffer;
 import net.sodium.client.gl.buffer.GlBufferMapFlags;
 import net.sodium.client.gl.buffer.GlBufferUsage;
@@ -68,6 +70,10 @@ public class SharedQuadIndexBuffer {
 
     public GlBuffer getBufferObject() {
         return this.buffer;
+    }
+
+    public GpuBuffer gpuBufferView(int usage) {
+        return new LegacyHandleGlBuffer(() -> "Shared quad index buffer", usage, Math.toIntExact(this.buffer.getSize()), this.buffer.handle());
     }
 
     public void delete(CommandList commandList) {

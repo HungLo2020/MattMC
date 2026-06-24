@@ -1,20 +1,24 @@
 package net.sodium.client.gl.arena;
 
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.opengl.LegacyHandleGlBuffer;
 import net.sodium.client.gl.arena.staging.StagingBuffer;
 import net.sodium.client.gl.buffer.GlBuffer;
 import net.sodium.client.gl.buffer.GlBufferUsage;
 import net.sodium.client.gl.buffer.GlMutableBuffer;
 import net.sodium.client.gl.device.CommandList;
+import net.sodium.client.render.chunk.buffer.ChunkBufferArena;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class GlBufferArena {
+public class GlBufferArena implements ChunkBufferArena {
     static final boolean CHECK_ASSERTIONS = false;
 
     private static final GlBufferUsage BUFFER_USAGE = GlBufferUsage.STATIC_DRAW;
@@ -158,10 +162,12 @@ public class GlBufferArena {
         return used;
     }
 
+    @Override
     public long getDeviceUsedMemory() {
         return this.used * this.stride;
     }
 
+    @Override
     public long getDeviceAllocatedMemory() {
         return this.capacity * this.stride;
     }
@@ -246,18 +252,31 @@ public class GlBufferArena {
         this.checkAssertions();
     }
 
+    @Override
     public void delete(CommandList commands) {
         commands.deleteBuffer(this.arenaBuffer);
     }
 
+    @Override
     public boolean isEmpty() {
         return this.used <= 0;
+    }
+
+    @Override
+    public GpuBuffer gpuBufferView(Supplier<String> label, int usage) {
+        return new LegacyHandleGlBuffer(label, usage, Math.toIntExact(this.arenaBuffer.getSize()), this.arenaBuffer.handle());
+    }
+
+    @Override
+    public GlBuffer legacyGlBuffer() {
+        return this.arenaBuffer;
     }
 
     public GlBuffer getBufferObject() {
         return this.arenaBuffer;
     }
 
+    @Override
     public boolean upload(CommandList commandList, Stream<PendingUpload> stream) {
         // Record the buffer object before we start any work
         // If the arena needs to re-allocate a buffer, this will allow us to check and return an appropriate flag
