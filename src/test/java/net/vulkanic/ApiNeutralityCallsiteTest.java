@@ -20,16 +20,20 @@ public class ApiNeutralityCallsiteTest {
     private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
 
+    private static String readSource(Path path) throws IOException {
+        return Files.readString(path).replace("\r\n", "\n").replace('\r', '\n');
+    }
+
     @Test
     public void testSodiumChunkRenderDeviceSelectionAndTessellationUseBackendNeutralSeams() throws IOException {
-        String renderDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/RenderDevice.java"));
-        String renderDeviceHolderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/RenderDeviceHolder.java"));
-        String vulkanicRenderDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/VulkanicRenderDevice.java"));
-        String commandListSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/CommandList.java"));
-        String drawCommandListSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/DrawCommandList.java"));
-        String defaultChunkRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java"));
-        String renderRegionSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/region/RenderRegion.java"));
-        String sharedQuadIndexBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/SharedQuadIndexBuffer.java"));
+        String renderDeviceSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/RenderDevice.java"));
+        String renderDeviceHolderSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/RenderDeviceHolder.java"));
+        String vulkanicRenderDeviceSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/VulkanicRenderDevice.java"));
+        String commandListSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/CommandList.java"));
+        String drawCommandListSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/DrawCommandList.java"));
+        String defaultChunkRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java"));
+        String renderRegionSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/region/RenderRegion.java"));
+        String sharedQuadIndexBufferSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/SharedQuadIndexBuffer.java"));
 
         assertFalse(renderDeviceSource.contains("RenderDevice INSTANCE = new GLRenderDevice()"),
             "Sodium RenderDevice should not be hardcoded to the GL adapter singleton");
@@ -91,7 +95,7 @@ public class ApiNeutralityCallsiteTest {
 
     @Test
     public void testVulkanicApiHotVulkanPathsUseDirectDispatch() throws IOException {
-        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
 
         assertTrue(source.contains("directVulkanBackend.submitCommandBuffer(ctx);"),
             "submitCommandBuffer is a render-thread hotspot and should bypass Vulkan proxy reflection");
@@ -115,10 +119,10 @@ public class ApiNeutralityCallsiteTest {
 
     @Test
     public void testVulkanTextureViewRenderPassesUseNativeEncoderConservatively() throws IOException {
-        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
-        String nativeEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
-        String terrainEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeTerrainCommandEncoder.java"));
-        String unihexProviderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/UnihexProvider.java"));
+        String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String nativeEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+        String terrainEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeTerrainCommandEncoder.java"));
+        String unihexProviderSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/UnihexProvider.java"));
 
         assertTrue(nativeEncoderSource.contains("class VulkanNativeCommandEncoder implements CommandEncoder"),
             "Vulkan should have a reusable native command encoder separate from GlCommandEncoder");
@@ -173,9 +177,9 @@ public class ApiNeutralityCallsiteTest {
 
     @Test
     public void testDrawStateParityDiagnosticsAreHookedIntoOpenGlAndVulkanDrawPaths() throws IOException {
-        String glEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
-        String vulkanEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
-        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String glEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String vulkanEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+        String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
         assertTrue(glEncoderSource.contains("VulkanicDrawStateDiagnostics.log(VulkanicDrawStateSnapshot.create("),
             "OpenGL draw path should emit backend-neutral draw-state snapshots when diagnostics are enabled");
@@ -191,41 +195,41 @@ public class ApiNeutralityCallsiteTest {
 
     @Test
     public void testHighTrafficRendererCallsitesAvoidConcreteBackendCastLeaks() throws IOException {
-        String graphicsBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java"));
-        String vulkanicApiSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
-        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/CommandEncoder.java"));
-        String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
-        String glRenderPassSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlRenderPass.java"));
-        String gpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/GpuDevice.java"));
-        String renderTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/RenderTarget.java"));
-        String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
-        String lightingSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/platform/Lighting.java"));
-        String tracyFrameCaptureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/TracyFrameCapture.java"));
-        String chunkSectionsToRenderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/ChunkSectionsToRender.java"));
-        String compiledSectionMeshSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/CompiledSectionMesh.java"));
-        String worldBorderRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/WorldBorderRenderer.java"));
-        String skyRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/SkyRenderer.java"));
-        String cloudRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CloudRenderer.java"));
-        String cubeMapSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"));
-        String renderTypeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java"));
-        String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
-        String irisSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
-        String renderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java"));
-        String vulkanCompatibilityGpuDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanCompatibilityGpuDevice.java"));
-        String dynamicUniformStorageSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/DynamicUniformStorage.java"));
-        String gpuWarnlistManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GpuWarnlistManager.java"));
-        String gameRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java"));
-        String levelRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java"));
-        String minecraftTextureAtlasSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/TextureAtlas.java"));
-        String shaderManagerSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ShaderManager.java"));
-        String debugEntrySystemSpecsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"));
-        String debugScreenOverlaySource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/DebugScreenOverlay.java"));
-        String guiRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"));
-        String pictureInPictureRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java"));
-        String oversizedItemRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/OversizedItemRenderer.java"));
-        String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"));
-        String screenshotSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/Screenshot.java"));
-        String voxelMapTextureAtlasSource = Files.readString(SRC_MAIN_JAVA.resolve("net/voxelmap/textures/TextureAtlas.java"));
+        String graphicsBackendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java"));
+        String vulkanicApiSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java"));
+        String commandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/CommandEncoder.java"));
+        String glCommandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String glRenderPassSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlRenderPass.java"));
+        String gpuDeviceSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/GpuDevice.java"));
+        String renderTargetSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/RenderTarget.java"));
+        String mainTargetSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
+        String lightingSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/platform/Lighting.java"));
+        String tracyFrameCaptureSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/TracyFrameCapture.java"));
+        String chunkSectionsToRenderSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/ChunkSectionsToRender.java"));
+        String compiledSectionMeshSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/chunk/CompiledSectionMesh.java"));
+        String worldBorderRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/WorldBorderRenderer.java"));
+        String skyRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/SkyRenderer.java"));
+        String cloudRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CloudRenderer.java"));
+        String cubeMapSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"));
+        String renderTypeSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java"));
+        String sodiumRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
+        String irisSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/Iris.java"));
+        String renderSystemSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java"));
+        String vulkanCompatibilityGpuDeviceSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanCompatibilityGpuDevice.java"));
+        String dynamicUniformStorageSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/DynamicUniformStorage.java"));
+        String gpuWarnlistManagerSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GpuWarnlistManager.java"));
+        String gameRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java"));
+        String levelRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java"));
+        String minecraftTextureAtlasSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/TextureAtlas.java"));
+        String shaderManagerSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ShaderManager.java"));
+        String debugEntrySystemSpecsSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/debug/DebugEntrySystemSpecs.java"));
+        String debugScreenOverlaySource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/components/DebugScreenOverlay.java"));
+        String guiRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java"));
+        String pictureInPictureRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java"));
+        String oversizedItemRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/OversizedItemRenderer.java"));
+        String minecraftSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java"));
+        String screenshotSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/Screenshot.java"));
+        String voxelMapTextureAtlasSource = readSource(SRC_MAIN_JAVA.resolve("net/voxelmap/textures/TextureAtlas.java"));
 
         assertTrue(graphicsBackendSource.contains("default CommandEncoder createCommandEncoder()"),
             "GraphicsBackend should expose backend-owned command-encoder acquisition seam");
@@ -597,7 +601,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testProgramUniformsTypeIntrospectionUsesTypedReflectionHelper() throws IOException {
         String relative = "net/irisshaders/iris/gl/program/ProgramUniforms.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertTrue(source.contains("activeUniformInfo.reflectionType()"),
             "ProgramUniforms should resolve reflected type through ActiveUniformInfo.reflectionType typed metadata: " + relative);
@@ -646,7 +650,7 @@ public class ApiNeutralityCallsiteTest {
                     }
 
                     try {
-                        String source = Files.readString(path);
+                        String source = readSource(path);
                         if (source.contains("VulkanicAPI.getActiveUniform(")
                             || source.contains("VulkanicAPI.retrieveActiveUniformBlockName(")
                             || source.contains("IrisRenderSystem.getActiveUniform(")) {
@@ -672,7 +676,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(source.contains("setPolygonMode(ctx, VulkanicAPI.GL_FRONT_AND_BACK"),
                 "Renderer should use typed polygon-mode overloads: " + relative);
         }
@@ -691,7 +695,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(rawDrawModePattern.matcher(source).find(),
                 "Renderer should use typed draw-mode overloads: " + relative);
         }
@@ -707,7 +711,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(rawVertexAttribPattern.matcher(source).find(),
                 "Renderer should use typed vertex-attribute types: " + relative);
         }
@@ -727,7 +731,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(rawTextureParamValuePattern.matcher(source).find(),
                 "Renderer should use typed texture-parameter values: " + relative);
         }
@@ -742,7 +746,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(source.contains("GL_VIEWPORT"),
                 "Renderer state queries should avoid raw GL_VIEWPORT constants: " + relative);
             assertFalse(source.contains("GL_COLOR_CLEAR_VALUE"),
@@ -763,7 +767,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(rawIrisTextureParamPattern.matcher(source).find(),
                 "Iris texture setup should use typed texture parameter APIs: " + relative);
         }
@@ -772,7 +776,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testIrisPbrUtilitiesUseTypedViewportAndClearColorQueryHelpers() throws IOException {
         String relative = "net/irisshaders/iris/pbr/util/TextureManipulationUtil.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertFalse(source.contains("GL_VIEWPORT"),
             "Iris PBR utilities should avoid raw GL_VIEWPORT constants: " + relative);
@@ -789,7 +793,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(source.contains("GL_TEXTURE_SWIZZLE_RGBA"),
                 "Iris swizzle setup should use typed swizzle helpers: " + relative);
         }
@@ -809,7 +813,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(rawIrisBarrierPattern.matcher(source).find(),
                 "Iris compute synchronization should use typed resource-barrier helpers: " + relative);
         }
@@ -836,7 +840,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(rawStatusQueryPattern.matcher(source).find(),
                 "Shader/program status queries should use typed parameter names: " + relative);
         }
@@ -855,7 +859,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : programFiles) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertTrue(source.contains("isProgramLinkSuccessful("),
                 "Program link checks should route through VulkanicAPI.isProgramLinkSuccessful helper: " + relative);
             assertFalse(source.contains("!= VulkanicAPI.GL_TRUE"),
@@ -875,7 +879,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : shaderFiles) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertTrue(source.contains("isShaderCompileSuccessful("),
                 "Shader compile checks should route through VulkanicAPI.isShaderCompileSuccessful helper: " + relative);
             assertFalse(source.contains("!= VulkanicAPI.GL_TRUE"),
@@ -890,7 +894,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testGlProgramUsesTypedActiveUniformBlockParameterName() throws IOException {
         String relative = "net/blaze3d/opengl/GlProgram.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertFalse(source.contains("getProgramParameter(VulkanicAPI.getCommandContext(), this.programId, 35382)"),
             "GlProgram should avoid raw numeric active-uniform-block pname queries: " + relative);
@@ -910,7 +914,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(rawSsboTargetPattern.matcher(source).find(),
                 "SSBO operations should use typed buffer-target APIs: " + relative);
         }
@@ -926,7 +930,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(source.contains("TextureType.TEXTURE_2D.getGlType()"),
                 "Iris callsite should use typed/default-2D overloads instead of explicit GL target arguments: " + relative);
         }
@@ -943,7 +947,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertFalse(source.contains("VulkanicAPI.getTextureHandle("),
                 "Selected Iris texture-id callsites should avoid direct VulkanicAPI.getTextureHandle usage: " + relative);
             assertTrue(source.contains("VulkanicCoreAPI.textureId("),
@@ -951,7 +955,7 @@ public class ApiNeutralityCallsiteTest {
         }
 
         String coreApiRelative = "net/vulkanic/VulkanicCoreAPI.java";
-        String coreApiSource = Files.readString(SRC_MAIN_JAVA.resolve(coreApiRelative));
+        String coreApiSource = readSource(SRC_MAIN_JAVA.resolve(coreApiRelative));
 
         assertTrue(coreApiSource.contains("public static int textureId(GpuTextureView textureView)"),
             "VulkanicCoreAPI should expose textureId(GpuTextureView) for typed texture-view callsites: " + coreApiRelative);
@@ -962,7 +966,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testGlCommandEncoderPrefersTypedTextureIdHelper() throws IOException {
         String relative = "net/blaze3d/opengl/GlCommandEncoder.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertFalse(source.contains("VulkanicAPI.getTextureHandle("),
             "GlCommandEncoder should avoid direct VulkanicAPI.getTextureHandle usage in frontend callsites: " + relative);
@@ -981,7 +985,7 @@ public class ApiNeutralityCallsiteTest {
         Pattern inlineContextPattern = Pattern.compile("VulkanicAPI\\.[A-Za-z0-9_]+\\s*\\(\\s*VulkanicAPI\\.getCommandContext\\s*\\(");
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertTrue(source.contains("private static CommandContext commandContext()"),
                 "Context-heavy frontend wrappers should centralize context acquisition behind a helper: " + relative);
             assertTrue(source.contains("return VulkanicAPI.getCommandContext();"),
@@ -994,7 +998,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testGraphicsBackendExposesTypedSeamsForClearLogicAndUniformLocations() throws IOException {
         String relative = "net/vulkanic/GraphicsBackend.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertTrue(source.contains("default void clearBuffers(CommandContext ctx, VulkanicClearBuffer... buffers)"),
             "GraphicsBackend should expose typed clear-buffer overloads at the backend boundary: " + relative);
@@ -1020,7 +1024,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testCenterDepthSamplerUsesTypedTextureUploadFormatSeam() throws IOException {
         String centerDepthRelative = "net/irisshaders/iris/pathways/CenterDepthSampler.java";
-        String centerDepthSource = Files.readString(SRC_MAIN_JAVA.resolve(centerDepthRelative));
+        String centerDepthSource = readSource(SRC_MAIN_JAVA.resolve(centerDepthRelative));
 
         assertTrue(centerDepthSource.contains("VulkanicTextureUploadFormat.RED32_SFLOAT"),
             "CenterDepthSampler should express center-depth texture upload intent through typed Vulkanic upload formats: " + centerDepthRelative);
@@ -1028,7 +1032,7 @@ public class ApiNeutralityCallsiteTest {
             "CenterDepthSampler should avoid raw GL pixel-type constants for center-depth texture setup: " + centerDepthRelative);
 
         String irisRenderSystemRelative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
-        String irisRenderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve(irisRenderSystemRelative));
+        String irisRenderSystemSource = readSource(SRC_MAIN_JAVA.resolve(irisRenderSystemRelative));
         assertTrue(irisRenderSystemSource.contains("VulkanicTextureUploadFormat uploadFormat"),
             "IrisRenderSystem should expose typed texture-upload overloads for backend-neutral callsites: " + irisRenderSystemRelative);
         assertTrue(irisRenderSystemSource.contains("VulkanicAPI.uploadTexture2D(VulkanicAPI.getCommandContext(), target, level, uploadFormat"),
@@ -1038,7 +1042,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testBackendOwnedDeviceIdentitySeamsAreUsedByShaderAndDebugCallsites() throws IOException {
         String standardMacrosRelative = "net/irisshaders/iris/gl/shader/StandardMacros.java";
-        String standardMacrosSource = Files.readString(SRC_MAIN_JAVA.resolve(standardMacrosRelative));
+        String standardMacrosSource = readSource(SRC_MAIN_JAVA.resolve(standardMacrosRelative));
         assertTrue(standardMacrosSource.contains("VulkanicAPI.getBackendVendorName()"),
             "StandardMacros should use backend-owned vendor identity seam instead of RenderSystem device metadata: " + standardMacrosRelative);
         assertTrue(standardMacrosSource.contains("VulkanicAPI.getBackendRendererName()"),
@@ -1049,21 +1053,21 @@ public class ApiNeutralityCallsiteTest {
             "StandardMacros should avoid direct RenderSystem.getDevice().getRenderer() callsites: " + standardMacrosRelative);
 
         String irisRelative = "net/irisshaders/iris/Iris.java";
-        String irisSource = Files.readString(SRC_MAIN_JAVA.resolve(irisRelative));
+        String irisSource = readSource(SRC_MAIN_JAVA.resolve(irisRelative));
         assertTrue(irisSource.contains("VulkanicAPI.getBackendEnabledExtensions()"),
             "Iris debug callback setup should use backend-owned extension seam: " + irisRelative);
         assertFalse(irisSource.contains("RenderSystem.getDevice().getEnabledExtensions()"),
             "Iris debug callback setup should avoid direct RenderSystem device extension access: " + irisRelative);
 
         String minecraftRelative = "net/minecraft/client/Minecraft.java";
-        String minecraftSource = Files.readString(SRC_MAIN_JAVA.resolve(minecraftRelative));
+        String minecraftSource = readSource(SRC_MAIN_JAVA.resolve(minecraftRelative));
         assertTrue(minecraftSource.contains("VulkanicAPI.getBackendOptionalFeatureNames()"),
             "Minecraft startup/system-report diagnostics should use backend-owned optional-feature seam: " + minecraftRelative);
         assertFalse(minecraftSource.contains("VulkanicAPI.getDevice().getOptionalFeatureNames()"),
             "Minecraft startup/system-report diagnostics should avoid device-wrapper optional-feature calls: " + minecraftRelative);
 
         String compatDeviceRelative = "net/vulkanic/backends/vulkan/VulkanCompatibilityGpuDevice.java";
-        String compatDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve(compatDeviceRelative));
+        String compatDeviceSource = readSource(SRC_MAIN_JAVA.resolve(compatDeviceRelative));
         assertTrue(compatDeviceSource.contains("this.backend.getBackendVendorName()"),
             "Vulkan compatibility device should source vendor metadata from backend-owned seam: " + compatDeviceRelative);
         assertTrue(compatDeviceSource.contains("this.backend.getBackendRendererName()"),
@@ -1080,7 +1084,7 @@ public class ApiNeutralityCallsiteTest {
             "Vulkan compatibility device should avoid leaking compatibility-device renderer metadata: " + compatDeviceRelative);
 
         String vulkanBackendRelative = "net/vulkanic/backends/vulkan/VulkanBackend.java";
-        String vulkanBackendSource = Files.readString(SRC_MAIN_JAVA.resolve(vulkanBackendRelative));
+        String vulkanBackendSource = readSource(SRC_MAIN_JAVA.resolve(vulkanBackendRelative));
         assertTrue(vulkanBackendSource.contains("void releaseCompatibilityDevice(net.blaze3d.opengl.GlDevice device)"),
             "Vulkan backend should expose a dedicated compatibility-device release seam: " + vulkanBackendRelative);
         assertTrue(vulkanBackendSource.contains("if (this.compatibilityDevice == device) {"),
@@ -1102,7 +1106,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testSpirvAndPipelineLayoutPrepSeamsExist() throws IOException {
         String pipelineDescriptorRelative = "net/vulkanic/PipelineDescriptor.java";
-        String pipelineDescriptorSource = Files.readString(SRC_MAIN_JAVA.resolve(pipelineDescriptorRelative));
+        String pipelineDescriptorSource = readSource(SRC_MAIN_JAVA.resolve(pipelineDescriptorRelative));
 
         assertTrue(pipelineDescriptorSource.contains("fromPortableStateAndSpirvModules("),
             "PipelineDescriptor should expose portable-state + SPIR-V module factory seam for Vulkan pipeline bring-up: " + pipelineDescriptorRelative);
@@ -1118,7 +1122,7 @@ public class ApiNeutralityCallsiteTest {
             "PipelineDescriptor should expose explicit-layout presence seam for migration-safe callsite behavior: " + pipelineDescriptorRelative);
 
         String vulkanicApiRelative = "net/vulkanic/VulkanicAPI.java";
-        String vulkanicApiSource = Files.readString(SRC_MAIN_JAVA.resolve(vulkanicApiRelative));
+        String vulkanicApiSource = readSource(SRC_MAIN_JAVA.resolve(vulkanicApiRelative));
         assertTrue(vulkanicApiSource.contains("public static PipelineHandle createPipeline(")
             && vulkanicApiSource.contains("PipelineDescriptor.PortableState portableState")
             && vulkanicApiSource.contains("java.util.List<VulkanicSpirvModule> spirvModules"),
@@ -1135,7 +1139,7 @@ public class ApiNeutralityCallsiteTest {
             "VulkanicAPI reflection/layout prep seams should support explicit stage-visibility metadata for Vulkan descriptor layout synthesis: " + vulkanicApiRelative);
 
         String coreApiRelative = "net/vulkanic/VulkanicCoreAPI.java";
-        String coreApiSource = Files.readString(SRC_MAIN_JAVA.resolve(coreApiRelative));
+        String coreApiSource = readSource(SRC_MAIN_JAVA.resolve(coreApiRelative));
         assertTrue(coreApiSource.contains("public static PipelineHandle createPipeline(")
             && coreApiSource.contains("PipelineDescriptor.PortableState portableState")
             && coreApiSource.contains("java.util.List<VulkanicSpirvModule> spirvModules"),
@@ -1155,7 +1159,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testSelectedShaderLifecycleHotspotsUseTypedHandleSeams() throws IOException {
         String sodiumShaderRelative = "net/sodium/client/gl/shader/GlShader.java";
-        String sodiumShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(sodiumShaderRelative));
+        String sodiumShaderSource = readSource(SRC_MAIN_JAVA.resolve(sodiumShaderRelative));
         assertTrue(sodiumShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type.stage)"),
             "Sodium GlShader should create shaders via typed handle seam: " + sodiumShaderRelative);
         assertTrue(sodiumShaderSource.contains("ShaderWorkarounds.safeShaderSource(handle, parsedShader.src())"),
@@ -1164,7 +1168,7 @@ public class ApiNeutralityCallsiteTest {
             "Sodium GlShader should delete shaders via typed handle seam: " + sodiumShaderRelative);
 
         String irisShaderRelative = "net/irisshaders/iris/gl/shader/GlShader.java";
-        String irisShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(irisShaderRelative));
+        String irisShaderSource = readSource(SRC_MAIN_JAVA.resolve(irisShaderRelative));
         assertTrue(irisShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type.stage)"),
             "Iris GlShader should create shaders via typed handle seam: " + irisShaderRelative);
         assertTrue(irisShaderSource.contains("ShaderWorkarounds.safeShaderSource(handle, src)"),
@@ -1173,21 +1177,21 @@ public class ApiNeutralityCallsiteTest {
             "Iris GlShader should delete shaders via typed handle seam: " + irisShaderRelative);
 
         String sodiumProgramRelative = "net/sodium/client/gl/shader/GlProgram.java";
-        String sodiumProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(sodiumProgramRelative));
+        String sodiumProgramSource = readSource(SRC_MAIN_JAVA.resolve(sodiumProgramRelative));
         assertTrue(sodiumProgramSource.contains("VulkanicAPI.createShaderProgramHandle(commandContext())"),
             "Sodium GlProgram should create programs via typed handle seam: " + sodiumProgramRelative);
         assertTrue(sodiumProgramSource.contains("VulkanicAPI.attachShader(commandContext(), this.program, VulkanicShaderHandle.of(shader.handle()))"),
             "Sodium GlProgram should attach shaders via typed handle seam: " + sodiumProgramRelative);
 
         String programCreatorRelative = "net/irisshaders/iris/gl/shader/ProgramCreator.java";
-        String programCreatorSource = Files.readString(SRC_MAIN_JAVA.resolve(programCreatorRelative));
+        String programCreatorSource = readSource(SRC_MAIN_JAVA.resolve(programCreatorRelative));
         assertTrue(programCreatorSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
             "Iris ProgramCreator should create programs via typed handle seam: " + programCreatorRelative);
         assertTrue(programCreatorSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(shader.getHandle()))"),
             "Iris ProgramCreator should attach shaders via typed handle seam: " + programCreatorRelative);
 
         String shaderCreatorRelative = "net/irisshaders/iris/pipeline/programs/ShaderCreator.java";
-        String shaderCreatorSource = Files.readString(SRC_MAIN_JAVA.resolve(shaderCreatorRelative));
+        String shaderCreatorSource = readSource(SRC_MAIN_JAVA.resolve(shaderCreatorRelative));
         assertTrue(shaderCreatorSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
             "Iris ShaderCreator should create programs via typed handle seam: " + shaderCreatorRelative);
         assertTrue(shaderCreatorSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(s))"),
@@ -1196,21 +1200,21 @@ public class ApiNeutralityCallsiteTest {
             "Iris ShaderCreator should create shaders via typed handle seam: " + shaderCreatorRelative);
 
         String dhGenericRelative = "net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java";
-        String dhGenericSource = Files.readString(SRC_MAIN_JAVA.resolve(dhGenericRelative));
+        String dhGenericSource = readSource(SRC_MAIN_JAVA.resolve(dhGenericRelative));
         assertTrue(dhGenericSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
             "IrisGenericRenderProgram should create programs via typed handle seam: " + dhGenericRelative);
         assertTrue(dhGenericSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(id))"),
             "IrisGenericRenderProgram should delete programs via typed handle seam: " + dhGenericRelative);
 
         String dhLodRelative = "net/irisshaders/iris/compat/dh/IrisLodRenderProgram.java";
-        String dhLodSource = Files.readString(SRC_MAIN_JAVA.resolve(dhLodRelative));
+        String dhLodSource = readSource(SRC_MAIN_JAVA.resolve(dhLodRelative));
         assertTrue(dhLodSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
             "IrisLodRenderProgram should create programs via typed handle seam: " + dhLodRelative);
         assertTrue(dhLodSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), VulkanicProgramHandle.of(id))"),
             "IrisLodRenderProgram should delete programs via typed handle seam: " + dhLodRelative);
 
         String blazeGlProgramRelative = "net/blaze3d/opengl/GlProgram.java";
-        String blazeGlProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(blazeGlProgramRelative));
+        String blazeGlProgramSource = readSource(SRC_MAIN_JAVA.resolve(blazeGlProgramRelative));
         assertTrue(blazeGlProgramSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
             "Blaze3D GlProgram should create programs via typed handle seam: " + blazeGlProgramRelative);
         assertTrue(blazeGlProgramSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(glShaderModule.getShaderId()))"),
@@ -1219,12 +1223,12 @@ public class ApiNeutralityCallsiteTest {
             "Blaze3D GlProgram should delete programs via typed handle seam: " + blazeGlProgramRelative);
 
         String blazeShaderModuleRelative = "net/blaze3d/opengl/GlShaderModule.java";
-        String blazeShaderModuleSource = Files.readString(SRC_MAIN_JAVA.resolve(blazeShaderModuleRelative));
+        String blazeShaderModuleSource = readSource(SRC_MAIN_JAVA.resolve(blazeShaderModuleRelative));
         assertTrue(blazeShaderModuleSource.contains("net.vulkanic.VulkanicShaderHandle.of(this.shaderId)"),
             "Blaze3D GlShaderModule should delete shaders via typed handle seam: " + blazeShaderModuleRelative);
 
         String blazeDeviceRelative = "net/blaze3d/opengl/GlDevice.java";
-        String blazeDeviceSource = Files.readString(SRC_MAIN_JAVA.resolve(blazeDeviceRelative));
+        String blazeDeviceSource = readSource(SRC_MAIN_JAVA.resolve(blazeDeviceRelative));
         assertTrue(blazeDeviceSource.contains("net.vulkanic.VulkanicAPI.createShaderHandle(ctx, toVulkanicShaderStage(shaderCompilationKey.type))"),
             "Blaze3D GlDevice should create shaders via typed handle seam in shader compilation path: " + blazeDeviceRelative);
         assertTrue(blazeDeviceSource.contains("net.irisshaders.iris.gl.shader.ShaderWorkarounds.safeShaderSource(shader, string2)"),
@@ -1233,7 +1237,7 @@ public class ApiNeutralityCallsiteTest {
             "Blaze3D GlDevice should create programs via typed handle seam in AMD workaround path: " + blazeDeviceRelative);
 
         String dhShaderRelative = "com/seibel/distanthorizons/core/render/glObject/shader/Shader.java";
-        String dhShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(dhShaderRelative));
+        String dhShaderSource = readSource(SRC_MAIN_JAVA.resolve(dhShaderRelative));
         assertTrue(dhShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, stage)")
                 || dhShaderSource.contains("VulkanicAPI.createShaderHandle(ctx, type)"),
             "Distant Horizons Shader should create shaders via typed handle seam when stage mapping is available: " + dhShaderRelative);
@@ -1243,7 +1247,7 @@ public class ApiNeutralityCallsiteTest {
             "Distant Horizons Shader should delete shaders via typed handle seam: " + dhShaderRelative);
 
         String dhShaderProgramRelative = "com/seibel/distanthorizons/core/render/glObject/shader/ShaderProgram.java";
-        String dhShaderProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(dhShaderProgramRelative));
+        String dhShaderProgramSource = readSource(SRC_MAIN_JAVA.resolve(dhShaderProgramRelative));
         assertTrue(dhShaderProgramSource.contains("VulkanicAPI.createShaderProgramHandle(ctx)"),
             "Distant Horizons ShaderProgram should create programs via typed handle seam: " + dhShaderProgramRelative);
         assertTrue(dhShaderProgramSource.contains("VulkanicAPI.attachShader(ctx, program, VulkanicShaderHandle.of(vertShader.id))"),
@@ -1254,7 +1258,7 @@ public class ApiNeutralityCallsiteTest {
             "Distant Horizons ShaderProgram should delete programs via typed handle seam: " + dhShaderProgramRelative);
 
         String partialShaderRelative = "net/irisshaders/iris/pipeline/programs/PartialShader.java";
-        String partialShaderSource = Files.readString(SRC_MAIN_JAVA.resolve(partialShaderRelative));
+        String partialShaderSource = readSource(SRC_MAIN_JAVA.resolve(partialShaderRelative));
         assertTrue(partialShaderSource.contains("VulkanicAPI.deleteShader(VulkanicAPI.getCommandContext(), VulkanicShaderHandle.of(s))"),
             "Iris PartialShader should delete detached shaders via typed handle seam: " + partialShaderRelative);
     }
@@ -1262,17 +1266,17 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testSelectedHotspotsUseTypedUniformLocationAndLogicOpSeams() throws IOException {
         String shaderProgramRelative = "com/seibel/distanthorizons/core/render/glObject/shader/ShaderProgram.java";
-        String shaderProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(shaderProgramRelative));
+        String shaderProgramSource = readSource(SRC_MAIN_JAVA.resolve(shaderProgramRelative));
         assertTrue(shaderProgramSource.contains("VulkanicAPI.resolveUniformLocation("),
             "ShaderProgram should resolve uniforms via typed location helper instead of raw location lookups: " + shaderProgramRelative);
 
         String glProgramRelative = "net/sodium/client/gl/shader/GlProgram.java";
-        String glProgramSource = Files.readString(SRC_MAIN_JAVA.resolve(glProgramRelative));
+        String glProgramSource = readSource(SRC_MAIN_JAVA.resolve(glProgramRelative));
         assertTrue(glProgramSource.contains("VulkanicAPI.resolveUniformLocation("),
             "Sodium GlProgram should resolve uniforms via typed location helper instead of raw location lookups: " + glProgramRelative);
 
         String encoderRelative = "net/blaze3d/opengl/GlCommandEncoder.java";
-        String encoderSource = Files.readString(SRC_MAIN_JAVA.resolve(encoderRelative));
+        String encoderSource = readSource(SRC_MAIN_JAVA.resolve(encoderRelative));
         assertTrue(encoderSource.contains("VulkanicAPI.setLogicOp(ctx, VulkanicLogicOp.OR_REVERSE)"),
             "GlCommandEncoder should use typed VulkanicLogicOp routing for OR_REVERSE logic-op setup: " + encoderRelative);
     }
@@ -1280,7 +1284,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testIrisBufferBlendToggleUsesTypedCapabilityEnum() throws IOException {
         String relative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertFalse(source.contains("setIndexedEnabled(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_BLEND"),
             "Iris indexed blend toggles should use VulkanicCapability.BLEND: " + relative);
@@ -1289,7 +1293,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testGlCommandEncoderMipRangeUsesTypedTextureParameterNames() throws IOException {
         String relative = "net/blaze3d/opengl/GlCommandEncoder.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         Pattern rawMipParameterPattern = Pattern.compile("setTextureParameter\\s*\\([^\\n]*GL_TEXTURE_(?:BASE_LEVEL|MAX_LEVEL)");
         assertFalse(rawMipParameterPattern.matcher(source).find(),
@@ -1299,7 +1303,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testIrisGlSamplerUsesTypedSamplerParameterEnums() throws IOException {
         String relative = "net/irisshaders/iris/gl/sampler/GlSampler.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         Pattern rawSamplerCallPattern = Pattern.compile("samplerParameteri\\s*\\([^\\n]*GL_");
         assertFalse(rawSamplerCallPattern.matcher(source).find(),
@@ -1311,7 +1315,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testBlaze3dGlTextureFlushModeUsesTypedTextureParameterEnums() throws IOException {
         String relative = "net/blaze3d/opengl/GlTexture.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         Pattern rawNumericTextureParamPattern = Pattern.compile("iris\\$texParameterDSA\\s*\\([^\\n]*\\b(?:10240|10241|10242|10243|9728|9729|9984|9985|9986|9987)\\b");
         assertFalse(rawNumericTextureParamPattern.matcher(source).find(),
@@ -1321,7 +1325,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testIrisDepthCopyStrategyAvoidsExplicitTexture2dTargets() throws IOException {
         String relative = "net/irisshaders/iris/gl/texture/DepthCopyStrategy.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertFalse(source.contains("VulkanicAPI.GL_TEXTURE_2D"),
             "DepthCopyStrategy should use typed/default-2D helper overloads instead of explicit GL texture target constants: " + relative);
@@ -1330,7 +1334,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testIrisTextureWrapperDefaultsUseTypedTexture2dHelpers() throws IOException {
         String relative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertFalse(source.contains("generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D)"),
             "Iris wrapper defaults should route through typed 2D helper overloads for mipmaps: " + relative);
@@ -1353,7 +1357,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testIrisTextureBindingAndCreationDefaultsUseTypedTexture2dHelpers() throws IOException {
         String relative = "net/irisshaders/iris/gl/IrisRenderSystem.java";
-        String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+        String source = readSource(SRC_MAIN_JAVA.resolve(relative));
 
         assertFalse(source.contains("dsaState.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, unit, texture)"),
             "Iris bindTextureToUnit 2D default should route through typed texture-target helper overloads: " + relative);
@@ -1368,7 +1372,7 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testBlaze3dTextureStatePathsAvoidLegacyTargetUnwrapping() throws IOException {
         String commandEncoderRelative = "net/blaze3d/opengl/GlCommandEncoder.java";
-        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve(commandEncoderRelative));
+        String commandEncoderSource = readSource(SRC_MAIN_JAVA.resolve(commandEncoderRelative));
 
         assertFalse(commandEncoderSource.contains("texture.flushModeChanges(textureTarget.toLegacyGlTarget())"),
             "GlCommandEncoder should use typed texture-target overload for flushModeChanges: " + commandEncoderRelative);
@@ -1382,7 +1386,7 @@ public class ApiNeutralityCallsiteTest {
             "GlCommandEncoder tessellation override should use typed VulkanicPrimitiveMode.PATCHES routing: " + commandEncoderRelative);
 
         String deviceRelative = "net/blaze3d/opengl/GlDevice.java";
-        String deviceSource = Files.readString(SRC_MAIN_JAVA.resolve(deviceRelative));
+        String deviceSource = readSource(SRC_MAIN_JAVA.resolve(deviceRelative));
 
         assertFalse(deviceSource.contains("setTextureMaxLevel(ctx, o, m - 1)"),
             "GlDevice texture setup should use typed texture-target overloads for mip configuration: " + deviceRelative);
@@ -1393,13 +1397,13 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testIrisTextureTypeDrivenCallsitesPreferTypedTargetHelpers() throws IOException {
         String samplerBindingRelative = "net/irisshaders/iris/gl/sampler/SamplerBinding.java";
-        String samplerBindingSource = Files.readString(SRC_MAIN_JAVA.resolve(samplerBindingRelative));
+        String samplerBindingSource = readSource(SRC_MAIN_JAVA.resolve(samplerBindingRelative));
 
         assertFalse(samplerBindingSource.contains("bindTextureToUnit(textureType.getGlType(), textureUnit, textureId)"),
             "SamplerBinding should route texture binding through TextureType typed helper methods: " + samplerBindingRelative);
 
         String glTextureRelative = "net/irisshaders/iris/gl/texture/GlTexture.java";
-        String glTextureSource = Files.readString(SRC_MAIN_JAVA.resolve(glTextureRelative));
+        String glTextureSource = readSource(SRC_MAIN_JAVA.resolve(glTextureRelative));
 
         assertFalse(glTextureSource.contains("bindTextureForSetup(target.getGlType(), getGlId())"),
             "Iris GlTexture setup should route through TextureType typed helper methods: " + glTextureRelative);
@@ -1407,7 +1411,7 @@ public class ApiNeutralityCallsiteTest {
             "Iris GlTexture bind should route through TextureType typed helper methods: " + glTextureRelative);
 
         String glImageRelative = "net/irisshaders/iris/gl/image/GlImage.java";
-        String glImageSource = Files.readString(SRC_MAIN_JAVA.resolve(glImageRelative));
+        String glImageSource = readSource(SRC_MAIN_JAVA.resolve(glImageRelative));
 
         assertFalse(glImageSource.contains("IrisRenderSystem.createTexture(target.getGlType())"),
             "Iris GlImage creation should route through TextureType typed helper methods: " + glImageRelative);
@@ -1415,7 +1419,7 @@ public class ApiNeutralityCallsiteTest {
             "Iris GlImage setup should route through TextureType typed helper methods: " + glImageRelative);
 
         String textureTypeRelative = "net/irisshaders/iris/gl/texture/TextureType.java";
-        String textureTypeSource = Files.readString(SRC_MAIN_JAVA.resolve(textureTypeRelative));
+        String textureTypeSource = readSource(SRC_MAIN_JAVA.resolve(textureTypeRelative));
 
         assertFalse(textureTypeSource.contains("TEXTURE_RECTANGLE(VulkanicAPI.GL_TEXTURE_3D)"),
             "TextureType.TEXTURE_RECTANGLE should map to GL_TEXTURE_RECTANGLE instead of GL_TEXTURE_3D: " + textureTypeRelative);
@@ -1430,7 +1434,7 @@ public class ApiNeutralityCallsiteTest {
         );
 
         for (String relative : files) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertTrue(source.contains("uploadShaderSource"),
                 "Shader source helper should route through VulkanicAPI.uploadShaderSource seam: " + relative);
             assertFalse(source.contains("pointers.address0()"),
@@ -1443,28 +1447,28 @@ public class ApiNeutralityCallsiteTest {
     @Test
     public void testTextureBufferAndUploadClusterCallsitesUseVulkanicAPISeams() throws IOException {
         // Font texture cluster
-        String fontTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/FontTexture.java"));
-        String specialGlyphsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/glyphs/SpecialGlyphs.java"));
-        String bitmapProviderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/BitmapProvider.java"));
-        String unihexProviderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/UnihexProvider.java"));
+        String fontTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/FontTexture.java"));
+        String specialGlyphsSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/glyphs/SpecialGlyphs.java"));
+        String bitmapProviderSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/BitmapProvider.java"));
+        String unihexProviderSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/font/providers/UnihexProvider.java"));
         // Texture system cluster
-        String dynamicTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/DynamicTexture.java"));
-        String reloadableTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/ReloadableTexture.java"));
-        String cubeMapTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/CubeMapTexture.java"));
-        String spriteContentsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/SpriteContents.java"));
-        String lightTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java"));
-        String pictureInPictureRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java"));
+        String dynamicTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/DynamicTexture.java"));
+        String reloadableTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/ReloadableTexture.java"));
+        String cubeMapTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/CubeMapTexture.java"));
+        String spriteContentsSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/SpriteContents.java"));
+        String lightTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java"));
+        String pictureInPictureRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/PictureInPictureRenderer.java"));
         // Buffer allocation cluster
-        String mappableRingBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/MappableRingBuffer.java"));
-        String perspProjBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/PerspectiveProjectionMatrixBuffer.java"));
-        String cachedPerspProjBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CachedPerspectiveProjectionMatrixBuffer.java"));
-        String cachedOrthoProjBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CachedOrthoProjectionMatrixBuffer.java"));
-        String voxelMapOrthoProjBufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/voxelmap/util/VoxelMapCachedOrthoProjectionMatrixBuffer.java"));
-        String fogRendererNewSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/fog/FogRenderer.java"));
+        String mappableRingBufferSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/MappableRingBuffer.java"));
+        String perspProjBufferSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/PerspectiveProjectionMatrixBuffer.java"));
+        String cachedPerspProjBufferSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CachedPerspectiveProjectionMatrixBuffer.java"));
+        String cachedOrthoProjBufferSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CachedOrthoProjectionMatrixBuffer.java"));
+        String voxelMapOrthoProjBufferSource = readSource(SRC_MAIN_JAVA.resolve("net/voxelmap/util/VoxelMapCachedOrthoProjectionMatrixBuffer.java"));
+        String fogRendererNewSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/fog/FogRenderer.java"));
         // Misc cluster
-        String renderTargetDescriptorSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/resource/RenderTargetDescriptor.java"));
-        String particleFeatureRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java"));
-        String vertexFormatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java"));
+        String renderTargetDescriptorSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/resource/RenderTargetDescriptor.java"));
+        String particleFeatureRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java"));
+        String vertexFormatSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java"));
 
         // Font texture cluster assertions
         assertTrue(fontTextureSource.contains("VulkanicAPI.createTexture("),
@@ -1570,20 +1574,20 @@ public class ApiNeutralityCallsiteTest {
 
     @Test
     public void testIrisAndSodiumRenderClusterCallsitesUseVulkanicAPISeams() throws IOException {
-        String renderTargetsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTargets.java"));
-        String customTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedCustomTexture.java"));
-        String noiseTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedNoiseTexture.java"));
-        String centerDepthSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/CenterDepthSampler.java"));
-        String colorSpaceSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/colorspace/ColorSpaceFragmentConverter.java"));
-        String fullScreenQuadSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/FullScreenQuadRenderer.java"));
-        String horizonRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java"));
-        String shadowCompositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
-        String shadowRenderTargetsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderTargets.java"));
-        String finalPassRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java"));
-        String compositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
-        String pbrAtlasTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/texture/PBRAtlasTexture.java"));
-        String sodiumOptionsSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/gui/SodiumGameOptionPages.java"));
-        String sodiumRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
+        String renderTargetsSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTargets.java"));
+        String customTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedCustomTexture.java"));
+        String noiseTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedNoiseTexture.java"));
+        String centerDepthSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/CenterDepthSampler.java"));
+        String colorSpaceSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/colorspace/ColorSpaceFragmentConverter.java"));
+        String fullScreenQuadSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/FullScreenQuadRenderer.java"));
+        String horizonRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java"));
+        String shadowCompositeSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+        String shadowRenderTargetsSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderTargets.java"));
+        String finalPassRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java"));
+        String compositeRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+        String pbrAtlasTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/texture/PBRAtlasTexture.java"));
+        String sodiumOptionsSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/gui/SodiumGameOptionPages.java"));
+        String sodiumRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java"));
 
         assertTrue(renderTargetsSource.contains("VulkanicAPI.createTexture("),
             "Iris RenderTargets should allocate depth textures through backend-owned VulkanicAPI seam");
