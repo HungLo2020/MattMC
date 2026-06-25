@@ -31,16 +31,22 @@ nav:
   - Home: index.md
   - Gameplay:
       - Overview: gameplay/Gameplay.md
-      - Creative: gameplay/Creative.md
-      - Survival: gameplay/Survival.md
-      - Blocks:
-          - Crafting Blocks: gameplay/blocks/CraftingBlocks.md
-      - Dimensions:
-          - Overview: gameplay/dimensions/Dimensions.md
-      - Mobs:
-          - Overview: gameplay/mobs/Mobs.md
-          - Allay: gameplay/mobs/Allay.md
-          - Crow: gameplay/mobs/Crow.md
+      - Biomes: gameplay/biomes/Biomes.md
+      - Blocks: gameplay/blocks/Blocks.md
+      - Brewing: gameplay/brewing/Brewing.md
+      - Commands: gameplay/commands/Commands.md
+      - Crafting: gameplay/crafting/Crafting.md
+      - Dimensions: gameplay/dimensions/Dimensions.md
+      - Effects: gameplay/effects/Effects.md
+      - Enchanting: gameplay/enchanting/Enchanting.md
+      - Gamemodes: gameplay/gamemodes/Gamemodes.md
+      - Items: gameplay/items/Items.md
+      - Mobs: gameplay/mobs/Mobs.md
+      - Redstone: gameplay/redstone/Redstone.md
+      - Smelting: gameplay/smelting/Smelting.md
+      - Smithing: gameplay/smithing/Smithing.md
+      - Structures: gameplay/structures/Structures.md
+      - Trading: gameplay/trading/Trading.md
   - Testing:
       - Overview: testing/home.md
       - How To Testing: testing/HOWTO-TESTING.md
