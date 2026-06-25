@@ -608,6 +608,13 @@ These tests can run in automated environments:
 ./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationBatchPerformanceTest" > chunk_batch_results.txt
 ```
 
+## Troubleshooting
+
+If tests fail locally but pass in CI, first compare Java versions, operating
+system behavior, and generated files. If tests pass locally but fail only on one
+runner, check for path separator, line ending, filesystem case-sensitivity, and
+native library differences.
+
 ### Notes
 
 - First run may be slower due to JVM warmup - the batch test accounts for this

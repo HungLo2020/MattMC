@@ -44,3 +44,7 @@ jmh-result.txt
 /Task
 *.inline_backup
 /mattmc_performance_history.html
+
+# Wiki build/local environment
+/site/
+/.venv-wiki/

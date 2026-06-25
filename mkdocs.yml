@@ -1,0 +1,58 @@
+site_name: MattMC Wiki
+site_description: Version-controlled MattMC wiki and project documentation
+site_url: https://hunglo2020.github.io/MattMC/
+repo_url: https://github.com/HungLo2020/MattMC
+repo_name: HungLo2020/MattMC
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Gameplay:
+      - Overview: gameplay/Gameplay.md
+      - Creative: gameplay/Creative.md
+      - Survival: gameplay/Survival.md
+      - Blocks:
+          - Crafting Blocks: gameplay/blocks/CraftingBlocks.md
+      - Dimensions:
+          - Overview: gameplay/dimensions/Dimensions.md
+      - Mobs:
+          - Overview: gameplay/mobs/Mobs.md
+          - Allay: gameplay/mobs/Allay.md
+          - Crow: gameplay/mobs/Crow.md
+  - Testing:
+      - Overview: testing/home.md
+      - How To Testing: testing/HOWTO-TESTING.md
+      - Profiler: testing/PROFILER.md
+      - Performance:
+          - Chunk Generation Performance Tracker: testing/performance/chunk_gen_performance_tracker.md
+  - Development:
+      - Dev Tips And Tools: devtools/DEV-TIPS-TOOLS.md
+      - Data Generation: DATA-GENERATION.md
+      - Data System: DATA-SYSTEM.md
+  - Changelog:
+      - Overview: changelog/CHANGELOG.md
+      - 6.2026: changelog/changelog/6.2026.md
+      - 1.2026: changelog/changelog/1.2026.md
+      - 12.2025: changelog/changelog/12.2025.md
