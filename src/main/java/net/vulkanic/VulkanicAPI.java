@@ -5019,6 +5019,11 @@ public class VulkanicAPI {
             throw new IllegalArgumentException("maxNameLength must be > 0");
         }
         java.util.Set<VulkanicShaderStage> normalizedStages = normalizeReflectedResourceStages(stages);
+        PipelineDescriptor.ResourceLayout backendNativeLayout =
+            deriveBackendNativeResourceLayoutFromProgramReflection(ctx, program, normalizedStages);
+        if (backendNativeLayout != null) {
+            return backendNativeLayout;
+        }
 
         java.util.ArrayList<PipelineDescriptor.ResourceBinding> bindings = new java.util.ArrayList<>();
         java.util.LinkedHashSet<String> seenNames = new java.util.LinkedHashSet<>();
@@ -5087,6 +5092,18 @@ public class VulkanicAPI {
         }
 
         return new PipelineDescriptor.ResourceLayout(bindings);
+    }
+
+    @Nullable
+    private static PipelineDescriptor.ResourceLayout deriveBackendNativeResourceLayoutFromProgramReflection(
+        CommandContext ctx,
+        int program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
+        return directVulkanBackend != null
+            ? directVulkanBackend.getLinkedProgramResourceLayout(ctx, program, stages)
+            : null;
     }
 
     /**

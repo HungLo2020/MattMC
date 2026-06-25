@@ -1,6 +1,7 @@
 package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.CommandContext;
+import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicIntegerQuery;
 import net.vulkanic.VulkanicShaderStage;
@@ -25,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -657,6 +659,105 @@ public class VulkanBackendSpirvPathTest {
         assertEquals(VulkanicAPI.GL_FLOAT_VEC4, fogColorType.get(0));
         assertEquals(VulkanicUniformReflectionType.FLOAT_VEC4,
             VulkanicUniformReflectionType.fromLegacyGlConstant(fogColorType.get(0)).orElseThrow());
+    }
+
+    @Test
+    public void testLinkedProgramResourceLayoutPreservesExplicitDescriptorBindings() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x41, 0x42}, sourceName, "stub")
+        );
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+
+        uploadSource(
+            backend,
+            vertexShader,
+            "#version 450\n"
+                + "layout(std140, set = 0, binding = 6) uniform DynamicTransforms { mat4 ModelViewMat; };\n"
+                + "void main(){ gl_Position = ModelViewMat * vec4(0.0); }"
+        );
+        uploadSource(
+            backend,
+            fragmentShader,
+            "#version 450\n"
+                + "layout(set = 0, binding = 4) uniform sampler2D Sampler0;\n"
+                + "layout(std140, set = 0, binding = 2) uniform Projection { mat4 ProjMat; };\n"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = texture(Sampler0, vec2(0.0)) + ProjMat[0][0]; }"
+        );
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(1L, "explicit-binding-layout-test");
+        PipelineDescriptor.ResourceLayout layout = backend.getLinkedProgramResourceLayout(
+            introspectionContext,
+            program,
+            Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT)
+        );
+
+        assertEquals(6, layout.findByName("DynamicTransforms").orElseThrow().binding());
+        assertEquals(4, layout.findByName("Sampler0").orElseThrow().binding());
+        assertEquals(2, layout.findByName("Projection").orElseThrow().binding());
+    }
+
+    @Test
+    public void testLinkedProgramResourceLayoutAllocatesImplicitBindingsAroundExplicitOnes() {
+        List<String> capturedSources = new ArrayList<>();
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) -> {
+            capturedSources.add(source.toString());
+            return new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x43, 0x44}, sourceName, "stub");
+        });
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+
+        uploadSource(
+            backend,
+            vertexShader,
+            "#version 450\n"
+                + "layout(std140) uniform DynamicTransforms { mat4 ModelViewMat; };\n"
+                + "void main(){ gl_Position = ModelViewMat * vec4(0.0); }"
+        );
+        uploadSource(
+            backend,
+            fragmentShader,
+            "#version 450\n"
+                + "layout(set = 0, binding = 0) uniform sampler2D Sampler0;\n"
+                + "uniform sampler2D Sampler1;\n"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = texture(Sampler0, vec2(0.0)) + texture(Sampler1, vec2(0.0)); }"
+        );
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(1L, "implicit-binding-layout-test");
+        PipelineDescriptor.ResourceLayout layout = backend.getLinkedProgramResourceLayout(
+            introspectionContext,
+            program,
+            Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT)
+        );
+
+        assertEquals(1, layout.findByName("DynamicTransforms").orElseThrow().binding());
+        assertEquals(0, layout.findByName("Sampler0").orElseThrow().binding());
+        assertEquals(2, layout.findByName("Sampler1").orElseThrow().binding());
+
+        String linkedSources = String.join("\n", capturedSources);
+        assertTrue(linkedSources.contains("layout(std140, set = 0, binding = 1) uniform DynamicTransforms"));
+        assertTrue(linkedSources.contains("layout(set = 0, binding = 0) uniform sampler2D Sampler0;"));
+        assertTrue(linkedSources.contains("layout(set = 0, binding = 2) uniform sampler2D Sampler1;"));
     }
 
     @Test

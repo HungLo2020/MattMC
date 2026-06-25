@@ -188,10 +188,12 @@ public class VulkanBackend {
     private static final int GL_LUMINANCE_ALPHA = 0x190A;
     private static final Pattern GLSL_BLOCK_COMMENT_PATTERN = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
     private static final Pattern GLSL_LINE_COMMENT_PATTERN = Pattern.compile("(?m)//.*$");
-    private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
+    private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\(([^)]*)\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
     private static final Pattern GLSL_STANDALONE_UNIFORM_PATTERN = Pattern.compile(
-        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;"
+        "(?m)^\\s*(?:layout\\s*\\(([^)]*)\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;"
     );
+    private static final Pattern GLSL_LAYOUT_SET_PATTERN = Pattern.compile("\\bset\\s*=\\s*(\\d+)\\b");
+    private static final Pattern GLSL_LAYOUT_BINDING_PATTERN = Pattern.compile("\\bbinding\\s*=\\s*(\\d+)\\b");
     private static final Pattern GLSL_STANDALONE_UNIFORM_MEMBER_PATTERN = Pattern.compile(
         "^\\s*(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;\\s*$"
     );
@@ -2082,6 +2084,7 @@ void main() {
             virtualProgram.activeUniformNames = List.of();
             virtualProgram.activeUniforms = List.of();
             virtualProgram.activeUniformBlocks = List.of();
+            virtualProgram.activeResourceBindings = List.of();
             virtualProgram.linkedSpirvModules = List.of();
             return;
         }
@@ -2123,46 +2126,21 @@ void main() {
 
     private static String injectExplicitReflectedResourceBindings(String shaderSource, VirtualProgram virtualProgram) {
         String reboundSource = shaderSource;
-        Set<String> seenNames = new java.util.LinkedHashSet<>();
-        int bindingIndex = 0;
-        boolean hasGeneratedStandaloneUniformBlock = false;
-
-        for (String blockName : virtualProgram.activeUniformBlocks) {
-            if (blockName == null || blockName.isBlank() || blockName.startsWith("gl_")) {
-                continue;
+        for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
+            if (resourceBinding.type() == PipelineDescriptor.ResourceType.UNIFORM_BUFFER) {
+                reboundSource = injectExplicitUniformBlockBinding(
+                    reboundSource,
+                    resourceBinding.name(),
+                    resourceBinding.binding()
+                );
+            } else if (resourceBinding.type() == PipelineDescriptor.ResourceType.SAMPLER
+                || resourceBinding.type() == PipelineDescriptor.ResourceType.COMPARISON_SAMPLER) {
+                reboundSource = injectExplicitNamedUniformBinding(
+                    reboundSource,
+                    resourceBinding.name(),
+                    resourceBinding.binding()
+                );
             }
-            if (!seenNames.add(blockName)) {
-                continue;
-            }
-            if (VulkanicAPI.generatedStandaloneUniformBlockName().equals(blockName)) {
-                hasGeneratedStandaloneUniformBlock = true;
-                continue;
-            }
-            reboundSource = injectExplicitUniformBlockBinding(reboundSource, blockName, bindingIndex++);
-        }
-
-        for (ReflectedUniform uniform : virtualProgram.activeUniforms) {
-            Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
-                net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(uniform.legacyType());
-            if (reflectionType.isEmpty() || !reflectionType.get().isSampler()) {
-                continue;
-            }
-            String uniformName = uniform.name();
-            if (uniformName == null || uniformName.isBlank() || uniformName.startsWith("gl_")) {
-                continue;
-            }
-            if (!seenNames.add(uniformName)) {
-                continue;
-            }
-            reboundSource = injectExplicitNamedUniformBinding(reboundSource, uniformName, bindingIndex++);
-        }
-
-        if (hasGeneratedStandaloneUniformBlock) {
-            reboundSource = injectExplicitUniformBlockBinding(
-                reboundSource,
-                VulkanicAPI.generatedStandaloneUniformBlockName(),
-                bindingIndex
-            );
         }
 
         return reboundSource;
@@ -2210,13 +2188,13 @@ void main() {
             String normalizedSource = stripGlslComments(shaderSource);
             Matcher uniformMatcher = GLSL_STANDALONE_UNIFORM_PATTERN.matcher(normalizedSource);
             while (uniformMatcher.find()) {
-                String uniformTypeName = uniformMatcher.group(1);
+                String uniformTypeName = uniformMatcher.group(2);
                 if (isOpaqueStandaloneUniformType(uniformTypeName)) {
                     continue;
                 }
 
-                String uniformName = uniformMatcher.group(2);
-                int arraySize = uniformMatcher.group(3) == null ? 1 : Integer.parseInt(uniformMatcher.group(3));
+                String uniformName = uniformMatcher.group(3);
+                int arraySize = uniformMatcher.group(4) == null ? 1 : Integer.parseInt(uniformMatcher.group(4));
                 String declaration = uniformTypeName + " " + uniformName + (arraySize > 1 ? "[" + arraySize + "]" : "") + ";";
                 declarationsByName.putIfAbsent(uniformName, declaration);
             }
@@ -2248,22 +2226,62 @@ void main() {
     }
 
     private static int standaloneUniformBlockBindingIndex(VirtualProgram virtualProgram) {
-        Set<String> seenNames = new java.util.LinkedHashSet<>();
-        int bindingIndex = 0;
-
-        for (String blockName : virtualProgram.activeUniformBlocks) {
-            if (blockName == null || blockName.isBlank() || blockName.startsWith("gl_")) {
-                continue;
-            }
-            if (GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(blockName)) {
-                continue;
-            }
-            if (seenNames.add(blockName)) {
-                bindingIndex++;
+        for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
+            if (GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(resourceBinding.name())) {
+                return resourceBinding.binding();
             }
         }
 
-        for (ReflectedUniform uniform : virtualProgram.activeUniforms) {
+        Set<DescriptorSlot> usedSlots = new java.util.LinkedHashSet<>();
+        for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
+            usedSlots.add(new DescriptorSlot(resourceBinding.set(), resourceBinding.binding()));
+        }
+        return nextUnusedBinding(0, usedSlots, 0);
+    }
+
+    private static Optional<ExplicitDescriptorBinding> parseExplicitDescriptorBinding(@Nullable String layoutBody) {
+        if (layoutBody == null || layoutBody.isBlank()) {
+            return Optional.empty();
+        }
+
+        Matcher bindingMatcher = GLSL_LAYOUT_BINDING_PATTERN.matcher(layoutBody);
+        if (!bindingMatcher.find()) {
+            return Optional.empty();
+        }
+
+        int set = 0;
+        Matcher setMatcher = GLSL_LAYOUT_SET_PATTERN.matcher(layoutBody);
+        if (setMatcher.find()) {
+            set = Integer.parseInt(setMatcher.group(1));
+        }
+        int binding = Integer.parseInt(bindingMatcher.group(1));
+        return Optional.of(new ExplicitDescriptorBinding(set, binding));
+    }
+
+    private static List<ReflectedResourceBinding> buildReflectedResourceBindings(
+        List<String> activeUniformBlocks,
+        List<ReflectedUniform> activeUniforms,
+        Map<String, ExplicitDescriptorBinding> explicitBindings
+    ) {
+        List<ReflectedResourceRequest> requests = new ArrayList<>();
+        Set<String> seenNames = new java.util.LinkedHashSet<>();
+        boolean hasGeneratedStandaloneUniformBlock = false;
+
+        for (String blockName : activeUniformBlocks) {
+            if (blockName == null || blockName.isBlank() || blockName.startsWith("gl_")) {
+                continue;
+            }
+            if (!seenNames.add(blockName)) {
+                continue;
+            }
+            if (GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME.equals(blockName)) {
+                hasGeneratedStandaloneUniformBlock = true;
+                continue;
+            }
+            requests.add(new ReflectedResourceRequest(blockName, PipelineDescriptor.ResourceType.UNIFORM_BUFFER));
+        }
+
+        for (ReflectedUniform uniform : activeUniforms) {
             Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
                 net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(uniform.legacyType());
             if (reflectionType.isEmpty() || !reflectionType.get().isSampler()) {
@@ -2273,12 +2291,60 @@ void main() {
             if (uniformName == null || uniformName.isBlank() || uniformName.startsWith("gl_")) {
                 continue;
             }
-            if (seenNames.add(uniformName)) {
-                bindingIndex++;
+            if (!seenNames.add(uniformName)) {
+                continue;
             }
+            boolean comparisonSampler = reflectionType.get() == net.vulkanic.VulkanicUniformReflectionType.SAMPLER_1D_SHADOW
+                || reflectionType.get() == net.vulkanic.VulkanicUniformReflectionType.SAMPLER_2D_SHADOW
+                || reflectionType.get() == net.vulkanic.VulkanicUniformReflectionType.SAMPLER_CUBE_SHADOW;
+            requests.add(new ReflectedResourceRequest(
+                uniformName,
+                comparisonSampler
+                    ? PipelineDescriptor.ResourceType.COMPARISON_SAMPLER
+                    : PipelineDescriptor.ResourceType.SAMPLER
+            ));
         }
 
-        return bindingIndex;
+        if (hasGeneratedStandaloneUniformBlock) {
+            requests.add(new ReflectedResourceRequest(
+                GlslangSpirvCompiler.GENERATED_UNIFORM_BLOCK_NAME,
+                PipelineDescriptor.ResourceType.UNIFORM_BUFFER
+            ));
+        }
+
+        List<ReflectedResourceBinding> bindings = new ArrayList<>(requests.size());
+        Set<DescriptorSlot> usedSlots = new java.util.LinkedHashSet<>();
+        for (ExplicitDescriptorBinding explicitBinding : explicitBindings.values()) {
+            usedSlots.add(new DescriptorSlot(explicitBinding.set(), explicitBinding.binding()));
+        }
+        int nextBinding = 0;
+
+        for (ReflectedResourceRequest request : requests) {
+            ExplicitDescriptorBinding explicitBinding = explicitBindings.get(request.name());
+            int set = explicitBinding != null ? explicitBinding.set() : 0;
+            int binding;
+            if (explicitBinding != null) {
+                binding = explicitBinding.binding();
+            } else {
+                binding = nextUnusedBinding(set, usedSlots, nextBinding);
+            }
+
+            usedSlots.add(new DescriptorSlot(set, binding));
+            if (set == 0) {
+                nextBinding = Math.max(nextBinding, binding + 1);
+            }
+            bindings.add(new ReflectedResourceBinding(request.name(), request.type(), set, binding));
+        }
+
+        return List.copyOf(bindings);
+    }
+
+    private static int nextUnusedBinding(int set, Set<DescriptorSlot> usedSlots, int startBinding) {
+        int binding = Math.max(0, startBinding);
+        while (usedSlots.contains(new DescriptorSlot(set, binding))) {
+            binding++;
+        }
+        return binding;
     }
 
     public int getProgramParameter(CommandContext ctx, int program, int pname) {
@@ -2303,6 +2369,7 @@ void main() {
         java.util.LinkedHashMap<String, ReflectedUniform> activeUniforms = new java.util.LinkedHashMap<>();
         Set<String> activeUniformNames = new java.util.LinkedHashSet<>();
         Set<String> activeUniformBlocks = new java.util.LinkedHashSet<>();
+        Map<String, ExplicitDescriptorBinding> explicitBindings = new java.util.LinkedHashMap<>();
         List<String> standaloneUniformDeclarations = collectStandaloneUniformDeclarations(virtualProgram);
 
         for (int shaderId : sortedAttachedShaderIds(virtualProgram)) {
@@ -2317,7 +2384,10 @@ void main() {
             ).replaceAll("");
             Matcher blockMatcher = GLSL_UNIFORM_BLOCK_PATTERN.matcher(normalizedSource);
             while (blockMatcher.find()) {
-                activeUniformBlocks.add(blockMatcher.group(1));
+                String blockName = blockMatcher.group(2);
+                activeUniformBlocks.add(blockName);
+                parseExplicitDescriptorBinding(blockMatcher.group(1))
+                    .ifPresent(binding -> explicitBindings.putIfAbsent(blockName, binding));
             }
             // If this shader has standalone non-opaque uniforms, the Vulkan normalizer rewrites
             // them into VulkanicStandaloneUniforms; mirror that here so reflection stays aligned.
@@ -2327,11 +2397,13 @@ void main() {
 
             Matcher uniformMatcher = GLSL_STANDALONE_UNIFORM_PATTERN.matcher(normalizedSource);
             while (uniformMatcher.find()) {
-                String uniformTypeName = uniformMatcher.group(1);
-                String uniformName = uniformMatcher.group(2);
-                int arraySize = uniformMatcher.group(3) == null ? 1 : Integer.parseInt(uniformMatcher.group(3));
+                String uniformTypeName = uniformMatcher.group(2);
+                String uniformName = uniformMatcher.group(3);
+                int arraySize = uniformMatcher.group(4) == null ? 1 : Integer.parseInt(uniformMatcher.group(4));
 
                 activeUniformNames.add(uniformName);
+                parseExplicitDescriptorBinding(uniformMatcher.group(1))
+                    .ifPresent(binding -> explicitBindings.putIfAbsent(uniformName, binding));
                 activeUniforms.putIfAbsent(
                     uniformName,
                     new ReflectedUniform(
@@ -2348,6 +2420,11 @@ void main() {
         virtualProgram.activeUniformNames = List.copyOf(activeUniformNames);
         virtualProgram.activeUniforms = List.copyOf(activeUniforms.values());
         virtualProgram.activeUniformBlocks = List.copyOf(activeUniformBlocks);
+        virtualProgram.activeResourceBindings = buildReflectedResourceBindings(
+            virtualProgram.activeUniformBlocks,
+            virtualProgram.activeUniforms,
+            explicitBindings
+        );
         virtualProgram.standaloneUniformDeclarations = standaloneUniformDeclarations;
         logStandaloneSliceTraceInternal(programId, "reflection", null, virtualProgram, null, false, null);
         initializeStandaloneUniformState(programId, virtualProgram, activeUniforms);
@@ -3932,6 +4009,40 @@ void main() {
         requireVulkanCommandBufferHandle("getLinkedProgramSpirvModules", ctx);
         VirtualProgram virtualProgram = virtualPrograms.get(program);
         return virtualProgram == null ? List.of() : virtualProgram.linkedSpirvModules;
+    }
+
+    @Nullable
+    public PipelineDescriptor.ResourceLayout getLinkedProgramResourceLayout(
+        CommandContext ctx,
+        int program,
+        java.util.Set<VulkanicShaderStage> stages
+    ) {
+        requireVulkanCommandBufferHandle("getLinkedProgramResourceLayout", ctx);
+        VirtualProgram virtualProgram = virtualPrograms.get(program);
+        if (virtualProgram == null || !virtualProgram.linkStatus) {
+            return null;
+        }
+
+        java.util.Set<VulkanicShaderStage> normalizedStages = java.util.Set.copyOf(
+            Objects.requireNonNull(stages, "stages must not be null")
+        );
+        if (normalizedStages.isEmpty()) {
+            throw new IllegalArgumentException("stages must not be empty");
+        }
+
+        List<PipelineDescriptor.ResourceBinding> bindings =
+            new ArrayList<>(virtualProgram.activeResourceBindings.size());
+        for (ReflectedResourceBinding resourceBinding : virtualProgram.activeResourceBindings) {
+            bindings.add(new PipelineDescriptor.ResourceBinding(
+                resourceBinding.set(),
+                resourceBinding.binding(),
+                resourceBinding.name(),
+                resourceBinding.type(),
+                null,
+                normalizedStages
+            ));
+        }
+        return new PipelineDescriptor.ResourceLayout(bindings);
     }
 
     private static final class BoundPipelineResources {
@@ -8827,6 +8938,7 @@ void main() {
         private volatile List<String> activeUniformNames = List.of();
         private volatile List<ReflectedUniform> activeUniforms = List.of();
         private volatile List<String> activeUniformBlocks = List.of();
+        private volatile List<ReflectedResourceBinding> activeResourceBindings = List.of();
         private volatile List<String> standaloneUniformDeclarations = List.of();
         private volatile List<VulkanicSpirvModule> linkedSpirvModules = List.of();
         private volatile Map<Integer, StandaloneUniformField> standaloneFieldsByLocation = Map.of();
@@ -8849,6 +8961,18 @@ void main() {
     }
 
     private record ReflectedUniform(String name, int arraySize, int legacyType) {
+    }
+
+    private record ReflectedResourceRequest(String name, PipelineDescriptor.ResourceType type) {
+    }
+
+    private record ReflectedResourceBinding(String name, PipelineDescriptor.ResourceType type, int set, int binding) {
+    }
+
+    private record ExplicitDescriptorBinding(int set, int binding) {
+    }
+
+    private record DescriptorSlot(int set, int binding) {
     }
 
     private record StandaloneUniformField(
