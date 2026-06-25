@@ -77,9 +77,8 @@ public class IrisFabricHelpers implements IrisPlatformHelpers {
 			case DEPTH24 -> null;
 			case DEPTH32 -> TextureFormat.DEPTH32;
 			case DEPTH32F -> null;
-			case DEPTH_STENCIL -> null;
-			case DEPTH24_STENCIL8 -> null;
-			case DEPTH32F_STENCIL8 -> null;
+			case DEPTH_STENCIL, DEPTH24_STENCIL8 -> TextureFormat.DEPTH24_STENCIL8;
+			case DEPTH32F_STENCIL8 -> TextureFormat.DEPTH32F_STENCIL8;
 		};
 	}
 }

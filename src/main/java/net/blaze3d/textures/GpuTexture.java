@@ -74,6 +74,8 @@ public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.
 			case RED8    -> VulkanicTextureFormat.RED8;
 			case RED8I   -> VulkanicTextureFormat.RED8I;
 			case DEPTH32 -> VulkanicTextureFormat.DEPTH32;
+			case DEPTH24_STENCIL8 -> VulkanicTextureFormat.DEPTH24_STENCIL8;
+			case DEPTH32F_STENCIL8 -> VulkanicTextureFormat.DEPTH32F_STENCIL8;
 		};
 	}
 

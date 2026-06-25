@@ -250,6 +250,8 @@ public class GlConst {
 			case RED8 -> 33321;
 			case RED8I -> 33329;
 			case DEPTH32 -> 33191;
+			case DEPTH24_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_DEPTH24_STENCIL8;
+			case DEPTH32F_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_DEPTH32F_STENCIL8;
 		};
 	}
 
@@ -260,6 +262,7 @@ public class GlConst {
 			case RED8 -> 6403;
 			case RED8I -> 6403;
 			case DEPTH32 -> 6402;
+			case DEPTH24_STENCIL8, DEPTH32F_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_DEPTH_STENCIL;
 		};
 	}
 
@@ -270,6 +273,8 @@ public class GlConst {
 			case RED8 -> 5121;
 			case RED8I -> 5121;
 			case DEPTH32 -> 5126;
+			case DEPTH24_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_UNSIGNED_INT_24_8;
+			case DEPTH32F_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
 		};
 	}
 

@@ -127,8 +127,15 @@ public class VulkanImageStateTrackerTest {
         assertEquals(VulkanRenderPassCompatibilityKey.DependencyProfile.FRAMEBUFFER, framebufferKey.dependencyProfile());
         assertEquals(VulkanRenderPassCompatibilityKey.DependencyProfile.SWAPCHAIN_PRESENT, swapchainKey.dependencyProfile());
         assertTrue(textureViewKey.hasDepthAttachment());
+        assertFalse(textureViewKey.hasStencilAttachment());
+        assertTrue(VulkanRenderPassCompatibilityKey.framebuffer(
+            List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
+            VK10.VK_FORMAT_D24_UNORM_S8_UINT,
+            false
+        ).hasStencilAttachment());
         assertEquals(1, swapchainKey.colorAttachmentCount());
         assertFalse(swapchainKey.hasDepthAttachment());
+        assertFalse(swapchainKey.hasStencilAttachment());
     }
 
     @Test

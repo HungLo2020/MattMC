@@ -24,7 +24,11 @@ public enum VulkanicTextureFormat {
     /** 1-component red, 8 bits (signed integer). */
     RED8I(1),
     /** 32-bit depth. */
-    DEPTH32(4);
+    DEPTH32(4),
+    /** 24-bit depth plus 8-bit stencil. */
+    DEPTH24_STENCIL8(4),
+    /** 32-bit float depth plus 8-bit stencil. */
+    DEPTH32F_STENCIL8(8);
 
     private final int pixelSize;
 
@@ -51,6 +55,11 @@ public enum VulkanicTextureFormat {
 
     /** Returns true if this format has a depth component. */
     public boolean hasDepthAspect() {
-        return this == DEPTH32;
+        return this == DEPTH32 || this == DEPTH24_STENCIL8 || this == DEPTH32F_STENCIL8;
+    }
+
+    /** Returns true if this format has a stencil component. */
+    public boolean hasStencilAspect() {
+        return this == DEPTH24_STENCIL8 || this == DEPTH32F_STENCIL8;
     }
 }

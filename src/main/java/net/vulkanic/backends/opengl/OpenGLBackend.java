@@ -3270,6 +3270,8 @@ public class OpenGLBackend implements GraphicsBackend {
             case RED8   -> new int[]{org.lwjgl.opengl.GL30.GL_R8};
             case RED8I  -> new int[]{org.lwjgl.opengl.GL30.GL_R8I};
             case DEPTH32 -> new int[]{org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT32};
+            case DEPTH24_STENCIL8 -> new int[]{net.vulkanic.VulkanicAPI.GL_DEPTH24_STENCIL8};
+            case DEPTH32F_STENCIL8 -> new int[]{net.vulkanic.VulkanicAPI.GL_DEPTH32F_STENCIL8};
         };
     }
 
@@ -3280,6 +3282,7 @@ public class OpenGLBackend implements GraphicsBackend {
             case BGRA8  -> net.vulkanic.VulkanicAPI.GL_BGRA;
             case RED8, RED8I, RED32F -> org.lwjgl.opengl.GL30.GL_RED;
             case DEPTH32 -> org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT;
+            case DEPTH24_STENCIL8, DEPTH32F_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_DEPTH_STENCIL;
         };
     }
 
@@ -3292,6 +3295,8 @@ public class OpenGLBackend implements GraphicsBackend {
             case RED32F       -> org.lwjgl.opengl.GL11.GL_FLOAT;
             case RED8I        -> org.lwjgl.opengl.GL11.GL_BYTE;
             case DEPTH32      -> org.lwjgl.opengl.GL11.GL_FLOAT;
+            case DEPTH24_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_UNSIGNED_INT_24_8;
+            case DEPTH32F_STENCIL8 -> net.vulkanic.VulkanicAPI.GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
         };
     }
 

@@ -175,7 +175,48 @@ public class VulkanRenderStateContractTest {
         final int GL_DEPTH_TEST = 0x0B71;
         assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, GL_BLEND, true));
         assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, GL_DEPTH_TEST, false));
+        assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, VulkanicAPI.GL_STENCIL_TEST, true));
         assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, 0xDEAD, true));
+    }
+
+    @Test
+    public void testStencilCapabilityAndStateAreCachedForPipelineCreation() {
+        vulkanBackend.setCapabilityEnabled(stubCtx, VulkanicAPI.GL_STENCIL_TEST, true);
+        assertTrue(vulkanBackend.isEnabled(stubCtx, VulkanicAPI.GL_STENCIL_TEST));
+
+        vulkanBackend.setStencilFunc(stubCtx, VulkanicAPI.GL_LESS, 7, 0x33);
+        vulkanBackend.setStencilOp(stubCtx, VulkanicAPI.GL_REPLACE, VulkanicAPI.GL_DECR, VulkanicAPI.GL_INCR_WRAP);
+        vulkanBackend.setStencilWriteMask(stubCtx, 0x55);
+
+        assertEquals(VulkanicAPI.GL_LESS, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_FUNC));
+        assertEquals(7, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_REF));
+        assertEquals(0x33, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_VALUE_MASK));
+        assertEquals(VulkanicAPI.GL_REPLACE, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_FAIL));
+        assertEquals(VulkanicAPI.GL_DECR, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_PASS_DEPTH_FAIL));
+        assertEquals(VulkanicAPI.GL_INCR_WRAP, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_PASS_DEPTH_PASS));
+        assertEquals(0x55, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_WRITEMASK));
+
+        vulkanBackend.setCapabilityEnabled(stubCtx, VulkanicAPI.GL_STENCIL_TEST, false);
+        assertFalse(vulkanBackend.isEnabled(stubCtx, VulkanicAPI.GL_STENCIL_TEST));
+    }
+
+    @Test
+    public void testStencilSeparateBackFaceDoesNotOverwriteFrontFaceQueries() {
+        vulkanBackend.setStencilFunc(stubCtx, VulkanicAPI.GL_LESS, 7, 0x33);
+        vulkanBackend.setStencilFuncSeparate(stubCtx, VulkanicAPI.GL_BACK, VulkanicAPI.GL_GEQUAL, 3, 0x44);
+        vulkanBackend.setStencilOp(stubCtx, VulkanicAPI.GL_REPLACE, VulkanicAPI.GL_DECR, VulkanicAPI.GL_INCR_WRAP);
+        vulkanBackend.setStencilOpSeparate(stubCtx, VulkanicAPI.GL_BACK,
+            VulkanicAPI.GL_KEEP, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_INVERT);
+        vulkanBackend.setStencilWriteMask(stubCtx, 0x55);
+        vulkanBackend.setStencilWriteMaskSeparate(stubCtx, VulkanicAPI.GL_BACK, 0xAA);
+
+        assertEquals(VulkanicAPI.GL_LESS, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_FUNC));
+        assertEquals(7, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_REF));
+        assertEquals(0x33, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_VALUE_MASK));
+        assertEquals(VulkanicAPI.GL_REPLACE, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_FAIL));
+        assertEquals(VulkanicAPI.GL_DECR, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_PASS_DEPTH_FAIL));
+        assertEquals(VulkanicAPI.GL_INCR_WRAP, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_PASS_DEPTH_PASS));
+        assertEquals(0x55, vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.STENCIL_WRITEMASK));
     }
 
     @Test

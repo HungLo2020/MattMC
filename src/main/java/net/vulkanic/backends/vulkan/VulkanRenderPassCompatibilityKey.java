@@ -76,6 +76,15 @@ record VulkanRenderPassCompatibilityKey(
         return depthFormat != VK10.VK_FORMAT_UNDEFINED;
     }
 
+    boolean hasStencilAttachment() {
+        return switch (depthFormat) {
+            case VK10.VK_FORMAT_D16_UNORM_S8_UINT,
+                 VK10.VK_FORMAT_D24_UNORM_S8_UINT,
+                 VK10.VK_FORMAT_D32_SFLOAT_S8_UINT -> true;
+            default -> false;
+        };
+    }
+
     enum DependencyProfile {
         TEXTURE_VIEW,
         FRAMEBUFFER,

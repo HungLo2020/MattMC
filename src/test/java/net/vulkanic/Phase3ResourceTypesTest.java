@@ -85,6 +85,8 @@ public class Phase3ResourceTypesTest {
         assertTrue(VulkanicTextureFormat.RED8.hasColorAspect());
         assertTrue(VulkanicTextureFormat.RED8I.hasColorAspect());
         assertFalse(VulkanicTextureFormat.DEPTH32.hasColorAspect());
+        assertFalse(VulkanicTextureFormat.DEPTH24_STENCIL8.hasColorAspect());
+        assertFalse(VulkanicTextureFormat.DEPTH32F_STENCIL8.hasColorAspect());
     }
 
     @Test
@@ -92,6 +94,16 @@ public class Phase3ResourceTypesTest {
         assertFalse(VulkanicTextureFormat.RGBA8.hasDepthAspect());
         assertFalse(VulkanicTextureFormat.RED8.hasDepthAspect());
         assertTrue(VulkanicTextureFormat.DEPTH32.hasDepthAspect());
+        assertTrue(VulkanicTextureFormat.DEPTH24_STENCIL8.hasDepthAspect());
+        assertTrue(VulkanicTextureFormat.DEPTH32F_STENCIL8.hasDepthAspect());
+    }
+
+    @Test
+    public void testVulkanicTextureFormatHasStencilAspect() {
+        assertFalse(VulkanicTextureFormat.RGBA8.hasStencilAspect());
+        assertFalse(VulkanicTextureFormat.DEPTH32.hasStencilAspect());
+        assertTrue(VulkanicTextureFormat.DEPTH24_STENCIL8.hasStencilAspect());
+        assertTrue(VulkanicTextureFormat.DEPTH32F_STENCIL8.hasStencilAspect());
     }
 
     @Test
@@ -100,6 +112,8 @@ public class Phase3ResourceTypesTest {
         assertEquals(1, VulkanicTextureFormat.RED8.pixelSize());
         assertEquals(1, VulkanicTextureFormat.RED8I.pixelSize());
         assertEquals(4, VulkanicTextureFormat.DEPTH32.pixelSize());
+        assertEquals(4, VulkanicTextureFormat.DEPTH24_STENCIL8.pixelSize());
+        assertEquals(8, VulkanicTextureFormat.DEPTH32F_STENCIL8.pixelSize());
     }
 
     // ---- OpenGLTexture tests ------------------------------------------------

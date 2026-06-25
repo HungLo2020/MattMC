@@ -6,6 +6,7 @@ import net.blaze3d.platform.LogicOp;
 import net.blaze3d.platform.PolygonMode;
 import net.blaze3d.platform.SourceFactor;
 import net.vulkanic.PipelineDescriptor;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.vulkan.VK10;
 
 import java.util.ArrayList;
@@ -30,9 +31,14 @@ record VulkanPipelineState(
     int colorWriteMask,
     boolean logicOpEnabled,
     int logicOp,
+    boolean stencilTestEnabled,
+    StencilFaceState frontStencil,
+    StencilFaceState backStencil,
     List<ColorBlendAttachment> colorBlendAttachments
 ) {
     VulkanPipelineState {
+        Objects.requireNonNull(frontStencil, "frontStencil must not be null");
+        Objects.requireNonNull(backStencil, "backStencil must not be null");
         colorBlendAttachments = List.copyOf(
             Objects.requireNonNull(colorBlendAttachments, "colorBlendAttachments must not be null"));
     }
@@ -43,9 +49,28 @@ record VulkanPipelineState(
         PolygonModeResolver polygonModeResolver,
         BlendStateResolver blendStateResolver
     ) {
+        return from(
+            portableState,
+            colorAttachmentCount,
+            polygonModeResolver,
+            blendStateResolver,
+            StencilState.disabled(),
+            false
+        );
+    }
+
+    static VulkanPipelineState from(
+        PipelineDescriptor.PortableState portableState,
+        int colorAttachmentCount,
+        PolygonModeResolver polygonModeResolver,
+        BlendStateResolver blendStateResolver,
+        StencilState stencilState,
+        boolean hasStencilAttachment
+    ) {
         Objects.requireNonNull(portableState, "portableState must not be null");
         Objects.requireNonNull(polygonModeResolver, "polygonModeResolver must not be null");
         Objects.requireNonNull(blendStateResolver, "blendStateResolver must not be null");
+        Objects.requireNonNull(stencilState, "stencilState must not be null");
         if (colorAttachmentCount < 0) {
             throw new IllegalArgumentException("colorAttachmentCount must be >= 0");
         }
@@ -77,6 +102,9 @@ record VulkanPipelineState(
             colorWriteMask,
             portableState.colorLogic() != LogicOp.NONE,
             toVkLogicOp(portableState.colorLogic()),
+            stencilState.enabled() && hasStencilAttachment,
+            stencilState.front(),
+            stencilState.back(),
             attachments
         );
     }
@@ -108,6 +136,34 @@ record VulkanPipelineState(
         return switch (op) {
             case NONE -> VK10.VK_LOGIC_OP_NO_OP;
             case OR_REVERSE -> VK10.VK_LOGIC_OP_OR_REVERSE;
+        };
+    }
+
+    private static int toVkCompareOp(int op) {
+        return switch (op) {
+            case VulkanicAPI.GL_NEVER -> VK10.VK_COMPARE_OP_NEVER;
+            case VulkanicAPI.GL_LESS -> VK10.VK_COMPARE_OP_LESS;
+            case VulkanicAPI.GL_EQUAL -> VK10.VK_COMPARE_OP_EQUAL;
+            case VulkanicAPI.GL_LEQUAL -> VK10.VK_COMPARE_OP_LESS_OR_EQUAL;
+            case VulkanicAPI.GL_GREATER -> VK10.VK_COMPARE_OP_GREATER;
+            case VulkanicAPI.GL_NOTEQUAL -> VK10.VK_COMPARE_OP_NOT_EQUAL;
+            case VulkanicAPI.GL_GEQUAL -> VK10.VK_COMPARE_OP_GREATER_OR_EQUAL;
+            case VulkanicAPI.GL_ALWAYS -> VK10.VK_COMPARE_OP_ALWAYS;
+            default -> VK10.VK_COMPARE_OP_ALWAYS;
+        };
+    }
+
+    private static int toVkStencilOp(int op) {
+        return switch (op) {
+            case VulkanicAPI.GL_ZERO -> VK10.VK_STENCIL_OP_ZERO;
+            case VulkanicAPI.GL_REPLACE -> VK10.VK_STENCIL_OP_REPLACE;
+            case VulkanicAPI.GL_INCR -> VK10.VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+            case VulkanicAPI.GL_DECR -> VK10.VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+            case VulkanicAPI.GL_INVERT -> VK10.VK_STENCIL_OP_INVERT;
+            case VulkanicAPI.GL_INCR_WRAP -> VK10.VK_STENCIL_OP_INCREMENT_AND_WRAP;
+            case VulkanicAPI.GL_DECR_WRAP -> VK10.VK_STENCIL_OP_DECREMENT_AND_WRAP;
+            case VulkanicAPI.GL_KEEP -> VK10.VK_STENCIL_OP_KEEP;
+            default -> VK10.VK_STENCIL_OP_KEEP;
         };
     }
 
@@ -202,6 +258,71 @@ record VulkanPipelineState(
                 toVkBlendFactor(blend.destAlpha()),
                 VK10.VK_BLEND_OP_ADD
             );
+        }
+    }
+
+    record StencilState(
+        boolean enabled,
+        StencilFaceState front,
+        StencilFaceState back
+    ) {
+        StencilState {
+            Objects.requireNonNull(front, "front must not be null");
+            Objects.requireNonNull(back, "back must not be null");
+        }
+
+        static StencilState disabled() {
+            StencilFaceState defaults = StencilFaceState.fromLegacyGl(
+                VulkanicAPI.GL_KEEP,
+                VulkanicAPI.GL_KEEP,
+                VulkanicAPI.GL_KEEP,
+                VulkanicAPI.GL_ALWAYS,
+                0xFF,
+                0xFF,
+                0
+            );
+            return new StencilState(false, defaults, defaults);
+        }
+
+        String cacheKey(boolean hasStencilAttachment) {
+            return enabled && hasStencilAttachment
+                ? "stencil:on:" + front.cacheKey() + ":" + back.cacheKey()
+                : "stencil:off";
+        }
+    }
+
+    record StencilFaceState(
+        int failOp,
+        int passOp,
+        int depthFailOp,
+        int compareOp,
+        int compareMask,
+        int writeMask,
+        int reference
+    ) {
+        static StencilFaceState fromLegacyGl(
+            int failOp,
+            int depthFailOp,
+            int passOp,
+            int compareOp,
+            int compareMask,
+            int writeMask,
+            int reference
+        ) {
+            return new StencilFaceState(
+                toVkStencilOp(failOp),
+                toVkStencilOp(passOp),
+                toVkStencilOp(depthFailOp),
+                toVkCompareOp(compareOp),
+                compareMask,
+                writeMask,
+                reference
+            );
+        }
+
+        private String cacheKey() {
+            return failOp + "," + passOp + "," + depthFailOp + "," + compareOp + ","
+                + compareMask + "," + writeMask + "," + reference;
         }
     }
 }

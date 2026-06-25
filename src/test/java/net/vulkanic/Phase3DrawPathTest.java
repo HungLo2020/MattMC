@@ -5429,10 +5429,10 @@ public class Phase3DrawPathTest {
             "VulkanBackend should retain a dedicated key for render-target-compatible pipeline variants");
         assertFalse(source.contains("private record FramebufferPipelineKey("),
             "Vulkan pipeline variants should no longer be keyed by a GL-style framebuffer identity");
-        assertFalse(source.contains("int framebuffer,\n        String indexedBlendKey,"),
+        assertFalse(source.contains("int framebuffer,\n        String dynamicStateKey,"),
             "Render-target pipeline variants must not include the virtual framebuffer id in the compatibility key");
-        assertTrue(source.contains("String indexedBlendKey,"),
-            "Render-target pipeline variants must be keyed by per-attachment blend state for Iris MRT blend overrides");
+        assertTrue(source.contains("String dynamicStateKey,"),
+            "Render-target pipeline variants must be keyed by pipeline-baked dynamic state for Iris MRT blend overrides and stencil state");
         assertTrue(source.contains("VulkanRenderPassCompatibilityKey renderPassCompatibilityKey"),
             "Render-target pipeline variants must be keyed by the full Vulkan render-pass compatibility contract");
         assertTrue(source.contains("Objects.requireNonNull(renderPassCompatibilityKey"),
@@ -5441,8 +5441,12 @@ public class Phase3DrawPathTest {
             "Framebuffer-backed pipeline keys should include color formats, depth format, and feedback-loop dependency profile");
         assertTrue(source.contains("RenderTargetPipelineKey.from("),
             "Framebuffer-backed pipeline resolution should derive a render-target compatibility key from resolved attachments");
-        assertTrue(source.contains("indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey.colorAttachmentCount())"),
+        assertTrue(source.contains("dynamicPipelineStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey)"),
+            "Render-target pipeline resolution should include all pipeline-baked compatibility state");
+        assertTrue(source.contains("indexedBlendStateCacheKey(portableState, renderPassCompatibilityKey.colorAttachmentCount())"),
             "Render-target pipeline resolution should include portable blend ownership when deriving blend cache keys");
+        assertTrue(source.contains("currentStencilState().cacheKey(renderPassCompatibilityKey.hasStencilAttachment())"),
+            "Render-target pipeline resolution should include effective stencil state in Vulkan pipeline cache keys");
         assertTrue(source.contains("if (portableState.blendState().isPresent()) {\n                key.append(\"portable\");"),
             "Portable pipeline blend state should not be overridden by stale legacy indexed blend state");
         assertTrue(source.contains("VulkanPipelineState.from(")

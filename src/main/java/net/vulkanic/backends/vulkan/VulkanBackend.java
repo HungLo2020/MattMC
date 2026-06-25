@@ -115,6 +115,7 @@ import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import org.lwjgl.vulkan.VkRect2D;
+import org.lwjgl.vulkan.VkStencilOpState;
 import org.lwjgl.vulkan.VkViewport;
 import org.lwjgl.vulkan.VkWriteDescriptorSet;
 import net.blaze3d.platform.DestFactor;
@@ -314,6 +315,7 @@ public class VulkanBackend {
     private final net.vulkanic.GraphicsCapabilities graphicsCapabilities = createVulkanGraphicsCapabilities();
 
     // Deferred stencil state (pipeline-baked in Vulkan — cached here for pipeline construction)
+    private volatile boolean pendingStencilTestEnabled = false;
     private volatile int    pendingStencilFunc       = 0x0207 /* GL_ALWAYS */;
     private volatile int    pendingStencilRef        = 0;
     private volatile int    pendingStencilMask       = 0xFF;
@@ -321,6 +323,13 @@ public class VulkanBackend {
     private volatile int    pendingStencilDpFail     = 0x1E00 /* GL_KEEP */;
     private volatile int    pendingStencilDpPass     = 0x1E00 /* GL_KEEP */;
     private volatile int    pendingStencilWriteMask  = 0xFF;
+    private volatile int    pendingBackStencilFunc       = 0x0207 /* GL_ALWAYS */;
+    private volatile int    pendingBackStencilRef        = 0;
+    private volatile int    pendingBackStencilMask       = 0xFF;
+    private volatile int    pendingBackStencilFail       = 0x1E00 /* GL_KEEP */;
+    private volatile int    pendingBackStencilDpFail     = 0x1E00 /* GL_KEEP */;
+    private volatile int    pendingBackStencilDpPass     = 0x1E00 /* GL_KEEP */;
+    private volatile int    pendingBackStencilWriteMask  = 0xFF;
 
     public VulkanBackend() {
         this(new GlslangSpirvCompiler());
@@ -387,7 +396,7 @@ public class VulkanBackend {
     private record RenderTargetPipelineKey(
         String stableCacheKey,
         String resourceLayoutKey,
-        String indexedBlendKey,
+        String dynamicStateKey,
         VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
     ) {
         private RenderTargetPipelineKey {
@@ -397,7 +406,7 @@ public class VulkanBackend {
         private static RenderTargetPipelineKey from(
             PipelineDescriptor descriptor,
             ResolvedFramebufferTargets targets,
-            String indexedBlendKey
+            String dynamicStateKey
         ) {
             return from(
                 descriptor,
@@ -406,19 +415,19 @@ public class VulkanBackend {
                     targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
                     targets.hasFeedbackLoopTarget()
                 ),
-                indexedBlendKey
+                dynamicStateKey
             );
         }
 
         private static RenderTargetPipelineKey from(
             PipelineDescriptor descriptor,
             VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
-            String indexedBlendKey
+            String dynamicStateKey
         ) {
             return new RenderTargetPipelineKey(
                 descriptor.getStableCacheKey(),
                 descriptor.getResourceLayoutCacheKey(),
-                indexedBlendKey,
+                dynamicStateKey,
                 renderPassCompatibilityKey
             );
         }
@@ -3658,6 +3667,26 @@ void main() {
         }
 
         private static LegacyTextureFormatInfo resolve(int internalFormat, int format, int type) {
+            if (internalFormat == VulkanicAPI.GL_DEPTH_STENCIL
+                || internalFormat == VulkanicAPI.GL_DEPTH24_STENCIL8
+                || (format == VulkanicAPI.GL_DEPTH_STENCIL && type == VulkanicAPI.GL_UNSIGNED_INT_24_8)) {
+                return new LegacyTextureFormatInfo(
+                    VK10.VK_FORMAT_D24_UNORM_S8_UINT,
+                    4,
+                    VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT
+                );
+            }
+
+            if (internalFormat == VulkanicAPI.GL_DEPTH32F_STENCIL8
+                || (format == VulkanicAPI.GL_DEPTH_STENCIL
+                    && type == VulkanicAPI.GL_FLOAT_32_UNSIGNED_INT_24_8_REV)) {
+                return new LegacyTextureFormatInfo(
+                    VK10.VK_FORMAT_D32_SFLOAT_S8_UINT,
+                    8,
+                    VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT
+                );
+            }
+
             if (internalFormat == VulkanicAPI.GL_DEPTH_COMPONENT
                 || internalFormat == VulkanicAPI.GL_DEPTH_COMPONENT16
                 || internalFormat == VulkanicAPI.GL_DEPTH_COMPONENT24
@@ -3733,6 +3762,12 @@ void main() {
         }
 
         private static LegacyTextureFormatInfo resolveStorage(int internalFormat, int format, int type) {
+            if (internalFormat == VulkanicAPI.GL_DEPTH_STENCIL
+                || internalFormat == VulkanicAPI.GL_DEPTH24_STENCIL8
+                || internalFormat == VulkanicAPI.GL_DEPTH32F_STENCIL8) {
+                return resolve(internalFormat, format, type);
+            }
+
             if ((format == VulkanicAPI.GL_BGRA || internalFormat == VulkanicAPI.GL_BGRA)
                 && type == VulkanicAPI.GL_UNSIGNED_BYTE) {
                 return new LegacyTextureFormatInfo(
@@ -4297,7 +4332,7 @@ void main() {
         RenderTargetPipelineKey key = RenderTargetPipelineKey.from(
             pipelineDescriptor,
             renderPassCompatibilityKey,
-            indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey.colorAttachmentCount())
+            dynamicPipelineStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey)
         );
         PipelineHandle cached = renderTargetPipelineCache.get(key);
         if (cached != null) {
@@ -4346,6 +4381,15 @@ void main() {
             key.append(';');
         }
         return key.toString();
+    }
+
+    private String dynamicPipelineStateCacheKey(
+        PipelineDescriptor.PortableState portableState,
+        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+    ) {
+        return indexedBlendStateCacheKey(portableState, renderPassCompatibilityKey.colorAttachmentCount())
+            + '|'
+            + currentStencilState().cacheKey(renderPassCompatibilityKey.hasStencilAttachment());
     }
 
     private static VulkanRenderPassCompatibilityKey defaultRenderPassCompatibilityKey() {
@@ -6405,11 +6449,14 @@ void main() {
         final int GL_BLEND        = 0x0BE2;
         final int GL_DEPTH_TEST   = 0x0B71;
         final int GL_SCISSOR_TEST = 0x0C11;
+        final int GL_STENCIL_TEST = 0x0B90;
         if (cap == GL_BLEND) {
             this.pendingBlendEnabled = enabled;
             updateIndexedBlendEnabled(0, enabled);
         } else if (cap == GL_DEPTH_TEST) {
             this.pendingDepthTestEnabled = enabled;
+        } else if (cap == GL_STENCIL_TEST) {
+            this.pendingStencilTestEnabled = enabled;
         } else if (cap == GL_SCISSOR_TEST) {
             ensureNativeReady("setCapabilityEnabled(scissor)");
             NativeSpine spine = requireNativeSpineForCommandOp("setCapabilityEnabled(scissor)");
@@ -7849,6 +7896,7 @@ void main() {
         return switch (cap) {
             case VulkanicAPI.GL_BLEND -> pendingBlendEnabled;
             case VulkanicAPI.GL_DEPTH_TEST -> pendingDepthTestEnabled;
+            case VulkanicAPI.GL_STENCIL_TEST -> pendingStencilTestEnabled;
             case VulkanicAPI.GL_CULL_FACE -> pendingCullFaceMode != 0;
             case VulkanicAPI.GL_POLYGON_OFFSET_FILL -> pendingPolygonOffsetFactor != 0.0f || pendingPolygonOffsetUnits != 0.0f;
             default -> false;
@@ -8671,17 +8719,23 @@ void main() {
         pendingStencilFunc = func;
         pendingStencilRef  = ref;
         pendingStencilMask = mask;
+        pendingBackStencilFunc = func;
+        pendingBackStencilRef  = ref;
+        pendingBackStencilMask = mask;
     }
 
-    /**
-     * Sets the stencil test function per face. For simplicity the Vulkan backend
-     * currently uses a shared state for both faces (front == back).
-     */
     public void setStencilFuncSeparate(CommandContext ctx, int face, int func, int ref, int mask) {
         requireVulkanCommandBufferHandle("setStencilFuncSeparate", ctx);
-        pendingStencilFunc = func;
-        pendingStencilRef  = ref;
-        pendingStencilMask = mask;
+        if (appliesToFrontFace(face)) {
+            pendingStencilFunc = func;
+            pendingStencilRef  = ref;
+            pendingStencilMask = mask;
+        }
+        if (appliesToBackFace(face)) {
+            pendingBackStencilFunc = func;
+            pendingBackStencilRef  = ref;
+            pendingBackStencilMask = mask;
+        }
     }
 
     /**
@@ -8693,24 +8747,72 @@ void main() {
         pendingStencilFail   = sfail;
         pendingStencilDpFail = dpfail;
         pendingStencilDpPass = dppass;
+        pendingBackStencilFail   = sfail;
+        pendingBackStencilDpFail = dpfail;
+        pendingBackStencilDpPass = dppass;
     }
 
     public void setStencilOpSeparate(CommandContext ctx, int face, int sfail, int dpfail, int dppass) {
         requireVulkanCommandBufferHandle("setStencilOpSeparate", ctx);
-        pendingStencilFail   = sfail;
-        pendingStencilDpFail = dpfail;
-        pendingStencilDpPass = dppass;
+        if (appliesToFrontFace(face)) {
+            pendingStencilFail   = sfail;
+            pendingStencilDpFail = dpfail;
+            pendingStencilDpPass = dppass;
+        }
+        if (appliesToBackFace(face)) {
+            pendingBackStencilFail   = sfail;
+            pendingBackStencilDpFail = dpfail;
+            pendingBackStencilDpPass = dppass;
+        }
     }
 
     /** Sets the stencil write mask. */
     public void setStencilWriteMask(CommandContext ctx, int mask) {
         requireVulkanCommandBufferHandle("setStencilWriteMask", ctx);
         pendingStencilWriteMask = mask;
+        pendingBackStencilWriteMask = mask;
     }
 
     public void setStencilWriteMaskSeparate(CommandContext ctx, int face, int mask) {
         requireVulkanCommandBufferHandle("setStencilWriteMaskSeparate", ctx);
-        pendingStencilWriteMask = mask;
+        if (appliesToFrontFace(face)) {
+            pendingStencilWriteMask = mask;
+        }
+        if (appliesToBackFace(face)) {
+            pendingBackStencilWriteMask = mask;
+        }
+    }
+
+    private static boolean appliesToFrontFace(int face) {
+        return face == VulkanicAPI.GL_FRONT || face == VulkanicAPI.GL_FRONT_AND_BACK;
+    }
+
+    private static boolean appliesToBackFace(int face) {
+        return face == VulkanicAPI.GL_BACK || face == VulkanicAPI.GL_FRONT_AND_BACK;
+    }
+
+    private VulkanPipelineState.StencilState currentStencilState() {
+        return new VulkanPipelineState.StencilState(
+            pendingStencilTestEnabled,
+            VulkanPipelineState.StencilFaceState.fromLegacyGl(
+                pendingStencilFail,
+                pendingStencilDpFail,
+                pendingStencilDpPass,
+                pendingStencilFunc,
+                pendingStencilMask,
+                pendingStencilWriteMask,
+                pendingStencilRef
+            ),
+            VulkanPipelineState.StencilFaceState.fromLegacyGl(
+                pendingBackStencilFail,
+                pendingBackStencilDpFail,
+                pendingBackStencilDpPass,
+                pendingBackStencilFunc,
+                pendingBackStencilMask,
+                pendingBackStencilWriteMask,
+                pendingBackStencilRef
+            )
+        );
     }
 
     // =====================================================================
@@ -13587,6 +13689,8 @@ void main() {
                 case RED8           -> VK10.VK_FORMAT_R8_UNORM;
                 case RED8I          -> VK10.VK_FORMAT_R8_SINT;
                 case DEPTH32        -> VK10.VK_FORMAT_D32_SFLOAT;
+                case DEPTH24_STENCIL8 -> VK10.VK_FORMAT_D24_UNORM_S8_UINT;
+                case DEPTH32F_STENCIL8 -> VK10.VK_FORMAT_D32_SFLOAT_S8_UINT;
             };
         }
 
@@ -13615,6 +13719,9 @@ void main() {
         }
 
         private static int toVkImageAspectMask(VulkanicTextureFormat format) {
+            if (format.hasStencilAspect()) {
+                return VK10.VK_IMAGE_ASPECT_DEPTH_BIT | VK10.VK_IMAGE_ASPECT_STENCIL_BIT;
+            }
             return format.hasDepthAspect()
                 ? VK10.VK_IMAGE_ASPECT_DEPTH_BIT
                 : VK10.VK_IMAGE_ASPECT_COLOR_BIT;
@@ -15324,6 +15431,8 @@ void main() {
                 case VK10.VK_FORMAT_R8_UNORM -> VulkanicTextureFormat.RED8;
                 case VK10.VK_FORMAT_R8_SINT -> VulkanicTextureFormat.RED8I;
                 case VK10.VK_FORMAT_D32_SFLOAT -> VulkanicTextureFormat.DEPTH32;
+                case VK10.VK_FORMAT_D24_UNORM_S8_UINT -> VulkanicTextureFormat.DEPTH24_STENCIL8;
+                case VK10.VK_FORMAT_D32_SFLOAT_S8_UINT -> VulkanicTextureFormat.DEPTH32F_STENCIL8;
                 default -> throw new IllegalArgumentException(
                     "Unsupported VkFormat for temporary Vulkanic texture wrapper: 0x" + Integer.toHexString(vkFormat)
                 );
@@ -16036,13 +16145,18 @@ void main() {
                         depthFeedback,
                         depthFinalLayout
                     );
+                    boolean depthHasStencil = depthTexture.getVulkanicFormat().hasStencilAspect();
                     attachments.get(1)
                         .format(toVkFormat(depthTexture.getVulkanicFormat()))
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
                         .loadOp(toVkLoadOp(depthAttachment.loadOp()))
                         .storeOp(toVkStoreOp(depthAttachment.storeOp()))
-                        .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-                        .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                        .stencilLoadOp(depthHasStencil
+                            ? toVkLoadOp(depthAttachment.loadOp())
+                            : VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                        .stencilStoreOp(depthHasStencil
+                            ? toVkStoreOp(depthAttachment.storeOp())
+                            : VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
                         .initialLayout(depthInitialLayout)
                         .finalLayout(depthFinalLayout);
 
@@ -16333,13 +16447,18 @@ void main() {
 	                        depthFeedback2,
 	                        depthFinalLayout2
 	                    );
+                    boolean depthHasStencil = hasStencilAspect(depthTexture.vkFormat);
                     attachments.get(depthAttachmentIndex)
                         .format(depthTexture.vkFormat)
                         .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
                         .loadOp(toVkLoadOp(targets.depthLoadOp()))
                         .storeOp(toVkStoreOp(targets.depthStoreOp()))
-                        .stencilLoadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-                        .stencilStoreOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                        .stencilLoadOp(depthHasStencil
+                            ? toVkLoadOp(targets.depthLoadOp())
+                            : VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                        .stencilStoreOp(depthHasStencil
+                            ? toVkStoreOp(targets.depthStoreOp())
+                            : VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
                         .initialLayout(depthInitialLayout2)
                         .finalLayout(depthFinalLayout2);
                     depthReference = VkAttachmentReference.calloc(stack)
@@ -17241,7 +17360,9 @@ void main() {
                     portableState,
                     colorFormats.size(),
                     mode -> toVkPolygonMode(mode, portableState.location().toString()),
-                    backend::blendStateForAttachment
+                    backend::blendStateForAttachment,
+                    backend.currentStencilState(),
+                    renderPassCompatibilityKey.hasStencilAttachment()
                 );
 
                 // --- 7. Rasterization ---
@@ -17274,7 +17395,9 @@ void main() {
                         .depthWriteEnable(pipelineState.depthWriteEnabled())
                         .depthCompareOp(pipelineState.depthCompareOp())
                         .depthBoundsTestEnable(false)
-                        .stencilTestEnable(false);
+                        .stencilTestEnable(pipelineState.stencilTestEnabled());
+                applyStencilFaceState(depthStencil.front(), pipelineState.frontStencil());
+                applyStencilFaceState(depthStencil.back(), pipelineState.backStencil());
 
                 // --- 10. Color blend ---
                 VkPipelineColorBlendAttachmentState.Buffer colorBlendAttachment = colorFormats.isEmpty()
@@ -17406,6 +17529,25 @@ void main() {
                 pipelineHandle);
             lastBoundGraphicsPipelineByCommandBuffer.put(commandBufferHandle, pipelineHandle);
             lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
+        }
+
+        private static void applyStencilFaceState(
+            VkStencilOpState target,
+            VulkanPipelineState.StencilFaceState source
+        ) {
+            target.failOp(source.failOp())
+                .passOp(source.passOp())
+                .depthFailOp(source.depthFailOp())
+                .compareOp(source.compareOp())
+                .compareMask(source.compareMask())
+                .writeMask(source.writeMask())
+                .reference(source.reference());
+        }
+
+        private static boolean hasStencilAspect(int vkFormat) {
+            return vkFormat == VK10.VK_FORMAT_D16_UNORM_S8_UINT
+                || vkFormat == VK10.VK_FORMAT_D24_UNORM_S8_UINT
+                || vkFormat == VK10.VK_FORMAT_D32_SFLOAT_S8_UINT;
         }
 
         private static VkSubpassDependency.Buffer allocateCompatibleSubpassDependencies(

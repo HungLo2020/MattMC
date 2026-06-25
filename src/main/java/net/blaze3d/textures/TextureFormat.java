@@ -9,7 +9,9 @@ public enum TextureFormat {
 	BGRA8(4),
 	RED8(1),
 	RED8I(1),
-	DEPTH32(4);
+	DEPTH32(4),
+	DEPTH24_STENCIL8(4),
+	DEPTH32F_STENCIL8(8);
 
 	private final int pixelSize;
 
@@ -26,6 +28,10 @@ public enum TextureFormat {
 	}
 
 	public boolean hasDepthAspect() {
-		return this == DEPTH32;
+		return this == DEPTH32 || this == DEPTH24_STENCIL8 || this == DEPTH32F_STENCIL8;
+	}
+
+	public boolean hasStencilAspect() {
+		return this == DEPTH24_STENCIL8 || this == DEPTH32F_STENCIL8;
 	}
 }

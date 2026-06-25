@@ -11,6 +11,7 @@ import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.VertexFormat;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.PipelineDescriptor;
+import net.vulkanic.VulkanicAPI;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.vulkan.VK10;
 
@@ -94,6 +95,54 @@ public class VulkanPipelineStateTranslationTest {
     }
 
     @Test
+    public void testStencilStateDisablesWhenRenderPassHasNoStencilAttachment() {
+        PipelineDescriptor.PortableState portableState = state(builder().build());
+        VulkanPipelineState.StencilState stencilState = stencilState(true);
+
+        VulkanPipelineState state = VulkanPipelineState.from(
+            portableState,
+            1,
+            mode -> VK10.VK_POLYGON_MODE_FILL,
+            (ignoredState, colorIndex) -> Optional.empty(),
+            stencilState,
+            false
+        );
+
+        assertFalse(state.stencilTestEnabled());
+    }
+
+    @Test
+    public void testStencilStateTranslatesFrontAndBackWhenAttachmentSupportsStencil() {
+        PipelineDescriptor.PortableState portableState = state(builder().build());
+        VulkanPipelineState.StencilState stencilState = stencilState(true);
+
+        VulkanPipelineState state = VulkanPipelineState.from(
+            portableState,
+            1,
+            mode -> VK10.VK_POLYGON_MODE_FILL,
+            (ignoredState, colorIndex) -> Optional.empty(),
+            stencilState,
+            true
+        );
+
+        assertTrue(state.stencilTestEnabled());
+        assertEquals(VK10.VK_COMPARE_OP_LESS, state.frontStencil().compareOp());
+        assertEquals(VK10.VK_STENCIL_OP_REPLACE, state.frontStencil().failOp());
+        assertEquals(VK10.VK_STENCIL_OP_INCREMENT_AND_WRAP, state.frontStencil().passOp());
+        assertEquals(VK10.VK_STENCIL_OP_DECREMENT_AND_CLAMP, state.frontStencil().depthFailOp());
+        assertEquals(0x33, state.frontStencil().compareMask());
+        assertEquals(0x55, state.frontStencil().writeMask());
+        assertEquals(7, state.frontStencil().reference());
+        assertEquals(VK10.VK_COMPARE_OP_GREATER_OR_EQUAL, state.backStencil().compareOp());
+        assertEquals(VK10.VK_STENCIL_OP_KEEP, state.backStencil().failOp());
+        assertEquals(VK10.VK_STENCIL_OP_INVERT, state.backStencil().passOp());
+        assertEquals(VK10.VK_STENCIL_OP_ZERO, state.backStencil().depthFailOp());
+        assertEquals(0x44, state.backStencil().compareMask());
+        assertEquals(0xAA, state.backStencil().writeMask());
+        assertEquals(3, state.backStencil().reference());
+    }
+
+    @Test
     public void testLogicPolygonAndDepthBiasTranslateFromPortableState() {
         VulkanPipelineState state = translate(state(builder()
             .withPolygonMode(PolygonMode.WIREFRAME)
@@ -143,6 +192,30 @@ public class VulkanPipelineStateTranslationTest {
 
     private static PipelineDescriptor.PortableState state(RenderPipeline pipeline) {
         return PipelineDescriptor.fromRenderPipeline(pipeline).getPortableState();
+    }
+
+    private static VulkanPipelineState.StencilState stencilState(boolean enabled) {
+        return new VulkanPipelineState.StencilState(
+            enabled,
+            VulkanPipelineState.StencilFaceState.fromLegacyGl(
+                VulkanicAPI.GL_REPLACE,
+                VulkanicAPI.GL_DECR,
+                VulkanicAPI.GL_INCR_WRAP,
+                VulkanicAPI.GL_LESS,
+                0x33,
+                0x55,
+                7
+            ),
+            VulkanPipelineState.StencilFaceState.fromLegacyGl(
+                VulkanicAPI.GL_KEEP,
+                VulkanicAPI.GL_ZERO,
+                VulkanicAPI.GL_INVERT,
+                VulkanicAPI.GL_GEQUAL,
+                0x44,
+                0xAA,
+                3
+            )
+        );
     }
 
     private static RenderPipeline.Builder builder() {
