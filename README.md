@@ -4,7 +4,8 @@
 
 This repository contains a complete, decompiled source code port of Minecraft Java Edition 1.21.10 (both client and server), with a focus on performance optimization and modular architecture.
 
-Wiki for this project is available at [Wiki](docs/index.md)
+Wiki for this project is available at: https://hunglo2020.github.io/MattMC/
+The source code for the wiki is in this repo: [Wiki](docs/index.md)
 
 Source Code: https://github.com/HungLo2020/MattMC
 
