@@ -13,6 +13,9 @@ EXCLUDES=(
 	"-x" ".vscode/*"
 	"-x" "out/*"
 	"-x" ".DS_Store"
+	"-x" "run/*"
+	"-x" "logs/*"
+	"-x" "site/*"
 	# "-x" ".git/*"     # uncomment to exclude git history
 )
 
