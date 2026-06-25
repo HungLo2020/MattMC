@@ -35,11 +35,15 @@ public class Phase3DrawPathTest {
     private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
 
+    private static String readSource(Path path) throws IOException {
+        return Files.readString(path).replace("\r\n", "\n").replace('\r', '\n');
+    }
+
     private static String readSourceIfExists(Path path) throws IOException {
         if (!Files.exists(path)) {
             return "";
         }
-        return Files.readString(path);
+        return readSource(path);
     }
 
     private static boolean containsAny(String source, String... needles) {
@@ -64,7 +68,7 @@ public class Phase3DrawPathTest {
                     continue;
                 }
 
-                String source = Files.readString(file);
+                String source = readSource(file);
                 if (!source.contains("getImmediateContext(")) {
                     continue;
                 }
@@ -84,7 +88,7 @@ public class Phase3DrawPathTest {
         assertTrue(offenders.isEmpty(),
             "Only VulkanicAPI.getImmediateContext() compatibility seam may remain; offenders: " + offenders);
 
-        String legacySource = Files.readString(legacyFile);
+        String legacySource = readSource(legacyFile);
         assertTrue(legacySource.contains("@Deprecated"),
             "VulkanicAPI.getImmediateContext() must remain explicitly deprecated");
     }
@@ -97,9 +101,9 @@ public class Phase3DrawPathTest {
         Path glTextureRelative = Paths.get("net/blaze3d/opengl/GlTexture.java");
         Path gpuTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java");
 
-        String interfaceSource = Files.readString(interfaceFile);
-        String glTextureSource = Files.readString(glTextureFile);
-        String gpuTextureSource = Files.readString(gpuTextureFile);
+        String interfaceSource = readSource(interfaceFile);
+        String glTextureSource = readSource(glTextureFile);
+        String gpuTextureSource = readSource(gpuTextureFile);
 
         assertTrue(interfaceSource.contains("@Deprecated"),
             "GpuTextureInterface.iris$getGlId should remain explicitly deprecated as a compatibility seam");
@@ -120,7 +124,7 @@ public class Phase3DrawPathTest {
                     continue;
                 }
 
-                String source = Files.readString(file);
+                String source = readSource(file);
                 Path relative = SRC_MAIN_JAVA.relativize(file);
                 if (source.contains("iris$getGlId(")
                     && !relative.equals(interfaceRelative)
@@ -147,8 +151,8 @@ public class Phase3DrawPathTest {
         Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
         Path glTextureRelative = Paths.get("net/blaze3d/opengl/GlTexture.java");
 
-        String gpuTextureSource = Files.readString(gpuTextureFile);
-        String glTextureSource = Files.readString(glTextureFile);
+        String gpuTextureSource = readSource(gpuTextureFile);
+        String glTextureSource = readSource(glTextureFile);
 
         assertTrue(gpuTextureSource.contains("@Deprecated"),
             "GpuTexture.glId should remain explicitly deprecated as a compatibility seam");
@@ -167,7 +171,7 @@ public class Phase3DrawPathTest {
                     continue;
                 }
 
-                String source = Files.readString(file);
+                String source = readSource(file);
                 Path relative = SRC_MAIN_JAVA.relativize(file);
 
                 if (source.contains(" glId(")
@@ -197,9 +201,9 @@ public class Phase3DrawPathTest {
         Path openGlTextureViewFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLTextureView.java");
         Path openGlTextureViewRelative = Paths.get("net/vulkanic/backends/opengl/OpenGLTextureView.java");
 
-        String glTextureSource = Files.readString(glTextureFile);
-        String openGlBackendSource = Files.readString(openGlBackendFile);
-        String openGlTextureViewSource = Files.readString(openGlTextureViewFile);
+        String glTextureSource = readSource(glTextureFile);
+        String openGlBackendSource = readSource(openGlBackendFile);
+        String openGlTextureViewSource = readSource(openGlTextureViewFile);
 
         assertTrue(glTextureSource.contains("public int getGlHandle()"),
             "GlTexture should expose getGlHandle for backend seam extraction");
@@ -222,7 +226,7 @@ public class Phase3DrawPathTest {
                     continue;
                 }
 
-                String source = Files.readString(file);
+                String source = readSource(file);
                 if (source.contains("GlTexture") && source.contains(".getGlHandle(")) {
                     offenders.add(relative.toString());
                 }
@@ -235,7 +239,7 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testSingleQuadParticlesShrinkAtlasUvsBeforeSampling() throws IOException {
-        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/particle/SingleQuadParticle.java"));
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/particle/SingleQuadParticle.java"));
 
         assertTrue(source.contains("return this.shrinkU(this.sprite.getU0(), this.sprite.getU1());"),
             "SingleQuadParticle should shrink the leading U edge inward before sampling atlas sprites");
@@ -255,7 +259,7 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testQuadParticleRenderStateFlushesSamplerTextureModesBeforeBinding() throws IOException {
-        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java"));
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java"));
 
         assertTrue(source.contains("particleTexture.setFilter(false, false);"),
             "QuadParticleRenderState should restore the particle atlas to nearest non-mip sampling before binding Sampler0");
@@ -271,12 +275,12 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testMainTargetUsesBgra8AndBackendMappingsPreserveIt() throws IOException {
-        String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
-        String textureFormatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/TextureFormat.java"));
-        String gpuTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
-        String vulkanFormatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicTextureFormat.java"));
-        String openGlBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java"));
-        String vulkanBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String mainTargetSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
+        String textureFormatSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/TextureFormat.java"));
+        String gpuTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
+        String vulkanFormatSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicTextureFormat.java"));
+        String openGlBackendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java"));
+        String vulkanBackendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
         assertTrue(mainTargetSource.contains("TextureFormat.BGRA8"),
             "MainTarget should allocate its color attachment as BGRA8 so Vulkan can present without shader compose into a BGRA swapchain");
@@ -304,8 +308,8 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testVulkanDescriptorSamplerKeysUseLiveGpuTextureState() throws IOException {
-        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
-        String textureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
+        String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String textureSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java"));
 
         assertTrue(textureSource.contains("public FilterMode getMinFilter()"),
             "GpuTexture should expose its live min filter so Vulkan descriptor samplers can follow current texture state");
@@ -325,10 +329,10 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testVulkanDescriptorSamplersUseCapturedIrisSamplerObjectState() throws IOException {
-        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
-        String resourceResolverSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicPipelineResourceResolver.java"));
-        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
-        String irisRenderSystemSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java"));
+        String commandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String resourceResolverSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicPipelineResourceResolver.java"));
+        String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String irisRenderSystemSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java"));
 
         assertTrue(irisRenderSystemSource.contains("public static int getBoundSamplerOnUnit(int unit)"),
             "Iris should expose the cached sampler object per texture unit so Vulkan descriptor binding can snapshot it");
@@ -348,8 +352,8 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testVulkanLegacyRenderTargetStoragePreservesIrisSizedInternalFormats() throws IOException {
-        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
-        String formatSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicTextureFormat.java"));
+        String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String formatSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicTextureFormat.java"));
 
         assertTrue(backendSource.contains("pixels == null")
                 && backendSource.contains("LegacyTextureFormatInfo.resolveStorage(internalFormat, format, type)"),
@@ -375,7 +379,7 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testVulkanLegacyStoragePreservesBgraExternalFormatForMainTarget() throws IOException {
-        String backendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+        String backendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
         int resolveStorageIndex = backendSource.indexOf("private static LegacyTextureFormatInfo resolveStorage");
         int sizedSwitchIndex = backendSource.indexOf("LegacyTextureFormatInfo sizedFormat = switch (internalFormat)", resolveStorageIndex);
@@ -391,7 +395,7 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testMainTargetDepthTextureUsesDepthSamplingStateForIrisDepthtex0() throws IOException {
-        String mainTargetSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
+        String mainTargetSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/pipeline/MainTarget.java"));
 
         assertTrue(mainTargetSource.contains("this.depthTexture.setTextureFilter(FilterMode.NEAREST, false);"),
             "MainTarget depth should be sampled with nearest filtering so Iris depthtex0 neighbor reads do not blur block edges");
@@ -404,8 +408,8 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testIrisTextureStateCopyPreservesWrapModeForDerivedShaderTextures() throws IOException {
-        String glTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java"));
-        String vulkanTextureSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanGpuTexture.java"));
+        String glTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java"));
+        String vulkanTextureSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanGpuTexture.java"));
 
         assertTrue(glTextureSource.contains("texture.setAddressMode(this.addressModeU, this.addressModeV);"),
             "OpenGL Iris texture state copies should preserve wrap mode alongside filter and mipmap state");
@@ -415,10 +419,10 @@ public class Phase3DrawPathTest {
 
     @Test
 	    public void testIrisCustomPassesUseFramebufferOwnedRenderPassAndRecoveredPipelineSeams() throws IOException {
-	        String compositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
-	        String shadowCompositeRendererSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
-	        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
-	        String nativeCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+	        String compositeRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+	        String shadowCompositeRendererSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+	        String commandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+	        String nativeCommandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
 
 	        assertTrue(compositeRendererSource.contains("compositePass.ensurePipelineState(renderTargetDescriptor);"),
 	            "CompositeRenderer should precompute a render-target-compatible pipeline for custom passes before opening the render pass");
@@ -481,12 +485,12 @@ public class Phase3DrawPathTest {
         assertTrue(Files.exists(vulkanBackendFile),
             "Vulkan backend bootstrap class should exist for incremental backend bring-up");
 
-        String vulkanBackendSource = Files.readString(vulkanBackendFile);
+        String vulkanBackendSource = readSource(vulkanBackendFile);
         assertFalse(vulkanBackendSource.contains("extends OpenGLBackend"),
             "Vulkan backend must not inherit OpenGL backend behavior; cross-backend inheritance must remain forbidden");
 
         Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String apiSource = Files.readString(apiFile);
+        String apiSource = readSource(apiFile);
         assertTrue(apiSource.contains("rawVulkanBackend = new VulkanBackend();"),
             "VulkanicAPI should construct VulkanBackend for GraphicsBackendType.VULKAN routing");
         assertTrue(apiSource.contains("backend = createFailFastVulkanProxy(rawVulkanBackend);"),
@@ -502,7 +506,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBackendReadinessSeamExistsForPrepOnlyVulkanPath() throws IOException {
         Path backendInterfaceFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
-        String backendInterfaceSource = Files.readString(backendInterfaceFile);
+        String backendInterfaceSource = readSource(backendInterfaceFile);
         assertTrue(backendInterfaceSource.contains("GraphicsBackendType getBackendType();"),
             "GraphicsBackend should expose active backend identity for explicit routing");
         assertTrue(backendInterfaceSource.contains("boolean isNativeVulkanReady();"),
@@ -531,7 +535,7 @@ public class Phase3DrawPathTest {
             "GraphicsBackend should expose managed GPU texture view seam (mip-range)");
 
         Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String apiSource = Files.readString(apiFile);
+        String apiSource = readSource(apiFile);
         assertTrue(apiSource.contains("public static GraphicsBackendType getActiveBackendType()"),
             "VulkanicAPI should expose active backend identity helper");
         assertTrue(apiSource.contains("public static boolean isVulkanBackendSelected()"),
@@ -562,7 +566,7 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose managed GPU texture view creation helper (mip-range variant)");
 
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
-        String vulkanBackendSource = Files.readString(vulkanBackendFile);
+        String vulkanBackendSource = readSource(vulkanBackendFile);
         assertTrue(vulkanBackendSource.contains("return GraphicsBackendType.VULKAN;"),
             "Bootstrap Vulkan backend should report Vulkan backend identity");
         assertTrue(vulkanBackendSource.contains("public boolean isNativeVulkanReady()"),
@@ -598,12 +602,12 @@ public class Phase3DrawPathTest {
     @Test
     public void testTextureHandleResolutionOwnedByBackendSeam() throws IOException {
         Path backendInterfaceFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
-        String backendInterfaceSource = Files.readString(backendInterfaceFile);
+        String backendInterfaceSource = readSource(backendInterfaceFile);
         assertTrue(backendInterfaceSource.contains("default int resolveTextureHandle(CommandContext ctx, VulkanicTexture texture)"),
             "GraphicsBackend should expose resolveTextureHandle seam for backend-owned texture-handle resolution");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
         assertFalse(vulkanicApiSource.contains("return texture.glId();"),
             "VulkanicAPI.getTextureHandle should not directly call texture.glId after backend-seam migration");
         assertTrue(vulkanicApiSource.contains("directVulkanBackend.resolveTextureHandle(ctx, target)")
@@ -611,7 +615,7 @@ public class Phase3DrawPathTest {
             "VulkanicAPI.getTextureHandle should delegate texture-handle extraction to the active backend, with direct Vulkan dispatch for the hot path");
 
         Path openGlBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
-        String openGlBackendSource = Files.readString(openGlBackendFile);
+        String openGlBackendSource = readSource(openGlBackendFile);
         assertTrue(openGlBackendSource.contains("public int resolveTextureHandle(CommandContext ctx, net.vulkanic.VulkanicTexture texture)"),
             "OpenGLBackend should implement resolveTextureHandle for OpenGL-backed texture ids");
         assertTrue(openGlBackendSource.contains("texture instanceof net.vulkanic.backends.opengl.OpenGLTexture openGLTexture"),
@@ -620,12 +624,12 @@ public class Phase3DrawPathTest {
             "OpenGLBackend resolveTextureHandle should support Blaze3D GlTexture instances");
 
         Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
-        String glTextureSource = Files.readString(glTextureFile);
+        String glTextureSource = readSource(glTextureFile);
         assertTrue(glTextureSource.contains("public int getGlHandle()"),
             "GlTexture should expose getGlHandle for backend-local OpenGL handle extraction");
 
         Path openGlTextureViewFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLTextureView.java");
-        String openGlTextureViewSource = Files.readString(openGlTextureViewFile);
+        String openGlTextureViewSource = readSource(openGlTextureViewFile);
         assertFalse(openGlTextureViewSource.contains("return VulkanicAPI.getTextureHandle(t);"),
             "OpenGLTextureView should not route GlTexture handle extraction back through VulkanicAPI");
         assertTrue(openGlTextureViewSource.contains("return t.getGlHandle();"),
@@ -640,7 +644,7 @@ public class Phase3DrawPathTest {
             "net/blaze3d/opengl/GlCommandEncoder.java");
         assertTrue(Files.exists(file), "GlCommandEncoder.java must exist");
 
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         // The three GlStateManager draw/bind calls that were in drawFromBuffers must be gone.
         // This assertion intentionally checks only draw-path calls, not other upload/readback paths.
@@ -662,7 +666,7 @@ public class Phase3DrawPathTest {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
         assertTrue(Files.exists(stateManagerFile), "GlStateManager.java path should remain for migration tracking");
 
-        String source = Files.readString(stateManagerFile);
+        String source = readSource(stateManagerFile);
         assertFalse(source.contains("class GlStateManager"),
             "GlStateManager type should be fully deleted from source");
         assertFalse(source.contains("public class GlStateManager"),
@@ -673,7 +677,7 @@ public class Phase3DrawPathTest {
     public void testDrawFromBuffersCallsVulkanicAPIDrawElements() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertTrue(source.contains("VulkanicAPI.drawElements(ctx,"),
             "drawFromBuffers must call VulkanicAPI.drawElements(ctx, ...) for non-instanced indexed draws");
@@ -687,7 +691,7 @@ public class Phase3DrawPathTest {
     public void testDrawFromBuffersPreservesIrisTessellationOverride() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         // The Iris tessellation override (TRIANGLES Î“Ã¥Ã† PATCHES) must still be present
         // in the non-instanced indexed draw path, since we replaced GlStateManager._drawElements
@@ -704,7 +708,7 @@ public class Phase3DrawPathTest {
     public void testDrawFromBuffersSharesContextAcrossCalls() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         // Verify that drawFromBuffers obtains the context once and reuses it (ctx variable),
         // rather than repeatedly resolving the backend-global context.
@@ -718,10 +722,10 @@ public class Phase3DrawPathTest {
             "com/seibel/distanthorizons/core/render/renderer/shaders/SSAOApplyShader.java");
         assertTrue(Files.exists(file), "SSAOApplyShader.java must exist");
 
-        String source = Files.readString(file);
+        String source = readSource(file);
         Path abstractShaderFile = SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/shaders/AbstractShaderRenderer.java");
-        String abstractShaderSource = Files.readString(abstractShaderFile);
+        String abstractShaderSource = readSource(abstractShaderFile);
 
         assertFalse(source.contains("VulkanicAPI.getCommandContext()"),
             "SSAOApplyShader should inherit the shared CommandContext from AbstractShaderRenderer");
@@ -747,7 +751,7 @@ public class Phase3DrawPathTest {
     public void testDrawFromBuffersUsesBackendAgnosticIndexTypeRouting() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("GlConst.toGl(indexType)"),
             "drawFromBuffers should not convert index types through OpenGL-specific GlConst.toGl(indexType); " +
@@ -760,7 +764,7 @@ public class Phase3DrawPathTest {
     public void testGlCommandEncoderUsesAgnosticTextureAndUniformBindings() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067"),
             "GlCommandEncoder should not bind cubemaps via hardcoded GL target 34067; use bindCubemapTexture");
@@ -798,7 +802,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlDeviceUsesAgnosticCubemapBindHelper() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("VulkanicAPI.bindTexture(VulkanicAPI.getImmediateContext(), 34067"),
             "GlDevice should not bind cubemaps via hardcoded GL target 34067");
@@ -809,7 +813,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testTimerQueryUsesAgnosticQueryHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/TimerQuery.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("VulkanicAPI.initiateQuery(VulkanicAPI.getImmediateContext(), 35007"),
             "TimerQuery should not begin queries with hardcoded GL_TIME_ELAPSED target literal 35007");
@@ -833,7 +837,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testDirectStateAccessUsesAgnosticFramebufferAndCopyHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("namedFramebufferTextureDSA(net.vulkanic.VulkanicAPI.getImmediateContext(), i, 36064"),
             "DirectStateAccess should not attach color with hardcoded GL_COLOR_ATTACHMENT0 literal 36064");
@@ -865,7 +869,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testIrisRenderSystemUsesFramebufferIntentHelpers() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _glBindFramebuffer("),
             "GlStateManager should no longer expose _glBindFramebuffer wrapper");
@@ -873,7 +877,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose getFrameBuffer wrapper");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
 
         assertFalse(irisRenderSystemSource.contains("public static void bindFramebuffer("),
             "IrisRenderSystem framebuffer bind wrapper should be removed after VulkanicAPI helper migration");
@@ -891,7 +895,7 @@ public class Phase3DrawPathTest {
             "IrisRenderSystem fallback blit path should use VulkanicAPI.blitNamedFramebuffer");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
 
         assertTrue(vulkanicApiSource.contains("private static int readFramebufferBinding"),
             "VulkanicAPI should own cached read framebuffer binding state");
@@ -908,14 +912,14 @@ public class Phase3DrawPathTest {
     @Test
     public void testRenderTargetBindingOwnedByBackendSeam() throws IOException {
         Path backendInterfaceFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
-        String backendInterfaceSource = Files.readString(backendInterfaceFile);
+        String backendInterfaceSource = readSource(backendInterfaceFile);
         assertTrue(backendInterfaceSource.contains("default void bindRenderTarget(CommandContext ctx, VulkanicTexture colorTexture, VulkanicTexture depthTexture)"),
             "GraphicsBackend should expose backend-owned render-target binding seam");
         assertTrue(backendInterfaceSource.contains("bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, resolveFramebufferForTextures(ctx, colorTexture, depthTexture));"),
             "GraphicsBackend default render-target seam should bridge through backend-owned framebuffer resolution");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
         assertTrue(vulkanicApiSource.contains("public static void bindRenderTarget(CommandContext ctx, @Nullable GpuTexture colorTexture, @Nullable GpuTexture depthTexture)"),
             "VulkanicAPI should expose render-target binding helper for color/depth texture pairs");
         assertTrue(vulkanicApiSource.contains("getBackend().bindRenderTarget(ctx, colorTarget, depthTarget);"),
@@ -924,14 +928,14 @@ public class Phase3DrawPathTest {
             "VulkanicAPI render-target binding helper should fall back to default framebuffer when no color target exists");
 
         Path openGlBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
-        String openGlBackendSource = Files.readString(openGlBackendFile);
+        String openGlBackendSource = readSource(openGlBackendFile);
         assertTrue(openGlBackendSource.contains("public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture)"),
             "OpenGLBackend should implement render-target binding seam");
         assertTrue(openGlBackendSource.contains("int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);"),
             "OpenGLBackend render-target binding should resolve framebuffer internally");
 
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
-        String vulkanBackendSource = Files.readString(vulkanBackendFile);
+        String vulkanBackendSource = readSource(vulkanBackendFile);
         assertTrue(vulkanBackendSource.contains("public void bindRenderTarget(CommandContext ctx, net.vulkanic.VulkanicTexture colorTexture, net.vulkanic.VulkanicTexture depthTexture)"),
             "VulkanBackend should implement render-target binding seam");
         assertTrue(vulkanBackendSource.contains("int framebuffer = resolveFramebufferForTextures(ctx, colorTexture, depthTexture);"),
@@ -944,14 +948,14 @@ public class Phase3DrawPathTest {
     @Test
     public void testFramebufferDeletePathsUseDirectVulkanicCalls() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
         assertFalse(stateManagerSource.contains("public static void _glDeleteFramebuffers("),
             "GlStateManager should no longer expose _glDeleteFramebuffers wrapper");
         assertFalse(stateManagerSource.contains("public static int glGenFramebuffers("),
             "GlStateManager should no longer expose glGenFramebuffers wrapper");
 
         Path directStateAccessFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
-        String directStateAccessSource = Files.readString(directStateAccessFile);
+        String directStateAccessSource = readSource(directStateAccessFile);
         assertFalse(directStateAccessSource.contains("GlStateManager.glGenFramebuffers("),
             "DirectStateAccess should not create FBOs through removed GlStateManager.glGenFramebuffers wrapper");
         assertTrue(containsAny(directStateAccessSource,
@@ -960,28 +964,28 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should create FBOs directly through VulkanicAPI.createFramebuffer");
 
         Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
-        String glTextureSource = Files.readString(glTextureFile);
+        String glTextureSource = readSource(glTextureFile);
         assertFalse(glTextureSource.contains("GlStateManager._glDeleteFramebuffers("),
             "GlTexture should not delete cached FBOs through removed GlStateManager._glDeleteFramebuffers wrapper");
         assertTrue(glTextureSource.contains("VulkanicAPI.deleteFramebuffer(ctx, i)"),
             "GlTexture should delete cached FBOs directly through VulkanicAPI.deleteFramebuffer");
 
         Path irisFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
-        String irisFramebufferSource = Files.readString(irisFramebufferFile);
+        String irisFramebufferSource = readSource(irisFramebufferFile);
         assertFalse(irisFramebufferSource.contains("GlStateManager._glDeleteFramebuffers("),
             "GlFramebuffer should not destroy FBOs through removed GlStateManager._glDeleteFramebuffers wrapper");
         assertTrue(irisFramebufferSource.contains("VulkanicAPI.deleteFramebuffer(VulkanicAPI.getCommandContext(), framebuffer)"),
             "GlFramebuffer should destroy FBOs directly through VulkanicAPI.deleteFramebuffer");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertFalse(irisRenderSystemSource.contains("GlStateManager.glGenFramebuffers("),
             "IrisRenderSystem should not create FBOs through removed GlStateManager.glGenFramebuffers wrapper");
         assertTrue(irisRenderSystemSource.contains("VulkanicAPI.createFramebuffer(VulkanicAPI.getCommandContext())"),
             "IrisRenderSystem should create FBOs directly through VulkanicAPI.createFramebuffer");
 
         Path textureManipulationUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
-        String textureManipulationUtilSource = Files.readString(textureManipulationUtilFile);
+        String textureManipulationUtilSource = readSource(textureManipulationUtilFile);
         assertFalse(textureManipulationUtilSource.contains("GlStateManager.glGenFramebuffers("),
             "TextureManipulationUtil should not create helper FBO through removed GlStateManager.glGenFramebuffers wrapper");
         assertTrue(textureManipulationUtilSource.contains("CommandContext ctx = VulkanicAPI.getCommandContext();"),
@@ -993,7 +997,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlCommandEncoderUsesAgnosticReadbackBindings() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("GlStateManager._glBindBuffer(35051"),
             "GlCommandEncoder readback path should not bind pixel-pack buffer via hardcoded target literal 35051");
@@ -1021,7 +1025,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlCommandEncoderUsesAgnosticUnpackUploadHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("GlStateManager._pixelStore(3314"),
             "GlCommandEncoder texture upload paths should not set unpack row length via hardcoded literal 3314");
@@ -1057,7 +1061,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlCommandEncoderClearPathsUseAgnosticFramebufferHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTexture).id, 0, 0, 36160"),
             "GlCommandEncoder clearColorTexture should not bind draw FBO with hardcoded GL_FRAMEBUFFER literal 36160");
@@ -1113,7 +1117,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlCommandEncoderUsesCommandBufferLifecycleForRenderPass() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertTrue(source.contains("CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();"),
             "GlCommandEncoder should begin an explicit command-buffer scope for backend render-pass recording");
@@ -1133,7 +1137,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSodiumGLRenderDeviceUsesAgnosticCopyFenceAndCapabilityHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/device/GLRenderDevice.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("getInteger(VulkanicAPI.getImmediateContext(), 33085)"),
             "GLRenderDevice should not query max texture LOD bias with hardcoded literal 33085");
@@ -1161,7 +1165,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSodiumGlProgramUsesBackendNeutralContext() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/shader/GlProgram.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
             "Sodium GlProgram should not hard-wire immediate-context retrieval");
@@ -1172,7 +1176,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSodiumVulkanChunkCutoutShaderRestrictsBackfaceDiscardToNonMippedCutouts() throws IOException {
         Path shaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/sodium/shaders/core/vulkan_chunk.fsh");
-        String shaderSource = Files.readString(shaderFile);
+        String shaderSource = readSource(shaderFile);
 
         assertTrue(shaderSource.contains("#ifdef USE_FRAGMENT_DISCARD"),
             "The Vulkan Sodium chunk fragment shader should keep the cutout-only discard branch");
@@ -1182,7 +1186,7 @@ public class Phase3DrawPathTest {
             "The Vulkan Sodium chunk cutout shader should keep alpha cutoff discard for all alpha-tested terrain");
 
         Path pipelineFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java");
-        String pipelineSource = Files.readString(pipelineFile);
+        String pipelineSource = readSource(pipelineFile);
 
         assertTrue(pipelineSource.contains("withShaderDefine(\"USE_FRAGMENT_DISCARD\")"),
             "The Vulkan Sodium cutout pipeline should keep the cutout-only shader define that scopes alpha discard to alpha-tested terrain");
@@ -1191,7 +1195,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testVulkanChunkRendererRoutesThroughSharedActiveProgram() throws IOException {
         Path rendererFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java");
-        String rendererSource = Files.readString(rendererFile);
+        String rendererSource = readSource(rendererFile);
 
         assertTrue(rendererSource.contains("super.begin(terrainPass, parameters);"),
             "The Vulkan chunk renderer should begin through the shared Sodium chunk program path before issuing terrain draws");
@@ -1224,11 +1228,11 @@ public class Phase3DrawPathTest {
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeTerrainCommandEncoder.java");
         Path nativeEncoderFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java");
 
-        String rendererSource = Files.readString(rendererFile);
-        String apiSource = Files.readString(apiFile);
-        String backendSource = Files.readString(backendFile);
-        String encoderSource = Files.readString(encoderFile);
-        String nativeEncoderSource = Files.readString(nativeEncoderFile);
+        String rendererSource = readSource(rendererFile);
+        String apiSource = readSource(apiFile);
+        String backendSource = readSource(backendFile);
+        String encoderSource = readSource(encoderFile);
+        String nativeEncoderSource = readSource(nativeEncoderFile);
 
         assertTrue(rendererSource.contains("CommandEncoder commandEncoder = VulkanicAPI.createNativeTerrainCommandEncoder();"),
             "Sodium's Vulkan chunk terrain branch should use the native terrain encoder seam instead of the general compatibility encoder");
@@ -1282,7 +1286,7 @@ public class Phase3DrawPathTest {
             "The native terrain pass should not keep a separate local resource-submission model once Vulkanic owns the shared plan");
 
         Path programSamplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
-        String programSamplersSource = Files.readString(programSamplersFile);
+        String programSamplersSource = readSource(programSamplersFile);
         assertTrue(programSamplersSource.contains("renderPass instanceof net.vulkanic.RenderPassResourceBinder resourceBinder")
                 && programSamplersSource.contains("resourceBinder.bindSampler(")
                 && programSamplersSource.contains("binding.textureUnit()"),
@@ -1294,11 +1298,11 @@ public class Phase3DrawPathTest {
     @Test
     public void testSortedTranslucentIndexUploadsInvalidateCachedDrawBatches() throws IOException {
         Path worldRendererFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/SodiumWorldRenderer.java");
-        String worldRendererSource = Files.readString(worldRendererFile);
+        String worldRendererSource = readSource(worldRendererFile);
         Path sectionManagerFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/RenderSectionManager.java");
-        String sectionManagerSource = Files.readString(sectionManagerFile);
+        String sectionManagerSource = readSource(sectionManagerFile);
         Path regionManagerFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/region/RenderRegionManager.java");
-        String regionManagerSource = Files.readString(regionManagerFile);
+        String regionManagerSource = readSource(regionManagerFile);
 
         assertTrue(worldRendererSource.contains("if (VulkanicAPI.isVulkanBackendSelected()) {\n            sortBehavior = SortBehavior.OFF;"),
             "Vulkan should avoid Sodium's sorted local translucent index path until that path is correct on Vulkan");
@@ -1321,7 +1325,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testVulkanIrisRenderProgramsUseLiveDescriptorsBeforeBindingResources() throws IOException {
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
 
         assertTrue(encoderSource.contains("createIrisProgramLiveDescriptor"),
             "Vulkan should build live descriptors for generic Iris render programs, not only shared terrain programs");
@@ -1337,7 +1341,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSharedChunkProgramOverridePrecedesIrisOverrideMap() throws IOException {
         Path overrideFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SharedChunkProgramOverrides.java");
-        String overrideSource = Files.readString(overrideFile);
+        String overrideSource = readSource(overrideFile);
 
         assertTrue(overrideSource.contains("wrapper.setupUniforms(pipeline.getUniforms(), pipeline.getSamplers());"),
             "Shared chunk program overrides should reflect the current render-pipeline sampler and uniform contract onto the wrapped Sodium program handle");
@@ -1345,7 +1349,7 @@ public class Phase3DrawPathTest {
             "Shared chunk program overrides should explicitly track the currently active Sodium chunk program");
 
         Path deviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String deviceSource = Files.readString(deviceFile);
+        String deviceSource = readSource(deviceFile);
         int sharedOverrideIndex = deviceSource.indexOf("SharedChunkProgramOverrides.createOverride(renderPipeline)");
         int irisOverrideIndex = deviceSource.indexOf("// Iris: Check for shader overrides first");
 
@@ -1358,7 +1362,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSharedChunkPipelinesMirrorExtendedVertexAbiWithoutStaticRegistration() throws IOException {
         Path pipelineFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java");
-        String pipelineSource = Files.readString(pipelineFile);
+        String pipelineSource = readSource(pipelineFile);
 
         assertTrue(pipelineSource.contains("createVertexFormat(WorldRenderingSettings.INSTANCE.getVertexFormat().getVertexFormat())"),
             "Shared Sodium chunk pipelines should derive their vertex ABI from the active WorldRenderingSettings format, not just the base stride");
@@ -1368,7 +1372,7 @@ public class Phase3DrawPathTest {
                 && pipelineSource.contains("SharedChunkProgramOverrides.unregister(pipeline);"),
             "Shared Sodium chunk pipeline cache should clean up tracked override entries when shader reloads invalidate cached pipelines");
         Path contractFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/TerrainPipelineContract.java");
-        String contractSource = Files.readString(contractFile);
+        String contractSource = readSource(contractFile);
 
         assertTrue(contractSource.contains("PassState.from(pipeline, pass.isTranslucent())")
                 && contractSource.contains("currentBlend(pipeline, translucentPass)")
@@ -1386,19 +1390,19 @@ public class Phase3DrawPathTest {
     @Test
     public void testGenericVertexLocationsHonorDeclaredAttributeIndices() throws IOException {
         Path vertexFormatFile = SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java");
-        String vertexFormatSource = Files.readString(vertexFormatFile);
+        String vertexFormatSource = readSource(vertexFormatFile);
         assertTrue(vertexFormatSource.contains("public int getShaderAttributeLocation(int attributeOrdinal)"),
             "VertexFormat should expose the shader attribute location derived from its declared element metadata");
         assertTrue(vertexFormatSource.contains("element.usage() == VertexFormatElement.Usage.GENERIC ? element.index() : attributeOrdinal"),
             "VertexFormat should preserve explicit generic attribute indices while keeping vanilla attribute ordering unchanged");
 
         Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
-        String glProgramSource = Files.readString(glProgramFile);
+        String glProgramSource = readSource(glProgramFile);
         assertTrue(glProgramSource.contains("vertexFormat.getShaderAttributeLocation(j)"),
             "GlProgram linking should bind declared attribute names to the shader locations supplied by the vertex format");
 
         Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
-        String backendSource = Files.readString(backendFile);
+        String backendSource = readSource(backendFile);
         assertTrue(backendSource.contains("renderPipeline.getVertexFormat().getShaderAttributeLocation(location)"),
             "Vulkan shader-source rebinding should inject explicit locations from the declared vertex format instead of forcing sequential chunk attributes");
         assertTrue(backendSource.contains(".location(vertexFormat.getShaderAttributeLocation(i))"),
@@ -1408,7 +1412,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSodiumGlShaderAndSyncWrappersUseBackendNeutralContext() throws IOException {
         Path shaderFile = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/shader/GlShader.java");
-        String shaderSource = Files.readString(shaderFile);
+        String shaderSource = readSource(shaderFile);
 
         assertFalse(shaderSource.contains("VulkanicAPI.getImmediateContext()"),
             "Sodium GlShader should not hard-wire immediate-context retrieval");
@@ -1416,7 +1420,7 @@ public class Phase3DrawPathTest {
             "Sodium GlShader should fetch backend-neutral command context once and reuse it");
 
         Path fenceFile = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/sync/GlFence.java");
-        String fenceSource = Files.readString(fenceFile);
+        String fenceSource = readSource(fenceFile);
 
         assertFalse(fenceSource.contains("VulkanicAPI.getImmediateContext()"),
             "Sodium GlFence should not hard-wire immediate-context retrieval");
@@ -1424,7 +1428,7 @@ public class Phase3DrawPathTest {
             "Sodium GlFence should fetch backend-neutral command context");
 
         Path storageFile = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/functions/BufferStorageFunctions.java");
-        String storageSource = Files.readString(storageFile);
+        String storageSource = readSource(storageFile);
 
         assertFalse(storageSource.contains("VulkanicAPI.getImmediateContext()"),
             "Sodium BufferStorageFunctions should not hard-wire immediate-context retrieval");
@@ -1435,7 +1439,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSodiumShaderChunkRendererUsesBackendNeutralContext() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/ShaderChunkRenderer.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
             "ShaderChunkRenderer should not hard-wire immediate-context retrieval in viewport/framebuffer setup");
@@ -1465,7 +1469,7 @@ public class Phase3DrawPathTest {
 
         for (String relativePath : migratedFiles) {
             Path file = SRC_MAIN_JAVA.resolve(relativePath);
-            String source = Files.readString(file);
+            String source = readSource(file);
 
             assertFalse(source.contains("VulkanicAPI.getImmediateContext()"),
                 relativePath + " should not hard-wire immediate-context retrieval");
@@ -1477,7 +1481,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testVertexArrayCacheUsesAgnosticArrayBufferConstant() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/VertexArrayCache.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("_glBindBuffer(34962"),
             "VertexArrayCache should not bind GL_ARRAY_BUFFER via hardcoded target literal 34962");
@@ -1508,7 +1512,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlDeviceUsesAgnosticCapabilityAndAlignmentHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("VulkanicAPI.getInteger(net.vulkanic.VulkanicAPI.getImmediateContext(), 35380)"),
             "GlDevice should not query UBO offset alignment via hardcoded literal 35380");
@@ -1524,7 +1528,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlDeviceTextureSetupUsesAgnosticTextureParameterHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("_texParameter(o, 33085"),
             "GlDevice texture setup should not set GL_TEXTURE_MAX_LEVEL via hardcoded literal 33085");
@@ -1553,7 +1557,7 @@ public class Phase3DrawPathTest {
             "GlDevice max texture-size probe should use VulkanicAPI.GL_PROXY_TEXTURE_2D constant");
 
         Path irisGlTextureFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/GlTexture.java");
-        String irisGlTextureSource = Files.readString(irisGlTextureFile);
+        String irisGlTextureSource = readSource(irisGlTextureFile);
         assertFalse(irisGlTextureSource.contains("IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
             "Iris GlTexture should not set min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(irisGlTextureSource.contains("IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAG_FILTER"),
@@ -1584,7 +1588,7 @@ public class Phase3DrawPathTest {
         );
 
         Path irisGlImageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/image/GlImage.java");
-        String irisGlImageSource = Files.readString(irisGlImageFile);
+        String irisGlImageSource = readSource(irisGlImageFile);
         assertFalse(irisGlImageSource.contains("IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
             "Iris GlImage should not set min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(irisGlImageSource.contains("IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_WRAP_S"),
@@ -1613,7 +1617,7 @@ public class Phase3DrawPathTest {
         );
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
         assertTrue(vulkanicApiSource.contains("public static void setTextureLinearFiltering(CommandContext ctx, int target)"),
             "VulkanicAPI should expose setTextureLinearFiltering helper");
         assertTrue(vulkanicApiSource.contains("public static void setTextureNearestFiltering(CommandContext ctx, int target)"),
@@ -1627,7 +1631,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlDeviceUsesDirectVulkanicQueryAndErrorCalls() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("GlStateManager._getString("),
             "GlDevice should not query strings via GlStateManager._getString wrapper in migrated paths");
@@ -1653,7 +1657,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testIrisGlDebugUsesAgnosticDebugControlHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/GLDebug.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("debugMessageControl(ctx, 4352, 4352"),
             "GLDebug should not use hardcoded GL_DONT_CARE literals for core debugMessageControl");
@@ -1679,7 +1683,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testIrisUtilityPathsUseDirectVulkanicCalls() throws IOException {
         Path clearPassCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/ClearPassCreator.java");
-        String clearPassCreatorSource = Files.readString(clearPassCreatorFile);
+        String clearPassCreatorSource = readSource(clearPassCreatorFile);
         assertFalse(clearPassCreatorSource.contains("GlStateManager._getInteger("),
             "ClearPassCreator should not query max draw buffers through GlStateManager wrapper");
         assertTrue(clearPassCreatorSource.contains("VulkanicAPI.getInteger(VulkanicAPI.getCommandContext(), VulkanicIntegerQuery.MAX_DRAW_BUFFERS)"),
@@ -1694,7 +1698,7 @@ public class Phase3DrawPathTest {
             "ClearPassCreator shadow clear pass should not pass raw GL_COLOR_BUFFER_BIT mask for main framebuffer");
 
         Path clearPassFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/ClearPass.java");
-        String clearPassSource = Files.readString(clearPassFile);
+        String clearPassSource = readSource(clearPassFile);
         assertFalse(clearPassSource.contains("private final int clearFlags;"),
             "ClearPass should not track generic raw clear flag masks for color-only clear passes");
         assertFalse(clearPassSource.contains("clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), clearFlags)"),
@@ -1704,7 +1708,7 @@ public class Phase3DrawPathTest {
             "ClearPass should clear color through explicit VulkanicAPI clearColorBufferWithMacosWorkaround helper");
 
         Path samplerLimitsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/sampler/SamplerLimits.java");
-        String samplerLimitsSource = Files.readString(samplerLimitsFile);
+        String samplerLimitsSource = readSource(samplerLimitsFile);
         assertFalse(samplerLimitsSource.contains("GlStateManager._getInteger("),
             "SamplerLimits should not query limits through GlStateManager wrapper");
         assertFalse(samplerLimitsSource.contains("VulkanicAPI.getImmediateContext()"),
@@ -1715,7 +1719,7 @@ public class Phase3DrawPathTest {
             "SamplerLimits should query limits through typed VulkanicIntegerQuery with shared context");
 
         Path standardMacrosFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/StandardMacros.java");
-        String standardMacrosSource = Files.readString(standardMacrosFile);
+        String standardMacrosSource = readSource(standardMacrosFile);
         assertFalse(standardMacrosSource.contains("GlStateManager._getString("),
             "StandardMacros should not query GL strings through GlStateManager wrapper");
         assertFalse(standardMacrosSource.contains("GlStateManager._getInteger("),
@@ -1728,57 +1732,57 @@ public class Phase3DrawPathTest {
             "StandardMacros should query extension count through typed VulkanicIntegerQuery");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertFalse(irisRenderSystemSource.contains("getInteger(ctx, VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)"),
             "IrisRenderSystem should not query NVX VRAM through raw GL pname constants");
         assertTrue(irisRenderSystemSource.contains("VulkanicAPI.getInteger(ctx, VulkanicIntegerQuery.GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)"),
             "IrisRenderSystem should query NVX VRAM through typed VulkanicIntegerQuery");
 
         Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
-        String programCreatorSource = Files.readString(programCreatorFile);
+        String programCreatorSource = readSource(programCreatorFile);
         assertFalse(programCreatorSource.contains("GlStateManager._glBindAttribLocation("),
             "ProgramCreator should not bind attributes through GlStateManager wrapper");
         assertTrue(programCreatorSource.contains("VulkanicAPI.setAttributeLocation(ctx, program"),
             "ProgramCreator should bind attributes through VulkanicAPI.setAttributeLocation");
 
         Path depthTextureFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/DepthTexture.java");
-        String depthTextureSource = Files.readString(depthTextureFile);
+        String depthTextureSource = readSource(depthTextureFile);
         assertTrue(depthTextureSource.contains("var ctx = VulkanicAPI.getCommandContext();")
                 && depthTextureSource.contains("VulkanicAPI.bindTexture2D(ctx, 0);"),
             "DepthTexture should reuse one local command context when restoring texture binding state");
 
         Path irisRenderTargetFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTarget.java");
-        String irisRenderTargetSource = Files.readString(irisRenderTargetFile);
+        String irisRenderTargetSource = readSource(irisRenderTargetFile);
         assertTrue(irisRenderTargetSource.contains("var ctx = VulkanicAPI.getCommandContext();")
                 && irisRenderTargetSource.contains("VulkanicAPI.bindTexture2D(ctx, 0);"),
             "Iris RenderTarget should reuse one local command context when cleaning up texture binding state");
 
         Path centerDepthFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/CenterDepthSampler.java");
-        String centerDepthSource = Files.readString(centerDepthFile);
+        String centerDepthSource = readSource(centerDepthFile);
         assertTrue(centerDepthSource.contains("VulkanicAPI.setDynamicViewport(ctx, 0, 0, 1, 1);"),
             "CenterDepthSampler should resolve a local command context before configuring its sampling viewport");
 
         Path shadowCompositeFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java");
-        String shadowCompositeSource = Files.readString(shadowCompositeFile);
+        String shadowCompositeSource = readSource(shadowCompositeFile);
         assertTrue(shadowCompositeSource.contains("VulkanicAPI.setDynamicViewport(ctx, beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);"),
             "ShadowCompositeRenderer should resolve a local command context before configuring per-pass viewport state");
 
         Path intCachedUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/custom/cached/IntCachedUniform.java");
-        String intCachedUniformSource = Files.readString(intCachedUniformFile);
+        String intCachedUniformSource = readSource(intCachedUniformFile);
         assertFalse(intCachedUniformSource.contains("GlStateManager._glUniform1i("),
             "IntCachedUniform should not upload via GlStateManager._glUniform1i wrapper");
         assertTrue(intCachedUniformSource.contains("VulkanicAPI.setUniform1i("),
             "IntCachedUniform should upload directly via VulkanicAPI.setUniform1i");
 
         Path boolCachedUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/custom/cached/BooleanCachedUniform.java");
-        String boolCachedUniformSource = Files.readString(boolCachedUniformFile);
+        String boolCachedUniformSource = readSource(boolCachedUniformFile);
         assertFalse(boolCachedUniformSource.contains("GlStateManager._glUniform1i("),
             "BooleanCachedUniform should not upload via GlStateManager._glUniform1i wrapper");
         assertTrue(boolCachedUniformSource.contains("VulkanicAPI.setUniform1i("),
             "BooleanCachedUniform should upload directly via VulkanicAPI.setUniform1i");
 
         Path programSamplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
-        String programSamplersSource = Files.readString(programSamplersFile);
+        String programSamplersSource = readSource(programSamplersFile);
         assertFalse(programSamplersSource.contains("GlStateManager._glUniform1i("),
             "ProgramSamplers initializer should not upload via GlStateManager._glUniform1i wrapper");
         assertFalse(programSamplersSource.contains("VulkanicAPI.getImmediateContext()"),
@@ -1787,7 +1791,7 @@ public class Phase3DrawPathTest {
             "ProgramSamplers initializer should upload directly through VulkanicAPI.setUniform1i");
 
         Path programImagesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramImages.java");
-        String programImagesSource = Files.readString(programImagesFile);
+        String programImagesSource = readSource(programImagesFile);
         assertFalse(programImagesSource.contains("GlStateManager._glUniform1i("),
             "ProgramImages initializer should not upload via GlStateManager._glUniform1i wrapper");
         assertFalse(programImagesSource.contains("VulkanicAPI.getImmediateContext()"),
@@ -1796,28 +1800,28 @@ public class Phase3DrawPathTest {
             "ProgramImages initializer should upload directly through VulkanicAPI.setUniform1i");
 
         Path textureUploadHelperFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/TextureUploadHelper.java");
-        String textureUploadHelperSource = Files.readString(textureUploadHelperFile);
+        String textureUploadHelperSource = readSource(textureUploadHelperFile);
         assertFalse(textureUploadHelperSource.contains("GlStateManager._pixelStore("),
             "TextureUploadHelper should not reset unpack state through GlStateManager._pixelStore wrapper");
         assertTrue(textureUploadHelperSource.contains("VulkanicAPI.setPixelStore(ctx"),
             "TextureUploadHelper should reset unpack state directly through VulkanicAPI.setPixelStore");
 
         Path fallbackShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/FallbackShader.java");
-        String fallbackShaderSource = Files.readString(fallbackShaderFile);
+        String fallbackShaderSource = readSource(fallbackShaderFile);
         assertFalse(fallbackShaderSource.contains("GlStateManager._glUniform1i("),
             "FallbackShader should not upload sampler uniforms through GlStateManager._glUniform1i wrapper");
         assertTrue(fallbackShaderSource.contains("VulkanicAPI.setUniform1i(ctx, gtexture, 0)"),
             "FallbackShader should upload sampler uniforms directly through VulkanicAPI.setUniform1i");
 
         Path intUniformFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/uniform/IntUniform.java");
-        String intUniformSource = Files.readString(intUniformFile);
+        String intUniformSource = readSource(intUniformFile);
         assertFalse(intUniformSource.contains("GlStateManager._glUniform1i("),
             "IntUniform should not upload through GlStateManager._glUniform1i wrapper");
         assertTrue(intUniformSource.contains("VulkanicAPI.setUniform1i(VulkanicAPI.getCommandContext(), location, newValue)"),
             "IntUniform should upload directly through VulkanicAPI.setUniform1i");
 
         Path glFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
-        String glFramebufferSource = Files.readString(glFramebufferFile);
+        String glFramebufferSource = readSource(glFramebufferFile);
         assertFalse(glFramebufferSource.contains("GlStateManager._getInteger("),
             "GlFramebuffer should not query caps through GlStateManager._getInteger wrapper");
         assertFalse(glFramebufferSource.contains("VulkanicAPI.getImmediateContext()"),
@@ -1828,7 +1832,7 @@ public class Phase3DrawPathTest {
             "GlFramebuffer should query color-attachment cap through typed VulkanicIntegerQuery");
 
         Path textureInfoCacheFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureInfoCache.java");
-        String textureInfoCacheSource = Files.readString(textureInfoCacheFile);
+        String textureInfoCacheSource = readSource(textureInfoCacheFile);
         assertFalse(textureInfoCacheSource.contains("GlStateManager._getInteger("),
             "TextureInfoCache should not query current texture binding through GlStateManager._getInteger wrapper");
         assertFalse(textureInfoCacheSource.contains("GlStateManager._getTexLevelParameter("),
@@ -1843,7 +1847,7 @@ public class Phase3DrawPathTest {
             "TextureInfoCache should query texture level params through VulkanicAPI 2D level helper");
 
         Path textureManipulationUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/util/TextureManipulationUtil.java");
-        String textureManipulationUtilSource = Files.readString(textureManipulationUtilFile);
+        String textureManipulationUtilSource = readSource(textureManipulationUtilFile);
         assertFalse(textureManipulationUtilSource.contains("GlStateManager._getInteger("),
             "TextureManipulationUtil should not query framebuffer/texture bindings through GlStateManager._getInteger wrapper");
         assertFalse(textureManipulationUtilSource.contains("GlStateManager._getTexLevelParameter("),
@@ -1862,7 +1866,7 @@ public class Phase3DrawPathTest {
             "TextureManipulationUtil should attach color attachments through VulkanicAPI.framebufferColorAttachment0Texture2D default-target helper");
 
         Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
-        String sodiumShaderSource = Files.readString(sodiumShaderFile);
+        String sodiumShaderSource = readSource(sodiumShaderFile);
         assertFalse(sodiumShaderSource.contains("GlStateManager._texParameter(3553, 33084"),
             "SodiumShader should not set base mip level with hardcoded target/pname literals via GlStateManager wrapper");
         assertFalse(sodiumShaderSource.contains("GlStateManager._texParameter(3553, 33085"),
@@ -1877,14 +1881,14 @@ public class Phase3DrawPathTest {
             "SodiumShader should flush texture mode changes via GlTexture default-2D helper");
 
         Path defaultShaderInterfaceFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/DefaultShaderInterface.java");
-        String defaultShaderInterfaceSource = Files.readString(defaultShaderInterfaceFile);
+        String defaultShaderInterfaceSource = readSource(defaultShaderInterfaceFile);
         assertFalse(defaultShaderInterfaceSource.contains("flushModeChanges(VulkanicAPI.GL_TEXTURE_2D)"),
             "DefaultShaderInterface should not pass explicit GL_TEXTURE_2D to GlTexture.flushModeChanges");
         assertTrue(defaultShaderInterfaceSource.contains("tex.flushModeChanges2D()"),
             "DefaultShaderInterface should flush texture mode changes via GlTexture default-2D helper");
 
         Path glTextureFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlTexture.java");
-        String glTextureSource = Files.readString(glTextureFile);
+        String glTextureSource = readSource(glTextureFile);
         assertTrue(glTextureSource.contains("public void flushModeChanges2D()"),
             "GlTexture should expose default-2D flush helper");
         assertTrue(glTextureSource.contains("this.flushModeChanges2D();"),
@@ -1894,7 +1898,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSodiumSyncPathsUseAgnosticFenceHelpers() throws IOException {
         Path helperFile = SRC_MAIN_JAVA.resolve("net/sodium/fabric/SodiumGpuSyncHelper.java");
-        String helperSource = Files.readString(helperFile);
+        String helperSource = readSource(helperFile);
 
         assertFalse(helperSource.contains("createFenceSync(VulkanicAPI.getImmediateContext(), 37143, 0)"),
             "SodiumGpuSyncHelper should not create fences with hardcoded GL_SYNC_GPU_COMMANDS_COMPLETE literal 37143");
@@ -1907,7 +1911,7 @@ public class Phase3DrawPathTest {
             "SodiumGpuSyncHelper should wait via VulkanicAPI.waitForSyncWithFlush");
 
         Path fenceFile = SRC_MAIN_JAVA.resolve("net/sodium/client/gl/sync/GlFence.java");
-        String fenceSource = Files.readString(fenceFile);
+        String fenceSource = readSource(fenceFile);
 
         assertFalse(fenceSource.contains("getSynci(VulkanicAPI.getImmediateContext(), this.id, 37140"),
             "GlFence should not query sync status via hardcoded GL_SYNC_STATUS literal 37140");
@@ -1927,7 +1931,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dSyncPathsUseAgnosticFenceHelpers() throws IOException {
         Path fenceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlFence.java");
-        String fenceSource = Files.readString(fenceFile);
+        String fenceSource = readSource(fenceFile);
 
         assertFalse(fenceSource.contains("_glFenceSync(37143, 0)"),
             "blaze3d GlFence should not create sync with hardcoded GL_SYNC_GPU_COMMANDS_COMPLETE literal 37143");
@@ -1948,7 +1952,7 @@ public class Phase3DrawPathTest {
             "blaze3d GlFence should wait directly via VulkanicAPI.waitForSync");
 
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static long _glFenceSync("),
             "GlStateManager should no longer expose _glFenceSync wrapper");
@@ -1961,7 +1965,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dUniformAndAttribWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _glUniform1i("),
             "GlStateManager should no longer expose _glUniform1i wrapper");
@@ -1971,7 +1975,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _glGetUniformLocation wrapper");
 
         Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
-        String glProgramSource = Files.readString(glProgramFile);
+        String glProgramSource = readSource(glProgramFile);
         assertFalse(glProgramSource.contains("GlStateManager._glBindAttribLocation("),
             "GlProgram should not bind attributes through removed GlStateManager wrapper");
         assertFalse(glProgramSource.contains("GlStateManager._glGetUniformLocation("),
@@ -1982,54 +1986,54 @@ public class Phase3DrawPathTest {
             "GlProgram should query uniforms via VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
 
         Path vertexFormatFile = SRC_MAIN_JAVA.resolve("net/blaze3d/vertex/VertexFormat.java");
-        String vertexFormatSource = Files.readString(vertexFormatFile);
+        String vertexFormatSource = readSource(vertexFormatFile);
         assertFalse(vertexFormatSource.contains("GlStateManager._glBindAttribLocation("),
             "VertexFormat Iris binding path should not use removed GlStateManager wrapper");
         assertTrue(vertexFormatSource.contains("VulkanicAPI.setAttributeLocation(ctx"),
             "VertexFormat Iris binding path should use VulkanicAPI.setAttributeLocation directly");
 
         Path samplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
-        String samplersSource = Files.readString(samplersFile);
+        String samplersSource = readSource(samplersFile);
         assertFalse(samplersSource.contains("GlStateManager._glGetUniformLocation("),
             "ProgramSamplers should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
         assertTrue(samplersSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
             "ProgramSamplers should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
 
         Path imagesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramImages.java");
-        String imagesSource = Files.readString(imagesFile);
+        String imagesSource = readSource(imagesFile);
         assertFalse(imagesSource.contains("GlStateManager._glGetUniformLocation("),
             "ProgramImages should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
         assertTrue(imagesSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
             "ProgramImages should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
 
         Path uniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramUniforms.java");
-        String uniformsSource = Files.readString(uniformsFile);
+        String uniformsSource = readSource(uniformsFile);
         assertFalse(uniformsSource.contains("GlStateManager._glGetUniformLocation("),
             "ProgramUniforms should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
         assertTrue(uniformsSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
             "ProgramUniforms should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
 
         Path fallbackShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/FallbackShader.java");
-        String fallbackShaderSource = Files.readString(fallbackShaderFile);
+        String fallbackShaderSource = readSource(fallbackShaderFile);
         assertFalse(fallbackShaderSource.contains("GlStateManager._glGetUniformLocation("),
             "FallbackShader should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
         assertTrue(fallbackShaderSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
             "FallbackShader should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
 
         Path extendedShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ExtendedShader.java");
-        String extendedShaderSource = Files.readString(extendedShaderFile);
+        String extendedShaderSource = readSource(extendedShaderFile);
         assertFalse(extendedShaderSource.contains("GlStateManager._glGetUniformLocation("),
             "ExtendedShader should not query uniforms through removed GlStateManager._glGetUniformLocation wrapper");
         assertTrue(extendedShaderSource.contains("VulkanicAPI.getUniformLocationWithLegacySamplerFallback("),
             "ExtendedShader should query uniforms through VulkanicAPI.getUniformLocationWithLegacySamplerFallback");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
         assertTrue(vulkanicApiSource.contains("getUniformLocationWithLegacySamplerFallback"),
             "VulkanicAPI should expose getUniformLocationWithLegacySamplerFallback for legacy Sampler0/1/2 compatibility");
 
         Path glProgramSamplerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
-        String glProgramSamplerSource = Files.readString(glProgramSamplerFile);
+        String glProgramSamplerSource = readSource(glProgramSamplerFile);
         assertTrue(glProgramSamplerSource.contains("private static int legacySamplerUnit(String samplerName)"),
             "GlProgram should define legacy sampler unit routing for fixed-function sampler names");
         assertTrue(glProgramSamplerSource.contains("case \"Sampler2\" -> 2;"),
@@ -2039,7 +2043,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dProgramLifecycleWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static int glCreateProgram("),
             "GlStateManager should no longer expose glCreateProgram wrapper");
@@ -2053,7 +2057,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose glGetProgramInfoLog wrapper");
 
         Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
-        String glProgramSource = Files.readString(glProgramFile);
+        String glProgramSource = readSource(glProgramFile);
         assertFalse(glProgramSource.contains("GlStateManager.glCreateProgram("),
             "GlProgram should not create programs through removed GlStateManager.glCreateProgram wrapper");
         assertFalse(glProgramSource.contains("GlStateManager.glLinkProgram("),
@@ -2092,7 +2096,7 @@ public class Phase3DrawPathTest {
         );
 
         Path shaderCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ShaderCreator.java");
-        String shaderCreatorSource = Files.readString(shaderCreatorFile);
+        String shaderCreatorSource = readSource(shaderCreatorFile);
         assertFalse(shaderCreatorSource.contains("GlStateManager.glCreateProgram("),
             "ShaderCreator should not create programs through removed GlStateManager.glCreateProgram wrapper");
         assertFalse(shaderCreatorSource.contains("GlStateManager.glLinkProgram("),
@@ -2109,7 +2113,7 @@ public class Phase3DrawPathTest {
         );
 
         Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
-        String programCreatorSource = Files.readString(programCreatorFile);
+        String programCreatorSource = readSource(programCreatorFile);
         assertFalse(programCreatorSource.contains("GlStateManager.glCreateProgram("),
             "ProgramCreator should not create programs through removed GlStateManager.glCreateProgram wrapper");
         assertFalse(programCreatorSource.contains("GlStateManager.glLinkProgram("),
@@ -2130,7 +2134,7 @@ public class Phase3DrawPathTest {
         );
 
         Path shaderMapFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ShaderMap.java");
-        String shaderMapSource = Files.readString(shaderMapFile);
+        String shaderMapSource = readSource(shaderMapFile);
         assertFalse(shaderMapSource.contains("GlStateManager.glDeleteProgram("),
             "ShaderMap should not delete programs through removed GlStateManager.glDeleteProgram wrapper");
         assertFalse(shaderMapSource.contains("GlStateManager.glGetProgrami("),
@@ -2151,7 +2155,7 @@ public class Phase3DrawPathTest {
             "ShaderMap should query program info logs directly through VulkanicAPI.getProgramInfoLog");
 
         Path uniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramUniforms.java");
-        String uniformsSource = Files.readString(uniformsFile);
+        String uniformsSource = readSource(uniformsFile);
         assertFalse(uniformsSource.contains("GlStateManager.glGetProgrami("),
             "ProgramUniforms should not query active uniforms through removed GlStateManager.glGetProgrami wrapper");
         assertTrue(
@@ -2161,21 +2165,21 @@ public class Phase3DrawPathTest {
         );
 
         Path programFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/Program.java");
-        String programSource = Files.readString(programFile);
+        String programSource = readSource(programFile);
         assertFalse(programSource.contains("GlStateManager.glDeleteProgram("),
             "Program should not destroy programs through removed GlStateManager.glDeleteProgram wrapper");
         assertTrue(programSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), getGlId())"),
             "Program should destroy programs directly through VulkanicAPI.deleteProgram");
 
         Path computeProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ComputeProgram.java");
-        String computeProgramSource = Files.readString(computeProgramFile);
+        String computeProgramSource = readSource(computeProgramFile);
         assertFalse(computeProgramSource.contains("GlStateManager.glDeleteProgram("),
             "ComputeProgram should not destroy programs through removed GlStateManager.glDeleteProgram wrapper");
         assertTrue(computeProgramSource.contains("VulkanicAPI.deleteProgram(VulkanicAPI.getCommandContext(), getGlId())"),
             "ComputeProgram should destroy programs directly through VulkanicAPI.deleteProgram");
 
         Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String glDeviceSource = Files.readString(glDeviceFile);
+        String glDeviceSource = readSource(glDeviceFile);
         assertFalse(glDeviceSource.contains("GlStateManager.glCreateProgram("),
             "GlDevice AMD workaround should not create programs through removed GlStateManager.glCreateProgram wrapper");
         assertFalse(glDeviceSource.contains("GlStateManager.glDeleteProgram("),
@@ -2195,7 +2199,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dShaderLifecycleWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void glAttachShader("),
             "GlStateManager should no longer expose glAttachShader wrapper");
@@ -2213,7 +2217,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose glGetShaderInfoLog wrapper");
 
         Path glProgramFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlProgram.java");
-        String glProgramSource = Files.readString(glProgramFile);
+        String glProgramSource = readSource(glProgramFile);
         assertFalse(glProgramSource.contains("GlStateManager.glAttachShader("),
             "GlProgram should not attach shaders through removed GlStateManager.glAttachShader wrapper");
         assertTrue(
@@ -2223,14 +2227,14 @@ public class Phase3DrawPathTest {
         );
 
         Path programCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/ProgramCreator.java");
-        String programCreatorSource = Files.readString(programCreatorFile);
+        String programCreatorSource = readSource(programCreatorFile);
         assertFalse(programCreatorSource.contains("GlStateManager.glAttachShader("),
             "ProgramCreator should not attach shaders through removed GlStateManager.glAttachShader wrapper");
         assertTrue(programCreatorSource.contains("VulkanicAPI.attachShader(ctx, program"),
             "ProgramCreator should attach shaders directly through VulkanicAPI.attachShader");
 
         Path shaderCreatorFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ShaderCreator.java");
-        String shaderCreatorSource = Files.readString(shaderCreatorFile);
+        String shaderCreatorSource = readSource(shaderCreatorFile);
         assertFalse(shaderCreatorSource.contains("GlStateManager.glAttachShader("),
             "ShaderCreator should not attach shaders through removed GlStateManager.glAttachShader wrapper");
         assertFalse(shaderCreatorSource.contains("GlStateManager.glDeleteShader("),
@@ -2272,7 +2276,7 @@ public class Phase3DrawPathTest {
         );
 
         Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String glDeviceSource = Files.readString(glDeviceFile);
+        String glDeviceSource = readSource(glDeviceFile);
         assertFalse(glDeviceSource.contains("GlStateManager.glCreateShader("),
             "GlDevice should not create shaders through removed GlStateManager.glCreateShader wrapper");
         assertFalse(glDeviceSource.contains("GlStateManager.glAttachShader("),
@@ -2331,7 +2335,7 @@ public class Phase3DrawPathTest {
         );
 
         Path glShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/shader/GlShader.java");
-        String glShaderSource = Files.readString(glShaderFile);
+        String glShaderSource = readSource(glShaderFile);
         assertFalse(glShaderSource.contains("GlStateManager.glCreateShader("),
             "GlShader should not create shaders through removed GlStateManager.glCreateShader wrapper");
         assertFalse(glShaderSource.contains("GlStateManager.glCompileShader("),
@@ -2356,7 +2360,7 @@ public class Phase3DrawPathTest {
         );
 
         Path partialShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/PartialShader.java");
-        String partialShaderSource = Files.readString(partialShaderFile);
+        String partialShaderSource = readSource(partialShaderFile);
         assertFalse(partialShaderSource.contains("GlStateManager.glDeleteShader("),
             "PartialShader should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
         assertTrue(
@@ -2366,7 +2370,7 @@ public class Phase3DrawPathTest {
         );
 
         Path shaderModuleFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlShaderModule.java");
-        String shaderModuleSource = Files.readString(shaderModuleFile);
+        String shaderModuleSource = readSource(shaderModuleFile);
         assertFalse(shaderModuleSource.contains("GlStateManager.glDeleteShader("),
             "GlShaderModule should not delete shaders through removed GlStateManager.glDeleteShader wrapper");
         assertTrue(
@@ -2380,7 +2384,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dQueryAndTexParameterWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static String _getString("),
             "GlStateManager should no longer expose _getString wrapper");
@@ -2395,7 +2399,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testOpenGLBackendManagedAllocationsAvoidBlaze3dErrorWrappers() throws IOException {
         Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
-        String backendSource = Files.readString(backendFile);
+        String backendSource = readSource(backendFile);
 
         assertFalse(backendSource.contains("net.blaze3d.opengl.GlStateManager.clearGlErrors()"),
             "OpenGLBackend managed allocation paths should not clear errors through Blaze3D GlStateManager wrapper");
@@ -2410,7 +2414,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testOpenGLBackendTracksTextureBindingsWithoutGlStateManager() throws IOException {
         Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/opengl/OpenGLBackend.java");
-        String backendSource = Files.readString(backendFile);
+        String backendSource = readSource(backendFile);
 
         assertFalse(backendSource.contains("import net.blaze3d.opengl.GlStateManager;"),
             "OpenGLBackend should not import GlStateManager for texture-state tracking");
@@ -2430,7 +2434,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testVertexArrayCacheUsesDirectVulkanicStringQueries() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/VertexArrayCache.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("GlStateManager._getString(7936)"),
             "VertexArrayCache should not query GL_VENDOR via hardcoded literal through GlStateManager._getString wrapper");
@@ -2445,7 +2449,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBufferStorageUsesDirectVulkanicErrorQueries() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/BufferStorage.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("GlStateManager._getError()"),
             "BufferStorage map failure paths should not query errors through GlStateManager._getError wrapper");
@@ -2458,7 +2462,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dErrorWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static int _getError("),
             "GlStateManager should no longer expose _getError wrapper");
@@ -2469,7 +2473,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dVertexArrayWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _glBindBuffer("),
             "GlStateManager should no longer expose _glBindBuffer wrapper");
@@ -2497,7 +2501,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _glDeleteBuffers wrapper");
 
         Path dhProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
-        String dhProgramSource = Files.readString(dhProgramFile);
+        String dhProgramSource = readSource(dhProgramFile);
         assertFalse(dhProgramSource.contains("GlStateManager._glBindVertexArray("),
             "IrisGenericRenderProgram should not bind VAOs through removed GlStateManager wrapper");
         assertFalse(dhProgramSource.contains("GlStateManager._glGenVertexArrays("),
@@ -2508,7 +2512,7 @@ public class Phase3DrawPathTest {
             "IrisGenericRenderProgram should bind VAOs directly through VulkanicAPI.bindVertexArray");
 
         Path directStateAccessFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
-        String directStateAccessSource = Files.readString(directStateAccessFile);
+        String directStateAccessSource = readSource(directStateAccessFile);
         assertFalse(directStateAccessSource.contains("GlStateManager._glGenBuffers("),
             "DirectStateAccess should not create buffers through removed GlStateManager._glGenBuffers wrapper");
         assertFalse(directStateAccessSource.contains("GlStateManager._glBindBuffer("),
@@ -2541,7 +2545,7 @@ public class Phase3DrawPathTest {
             "DirectStateAccess should unmap buffers through Vulkanic frontend APIs");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertFalse(irisRenderSystemSource.contains("GlStateManager._glGenBuffers("),
             "IrisRenderSystem should not create buffers through removed GlStateManager._glGenBuffers wrapper");
         assertFalse(irisRenderSystemSource.contains("GlStateManager._glBindBuffer("),
@@ -2552,7 +2556,7 @@ public class Phase3DrawPathTest {
             "IrisRenderSystem should bind new buffers directly via VulkanicAPI.bindBuffer");
 
         Path ssboFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/buffer/ShaderStorageBuffer.java");
-        String ssboSource = Files.readString(ssboFile);
+        String ssboSource = readSource(ssboFile);
         assertFalse(ssboSource.contains("GlStateManager._glGenBuffers("),
             "ShaderStorageBuffer should not create buffers through removed GlStateManager._glGenBuffers wrapper");
         assertFalse(ssboSource.contains("GlStateManager._glBindBuffer("),
@@ -2569,7 +2573,7 @@ public class Phase3DrawPathTest {
             "ShaderStorageBuffer should upload content directly via VulkanicAPI.bufferSubData");
 
         Path glBufferFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlBuffer.java");
-        String glBufferSource = Files.readString(glBufferFile);
+        String glBufferSource = readSource(glBufferFile);
         assertFalse(glBufferSource.contains("GlStateManager._glDeleteBuffers("),
             "GlBuffer should not delete buffers through removed GlStateManager._glDeleteBuffers wrapper");
         assertTrue(glBufferSource.contains("IrisRenderSystem.decrementTrackedBuffers();"),
@@ -2578,7 +2582,7 @@ public class Phase3DrawPathTest {
             "GlBuffer should delete buffers directly via VulkanicAPI.deleteBuffer");
 
         Path dsaFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
-        String dsaSource = Files.readString(dsaFile);
+        String dsaSource = readSource(dsaFile);
         assertFalse(dsaSource.contains("GlStateManager._glBufferData("),
             "DirectStateAccess should not call removed GlStateManager._glBufferData wrappers");
         assertFalse(dsaSource.contains("GlStateManager._glBufferSubData("),
@@ -2596,7 +2600,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dDrawAndPixelWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _drawElements("),
             "GlStateManager should no longer expose _drawElements wrapper");
@@ -2617,7 +2621,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dScissorAndPolygonWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _scissorBox("),
             "GlStateManager should no longer expose _scissorBox wrapper");
@@ -2625,7 +2629,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _polygonMode wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
 
         assertFalse(encoderSource.contains("GlStateManager._scissorBox("),
             "GlCommandEncoder should not call removed GlStateManager._scissorBox wrapper");
@@ -2640,7 +2644,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dColorLogicWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _enableColorLogicOp("),
             "GlStateManager should no longer expose _enableColorLogicOp wrapper");
@@ -2650,7 +2654,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _logicOp wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
 
         assertFalse(encoderSource.contains("GlStateManager._enableColorLogicOp("),
             "GlCommandEncoder should not call removed GlStateManager._enableColorLogicOp wrapper");
@@ -2672,7 +2676,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dPolygonOffsetWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _enablePolygonOffset("),
             "GlStateManager should no longer expose _enablePolygonOffset wrapper");
@@ -2682,7 +2686,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _polygonOffset wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
 
         assertFalse(encoderSource.contains("GlStateManager._enablePolygonOffset("),
             "GlCommandEncoder should not call removed GlStateManager._enablePolygonOffset wrapper");
@@ -2700,7 +2704,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dCullWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _enableCull("),
             "GlStateManager should no longer expose _enableCull wrapper");
@@ -2708,7 +2712,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _disableCull wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._enableCull("),
             "GlCommandEncoder should not call removed GlStateManager._enableCull wrapper");
         assertFalse(encoderSource.contains("GlStateManager._disableCull("),
@@ -2717,7 +2721,7 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should toggle cull state directly through VulkanicAPI.setCullFaceEnabled");
 
         Path shadowRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderer.java");
-        String shadowRendererSource = Files.readString(shadowRendererFile);
+        String shadowRendererSource = readSource(shadowRendererFile);
         assertFalse(shadowRendererSource.contains("GlStateManager._disableCull("),
             "ShadowRenderer should not call removed GlStateManager._disableCull wrapper");
         assertFalse(shadowRendererSource.contains("GlStateManager._enableCull("),
@@ -2726,7 +2730,7 @@ public class Phase3DrawPathTest {
             "ShadowRenderer should toggle cull state via VulkanicAPI.setCullFaceEnabled");
 
         Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
-        String sodiumShaderSource = Files.readString(sodiumShaderFile);
+        String sodiumShaderSource = readSource(sodiumShaderFile);
         assertFalse(sodiumShaderSource.contains("GlStateManager._disableCull("),
             "SodiumShader should not call removed GlStateManager._disableCull wrapper");
         assertTrue(sodiumShaderSource.contains("VulkanicAPI.setCullFaceEnabled("),
@@ -2747,7 +2751,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dDepthWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _enableDepthTest("),
             "GlStateManager should no longer expose _enableDepthTest wrapper");
@@ -2763,7 +2767,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer define DepthState helper class");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._enableDepthTest("),
             "GlCommandEncoder should not call removed GlStateManager._enableDepthTest wrapper");
         assertFalse(encoderSource.contains("GlStateManager._disableDepthTest("),
@@ -2780,21 +2784,21 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should route depth-write mask changes through DepthColorStorage.setDepthMask");
 
         Path oldImageButtonFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gui/OldImageButton.java");
-        String oldImageButtonSource = Files.readString(oldImageButtonFile);
+        String oldImageButtonSource = readSource(oldImageButtonFile);
         assertFalse(oldImageButtonSource.contains("GlStateManager._enableDepthTest("),
             "OldImageButton should not call removed GlStateManager._enableDepthTest wrapper");
         assertTrue(oldImageButtonSource.contains("VulkanicAPI.setDepthTestEnabled("),
             "OldImageButton should enable depth test through VulkanicAPI.setDepthTestEnabled");
 
         Path irisButtonFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gui/element/screen/IrisButton.java");
-        String irisButtonSource = Files.readString(irisButtonFile);
+        String irisButtonSource = readSource(irisButtonFile);
         assertFalse(irisButtonSource.contains("GlStateManager._enableDepthTest("),
             "IrisButton should not call removed GlStateManager._enableDepthTest wrapper");
         assertTrue(irisButtonSource.contains("VulkanicAPI.setDepthTestEnabled("),
             "IrisButton should enable depth test through VulkanicAPI.setDepthTestEnabled");
 
         Path dhProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
-        String dhProgramSource = Files.readString(dhProgramFile);
+        String dhProgramSource = readSource(dhProgramFile);
         assertFalse(dhProgramSource.contains("GlStateManager._enableDepthTest("),
             "IrisGenericRenderProgram should not call removed GlStateManager._enableDepthTest wrapper");
         assertFalse(dhProgramSource.contains("GlStateManager._depthFunc("),
@@ -2826,7 +2830,7 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should no longer expose depth-write mask wrapper methods");
 
         Path depthColorStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/DepthColorStorage.java");
-        String depthColorStorageSource = Files.readString(depthColorStorageFile);
+        String depthColorStorageSource = readSource(depthColorStorageFile);
         assertTrue(depthColorStorageSource.contains("public static void setDepthMask("),
             "DepthColorStorage should expose lock-aware setDepthMask after _depthMask wrapper removal");
         assertFalse(depthColorStorageSource.contains("GlStateManager.DEPTH"),
@@ -2838,7 +2842,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dColorMaskWrapperRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _colorMask("),
             "GlStateManager should no longer expose _colorMask wrapper");
@@ -2848,14 +2852,14 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer define color-mask state helper class");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._colorMask("),
             "GlCommandEncoder should not call removed GlStateManager._colorMask wrapper");
         assertTrue(encoderSource.contains("DepthColorStorage.setColorMask("),
             "GlCommandEncoder should route color-mask changes through DepthColorStorage.setColorMask");
 
         Path depthColorStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/DepthColorStorage.java");
-        String depthColorStorageSource = Files.readString(depthColorStorageFile);
+        String depthColorStorageSource = readSource(depthColorStorageFile);
         assertFalse(depthColorStorageSource.contains("GlStateManager._colorMask("),
             "DepthColorStorage should not call removed GlStateManager._colorMask wrapper");
         assertTrue(depthColorStorageSource.contains("public static void setColorMask("),
@@ -2869,7 +2873,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dBlendWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _enableBlend("),
             "GlStateManager should no longer expose _enableBlend wrapper");
@@ -2891,7 +2895,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer define BooleanState helper class");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._enableBlend("),
             "GlCommandEncoder should not call removed GlStateManager._enableBlend wrapper");
         assertFalse(encoderSource.contains("GlStateManager._disableBlend("),
@@ -2904,7 +2908,7 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should route blend functions through BlendModeStorage.setBlendFuncSeparate");
 
         Path blendStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/BlendModeStorage.java");
-        String blendStorageSource = Files.readString(blendStorageFile);
+        String blendStorageSource = readSource(blendStorageFile);
         assertTrue(blendStorageSource.contains("public static void setBlendEnabled("),
             "BlendModeStorage should expose setBlendEnabled helper after wrapper removal");
         assertTrue(blendStorageSource.contains("public static void setBlendFuncSeparate("),
@@ -2927,7 +2931,7 @@ public class Phase3DrawPathTest {
             "BlendModeStorage should no longer read or write blend state through GlStateManager.BLEND");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertTrue(irisRenderSystemSource.contains("public static void notifyBlendFuncChanged("),
             "IrisRenderSystem should expose blend-function notifier trigger after migration");
         assertTrue(irisRenderSystemSource.contains("StateUpdateNotifiers.blendFuncNotifier"),
@@ -2938,7 +2942,7 @@ public class Phase3DrawPathTest {
             "IrisRenderSystem should invalidate blend state through BlendModeStorage helper");
 
         Path commonUniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/CommonUniforms.java");
-        String commonUniformsSource = Files.readString(commonUniformsFile);
+        String commonUniformsSource = readSource(commonUniformsFile);
         assertFalse(commonUniformsSource.contains("GlStateManager.BLEND"),
             "CommonUniforms should not read blend state directly from GlStateManager");
         assertTrue(commonUniformsSource.contains("BlendModeStorage.isBlendEnabled("),
@@ -2963,7 +2967,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testCapabilityCallsitesUseTypedEnumsForKnownStateToggles() throws IOException {
         Path blendStorageFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/blending/BlendModeStorage.java");
-        String blendStorageSource = Files.readString(blendStorageFile);
+        String blendStorageSource = readSource(blendStorageFile);
         assertTrue(blendStorageSource.contains("VulkanicCapability.BLEND"),
             "BlendModeStorage should use typed VulkanicCapability.BLEND for blend toggles");
         assertFalse(blendStorageSource.contains("setCapabilityEnabled(ctx, VulkanicAPI.GL_BLEND"),
@@ -3104,34 +3108,34 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dUseProgramWrapperRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _glUseProgram("),
             "GlStateManager should no longer expose _glUseProgram wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._glUseProgram("),
             "GlCommandEncoder should not call removed GlStateManager._glUseProgram wrapper");
         assertTrue(encoderSource.contains("IrisRenderSystem.useProgram("),
             "GlCommandEncoder should bind programs through IrisRenderSystem.useProgram");
 
         Path programFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/Program.java");
-        String programSource = Files.readString(programFile);
+        String programSource = readSource(programFile);
         assertFalse(programSource.contains("GlStateManager._glUseProgram("),
             "Program should not call removed GlStateManager._glUseProgram wrapper");
         assertTrue(programSource.contains("IrisRenderSystem.useProgram("),
             "Program should bind programs through IrisRenderSystem.useProgram");
 
         Path computeProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ComputeProgram.java");
-        String computeProgramSource = Files.readString(computeProgramFile);
+        String computeProgramSource = readSource(computeProgramFile);
         assertFalse(computeProgramSource.contains("GlStateManager._glUseProgram("),
             "ComputeProgram should not call removed GlStateManager._glUseProgram wrapper");
         assertTrue(computeProgramSource.contains("IrisRenderSystem.useProgram("),
             "ComputeProgram should bind programs through IrisRenderSystem.useProgram");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertTrue(irisRenderSystemSource.contains("public static void useProgram("),
             "IrisRenderSystem should provide useProgram helper after _glUseProgram removal");
         assertTrue(irisRenderSystemSource.contains("ImmediateState.usingTessellation = false"),
@@ -3141,13 +3145,13 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dActiveTextureWrapperRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _activeTexture("),
             "GlStateManager should no longer expose _activeTexture wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._activeTexture("),
             "GlCommandEncoder should not call removed GlStateManager._activeTexture wrapper");
         assertFalse(encoderSource.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 +"),
@@ -3156,7 +3160,7 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should route active texture changes through IrisRenderSystem.setActiveTextureUnitIndex");
 
         Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
-        String sodiumShaderSource = Files.readString(sodiumShaderFile);
+        String sodiumShaderSource = readSource(sodiumShaderFile);
         assertFalse(sodiumShaderSource.contains("GlStateManager._activeTexture("),
             "SodiumShader should not call removed GlStateManager._activeTexture wrapper");
         assertFalse(sodiumShaderSource.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 +"),
@@ -3170,12 +3174,12 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should not call removed GlStateManager._activeTexture wrapper");
 
         Path dhTextureStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/DhTextureState.java");
-        String dhTextureStateSource = Files.readString(dhTextureStateFile);
+        String dhTextureStateSource = readSource(dhTextureStateFile);
         assertTrue(dhTextureStateSource.contains("IrisRenderSystem.setActiveTexture("),
             "DhTextureState should route active texture changes through IrisRenderSystem.setActiveTexture");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertTrue(irisRenderSystemSource.contains("public static void setActiveTexture("),
             "IrisRenderSystem should provide setActiveTexture helper after _activeTexture removal");
         assertTrue(irisRenderSystemSource.contains("public static void setActiveTextureUnitIndex("),
@@ -3185,7 +3189,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testIrisTextureStateAccessUsesIrisRenderSystemHelpers() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
         assertFalse(stateManagerSource.contains("public static int activeTexture"),
             "GlStateManager should no longer own activeTexture state field");
         assertFalse(stateManagerSource.contains("public static final GlStateManager.TextureState[] TEXTURES"),
@@ -3194,7 +3198,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer define TextureState helper class");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
 
         assertTrue(irisRenderSystemSource.contains("public static int getActiveTextureUnitIndex("),
             "IrisRenderSystem should expose getActiveTextureUnitIndex helper for active texture state");
@@ -3218,14 +3222,14 @@ public class Phase3DrawPathTest {
             "IrisRenderSystem should not read texture bindings from GlStateManager");
 
         Path programSamplersFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
-        String programSamplersSource = Files.readString(programSamplersFile);
+        String programSamplersSource = readSource(programSamplersFile);
         assertFalse(programSamplersSource.contains("GlStateManager.activeTexture"),
             "ProgramSamplers should not read active texture directly from GlStateManager");
         assertTrue(programSamplersSource.contains("IrisRenderSystem.getActiveTextureUnitIndex("),
             "ProgramSamplers should read active texture through IrisRenderSystem helper");
 
         Path depthCopyStrategyFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/DepthCopyStrategy.java");
-        String depthCopyStrategySource = Files.readString(depthCopyStrategyFile);
+        String depthCopyStrategySource = readSource(depthCopyStrategyFile);
         assertFalse(depthCopyStrategySource.contains("GlStateManager.TEXTURES[GlStateManager.activeTexture].binding"),
             "DepthCopyStrategy should not read active-unit binding directly from GlStateManager");
         assertTrue(depthCopyStrategySource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
@@ -3242,7 +3246,7 @@ public class Phase3DrawPathTest {
             "DepthCopyStrategy should blit combined depth-stencil through IrisRenderSystem intent helper");
 
         Path customTextureManagerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CustomTextureManager.java");
-        String customTextureManagerSource = Files.readString(customTextureManagerFile);
+        String customTextureManagerSource = readSource(customTextureManagerFile);
         assertFalse(customTextureManagerSource.contains("GlStateManager.activeTexture"),
             "CustomTextureManager should not read active texture directly from GlStateManager");
         assertFalse(customTextureManagerSource.contains("GlStateManager.TEXTURES"),
@@ -3253,14 +3257,14 @@ public class Phase3DrawPathTest {
             "CustomTextureManager should read texture bindings through IrisRenderSystem helper");
 
         Path compositeRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java");
-        String compositeRendererSource = Files.readString(compositeRendererFile);
+        String compositeRendererSource = readSource(compositeRendererFile);
         assertFalse(compositeRendererSource.contains("GlStateManager.TEXTURES"),
             "CompositeRenderer should not read texture bindings directly from GlStateManager");
         assertTrue(compositeRendererSource.contains("IrisRenderSystem.getTextureBinding("),
             "CompositeRenderer should check bindings through IrisRenderSystem helper");
 
         Path finalPassRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java");
-        String finalPassRendererSource = Files.readString(finalPassRendererFile);
+        String finalPassRendererSource = readSource(finalPassRendererFile);
         assertFalse(finalPassRendererSource.contains("GlStateManager.TEXTURES"),
             "FinalPassRenderer should not read texture bindings directly from GlStateManager");
         assertTrue(finalPassRendererSource.contains("IrisRenderSystem.getTextureBinding("),
@@ -3279,7 +3283,7 @@ public class Phase3DrawPathTest {
             "FinalPassRenderer should use VulkanicAPI default-2D copyTexSubImage2D overload");
 
         Path shadowRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderer.java");
-        String shadowRendererSource = Files.readString(shadowRendererFile);
+        String shadowRendererSource = readSource(shadowRendererFile);
         assertFalse(shadowRendererSource.contains("IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D"),
             "ShadowRenderer should not pass explicit GL_TEXTURE_2D when generating mipmaps");
         assertTrue(shadowRendererSource.contains("IrisRenderSystem.generateMipmaps(texture);"),
@@ -3294,7 +3298,7 @@ public class Phase3DrawPathTest {
             "ShadowRenderer should set nearest filtering through IrisRenderSystem texture intent helper");
 
         Path colorSpaceConverterFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/colorspace/ColorSpaceFragmentConverter.java");
-        String colorSpaceConverterSource = Files.readString(colorSpaceConverterFile);
+        String colorSpaceConverterSource = readSource(colorSpaceConverterFile);
         assertFalse(colorSpaceConverterSource.contains("IrisRenderSystem.texImage2D(swapTexture, VulkanicAPI.GL_TEXTURE_2D"),
             "ColorSpaceFragmentConverter should not pass explicit GL_TEXTURE_2D when allocating swap texture");
         assertTrue(colorSpaceConverterSource.contains("IrisRenderSystem.texImage2D(swapTexture, 0"),
@@ -3307,7 +3311,7 @@ public class Phase3DrawPathTest {
             "ColorSpaceFragmentConverter should copy texture data through IrisRenderSystem default-2D helper");
 
         Path glFramebufferFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java");
-        String glFramebufferSource = Files.readString(glFramebufferFile);
+        String glFramebufferSource = readSource(glFramebufferFile);
         assertFalse(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D"),
             "GlFramebuffer should not pass explicit GL_TEXTURE_2D for depth attachment");
         assertFalse(glFramebufferSource.contains("IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + index, VulkanicAPI.GL_TEXTURE_2D"),
@@ -3330,49 +3334,49 @@ public class Phase3DrawPathTest {
             "GlFramebuffer should query status through IrisRenderSystem default-target helper");
 
         Path dhFramebufferWrapperFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/DhFrameBufferWrapper.java");
-        String dhFramebufferWrapperSource = Files.readString(dhFramebufferWrapperFile);
+        String dhFramebufferWrapperSource = readSource(dhFramebufferWrapperFile);
         assertFalse(dhFramebufferWrapperSource.contains("IrisRenderSystem.checkFramebufferStatus(VulkanicAPI.GL_FRAMEBUFFER)"),
             "DhFrameBufferWrapper should not hard-code GL_FRAMEBUFFER target in status query path");
         assertTrue(dhFramebufferWrapperSource.contains("IrisRenderSystem.checkFramebufferStatus()"),
             "DhFrameBufferWrapper should query status through IrisRenderSystem default-target helper");
 
         Path pipelineFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java");
-        String pipelineSource = Files.readString(pipelineFile);
+        String pipelineSource = readSource(pipelineFile);
         assertFalse(pipelineSource.contains("GlStateManager.TEXTURES[GlStateManager.activeTexture].binding"),
             "IrisRenderingPipeline should not read active-unit binding directly from GlStateManager");
         assertTrue(pipelineSource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
             "IrisRenderingPipeline should read active-unit binding through IrisRenderSystem helper");
 
         Path textureInfoCacheFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureInfoCache.java");
-        String textureInfoCacheSource = Files.readString(textureInfoCacheFile);
+        String textureInfoCacheSource = readSource(textureInfoCacheFile);
         assertFalse(textureInfoCacheSource.contains("GlStateManager.TEXTURES[GlStateManager.activeTexture].binding"),
             "TextureInfoCache should not read active-unit binding directly from GlStateManager");
         assertTrue(textureInfoCacheSource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
             "TextureInfoCache should read active-unit binding through IrisRenderSystem helper");
 
         Path pbrTextureManagerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/texture/PBRTextureManager.java");
-        String pbrTextureManagerSource = Files.readString(pbrTextureManagerFile);
+        String pbrTextureManagerSource = readSource(pbrTextureManagerFile);
         assertFalse(pbrTextureManagerSource.contains("GlStateManager.TEXTURES[GlStateManager.activeTexture].binding"),
             "PBRTextureManager should not read active-unit binding directly from GlStateManager");
         assertTrue(pbrTextureManagerSource.contains("IrisRenderSystem.getBoundTextureOnActiveUnit("),
             "PBRTextureManager should read active-unit binding through IrisRenderSystem helper");
 
         Path programSamplersFile2 = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramSamplers.java");
-        String programSamplersSource2 = Files.readString(programSamplersFile2);
+        String programSamplersSource2 = readSource(programSamplersFile2);
         assertFalse(programSamplersSource2.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 +"),
             "ProgramSamplers should not compute GL_TEXTURE0 offsets directly when restoring active texture");
         assertTrue(programSamplersSource2.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
             "ProgramSamplers should restore active texture through IrisRenderSystem index helper");
 
         Path pipelineManagerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/PipelineManager.java");
-        String pipelineManagerSource = Files.readString(pipelineManagerFile);
+        String pipelineManagerSource = readSource(pipelineManagerFile);
         assertFalse(pipelineManagerSource.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE0 +"),
             "PipelineManager should not compute GL_TEXTURE0 offsets directly in texture unit loops");
         assertTrue(pipelineManagerSource.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
             "PipelineManager should switch texture units through IrisRenderSystem index helper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("RenderSystem.setShaderTexture(0, sam)"),
             "GlCommandEncoder should not bridge Sampler0 through RenderSystem.setShaderTexture in Iris setup path");
         assertTrue(encoderSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, sam)"),
@@ -3383,49 +3387,49 @@ public class Phase3DrawPathTest {
 			"GlCommandEncoder should mirror draw-time sampler binds into the Iris texture-binding cache");
 
         Path commonUniformsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/uniforms/CommonUniforms.java");
-        String commonUniformsSource = Files.readString(commonUniformsFile);
+        String commonUniformsSource = readSource(commonUniformsFile);
         assertFalse(commonUniformsSource.contains("RenderSystem.getShaderTexture(0)"),
             "CommonUniforms should not read atlasSize texture through RenderSystem.getShaderTexture after Iris texture-state migration");
         assertTrue(commonUniformsSource.contains("IrisRenderSystem.getTextureBinding(0)"),
             "CommonUniforms should read atlasSize texture through IrisRenderSystem.getTextureBinding");
 
         Path extendedShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/ExtendedShader.java");
-        String extendedShaderSource = Files.readString(extendedShaderFile);
+        String extendedShaderSource = readSource(extendedShaderFile);
         assertFalse(extendedShaderSource.contains("RenderSystem.getShaderTexture(0)"),
             "ExtendedShader should not read intensity swizzle texture through RenderSystem.getShaderTexture after Iris texture-state migration");
         assertTrue(extendedShaderSource.contains("IrisRenderSystem.getTextureBinding(0)"),
             "ExtendedShader should read intensity swizzle texture through IrisRenderSystem.getTextureBinding");
 
         Path sodiumShaderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/programs/SodiumShader.java");
-        String sodiumShaderSource = Files.readString(sodiumShaderFile);
+        String sodiumShaderSource = readSource(sodiumShaderFile);
         assertFalse(sodiumShaderSource.contains("RenderSystem.setShaderTexture(0, pass.getAtlas())"),
             "SodiumShader should not bridge atlas binding through RenderSystem.setShaderTexture after Iris texture-state migration");
         assertTrue(sodiumShaderSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, pass.getAtlas())"),
             "SodiumShader should notify Iris texture tracking directly for atlas binding");
 
         Path dhLodProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisLodRenderProgram.java");
-        String dhLodProgramSource = Files.readString(dhLodProgramFile);
+        String dhLodProgramSource = readSource(dhLodProgramFile);
         assertFalse(dhLodProgramSource.contains("RenderSystem.getShaderTexture(2)"),
             "IrisLodRenderProgram should not read lightmap texture through RenderSystem.getShaderTexture after Iris texture-state migration");
         assertTrue(dhLodProgramSource.contains("IrisRenderSystem.getTextureBinding(2)"),
             "IrisLodRenderProgram should read lightmap texture through IrisRenderSystem.getTextureBinding");
 
         Path dhGenericProgramFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
-        String dhGenericProgramSource = Files.readString(dhGenericProgramFile);
+        String dhGenericProgramSource = readSource(dhGenericProgramFile);
         assertFalse(dhGenericProgramSource.contains("RenderSystem.getShaderTexture(2)"),
             "IrisGenericRenderProgram should not read lightmap texture through RenderSystem.getShaderTexture after Iris texture-state migration");
         assertTrue(dhGenericProgramSource.contains("IrisRenderSystem.getTextureBinding(2)"),
             "IrisGenericRenderProgram should read lightmap texture through IrisRenderSystem.getTextureBinding");
 
         Path guiUtilFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gui/GuiUtil.java");
-        String guiUtilSource = Files.readString(guiUtilFile);
+        String guiUtilSource = readSource(guiUtilFile);
         assertFalse(guiUtilSource.contains("RenderSystem.setShaderTexture(0"),
             "GuiUtil should not bind widget texture through RenderSystem.setShaderTexture after Iris texture-state migration");
         assertTrue(guiUtilSource.contains("TextureTracker.INSTANCE.onSetShaderTexture(0, textureView)"),
             "GuiUtil should notify Iris texture tracking directly when binding widget texture");
 
         Path horizonRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java");
-        String horizonRendererSource = Files.readString(horizonRendererFile);
+        String horizonRendererSource = readSource(horizonRendererFile);
         assertFalse(horizonRendererSource.contains("RenderSystem.getShaderTexture(i)"),
             "HorizonRenderer should not read shader samplers through RenderSystem.getShaderTexture after Iris texture-state migration");
         assertTrue(horizonRendererSource.contains("IrisRenderSystem.getTextureBinding(i)"),
@@ -3434,14 +3438,14 @@ public class Phase3DrawPathTest {
             "HorizonRenderer should resolve bound textures through TextureTracker before binding samplers");
 
         Path irisPipelineFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java");
-        String irisPipelineSource = Files.readString(irisPipelineFile);
+        String irisPipelineSource = readSource(irisPipelineFile);
         assertFalse(irisPipelineSource.contains("RenderSystem.setShaderTexture(i, null)"),
             "IrisRenderingPipeline destroy path should not clear shader textures through RenderSystem.setShaderTexture");
         assertTrue(irisPipelineSource.contains("IrisRenderSystem.setTextureBinding(i, 0)"),
             "IrisRenderingPipeline destroy path should clear cached texture bindings through IrisRenderSystem.setTextureBinding");
 
         Path renderStateShardFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderStateShard.java");
-        String renderStateShardSource = Files.readString(renderStateShardFile);
+        String renderStateShardSource = readSource(renderStateShardFile);
         assertFalse(renderStateShardSource.contains("RenderSystem.setShaderTexture(i, abstractTexture.getTextureView())"),
             "RenderStateShard multi-texture setup should not bind shader textures through RenderSystem.setShaderTexture");
         assertFalse(renderStateShardSource.contains("RenderSystem.setShaderTexture(0, abstractTexture.getTextureView())"),
@@ -3459,7 +3463,7 @@ public class Phase3DrawPathTest {
             "RenderStateShard multi-texture setup should notify TextureTracker for each texture unit binding");
 
         Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
-        String renderTypeSource = Files.readString(renderTypeFile);
+        String renderTypeSource = readSource(renderTypeFile);
         assertFalse(renderTypeSource.contains("RenderSystem.getShaderTexture(i)"),
             "RenderType draw path should not fetch samplers through RenderSystem.getShaderTexture");
         assertTrue(renderTypeSource.contains("IrisRenderSystem.getTextureBinding(i)"),
@@ -3470,21 +3474,21 @@ public class Phase3DrawPathTest {
             "RenderType draw path should resolve texture views through TextureTracker before binding samplers");
 
         Path textureTrackerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureTracker.java");
-        String textureTrackerSource = Files.readString(textureTrackerFile);
+        String textureTrackerSource = readSource(textureTrackerFile);
         assertTrue(textureTrackerSource.contains("private final GpuTextureView[] shaderTexturesByUnit = new GpuTextureView[128];"),
             "TextureTracker should maintain per-unit shader texture view cache for robust sampler binding");
         assertTrue(textureTrackerSource.contains("public GpuTextureView getShaderTexture(int unit)"),
             "TextureTracker should expose per-unit shader texture lookup for RenderType sampler binding");
 
         Path abstractTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/AbstractTexture.java");
-        String abstractTextureSource = Files.readString(abstractTextureFile);
+        String abstractTextureSource = readSource(abstractTextureFile);
         assertTrue(containsAny(abstractTextureSource,
             "TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicAPI.getTextureHandle(lastChecked), this)",
             "TextureTracker.INSTANCE.trackTexture(net.vulkanic.VulkanicCoreAPI.textureId(lastChecked), this)"),
             "AbstractTexture should track textures when getTextureView() is used so RenderType sampler binding cannot silently drop GUI/item textures");
 
         Path lightTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LightTexture.java");
-        String lightTextureSource = Files.readString(lightTextureFile);
+        String lightTextureSource = readSource(lightTextureFile);
         assertFalse(lightTextureSource.contains("RenderSystem.setShaderTexture(2, null)"),
             "LightTexture should not disable light layer via RenderSystem.setShaderTexture bridge");
         assertFalse(lightTextureSource.contains("RenderSystem.setShaderTexture(2, this.textureView)"),
@@ -3498,7 +3502,7 @@ public class Phase3DrawPathTest {
             "LightTexture should enable light layer through VulkanicAPI texture-view seam");
 
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
-        String renderSystemSource = Files.readString(renderSystemFile);
+        String renderSystemSource = readSource(renderSystemFile);
         assertFalse(renderSystemSource.contains("GpuTextureView[] shaderTextures"),
             "RenderSystem should not maintain a local shaderTextures array after Iris/Vulkanic texture-state migration");
         assertFalse(renderSystemSource.contains("shaderTextures[i] ="),
@@ -3553,7 +3557,7 @@ public class Phase3DrawPathTest {
             "RenderSystem should not own shader line width getter after migration to VulkanicAPI");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
         assertTrue(vulkanicApiSource.contains("public static void queueFencedTask("),
             "VulkanicAPI should expose queueFencedTask for backend-owned GPU callback scheduling");
         assertTrue(vulkanicApiSource.contains("public static void executePendingFenceTasks("),
@@ -3607,14 +3611,14 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should schedule fenced callbacks through VulkanicAPI.queueFencedTask");
 
         Path minecraftFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java");
-        String minecraftSource = Files.readString(minecraftFile);
+        String minecraftSource = readSource(minecraftFile);
         assertFalse(minecraftSource.contains("RenderSystem.executePendingTasks()"),
             "Minecraft render loop should not execute GPU pending tasks through RenderSystem.executePendingTasks");
         assertTrue(minecraftSource.contains("VulkanicAPI.executePendingFenceTasks()"),
             "Minecraft render loop should execute GPU pending tasks through VulkanicAPI.executePendingFenceTasks");
 
         Path gameRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GameRenderer.java");
-        String gameRendererSource = Files.readString(gameRendererFile);
+        String gameRendererSource = readSource(gameRendererFile);
         assertFalse(gameRendererSource.contains("RenderSystem.setShaderFog("),
             "GameRenderer should not set fog uniforms through RenderSystem after VulkanicAPI migration");
         assertTrue(gameRendererSource.contains("VulkanicAPI.setShaderFog("),
@@ -3629,14 +3633,14 @@ public class Phase3DrawPathTest {
             "GameRenderer should reset texture matrix through VulkanicAPI after migration");
 
         Path fogRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/fog/FogRenderer.java");
-        String fogRendererSource = Files.readString(fogRendererFile);
+        String fogRendererSource = readSource(fogRendererFile);
         assertFalse(fogRendererSource.contains("RenderSystem.setShaderFog("),
             "FogRenderer should not initialize fog uniforms through RenderSystem after VulkanicAPI migration");
         assertTrue(fogRendererSource.contains("VulkanicAPI.setShaderFog("),
             "FogRenderer should initialize fog uniforms through VulkanicAPI after migration");
 
         Path levelRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/LevelRenderer.java");
-        String levelRendererSource = Files.readString(levelRendererFile);
+        String levelRendererSource = readSource(levelRendererFile);
         assertFalse(levelRendererSource.contains("RenderSystem.getShaderFog("),
             "LevelRenderer should not read fog uniforms through RenderSystem after VulkanicAPI migration");
         assertFalse(levelRendererSource.contains("RenderSystem.setShaderFog("),
@@ -3647,7 +3651,7 @@ public class Phase3DrawPathTest {
             "LevelRenderer should set fog uniforms through VulkanicAPI after migration");
 
         Path particleFeatureRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java");
-        String particleFeatureRendererSource = Files.readString(particleFeatureRendererFile);
+        String particleFeatureRendererSource = readSource(particleFeatureRendererFile);
         assertFalse(particleFeatureRendererSource.contains("RenderSystem.getShaderFog()"),
             "ParticleFeatureRenderer should not read fog uniforms through RenderSystem after VulkanicAPI migration");
         assertTrue(particleFeatureRendererSource.contains("VulkanicAPI.getShaderFog()"),
@@ -3658,21 +3662,21 @@ public class Phase3DrawPathTest {
             "ParticleFeatureRenderer should read projection matrix through VulkanicAPI after migration");
 
         Path lightingFile = SRC_MAIN_JAVA.resolve("net/blaze3d/platform/Lighting.java");
-        String lightingSource = Files.readString(lightingFile);
+        String lightingSource = readSource(lightingFile);
         assertFalse(lightingSource.contains("RenderSystem.setShaderLights("),
             "Lighting should not publish lighting uniforms through RenderSystem after VulkanicAPI migration");
         assertTrue(lightingSource.contains("VulkanicAPI.setShaderLights("),
             "Lighting should publish lighting uniforms through VulkanicAPI after migration");
 
         Path globalSettingsUniformFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/GlobalSettingsUniform.java");
-        String globalSettingsUniformSource = Files.readString(globalSettingsUniformFile);
+        String globalSettingsUniformSource = readSource(globalSettingsUniformFile);
         assertFalse(globalSettingsUniformSource.contains("RenderSystem.setGlobalSettingsUniform("),
             "GlobalSettingsUniform should not publish globals UBO through RenderSystem after VulkanicAPI migration");
         assertTrue(globalSettingsUniformSource.contains("VulkanicAPI.setGlobalSettingsUniform("),
             "GlobalSettingsUniform should publish globals UBO through VulkanicAPI after migration");
 
         Path postPassFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/PostPass.java");
-        String postPassSource = Files.readString(postPassFile);
+        String postPassSource = readSource(postPassFile);
         assertFalse(postPassSource.contains("RenderSystem.backupProjectionMatrix("),
             "PostPass should not backup projection through RenderSystem after VulkanicAPI migration");
         assertFalse(postPassSource.contains("RenderSystem.setProjectionMatrix("),
@@ -3687,7 +3691,7 @@ public class Phase3DrawPathTest {
             "PostPass should restore projection through VulkanicAPI after migration");
 
         Path renderStateShardProjectionFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderStateShard.java");
-        String renderStateShardProjectionSource = Files.readString(renderStateShardProjectionFile);
+        String renderStateShardProjectionSource = readSource(renderStateShardProjectionFile);
         assertFalse(renderStateShardProjectionSource.contains("RenderSystem.getProjectionType()"),
             "RenderStateShard should not read projection type through RenderSystem after VulkanicAPI migration");
         assertTrue(renderStateShardProjectionSource.contains("VulkanicAPI.getProjectionType()"),
@@ -3706,7 +3710,7 @@ public class Phase3DrawPathTest {
             "RenderStateShard should set line width through VulkanicAPI after migration");
 
         Path multiBufferSourceFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/MultiBufferSource.java");
-        String multiBufferSourceSource = Files.readString(multiBufferSourceFile);
+        String multiBufferSourceSource = readSource(multiBufferSourceFile);
         assertFalse(multiBufferSourceSource.contains("RenderSystem.getProjectionType()"),
             "MultiBufferSource should not read projection type through RenderSystem after VulkanicAPI migration");
         assertTrue(multiBufferSourceSource.contains("VulkanicAPI.getProjectionType()"),
@@ -3726,7 +3730,7 @@ public class Phase3DrawPathTest {
             "RenderType should read line width through VulkanicAPI after migration");
 
         Path quadParticleFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java");
-        String quadParticleSource = Files.readString(quadParticleFile);
+        String quadParticleSource = readSource(quadParticleFile);
         assertFalse(quadParticleSource.contains("RenderSystem.getTextureMatrix()"),
             "QuadParticleRenderState should not read texture matrix through RenderSystem after VulkanicAPI migration");
         assertFalse(quadParticleSource.contains("RenderSystem.getShaderLineWidth()"),
@@ -3746,7 +3750,7 @@ public class Phase3DrawPathTest {
             "HorizonRenderer should read line width through VulkanicAPI after migration");
 
         Path overlayTextureFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/texture/OverlayTexture.java");
-        String overlayTextureSource = Files.readString(overlayTextureFile);
+        String overlayTextureSource = readSource(overlayTextureFile);
         assertFalse(overlayTextureSource.contains("RenderSystem.setupOverlayColor("),
             "OverlayTexture should not route overlay setup through RenderSystem.setupOverlayColor");
         assertFalse(overlayTextureSource.contains("RenderSystem.teardownOverlayColor("),
@@ -3764,7 +3768,7 @@ public class Phase3DrawPathTest {
             "OverlayTexture should clear Sampler1 texture view updates from TextureTracker when unbinding");
 
         Path graphicsBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
-        String graphicsBackendSource = Files.readString(graphicsBackendFile);
+        String graphicsBackendSource = readSource(graphicsBackendFile);
         assertTrue(graphicsBackendSource.contains("default void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView)"),
             "GraphicsBackend should expose texture-view texture-unit binding seam for backend-neutral callsites");
         assertTrue(vulkanicApiSource.contains("public static void bindTextureUnit(CommandContext ctx, int unit, GpuTextureView textureView)"),
@@ -3786,7 +3790,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : dhFiles) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("DhTextureState.setActiveTextureUnit(VulkanicAPI.GL_TEXTURE"),
                 file.getFileName() + " should not select texture units through raw GL_TEXTURE constants");
             assertTrue(source.contains("DhTextureState.setActiveTextureUnitIndex("),
@@ -3803,7 +3807,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : irisFiles) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("IrisRenderSystem.setActiveTexture(VulkanicAPI.GL_TEXTURE"),
                 file.getFileName() + " should not select texture units through raw GL_TEXTURE constants");
             assertTrue(source.contains("IrisRenderSystem.setActiveTextureUnitIndex("),
@@ -3811,14 +3815,14 @@ public class Phase3DrawPathTest {
         }
 
         Path defaultShaderInterfaceFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/DefaultShaderInterface.java");
-        String defaultShaderInterfaceSource = Files.readString(defaultShaderInterfaceFile);
+        String defaultShaderInterfaceSource = readSource(defaultShaderInterfaceFile);
         assertFalse(defaultShaderInterfaceSource.contains("VulkanicAPI.setActiveTextureUnit(ctx, VulkanicAPI.GL_TEXTURE0 + slot.ordinal())"),
             "DefaultShaderInterface should not compute GL texture units via GL_TEXTURE0 arithmetic");
         assertTrue(defaultShaderInterfaceSource.contains("VulkanicAPI.setActiveTextureUnitIndex(ctx, slot.ordinal())"),
             "DefaultShaderInterface should select texture units via VulkanicAPI index helper");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertTrue(irisRenderSystemSource.contains("VulkanicAPI.textureUnitToIndex(textureUnit)"),
             "IrisRenderSystem should convert GL texture units to indices via VulkanicAPI helper");
         assertTrue(irisRenderSystemSource.contains("VulkanicAPI.setActiveTextureUnitIndex(VulkanicAPI.getCommandContext(), textureUnitIndex)"),
@@ -3827,7 +3831,7 @@ public class Phase3DrawPathTest {
             "IrisRenderSystem index path should not compute GL texture units inline");
 
         Path glEnumsFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/GLEnums.java");
-        String glEnumsSource = Files.readString(glEnumsFile);
+        String glEnumsSource = readSource(glEnumsFile);
         assertTrue(glEnumsSource.contains("if (glEnum >= VulkanicAPI.GL_TEXTURE0 && glEnum <= VulkanicAPI.GL_TEXTURE31)"),
             "GLEnums should map texture binding points through GL_TEXTURE range check");
         assertTrue(glEnumsSource.contains("\"GL_TEXTURE\" + VulkanicAPI.textureUnitToIndex(glEnum)"),
@@ -3839,13 +3843,13 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dClearWrapperRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _clear("),
             "GlStateManager should no longer expose _clear wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._clear("),
             "GlCommandEncoder should not call removed GlStateManager._clear wrapper");
         assertFalse(encoderSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_COLOR_BUFFER_BIT)"),
@@ -3868,7 +3872,7 @@ public class Phase3DrawPathTest {
             "GlCommandEncoder should clear depth through VulkanicAPI clearDepthBufferWithMacosWorkaround helper");
 
         Path clearPassFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/ClearPass.java");
-        String clearPassSource = Files.readString(clearPassFile);
+        String clearPassSource = readSource(clearPassFile);
         assertFalse(clearPassSource.contains("GlStateManager._clear("),
             "ClearPass should not call removed GlStateManager._clear wrapper");
         assertFalse(clearPassSource.contains("VulkanicAPI.clearBuffersWithMacosWorkaround("),
@@ -3882,20 +3886,20 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dBindTextureWrapperRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _bindTexture("),
             "GlStateManager should no longer expose _bindTexture wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._bindTexture("),
             "GlCommandEncoder should not call removed GlStateManager._bindTexture wrapper");
         assertTrue(encoderSource.contains("VulkanicAPI.bindTexture2D("),
             "GlCommandEncoder should bind 2D textures directly through VulkanicAPI.bindTexture2D");
 
         Path renderTargetsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTargets.java");
-        String renderTargetsSource = Files.readString(renderTargetsFile);
+        String renderTargetsSource = readSource(renderTargetsFile);
         assertFalse(renderTargetsSource.contains("GlStateManager._bindTexture("),
             "RenderTargets should not call removed GlStateManager._bindTexture wrapper");
         assertFalse(renderTargetsSource.contains("IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D"),
@@ -3910,7 +3914,7 @@ public class Phase3DrawPathTest {
             "RenderTargets pre-translucent depth path should route through the shared depth copy strategy");
 
         Path depthCopyStrategyFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/texture/DepthCopyStrategy.java");
-        String depthCopyStrategySource = Files.readString(depthCopyStrategyFile);
+        String depthCopyStrategySource = readSource(depthCopyStrategyFile);
         assertTrue(depthCopyStrategySource.contains("fastestDepthSnapshot(boolean combinedStencilRequired)"),
             "DepthCopyStrategy should expose a dedicated depth snapshot selector");
         assertTrue(depthCopyStrategySource.contains("VulkanicAPI.isVulkanBackendSelected()"),
@@ -3919,12 +3923,12 @@ public class Phase3DrawPathTest {
             "DepthCopyStrategy should provide a depth-only framebuffer blit strategy");
 
         Path shadowRenderTargetsFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderTargets.java");
-        String shadowRenderTargetsSource = Files.readString(shadowRenderTargetsFile);
+        String shadowRenderTargetsSource = readSource(shadowRenderTargetsFile);
         assertTrue(shadowRenderTargetsSource.contains("DepthCopyStrategy.fastestDepthSnapshot(false).copy("),
             "ShadowRenderTargets should reuse the Vulkan-safe depth snapshot strategy after the initial blit");
 
         Path dhCompatInternalFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/compat/dh/DHCompatInternal.java");
-        String dhCompatInternalSource = Files.readString(dhCompatInternalFile);
+        String dhCompatInternalSource = readSource(dhCompatInternalFile);
         assertFalse(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D"),
             "DHCompatInternal should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
         assertTrue(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D(0"),
@@ -3939,7 +3943,7 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should not call removed GlStateManager._bindTexture wrapper");
 
         Path dhTextureStateFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/DhTextureState.java");
-        String dhTextureStateSource = Files.readString(dhTextureStateFile);
+        String dhTextureStateSource = readSource(dhTextureStateFile);
         assertTrue(dhTextureStateSource.contains("VulkanicAPI.bindTexture2D("),
             "DhTextureState should bind textures through VulkanicAPI.bindTexture2D");
     }
@@ -3947,7 +3951,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testIrisComputePipelinesFailOpenWhenComputeUnsupported() throws IOException {
         Path programBuilderFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/program/ProgramBuilder.java");
-        String programBuilderSource = Files.readString(programBuilderFile);
+        String programBuilderSource = readSource(programBuilderFile);
 
         assertTrue(programBuilderSource.contains("beginComputeIfSupported("),
             "ProgramBuilder should expose a compute fail-open helper for unsupported runtimes");
@@ -3964,25 +3968,25 @@ public class Phase3DrawPathTest {
         );
 
         for (String relative : pipelineFiles) {
-            String source = Files.readString(SRC_MAIN_JAVA.resolve(relative));
+            String source = readSource(SRC_MAIN_JAVA.resolve(relative));
             assertTrue(source.contains("ProgramBuilder.beginComputeIfSupported("),
                 "Iris compute pipeline should use compute fail-open helper: " + relative);
         }
 
-        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java")).contains("ProgramBuilder.beginCompute("),
+        assertFalse(readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java")).contains("ProgramBuilder.beginCompute("),
             "ShadowCompositeRenderer should not use fatal compute builder directly");
-        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java")).contains("ProgramBuilder.beginCompute("),
+        assertFalse(readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java")).contains("ProgramBuilder.beginCompute("),
             "CompositeRenderer should not use fatal compute builder directly");
-        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java")).contains("ProgramBuilder.beginCompute("),
+        assertFalse(readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java")).contains("ProgramBuilder.beginCompute("),
             "FinalPassRenderer should not use fatal compute builder directly");
-        assertFalse(Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java")).contains("ProgramBuilder.beginCompute("),
+        assertFalse(readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisRenderingPipeline.java")).contains("ProgramBuilder.beginCompute("),
             "IrisRenderingPipeline should not use fatal compute builder directly");
     }
 
     @Test
     public void testBlaze3dTextureLifecycleWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static int _genTexture("),
             "GlStateManager should no longer expose _genTexture wrapper");
@@ -3994,14 +3998,14 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose decrementTrackedTextures helper");
 
         Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String glDeviceSource = Files.readString(glDeviceFile);
+        String glDeviceSource = readSource(glDeviceFile);
         assertFalse(glDeviceSource.contains("GlStateManager._genTexture("),
             "GlDevice should not call removed GlStateManager._genTexture wrapper");
         assertTrue(glDeviceSource.contains("IrisRenderSystem.createTextureId("),
             "GlDevice should create textures through IrisRenderSystem.createTextureId");
 
         Path uniformFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/Uniform.java");
-        String uniformSource = Files.readString(uniformFile);
+        String uniformSource = readSource(uniformFile);
         assertFalse(uniformSource.contains("GlStateManager._genTexture("),
             "Uniform should not call removed GlStateManager._genTexture wrapper");
         assertFalse(uniformSource.contains("GlStateManager._deleteTexture("),
@@ -4012,7 +4016,7 @@ public class Phase3DrawPathTest {
             "Uniform should delete textures through IrisRenderSystem.deleteTextureId");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertTrue(irisRenderSystemSource.contains("public static int createTextureId("),
             "IrisRenderSystem should provide createTextureId helper after _genTexture removal");
         assertTrue(irisRenderSystemSource.contains("public static void deleteTextureId("),
@@ -4026,7 +4030,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dBufferTrackingMovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void incrementTrackedBuffers("),
             "GlStateManager should no longer expose incrementTrackedBuffers helper");
@@ -4034,21 +4038,21 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose decrementTrackedBuffers helper");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertTrue(irisRenderSystemSource.contains("public static void incrementTrackedBuffers("),
             "IrisRenderSystem should expose incrementTrackedBuffers helper after migration");
         assertTrue(irisRenderSystemSource.contains("public static void decrementTrackedBuffers("),
             "IrisRenderSystem should expose decrementTrackedBuffers helper after migration");
 
         Path dsaFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/DirectStateAccess.java");
-        String dsaSource = Files.readString(dsaFile);
+        String dsaSource = readSource(dsaFile);
         assertFalse(dsaSource.contains("GlStateManager.incrementTrackedBuffers("),
             "DirectStateAccess should not increment tracked buffers through GlStateManager");
         assertTrue(dsaSource.contains("IrisRenderSystem.incrementTrackedBuffers("),
             "DirectStateAccess should increment tracked buffers through IrisRenderSystem helper");
 
         Path glBufferFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlBuffer.java");
-        String glBufferSource = Files.readString(glBufferFile);
+        String glBufferSource = readSource(glBufferFile);
         assertFalse(glBufferSource.contains("GlStateManager.decrementTrackedBuffers("),
             "GlBuffer should not decrement tracked buffers through GlStateManager");
         assertTrue(glBufferSource.contains("IrisRenderSystem.decrementTrackedBuffers("),
@@ -4066,14 +4070,14 @@ public class Phase3DrawPathTest {
             "MinecraftGLWrapper should no longer expose buffer deletion wrapper methods");
 
         Path dhGlBufferFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/glObject/buffer/GLBuffer.java");
-        String dhGlBufferSource = Files.readString(dhGlBufferFile);
+        String dhGlBufferSource = readSource(dhGlBufferFile);
         assertTrue(dhGlBufferSource.contains("IrisRenderSystem.incrementTrackedBuffers("),
             "DH GLBuffer should increment tracked buffers through IrisRenderSystem helper");
         assertTrue(dhGlBufferSource.contains("IrisRenderSystem.decrementTrackedBuffers("),
             "DH GLBuffer should decrement tracked buffers through IrisRenderSystem helper");
 
         Path renderableBoxGroupFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/generic/RenderableBoxGroup.java");
-        String renderableBoxGroupSource = Files.readString(renderableBoxGroupFile);
+        String renderableBoxGroupSource = readSource(renderableBoxGroupFile);
         assertTrue(renderableBoxGroupSource.contains("IrisRenderSystem.incrementTrackedBuffers("),
             "RenderableBoxGroup should increment tracked buffers through IrisRenderSystem helper");
         assertTrue(renderableBoxGroupSource.contains("IrisRenderSystem.decrementTrackedBuffers("),
@@ -4083,13 +4087,13 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dTexImageWrapperRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _texImage2D("),
             "GlStateManager should no longer expose _texImage2D wrapper");
 
         Path glDeviceFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDevice.java");
-        String glDeviceSource = Files.readString(glDeviceFile);
+        String glDeviceSource = readSource(glDeviceFile);
         assertFalse(glDeviceSource.contains("GlStateManager._texImage2D("),
             "GlDevice should not call removed GlStateManager._texImage2D wrapper");
         assertTrue(glDeviceSource.contains("net.vulkanic.VulkanicAPI.uploadTexture2D("),
@@ -4110,7 +4114,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : files) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("uploadTexture2D(ctx, VulkanicAPI.GL_TEXTURE_2D"),
                 file.getFileName() + " should not pass explicit GL_TEXTURE_2D in uploadTexture2D");
             assertTrue(source.contains("uploadTexture2D(ctx, 0"),
@@ -4121,7 +4125,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testDistantHorizonsTargetFramebufferUsesRenderTargetResolutionSeam() throws IOException {
         Path wrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftRenderWrapper.java");
-        String wrapperSource = Files.readString(wrapperFile);
+        String wrapperSource = readSource(wrapperFile);
 
         assertFalse(wrapperSource.contains("return 0; // 0 is the ID for the default frame buffer"),
             "MinecraftRenderWrapper.getTargetFramebuffer should not hardcode default FBO 0");
@@ -4167,14 +4171,14 @@ public class Phase3DrawPathTest {
     @Test
     public void testDistantHorizonsRenderPathsGuardUnresolvedFramebufferIds() throws IOException {
         Path testRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/TestRenderer.java");
-        String testRendererSource = Files.readString(testRendererFile);
+        String testRendererSource = readSource(testRendererFile);
         assertTrue(testRendererSource.contains("if (!MC_RENDER.bindTargetRenderTarget(ctx))"),
             "TestRenderer should bind Minecraft's target render target through the wrapper seam");
         assertFalse(testRendererSource.contains("MC_RENDER.getTargetFramebuffer()"),
             "TestRenderer should avoid resolving raw target framebuffer ids in the render hot path");
 
         Path dhApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/DhApplyShader.java");
-        String dhApplySource = Files.readString(dhApplyFile);
+        String dhApplySource = readSource(dhApplyFile);
         assertTrue(dhApplySource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
             "DhApplyShader should use shared pre-bind precheck hook for unresolved resources");
         assertTrue(dhApplySource.contains("this.activeDhColorTextureId == -1 || this.activeDhDepthTextureId == -1")
@@ -4193,7 +4197,7 @@ public class Phase3DrawPathTest {
             "DhApplyShader should bind MC and DH outputs through owner seams instead of raw framebuffer ids");
 
         Path fadeApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FadeApplyShader.java");
-        String fadeApplySource = Files.readString(fadeApplyFile);
+        String fadeApplySource = readSource(fadeApplyFile);
         assertTrue(fadeApplySource.contains("public int fadeTexture = -1;"),
             "FadeApplyShader should initialize fadeTexture to unresolved sentinel -1");
         assertTrue(fadeApplySource.contains("public DhFramebuffer readFramebuffer;")
@@ -4213,7 +4217,7 @@ public class Phase3DrawPathTest {
             "FadeApplyShader should bind through framebuffer owners and MC/DH owner seams instead of cached draw framebuffer ids");
 
         Path fogApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogApplyShader.java");
-        String fogApplySource = Files.readString(fogApplyFile);
+        String fogApplySource = readSource(fogApplyFile);
         assertTrue(fogApplySource.contains("public int fogTexture = -1;"),
             "FogApplyShader should initialize fog texture id to unresolved sentinel -1");
         assertTrue(fogApplySource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
@@ -4229,7 +4233,7 @@ public class Phase3DrawPathTest {
             "FogApplyShader should bind framebuffer owners through the DH render-target seam");
 
         Path ssaoApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOApplyShader.java");
-        String ssaoApplySource = Files.readString(ssaoApplyFile);
+        String ssaoApplySource = readSource(ssaoApplyFile);
         assertTrue(ssaoApplySource.contains("public int ssaoTexture = -1;"),
             "SSAOApplyShader should initialize SSAO texture id to unresolved sentinel -1");
         assertTrue(ssaoApplySource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
@@ -4245,7 +4249,7 @@ public class Phase3DrawPathTest {
             "SSAOApplyShader should bind framebuffer owners through the DH render-target seam");
 
         Path dhFadeShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/DhFadeShader.java");
-        String dhFadeShaderSource = Files.readString(dhFadeShaderFile);
+        String dhFadeShaderSource = readSource(dhFadeShaderFile);
         assertTrue(dhFadeShaderSource.contains("public DhFramebuffer frameBuffer;")
                 && dhFadeShaderSource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
             "DhFadeShader should use shared pre-bind precheck hook for unresolved resources");
@@ -4260,7 +4264,7 @@ public class Phase3DrawPathTest {
             "DhFadeShader should bind cached validated framebuffer owners and texture ids resolved during precheck");
 
         Path vanillaFadeShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/VanillaFadeShader.java");
-        String vanillaFadeShaderSource = Files.readString(vanillaFadeShaderFile);
+        String vanillaFadeShaderSource = readSource(vanillaFadeShaderFile);
         assertTrue(vanillaFadeShaderSource.contains("public DhFramebuffer frameBuffer;")
                 && vanillaFadeShaderSource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
             "VanillaFadeShader should use shared pre-bind precheck hook for unresolved resources");
@@ -4278,7 +4282,7 @@ public class Phase3DrawPathTest {
             "VanillaFadeShader should bind cached validated MC/DH texture and framebuffer owners resolved during precheck");
 
         Path fogShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FogShader.java");
-        String fogShaderSource = Files.readString(fogShaderFile);
+        String fogShaderSource = readSource(fogShaderFile);
         assertTrue(fogShaderSource.contains("public DhFramebuffer frameBuffer;"),
             "FogShader should store its target as a framebuffer owner instead of a raw id");
         assertTrue(fogShaderSource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
@@ -4292,7 +4296,7 @@ public class Phase3DrawPathTest {
             "FogShader should bind cached validated framebuffer owners and depth texture ids resolved during precheck");
 
         Path ssaoShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOShader.java");
-        String ssaoShaderSource = Files.readString(ssaoShaderFile);
+        String ssaoShaderSource = readSource(ssaoShaderFile);
         assertTrue(ssaoShaderSource.contains("public DhFramebuffer frameBuffer;"),
             "SSAOShader should store its target as a framebuffer owner instead of a raw id");
         assertTrue(ssaoShaderSource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
@@ -4306,7 +4310,7 @@ public class Phase3DrawPathTest {
             "SSAOShader should bind cached validated framebuffer owners and depth texture ids resolved during precheck");
 
         Path vanillaFadeRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java");
-        String vanillaFadeRendererSource = Files.readString(vanillaFadeRendererFile);
+        String vanillaFadeRendererSource = readSource(vanillaFadeRendererFile);
         assertTrue(vanillaFadeRendererSource.contains("if (!MC_RENDER.mcRendersToFrameBuffer())"),
             "VanillaFadeRenderer should branch MC-color attachment setup based on render-target path");
         assertTrue(vanillaFadeRendererSource.contains("if (mcColorTextureId == -1)"),
@@ -4315,7 +4319,7 @@ public class Phase3DrawPathTest {
             "VanillaFadeRenderer should skip rendering when target viewport dimensions are invalid");
 
         Path fogRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/FogRenderer.java");
-        String fogRendererSource = Files.readString(fogRendererFile);
+        String fogRendererSource = readSource(fogRendererFile);
         assertTrue(fogRendererSource.contains("if (width <= 0 || height <= 0)"),
             "FogRenderer should skip rendering when target viewport dimensions are invalid");
         assertTrue(fogRendererSource.contains("private DhFramebuffer fogFramebuffer;")
@@ -4325,7 +4329,7 @@ public class Phase3DrawPathTest {
             "FogRenderer should manage its offscreen target through DhFramebuffer owner objects");
 
         Path ssaoRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/SSAORenderer.java");
-        String ssaoRendererSource = Files.readString(ssaoRendererFile);
+        String ssaoRendererSource = readSource(ssaoRendererFile);
         assertTrue(ssaoRendererSource.contains("if (width <= 0 || height <= 0)"),
             "SSAORenderer should skip rendering when target viewport dimensions are invalid");
         assertTrue(ssaoRendererSource.contains("private DhFramebuffer ssaoFramebuffer;")
@@ -4335,7 +4339,7 @@ public class Phase3DrawPathTest {
             "SSAORenderer should manage its offscreen target through DhFramebuffer owner objects");
 
         Path dhFadeRendererFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/DhFadeRenderer.java");
-        String dhFadeRendererSource = Files.readString(dhFadeRendererFile);
+        String dhFadeRendererSource = readSource(dhFadeRendererFile);
         assertTrue(dhFadeRendererSource.contains("if (width <= 0 || height <= 0)"),
             "DhFadeRenderer should skip rendering when target viewport dimensions are invalid");
         assertTrue(dhFadeRendererSource.contains("private DhFramebuffer fadeFramebuffer;")
@@ -4354,7 +4358,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : files) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("IrisRenderSystem.createTexture(VulkanicAPI.GL_TEXTURE_2D)"),
                 file.getFileName() + " should not pass explicit GL_TEXTURE_2D to IrisRenderSystem.createTexture");
             assertTrue(source.contains("IrisRenderSystem.createTexture2D()"),
@@ -4362,7 +4366,7 @@ public class Phase3DrawPathTest {
         }
 
         Path depthTextureFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/DepthTexture.java");
-        String depthTextureSource = Files.readString(depthTextureFile);
+        String depthTextureSource = readSource(depthTextureFile);
         assertFalse(depthTextureSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
             "DepthTexture should not set min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(depthTextureSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S"),
@@ -4373,7 +4377,7 @@ public class Phase3DrawPathTest {
             "DepthTexture should use IrisRenderSystem.setTextureWrapMode2D clamp helper");
 
         Path noiseTextureFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NoiseTexture.java");
-        String noiseTextureSource = Files.readString(noiseTextureFile);
+        String noiseTextureSource = readSource(noiseTextureFile);
         assertFalse(noiseTextureSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
             "NoiseTexture should not set min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(noiseTextureSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S"),
@@ -4388,7 +4392,7 @@ public class Phase3DrawPathTest {
             "NoiseTexture should use IrisRenderSystem.resetTextureLodRangeToZero helper");
 
         Path singleColorTextureFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/SingleColorTexture.java");
-        String singleColorTextureSource = Files.readString(singleColorTextureFile);
+        String singleColorTextureSource = readSource(singleColorTextureFile);
         assertFalse(singleColorTextureSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
             "SingleColorTexture should not set min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(singleColorTextureSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S"),
@@ -4399,7 +4403,7 @@ public class Phase3DrawPathTest {
             "SingleColorTexture should use IrisRenderSystem.setTextureWrapMode2D repeat helper");
 
         Path renderTargetFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/RenderTarget.java");
-        String renderTargetSource = Files.readString(renderTargetFile);
+        String renderTargetSource = readSource(renderTargetFile);
         assertFalse(renderTargetSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
             "RenderTarget should not set min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(renderTargetSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S"),
@@ -4412,7 +4416,7 @@ public class Phase3DrawPathTest {
             "RenderTarget should use IrisRenderSystem.setTextureWrapMode2D clamp helper");
 
         Path centerDepthSamplerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/CenterDepthSampler.java");
-        String centerDepthSamplerSource = Files.readString(centerDepthSamplerFile);
+        String centerDepthSamplerSource = readSource(centerDepthSamplerFile);
         assertFalse(centerDepthSamplerSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
             "CenterDepthSampler should not set min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(centerDepthSamplerSource.contains("IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_WRAP_S"),
@@ -4423,7 +4427,7 @@ public class Phase3DrawPathTest {
             "CenterDepthSampler should use IrisRenderSystem.setTextureWrapMode2D clamp helper");
 
         Path nativeImageBackedCustomTextureFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/backed/NativeImageBackedCustomTexture.java");
-        String nativeImageBackedCustomTextureSource = Files.readString(nativeImageBackedCustomTextureFile);
+        String nativeImageBackedCustomTextureSource = readSource(nativeImageBackedCustomTextureFile);
         assertFalse(nativeImageBackedCustomTextureSource.contains("IrisRenderSystem.texParameteri(getId(), VulkanicAPI.GL_TEXTURE_MIN_FILTER"),
             "NativeImageBackedCustomTexture should not set min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(nativeImageBackedCustomTextureSource.contains("IrisRenderSystem.texParameteri(getId(), VulkanicAPI.GL_TEXTURE_WRAP_S"),
@@ -4434,7 +4438,7 @@ public class Phase3DrawPathTest {
             "NativeImageBackedCustomTexture clamp path should use IrisRenderSystem.setTextureWrapMode2D helper");
 
         Path shadowRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowRenderer.java");
-        String shadowRendererSource = Files.readString(shadowRendererFile);
+        String shadowRendererSource = readSource(shadowRendererFile);
         assertFalse(shadowRendererSource.contains("IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR)"),
             "ShadowRenderer should not set linear min filter through raw GL_TEXTURE_MIN_FILTER pname constants");
         assertFalse(shadowRendererSource.contains("IrisRenderSystem.texParameteri(glTextureId, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST)"),
@@ -4445,7 +4449,7 @@ public class Phase3DrawPathTest {
             "ShadowRenderer nearest path should use IrisRenderSystem.setTextureNearestFiltering helper");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertTrue(irisRenderSystemSource.contains("public static void setTextureLinearFiltering(int texture)"),
             "IrisRenderSystem should expose setTextureLinearFiltering helper for object-DSA texture setup");
         assertTrue(irisRenderSystemSource.contains("public static void setTextureNearestFiltering(int texture)"),
@@ -4459,20 +4463,20 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dViewportWrapperRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _viewport("),
             "GlStateManager should no longer expose _viewport wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._viewport("),
             "GlCommandEncoder should not call removed GlStateManager._viewport wrapper");
         assertTrue(encoderSource.contains("VulkanicAPI.setDynamicViewport("),
             "GlCommandEncoder should set viewport through VulkanicAPI.setDynamicViewport");
 
         Path clearPassFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/targets/ClearPass.java");
-        String clearPassSource = Files.readString(clearPassFile);
+        String clearPassSource = readSource(clearPassFile);
         assertFalse(clearPassSource.contains("GlStateManager._viewport("),
             "ClearPass should not call removed GlStateManager._viewport wrapper");
         assertTrue(clearPassSource.contains("VulkanicAPI.setDynamicViewport("),
@@ -4482,7 +4486,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBlaze3dScissorToggleWrappersRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
-        String stateManagerSource = Files.readString(stateManagerFile);
+        String stateManagerSource = readSource(stateManagerFile);
 
         assertFalse(stateManagerSource.contains("public static void _enableScissorTest("),
             "GlStateManager should no longer expose _enableScissorTest wrapper");
@@ -4490,7 +4494,7 @@ public class Phase3DrawPathTest {
             "GlStateManager should no longer expose _disableScissorTest wrapper");
 
         Path encoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
-        String encoderSource = Files.readString(encoderFile);
+        String encoderSource = readSource(encoderFile);
         assertFalse(encoderSource.contains("GlStateManager._enableScissorTest("),
             "GlCommandEncoder should not call removed GlStateManager._enableScissorTest wrapper");
         assertFalse(encoderSource.contains("GlStateManager._disableScissorTest("),
@@ -4513,7 +4517,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGlDebugLabelUsesAgnosticLabelHelpers() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlDebugLabel.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("getInteger(VulkanicAPI.getImmediateContext(), 33512)"),
             "GlDebugLabel should not query max label length with hardcoded GL_MAX_LABEL_LENGTH literal 33512");
@@ -4543,7 +4547,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testNvidiaWorkaroundUsesDebugOutputSyncHelper() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/sodium/client/compatibility/workarounds/nvidia/NvidiaWorkarounds.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("setCapabilityEnabled(ctx, 33346, true)"),
             "NvidiaWorkarounds should not toggle GL_DEBUG_OUTPUT_SYNCHRONOUS using hardcoded literal 33346");
@@ -4576,7 +4580,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testCreateTextureViewFromGlHandleRemovedFromGraphicsBackend() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/vulkanic/GraphicsBackend.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         // The bridge method has been removed: GpuTexture now implements VulkanicTexture,
         // so no GL-handle bridge is needed.
@@ -4588,7 +4592,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGpuTextureImplementsVulkanicTextureInSource() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve("net/blaze3d/textures/GpuTexture.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertTrue(source.contains("implements") && source.contains("VulkanicTexture"),
             "GpuTexture must implement VulkanicTexture");
@@ -4603,7 +4607,7 @@ public class Phase3DrawPathTest {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/voxelmap/persistent/CompressibleGLBufferedImage.java");
         assertTrue(Files.exists(file), "CompressibleGLBufferedImage.java must exist");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("VulkanicAPI.bindTexture2D"),
             "CompressibleGLBufferedImage must no longer call bindTexture2D before mipmap generation; " +
@@ -4619,7 +4623,7 @@ public class Phase3DrawPathTest {
     public void testCompressibleGLBufferedImageDropsCommandContextImport() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/voxelmap/persistent/CompressibleGLBufferedImage.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertFalse(source.contains("import net.vulkanic.CommandContext;"),
             "CompressibleGLBufferedImage must not import CommandContext after the mipmap migration " +
@@ -4630,7 +4634,7 @@ public class Phase3DrawPathTest {
     public void testCompressibleGLBufferedImageStillCallsVulkanicAPI() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/voxelmap/persistent/CompressibleGLBufferedImage.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertTrue(source.contains("VulkanicAPI."),
             "CompressibleGLBufferedImage must still call VulkanicAPI (generateTextureMipmapDSA)");
@@ -4639,7 +4643,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testModelViewOwnershipMovedToVulkanicAPI() throws IOException {
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
-        String renderSystemSource = Files.readString(renderSystemFile);
+        String renderSystemSource = readSource(renderSystemFile);
 
         assertFalse(renderSystemSource.contains("private static final Matrix4fStack modelViewStack"),
             "RenderSystem should not own modelViewStack after model-view migration to VulkanicAPI");
@@ -4649,7 +4653,7 @@ public class Phase3DrawPathTest {
             "RenderSystem should not expose getModelViewStack after model-view migration to VulkanicAPI");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
 
         assertTrue(vulkanicApiSource.contains("private static final Matrix4fStack modelViewStack = new Matrix4fStack(16);"),
             "VulkanicAPI should own the model-view stack after migration");
@@ -4668,7 +4672,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testBootstrapHelpersOwnershipMovedToVulkanicAPI() throws IOException {
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
-        String renderSystemSource = Files.readString(renderSystemFile);
+        String renderSystemSource = readSource(renderSystemFile);
 
         assertFalse(renderSystemSource.contains("public static String getBackendDescription("),
             "RenderSystem should not expose getBackendDescription after bootstrap migration");
@@ -4686,7 +4690,7 @@ public class Phase3DrawPathTest {
             "RenderSystem should not expose limitDisplayFPS after frame pacing migration");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
 
         assertTrue(vulkanicApiSource.contains("public static String getBackendDescription("),
             "VulkanicAPI should expose getBackendDescription after bootstrap migration");
@@ -4706,7 +4710,7 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose limitDisplayFPS after frame pacing migration");
 
         Path minecraftFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java");
-        String minecraftSource = Files.readString(minecraftFile);
+        String minecraftSource = readSource(minecraftFile);
 
         assertFalse(minecraftSource.contains("RenderSystem.getBackendDescription("),
             "Minecraft should not call RenderSystem.getBackendDescription after bootstrap migration");
@@ -4737,14 +4741,14 @@ public class Phase3DrawPathTest {
             "Minecraft should call VulkanicAPI.limitDisplayFPS after frame pacing migration");
 
         Path glxFile = SRC_MAIN_JAVA.resolve("net/blaze3d/platform/GLX.java");
-        String glxSource = Files.readString(glxFile);
+        String glxSource = readSource(glxFile);
         assertFalse(glxSource.contains("RenderSystem.setErrorCallback("),
             "GLX should not route GLFW error callback setup through RenderSystem after bootstrap migration");
         assertTrue(glxSource.contains("VulkanicAPI.setErrorCallback("),
             "GLX should route GLFW error callback setup through VulkanicAPI after bootstrap migration");
 
         Path packetListenerFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/multiplayer/ClientCommonPacketListenerImpl.java");
-        String packetListenerSource = Files.readString(packetListenerFile);
+        String packetListenerSource = readSource(packetListenerFile);
         assertFalse(packetListenerSource.contains("RenderSystem.isFrozenAtPollEvents("),
             "ClientCommonPacketListenerImpl should not query poll freeze state through RenderSystem after migration");
         assertTrue(packetListenerSource.contains("VulkanicAPI.isFrozenAtPollEvents("),
@@ -4757,7 +4761,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testThreadAndDeviceOwnershipMovedToVulkanicAPI() throws IOException {
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
-        String renderSystemSource = Files.readString(renderSystemFile);
+        String renderSystemSource = readSource(renderSystemFile);
 
         assertFalse(renderSystemSource.contains("private static Thread renderThread;"),
             "RenderSystem should not own renderThread after thread ownership migration");
@@ -4783,7 +4787,7 @@ public class Phase3DrawPathTest {
             "RenderSystem.getDevice should delegate to VulkanicAPI after migration");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
 
         assertTrue(vulkanicApiSource.contains("private static Thread renderThread;"),
             "VulkanicAPI should own renderThread after migration");
@@ -4805,35 +4809,35 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose tryGetDevice after migration");
 
         Path mainFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/main/Main.java");
-        String mainSource = Files.readString(mainFile);
+        String mainSource = readSource(mainFile);
         assertFalse(mainSource.contains("RenderSystem.initRenderThread("),
             "Main should not initialize render thread through RenderSystem after migration");
         assertTrue(mainSource.contains("VulkanicAPI.initRenderThread("),
             "Main should initialize render thread through VulkanicAPI after migration");
 
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String irisRenderSystemSource = Files.readString(irisRenderSystemFile);
+        String irisRenderSystemSource = readSource(irisRenderSystemFile);
         assertFalse(irisRenderSystemSource.contains("RenderSystem.assertOnRenderThreadOrInit("),
             "IrisRenderSystem should not call RenderSystem.assertOnRenderThreadOrInit after migration");
         assertTrue(irisRenderSystemSource.contains("VulkanicAPI.assertOnRenderThreadOrInit("),
             "IrisRenderSystem should call VulkanicAPI.assertOnRenderThreadOrInit after migration");
 
         Path renderAssertsFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/util/RenderAsserts.java");
-        String renderAssertsSource = Files.readString(renderAssertsFile);
+        String renderAssertsSource = readSource(renderAssertsFile);
         assertFalse(renderAssertsSource.contains("RenderSystem.isOnRenderThread("),
             "RenderAsserts should not call RenderSystem.isOnRenderThread after migration");
         assertTrue(renderAssertsSource.contains("VulkanicAPI.isOnRenderThread("),
             "RenderAsserts should call VulkanicAPI.isOnRenderThread after migration");
 
         Path voxelImageFile = SRC_MAIN_JAVA.resolve("net/voxelmap/persistent/CompressibleGLBufferedImage.java");
-        String voxelImageSource = Files.readString(voxelImageFile);
+        String voxelImageSource = readSource(voxelImageFile);
         assertFalse(voxelImageSource.contains("RenderSystem.isOnRenderThread("),
             "CompressibleGLBufferedImage should not call RenderSystem.isOnRenderThread after migration");
         assertTrue(voxelImageSource.contains("VulkanicAPI.isOnRenderThread("),
             "CompressibleGLBufferedImage should call VulkanicAPI.isOnRenderThread after migration");
 
         Path minecraftFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/Minecraft.java");
-        String minecraftSource = Files.readString(minecraftFile);
+        String minecraftSource = readSource(minecraftFile);
         assertFalse(minecraftSource.contains("RenderSystem.tryGetDevice("),
             "Minecraft should not call RenderSystem.tryGetDevice after migration");
         assertTrue(minecraftSource.contains("VulkanicAPI.tryGetDevice("),
@@ -4854,7 +4858,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : migratedFiles) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after device-access migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
@@ -4893,7 +4897,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : migratedFiles) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after device-access migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
@@ -4936,7 +4940,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : migratedFiles) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after device-access migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
@@ -4990,7 +4994,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : migratedFiles) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after renderer-cluster migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
@@ -5037,7 +5041,7 @@ public class Phase3DrawPathTest {
         };
 
         for (Path file : migratedFiles) {
-            String source = Files.readString(file);
+            String source = readSource(file);
             assertFalse(source.contains("RenderSystem.getDevice("),
                 file + " should not call RenderSystem.getDevice after Iris/Sodium seam migration");
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
@@ -5066,7 +5070,7 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testCubemapRenderPassStaysColorOnly() throws IOException {
-        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"));
+        String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"));
 
         assertTrue(source.contains("VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture())"),
             "CubeMap should recover the main render target framebuffer contract before rendering the panorama background");
@@ -5079,7 +5083,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testScissorStateOwnershipMovedToVulkanicAPI() throws IOException {
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
-        String renderSystemSource = Files.readString(renderSystemFile);
+        String renderSystemSource = readSource(renderSystemFile);
 
         assertFalse(renderSystemSource.contains("scissorStateForRenderTypeDraws"),
             "RenderSystem should not own scissorStateForRenderTypeDraws after migration to VulkanicAPI");
@@ -5091,7 +5095,7 @@ public class Phase3DrawPathTest {
             "RenderSystem should not expose getScissorStateForRenderTypeDraws after migration to VulkanicAPI");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
 
         assertTrue(vulkanicApiSource.contains("private static final ScissorState scissorStateForRenderTypeDraws = new ScissorState();"),
             "VulkanicAPI should own scissorStateForRenderTypeDraws after migration");
@@ -5103,7 +5107,7 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose getScissorStateForRenderTypeDraws after migration");
 
         Path guiRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java");
-        String guiRendererSource = Files.readString(guiRendererFile);
+        String guiRendererSource = readSource(guiRendererFile);
         assertFalse(guiRendererSource.contains("RenderSystem.enableScissorForRenderTypeDraws("),
             "GuiRenderer should not enable draw scissor through RenderSystem after migration");
         assertFalse(guiRendererSource.contains("RenderSystem.disableScissorForRenderTypeDraws("),
@@ -5114,7 +5118,7 @@ public class Phase3DrawPathTest {
             "GuiRenderer should disable draw scissor through VulkanicAPI after migration");
 
         Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
-        String renderTypeSource = Files.readString(renderTypeFile);
+        String renderTypeSource = readSource(renderTypeFile);
         assertFalse(renderTypeSource.contains("RenderSystem.getScissorStateForRenderTypeDraws("),
             "RenderType should not read draw scissor state through RenderSystem after migration");
         assertTrue(renderTypeSource.contains("VulkanicAPI.getScissorStateForRenderTypeDraws("),
@@ -5124,9 +5128,9 @@ public class Phase3DrawPathTest {
     @Test
     public void testStandard3dItemDebugPipDumpIsOptIn() throws IOException {
         Path guiRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/GuiRenderer.java");
-        String guiRendererSource = Files.readString(guiRendererFile);
+        String guiRendererSource = readSource(guiRendererFile);
         Path standard3dItemRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/render/pip/Standard3dItemRenderer.java");
-        String standard3dItemRendererSource = Files.readString(standard3dItemRendererFile);
+        String standard3dItemRendererSource = readSource(standard3dItemRendererFile);
 
         assertTrue(standard3dItemRendererSource.contains("Boolean.getBoolean(\"mattmc.gui.debugStandard3dItemPipDump\")"),
             "Standard3dItemRenderer should make its forced grass-block PIP dump opt-in behind an explicit debug flag");
@@ -5138,7 +5142,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testSequentialAndDynamicUniformOwnershipMovedToVulkanicAPI() throws IOException {
         Path renderSystemFile = SRC_MAIN_JAVA.resolve("net/blaze3d/systems/RenderSystem.java");
-        String renderSystemSource = Files.readString(renderSystemFile);
+        String renderSystemSource = readSource(renderSystemFile);
 
         assertFalse(renderSystemSource.contains("class AutoStorageIndexBuffer"),
             "RenderSystem should not define AutoStorageIndexBuffer after migration to VulkanicAPI");
@@ -5154,7 +5158,7 @@ public class Phase3DrawPathTest {
             "RenderSystem.flipFrame should reset dynamic uniforms via VulkanicAPI");
 
         Path vulkanicApiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
-        String vulkanicApiSource = Files.readString(vulkanicApiFile);
+        String vulkanicApiSource = readSource(vulkanicApiFile);
 
         assertTrue(vulkanicApiSource.contains("private static final VulkanicAPI.AutoStorageIndexBuffer sharedSequential ="),
             "VulkanicAPI should own sharedSequential index buffer after migration");
@@ -5172,7 +5176,7 @@ public class Phase3DrawPathTest {
             "VulkanicAPI should expose getDynamicUniforms after migration");
 
         Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
-        String renderTypeSource = Files.readString(renderTypeFile);
+        String renderTypeSource = readSource(renderTypeFile);
         assertFalse(renderTypeSource.contains("RenderSystem.getSequentialBuffer("),
             "RenderType should not use RenderSystem.getSequentialBuffer after migration");
         assertFalse(renderTypeSource.contains("RenderSystem.getDynamicUniforms("),
@@ -5183,7 +5187,7 @@ public class Phase3DrawPathTest {
             "RenderType should use VulkanicAPI.getDynamicUniforms after migration");
 
         Path skyRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/SkyRenderer.java");
-        String skyRendererSource = Files.readString(skyRendererFile);
+        String skyRendererSource = readSource(skyRendererFile);
         assertFalse(skyRendererSource.contains("RenderSystem.getSequentialBuffer("),
             "SkyRenderer should not use RenderSystem.getSequentialBuffer after migration");
         assertFalse(skyRendererSource.contains("RenderSystem.getDynamicUniforms("),
@@ -5197,7 +5201,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testHandPassLayerRoutingKeepsOpaqueItemSubpassesOpaque() throws IOException {
         Path irisPipelinesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisPipelines.java");
-        String irisPipelinesSource = Files.readString(irisPipelinesFile);
+        String irisPipelinesSource = readSource(irisPipelinesFile);
 
         assertFalse(irisPipelinesSource.contains("HandRenderer.INSTANCE.isRenderingSolid() ? ShaderKey.HAND_CUTOUT : ShaderKey.HAND_TRANSLUCENT"),
             "IrisPipelines solid hand routing should not remap opaque subpasses to HAND_TRANSLUCENT in translucent pass");
@@ -5207,7 +5211,7 @@ public class Phase3DrawPathTest {
             "IrisPipelines solid hand routing should keep opaque subpasses on HAND_CUTOUT shader");
 
         Path itemInHandRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/ItemInHandRenderer.java");
-        String itemInHandRendererSource = Files.readString(itemInHandRendererFile);
+        String itemInHandRendererSource = readSource(itemInHandRendererFile);
         assertTrue(itemInHandRendererSource.contains("Iris.isPackInUseQuick() && net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isActive()"),
             "ItemInHandRenderer hand pass filtering should only apply while Iris HandRenderer is actively rendering a hand pass");
     }
@@ -5215,14 +5219,14 @@ public class Phase3DrawPathTest {
     @Test
     public void testIrisHorizonPipelineUsesShaderpackSkyProgram() throws IOException {
         Path horizonRendererFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pathways/HorizonRenderer.java");
-        String horizonRendererSource = Files.readString(horizonRendererFile);
+        String horizonRendererSource = readSource(horizonRendererFile);
         assertTrue(horizonRendererSource.contains("public static final RenderPipeline HORIZON_PIPELINE"),
             "HorizonRenderer should expose its custom horizon pipeline so Iris can map it to shaderpack sky programs");
         assertTrue(horizonRendererSource.contains("pass.setPipeline(HORIZON_PIPELINE);"),
             "HorizonRenderer should keep the custom pipeline needed by Vulkan rather than falling back to RenderPipelines.SKY");
 
         Path irisPipelinesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisPipelines.java");
-        String irisPipelinesSource = Files.readString(irisPipelinesFile);
+        String irisPipelinesSource = readSource(irisPipelinesFile);
         assertTrue(irisPipelinesSource.contains("import net.irisshaders.iris.pathways.HorizonRenderer;"),
             "IrisPipelines should import HorizonRenderer so the custom horizon pipeline can be mapped explicitly");
         assertTrue(irisPipelinesSource.contains("assignToMain(HorizonRenderer.HORIZON_PIPELINE, p -> ShaderKey.SKY_BASIC);"),
@@ -5232,7 +5236,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testGuiItemsBypassSodiumFastQuadPath() throws IOException {
         Path itemRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/entity/ItemRenderer.java");
-        String itemRendererSource = Files.readString(itemRendererFile);
+        String itemRendererSource = readSource(itemRendererFile);
 
         assertTrue(itemRendererSource.contains("itemDisplayContext != ItemDisplayContext.GUI"),
             "ItemRenderer should disable Sodium fast quad path for GUI item rendering to preserve vanilla alpha behavior");
@@ -5240,7 +5244,7 @@ public class Phase3DrawPathTest {
             "ItemRenderer fast path should be explicitly gated so GUI item rendering falls back to vanilla vertex submission");
 
         Path renderTypeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/RenderType.java");
-        String renderTypeSource = Files.readString(renderTypeFile);
+        String renderTypeSource = readSource(renderTypeFile);
         assertTrue(renderTypeSource.contains("GpuTextureView textureView = TextureTracker.INSTANCE.getShaderTexture(i);"),
             "RenderType draw path should first resolve sampler views from TextureTracker unit bindings");
         assertTrue(containsAny(renderTypeSource,
@@ -5253,7 +5257,7 @@ public class Phase3DrawPathTest {
             "RenderType draw path should explicitly fall back to live lightmap binding for Sampler2 when tracked state is unavailable");
 
         Path textureTrackerFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pbr/TextureTracker.java");
-        String textureTrackerSource = Files.readString(textureTrackerFile);
+        String textureTrackerSource = readSource(textureTrackerFile);
         assertTrue(textureTrackerSource.contains("shaderTexturesByUnit[unit] = id;"),
             "TextureTracker should always update per-unit shader texture cache on setShaderTexture");
         assertTrue(textureTrackerSource.contains("if (lockBindCallback)"),
@@ -5264,32 +5268,32 @@ public class Phase3DrawPathTest {
             "TextureTracker should clear per-unit cache entries that reference deleted textures");
 
         Path blockModelWrapperFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/item/BlockModelWrapper.java");
-        String blockModelWrapperSource = Files.readString(blockModelWrapperFile);
+        String blockModelWrapperSource = readSource(blockModelWrapperFile);
         assertFalse(blockModelWrapperSource.contains("renderType = Sheets.cutoutBlockSheet();"),
             "BlockModelWrapper should not force GUI item rendering onto the cutout sheet; translucent items need their original render type");
 
         Path irisPipelinesFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisPipelines.java");
-        String irisPipelinesSource = Files.readString(irisPipelinesFile);
+        String irisPipelinesSource = readSource(irisPipelinesFile);
         assertTrue(irisPipelinesSource.contains("assignToMain(RenderPipelines.ITEM_ENTITY_TRANSLUCENT_CULL, p -> getTranslucent(p));"),
             "IrisPipelines should keep ITEM_ENTITY_TRANSLUCENT_CULL on translucent shader selection so GUI translucent items preserve alpha blending");
 
         Path itemShaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/minecraft/shaders/core/rendertype_item_entity_translucent_cull.vsh");
-        String itemShaderSource = Files.readString(itemShaderFile);
+        String itemShaderSource = readSource(itemShaderFile);
         assertTrue(itemShaderSource.contains("vec4(lightColor.rgb, 1.0)"),
             "Item shader should not allow lightmap alpha to modulate item alpha; only lightmap RGB should affect item shading");
 
         Path entityShaderFile = PROJECT_ROOT.resolve("src/main/resources/assets/minecraft/shaders/core/entity.vsh");
-        String entityShaderSource = Files.readString(entityShaderFile);
+        String entityShaderSource = readSource(entityShaderFile);
         assertTrue(entityShaderSource.contains("lightMapColor = vec4(lightColor.rgb, 1.0);"),
             "Entity shader should not allow lightmap alpha to modulate entity/item alpha; lightmap alpha must be clamped to 1.0");
 
         Path itemStackRenderStateFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/item/ItemStackRenderState.java");
-        String itemStackRenderStateSource = Files.readString(itemStackRenderStateFile);
+        String itemStackRenderStateSource = readSource(itemStackRenderStateFile);
         assertTrue(itemStackRenderStateSource.contains("ItemStackRenderState.this.displayContext != ItemDisplayContext.GUI"),
             "ItemStackRenderState should bypass FRAPI mesh submission for GUI item rendering so GUI follows vanilla submit path");
 
         Path trackingItemStackRenderStateFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/item/TrackingItemStackRenderState.java");
-        String trackingItemStackRenderStateSource = Files.readString(trackingItemStackRenderStateFile);
+        String trackingItemStackRenderStateSource = readSource(trackingItemStackRenderStateFile);
         assertTrue(trackingItemStackRenderStateSource.contains("this.modelIdentityElements.clear();"),
             "TrackingItemStackRenderState should clear model identity elements when state is cleared so GUI item identity does not leak across updates");
         assertTrue(trackingItemStackRenderStateSource.contains("return List.copyOf(this.modelIdentityElements);"),
@@ -5299,7 +5303,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testJeiPanelDropDeletesCarriedStackInsteadOfWorldDrop() throws IOException {
         Path jeiPanelFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/screens/inventory/JeiPanel.java");
-        String jeiPanelSource = Files.readString(jeiPanelFile);
+        String jeiPanelSource = readSource(jeiPanelFile);
         assertTrue(jeiPanelSource.contains("public boolean containsMouse(double mouseX, double mouseY)"),
             "JeiPanel should expose panel bounds so container screens can distinguish JEI drops from normal outside-inventory drops");
         int carriedGuardIndex = jeiPanelSource.indexOf("if (!this.minecraft.player.containerMenu.getCarried().isEmpty())");
@@ -5310,7 +5314,7 @@ public class Phase3DrawPathTest {
             "JEI item clicks should consume carried-stack clicks before granting the hovered item");
 
         Path containerScreenFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/gui/screens/inventory/AbstractContainerScreen.java");
-        String containerScreenSource = Files.readString(containerScreenFile);
+        String containerScreenSource = readSource(containerScreenFile);
         int deleteCheckIndex = containerScreenSource.indexOf("if (this.deleteCarriedItemIfReleasedOverJeiPanel(mouseButtonEvent))");
         int panelReleaseIndex = containerScreenSource.indexOf("if (this.jeiPanel != null && this.jeiPanel.mouseReleased(mouseButtonEvent))", deleteCheckIndex);
         int outsideClickIndex = containerScreenSource.indexOf("boolean bl = this.hasClickedOutside(mouseButtonEvent.x(), mouseButtonEvent.y(), i, j);", panelReleaseIndex);
@@ -5324,7 +5328,7 @@ public class Phase3DrawPathTest {
             "Dropping a carried stack over JEI should use the explicit delete action instead of slot -999 pickup");
 
         Path gameModeFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/multiplayer/MultiPlayerGameMode.java");
-        String gameModeSource = Files.readString(gameModeFile);
+        String gameModeSource = readSource(gameModeFile);
         assertTrue(gameModeSource.contains("public void handleJeiCarriedItemDelete(Player player)"),
             "MultiPlayerGameMode should expose a dedicated JEI carried-item delete action");
         assertTrue(gameModeSource.contains("abstractContainerMenu.setCarried(ItemStack.EMPTY);"),
@@ -5333,7 +5337,7 @@ public class Phase3DrawPathTest {
             "JEI carried-item delete should tell the server to clear the cursor without spawning a dropped item");
 
         Path serverListenerFile = SRC_MAIN_JAVA.resolve("net/minecraft/server/network/ServerGamePacketListenerImpl.java");
-        String serverListenerSource = Files.readString(serverListenerFile);
+        String serverListenerSource = readSource(serverListenerFile);
         assertTrue(serverListenerSource.contains("if (bl && itemStack.isEmpty())"),
             "Server creative-slot handler should reserve empty slot -1 for JEI carried-stack deletion");
         assertTrue(serverListenerSource.contains("this.player.containerMenu.setCarried(ItemStack.EMPTY);"),
@@ -5348,7 +5352,7 @@ public class Phase3DrawPathTest {
     public void testDrawFromBuffersRetainsInstancedDrawCalls() throws IOException {
         Path file = SRC_MAIN_JAVA.resolve(
             "net/blaze3d/opengl/GlCommandEncoder.java");
-        String source = Files.readString(file);
+        String source = readSource(file);
 
         assertTrue(source.contains("VulkanicAPI.drawIndexedInstancedBaseVertex("),
             "Instanced+baseVertex indexed draw must still be present in drawFromBuffers");
@@ -5363,7 +5367,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testParticleDrawPathRebindsPipelineScopedStateAfterSetPipeline() throws IOException {
         Path particleFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/state/QuadParticleRenderState.java");
-        String particleSource = Files.readString(particleFile);
+        String particleSource = readSource(particleFile);
 
         int pipelineIndex = particleSource.indexOf("renderPass.setPipeline(((SingleQuadParticle.Layer)entry.getKey()).pipeline());");
         int defaultUniformsIndex = particleSource.indexOf("VulkanicAPI.bindDefaultUniforms(renderPass);", pipelineIndex);
@@ -5383,7 +5387,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testParticleFeatureRendererExplicitlyScopesLightLayerAroundParticlePasses() throws IOException {
         Path particleFeatureRendererFile = SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/feature/ParticleFeatureRenderer.java");
-        String source = Files.readString(particleFeatureRendererFile);
+        String source = readSource(particleFeatureRendererFile);
 
         int turnOnIndex = source.indexOf("minecraft.gameRenderer.lightTexture().turnOnLightLayer();");
         int mainLoopIndex = source.indexOf("for (SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer : submitNodeCollection.getParticleGroupRenderers())");
@@ -5402,7 +5406,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testIrisFallbackTextureRestoreSkipsUnknownBindingSentinels() throws IOException {
         Path irisRenderSystemFile = SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/IrisRenderSystem.java");
-        String source = Files.readString(irisRenderSystemFile);
+        String source = readSource(irisRenderSystemFile);
 
         assertTrue(source.contains("private static void restoreKnownTextureBinding(int textureId)"),
             "IrisRenderSystem should centralize legacy texture restore guards for fallback paths");
@@ -5417,7 +5421,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testVulkanRenderTargetPipelineCacheKeyIncludesAttachmentContract() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
-        String source = Files.readString(vulkanBackendFile);
+        String source = readSource(vulkanBackendFile);
 
         assertTrue(source.contains("private record RenderTargetPipelineKey("),
             "VulkanBackend should retain a dedicated key for render-target-compatible pipeline variants");
@@ -5475,11 +5479,11 @@ public class Phase3DrawPathTest {
 	        assertTrue(attachmentlessDescriptor.hasExplicitExtent());
 
 	        String renderTargetDescriptorSource =
-	            Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicRenderTargetDescriptor.java"));
+	            readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicRenderTargetDescriptor.java"));
 	        String vulkanBackendSource =
-	            Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+	            readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
 	        String renderPassKeySource =
-	            Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassKey.java"));
+	            readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassKey.java"));
 
 	        assertTrue(renderTargetDescriptorSource.contains("colorAttachments.isEmpty() && depthAttachment == null && (width <= 0 || height <= 0)"),
 	            "Render-target descriptors should reject only attachmentless passes without explicit extents");
@@ -5496,8 +5500,8 @@ public class Phase3DrawPathTest {
 	                && vulkanBackendSource.contains("VkClearValue.calloc(attachmentCount, stack)"),
 	            "Vulkan render-pass creation should avoid fake attachments for attachmentless passes");
 
-	        String compositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
-	        String shadowCompositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+	        String compositeSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+	        String shadowCompositeSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
 	        assertTrue(compositeSource.contains("passWidth = main.width")
 	                && compositeSource.contains("passHeight = main.height")
 	                && !compositeSource.contains("if (compositePass.viewWidth <= 0 || compositePass.viewHeight <= 0)"),
@@ -5509,15 +5513,15 @@ public class Phase3DrawPathTest {
 
 	    @Test
 	    public void testShaderFramebufferPathsExposeDescriptorBackedVulkanRenderTargets() throws IOException {
-	        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/CommandEncoder.java"));
-        String glFramebufferSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java"));
-        String glCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
-        String terrainSource = Files.readString(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java"));
-	        String compositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
-        String finalPassSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java"));
-        String shadowCompositeSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
-        String shaderTargetContractSource = Files.readString(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisVulkanRenderTargetContract.java"));
-        String vulkanBackendSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
+	        String commandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/systems/CommandEncoder.java"));
+        String glFramebufferSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/gl/framebuffer/GlFramebuffer.java"));
+        String glCommandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String terrainSource = readSource(SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java"));
+	        String compositeSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/CompositeRenderer.java"));
+        String finalPassSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/FinalPassRenderer.java"));
+        String shadowCompositeSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/shadows/ShadowCompositeRenderer.java"));
+        String shaderTargetContractSource = readSource(SRC_MAIN_JAVA.resolve("net/irisshaders/iris/pipeline/IrisVulkanRenderTargetContract.java"));
+        String vulkanBackendSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java"));
 
         assertTrue(commandEncoderSource.contains("createRenderPass(VulkanicRenderTargetDescriptor descriptor)"),
             "CommandEncoder should expose descriptor-backed render-pass creation for migrated Vulkan shader paths");
@@ -5598,7 +5602,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testVulkanFeedbackLoopPipelineRenderPassUsesFeedbackSubpassLayouts() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
-        String source = Files.readString(vulkanBackendFile);
+        String source = readSource(vulkanBackendFile);
 
         assertTrue(source.contains("int colorAttachmentRefLayout = feedbackLoopCompatible"),
             "Pipeline-compatible render passes should choose color subpass layouts from attachment-feedback-loop mode");
@@ -5613,7 +5617,7 @@ public class Phase3DrawPathTest {
     @Test
     public void testVulkanSwapchainComposePipelineUsesPresentCompatibleRenderPassContract() throws IOException {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
-        String source = Files.readString(vulkanBackendFile);
+        String source = readSource(vulkanBackendFile);
 
         assertTrue(source.contains("boolean swapchainPresentCompatible"),
             "Vulkan pipeline creation should distinguish swapchain-present render-pass compatibility from feedback-loop compatibility");
@@ -5628,9 +5632,9 @@ public class Phase3DrawPathTest {
 
     @Test
     public void testVulkanRenderPassResourceResolutionUsesSharedContract() throws IOException {
-        String commandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
-        String nativeCommandEncoderSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
-        String resolverSource = Files.readString(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicPipelineResourceResolver.java"));
+        String commandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
+        String nativeCommandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+        String resolverSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicPipelineResourceResolver.java"));
 
         assertTrue(resolverSource.contains("public final class VulkanicPipelineResourceResolver")
                 && resolverSource.contains("PipelineResourcePlanner.buildPlan(")

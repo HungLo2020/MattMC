@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class VulkanFramePresentationLifecycleTest {
 
     private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
+
+    private static String readSource(Path path) throws IOException {
+        return Files.readString(path).replace("\r\n", "\n").replace('\r', '\n');
+    }
 
     @BeforeEach
     public void beforeEach() throws Exception {
@@ -70,13 +75,13 @@ public class VulkanFramePresentationLifecycleTest {
 
     @Test
     public void testFramePresentationSourceWiring() throws Exception {
-        String vulkanBackendSource = Files.readString(PROJECT_ROOT
+        String vulkanBackendSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
-        String renderSystemSource = Files.readString(PROJECT_ROOT
+        String renderSystemSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/blaze3d/systems/RenderSystem.java"));
-        String glCommandEncoderSource = Files.readString(PROJECT_ROOT
+        String glCommandEncoderSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/blaze3d/opengl/GlCommandEncoder.java"));
-        String openGLBackendSource = Files.readString(PROJECT_ROOT
+        String openGLBackendSource = readSource(PROJECT_ROOT
             .resolve("src/main/java/net/vulkanic/backends/opengl/OpenGLBackend.java"));
 
         int presentStart = openGLBackendSource.indexOf("public void presentTextureToScreen(CommandContext ctx, GpuTextureView textureView)");
