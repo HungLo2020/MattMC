@@ -386,12 +386,10 @@ public class VulkanBackend {
         String stableCacheKey,
         String resourceLayoutKey,
         String indexedBlendKey,
-        List<Integer> colorFormats,
-        int depthFormat,
-        boolean feedbackLoopCompatible
+        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
     ) {
         private RenderTargetPipelineKey {
-            colorFormats = List.copyOf(colorFormats);
+            Objects.requireNonNull(renderPassCompatibilityKey, "renderPassCompatibilityKey must not be null");
         }
 
         private static RenderTargetPipelineKey from(
@@ -401,27 +399,25 @@ public class VulkanBackend {
         ) {
             return from(
                 descriptor,
-                targets.colorFormats(),
-                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
-                targets.hasFeedbackLoopTarget(),
+                VulkanRenderPassCompatibilityKey.framebuffer(
+                    targets.colorFormats(),
+                    targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+                    targets.hasFeedbackLoopTarget()
+                ),
                 indexedBlendKey
             );
         }
 
         private static RenderTargetPipelineKey from(
             PipelineDescriptor descriptor,
-            List<Integer> colorFormats,
-            int depthFormat,
-            boolean feedbackLoopCompatible,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
             String indexedBlendKey
         ) {
             return new RenderTargetPipelineKey(
                 descriptor.getStableCacheKey(),
                 descriptor.getResourceLayoutCacheKey(),
                 indexedBlendKey,
-                colorFormats,
-                depthFormat,
-                feedbackLoopCompatible
+                renderPassCompatibilityKey
             );
         }
     }
@@ -3718,6 +3714,7 @@ void main() {
         private final long vkPipelineHandle;
         private final long vkPipelineLayoutHandle;
         private final long vkDescriptorSetLayoutHandle;
+        private final VulkanRenderPassCompatibilityKey renderPassCompatibilityKey;
         /** Number of resource bindings in the DSL this pipeline was compiled with. */
         private final int resourceBindingCount;
         private final NativeSpine spine;
@@ -3727,12 +3724,17 @@ void main() {
             long vkPipelineHandle,
             long vkPipelineLayoutHandle,
             long vkDescriptorSetLayoutHandle,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey,
             int resourceBindingCount,
             NativeSpine spine
         ) {
             this.vkPipelineHandle = vkPipelineHandle;
             this.vkPipelineLayoutHandle = vkPipelineLayoutHandle;
             this.vkDescriptorSetLayoutHandle = vkDescriptorSetLayoutHandle;
+            this.renderPassCompatibilityKey = Objects.requireNonNull(
+                renderPassCompatibilityKey,
+                "renderPassCompatibilityKey must not be null"
+            );
             this.resourceBindingCount = resourceBindingCount;
             this.spine = Objects.requireNonNull(spine, "spine must not be null");
         }
@@ -3750,6 +3752,10 @@ void main() {
         /** Returns the native {@code VkDescriptorSetLayout} handle used by this pipeline. */
         long getVkDescriptorSetLayoutHandle() {
             return vkDescriptorSetLayoutHandle;
+        }
+
+        VulkanRenderPassCompatibilityKey getRenderPassCompatibilityKey() {
+            return renderPassCompatibilityKey;
         }
 
         /**
@@ -3775,7 +3781,9 @@ void main() {
         @Override
         public String toString() {
             return "VulkanPipelineHandle{valid=" + isValid() + ", pipeline=0x"
-                + Long.toHexString(vkPipelineHandle) + "}";
+                + Long.toHexString(vkPipelineHandle)
+                + ", renderPassCompatibility=" + renderPassCompatibilityKey
+                + "}";
         }
     }
 
@@ -3822,7 +3830,12 @@ void main() {
         long vertModuleHandle = spine.createShaderModule(vertModule);
         long fragModuleHandle = spine.createShaderModule(fragModule);
         try {
-            return spine.createVulkanPipeline(descriptor, vertModuleHandle, fragModuleHandle);
+            return spine.createVulkanPipeline(
+                descriptor,
+                vertModuleHandle,
+                fragModuleHandle,
+                defaultRenderPassCompatibilityKey()
+            );
         } finally {
             spine.destroyShaderModule(vertModuleHandle);
             spine.destroyShaderModule(fragModuleHandle);
@@ -3846,17 +3859,17 @@ void main() {
     private PipelineHandle createPipeline(PipelineDescriptor descriptor, ResolvedFramebufferTargets targets) {
         return createPipeline(
             descriptor,
-            targets.colorFormats(),
-            targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
-            targets.hasFeedbackLoopTarget()
+            VulkanRenderPassCompatibilityKey.framebuffer(
+                targets.colorFormats(),
+                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+                targets.hasFeedbackLoopTarget()
+            )
         );
     }
 
     private PipelineHandle createPipeline(
         PipelineDescriptor descriptor,
-        List<Integer> colorFormats,
-        int depthFormat,
-        boolean feedbackLoopCompatible
+        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
     ) {
         ensureNativeReady("createPipeline(framebuffer)");
         NativeSpine spine = nativeSpine;
@@ -3904,10 +3917,7 @@ void main() {
                 vertModuleHandle,
                 geomModuleHandle,
                 fragModuleHandle,
-                colorFormats,
-                depthFormat,
-                feedbackLoopCompatible,
-                false
+                renderPassCompatibilityKey
             );
         } finally {
             spine.destroyShaderModule(vertModuleHandle);
@@ -4153,18 +4163,14 @@ void main() {
         return resolvePipelineHandle(
             renderPipeline,
             descriptor,
-            plan.colorFormats(),
-            plan.depthFormat(),
-            plan.feedbackLoopCompatible()
+            plan.compatibilityKey()
         );
     }
 
     private net.vulkanic.PipelineHandle resolvePipelineHandle(
             net.blaze3d.pipeline.RenderPipeline renderPipeline,
             net.vulkanic.PipelineDescriptor descriptor,
-            List<Integer> colorFormats,
-            int depthFormat,
-            boolean feedbackLoopCompatible) {
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey) {
         PrecompiledPipelineState state = precompiledPipelineCache.get(renderPipeline);
         if (state == null || !state.isValid()) {
             return null;
@@ -4179,10 +4185,8 @@ void main() {
 
         RenderTargetPipelineKey key = RenderTargetPipelineKey.from(
             pipelineDescriptor,
-            colorFormats,
-            depthFormat,
-            feedbackLoopCompatible,
-            indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), colorFormats.size())
+            renderPassCompatibilityKey,
+            indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey.colorAttachmentCount())
         );
         PipelineHandle cached = renderTargetPipelineCache.get(key);
         if (cached != null) {
@@ -4192,7 +4196,7 @@ void main() {
             renderTargetPipelineCache.remove(key, cached);
         }
 
-        PipelineHandle framebufferCompatible = createPipeline(pipelineDescriptor, colorFormats, depthFormat, feedbackLoopCompatible);
+        PipelineHandle framebufferCompatible = createPipeline(pipelineDescriptor, renderPassCompatibilityKey);
         if (framebufferCompatible == null || !framebufferCompatible.isValid()) {
             if (framebufferCompatible != null) {
                 framebufferCompatible.close();
@@ -4231,6 +4235,14 @@ void main() {
             key.append(';');
         }
         return key.toString();
+    }
+
+    private static VulkanRenderPassCompatibilityKey defaultRenderPassCompatibilityKey() {
+        return VulkanRenderPassCompatibilityKey.framebuffer(
+            List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
+            VK10.VK_FORMAT_UNDEFINED,
+            false
+        );
     }
 
     private java.util.Optional<PipelineDescriptor.BlendState> blendStateForAttachment(
@@ -4640,6 +4652,8 @@ void main() {
         private final VulkanicTexture depthTexture;
         private final int width;
         private final int height;
+        private final boolean colorFeedbackLoopCapable;
+        private final boolean depthFeedbackLoopCapable;
 
         private ResolvedRenderTargets(
             VulkanTextureView colorView,
@@ -4649,16 +4663,35 @@ void main() {
             int width,
             int height
         ) {
+            this(colorView, colorTexture, depthView, depthTexture, width, height, false, false);
+        }
+
+        private ResolvedRenderTargets(
+            VulkanTextureView colorView,
+            VulkanicTexture colorTexture,
+            VulkanTextureView depthView,
+            VulkanicTexture depthTexture,
+            int width,
+            int height,
+            boolean colorFeedbackLoopCapable,
+            boolean depthFeedbackLoopCapable
+        ) {
             this.colorView = colorView;
             this.colorTexture = colorTexture;
             this.depthView = depthView;
             this.depthTexture = depthTexture;
             this.width = width;
             this.height = height;
+            this.colorFeedbackLoopCapable = colorFeedbackLoopCapable;
+            this.depthFeedbackLoopCapable = depthFeedbackLoopCapable;
         }
 
         private boolean hasDepthTarget() {
             return depthView != null;
+        }
+
+        private boolean hasFeedbackLoopTarget() {
+            return colorFeedbackLoopCapable || (hasDepthTarget() && depthFeedbackLoopCapable);
         }
     }
 
@@ -4787,6 +4820,25 @@ void main() {
 
         private boolean feedbackLoopCompatible() {
             return framebufferTargets != null && framebufferTargets.hasFeedbackLoopTarget();
+        }
+
+        private VulkanRenderPassCompatibilityKey compatibilityKey() {
+            if (framebufferTargets != null) {
+                return VulkanRenderPassCompatibilityKey.framebuffer(
+                    framebufferTargets.colorFormats(),
+                    framebufferTargets.hasDepthTarget() ? framebufferTargets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+                    framebufferTargets.hasFeedbackLoopTarget()
+                );
+            }
+
+            ResolvedRenderTargets targets = requireTextureViewTargets();
+            return VulkanRenderPassCompatibilityKey.textureView(
+                colorFormats(),
+                targets.hasDepthTarget()
+                    ? NativeSpine.toVkFormat(targets.depthTexture.getVulkanicFormat())
+                    : VK10.VK_FORMAT_UNDEFINED,
+                targets.hasFeedbackLoopTarget()
+            );
         }
 
         private String compatibilitySignature() {
@@ -5092,13 +5144,13 @@ void main() {
         MISMATCH
     }
 
-    private static VulkanRenderTargetPlan resolveRenderPassDescriptorPlan(VulkanicRenderPassDescriptor descriptor) {
+    private VulkanRenderTargetPlan resolveRenderPassDescriptorPlan(VulkanicRenderPassDescriptor descriptor) {
         VulkanicRenderPassDescriptor safeDescriptor =
             Objects.requireNonNull(descriptor, "descriptor must not be null");
         return VulkanRenderTargetPlan.textureView(safeDescriptor, resolveRenderTargets(safeDescriptor));
     }
 
-    private static ResolvedRenderTargets resolveRenderTargets(VulkanicRenderPassDescriptor descriptor) {
+    private ResolvedRenderTargets resolveRenderTargets(VulkanicRenderPassDescriptor descriptor) {
         VulkanTextureView colorView = requireVulkanTextureView(descriptor.colorAttachment().target(), "colorAttachment.target");
         VulkanicTexture colorTexture = requireRenderPassTexture(colorView.texture(), "colorAttachment.texture");
         if (!colorTexture.getVulkanicFormat().hasColorAspect()) {
@@ -5113,10 +5165,20 @@ void main() {
         if (width <= 0 || height <= 0) {
             throw new IllegalArgumentException("Render pass attachments must have non-zero dimensions");
         }
+        boolean colorFeedbackLoopCapable = isFeedbackLoopCapable(colorTexture);
 
         VulkanicRenderPassDescriptor.DepthAttachment depthAttachment = descriptor.depthAttachment();
         if (depthAttachment == null) {
-            return new ResolvedRenderTargets(colorView, colorTexture, null, null, width, height);
+            return new ResolvedRenderTargets(
+                colorView,
+                colorTexture,
+                null,
+                null,
+                width,
+                height,
+                colorFeedbackLoopCapable,
+                false
+            );
         }
 
         VulkanTextureView depthView = requireVulkanTextureView(depthAttachment.target(), "depthAttachment.target");
@@ -5130,8 +5192,27 @@ void main() {
         if (depthView.getWidth(0) != width || depthView.getHeight(0) != height) {
             throw new IllegalArgumentException("Depth attachment dimensions must match color attachment dimensions");
         }
+        boolean depthFeedbackLoopCapable = isFeedbackLoopCapable(depthTexture);
 
-        return new ResolvedRenderTargets(colorView, colorTexture, depthView, depthTexture, width, height);
+        return new ResolvedRenderTargets(
+            colorView,
+            colorTexture,
+            depthView,
+            depthTexture,
+            width,
+            height,
+            colorFeedbackLoopCapable,
+            depthFeedbackLoopCapable
+        );
+    }
+
+    private boolean isFeedbackLoopCapable(VulkanicTexture texture) {
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            return false;
+        }
+        NativeSpine.LegacyTextureObject legacyTexture = spine.tryResolveLegacyTexture(texture);
+        return legacyTexture != null && legacyTexture.feedbackLoopCapable;
     }
 
     private VulkanRenderTargetPlan resolveFramebufferRenderTargetPlan(Supplier<String> label, int framebuffer) {
@@ -5568,11 +5649,17 @@ void main() {
     private static final class VulkanBackedRenderPass implements VulkanicRenderPass {
         private final NativeSpine spine;
         private final long commandBufferHandle;
+        private final VulkanRenderPassCompatibilityKey compatibilityKey;
         private volatile boolean closed;
 
-        private VulkanBackedRenderPass(NativeSpine spine, long commandBufferHandle) {
+        private VulkanBackedRenderPass(
+            NativeSpine spine,
+            long commandBufferHandle,
+            VulkanRenderPassCompatibilityKey compatibilityKey
+        ) {
             this.spine = Objects.requireNonNull(spine, "spine must not be null");
             this.commandBufferHandle = commandBufferHandle;
+            this.compatibilityKey = Objects.requireNonNull(compatibilityKey, "compatibilityKey must not be null");
         }
 
         private void ensureOpen(String operation) {
@@ -5591,6 +5678,14 @@ void main() {
             }
             if (!vulkanPipeline.isValid()) {
                 throw new IllegalStateException("Cannot bind a closed or invalid VulkanPipelineHandle");
+            }
+            if (!compatibilityKey.equals(vulkanPipeline.getRenderPassCompatibilityKey())) {
+                throw new IllegalStateException(
+                    "Cannot bind Vulkan pipeline compiled for render-pass compatibility "
+                        + vulkanPipeline.getRenderPassCompatibilityKey()
+                        + " inside active render pass "
+                        + compatibilityKey
+                );
             }
             spine.bindPipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
         }
@@ -5921,8 +6016,8 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        spine.beginRenderPass(commandBufferHandle, plan);
-        return new VulkanBackedRenderPass(spine, commandBufferHandle);
+        VulkanRenderPassCompatibilityKey compatibilityKey = spine.beginRenderPass(commandBufferHandle, plan);
+        return new VulkanBackedRenderPass(spine, commandBufferHandle, compatibilityKey);
     }
 
     public net.vulkanic.VulkanicRenderPass beginRenderPass(
@@ -5939,8 +6034,8 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        spine.beginFramebufferRenderPass(commandBufferHandle, plan);
-        return new VulkanBackedRenderPass(spine, commandBufferHandle);
+        VulkanRenderPassCompatibilityKey compatibilityKey = spine.beginFramebufferRenderPass(commandBufferHandle, plan);
+        return new VulkanBackedRenderPass(spine, commandBufferHandle, compatibilityKey);
     }
 
     public net.vulkanic.VulkanicRenderPass beginRenderPass(
@@ -5956,8 +6051,8 @@ void main() {
             throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
         }
 
-        spine.beginFramebufferRenderPass(commandBufferHandle, plan);
-        return new VulkanBackedRenderPass(spine, commandBufferHandle);
+        VulkanRenderPassCompatibilityKey compatibilityKey = spine.beginFramebufferRenderPass(commandBufferHandle, plan);
+        return new VulkanBackedRenderPass(spine, commandBufferHandle, compatibilityKey);
     }
 
     public boolean isFallbackMode() {
@@ -15605,7 +15700,7 @@ void main() {
             requireRecordingCommandBuffer(commandBufferHandle, operation);
         }
 
-        private void beginRenderPass(long commandBufferHandle, VulkanRenderTargetPlan plan) {
+        private VulkanRenderPassCompatibilityKey beginRenderPass(long commandBufferHandle, VulkanRenderTargetPlan plan) {
             VulkanicRenderPassDescriptor descriptor = plan.requireRenderPassDescriptor();
             ResolvedRenderTargets targets = plan.requireTextureViewTargets();
             VulkanPerfAudit.recordRenderPassBegin();
@@ -15724,8 +15819,8 @@ void main() {
                     renderPassRecording = true;
                     activeRenderPassWidth = width;
                     activeRenderPassHeight = height;
-                    return;
-                }
+                    return VulkanRenderPassCompatibilityKey.swapchainPresent(swapchainImageFormat);
+	                }
 
                 int colorInitialLayout = swapchainColorAttachment
                     ? trackedSwapchainImageLayout(swapchainColorImageIndex)
@@ -15850,45 +15945,12 @@ void main() {
                 // in the same subpass may sample from the current attachment.
                 boolean needsFeedbackDep = (!swapchainColorAttachment && legacyColorTexture != null && legacyColorTexture.feedbackLoopCapable)
                     || (legacyDepthTexture != null && legacyDepthTexture.feedbackLoopCapable);
-                int dependencyCount = needsFeedbackDep ? 3 : 2;
-                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(dependencyCount, stack);
-                dependencies.get(0)
-                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
-                    .dstSubpass(0)
-                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                    .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_SHADER_READ_BIT)
-                    .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_SHADER_READ_BIT);
-                dependencies.get(1)
-                    .srcSubpass(0)
-                    .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
-                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                        | VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT)
-                    .dstStageMask(swapchainColorAttachment
-                        ? VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
-                        : VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                        | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
-                    .dstAccessMask(swapchainColorAttachment ? 0 : VK10.VK_ACCESS_SHADER_READ_BIT);
-                if (needsFeedbackDep) {
-                    // Self-dependency required by VK_EXT_attachment_feedback_loop_layout spec.
-                    // Without this, the driver won't guarantee read-after-write ordering for
-                    // ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT layout accesses.
-                    dependencies.get(2)
-                        .srcSubpass(0)
-                        .dstSubpass(0)
-                        .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                        .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
-                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
-                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
-                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
-                }
+                VulkanRenderPassCompatibilityKey compatibilityKey = VulkanRenderPassCompatibilityKey.textureView(
+                    List.of(attachments.get(0).format()),
+                    targets.hasDepthTarget() ? attachments.get(1).format() : VK10.VK_FORMAT_UNDEFINED,
+                    needsFeedbackDep
+                );
+                VkSubpassDependency.Buffer dependencies = allocateCompatibleSubpassDependencies(stack, compatibilityKey);
 
                 VkRenderPassCreateInfo renderPassCreateInfo = VkRenderPassCreateInfo.calloc(stack)
                     .sType$Default()
@@ -16010,19 +16072,20 @@ void main() {
                 activeRenderPassWidth = width;
                 activeRenderPassHeight = height;
                 trackTransientRenderPassHandle(renderPassHandle);
-                trackTransientFramebufferHandle(framebufferHandle);
-            } catch (RuntimeException exception) {
+	                trackTransientFramebufferHandle(framebufferHandle);
+                return compatibilityKey;
+	            } catch (RuntimeException exception) {
                 if (framebufferHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
                 }
                 if (renderPassHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyRenderPass(logicalDevice, renderPassHandle, null);
                 }
-                throw exception;
-            }
-        }
+	                throw exception;
+	            }
+	        }
 
-        private void beginFramebufferRenderPass(long commandBufferHandle, VulkanRenderTargetPlan plan) {
+	        private VulkanRenderPassCompatibilityKey beginFramebufferRenderPass(long commandBufferHandle, VulkanRenderTargetPlan plan) {
             ResolvedFramebufferTargets targets = plan.requireFramebufferTargets();
             VulkanPerfAudit.recordRenderPassBegin();
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "beginFramebufferRenderPass");
@@ -16170,73 +16233,12 @@ void main() {
                 // Base external→subpass and subpass→external dependencies plus optional feedback loop self-dependency.
                 boolean hasFeedbackLoop = targets.colorTextures.stream().anyMatch(t -> t.feedbackLoopCapable)
                     || (targets.hasDepthTarget() && targets.depthTexture.feedbackLoopCapable);
-                int dependencyCount2 = hasFeedbackLoop ? 3 : 2;
-                VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(dependencyCount2, stack);
-	                int srcStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	                int dstStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	                int srcAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
-	                int dstAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
-	                if (colorAttachmentCount > 0) {
-	                    srcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	                    dstStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	                    srcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	                    dstAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	                }
-	                if (targets.hasDepthTarget()) {
-	                    srcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	                    dstStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	                    srcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	                    dstAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	                }
-	                dependencies.get(0)
-	                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
-	                    .dstSubpass(0)
-	                    .srcStageMask(srcStageMask)
-	                    .dstStageMask(dstStageMask)
-	                    .srcAccessMask(srcAccessMask)
-	                    .dstAccessMask(dstAccessMask);
-	                int exitSrcStageMask = 0;
-	                int exitSrcAccessMask = 0;
-	                if (colorAttachmentCount > 0) {
-	                    exitSrcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	                    exitSrcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	                }
-	                if (targets.hasDepthTarget()) {
-	                    exitSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	                    exitSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	                }
-	                dependencies.get(1)
-	                    .srcSubpass(0)
-	                    .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
-	                    .srcStageMask(exitSrcStageMask)
-	                    .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-	                    .srcAccessMask(exitSrcAccessMask)
-	                    .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT);
-	                if (hasFeedbackLoop) {
-	                    int feedbackSrcStageMask = 0;
-	                    int feedbackSrcAccessMask = 0;
-	                    if (colorAttachmentCount > 0) {
-	                        feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	                        feedbackSrcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	                    }
-	                    if (targets.hasDepthTarget()) {
-	                        feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-	                            | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	                        feedbackSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	                    }
-	                    dependencies.get(2)
-	                        .srcSubpass(0)
-	                        .dstSubpass(0)
-	                        .srcStageMask(feedbackSrcStageMask)
-	                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-	                        .srcAccessMask(feedbackSrcAccessMask)
-	                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
-	                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
-	                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
-                }
+                VulkanRenderPassCompatibilityKey compatibilityKey = VulkanRenderPassCompatibilityKey.framebuffer(
+                    targets.colorFormats(),
+                    targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+                    hasFeedbackLoop
+                );
+                VkSubpassDependency.Buffer dependencies = allocateCompatibleSubpassDependencies(stack, compatibilityKey);
 
                 // Build a stable typed cache key from the render pass configuration. For
                 // feedback-loop passes the initialLayout is now constant, so the key
@@ -16443,8 +16445,9 @@ void main() {
                 if (!permanentRenderPassCache.containsValue(renderPassHandle)) {
                     trackTransientRenderPassHandle(renderPassHandle);
                 }
-                trackTransientFramebufferHandle(framebufferHandle);
-            } catch (RuntimeException exception) {
+	                trackTransientFramebufferHandle(framebufferHandle);
+                return compatibilityKey;
+	            } catch (RuntimeException exception) {
                 if (framebufferHandle != VK10.VK_NULL_HANDLE) {
                     VK10.vkDestroyFramebuffer(logicalDevice, framebufferHandle, null);
                 }
@@ -16892,12 +16895,23 @@ void main() {
             return createVulkanPipeline(
                 descriptor,
                 vertShaderModuleHandle,
+                fragShaderModuleHandle,
+                defaultRenderPassCompatibilityKey()
+            );
+        }
+
+        private VulkanPipelineHandle createVulkanPipeline(
+            PipelineDescriptor descriptor,
+            long vertShaderModuleHandle,
+            long fragShaderModuleHandle,
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+        ) {
+            return createVulkanPipeline(
+                descriptor,
+                vertShaderModuleHandle,
                 VK10.VK_NULL_HANDLE,
                 fragShaderModuleHandle,
-                List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
-                VK10.VK_FORMAT_UNDEFINED,
-                false,
-                false
+                renderPassCompatibilityKey
             );
         }
 
@@ -16912,10 +16926,11 @@ void main() {
                 vertShaderModuleHandle,
                 VK10.VK_NULL_HANDLE,
                 fragShaderModuleHandle,
-                List.of(colorFormat),
-                VK10.VK_FORMAT_UNDEFINED,
-                false,
-                false
+                VulkanRenderPassCompatibilityKey.framebuffer(
+                    List.of(colorFormat),
+                    VK10.VK_FORMAT_UNDEFINED,
+                    false
+                )
             );
         }
 
@@ -16931,10 +16946,13 @@ void main() {
                 vertShaderModuleHandle,
                 VK10.VK_NULL_HANDLE,
                 fragShaderModuleHandle,
-                List.of(colorFormat),
-                VK10.VK_FORMAT_UNDEFINED,
-                false,
                 swapchainPresentCompatible
+                    ? VulkanRenderPassCompatibilityKey.swapchainPresent(colorFormat)
+                    : VulkanRenderPassCompatibilityKey.framebuffer(
+                        List.of(colorFormat),
+                        VK10.VK_FORMAT_UNDEFINED,
+                        false
+                    )
             );
         }
 
@@ -16943,25 +16961,16 @@ void main() {
             long vertShaderModuleHandle,
             long geomShaderModuleHandle,
             long fragShaderModuleHandle,
-            List<Integer> colorFormats,
-            int depthFormat,
-            boolean feedbackLoopCompatible,
-            boolean swapchainPresentCompatible
+            VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
         ) {
             Objects.requireNonNull(descriptor, "descriptor must not be null");
+            Objects.requireNonNull(renderPassCompatibilityKey, "renderPassCompatibilityKey must not be null");
             if (logicalDevice == null) {
                 throw new IllegalStateException("Cannot create pipeline: Vulkan logical device is unavailable.");
 	            }
-	            Objects.requireNonNull(colorFormats, "colorFormats must not be null");
-	            for (int colorFormat : colorFormats) {
-	                if (colorFormat == VK10.VK_FORMAT_UNDEFINED) {
-	                    throw new IllegalArgumentException("Cannot create Vulkan pipeline with VK_FORMAT_UNDEFINED color attachment format");
-	                }
-	            }
 
             PipelineDescriptor.PortableState portableState = descriptor.getPortableState();
-	            boolean includeDepth = depthFormat != VK10.VK_FORMAT_UNDEFINED;
-	            int pipelineDepthFormat = depthFormat != VK10.VK_FORMAT_UNDEFINED ? depthFormat : VK10.VK_FORMAT_D32_SFLOAT;
+            List<Integer> colorFormats = renderPassCompatibilityKey.colorFormats();
 
             try (MemoryStack stack = stackPush()) {
 
@@ -17185,11 +17194,7 @@ void main() {
                 // passes created by beginRenderPass() for standard Minecraft draw calls.
                 long placeholderRenderPass = createPipelineCompatibleRenderPass(
                     stack,
-                    colorFormats,
-                    includeDepth,
-                    pipelineDepthFormat,
-                    feedbackLoopCompatible,
-                    swapchainPresentCompatible
+                    renderPassCompatibilityKey
                 );
 
                 // --- 13. VkGraphicsPipelineCreateInfo ---
@@ -17231,6 +17236,7 @@ void main() {
 
                 return new VulkanPipelineHandle(
                     pipelineHandle, pipelineLayoutHandle, descriptorSetLayoutHandle,
+                    renderPassCompatibilityKey,
                     bindings.size(),
                     this);
             }
@@ -17278,6 +17284,156 @@ void main() {
             lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
         }
 
+        private static VkSubpassDependency.Buffer allocateCompatibleSubpassDependencies(
+            MemoryStack stack,
+            VulkanRenderPassCompatibilityKey compatibilityKey
+        ) {
+            return switch (compatibilityKey.dependencyProfile()) {
+                case SWAPCHAIN_PRESENT -> allocateSwapchainPresentDependencies(stack);
+                case TEXTURE_VIEW -> allocateTextureViewDependencies(stack, compatibilityKey);
+                case FRAMEBUFFER -> allocateFramebufferDependencies(stack, compatibilityKey);
+            };
+        }
+
+        private static VkSubpassDependency.Buffer allocateSwapchainPresentDependencies(MemoryStack stack) {
+            VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(2, stack);
+            dependencies.get(0)
+                .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                .dstSubpass(0)
+                .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                .srcAccessMask(0)
+                .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+            dependencies.get(1)
+                .srcSubpass(0)
+                .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                .dstStageMask(VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)
+                .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+                .dstAccessMask(0);
+            return dependencies;
+        }
+
+        private static VkSubpassDependency.Buffer allocateTextureViewDependencies(
+            MemoryStack stack,
+            VulkanRenderPassCompatibilityKey compatibilityKey
+        ) {
+            VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(
+                compatibilityKey.feedbackLoop() ? 3 : 2,
+                stack
+            );
+            dependencies.get(0)
+                .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                .dstSubpass(0)
+                .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                    | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                    | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                    | VK10.VK_ACCESS_SHADER_READ_BIT)
+                .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                    | VK10.VK_ACCESS_SHADER_READ_BIT);
+
+            int exitSrcStageMask = VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            int exitSrcAccessMask = VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            if (compatibilityKey.hasDepthAttachment()) {
+                exitSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                    | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                exitSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            }
+            dependencies.get(1)
+                .srcSubpass(0)
+                .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                .srcStageMask(exitSrcStageMask)
+                .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                .srcAccessMask(exitSrcAccessMask)
+                .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT);
+
+            if (compatibilityKey.feedbackLoop()) {
+                dependencies.get(2)
+                    .srcSubpass(0)
+                    .dstSubpass(0)
+                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                    .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+                    .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
+                    .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
+                        | VK10.VK_DEPENDENCY_BY_REGION_BIT);
+            }
+            return dependencies;
+        }
+
+        private static VkSubpassDependency.Buffer allocateFramebufferDependencies(
+            MemoryStack stack,
+            VulkanRenderPassCompatibilityKey compatibilityKey
+        ) {
+            VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(
+                compatibilityKey.feedbackLoop() ? 3 : 2,
+                stack
+            );
+            int entryStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            int entryAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
+            if (compatibilityKey.colorAttachmentCount() > 0) {
+                entryStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                entryAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            }
+            if (compatibilityKey.hasDepthAttachment()) {
+                entryStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                    | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                entryAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            }
+            dependencies.get(0)
+                .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                .dstSubpass(0)
+                .srcStageMask(entryStageMask)
+                .dstStageMask(entryStageMask)
+                .srcAccessMask(entryAccessMask)
+                .dstAccessMask(entryAccessMask);
+
+            int exitSrcStageMask = 0;
+            int exitSrcAccessMask = 0;
+            if (compatibilityKey.colorAttachmentCount() > 0) {
+                exitSrcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                exitSrcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            }
+            if (compatibilityKey.hasDepthAttachment()) {
+                exitSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                    | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                exitSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            }
+            dependencies.get(1)
+                .srcSubpass(0)
+                .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
+                .srcStageMask(exitSrcStageMask)
+                .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                .srcAccessMask(exitSrcAccessMask)
+                .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT);
+
+            if (compatibilityKey.feedbackLoop()) {
+                int feedbackSrcStageMask = 0;
+                int feedbackSrcAccessMask = 0;
+                if (compatibilityKey.colorAttachmentCount() > 0) {
+                    feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                    feedbackSrcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                }
+                if (compatibilityKey.hasDepthAttachment()) {
+                    feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                    feedbackSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                }
+                dependencies.get(2)
+                    .srcSubpass(0)
+                    .dstSubpass(0)
+                    .srcStageMask(feedbackSrcStageMask)
+                    .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+                    .srcAccessMask(feedbackSrcAccessMask)
+                    .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
+                    .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
+                        | VK10.VK_DEPENDENCY_BY_REGION_BIT);
+            }
+            return dependencies;
+        }
+
         /**
          * Creates a transient render-pass object suitable for pipeline compilation.
          *
@@ -17290,55 +17446,43 @@ void main() {
         private long createPipelineCompatibleRenderPass(MemoryStack stack, boolean includeDepth) {
             return createPipelineCompatibleRenderPass(
                 stack,
-                List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
-                includeDepth,
-                VK10.VK_FORMAT_D32_SFLOAT,
-                false,
-                false
+                VulkanRenderPassCompatibilityKey.framebuffer(
+                    List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
+                    includeDepth ? VK10.VK_FORMAT_D32_SFLOAT : VK10.VK_FORMAT_UNDEFINED,
+                    false
+                )
             );
         }
 
         private long createPipelineCompatibleRenderPass(MemoryStack stack, boolean includeDepth, int colorFormat) {
             return createPipelineCompatibleRenderPass(
                 stack,
-                List.of(colorFormat),
-                includeDepth,
-                VK10.VK_FORMAT_D32_SFLOAT,
-                false,
-                false
+                VulkanRenderPassCompatibilityKey.framebuffer(
+                    List.of(colorFormat),
+                    includeDepth ? VK10.VK_FORMAT_D32_SFLOAT : VK10.VK_FORMAT_UNDEFINED,
+                    false
+                )
             );
         }
 
         private long createPipelineCompatibleRenderPass(
             MemoryStack stack,
-            List<Integer> colorFormats,
-            boolean includeDepth,
-            int depthFormat,
-            boolean feedbackLoopCompatible,
-            boolean swapchainPresentCompatible
+            VulkanRenderPassCompatibilityKey compatibilityKey
         ) {
-	            Objects.requireNonNull(colorFormats, "colorFormats must not be null");
-	            if (includeDepth && depthFormat == VK10.VK_FORMAT_UNDEFINED) {
-	                throw new IllegalArgumentException("Depth-enabled pipeline-compatible render pass requires a defined depth format");
-	            }
-	            if (swapchainPresentCompatible && colorFormats.isEmpty()) {
-	                throw new IllegalArgumentException("Swapchain-present-compatible render pass requires a color attachment");
-	            }
+            Objects.requireNonNull(compatibilityKey, "compatibilityKey must not be null");
+            List<Integer> colorFormats = compatibilityKey.colorFormats();
+            boolean includeDepth = compatibilityKey.hasDepthAttachment();
 
-            if (feedbackLoopCompatible && swapchainPresentCompatible) {
-                throw new IllegalArgumentException("A pipeline-compatible render pass cannot be both feedback-loop and swapchain-present compatible");
-            }
-
-            int colorAttachmentImageLayout = feedbackLoopCompatible
+            int colorAttachmentImageLayout = compatibilityKey.feedbackLoop()
                 ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                 : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            int depthAttachmentImageLayout = feedbackLoopCompatible
+            int depthAttachmentImageLayout = compatibilityKey.feedbackLoop()
                 ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                 : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            int colorAttachmentRefLayout = feedbackLoopCompatible
+            int colorAttachmentRefLayout = compatibilityKey.feedbackLoop()
                 ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                 : VK10.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            int depthAttachmentRefLayout = feedbackLoopCompatible
+            int depthAttachmentRefLayout = compatibilityKey.feedbackLoop()
                 ? EXTAttachmentFeedbackLoopLayout.VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
                 : VK10.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
@@ -17372,7 +17516,7 @@ void main() {
             VkAttachmentReference depthRef = null;
             if (includeDepth) {
                 attachments.get(colorAttachmentCount)
-                    .format(depthFormat)
+                    .format(compatibilityKey.depthFormat())
                     .samples(VK10.VK_SAMPLE_COUNT_1_BIT)
                     .loadOp(VK10.VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                     .storeOp(VK10.VK_ATTACHMENT_STORE_OP_DONT_CARE)
@@ -17392,72 +17536,7 @@ void main() {
 	                .pColorAttachments(colorRef)
 	                .pDepthStencilAttachment(depthRef);
 
-            int placeholderDependencyCount = feedbackLoopCompatible || swapchainPresentCompatible ? 2 : 1;
-            VkSubpassDependency.Buffer dependencies = VkSubpassDependency.calloc(placeholderDependencyCount, stack);
-            if (swapchainPresentCompatible) {
-                dependencies.get(0)
-                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
-                    .dstSubpass(0)
-                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                    .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                    .srcAccessMask(0)
-                    .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-                dependencies.get(1)
-                    .srcSubpass(0)
-                    .dstSubpass(VK10.VK_SUBPASS_EXTERNAL)
-                    .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                    .dstStageMask(VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)
-                    .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
-                    .dstAccessMask(0);
-            } else {
-	                int srcStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	                int dstStageMask = VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	                int srcAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
-	                int dstAccessMask = VK10.VK_ACCESS_SHADER_READ_BIT;
-	                if (colorAttachmentCount > 0) {
-	                    srcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	                    dstStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	                    srcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	                    dstAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	                }
-	                if (includeDepth) {
-	                    srcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	                    dstStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-	                        | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	                    srcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	                    dstAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	                }
-	                dependencies.get(0)
-	                    .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
-	                    .dstSubpass(0)
-	                    .srcStageMask(srcStageMask)
-	                    .dstStageMask(dstStageMask)
-	                    .srcAccessMask(srcAccessMask)
-	                    .dstAccessMask(dstAccessMask);
-	                if (feedbackLoopCompatible) {
-	                    int feedbackSrcStageMask = 0;
-	                    int feedbackSrcAccessMask = 0;
-	                    if (colorAttachmentCount > 0) {
-	                        feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	                        feedbackSrcAccessMask |= VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	                    }
-	                    if (includeDepth) {
-	                        feedbackSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-	                            | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	                        feedbackSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	                    }
-	                    dependencies.get(1)
-	                        .srcSubpass(0)
-	                        .dstSubpass(0)
-	                        .srcStageMask(feedbackSrcStageMask)
-	                        .dstStageMask(VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-	                        .srcAccessMask(feedbackSrcAccessMask)
-	                        .dstAccessMask(VK10.VK_ACCESS_SHADER_READ_BIT)
-	                        .dependencyFlags(EXTAttachmentFeedbackLoopLayout.VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT
-	                            | VK10.VK_DEPENDENCY_BY_REGION_BIT);
-                }
-            }
+            VkSubpassDependency.Buffer dependencies = allocateCompatibleSubpassDependencies(stack, compatibilityKey);
 
             VkRenderPassCreateInfo rpInfo = VkRenderPassCreateInfo.calloc(stack)
                 .sType$Default()

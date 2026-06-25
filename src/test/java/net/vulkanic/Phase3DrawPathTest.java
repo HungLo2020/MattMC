@@ -5431,19 +5431,17 @@ public class Phase3DrawPathTest {
             "Vulkan pipeline variants should no longer be keyed by a GL-style framebuffer identity");
         assertFalse(source.contains("int framebuffer,\n        String indexedBlendKey,"),
             "Render-target pipeline variants must not include the virtual framebuffer id in the compatibility key");
-        assertTrue(source.contains("List<Integer> colorFormats,"),
-            "Render-target pipeline variants must be keyed by the resolved color attachment formats");
         assertTrue(source.contains("String indexedBlendKey,"),
             "Render-target pipeline variants must be keyed by per-attachment blend state for Iris MRT blend overrides");
-        assertTrue(source.contains("int depthFormat"),
-            "Render-target pipeline variants must include the resolved depth attachment format");
-        assertTrue(source.contains("boolean feedbackLoopCompatible"),
-            "Render-target pipeline variants must include feedback-loop compatibility because it changes render-pass layouts");
-        assertTrue(source.contains("colorFormats = List.copyOf(colorFormats);"),
-            "Render-target pipeline keys should defensively snapshot the color format list");
+        assertTrue(source.contains("VulkanRenderPassCompatibilityKey renderPassCompatibilityKey"),
+            "Render-target pipeline variants must be keyed by the full Vulkan render-pass compatibility contract");
+        assertTrue(source.contains("Objects.requireNonNull(renderPassCompatibilityKey"),
+            "Render-target pipeline keys should require an explicit render-pass compatibility contract");
+        assertTrue(source.contains("VulkanRenderPassCompatibilityKey.framebuffer("),
+            "Framebuffer-backed pipeline keys should include color formats, depth format, and feedback-loop dependency profile");
         assertTrue(source.contains("RenderTargetPipelineKey.from("),
             "Framebuffer-backed pipeline resolution should derive a render-target compatibility key from resolved attachments");
-        assertTrue(source.contains("indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), colorFormats.size())"),
+        assertTrue(source.contains("indexedBlendStateCacheKey(pipelineDescriptor.getPortableState(), renderPassCompatibilityKey.colorAttachmentCount())"),
             "Render-target pipeline resolution should include portable blend ownership when deriving blend cache keys");
         assertTrue(source.contains("if (portableState.blendState().isPresent()) {\n                key.append(\"portable\");"),
             "Portable pipeline blend state should not be overridden by stale legacy indexed blend state");
@@ -5597,7 +5595,7 @@ public class Phase3DrawPathTest {
                 && vulkanBackendSource.contains("compatibilitySignature()")
                 && vulkanBackendSource.contains("TRACE_RENDER_TARGET_PARITY"),
             "VulkanBackend should keep exact parity diagnostics while allowing narrowly compatible explicit descriptor shader paths");
-        assertTrue(vulkanBackendSource.contains("boolean includeDepth = depthFormat != VK10.VK_FORMAT_UNDEFINED"),
+        assertTrue(vulkanBackendSource.contains("boolean includeDepth = compatibilityKey.hasDepthAttachment()"),
             "Vulkan target-specific pipelines should match the actual descriptor depth attachment contract");
     }
 
@@ -5606,9 +5604,9 @@ public class Phase3DrawPathTest {
         Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
         String source = readSource(vulkanBackendFile);
 
-        assertTrue(source.contains("int colorAttachmentRefLayout = feedbackLoopCompatible"),
+        assertTrue(source.contains("int colorAttachmentRefLayout = compatibilityKey.feedbackLoop()"),
             "Pipeline-compatible render passes should choose color subpass layouts from attachment-feedback-loop mode");
-        assertTrue(source.contains("int depthAttachmentRefLayout = feedbackLoopCompatible"),
+        assertTrue(source.contains("int depthAttachmentRefLayout = compatibilityKey.feedbackLoop()"),
             "Pipeline-compatible render passes should choose depth subpass layouts from attachment-feedback-loop mode");
         assertTrue(source.contains(".layout(colorAttachmentRefLayout);"),
             "Color attachment references in the pipeline-compatible render pass must use the selected layout");
@@ -5625,11 +5623,41 @@ public class Phase3DrawPathTest {
             "Vulkan pipeline creation should distinguish swapchain-present render-pass compatibility from feedback-loop compatibility");
         assertTrue(source.contains("swapchainImageFormat,\n                    true"),
             "Swapchain present compose pipeline should request the swapchain-present-compatible render pass contract");
-        assertTrue(source.contains("if (swapchainPresentCompatible)"),
+        assertTrue(source.contains("case SWAPCHAIN_PRESENT -> allocateSwapchainPresentDependencies(stack);"),
             "Pipeline-compatible render pass creation should emit a dedicated dependency set for swapchain-present passes");
         assertTrue(source.contains(".dstSubpass(VK10.VK_SUBPASS_EXTERNAL)")
                 && source.contains(".dstStageMask(VK10.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT)"),
             "Swapchain-present-compatible placeholder render passes should match the persistent swapchain present render pass dependencies");
+    }
+
+    @Test
+    public void testVulkanPipelineRenderPassCompatibilityUsesLiveRenderPassProfile() throws IOException {
+        Path vulkanBackendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        Path compatibilityKeyFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanRenderPassCompatibilityKey.java");
+        String source = readSource(vulkanBackendFile);
+        String keySource = readSource(compatibilityKeyFile);
+
+        assertTrue(keySource.contains("record VulkanRenderPassCompatibilityKey("),
+            "VulkanBackend should use a typed render-pass compatibility contract for pipeline variants");
+        assertTrue(source.contains("VulkanRenderPassCompatibilityKey compatibilityKey = spine.beginRenderPass(commandBufferHandle, plan)")
+                && source.contains("VulkanRenderPassCompatibilityKey compatibilityKey = spine.beginFramebufferRenderPass(commandBufferHandle, plan)"),
+            "Render-pass begin paths should return the exact compatibility key for the active native render pass");
+        assertTrue(source.contains("return new VulkanBackedRenderPass(spine, commandBufferHandle, compatibilityKey);"),
+            "Active Vulkan render passes should carry the native compatibility key into draw-time binding");
+        assertTrue(source.contains("if (!compatibilityKey.equals(vulkanPipeline.getRenderPassCompatibilityKey()))"),
+            "Vulkan pipeline binding should fail fast before incompatible render-pass/pipeline pairs reach vkCmdDraw");
+        assertTrue(source.contains("boolean colorFeedbackLoopCapable = isFeedbackLoopCapable(colorTexture)")
+                && source.contains("boolean depthFeedbackLoopCapable = isFeedbackLoopCapable(depthTexture)")
+                && source.contains("targets.hasFeedbackLoopTarget()"),
+            "Texture-view pipeline variants should snapshot the same attachment feedback-loop capability used by live render passes");
+        assertTrue(source.contains("createPipelineCompatibleRenderPass(\n                    stack,\n                    renderPassCompatibilityKey"),
+            "Vulkan pipeline creation should compile against the same compatibility key used for draw-time render passes");
+        assertTrue(source.contains("allocateCompatibleSubpassDependencies(stack, compatibilityKey)"),
+            "Pipeline-compatible render passes and live render passes should share dependency profile construction");
+        assertTrue(source.contains("case TEXTURE_VIEW -> allocateTextureViewDependencies(stack, compatibilityKey);")
+                && source.contains("case FRAMEBUFFER -> allocateFramebufferDependencies(stack, compatibilityKey);")
+                && source.contains("case SWAPCHAIN_PRESENT -> allocateSwapchainPresentDependencies(stack);"),
+            "Texture-view, framebuffer, and swapchain-present render-pass profiles should stay distinct");
     }
 
     @Test
