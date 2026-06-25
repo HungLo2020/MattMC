@@ -2101,7 +2101,7 @@ void main() {
         VirtualShader virtualShader,
         VirtualProgram virtualProgram
     ) {
-        String reboundSource = virtualShader.source;
+        String reboundSource = prepareVirtualShaderSourceForVulkanReflection(virtualShader);
         if (virtualShader.stage == VulkanicShaderStage.VERTEX) {
             for (Map.Entry<String, Integer> entry : virtualProgram.attributeLocationsByName.entrySet()) {
                 reboundSource = injectExplicitVertexInputLocation(reboundSource, entry.getKey(), entry.getValue());
@@ -2185,12 +2185,20 @@ void main() {
         return shaderIds;
     }
 
+    private static String prepareVirtualShaderSourceForVulkanReflection(VirtualShader virtualShader) {
+        String source = virtualShader.source;
+        if (source == null || source.isBlank()) {
+            return source;
+        }
+        return GlslangSpirvCompiler.prepareSourceForVulkanResourceReflection(virtualShader.stage, source);
+    }
+
     private List<String> collectStandaloneUniformDeclarations(VirtualProgram virtualProgram) {
         List<String> sources = new ArrayList<>();
         for (int shaderId : sortedAttachedShaderIds(virtualProgram)) {
             VirtualShader virtualShader = virtualShaders.get(shaderId);
             if (virtualShader != null && virtualShader.source != null && !virtualShader.source.isBlank()) {
-                sources.add(virtualShader.source);
+                sources.add(prepareVirtualShaderSourceForVulkanReflection(virtualShader));
             }
         }
         return collectStandaloneUniformDeclarations(sources);
@@ -2307,8 +2315,9 @@ void main() {
                 continue;
             }
 
+            String reflectedSource = prepareVirtualShaderSourceForVulkanReflection(virtualShader);
             String normalizedSource = GLSL_LINE_COMMENT_PATTERN.matcher(
-                GLSL_BLOCK_COMMENT_PATTERN.matcher(virtualShader.source).replaceAll("")
+                GLSL_BLOCK_COMMENT_PATTERN.matcher(reflectedSource).replaceAll("")
             ).replaceAll("");
             Matcher blockMatcher = GLSL_UNIFORM_BLOCK_PATTERN.matcher(normalizedSource);
             while (blockMatcher.find()) {

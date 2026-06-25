@@ -33,6 +33,13 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     private static final java.util.regex.Pattern EXPLICIT_BINDING_PATTERN = java.util.regex.Pattern.compile(
         "layout\\s*\\(([^)]*\\bbinding\\s*=\\s*(\\d+)[^)]*)\\)"
     );
+    private static final java.util.regex.Pattern SODIUM_REGION_OFFSET_UNIFORM_PATTERN = java.util.regex.Pattern.compile(
+        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+vec3\\s+u_RegionOffset\\s*;\\s*(?://.*)?(?:\\R|$)"
+    );
+    private static final java.util.regex.Pattern SODIUM_REGION_OFFSET_REFERENCE_PATTERN = java.util.regex.Pattern.compile("\\bu_RegionOffset\\b");
+    private static final java.util.regex.Pattern DYNAMIC_TRANSFORMS_BLOCK_PATTERN = java.util.regex.Pattern.compile(
+        "(?m)(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+DynamicTransforms\\s*\\{"
+    );
     static final String GENERATED_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
 
     @Override
@@ -162,6 +169,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         }
 
         String normalized = promoteVersionForVulkan(shaderSource);
+        normalized = prepareSourceForVulkanResourceReflection(stage, normalized);
         normalized = rewriteStandaloneUniformsForVulkan(
             normalized,
             standaloneUniformDeclarations,
@@ -179,6 +187,39 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
         normalized = LEGACY_VERTEX_ID_PATTERN.matcher(normalized).replaceAll("gl_VertexIndex");
         return LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
+    }
+
+    static String prepareSourceForVulkanResourceReflection(VulkanicShaderStage stage, String shaderSource) {
+        if (stage != VulkanicShaderStage.VERTEX || !isSodiumTerrainRegionOffsetSource(shaderSource)) {
+            return shaderSource;
+        }
+
+        String rewritten = SODIUM_REGION_OFFSET_UNIFORM_PATTERN.matcher(shaderSource).replaceFirst("");
+        if (rewritten.equals(shaderSource)) {
+            return shaderSource;
+        }
+
+        if (!DYNAMIC_TRANSFORMS_BLOCK_PATTERN.matcher(rewritten).find()) {
+            int insertOffset = findUniformBlockInsertionOffset(rewritten);
+            rewritten = rewritten.substring(0, insertOffset)
+                + "layout(std140) uniform DynamicTransforms {\n"
+                + "    mat4 ModelViewMat;\n"
+                + "    vec4 ColorModulator;\n"
+                + "    vec3 ModelOffset;\n"
+                + "    mat4 TextureMat;\n"
+                + "    float LineWidth;\n"
+                + "};\n\n"
+                + rewritten.substring(insertOffset);
+        }
+
+        return SODIUM_REGION_OFFSET_REFERENCE_PATTERN.matcher(rewritten).replaceAll("ModelOffset");
+    }
+
+    private static boolean isSodiumTerrainRegionOffsetSource(String shaderSource) {
+        return shaderSource.contains("u_RegionOffset")
+            && shaderSource.contains("_vert_position")
+            && shaderSource.contains("_get_draw_translation")
+            && shaderSource.contains("getVertexPosition");
     }
 
     private static String rewriteFragmentCoordForVulkan(String shaderSource) {

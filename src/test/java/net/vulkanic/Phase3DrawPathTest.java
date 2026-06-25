@@ -1210,8 +1210,10 @@ public class Phase3DrawPathTest {
             "The Vulkan chunk renderer should create an explicit terrain pipeline contract before choosing the shared terrain pipeline");
         assertTrue(rendererSource.contains("renderPassShader.bindRenderPassResources(renderPass, terrainPass);"),
             "The Vulkan chunk renderer should mirror chunk-program sampler state into the render pass before drawing");
-        assertTrue(rendererSource.contains("setModelMatrixUniforms(shader, preparedDraw.region(), camera);"),
-            "The Vulkan chunk renderer should keep per-region translation updates on the shared chunk shader interface");
+        assertFalse(rendererSource.contains("setModelMatrixUniforms(shader, preparedDraw.region(), camera);"),
+            "Native Vulkan terrain should use explicit DynamicTransforms draw data instead of per-draw GL-style region uniform mutation");
+        assertTrue(rendererSource.contains("renderPass.setUniform(\"DynamicTransforms\", preparedDraw.transforms());"),
+            "Native Vulkan terrain should bind per-region translation through the explicit Vulkanic DynamicTransforms UBO");
         assertTrue(rendererSource.contains("final boolean useIndexedTessellation = terrainPass.isTranslucent() && indexedRenderingEnabled;"),
             "Vulkan shader terrain should keep Sodium's sorted translucent local-index path enabled");
         assertTrue(rendererSource.contains("if (useIndexedTessellation && SectionRenderDataUnsafe.isLocalIndex(pMeshData))"),

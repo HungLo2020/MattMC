@@ -22,6 +22,7 @@ import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -352,6 +353,71 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(normalized.contains("uniform sampler2D u_LightTex;"));
         assertFalse(normalized.contains("uniform vec3 u_RegionOffset;"));
         assertFalse(normalized.contains("uniform vec2 u_TexCoordShrink;"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanRoutesSodiumTerrainRegionOffsetThroughDynamicTransforms() {
+        String source = "#version 330\n"
+            + "uniform vec3 u_RegionOffset;\n"
+            + "vec3 _vert_position;\n"
+            + "uint _draw_id;\n"
+            + "vec3 _get_draw_translation(uint drawId) { return vec3(drawId); }\n"
+            + "vec4 getVertexPosition() { return vec4(_vert_position + u_RegionOffset + _get_draw_translation(_draw_id), 1.0); }\n"
+            + "void main(){ gl_Position = getVertexPosition(); }";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+
+        assertTrue(normalized.contains("uniform DynamicTransforms {"));
+        assertTrue(normalized.contains("vec3 ModelOffset;"));
+        assertTrue(normalized.contains("_vert_position + ModelOffset + _get_draw_translation(_draw_id)"));
+        assertFalse(normalized.contains("u_RegionOffset"));
+        assertFalse(normalized.contains("VulkanicStandaloneUniforms"));
+    }
+
+    @Test
+    public void testLinkedSodiumTerrainProgramReflectsRegionOffsetAsDynamicTransforms() {
+        List<String> capturedSources = new ArrayList<>();
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) -> {
+            capturedSources.add(source.toString());
+            return new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x31, 0x32}, sourceName, "stub");
+        });
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+        uploadSource(
+            backend,
+            vertexShader,
+            "#version 330\n"
+                + "uniform vec3 u_RegionOffset;\n"
+                + "vec3 _vert_position;\n"
+                + "uint _draw_id;\n"
+                + "vec3 _get_draw_translation(uint drawId) { return vec3(drawId); }\n"
+                + "vec4 getVertexPosition() { return vec4(_vert_position + u_RegionOffset + _get_draw_translation(_draw_id), 1.0); }\n"
+                + "void main(){ gl_Position = getVertexPosition(); }"
+        );
+        uploadSource(
+            backend,
+            fragmentShader,
+            "#version 330\n"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = vec4(1.0); }"
+        );
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(1L, "sodium-terrain-region-offset-test");
+        assertEquals(VulkanicAPI.GL_TRUE, backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_LINK_STATUS));
+        assertEquals(0, backend.getUniformBlockIndex(introspectionContext, program, "DynamicTransforms"));
+        assertEquals(-1, backend.getUniformLocation(introspectionContext, program, "u_RegionOffset"));
+        assertTrue(capturedSources.stream().anyMatch(source ->
+            source.contains("layout(std140, set = 0, binding = 0) uniform DynamicTransforms")));
+        assertFalse(String.join("\n", capturedSources).contains("u_RegionOffset"));
     }
 
     @Test

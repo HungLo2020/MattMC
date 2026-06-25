@@ -291,7 +291,6 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 renderPass.setVertexBuffer(0, preparedDraw.vertexBuffer());
                 renderPass.setIndexBuffer(preparedDraw.indexBuffer(), net.blaze3d.vertex.VertexFormat.IndexType.INT);
                 renderPass.setUniform("DynamicTransforms", preparedDraw.transforms());
-				setModelMatrixUniforms(shader, preparedDraw.region(), camera);
 
                 for (int drawIndex = 0; drawIndex < preparedDraw.batch().size; drawIndex++) {
                     int indexCount = MemoryUtil.memGetInt(preparedDraw.batch().pElementCount + ((long) drawIndex << 2));
