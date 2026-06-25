@@ -3,6 +3,8 @@
 
 This is the official wiki for the MattMC project, a fork of Minecraft Java Edition 1.21.10 focused on performance and modernization. It includes advanced features that originally came from mods such as Distant Horizons, Sodium, Iris Shaders, Alex's Caves, Alex's Mobs, and World Edit. 
 
+Source Code for the project: https://github.com/HungLo2020/MattMC
+
 Minecraft is a 3D sandbox game developed by Mojang Studios, a part of Xbox Game Studios. Initially released as what is now known as Minecraft Classic on May 17, 2009, the game was fully released on November 18, 2011, after multiple updates. Since its release, Minecraft has expanded to mobile devices and consoles.
 
 Minecraft focuses on allowing the player to explore, interact with and modify a dynamically-generated world made of one-cubic-meter-sized blocks. In addition to blocks, the environment features plants, mobs and items. Some activities in the game include building, mining for ore, fighting hostile mobs and crafting new blocks and tools by gathering various resources found in the game. The game's open-ended model allows players to create structures, creations and artwork on various competitive or collaborative multiplayer servers or their single-player maps. Other features include redstone circuits for logic computations and remote actions, minecarts and tracks, and a mysterious underworld called the Nether. A designated but completely optional goal of the game is to travel to a dimension called the End and defeat the ender dragon.

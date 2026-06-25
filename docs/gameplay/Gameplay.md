@@ -17,5 +17,6 @@ Gameplay.
 - [Mobs](mobs/Mobs.md)
 - [Redstone](redstone/Redstone.md)
 - [Smelting](smelting/Smelting.md)
-- [smithing](smithing/Smithing.md)
+- [Smithing](smithing/Smithing.md)
 - [Structures](structures/Structures.md)
+- [Trading](trading/Trading.md)
