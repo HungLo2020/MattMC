@@ -98,7 +98,8 @@ public final class SodiumChunkRenderPipelines {
             shaderReloadVersion,
             net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered(),
             vertexFormat,
-            bindableSamplers
+            bindableSamplers,
+            shaderInterface == null ? List.of() : shaderInterface.getRenderPassBufferBlendOverrides()
         );
     }
 

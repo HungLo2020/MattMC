@@ -2,7 +2,10 @@ package net.sodium.client.render.chunk.shader;
 
 import net.blaze3d.opengl.GlProgram;
 import net.blaze3d.opengl.Uniform;
+import net.blaze3d.pipeline.BlendFunction;
 import net.blaze3d.pipeline.RenderPipeline;
+import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.PipelineDescriptor;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,6 +27,7 @@ public final class SharedChunkProgramOverrides {
 	private static final AtomicInteger DEBUG_CREATE_OVERRIDE_LOG_COUNT = new AtomicInteger();
 	private static final Set<RenderPipeline> TRACKED_PIPELINES = ConcurrentHashMap.newKeySet();
 	private static final Map<RenderPipeline, TerrainPipelineContract> CONTRACTS = new ConcurrentHashMap<>();
+	private static final Map<ResourceLocation, TerrainPipelineContract> CONTRACTS_BY_LOCATION = new ConcurrentHashMap<>();
 	private static final ThreadLocal<net.sodium.client.gl.shader.GlProgram<? extends ChunkShaderInterface>> ACTIVE_CHUNK_PROGRAM = new ThreadLocal<>();
 
 	private SharedChunkProgramOverrides() {
@@ -31,10 +36,12 @@ public final class SharedChunkProgramOverrides {
 	public static void register(RenderPipeline pipeline, TerrainPipelineContract contract) {
 		TRACKED_PIPELINES.add(pipeline);
 		CONTRACTS.put(pipeline, contract);
+		CONTRACTS_BY_LOCATION.put(pipeline.getLocation(), contract);
 	}
 
 	public static void unregister(RenderPipeline pipeline) {
 		TRACKED_PIPELINES.remove(pipeline);
+		CONTRACTS_BY_LOCATION.remove(pipeline.getLocation());
 		CONTRACTS.remove(pipeline);
 	}
 
@@ -77,6 +84,28 @@ public final class SharedChunkProgramOverrides {
 	@Nullable
 	public static TerrainPipelineContract contract(RenderPipeline pipeline) {
 		return CONTRACTS.get(pipeline);
+	}
+
+	public static Optional<Optional<PipelineDescriptor.BlendState>> indexedBlendState(
+		ResourceLocation pipelineLocation,
+		int colorAttachmentIndex
+	) {
+		TerrainPipelineContract contract = CONTRACTS_BY_LOCATION.get(pipelineLocation);
+		if (contract == null) {
+			return Optional.empty();
+		}
+		return contract.passState()
+			.blendOverrideForAttachment(colorAttachmentIndex)
+			.map(blend -> blend.map(SharedChunkProgramOverrides::toPipelineBlendState));
+	}
+
+	private static PipelineDescriptor.BlendState toPipelineBlendState(BlendFunction blend) {
+		return new PipelineDescriptor.BlendState(
+			blend.sourceColor(),
+			blend.destColor(),
+			blend.sourceAlpha(),
+			blend.destAlpha()
+		);
 	}
 
 	@Nullable

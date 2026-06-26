@@ -8,11 +8,13 @@ import net.blaze3d.platform.PolygonMode;
 import net.blaze3d.platform.SourceFactor;
 import net.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.gl.blending.BlendModeStorage;
+import net.irisshaders.iris.gl.blending.BufferBlendInformation;
 import net.irisshaders.iris.gl.blending.DepthColorStorage;
 import net.minecraft.resources.ResourceLocation;
 import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.vulkanic.VulkanicBlendFactor;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -48,6 +50,17 @@ public record TerrainPipelineContract(
         VertexFormat vertexFormat,
         List<String> samplerNames
     ) {
+        return from(pass, shaderReloadVersion, shadowPass, vertexFormat, samplerNames, List.of());
+    }
+
+    public static TerrainPipelineContract from(
+        TerrainRenderPass pass,
+        int shaderReloadVersion,
+        boolean shadowPass,
+        VertexFormat vertexFormat,
+        List<String> samplerNames,
+        Collection<BufferBlendInformation> indexedBlendOverrides
+    ) {
         Objects.requireNonNull(pass, "pass must not be null");
         RenderPipeline pipeline = pass.getPipeline();
         return new TerrainPipelineContract(
@@ -56,7 +69,7 @@ public record TerrainPipelineContract(
             vertexFormat,
             samplerNames,
             PassKind.from(pass),
-            PassState.from(pipeline, pass.isTranslucent()),
+            PassState.from(pipeline, pass.isTranslucent(), indexedBlendOverrides),
             pipeline.getLocation()
         );
     }
@@ -116,15 +129,25 @@ public record TerrainPipelineContract(
         boolean writeAlpha,
         boolean writeDepth,
         float depthBiasScaleFactor,
-        float depthBiasConstant
+        float depthBiasConstant,
+        List<IndexedBlendState> indexedBlendStates
     ) {
         public PassState {
             blend = Objects.requireNonNull(blend, "blend must not be null");
             depthTest = Objects.requireNonNull(depthTest, "depthTest must not be null");
             polygonMode = Objects.requireNonNull(polygonMode, "polygonMode must not be null");
+            indexedBlendStates = List.copyOf(Objects.requireNonNull(indexedBlendStates, "indexedBlendStates must not be null"));
         }
 
         public static PassState from(RenderPipeline pipeline, boolean translucentPass) {
+            return from(pipeline, translucentPass, List.of());
+        }
+
+        public static PassState from(
+            RenderPipeline pipeline,
+            boolean translucentPass,
+            Collection<BufferBlendInformation> indexedBlendOverrides
+        ) {
             Objects.requireNonNull(pipeline, "pipeline must not be null");
             return new PassState(
                 currentBlend(pipeline, translucentPass),
@@ -136,8 +159,32 @@ public record TerrainPipelineContract(
                 DepthColorStorage.isAlphaMaskEnabled(),
                 !translucentPass && DepthColorStorage.isDepthMaskEnabled(),
                 pipeline.getDepthBiasScaleFactor(),
-                pipeline.getDepthBiasConstant()
+                pipeline.getDepthBiasConstant(),
+                indexedBlendStates(indexedBlendOverrides)
             );
+        }
+
+        public Optional<Optional<BlendFunction>> blendOverrideForAttachment(int colorAttachmentIndex) {
+            for (IndexedBlendState state : indexedBlendStates) {
+                if (state.colorAttachmentIndex() == colorAttachmentIndex) {
+                    return Optional.of(state.blend());
+                }
+            }
+            return Optional.empty();
+        }
+
+        private static List<IndexedBlendState> indexedBlendStates(Collection<BufferBlendInformation> overrides) {
+            return Objects.requireNonNull(overrides, "overrides must not be null").stream()
+                .map(information -> new IndexedBlendState(
+                    information.index(),
+                    Optional.ofNullable(information.blendMode()).map(mode -> new BlendFunction(
+                        toSourceFactor(mode.srcRgb()).orElseThrow(),
+                        toDestFactor(mode.dstRgb()).orElseThrow(),
+                        toSourceFactor(mode.srcAlpha()).orElseThrow(),
+                        toDestFactor(mode.dstAlpha()).orElseThrow()
+                    ))
+                ))
+                .toList();
         }
 
         private static Optional<BlendFunction> currentBlend(RenderPipeline pipeline, boolean translucentPass) {
@@ -172,6 +219,15 @@ public record TerrainPipelineContract(
                         return Optional.empty();
                     }
                 });
+        }
+    }
+
+    public record IndexedBlendState(int colorAttachmentIndex, Optional<BlendFunction> blend) {
+        public IndexedBlendState {
+            if (colorAttachmentIndex < 0) {
+                throw new IllegalArgumentException("colorAttachmentIndex must be >= 0");
+            }
+            blend = Objects.requireNonNull(blend, "blend must not be null");
         }
     }
 }

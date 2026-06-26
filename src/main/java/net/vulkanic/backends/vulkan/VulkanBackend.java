@@ -15,6 +15,7 @@ import net.blaze3d.textures.TextureFormat;
 import net.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
@@ -4368,10 +4369,16 @@ void main() {
 
         StringBuilder key = new StringBuilder(colorAttachmentCount * 24);
         for (int index = 0; index < colorAttachmentCount; index++) {
-            if (portableState.blendState().isPresent()) {
-                key.append("portable");
+            java.util.Optional<java.util.Optional<PipelineDescriptor.BlendState>> sharedOverride =
+                SharedChunkProgramOverrides.indexedBlendState(portableState.location(), index);
+            if (sharedOverride.isPresent()) {
+                key.append("shared:");
+                appendBlendStateCacheKey(key, sharedOverride.get());
+            } else if (portableState.blendState().isPresent()) {
+                key.append("portable:");
+                appendBlendStateCacheKey(key, portableState.blendState());
             } else {
-                IndexedBlendState state = indexedBlendStates.get(index);
+                IndexedBlendState state = effectiveBlendStateForAttachment(index);
                 if (state == null) {
                     key.append("default");
                 } else {
@@ -4381,6 +4388,24 @@ void main() {
             key.append(';');
         }
         return key.toString();
+    }
+
+    private static void appendBlendStateCacheKey(
+        StringBuilder key,
+        java.util.Optional<PipelineDescriptor.BlendState> blendState
+    ) {
+        if (blendState.isEmpty()) {
+            key.append("off");
+            return;
+        }
+        PipelineDescriptor.BlendState blend = blendState.get();
+        key.append(blend.sourceColor().name())
+            .append(',')
+            .append(blend.destColor().name())
+            .append(',')
+            .append(blend.sourceAlpha().name())
+            .append(',')
+            .append(blend.destAlpha().name());
     }
 
     private String dynamicPipelineStateCacheKey(
@@ -4404,11 +4429,17 @@ void main() {
         PipelineDescriptor.PortableState portableState,
         int colorAttachmentIndex
     ) {
+        java.util.Optional<java.util.Optional<PipelineDescriptor.BlendState>> sharedOverride =
+            SharedChunkProgramOverrides.indexedBlendState(portableState.location(), colorAttachmentIndex);
+        if (sharedOverride.isPresent()) {
+            return sharedOverride.get();
+        }
+
         if (portableState.blendState().isPresent()) {
             return portableState.blendState();
         }
 
-        IndexedBlendState indexedState = indexedBlendStates.get(colorAttachmentIndex);
+        IndexedBlendState indexedState = effectiveBlendStateForAttachment(colorAttachmentIndex);
         if (indexedState == null) {
             return java.util.Optional.empty();
         }
@@ -4425,6 +4456,25 @@ void main() {
         }
 
         return java.util.Optional.of(new PipelineDescriptor.BlendState(srcRgb, dstRgb, srcAlpha, dstAlpha));
+    }
+
+    private IndexedBlendState effectiveBlendStateForAttachment(int colorAttachmentIndex) {
+        IndexedBlendState indexedState = indexedBlendStates.get(colorAttachmentIndex);
+        if (indexedState != null) {
+            return indexedState;
+        }
+
+        if (!pendingBlendEnabled) {
+            return null;
+        }
+
+        return new IndexedBlendState(
+            true,
+            pendingBlendSrcRgb,
+            pendingBlendDstRgb,
+            pendingBlendSrcAlpha,
+            pendingBlendDstAlpha
+        );
     }
 
     public net.vulkanic.VulkanicDrawStateSnapshot.TranslatedPipelineState describeTranslatedPipelineState(
@@ -10138,6 +10188,22 @@ void main() {
             return binding;
         }
 
+        private boolean shouldLogSodiumDescriptorBinding(String name) {
+            if ("Sampler0".contentEquals(name) || "Sampler2".contentEquals(name)) {
+                return true;
+            }
+            if (!DEBUG_VULKAN_DESCRIPTOR_BIND_LOGS) {
+                return false;
+            }
+            return name.startsWith("customtex")
+                || name.startsWith("colortex")
+                || name.startsWith("gaux")
+                || name.startsWith("depthtex")
+                || "noisetex".contentEquals(name)
+                || "normals".contentEquals(name)
+                || "specular".contentEquals(name);
+        }
+
         @SuppressWarnings("resource")
         private ResolvedSamplerDescriptorBinding resolveSamplerDescriptorBinding(
             PipelineDescriptor.ResourceBinding binding,
@@ -10273,8 +10339,8 @@ void main() {
             long samplerHandle = resolveDescriptorSamplerHandle(samplerKey);
             int descriptorImageLayout = descriptorImageLayoutFor(sampledLegacyTexture);
             if (sodiumChunkDescriptor
-                && ("Sampler0".contentEquals(binding.name()) || "Sampler2".contentEquals(binding.name()))
-                && debugSodiumChunkDescriptorSamplerLogCount < 80) {
+                && shouldLogSodiumDescriptorBinding(binding.name())
+                && debugSodiumChunkDescriptorSamplerLogCount < 160) {
                 debugSodiumChunkDescriptorSamplerLogCount++;
                 int sampledLegacyId = sampledLegacyTexture != null ? sampledLegacyTexture.id : 0;
                 int sampledLayout = sampledLegacyTexture != null
@@ -10285,8 +10351,9 @@ void main() {
                 int sampledVkFormat = sampledLegacyTexture != null ? sampledLegacyTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED;
                 long sampledImageHandle = sampledLegacyTexture != null ? sampledLegacyTexture.imageHandle : VK10.VK_NULL_HANDLE;
                 LOGGER.info(
-                    "Sodium Vulkan descriptor write#{} binding={} texId={} label={} usage=0x{} sampler=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} requestedView=0x{} remappedDefaultView={} pipeline=0x{}",
+                    "Sodium Vulkan descriptor write#{} pipelineLocation={} binding={} texId={} label={} usage=0x{} sampler=0x{} view=0x{} image=0x{} texExtent={}x{} vkFormat=0x{} baseMip={} mipCount={} trackedLayout=0x{} requestedView=0x{} remappedDefaultView={} pipeline=0x{}",
                     debugSodiumChunkDescriptorSamplerLogCount,
+                    pipelineLocation,
                     binding.name(),
                     sampledLegacyId,
                     sampledTextureLabel,
@@ -17936,7 +18003,8 @@ void main() {
         private static boolean isSodiumIrisFloatAttribute(VertexFormatElement element) {
             return (element.index() == 10 && element.type() == VertexFormatElement.Type.BYTE && element.count() == 4)
                 || (element.index() == 12 && element.type() == VertexFormatElement.Type.USHORT && element.count() == 2)
-                || (element.index() == 13 && element.type() == VertexFormatElement.Type.BYTE && element.count() == 4);
+                || (element.index() == 13 && element.type() == VertexFormatElement.Type.BYTE && element.count() == 4)
+                || (element.index() == 14 && element.type() == VertexFormatElement.Type.BYTE && element.count() == 4);
         }
 
         private static int toVkPrimitiveTopology(VertexFormat.Mode mode) {
@@ -18197,7 +18265,9 @@ void main() {
                 // Cannot issue ClearAttachments outside a render pass; silently defer.
                 return;
             }
-            int attachmentCount = (clearColor ? 1 : 0) + (clearDepth ? 1 : 0);
+            int colorAttachmentCount = clearColor ? activeRenderPassColorAttachmentCount() : 0;
+            boolean clearActiveDepth = clearDepth && activeRenderPassDepthTexture != null;
+            int attachmentCount = colorAttachmentCount + (clearActiveDepth ? 1 : 0);
             if (attachmentCount == 0) return;
 
             try (MemoryStack stack = stackPush()) {
@@ -18207,22 +18277,22 @@ void main() {
                     org.lwjgl.vulkan.VkClearRect.calloc(1, stack);
 
                 int idx = 0;
-                if (clearColor) {
+                for (int colorAttachment = 0; colorAttachment < colorAttachmentCount; colorAttachment++) {
                     attachments.get(idx)
                         .aspectMask(VK10.VK_IMAGE_ASPECT_COLOR_BIT)
-                        .colorAttachment(0);
+                        .colorAttachment(colorAttachment);
                     attachments.get(idx).clearValue().color()
                         .float32(0, cr).float32(1, cg).float32(2, cb).float32(3, ca);
                     idx++;
                 }
-                if (clearDepth) {
+                if (clearActiveDepth) {
                     attachments.get(idx)
                         .aspectMask(VK10.VK_IMAGE_ASPECT_DEPTH_BIT);
                     attachments.get(idx).clearValue().depthStencil().depth(depth).stencil(0);
                 }
 
-                int w = Math.max(1, swapchainWidth);
-                int h = Math.max(1, swapchainHeight);
+                int w = Math.max(1, activeRenderPassWidth > 0 ? activeRenderPassWidth : swapchainWidth);
+                int h = Math.max(1, activeRenderPassHeight > 0 ? activeRenderPassHeight : swapchainHeight);
                 rects.get(0)
                     .rect(r -> r.offset(o -> o.x(0).y(0)).extent(e -> e.width(w).height(h)))
                     .baseArrayLayer(0)
@@ -18230,6 +18300,13 @@ void main() {
 
                 VK10.vkCmdClearAttachments(activeCommandBuffer, attachments, rects);
             }
+        }
+
+        private int activeRenderPassColorAttachmentCount() {
+            if (!activeRenderPassColorTextures.isEmpty()) {
+                return activeRenderPassColorTextures.size();
+            }
+            return activeRenderPassTargetsSwapchain ? 1 : 0;
         }
 
         private void close() {

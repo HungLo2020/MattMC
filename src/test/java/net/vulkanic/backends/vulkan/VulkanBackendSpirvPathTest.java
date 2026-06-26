@@ -14,9 +14,11 @@ import net.blaze3d.platform.LogicOp;
 import net.blaze3d.platform.PolygonMode;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormatElement;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.vulkan.VK10;
 
 import java.lang.reflect.Method;
 import java.nio.IntBuffer;
@@ -339,6 +341,18 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanRemapsVertexClipDepthToZeroOne() {
+        String source = "#version 330\n"
+            + "uniform mat4 iris_ProjectionMatrix;\n"
+            + "void main(){ gl_Position = iris_ProjectionMatrix * vec4(1.0); }";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+
+        assertTrue(normalized.contains("float vulkanicOpenGlClipDepthToVulkan(float z, float w)"));
+        assertTrue(normalized.contains("gl_Position.z = vulkanicOpenGlClipDepthToVulkan(gl_Position.z, gl_Position.w);"));
+    }
+
+    @Test
     public void testNormalizeForVulkanRewritesStandaloneNonOpaqueUniformsIntoBlock() {
         String source = "#version 330\n"
             + "uniform vec3 u_RegionOffset;\n"
@@ -481,6 +495,24 @@ public class VulkanBackendSpirvPathTest {
         assertTrue(rewritten.contains("layout(location = 1) in vec2 UV0;"));
         assertTrue(rewritten.contains("layout(location = 2) in vec4 Color;"));
         assertTrue(rewritten.contains("layout(location = 3) in ivec2 UV2;"));
+    }
+
+    @Test
+    public void testSodiumIrisTerrainVertexFormatsMatchShaderInputTypes() throws Exception {
+        Method mapper = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
+            .getDeclaredMethod("toVkVertexElementFormat", VertexFormatElement.class);
+        mapper.setAccessible(true);
+
+        assertEquals(VK10.VK_FORMAT_R32_UINT, mapper.invoke(null,
+            new VertexFormatElement(20, 11, VertexFormatElement.Type.UINT, VertexFormatElement.Usage.GENERIC, 1)));
+        assertEquals(VK10.VK_FORMAT_R8G8B8A8_SNORM, mapper.invoke(null,
+            new VertexFormatElement(21, 10, VertexFormatElement.Type.BYTE, VertexFormatElement.Usage.GENERIC, 4)));
+        assertEquals(VK10.VK_FORMAT_R16G16_USCALED, mapper.invoke(null,
+            new VertexFormatElement(22, 12, VertexFormatElement.Type.USHORT, VertexFormatElement.Usage.GENERIC, 2)));
+        assertEquals(VK10.VK_FORMAT_R8G8B8A8_SNORM, mapper.invoke(null,
+            new VertexFormatElement(23, 13, VertexFormatElement.Type.BYTE, VertexFormatElement.Usage.GENERIC, 4)));
+        assertEquals(VK10.VK_FORMAT_R8G8B8A8_SNORM, mapper.invoke(null,
+            new VertexFormatElement(24, 14, VertexFormatElement.Type.BYTE, VertexFormatElement.Usage.GENERIC, 4)));
     }
 
     @Test

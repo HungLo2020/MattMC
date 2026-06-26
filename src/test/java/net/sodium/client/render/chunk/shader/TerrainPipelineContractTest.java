@@ -4,8 +4,14 @@ import net.blaze3d.pipeline.BlendFunction;
 import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.VertexFormat;
+import net.irisshaders.iris.gl.blending.BlendMode;
+import net.irisshaders.iris.gl.blending.BufferBlendInformation;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,6 +54,41 @@ public class TerrainPipelineContractTest {
         String location = contract.sharedPipelineLocation().toString();
         assertTrue(location.startsWith("sodium:pipeline/shared_chunk_solid_v7_"));
         assertEquals(location, contract.sharedPipelineLocation().toString());
+    }
+
+    @Test
+    public void testIndexedBlendOverrideIsCapturedByAttachmentIndex() {
+        TerrainPipelineContract.PassState state = TerrainPipelineContract.PassState.from(
+            testPipeline("translucent"),
+            true,
+            List.of(new BufferBlendInformation(1, new BlendMode(
+                VulkanicAPI.GL_SRC_ALPHA,
+                VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA,
+                VulkanicAPI.GL_ONE,
+                VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA
+            )))
+        );
+
+        Optional<Optional<BlendFunction>> attachmentOverride = state.blendOverrideForAttachment(1);
+
+        assertTrue(attachmentOverride.isPresent());
+        assertTrue(attachmentOverride.get().isPresent());
+        assertEquals(BlendFunction.TRANSLUCENT, attachmentOverride.get().get());
+        assertTrue(state.blendOverrideForAttachment(0).isEmpty());
+    }
+
+    @Test
+    public void testIndexedBlendOffIsPreservedAsExplicitOverride() {
+        TerrainPipelineContract.PassState state = TerrainPipelineContract.PassState.from(
+            testPipeline("translucent"),
+            true,
+            List.of(new BufferBlendInformation(1, null))
+        );
+
+        Optional<Optional<BlendFunction>> attachmentOverride = state.blendOverrideForAttachment(1);
+
+        assertTrue(attachmentOverride.isPresent());
+        assertTrue(attachmentOverride.get().isEmpty());
     }
 
     private static RenderPipeline testPipeline(String path) {

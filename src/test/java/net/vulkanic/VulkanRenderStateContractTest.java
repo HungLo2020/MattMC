@@ -1,11 +1,27 @@
 package net.vulkanic;
 
+import net.blaze3d.pipeline.BlendFunction;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.DepthTestFunction;
+import net.blaze3d.platform.DestFactor;
+import net.blaze3d.platform.LogicOp;
+import net.blaze3d.platform.PolygonMode;
+import net.blaze3d.platform.SourceFactor;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
+import net.irisshaders.iris.gl.blending.BufferBlendInformation;
+import net.minecraft.resources.ResourceLocation;
+import net.sodium.client.render.chunk.shader.SharedChunkProgramOverrides;
+import net.sodium.client.render.chunk.shader.TerrainPipelineContract;
 import net.vulkanic.backends.vulkan.VulkanBackend;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -96,6 +112,70 @@ public class VulkanRenderStateContractTest {
         assertEquals(VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, indexedBlendStateValue(state, "dstRgb"));
         assertEquals(VulkanicAPI.GL_ONE, indexedBlendStateValue(state, "srcAlpha"));
         assertEquals(VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, indexedBlendStateValue(state, "dstAlpha"));
+    }
+
+    @Test
+    public void testGlobalBlendFunctionAppliesToNonzeroAttachmentsWhenNoIndexedOverride() throws Exception {
+        vulkanBackend.setBlendEnabled(stubCtx, true);
+        vulkanBackend.setBlendFunction(stubCtx,
+            VulkanicAPI.GL_SRC_ALPHA,
+            VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA,
+            VulkanicAPI.GL_ONE,
+            VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+
+        Optional<PipelineDescriptor.BlendState> blendState = blendStateForAttachment(1);
+
+        assertTrue(blendState.isPresent(),
+            "OpenGL global blend state should apply to every draw buffer unless an indexed override exists");
+        assertEquals(SourceFactor.SRC_ALPHA, blendState.get().sourceColor());
+        assertEquals(DestFactor.ONE_MINUS_SRC_ALPHA, blendState.get().destColor());
+        assertEquals(SourceFactor.ONE, blendState.get().sourceAlpha());
+        assertEquals(DestFactor.ONE_MINUS_SRC_ALPHA, blendState.get().destAlpha());
+    }
+
+    @Test
+    public void testIndexedBlendStateOverridesGlobalAttachmentFallback() throws Exception {
+        vulkanBackend.setBlendEnabled(stubCtx, true);
+        vulkanBackend.setBlendFunction(stubCtx,
+            VulkanicAPI.GL_SRC_ALPHA,
+            VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA,
+            VulkanicAPI.GL_ONE,
+            VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+        vulkanBackend.setIndexedEnabled(stubCtx, VulkanicAPI.GL_BLEND, 1, false);
+
+        Optional<PipelineDescriptor.BlendState> blendState = blendStateForAttachment(1);
+
+        assertTrue(blendState.isEmpty(),
+            "An explicit indexed blend-disable should override the global draw-buffer fallback");
+    }
+
+    @Test
+    public void testSharedChunkIndexedBlendDisableOverridesPortableBlend() throws Exception {
+        RenderPipeline pipeline = sharedChunkBlendPipeline("indexed_disable");
+        TerrainPipelineContract contract = new TerrainPipelineContract(
+            1,
+            false,
+            DefaultVertexFormat.POSITION_COLOR,
+            List.of("Sampler0", "Sampler2"),
+            TerrainPipelineContract.PassKind.TRANSLUCENT,
+            TerrainPipelineContract.PassState.from(
+                pipeline,
+                true,
+                List.of(new BufferBlendInformation(1, null))
+            ),
+            pipeline.getLocation()
+        );
+        SharedChunkProgramOverrides.register(pipeline, contract);
+        PipelineDescriptor.PortableState portableState = PipelineDescriptor.fromRenderPipeline(pipeline).getPortableState();
+
+        try {
+            assertTrue(blendStateForAttachment(portableState, 0).isPresent(),
+                "Attachment 0 should keep the pass-wide blend when it has no indexed override");
+            assertTrue(blendStateForAttachment(portableState, 1).isEmpty(),
+                "An explicit shared-chunk indexed blend-disable should override the pass-wide blend");
+        } finally {
+            SharedChunkProgramOverrides.unregister(pipeline);
+        }
     }
 
     @Test
@@ -503,6 +583,62 @@ public class VulkanRenderStateContractTest {
         java.lang.reflect.Method accessor = state.getClass().getDeclaredMethod(accessorName);
         accessor.setAccessible(true);
         return accessor.invoke(state);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<PipelineDescriptor.BlendState> blendStateForAttachment(int colorAttachmentIndex) throws Exception {
+        return blendStateForAttachment(portableStateWithoutExplicitBlend(), colorAttachmentIndex);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<PipelineDescriptor.BlendState> blendStateForAttachment(
+        PipelineDescriptor.PortableState portableState,
+        int colorAttachmentIndex
+    ) throws Exception {
+        Method method = VulkanBackend.class.getDeclaredMethod(
+            "blendStateForAttachment",
+            PipelineDescriptor.PortableState.class,
+            int.class);
+        method.setAccessible(true);
+        return (Optional<PipelineDescriptor.BlendState>) method.invoke(
+            vulkanBackend,
+            portableState,
+            colorAttachmentIndex);
+    }
+
+    private static RenderPipeline sharedChunkBlendPipeline(String path) {
+        return RenderPipeline.builder()
+            .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/shared_chunk_" + path))
+            .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+            .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+            .withDepthTestFunction(DepthTestFunction.LESS_DEPTH_TEST)
+            .withPolygonMode(PolygonMode.FILL)
+            .withCull(false)
+            .withBlend(BlendFunction.TRANSLUCENT)
+            .withColorWrite(true, true)
+            .withDepthWrite(false)
+            .withColorLogic(LogicOp.NONE)
+            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLES)
+            .withDepthBias(0.0f, 0.0f)
+            .build();
+    }
+
+    private static PipelineDescriptor.PortableState portableStateWithoutExplicitBlend() {
+        RenderPipeline pipeline = RenderPipeline.builder()
+            .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/blend_contract"))
+            .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+            .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+            .withDepthTestFunction(DepthTestFunction.LESS_DEPTH_TEST)
+            .withPolygonMode(PolygonMode.FILL)
+            .withCull(true)
+            .withoutBlend()
+            .withColorWrite(true, true)
+            .withDepthWrite(true)
+            .withColorLogic(LogicOp.NONE)
+            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLES)
+            .withDepthBias(0.0f, 0.0f)
+            .build();
+        return PipelineDescriptor.fromRenderPipeline(pipeline).getPortableState();
     }
 
 }

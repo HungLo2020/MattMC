@@ -14,6 +14,7 @@ import net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
 import net.sodium.client.util.FogParameters;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
+import net.irisshaders.iris.gl.blending.BufferBlendInformation;
 import net.irisshaders.iris.gl.blending.BufferBlendOverride;
 import net.irisshaders.iris.gl.blending.DepthColorStorage;
 import net.irisshaders.iris.gl.program.ProgramImages;
@@ -60,6 +61,7 @@ public class SodiumShader implements RenderPassChunkShaderInterface {
 	private final ProgramUniforms uniforms;
 	private final CustomUniforms customUniforms;
 	private final BlendModeOverride blendModeOverride;
+	private final List<BufferBlendInformation> bufferBlendInformations;
 	private final List<BufferBlendOverride> bufferBlendOverrides;
 	private final float alphaTest;
 	private final boolean containsTessellation;
@@ -67,7 +69,7 @@ public class SodiumShader implements RenderPassChunkShaderInterface {
 
 	public SodiumShader(IrisRenderingPipeline pipeline, SodiumPrograms.Pass pass, ShaderBindingContext context,
 						int handle, BlendModeOverride blendModeOverride,
-						List<BufferBlendOverride> bufferBlendOverrides,
+						List<BufferBlendInformation> bufferBlendInformations,
 						CustomUniforms customUniforms, Supplier<ImmutableSet<Integer>> flipState, float alphaTest,
 						boolean containsTessellation) {
 		this.uniformModelViewMatrix = context.bindUniformOptional("iris_ModelViewMatrix", GlUniformMatrix4f::new);
@@ -89,7 +91,10 @@ public class SodiumShader implements RenderPassChunkShaderInterface {
 		this.images = buildImages(pipeline, pass, handle, isShadowPass, flipState);
 
 		this.blendModeOverride = blendModeOverride;
-		this.bufferBlendOverrides = bufferBlendOverrides;
+		this.bufferBlendInformations = List.copyOf(bufferBlendInformations);
+		this.bufferBlendOverrides = this.bufferBlendInformations.stream()
+			.map(information -> new BufferBlendOverride(information.index(), information.blendMode()))
+			.toList();
 	}
 
 	private ProgramUniforms buildUniforms(SodiumPrograms.Pass pass, int handle, CustomUniforms customUniforms) {
@@ -232,6 +237,11 @@ public class SodiumShader implements RenderPassChunkShaderInterface {
 	@Override
 	public java.util.Collection<String> getRenderPassSamplerNames() {
 		return samplers.getRenderPassSamplerNames();
+	}
+
+	@Override
+	public java.util.Collection<BufferBlendInformation> getRenderPassBufferBlendOverrides() {
+		return bufferBlendInformations;
 	}
 
 	@Override

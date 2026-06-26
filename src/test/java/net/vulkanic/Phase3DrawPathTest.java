@@ -1376,10 +1376,13 @@ public class Phase3DrawPathTest {
         Path contractFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/TerrainPipelineContract.java");
         String contractSource = readSource(contractFile);
 
-        assertTrue(contractSource.contains("PassState.from(pipeline, pass.isTranslucent())")
+        assertTrue(contractSource.contains("PassState.from(pipeline, pass.isTranslucent(), indexedBlendOverrides)")
                 && contractSource.contains("currentBlend(pipeline, translucentPass)")
                 && contractSource.contains("!translucentPass && DepthColorStorage.isDepthMaskEnabled()"),
             "Shared Sodium chunk pipelines should derive Vulkan terrain depth, blend, and write-mask state from the explicit terrain contract while keeping translucent water from writing depth");
+        assertTrue(contractSource.contains("blendOverrideForAttachment(int colorAttachmentIndex)")
+                && contractSource.contains("List<IndexedBlendState> indexedBlendStates"),
+            "Shared Sodium chunk pipelines should carry Iris per-buffer blend overrides in the explicit terrain contract");
         assertTrue(contractSource.contains("if (!BlendModeStorage.isBlendEnabled())")
                 && contractSource.contains("Optional.of(pipeline.getBlendFunction().orElse(BlendFunction.TRANSLUCENT))"),
             "The terrain pipeline contract should preserve declared translucent blending when Iris has no active legacy blend override");
@@ -3886,6 +3889,25 @@ public class Phase3DrawPathTest {
     }
 
     @Test
+    public void testVulkanRenderPassClearCoversAllActiveColorAttachments() throws IOException {
+        Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String backendSource = readSource(backendFile);
+
+        assertTrue(backendSource.contains("int colorAttachmentCount = clearColor ? activeRenderPassColorAttachmentCount() : 0;"),
+            "Vulkan render-pass clears should derive the active color attachment count instead of hardcoding attachment zero");
+        assertTrue(backendSource.contains("for (int colorAttachment = 0; colorAttachment < colorAttachmentCount; colorAttachment++)"),
+            "Vulkan render-pass clears should emit a VkClearAttachment for each active color attachment");
+        assertTrue(backendSource.contains(".colorAttachment(colorAttachment);"),
+            "Vulkan render-pass clears should target the looped attachment index");
+        assertTrue(backendSource.contains("activeRenderPassWidth > 0 ? activeRenderPassWidth : swapchainWidth"),
+            "Vulkan render-pass clears should use the active render area width when clearing framebuffer-backed passes");
+        assertTrue(backendSource.contains("activeRenderPassHeight > 0 ? activeRenderPassHeight : swapchainHeight"),
+            "Vulkan render-pass clears should use the active render area height when clearing framebuffer-backed passes");
+        assertTrue(backendSource.contains("return activeRenderPassTargetsSwapchain ? 1 : 0;"),
+            "Vulkan render-pass clears should still clear swapchain-only render passes that do not track legacy color textures");
+    }
+
+    @Test
     public void testBlaze3dBindTextureWrapperRemovedFromGlStateManager() throws IOException {
         Path stateManagerFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlStateManager.java");
         String stateManagerSource = readSource(stateManagerFile);
@@ -5447,8 +5469,10 @@ public class Phase3DrawPathTest {
             "Render-target pipeline resolution should include portable blend ownership when deriving blend cache keys");
         assertTrue(source.contains("currentStencilState().cacheKey(renderPassCompatibilityKey.hasStencilAttachment())"),
             "Render-target pipeline resolution should include effective stencil state in Vulkan pipeline cache keys");
-        assertTrue(source.contains("if (portableState.blendState().isPresent()) {\n                key.append(\"portable\");"),
-            "Portable pipeline blend state should not be overridden by stale legacy indexed blend state");
+        assertTrue(source.contains("SharedChunkProgramOverrides.indexedBlendState(portableState.location(), index)")
+                && source.contains("key.append(\"shared:\")")
+                && source.contains("key.append(\"portable:\")"),
+            "Portable pipeline blend state should not be overridden by stale legacy indexed blend state unless a shared chunk indexed override exists");
         assertTrue(source.contains("VulkanPipelineState.from(")
                 && source.contains("backend::blendStateForAttachment"),
             "Vulkan pipeline creation should apply blend state independently for each color attachment through the shared state translator");

@@ -186,7 +186,8 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         }
 
         normalized = LEGACY_VERTEX_ID_PATTERN.matcher(normalized).replaceAll("gl_VertexIndex");
-        return LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
+        normalized = LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
+        return rewriteVertexClipDepthForVulkan(normalized);
     }
 
     static String prepareSourceForVulkanResourceReflection(VulkanicShaderStage stage, String shaderSource) {
@@ -241,6 +242,71 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
     private static String lowerLeftFragmentCoordXyExpression() {
         return "vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y)";
+    }
+
+    private static String rewriteVertexClipDepthForVulkan(String shaderSource) {
+        if (!shaderSource.contains("gl_Position") || shaderSource.contains("vulkanicOpenGlClipDepthToVulkan")) {
+            return shaderSource;
+        }
+
+        int mainStart = indexOfFunctionCall(shaderSource, "main", 0);
+        if (mainStart < 0) {
+            return shaderSource;
+        }
+
+        int mainOpenParen = shaderSource.indexOf('(', mainStart);
+        int mainCloseParen = findMatchingParen(shaderSource, mainOpenParen);
+        if (mainOpenParen < 0 || mainCloseParen < 0) {
+            return shaderSource;
+        }
+
+        int mainOpenBrace = nextNonWhitespaceIndex(shaderSource, mainCloseParen + 1);
+        if (mainOpenBrace < 0 || shaderSource.charAt(mainOpenBrace) != '{') {
+            return shaderSource;
+        }
+
+        int mainCloseBrace = findMatchingBrace(shaderSource, mainOpenBrace);
+        if (mainCloseBrace < 0) {
+            return shaderSource;
+        }
+
+        String remap = "\n    gl_Position.z = vulkanicOpenGlClipDepthToVulkan(gl_Position.z, gl_Position.w);\n";
+        int helperOffset = findUniformBlockInsertionOffset(shaderSource);
+        String withHelper = shaderSource.substring(0, helperOffset)
+            + "float vulkanicOpenGlClipDepthToVulkan(float z, float w) {\n"
+            + "    return 0.5f * (z + w);\n"
+            + "}\n\n"
+            + shaderSource.substring(helperOffset);
+        int adjustedMainCloseBrace = mainCloseBrace + (withHelper.length() - shaderSource.length());
+        return withHelper.substring(0, adjustedMainCloseBrace) + remap + withHelper.substring(adjustedMainCloseBrace);
+    }
+
+    private static int nextNonWhitespaceIndex(String text, int start) {
+        for (int index = Math.max(0, start); index < text.length(); index++) {
+            if (!Character.isWhitespace(text.charAt(index))) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static int findMatchingBrace(String text, int openBrace) {
+        if (openBrace < 0 || openBrace >= text.length() || text.charAt(openBrace) != '{') {
+            return -1;
+        }
+        int depth = 0;
+        for (int index = openBrace; index < text.length(); index++) {
+            char c = text.charAt(index);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return index;
+                }
+            }
+        }
+        return -1;
     }
 
     private static String rewriteFramebufferTextureSamplingForVulkan(String shaderSource) {

@@ -15,7 +15,7 @@ import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.blending.AlphaTest;
 import net.irisshaders.iris.gl.blending.AlphaTests;
-import net.irisshaders.iris.gl.blending.BufferBlendOverride;
+import net.irisshaders.iris.gl.blending.BufferBlendInformation;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.pipeline.transform.PatchShaderType;
@@ -141,12 +141,12 @@ public class SodiumPrograms {
 		}
 	}
 
-	private List<BufferBlendOverride> createBufferBlendOverrides(ProgramSource source) {
-		List<BufferBlendOverride> overrides = new ArrayList<>();
+	private List<BufferBlendInformation> createBufferBlendInformations(ProgramSource source) {
+		List<BufferBlendInformation> overrides = new ArrayList<>();
 		source.getDirectives().getBufferBlendOverrides().forEach(information -> {
 			int index = Ints.indexOf(source.getDirectives().getDrawBuffers(), information.index());
 			if (index > -1) {
-				overrides.add(new BufferBlendOverride(index, information.blendMode()));
+				overrides.add(new BufferBlendInformation(index, information.blendMode()));
 			}
 		});
 		return overrides;
@@ -176,7 +176,7 @@ public class SodiumPrograms {
 				if (!hasMidUv) hasMidUv = IrisRenderSystem.getAttribLocation(handle, "mc_midTexCoord") != -1;
 
 				return new SodiumShader(pipeline, pass, shader, handle, source.getDirectives().getBlendModeOverride().orElse(null),
-					createBufferBlendOverrides(source), customUniforms, flipState,
+					createBufferBlendInformations(source), customUniforms, flipState,
 					alphaTest.reference(), containsTessellation);
 			});
 	}
