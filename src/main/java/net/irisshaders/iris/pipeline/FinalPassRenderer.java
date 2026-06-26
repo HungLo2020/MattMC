@@ -54,6 +54,7 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicCoreAPI;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
+import net.vulkanic.VulkanicResourceUsage;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
@@ -261,8 +262,13 @@ public class FinalPassRenderer {
 			VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 			VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> "Final pass", baseWidth, baseHeight);
 			boolean useDescriptorBackedFinalPass = shouldUseDescriptorBackedFinalPass(renderTargetDescriptor);
+			boolean useVulkanFramebufferFallback = !useDescriptorBackedFinalPass
+				&& VulkanicAPI.isVulkanBackendSelected()
+				&& !ctx.isImmediate();
 			try (RenderPass renderPass = useDescriptorBackedFinalPass
 					? VulkanicAPI.createRenderPass(renderTargetDescriptor)
+					: useVulkanFramebufferFallback
+					? VulkanicAPI.createRenderPass(() -> "Final pass", this.colorHolder.getId(), false)
 					: VulkanicAPI.createRenderPass(() -> "Final pass", main.getColorTextureView(), OptionalInt.empty())) {
 				renderPass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
 				VulkanicAPI.bindDefaultUniforms(renderPass);
@@ -357,7 +363,10 @@ public class FinalPassRenderer {
 				this.lastColorTextureId,
 				VulkanicRenderPassDescriptor.LoadOp.LOAD,
 				VulkanicRenderPassDescriptor.StoreOp.STORE,
-				OptionalInt.empty()
+				OptionalInt.empty(),
+				VulkanicResourceUsage.SAMPLED_READ,
+				VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE,
+				VulkanicResourceUsage.SAMPLED_READ
 			)),
 			null,
 			width,

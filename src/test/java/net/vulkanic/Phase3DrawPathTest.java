@@ -5559,6 +5559,10 @@ public class Phase3DrawPathTest {
             "Iris GlFramebuffer should expose an explicit render-target descriptor snapshot");
         assertTrue(glFramebufferSource.contains("List<VulkanicRenderTargetDescriptor.ColorAttachment>"),
             "GlFramebuffer descriptor snapshots should preserve ordered MRT color attachments");
+        assertTrue(glFramebufferSource.contains("VulkanicResourceUsage.SAMPLED_READ")
+                && glFramebufferSource.contains("VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE")
+                && glFramebufferSource.contains("VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE"),
+            "Iris shader framebuffer descriptors should carry explicit sampled/read-write usage intent instead of backend-only inference");
         assertTrue(glFramebufferSource.contains("this.drawBuffers = new int[]{VulkanicAPI.GL_NONE}"),
             "GlFramebuffer descriptor snapshots should preserve explicit no-draw-buffer state");
         assertTrue(glCommandEncoderSource.contains("VulkanicAPI.beginRenderPass(renderPassCtx, descriptor)"),
@@ -5584,6 +5588,9 @@ public class Phase3DrawPathTest {
 	            "Iris composite passes should create pipelines through the same descriptor/fallback seam used to begin the render pass");
         assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),
             "FinalPassRenderer should snapshot the final pass target before pipeline/render-pass creation");
+        assertTrue(finalPassSource.contains("VulkanicResourceUsage.SAMPLED_READ")
+                && finalPassSource.contains("VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE"),
+            "FinalPassRenderer should carry explicit render-target usage intent for descriptor-backed Vulkan final passes");
 	        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = shouldUseDescriptorBackedFinalPass(renderTargetDescriptor)")
 	                && finalPassSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
 	                && shaderTargetContractSource.contains("IrisShaderRenderTargetContract"),
@@ -5592,6 +5599,9 @@ public class Phase3DrawPathTest {
 	            "FinalPassRenderer should route parity-proven Vulkan final passes through the descriptor-backed render-pass path");
         assertTrue(finalPassSource.contains("VulkanicAPI.createRenderPass(() -> \"Final pass\", main.getColorTextureView(), OptionalInt.empty())"),
             "FinalPassRenderer should preserve the existing OpenGL texture-view render-pass path");
+        assertTrue(finalPassSource.contains("useVulkanFramebufferFallback")
+                && finalPassSource.contains("VulkanicAPI.createRenderPass(() -> \"Final pass\", this.colorHolder.getId(), false)"),
+            "FinalPassRenderer should keep Vulkan fallback render-pass compatibility aligned with its framebuffer-target pipeline");
         assertTrue(finalPassSource.contains("finalPass.ensurePipelineState(useDescriptorBackedFinalPass ? renderTargetDescriptor : null)")
 	                && finalPassSource.contains("renderTargetContractKey")
 	                && finalPassSource.contains("targetContractChanged"),

@@ -5233,10 +5233,7 @@ void main() {
                 && thisTexture.feedbackLoopCapable == otherTexture.feedbackLoopCapable
                 && colorLoadOps.get(thisIndex) == other.colorLoadOps.get(otherIndex)
                 && colorStoreOps.get(thisIndex) == other.colorStoreOps.get(otherIndex)
-                && colorClearColors.get(thisIndex).equals(other.colorClearColors.get(otherIndex))
-                && colorInitialUsages.get(thisIndex) == other.colorInitialUsages.get(otherIndex)
-                && colorPassUsages.get(thisIndex) == other.colorPassUsages.get(otherIndex)
-                && colorFinalUsages.get(thisIndex) == other.colorFinalUsages.get(otherIndex);
+                && colorClearColors.get(thisIndex).equals(other.colorClearColors.get(otherIndex));
         }
 
         private boolean depthAttachmentMatches(ResolvedFramebufferTargets other) {
@@ -5253,10 +5250,7 @@ void main() {
                 && depthTexture.feedbackLoopCapable == other.depthTexture.feedbackLoopCapable
                 && depthLoadOp == other.depthLoadOp
                 && depthStoreOp == other.depthStoreOp
-                && depthClearValue.equals(other.depthClearValue)
-                && depthInitialUsage == other.depthInitialUsage
-                && depthPassUsage == other.depthPassUsage
-                && depthFinalUsage == other.depthFinalUsage;
+                && depthClearValue.equals(other.depthClearValue);
         }
 
         private VulkanicRenderPassDescriptor.LoadOp depthLoadOp() {
@@ -5628,16 +5622,18 @@ void main() {
             VulkanRenderTargetPlan framebufferPlan =
                 resolveFramebufferRenderTargetPlan(() -> "framebuffer:" + framebuffer, framebuffer);
             VulkanRenderTargetPlan descriptorPlan = resolveRenderTargetDescriptorPlan(descriptor);
-            String framebufferSignature = framebufferPlan.requireFramebufferTargets().compatibilitySignature();
-            String descriptorSignature = descriptorPlan.requireFramebufferTargets().compatibilitySignature();
-            boolean equivalent = framebufferSignature.equals(descriptorSignature);
+            ResolvedFramebufferTargets framebufferTargets = framebufferPlan.requireFramebufferTargets();
+            ResolvedFramebufferTargets descriptorTargets = descriptorPlan.requireFramebufferTargets();
+            RenderTargetCompatibility compatibility =
+                classifyRenderTargetCompatibility(framebufferTargets, descriptorTargets);
+            boolean equivalent = compatibility == RenderTargetCompatibility.EXACT;
             if (TRACE_RENDER_TARGET_PARITY) {
                 logRenderTargetParity(
                     equivalent,
                     framebuffer,
                     descriptor.label().get(),
-                    framebufferSignature,
-                    descriptorSignature,
+                    framebufferTargets.compatibilitySignature(),
+                    descriptorTargets.compatibilitySignature(),
                     null
                 );
             }

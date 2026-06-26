@@ -9,6 +9,7 @@ import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicIntegerQuery;
 import net.vulkanic.VulkanicRenderPassDescriptor;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
+import net.vulkanic.VulkanicResourceUsage;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -117,12 +118,7 @@ public class GlFramebuffer extends GlResource {
 			if (texture <= 0) {
 				throw new IllegalStateException("Iris framebuffer draw buffer " + drawBuffer + " has no color attachment");
 			}
-			colors.add(new VulkanicRenderTargetDescriptor.ColorAttachment(
-				texture,
-				VulkanicRenderPassDescriptor.LoadOp.LOAD,
-				VulkanicRenderPassDescriptor.StoreOp.STORE,
-				OptionalInt.empty()
-			));
+			colors.add(colorAttachmentDescriptor(texture));
 		}
 
 		VulkanicRenderTargetDescriptor.DepthAttachment depth = null;
@@ -130,15 +126,34 @@ public class GlFramebuffer extends GlResource {
 			if (depthAttachmentTexture <= 0) {
 				throw new IllegalStateException("Iris framebuffer has depth enabled but no depth texture");
 			}
-			depth = new VulkanicRenderTargetDescriptor.DepthAttachment(
-				depthAttachmentTexture,
-				VulkanicRenderPassDescriptor.LoadOp.LOAD,
-				VulkanicRenderPassDescriptor.StoreOp.STORE,
-				OptionalDouble.empty()
-			);
+			depth = depthAttachmentDescriptor(depthAttachmentTexture);
 		}
 
 		return new VulkanicRenderTargetDescriptor(label, colors, depth, width, height);
+	}
+
+	private static VulkanicRenderTargetDescriptor.ColorAttachment colorAttachmentDescriptor(int texture) {
+		return new VulkanicRenderTargetDescriptor.ColorAttachment(
+			texture,
+			VulkanicRenderPassDescriptor.LoadOp.LOAD,
+			VulkanicRenderPassDescriptor.StoreOp.STORE,
+			OptionalInt.empty(),
+			VulkanicResourceUsage.SAMPLED_READ,
+			VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE,
+			VulkanicResourceUsage.SAMPLED_READ
+		);
+	}
+
+	private static VulkanicRenderTargetDescriptor.DepthAttachment depthAttachmentDescriptor(int texture) {
+		return new VulkanicRenderTargetDescriptor.DepthAttachment(
+			texture,
+			VulkanicRenderPassDescriptor.LoadOp.LOAD,
+			VulkanicRenderPassDescriptor.StoreOp.STORE,
+			OptionalDouble.empty(),
+			VulkanicResourceUsage.SAMPLED_READ,
+			VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE,
+			VulkanicResourceUsage.SAMPLED_READ
+		);
 	}
 
 	public void bind() {
