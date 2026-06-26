@@ -223,6 +223,23 @@ public class VulkanDescriptorLifecycleTest {
             "Descriptor set update should no longer be marked unsupported");
     }
 
+    @Test
+    public void testVulkanNativeRenderPassDirtyTracksDescriptorSubmissions() throws Exception {
+        String source = Files.readString(PROJECT_ROOT
+            .resolve("src/main/java/net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+
+        assertTrue(source.contains("resourceStateGeneration"),
+            "Native Vulkan render pass should track descriptor-affecting state changes");
+        assertTrue(source.contains("cachedResourceSubmission"),
+            "Native Vulkan render pass should remember the last resolved descriptor submission");
+        assertTrue(source.contains("isCachedResourceSubmission"),
+            "Native Vulkan render pass should skip redundant pipeline/resource submissions only after comparing resolved state");
+        assertTrue(source.contains("markResourceBindingsDirty"),
+            "Native Vulkan render pass should invalidate descriptor cache when resource bindings change");
+        assertTrue(source.contains("cacheSubmittedResources"),
+            "Native Vulkan render pass should refresh its descriptor submission cache after binding resources");
+    }
+
     private static RenderPipeline buildTestPipeline() {
         return RenderPipeline.builder()
             .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/test_pipeline_vulkan_desc"))

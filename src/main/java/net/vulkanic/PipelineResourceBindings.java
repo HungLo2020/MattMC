@@ -166,6 +166,24 @@ public final class PipelineResourceBindings {
         }
     }
 
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) {
+            return true;
+        }
+        if (!(object instanceof PipelineResourceBindings other)) {
+            return false;
+        }
+        return samplerBindings.equals(other.samplerBindings)
+            && uniformBufferBindings.equals(other.uniformBufferBindings)
+            && texelBufferBindings.equals(other.texelBufferBindings);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(samplerBindings, uniformBufferBindings, texelBufferBindings);
+    }
+
     public record SamplerBinding(int textureUnit, @Nullable Integer samplerObject, @Nullable VulkanicTextureView textureView) {
         public SamplerBinding {
             if (textureUnit < 0) {

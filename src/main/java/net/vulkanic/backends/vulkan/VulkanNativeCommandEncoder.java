@@ -22,6 +22,7 @@ import net.logging.LogUtils;
 import net.vulkanic.CommandContext;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
+import net.vulkanic.PipelineResourceBindings;
 import net.vulkanic.PipelineResourcePlanner;
 import net.vulkanic.RenderPassResourceBinder;
 import net.vulkanic.VulkanicAPI;
@@ -42,6 +43,7 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.function.Supplier;
@@ -68,6 +70,14 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         GENERAL,
         TERRAIN
     }
+
+    private record CachedResourceSubmission(
+        PipelineHandle pipelineHandle,
+        PipelineDescriptor descriptor,
+        PipelineResourceBindings bindings,
+        long resourceStateGeneration,
+        boolean customPass
+    ) {}
 
     private final VulkanBackend backend;
     private final ResourceMode resourceMode;
@@ -817,6 +827,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         private PipelineResourcePlanner.Plan lastSubmittedPlan;
         @Nullable
         private PipelineHandle lastPipelineHandle;
+        private long resourceStateGeneration;
+        @Nullable
+        private CachedResourceSubmission cachedResourceSubmission;
         private boolean scissorEnabled;
         private int scissorX;
         private int scissorY;
@@ -846,6 +859,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void iris$setCustomPass(CustomPass pass) {
             this.checkOpen();
+            if (this.customPass != pass) {
+                this.markResourceBindingsDirty();
+            }
             this.customPass = pass;
         }
 
@@ -872,11 +888,15 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void setPipeline(RenderPipeline renderPipeline) {
             this.checkOpen();
-            this.renderPipeline = renderPipeline;
-            this.pipelineDescriptor = VulkanNativeCommandEncoder.this.backend.resolvePrecompiledPipelineDescriptor(renderPipeline);
-            if (this.pipelineDescriptor == null) {
-                this.pipelineDescriptor = PipelineDescriptor.fromRenderPipeline(renderPipeline);
+            PipelineDescriptor resolvedDescriptor = VulkanNativeCommandEncoder.this.backend.resolvePrecompiledPipelineDescriptor(renderPipeline);
+            if (resolvedDescriptor == null) {
+                resolvedDescriptor = PipelineDescriptor.fromRenderPipeline(renderPipeline);
             }
+            if (this.renderPipeline != renderPipeline || !Objects.equals(this.pipelineDescriptor, resolvedDescriptor)) {
+                this.markResourceBindingsDirty();
+            }
+            this.renderPipeline = renderPipeline;
+            this.pipelineDescriptor = resolvedDescriptor;
         }
 
         @Override
@@ -888,6 +908,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void bindSampler(String name, @Nullable GpuTextureView view, int textureUnit) {
             this.checkOpen();
+            this.markResourceBindingsDirty();
             this.closeSampler(name);
             if (view == null) {
                 this.samplerUnits.remove(name);
@@ -909,6 +930,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public boolean bindLegacySampler(String name, int textureId, int textureUnit) {
             this.checkOpen();
+            this.markResourceBindingsDirty();
             this.closeSampler(name);
             if (textureId <= 0) {
                 this.samplerUnits.remove(name);
@@ -938,14 +960,15 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         @Override
         public void setUniform(String name, GpuBufferSlice slice) {
             this.checkOpen();
-            this.uniforms.put(
-                name,
-                new VulkanicBufferSlice(
-                    VulkanicAPI.resolveVulkanicBuffer(slice.buffer()),
-                    slice.offset(),
-                    slice.length()
-                )
+            VulkanicBufferSlice resolvedSlice = new VulkanicBufferSlice(
+                VulkanicAPI.resolveVulkanicBuffer(slice.buffer()),
+                slice.offset(),
+                slice.length()
             );
+            if (!Objects.equals(this.uniforms.get(name), resolvedSlice)) {
+                this.markResourceBindingsDirty();
+            }
+            this.uniforms.put(name, resolvedSlice);
         }
 
         @Override
@@ -1085,11 +1108,14 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 throw new IllegalStateException("Unable to resolve native Vulkan pipeline handle for " + pipeline.getLocation());
             }
 
+            if (this.isCachedResourceSubmission(handle, submission, false)) {
+                this.rememberSubmittedResources(handle, submission);
+                return;
+            }
+
             this.pass.setPipeline(handle);
             VulkanNativeCommandEncoder.this.backend.bindPipelineResources(this.ctx, handle, submission.descriptor(), submission.bindings());
-            this.lastPipelineHandle = handle;
-            this.lastSubmittedDescriptor = submission.descriptor();
-            this.lastSubmittedPlan = submission;
+            this.cacheSubmittedResources(handle, submission, false);
         }
 
         private void bindCustomPassPipelineAndResources(CustomPass pass) {
@@ -1159,6 +1185,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 throw new IllegalStateException("Unable to resolve native Vulkan custom-pass pipeline handle for " + pipeline.getLocation());
             }
 
+            if (this.isCachedResourceSubmission(handle, submission, true)) {
+                this.rememberSubmittedResources(handle, submission);
+                return;
+            }
+
             this.pass.setPipeline(handle);
             VulkanNativeCommandEncoder.this.backend.bindPipelineResources(
                 this.ctx,
@@ -1166,6 +1197,39 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
                 submission.descriptor(),
                 submission.bindings()
             );
+            this.cacheSubmittedResources(handle, submission, true);
+        }
+
+        private boolean isCachedResourceSubmission(
+            PipelineHandle handle,
+            PipelineResourcePlanner.Plan submission,
+            boolean customPass
+        ) {
+            CachedResourceSubmission cachedSubmission = this.cachedResourceSubmission;
+            return cachedSubmission != null
+                && cachedSubmission.pipelineHandle() == handle
+                && cachedSubmission.resourceStateGeneration() == this.resourceStateGeneration
+                && cachedSubmission.customPass() == customPass
+                && Objects.equals(cachedSubmission.descriptor(), submission.descriptor())
+                && Objects.equals(cachedSubmission.bindings(), submission.bindings());
+        }
+
+        private void cacheSubmittedResources(
+            PipelineHandle handle,
+            PipelineResourcePlanner.Plan submission,
+            boolean customPass
+        ) {
+            this.cachedResourceSubmission = new CachedResourceSubmission(
+                handle,
+                submission.descriptor(),
+                submission.bindings(),
+                this.resourceStateGeneration,
+                customPass
+            );
+            this.rememberSubmittedResources(handle, submission);
+        }
+
+        private void rememberSubmittedResources(PipelineHandle handle, PipelineResourcePlanner.Plan submission) {
             this.lastPipelineHandle = handle;
             this.lastSubmittedDescriptor = submission.descriptor();
             this.lastSubmittedPlan = submission;
@@ -1511,6 +1575,11 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             if (previous != null) {
                 previous.close();
             }
+        }
+
+        private void markResourceBindingsDirty() {
+            this.resourceStateGeneration++;
+            this.cachedResourceSubmission = null;
         }
 
         private void unsupported(String operation) {

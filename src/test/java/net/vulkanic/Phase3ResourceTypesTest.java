@@ -72,6 +72,19 @@ public class Phase3ResourceTypesTest {
     }
 
     @Test
+    public void testVulkanicBufferSliceValueIdentity() {
+        OpenGLBuffer buffer = new OpenGLBuffer(1, VulkanicBuffer.USAGE_UNIFORM, 512);
+
+        VulkanicBufferSlice sliceA = new VulkanicBufferSlice(buffer, 64, 128);
+        VulkanicBufferSlice sliceB = new VulkanicBufferSlice(buffer, 64, 128);
+        VulkanicBufferSlice sliceC = new VulkanicBufferSlice(buffer, 96, 128);
+
+        assertEquals(sliceA, sliceB);
+        assertEquals(sliceA.hashCode(), sliceB.hashCode());
+        assertNotEquals(sliceA, sliceC);
+    }
+
+    @Test
     public void testOpenGLBufferSliceOutOfRange() {
         OpenGLBuffer buffer = new OpenGLBuffer(1, VulkanicBuffer.USAGE_VERTEX, 256);
         assertThrows(IllegalArgumentException.class, () -> buffer.slice(200, 100));
@@ -201,6 +214,34 @@ public class Phase3ResourceTypesTest {
         OpenGLTextureView view = new OpenGLTextureView(tex, 1, 2);
         assertEquals(128, view.getWidth(0));
         assertEquals(64,  view.getHeight(0));
+    }
+
+    @Test
+    public void testPipelineResourceBindingsValueIdentityTracksResolvedResources() {
+        OpenGLBuffer uniformBuffer = new OpenGLBuffer(2, VulkanicBuffer.USAGE_UNIFORM, 512);
+        OpenGLTexture texture = new OpenGLTexture(3, VulkanicTexture.USAGE_TEXTURE_BINDING,
+            VulkanicTextureFormat.RGBA8, 16, 16, 1, 1, "binding-texture");
+        OpenGLTextureView textureView = new OpenGLTextureView(texture, 0, 1);
+
+        PipelineResourceBindings bindingsA = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", textureView, 0, 9)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(uniformBuffer, 64, 128))
+            .bindTexelBuffer("CloudFaces", 3)
+            .build();
+        PipelineResourceBindings bindingsB = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", textureView, 0, 9)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(uniformBuffer, 64, 128))
+            .bindTexelBuffer("CloudFaces", 3)
+            .build();
+        PipelineResourceBindings changedUniform = PipelineResourceBindings.builder()
+            .bindSampler("Sampler0", textureView, 0, 9)
+            .bindUniformBuffer("Globals", new VulkanicBufferSlice(uniformBuffer, 96, 128))
+            .bindTexelBuffer("CloudFaces", 3)
+            .build();
+
+        assertEquals(bindingsA, bindingsB);
+        assertEquals(bindingsA.hashCode(), bindingsB.hashCode());
+        assertNotEquals(bindingsA, changedUniform);
     }
 
     // ---- PipelineDescriptor tests ------------------------------------------
