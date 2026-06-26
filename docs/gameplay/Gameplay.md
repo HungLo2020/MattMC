@@ -15,6 +15,7 @@ Gameplay.
 - [Gamemodes](gamemodes/Gamemodes.md)
 - [Items](items/Items.md)
 - [Mobs](mobs/Mobs.md)
+- [Mechanics](mechanics/Mechanics.md)
 - [Redstone](redstone/Redstone.md)
 - [Smelting](smelting/Smelting.md)
 - [Smithing](smithing/Smithing.md)
