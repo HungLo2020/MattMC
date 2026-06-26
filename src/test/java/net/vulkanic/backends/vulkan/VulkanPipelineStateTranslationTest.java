@@ -29,9 +29,32 @@ public class VulkanPipelineStateTranslationTest {
         VulkanPipelineState enabled = translate(state(builder().withCull(true).build()), 1);
         VulkanPipelineState disabled = translate(state(builder().withCull(false).build()), 1);
 
+        assertTrue(enabled.requestedCull());
+        assertEquals(VulkanPipelineState.CullDecision.DEFERRED_UNSAFE_WINDING_PARITY, enabled.cullDecision());
         assertEquals(VK10.VK_CULL_MODE_NONE, enabled.cullMode());
         assertEquals(VK10.VK_CULL_MODE_NONE, disabled.cullMode());
         assertEquals(VK10.VK_FRONT_FACE_CLOCKWISE, enabled.frontFace());
+        assertFalse(disabled.requestedCull());
+        assertEquals(VulkanPipelineState.CullDecision.PORTABLE_STATE_DISABLED, disabled.cullDecision());
+        assertEquals(VK10.VK_FRONT_FACE_CLOCKWISE, disabled.frontFace());
+    }
+
+    @Test
+    public void testCullRequestsRemainDeferredForGuiLikeScreenPipelines() {
+        RenderPipeline guiLikePipeline = builder()
+            .withLocation(ResourceLocation.withDefaultNamespace("pipeline/gui_text_like"))
+            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+            .withDepthWrite(false)
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
+            .withCull(true)
+            .build();
+
+        VulkanPipelineState state = translate(state(guiLikePipeline), 1);
+
+        assertTrue(state.requestedCull());
+        assertEquals(VulkanPipelineState.CullDecision.DEFERRED_UNSAFE_WINDING_PARITY, state.cullDecision());
+        assertEquals(VK10.VK_CULL_MODE_NONE, state.cullMode());
+        assertEquals(VK10.VK_FRONT_FACE_CLOCKWISE, state.frontFace());
     }
 
     @Test

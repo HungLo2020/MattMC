@@ -20,8 +20,7 @@ import java.util.Optional;
  */
 record VulkanPipelineState(
     int polygonMode,
-    int cullMode,
-    int frontFace,
+    RasterizationPolicy rasterizationPolicy,
     boolean depthBiasEnabled,
     float depthBiasConstantFactor,
     float depthBiasSlopeFactor,
@@ -37,6 +36,7 @@ record VulkanPipelineState(
     List<ColorBlendAttachment> colorBlendAttachments
 ) {
     VulkanPipelineState {
+        Objects.requireNonNull(rasterizationPolicy, "rasterizationPolicy must not be null");
         Objects.requireNonNull(frontStencil, "frontStencil must not be null");
         Objects.requireNonNull(backStencil, "backStencil must not be null");
         colorBlendAttachments = List.copyOf(
@@ -82,17 +82,11 @@ record VulkanPipelineState(
                 blendStateResolver.resolve(portableState, colorIndex);
             attachments.add(ColorBlendAttachment.from(colorWriteMask, blendState));
         }
+        RasterizationPolicy rasterizationPolicy = RasterizationPolicy.from(portableState);
 
         return new VulkanPipelineState(
             polygonModeResolver.resolve(portableState.polygonMode()),
-            // The current Vulkan backend still inherits Minecraft's OpenGL-era
-            // clip/winding conventions.  Static Vulkan face culling therefore
-            // is not a safe translation of RenderPipeline#isCull yet; enabling
-            // it globally culls valid fullscreen/world passes.  Keep the field
-            // in the native state snapshot, but preserve the historical Vulkan
-            // behavior until front-face/winding parity is solved end-to-end.
-            VK10.VK_CULL_MODE_NONE,
-            VK10.VK_FRONT_FACE_CLOCKWISE,
+            rasterizationPolicy,
             portableState.depthBiasConstant() != 0.0f || portableState.depthBiasScaleFactor() != 0.0f,
             portableState.depthBiasConstant(),
             portableState.depthBiasScaleFactor(),
@@ -107,6 +101,51 @@ record VulkanPipelineState(
             stencilState.back(),
             attachments
         );
+    }
+
+    int cullMode() {
+        return rasterizationPolicy.cullMode();
+    }
+
+    int frontFace() {
+        return rasterizationPolicy.frontFace();
+    }
+
+    boolean requestedCull() {
+        return rasterizationPolicy.requestedCull();
+    }
+
+    CullDecision cullDecision() {
+        return rasterizationPolicy.cullDecision();
+    }
+
+    record RasterizationPolicy(
+        boolean requestedCull,
+        CullDecision cullDecision,
+        int cullMode,
+        int frontFace
+    ) {
+        private static RasterizationPolicy from(PipelineDescriptor.PortableState portableState) {
+            Objects.requireNonNull(portableState, "portableState must not be null");
+            return new RasterizationPolicy(
+                portableState.cull(),
+                portableState.cull()
+                    ? CullDecision.DEFERRED_UNSAFE_WINDING_PARITY
+                    : CullDecision.PORTABLE_STATE_DISABLED,
+                // The current Vulkan backend still inherits Minecraft's OpenGL-era
+                // clip/winding conventions. Static Vulkan face culling therefore
+                // is not a safe translation of RenderPipeline#isCull yet; enabling
+                // it globally culls valid fullscreen/world/UI passes. Preserve the
+                // historical Vulkan behavior until winding parity is solved per pass.
+                VK10.VK_CULL_MODE_NONE,
+                VK10.VK_FRONT_FACE_CLOCKWISE
+            );
+        }
+    }
+
+    enum CullDecision {
+        PORTABLE_STATE_DISABLED,
+        DEFERRED_UNSAFE_WINDING_PARITY
     }
 
     private static int colorWriteMask(PipelineDescriptor.PortableState portableState) {
