@@ -192,7 +192,7 @@ public class VulkanBackend {
     private static final Pattern GLSL_LINE_COMMENT_PATTERN = Pattern.compile("(?m)//.*$");
     private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\(([^)]*)\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
     private static final Pattern GLSL_STANDALONE_UNIFORM_PATTERN = Pattern.compile(
-        "(?m)^\\s*(?:layout\\s*\\(([^)]*)\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?\\s*;"
+        "(?m)^\\s*(?:layout\\s*\\(([^)]*)\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?(?:\\s*=\\s*[^;]+)?\\s*;"
     );
     private static final Pattern GLSL_LAYOUT_SET_PATTERN = Pattern.compile("\\bset\\s*=\\s*(\\d+)\\b");
     private static final Pattern GLSL_LAYOUT_BINDING_PATTERN = Pattern.compile("\\bbinding\\s*=\\s*(\\d+)\\b");
@@ -2044,6 +2044,7 @@ void main() {
     public void detachShader(CommandContext ctx, int program, int shader) {
         VirtualProgram virtualProgram = requireVirtualProgram(program);
         virtualProgram.attachedShaderIds.remove(shader);
+        releaseVirtualShaderIfDeletionPendingAndDetached(shader);
     }
 
     public void linkProgram(CommandContext ctx, int program) {
@@ -2767,13 +2768,12 @@ void main() {
     }
 
     public void deleteShader(CommandContext ctx, int shader) {
-        VirtualShader removedShader = virtualShaders.remove(shader);
-        if (removedShader != null) {
-            releaseVirtualShaderNativeModule(removedShader);
+        VirtualShader virtualShader = virtualShaders.get(shader);
+        if (virtualShader == null) {
+            return;
         }
-        for (VirtualProgram virtualProgram : virtualPrograms.values()) {
-            virtualProgram.attachedShaderIds.remove(shader);
-        }
+        virtualShader.deletionPending = true;
+        releaseVirtualShaderIfDeletionPendingAndDetached(shader);
     }
 
     public void deleteProgram(CommandContext ctx, int program) {
@@ -2781,9 +2781,33 @@ void main() {
         if (removedProgram != null) {
             unregisterUniformLocationTokens(removedProgram);
             removedProgram.closeStandaloneUniformBacking();
+            for (int shader : removedProgram.attachedShaderIds) {
+                releaseVirtualShaderIfDeletionPendingAndDetached(shader);
+            }
         }
         if (boundVirtualProgram == program) {
             boundVirtualProgram = 0;
+        }
+    }
+
+    private boolean isShaderAttachedToAnyProgram(int shader) {
+        for (VirtualProgram virtualProgram : virtualPrograms.values()) {
+            if (virtualProgram.attachedShaderIds.contains(shader)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void releaseVirtualShaderIfDeletionPendingAndDetached(int shader) {
+        VirtualShader virtualShader = virtualShaders.get(shader);
+        if (virtualShader == null || !virtualShader.deletionPending || isShaderAttachedToAnyProgram(shader)) {
+            return;
+        }
+
+        VirtualShader removedShader = virtualShaders.remove(shader);
+        if (removedShader != null) {
+            releaseVirtualShaderNativeModule(removedShader);
         }
     }
 
@@ -9072,6 +9096,7 @@ void main() {
         private volatile VulkanicSpirvModule compiledModule;
         private volatile long nativeShaderModuleHandle = VK10.VK_NULL_HANDLE;
         private volatile boolean compileStatus;
+        private volatile boolean deletionPending;
         private volatile String infoLog = "";
 
         private VirtualShader(VulkanicShaderStage stage) {

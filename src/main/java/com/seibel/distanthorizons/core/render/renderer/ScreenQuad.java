@@ -4,6 +4,7 @@ import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
+import net.blaze3d.systems.RenderPass;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicPrimitiveMode;
@@ -69,9 +70,25 @@ public class ScreenQuad
 		this.va.bind();
 		this.va.bindBufferToAllBindingPoints(this.boxBuffer.getId());
 		
-		VulkanicAPI.drawArrays(ctx, VulkanicPrimitiveMode.TRIANGLES, 0, 6);
+		try (RenderPass ignored = createVulkanCompatibilityRenderPass())
+		{
+			VulkanicAPI.drawArrays(ctx, VulkanicPrimitiveMode.TRIANGLES, 0, 6);
+		}
 	}
-	
+
+	private static RenderPass createVulkanCompatibilityRenderPass()
+	{
+		if (!VulkanicAPI.isVulkanBackendSelected())
+		{
+			return null;
+		}
+
+		return VulkanicAPI.createRenderPass(
+				() -> "Distant Horizons screen quad",
+				VulkanicAPI.getDrawFramebufferBinding(),
+				false);
+	}
+		
 	private void createBuffer()
 	{
 		ByteBuffer buffer = MemoryUtil.memAlloc(box_vertices.length * Float.BYTES);

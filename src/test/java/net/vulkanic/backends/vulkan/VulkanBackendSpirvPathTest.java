@@ -372,6 +372,37 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanLegalizesDistantHorizonsTerrainFragmentShaderShape() {
+        String source = "#version 150\n"
+            + "in vec4 vertexColor;\n"
+            + "in vec3 vertexWorldPos;\n"
+            + "in vec4 vPos;\n"
+            + "in vec4 gl_FragCoord;\n"
+            + "out vec4 fragColor;\n"
+            + "uniform float uClipDistance = 0.0;\n"
+            + "uniform bool uNoiseEnabled;\n"
+            + "uniform int uNoiseSteps;\n"
+            + "uniform float uNoiseIntensity;\n"
+            + "uniform int uNoiseDropoff;\n"
+            + "uniform bool uDitherDhRendering;\n"
+            + "void main(){ fragColor = vertexColor; if (uDitherDhRendering) { fragColor.a = gl_FragCoord.x; } }";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
+
+        assertTrue(normalized.startsWith("#version 450"));
+        assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
+        assertTrue(normalized.contains("float uClipDistance;"));
+        assertTrue(normalized.contains("bool uNoiseEnabled;"));
+        assertTrue(normalized.contains("int uNoiseSteps;"));
+        assertTrue(normalized.contains("float uNoiseIntensity;"));
+        assertTrue(normalized.contains("int uNoiseDropoff;"));
+        assertTrue(normalized.contains("bool uDitherDhRendering;"));
+        assertFalse(normalized.contains("in vec4 gl_FragCoord;"));
+        assertFalse(normalized.contains("uniform float uClipDistance = 0.0;"));
+        assertTrue(normalized.contains("fragColor.a = gl_FragCoord.x;"));
+    }
+
+    @Test
     public void testNormalizeForVulkanRoutesSodiumTerrainRegionOffsetThroughDynamicTransforms() {
         String source = "#version 330\n"
             + "uniform vec3 u_RegionOffset;\n"
@@ -586,6 +617,33 @@ public class VulkanBackendSpirvPathTest {
         int program = backend.createShaderProgram(TEST_CONTEXT);
         backend.attachShader(TEST_CONTEXT, program, vertexShader);
         backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        assertEquals(VulkanicAPI.GL_TRUE,
+            backend.getProgramParameter(TEST_CONTEXT, program, VulkanicAPI.GL_LINK_STATUS));
+        assertEquals("", backend.getProgramInfoLog(TEST_CONTEXT, program));
+    }
+
+    @Test
+    public void testDeletingAttachedShadersBeforeLinkPreservesOpenGlLifetimeSemantics() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x2A, 0x2B}, sourceName, "stub")
+        );
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+
+        uploadSource(backend, vertexShader, "#version 450\nvoid main(){gl_Position=vec4(0.0);}");
+        uploadSource(backend, fragmentShader, "#version 450\nvoid main(){}");
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.deleteShader(TEST_CONTEXT, vertexShader);
+        backend.deleteShader(TEST_CONTEXT, fragmentShader);
         backend.linkProgram(TEST_CONTEXT, program);
 
         assertEquals(VulkanicAPI.GL_TRUE,

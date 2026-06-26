@@ -28,6 +28,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAcce
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.coreapi.ModInfo;
+import net.blaze3d.systems.RenderPass;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicBlendEquation;
 import net.vulkanic.VulkanicBlendFactor;
@@ -370,6 +371,11 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	 */
 	public void render(DhApiRenderParam renderEventParam, IProfilerWrapper profiler, boolean renderingWithSsao)
 	{
+		this.render(renderEventParam, profiler, renderingWithSsao, VulkanicAPI.getDrawFramebufferBinding(), true);
+	}
+
+	public void render(DhApiRenderParam renderEventParam, IProfilerWrapper profiler, boolean renderingWithSsao, int framebufferId, boolean framebufferHasDepthAttachment)
+	{
 		// render setup //
 		profiler.push("setup");
 		
@@ -422,6 +428,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		
 		// rendering //
 		
+		ArrayList<RenderableBoxGroup> renderableBoxGroups = new ArrayList<>();
 		Collection<RenderableBoxGroup> boxList = this.boxGroupById.values();
 		for (RenderableBoxGroup boxGroup : boxList)
 		{
@@ -455,25 +462,34 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 				continue;
 			}
 			
-			
-			
-			// render //
-			
-			profiler.popPush("rendering");
-			profiler.push(boxGroup.getResourceLocationNamespace());
-			profiler.push(boxGroup.getResourceLocationPath());
-			if (useInstancedRendering)
+			renderableBoxGroups.add(boxGroup);
+		}
+
+		if (!renderableBoxGroups.isEmpty())
+		{
+			try (RenderPass ignored = this.createVulkanCompatibilityRenderPass(framebufferId, framebufferHasDepthAttachment))
 			{
-				this.renderBoxGroupInstanced(shaderProgram, renderEventParam, boxGroup, camPos, profiler);
+				for (RenderableBoxGroup boxGroup : renderableBoxGroups)
+				{
+					// render //
+					
+					profiler.popPush("rendering");
+					profiler.push(boxGroup.getResourceLocationNamespace());
+					profiler.push(boxGroup.getResourceLocationPath());
+					if (useInstancedRendering)
+					{
+						this.renderBoxGroupInstanced(shaderProgram, renderEventParam, boxGroup, camPos, profiler);
+					}
+					else
+					{
+						this.renderBoxGroupDirect(shaderProgram, renderEventParam, boxGroup, camPos);
+					}
+					profiler.pop(); // resource path
+					profiler.pop(); // resource namespace
+					
+					boxGroup.postRender(renderEventParam);
+				}
 			}
-			else
-			{
-				this.renderBoxGroupDirect(shaderProgram, renderEventParam, boxGroup, camPos);
-			}
-			profiler.pop(); // resource path
-			profiler.pop(); // resource namespace
-			
-			boxGroup.postRender(renderEventParam);
 		}
 		
 		
@@ -495,6 +511,19 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		shaderProgram.unbind();
 		
 		profiler.pop();
+	}
+
+	private RenderPass createVulkanCompatibilityRenderPass(int framebufferId, boolean framebufferHasDepthAttachment)
+	{
+		if (!VulkanicAPI.isVulkanBackendSelected() || framebufferId < 0)
+		{
+			return null;
+		}
+
+		return VulkanicAPI.createRenderPass(
+				() -> "Distant Horizons generic objects",
+				framebufferId,
+				framebufferHasDepthAttachment);
 	}
 	
 	

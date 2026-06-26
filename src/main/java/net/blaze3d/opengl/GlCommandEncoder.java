@@ -209,15 +209,23 @@ public class GlCommandEncoder implements CommandEncoder {
 		this.device.debugLabels().pushDebugGroup(supplier);
 		this.lastPipeline = null;
 
-		CommandContext ctx = commandContext();
-		if (ctx.isImmediate()) {
-			VulkanicAPI.bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+		try {
+			CommandContext ctx = commandContext();
+			if (ctx.isImmediate()) {
+				VulkanicAPI.bindFramebuffer(ctx, VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+				this.activeVulkanicRenderPass = null;
+				this.activeRenderPassContext = null;
+			} else {
+				CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
+				this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(renderPassCtx, supplier, framebuffer);
+				this.activeRenderPassContext = renderPassCtx;
+			}
+		} catch (RuntimeException | Error exception) {
+			this.inRenderPass = false;
 			this.activeVulkanicRenderPass = null;
 			this.activeRenderPassContext = null;
-		} else {
-			CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
-			this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(renderPassCtx, supplier, framebuffer);
-			this.activeRenderPassContext = renderPassCtx;
+			this.device.debugLabels().popDebugGroup();
+			throw exception;
 		}
 
 		return new GlRenderPass(this, hasDepthTexture, framebuffer);
@@ -238,9 +246,17 @@ public class GlCommandEncoder implements CommandEncoder {
 			throw new UnsupportedOperationException("Descriptor-backed GlCommandEncoder render passes require a recorded Vulkan command context");
 		}
 
-		CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
-		this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(renderPassCtx, descriptor);
-		this.activeRenderPassContext = renderPassCtx;
+		try {
+			CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
+			this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(renderPassCtx, descriptor);
+			this.activeRenderPassContext = renderPassCtx;
+		} catch (RuntimeException | Error exception) {
+			this.inRenderPass = false;
+			this.activeVulkanicRenderPass = null;
+			this.activeRenderPassContext = null;
+			this.device.debugLabels().popDebugGroup();
+			throw exception;
+		}
 		return new GlRenderPass(this, descriptor.hasDepthAttachment(), 0, descriptor);
 	}
 

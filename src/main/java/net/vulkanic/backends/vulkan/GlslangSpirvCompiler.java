@@ -25,10 +25,13 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     private static final java.util.regex.Pattern LEGACY_BAYER_FRAG_COORD_XY_PATTERN = java.util.regex.Pattern.compile(
         "\\b(Bayer(?:2|4|8|16|32|64|128)?)\\s*\\(\\s*gl_FragCoord\\s*\\.\\s*xy\\s*\\)"
     );
+    private static final java.util.regex.Pattern LEGACY_FRAG_COORD_INPUT_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
+        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:(?:flat|smooth|noperspective)\\s+)?in\\s+\\w+\\s+gl_FragCoord\\s*;\\s*(?://.*)?(?:\\R|$)"
+    );
     private static final java.util.regex.Pattern GLSL_VERSION_PATTERN = java.util.regex.Pattern.compile("(?m)^\\s*#version\\s+(\\d+)");
     private static final java.util.regex.Pattern VIEW_HEIGHT_DECLARATION_PATTERN = java.util.regex.Pattern.compile("\\bfloat\\s+viewHeight\\s*;");
     private static final java.util.regex.Pattern STANDALONE_UNIFORM_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
-        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+([^;{}]+?)\\s*;\\s*(?://.*)?$"
+        "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+([^;{}=]+?)(?:\\s*=\\s*[^;]+)?\\s*;\\s*(?://.*)?$"
     );
     private static final java.util.regex.Pattern EXPLICIT_BINDING_PATTERN = java.util.regex.Pattern.compile(
         "layout\\s*\\(([^)]*\\bbinding\\s*=\\s*(\\d+)[^)]*)\\)"
@@ -169,6 +172,9 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         }
 
         String normalized = promoteVersionForVulkan(shaderSource);
+        if (stage == VulkanicShaderStage.FRAGMENT) {
+            normalized = LEGACY_FRAG_COORD_INPUT_DECLARATION_PATTERN.matcher(normalized).replaceAll("");
+        }
         normalized = prepareSourceForVulkanResourceReflection(stage, normalized);
         normalized = rewriteStandaloneUniformsForVulkan(
             normalized,

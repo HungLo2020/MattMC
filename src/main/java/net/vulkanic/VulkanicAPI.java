@@ -3404,7 +3404,10 @@ public class VulkanicAPI {
     
     
     public static void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
-        getBackend().setVertexAttribDivisor(ctx, index, divisor);
+        dispatchImplementedVoid(
+            direct -> direct.setVertexAttribDivisor(ctx, index, divisor),
+            activeBackend -> activeBackend.setVertexAttribDivisor(ctx, index, divisor)
+        );
     }
     
     
@@ -4511,7 +4514,7 @@ public class VulkanicAPI {
      * @param ctx Command context
      */
     public static void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
-        getBackend().drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, instanceCount, baseVertex);
+        drawIndexedInstancedBaseVertexRaw(ctx, mode, count, type, indices, instanceCount, baseVertex);
     }
 
     /**
@@ -4521,7 +4524,7 @@ public class VulkanicAPI {
         VulkanicIndexType.fromLegacyGlConstant(type)
             .ifPresentOrElse(
                 typedIndexType -> drawIndexedInstancedBaseVertex(ctx, mode, count, typedIndexType, indices, instanceCount, baseVertex),
-                () -> getBackend().drawIndexedInstancedBaseVertex(ctx, mode.toGlModeConstant(), count, type, indices, instanceCount, baseVertex)
+                () -> drawIndexedInstancedBaseVertex(ctx, mode.toGlModeConstant(), count, type, indices, instanceCount, baseVertex)
             );
     }
 
@@ -4529,14 +4532,21 @@ public class VulkanicAPI {
      * Renders indexed primitives with instancing and a base vertex using a backend-agnostic index type.
      */
     public static void drawIndexedInstancedBaseVertex(CommandContext ctx, int mode, int count, VulkanicIndexType indexType, long indices, int instanceCount, int baseVertex) {
-        getBackend().drawIndexedInstancedBaseVertex(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount, baseVertex);
+        drawIndexedInstancedBaseVertexRaw(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount, baseVertex);
     }
 
     /**
      * Renders indexed primitives with instancing and a base vertex using backend-neutral primitive and index types.
      */
     public static void drawIndexedInstancedBaseVertex(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices, int instanceCount, int baseVertex) {
-        getBackend().drawIndexedInstancedBaseVertex(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, instanceCount, baseVertex);
+        drawIndexedInstancedBaseVertexRaw(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, instanceCount, baseVertex);
+    }
+
+    private static void drawIndexedInstancedBaseVertexRaw(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        dispatchImplementedVoid(
+            direct -> direct.drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, instanceCount, baseVertex),
+            activeBackend -> activeBackend.drawIndexedInstancedBaseVertex(ctx, mode, count, type, indices, instanceCount, baseVertex)
+        );
     }
     
     /**
@@ -4589,7 +4599,7 @@ public class VulkanicAPI {
             return;
         }
 
-        getBackend().drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount);
+        drawIndexedInstancedRaw(ctx, mode, count, type, indices, instanceCount);
     }
 
     /**
@@ -4599,7 +4609,7 @@ public class VulkanicAPI {
         VulkanicPrimitiveMode.fromLegacyGlConstant(mode)
             .ifPresentOrElse(
                 typedMode -> drawIndexedInstanced(ctx, typedMode, count, indexType, indices, instanceCount),
-                () -> getBackend().drawIndexedInstanced(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount)
+                () -> drawIndexedInstancedRaw(ctx, mode, count, indexType.toGlTypeConstant(), indices, instanceCount)
             );
     }
 
@@ -4607,7 +4617,14 @@ public class VulkanicAPI {
      * Renders indexed primitives with instancing using backend-neutral primitive and index types.
      */
     public static void drawIndexedInstanced(CommandContext ctx, VulkanicPrimitiveMode mode, int count, VulkanicIndexType indexType, long indices, int instanceCount) {
-        getBackend().drawIndexedInstanced(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, instanceCount);
+        drawIndexedInstancedRaw(ctx, mode.toGlModeConstant(), count, indexType.toGlTypeConstant(), indices, instanceCount);
+    }
+
+    private static void drawIndexedInstancedRaw(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+        dispatchImplementedVoid(
+            direct -> direct.drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount),
+            activeBackend -> activeBackend.drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount)
+        );
     }
     
     /**
@@ -6213,12 +6230,18 @@ public class VulkanicAPI {
         VulkanicStencilCompareOp.fromLegacyGlConstant(func)
             .ifPresentOrElse(
                 typedFunc -> setStencilFunc(ctx, typedFunc, ref, mask),
-                () -> getBackend().setStencilFunc(ctx, func, ref, mask)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.setStencilFunc(ctx, func, ref, mask),
+                    activeBackend -> activeBackend.setStencilFunc(ctx, func, ref, mask)
+                )
             );
     }
 
     public static void setStencilFunc(CommandContext ctx, VulkanicStencilCompareOp func, int ref, int mask) {
-        getBackend().setStencilFunc(ctx, func, ref, mask);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilFunc(ctx, toLegacyStencilCompareOp(func), ref, mask),
+            activeBackend -> activeBackend.setStencilFunc(ctx, func, ref, mask)
+        );
     }
 
     /**
@@ -6233,14 +6256,20 @@ public class VulkanicAPI {
             return;
         }
 
-        getBackend().setStencilFuncSeparate(ctx, face, func, ref, mask);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilFuncSeparate(ctx, face, func, ref, mask),
+            activeBackend -> activeBackend.setStencilFuncSeparate(ctx, face, func, ref, mask)
+        );
     }
 
     /**
      * Sets the stencil test function for a specific face using backend-neutral semantics.
      */
     public static void setStencilFuncSeparate(CommandContext ctx, VulkanicStencilFace face, VulkanicStencilCompareOp func, int ref, int mask) {
-        getBackend().setStencilFuncSeparate(ctx, face, func, ref, mask);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilFuncSeparate(ctx, toLegacyStencilFace(face), toLegacyStencilCompareOp(func), ref, mask),
+            activeBackend -> activeBackend.setStencilFuncSeparate(ctx, face, func, ref, mask)
+        );
     }
 
     /**
@@ -6256,7 +6285,10 @@ public class VulkanicAPI {
             return;
         }
 
-        getBackend().setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp),
+            activeBackend -> activeBackend.setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp)
+        );
     }
 
     /**
@@ -6268,7 +6300,15 @@ public class VulkanicAPI {
         VulkanicStencilOperation depthFailOp,
         VulkanicStencilOperation depthPassOp
     ) {
-        getBackend().setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilOp(
+                ctx,
+                toLegacyStencilOperation(stencilFailOp),
+                toLegacyStencilOperation(depthFailOp),
+                toLegacyStencilOperation(depthPassOp)
+            ),
+            activeBackend -> activeBackend.setStencilOp(ctx, stencilFailOp, depthFailOp, depthPassOp)
+        );
     }
 
     /**
@@ -6291,7 +6331,10 @@ public class VulkanicAPI {
             return;
         }
 
-        getBackend().setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp),
+            activeBackend -> activeBackend.setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp)
+        );
     }
 
     /**
@@ -6304,14 +6347,26 @@ public class VulkanicAPI {
         VulkanicStencilOperation depthFailOp,
         VulkanicStencilOperation depthPassOp
     ) {
-        getBackend().setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilOpSeparate(
+                ctx,
+                toLegacyStencilFace(face),
+                toLegacyStencilOperation(stencilFailOp),
+                toLegacyStencilOperation(depthFailOp),
+                toLegacyStencilOperation(depthPassOp)
+            ),
+            activeBackend -> activeBackend.setStencilOpSeparate(ctx, face, stencilFailOp, depthFailOp, depthPassOp)
+        );
     }
 
     /**
      * Sets the stencil write mask.
      */
     public static void setStencilWriteMask(CommandContext ctx, int mask) {
-        getBackend().setStencilWriteMask(ctx, mask);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilWriteMask(ctx, mask),
+            activeBackend -> activeBackend.setStencilWriteMask(ctx, mask)
+        );
     }
 
     /**
@@ -6321,7 +6376,10 @@ public class VulkanicAPI {
         VulkanicStencilFace.fromLegacyGlConstant(face)
             .ifPresentOrElse(
                 typedFace -> setStencilWriteMaskSeparate(ctx, typedFace, mask),
-                () -> getBackend().setStencilWriteMaskSeparate(ctx, face, mask)
+                () -> dispatchImplementedVoid(
+                    direct -> direct.setStencilWriteMaskSeparate(ctx, face, mask),
+                    activeBackend -> activeBackend.setStencilWriteMaskSeparate(ctx, face, mask)
+                )
             );
     }
 
@@ -6329,7 +6387,44 @@ public class VulkanicAPI {
      * Sets the stencil write mask for a specific face using backend-neutral semantics.
      */
     public static void setStencilWriteMaskSeparate(CommandContext ctx, VulkanicStencilFace face, int mask) {
-        getBackend().setStencilWriteMaskSeparate(ctx, face, mask);
+        dispatchImplementedVoid(
+            direct -> direct.setStencilWriteMaskSeparate(ctx, toLegacyStencilFace(face), mask),
+            activeBackend -> activeBackend.setStencilWriteMaskSeparate(ctx, face, mask)
+        );
+    }
+
+    private static int toLegacyStencilCompareOp(VulkanicStencilCompareOp op) {
+        return switch (op) {
+            case NEVER -> GL_NEVER;
+            case LESS -> GL_LESS;
+            case EQUAL -> GL_EQUAL;
+            case LEQUAL -> GL_LEQUAL;
+            case GREATER -> GL_GREATER;
+            case NOTEQUAL -> GL_NOTEQUAL;
+            case GEQUAL -> GL_GEQUAL;
+            case ALWAYS -> GL_ALWAYS;
+        };
+    }
+
+    private static int toLegacyStencilFace(VulkanicStencilFace face) {
+        return switch (face) {
+            case FRONT -> GL_FRONT;
+            case BACK -> GL_BACK;
+            case FRONT_AND_BACK -> GL_FRONT_AND_BACK;
+        };
+    }
+
+    private static int toLegacyStencilOperation(VulkanicStencilOperation op) {
+        return switch (op) {
+            case KEEP -> GL_KEEP;
+            case ZERO -> GL_ZERO;
+            case REPLACE -> GL_REPLACE;
+            case INCREMENT_CLAMP -> GL_INCR;
+            case DECREMENT_CLAMP -> GL_DECR;
+            case INVERT -> GL_INVERT;
+            case INCREMENT_WRAP -> GL_INCR_WRAP;
+            case DECREMENT_WRAP -> GL_DECR_WRAP;
+        };
     }
     
     

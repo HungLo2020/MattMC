@@ -3953,11 +3953,12 @@ public class Phase3DrawPathTest {
         String dhCompatInternalSource = readSource(dhCompatInternalFile);
         assertFalse(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D"),
             "DHCompatInternal should not pass explicit GL_TEXTURE_2D in copyTexImage2D calls");
-        assertTrue(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D(0"),
-            "DHCompatInternal should use IrisRenderSystem default-2D copyTexImage2D helper");
-        assertTrue(dhCompatInternalSource.contains("var ctx = VulkanicAPI.getCommandContext();")
-                && dhCompatInternalSource.contains("VulkanicAPI.bindTexture2D(ctx, depthTexNoTranslucent.getTextureId());"),
-            "DHCompatInternal should reuse one local command context when preparing the translucent depth copy");
+        assertFalse(dhCompatInternalSource.contains("IrisRenderSystem.copyTexImage2D("),
+            "DHCompatInternal should avoid color-oriented copyTexImage2D for translucent depth snapshots");
+        assertTrue(dhCompatInternalSource.contains("DepthCopyStrategy strategy = DepthCopyStrategy.fastestDepthSnapshot(false)"),
+            "DHCompatInternal should use the Vulkan-safe depth snapshot strategy for translucent depth copies");
+        assertTrue(dhCompatInternalSource.contains("depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId())"),
+            "DHCompatInternal should provide a depth-only destination framebuffer for Vulkan depth snapshot blits");
 
         Path dhWrapperFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftGLWrapper.java");
         String dhWrapperSource = readSourceIfExists(dhWrapperFile);

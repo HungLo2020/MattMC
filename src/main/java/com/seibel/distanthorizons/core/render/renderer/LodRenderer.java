@@ -32,6 +32,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccess
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
+import net.blaze3d.systems.RenderPass;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicBlendEquation;
 import net.vulkanic.VulkanicBlendFactor;
@@ -214,7 +215,7 @@ public class LodRenderer
 			if (Config.Client.Advanced.Graphics.GenericRendering.enableGenericRendering.get())
 			{
 				profiler.popPush("Custom Objects");
-				genericRenderer.render(renderParams, profiler, true);
+				genericRenderer.render(renderParams, profiler, true, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment());
 			}
 			
 			// SSAO
@@ -228,7 +229,7 @@ public class LodRenderer
 			if (Config.Client.Advanced.Graphics.GenericRendering.enableGenericRendering.get())
 			{
 				profiler.popPush("Custom Objects");
-				genericRenderer.render(renderParams, profiler, false);
+				genericRenderer.render(renderParams, profiler, false, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment());
 			}
 			
 			// combined pass transparent rendering
@@ -639,36 +640,39 @@ public class LodRenderer
 		}
 		
 		
-		SortedArraySet<LodBufferContainer> lodBufferContainer = lodBufferHandler.getColumnRenderBuffers();
-		if (lodBufferContainer != null)
+		try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
 		{
-			for (int lodIndex = 0; lodIndex < lodBufferContainer.size(); lodIndex++)
+			SortedArraySet<LodBufferContainer> lodBufferContainer = lodBufferHandler.getColumnRenderBuffers();
+			if (lodBufferContainer != null)
 			{
-				LodBufferContainer bufferContainer = lodBufferContainer.get(lodIndex);
-				this.setShaderProgramMvmOffset(bufferContainer.minCornerBlockPos, shaderProgram, renderEventParam);
-				
-				GLVertexBuffer[] vbos = opaquePass ? bufferContainer.vbos : bufferContainer.vbosTransparent;
-				for (int vboIndex = 0; vboIndex < vbos.length; vboIndex++)
+				for (int lodIndex = 0; lodIndex < lodBufferContainer.size(); lodIndex++)
 				{
-					GLVertexBuffer vbo = vbos[vboIndex];
-					if (vbo == null)
-					{
-						continue;
-					}
+					LodBufferContainer bufferContainer = lodBufferContainer.get(lodIndex);
+					this.setShaderProgramMvmOffset(bufferContainer.minCornerBlockPos, shaderProgram, renderEventParam);
 					
-					if (vbo.getVertexCount() == 0)
+					GLVertexBuffer[] vbos = opaquePass ? bufferContainer.vbos : bufferContainer.vbosTransparent;
+					for (int vboIndex = 0; vboIndex < vbos.length; vboIndex++)
 					{
-						continue;
+						GLVertexBuffer vbo = vbos[vboIndex];
+						if (vbo == null)
+						{
+							continue;
+						}
+						
+						if (vbo.getVertexCount() == 0)
+						{
+							continue;
+						}
+						
+						vbo.bind();
+						shaderProgram.bindVertexBuffer(vbo.getId());
+						VulkanicAPI.drawElements(
+								ctx,
+								VulkanicPrimitiveMode.TRIANGLES,
+								(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
+								this.quadIBO.getType(), 0);
+						vbo.unbind();
 					}
-					
-					vbo.bind();
-					shaderProgram.bindVertexBuffer(vbo.getId());
-					VulkanicAPI.drawElements(
-							ctx,
-							VulkanicPrimitiveMode.TRIANGLES,
-							(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
-							this.quadIBO.getType(), 0);
-					vbo.unbind();
 				}
 			}
 		}
@@ -687,7 +691,27 @@ public class LodRenderer
 		}
 		
 	}
-	
+
+	private RenderPass createVulkanCompatibilityRenderPass(String label)
+	{
+		if (!VulkanicAPI.isVulkanBackendSelected() || this.activeFramebufferId < 0)
+		{
+			return null;
+		}
+
+		return VulkanicAPI.createRenderPass(() -> label, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment());
+	}
+
+	private boolean activeFramebufferHasDepthAttachment()
+	{
+		if (this.activeFramebuffer instanceof DhFramebuffer dhFramebuffer)
+		{
+			return dhFramebuffer.hasDepthAttachment();
+		}
+
+		return this.framebuffer instanceof DhFramebuffer dhFramebuffer && dhFramebuffer.hasDepthAttachment();
+	}
+		
 	/**
 	 * the MVM offset is needed so LODs can be rendered anywhere in the MC world
 	 * without running into floating point percision loss.

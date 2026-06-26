@@ -84,14 +84,22 @@ public class GLProxy
 	
 	private GLProxy() throws IllegalStateException
 	{
+		boolean vulkanBackend = VulkanicAPI.isVulkanBackendSelected();
 		// this must be created on minecraft's render context to work correctly
-		if (GLFW.glfwGetCurrentContext() == 0L)
+		if (!vulkanBackend && GLFW.glfwGetCurrentContext() == 0L)
 		{
 			throw new IllegalStateException(GLProxy.class.getSimpleName() + " was created outside the render thread!");
 		}
 		
 		LOGGER.info("Creating " + GLProxy.class.getSimpleName() + "... If this is the last message you see there must have been an OpenGL error.");
-		LOGGER.info("Lod Render OpenGL version [" + VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VERSION) + "].");
+		if (vulkanBackend)
+		{
+			LOGGER.info("Lod Render Vulkan compatibility backend [" + VulkanicAPI.getActiveBackendType() + "].");
+		}
+		else
+		{
+			LOGGER.info("Lod Render OpenGL version [" + VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VERSION) + "].");
+		}
 		
 		
 		
@@ -104,7 +112,7 @@ public class GLProxy
 		this.glCapabilities = VulkanicAPI.getGLCapabilities();
 		
 		// crash the game if the GPU doesn't support OpenGL 3.2
-		if (!VulkanicAPI.checkOpenGL32Support())
+		if (!vulkanBackend && !VulkanicAPI.checkOpenGL32Support())
 		{
 			String supportedVersionInfo = VulkanicAPI.getCapabilityDebugInfo() +
 				"If you noticed that your computer supports higher OpenGL versions" +
@@ -114,12 +122,19 @@ public class GLProxy
 			// See full requirement at above.
 			String errorMessage = ModInfo.READABLE_NAME + " was initializing " + GLProxy.class.getSimpleName()
 					+ " and discovered this GPU doesn't meet the OpenGL requirements. Sorry I couldn't tell you sooner :(\n" +
-					"Additional info:\n" + supportedVersionInfo;
+				"Additional info:\n" + supportedVersionInfo;
 			MC.crashMinecraft(errorMessage, new UnsupportedOperationException("Distant Horizon OpenGL requirements not met"));
 		}
-	 	LOGGER.info("minecraftGlCapabilities:\n" + VulkanicAPI.getCapabilityDebugInfo());
-		
-		if (Config.Client.Advanced.Debugging.OpenGl.overrideVanillaGLLogger.get())
+		if (!vulkanBackend)
+		{
+			LOGGER.info("minecraftGlCapabilities:\n" + VulkanicAPI.getCapabilityDebugInfo());
+		}
+		else
+		{
+			LOGGER.info("minecraftGlCapabilities: Vulkan compatibility mode; OpenGL capability floor checks skipped.");
+		}
+			
+		if (!vulkanBackend && Config.Client.Advanced.Debugging.OpenGl.overrideVanillaGLLogger.get())
 		{
 			VulkanicAPI.setupDebugMessageCallback(new PrintStream(new GLMessageOutputStream(GLProxy::logMessage, this.vanillaDebugMessageBuilder), true));
 		}
@@ -144,16 +159,30 @@ public class GLProxy
 		// Check if we can use the make-over version of Vertex Attribute, which is available in GL4.3 or after
 		this.vertexAttributeBufferBindingSupported = VulkanicAPI.getBindVertexBufferPointer() != 0L; // Nullptr
 		
-		// used by instanced rendering
-		this.vertexAttribDivisorSupported = VulkanicAPI.checkOpenGL33Support();
-		// denotes if ARBInstancedArrays.glVertexAttribDivisorARB() is available or not
-		// can be used as a backup if MC didn't create a GL 3.3+ context
-		this.instancedArraysSupported = VulkanicAPI.checkARBInstancedArraysSupport();
+		if (vulkanBackend)
+		{
+			this.vertexAttribDivisorSupported = true;
+			this.instancedArraysSupported = true;
+		}
+		else
+		{
+			// used by instanced rendering
+			this.vertexAttribDivisorSupported = VulkanicAPI.checkOpenGL33Support();
+			// denotes if ARBInstancedArrays.glVertexAttribDivisorARB() is available or not
+			// can be used as a backup if MC didn't create a GL 3.3+ context
+			this.instancedArraysSupported = VulkanicAPI.checkARBInstancedArraysSupport();
+		}
 		
 		// get the best automatic upload method
-		String vendor = VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
-		if (EPlatform.get() != EPlatform.MACOS)
+		String vendor;
+		if (vulkanBackend)
 		{
+			vendor = "VULKANIC";
+			this.preferredUploadMethod = EDhApiGpuUploadMethod.DATA;
+		}
+		else if (EPlatform.get() != EPlatform.MACOS)
+		{
+			vendor = VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
 			if (vendor.contains("NVIDIA") || vendor.contains("GEFORCE"))
 			{
 				// NVIDIA card
@@ -167,6 +196,7 @@ public class GLProxy
 		}
 		else
 		{
+			vendor = VulkanicAPI.getString(VulkanicAPI.getCommandContext(), VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
 			// Mac may have an issue with Buffer Storage, so default to the most basic
 			// form of uploading
 			this.preferredUploadMethod = EDhApiGpuUploadMethod.DATA;
@@ -214,6 +244,11 @@ public class GLProxy
 	
 	public static boolean runningOnRenderThread()
 	{
+		if (VulkanicAPI.isVulkanBackendSelected())
+		{
+			return VulkanicAPI.isOnRenderThread();
+		}
+
 		long currentContext = GLFW.glfwGetCurrentContext();
 		return currentContext != 0L; // if the context isn't null, it's the MC context
 	}

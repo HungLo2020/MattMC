@@ -6,7 +6,6 @@ import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiGeneri
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.gl.texture.DepthBufferFormat;
 import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
@@ -17,7 +16,6 @@ import net.irisshaders.iris.targets.Blaze3dRenderTargetExt;
 import net.irisshaders.iris.targets.DepthTexture;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.Minecraft;
-import net.vulkanic.VulkanicAPI;
 
 import java.io.IOException;
 
@@ -39,6 +37,7 @@ public class DHCompatInternal {
 	private GlFramebuffer dhShadowFramebuffer;
 	private DhFrameBufferWrapper dhShadowFramebufferWrapper;
 	private DepthTexture depthTexNoTranslucent;
+	private GlFramebuffer depthTexNoTranslucentFramebuffer;
 	private boolean translucentDepthDirty;
 	private int storedDepthTex = -1;
 	private boolean incompatible = false;
@@ -185,6 +184,10 @@ public class DHCompatInternal {
 	}
 
 	public void createDepthTex(int width, int height) {
+		if (depthTexNoTranslucentFramebuffer != null) {
+			depthTexNoTranslucentFramebuffer.destroy();
+			depthTexNoTranslucentFramebuffer = null;
+		}
 		if (depthTexNoTranslucent != null) {
 			depthTexNoTranslucent.destroy();
 			depthTexNoTranslucent = null;
@@ -193,6 +196,9 @@ public class DHCompatInternal {
 		translucentDepthDirty = true;
 
 		depthTexNoTranslucent = new DepthTexture("DH depth tex", width, height, DepthBufferFormat.DEPTH32F);
+		depthTexNoTranslucentFramebuffer = new GlFramebuffer();
+		depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId());
+		depthTexNoTranslucentFramebuffer.noDrawBuffers();
 	}
 
 	public void clear() {
@@ -269,13 +275,15 @@ public class DHCompatInternal {
 	public void copyTranslucents(int width, int height) {
 		if (translucentDepthDirty) {
 			translucentDepthDirty = false;
-			var ctx = VulkanicAPI.getCommandContext();
-			VulkanicAPI.bindTexture2D(ctx, depthTexNoTranslucent.getTextureId());
-			dhTerrainFramebuffer.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(0, DepthBufferFormat.DEPTH32F.getGlInternalFormat(), 0, 0, width, height, 0);
 		} else {
-			DepthCopyStrategy.fastest(false).copy(dhTerrainFramebuffer, storedDepthTex, null, depthTexNoTranslucent.getTextureId(), width, height);
+			if (storedDepthTex == depthTexNoTranslucent.getTextureId()) {
+				return;
+			}
 		}
+
+		DepthCopyStrategy strategy = DepthCopyStrategy.fastestDepthSnapshot(false);
+		GlFramebuffer destFramebuffer = strategy.needsDestFramebuffer() ? depthTexNoTranslucentFramebuffer : null;
+		strategy.copy(dhTerrainFramebuffer, storedDepthTex, destFramebuffer, depthTexNoTranslucent.getTextureId(), width, height);
 	}
 
 	public GlFramebuffer getTranslucentFB() {
