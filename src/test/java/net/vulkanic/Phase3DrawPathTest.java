@@ -424,23 +424,23 @@ public class Phase3DrawPathTest {
 	        String commandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java"));
 	        String nativeCommandEncoderSource = readSource(SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
 
-	        assertTrue(compositeRendererSource.contains("compositePass.ensurePipelineState(renderTargetDescriptor);"),
-	            "CompositeRenderer should precompute a render-target-compatible pipeline for custom passes before opening the render pass");
+	        assertTrue(compositeRendererSource.contains("compositePass.ensurePipelineState(renderTargetSelection);"),
+	            "CompositeRenderer should precompute a render-target-compatible pipeline selection for custom passes before opening the render pass");
 	        assertTrue(compositeRendererSource.contains("USE_DESCRIPTOR_COMPOSITE_RENDER_PASS")
-	                && compositeRendererSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
-	                && compositeRendererSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
-	                && compositeRendererSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())"),
+	                && compositeRendererSource.contains("IrisVulkanRenderTargetContract.selectTarget(")
+	                && compositeRendererSource.contains("renderTargetSelection.createRenderPass(label)")
+	                && compositeRendererSource.contains("renderTargetSelection.createPipeline(descriptor)"),
 	            "CompositeRenderer should migrate main Iris composite passes to descriptor-backed Vulkan render targets while preserving framebuffer-compatible fallback paths");
 	        assertTrue(compositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(renderPass);"),
 	            "CompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
 	        assertFalse(compositeRendererSource.contains("framebuffer.bind();"),
 	            "CompositeRenderer custom pass setup should not manually rebind the framebuffer after backend-owned render-pass creation");
 
-	        assertTrue(shadowCompositeRendererSource.contains("renderPass.ensurePipelineState(renderTargetDescriptor);"),
-	            "ShadowCompositeRenderer should precompute a render-target-compatible pipeline for custom passes before opening the render pass");
-	        assertTrue(shadowCompositeRendererSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
-	                && shadowCompositeRendererSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())")
-	                && shadowCompositeRendererSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget("),
+	        assertTrue(shadowCompositeRendererSource.contains("renderPass.ensurePipelineState(renderTargetSelection);"),
+	            "ShadowCompositeRenderer should precompute a render-target-compatible pipeline selection for custom passes before opening the render pass");
+	        assertTrue(shadowCompositeRendererSource.contains("renderTargetSelection.createRenderPass(label)")
+	                && shadowCompositeRendererSource.contains("renderTargetSelection.createPipeline(descriptor)")
+	                && shadowCompositeRendererSource.contains("IrisVulkanRenderTargetContract.selectTarget("),
 	            "ShadowCompositeRenderer should use parity-proven descriptor-backed native render targets on Vulkan while preserving framebuffer-compatible rendering for OpenGL/immediate paths");
 	        assertTrue(shadowCompositeRendererSource.contains("VulkanicAPI.bindDefaultUniforms(pass);"),
 	            "ShadowCompositeRenderer should bind shared default uniforms before Vulkan custom-pass draws");
@@ -458,14 +458,12 @@ public class Phase3DrawPathTest {
 	                && commandEncoderSource.contains("Skipping Vulkan custom pass"),
 	            "GlCommandEncoder should fail open instead of submitting underbound Vulkan custom passes");
 	        assertTrue(compositeRendererSource.contains("pipelineLayoutVariants")
-	                && compositeRendererSource.contains("? VulkanicAPI.createPipeline(descriptor, renderTargetDescriptor)")
-	                && compositeRendererSource.contains(": VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())")
+	                && compositeRendererSource.contains("renderTargetSelection.createPipeline(descriptor)")
 	                && compositeRendererSource.contains("renderTargetContractKey")
 	                && compositeRendererSource.contains("targetContractChanged"),
 	            "CompositeRenderer custom passes should cache descriptor-layout pipeline variants against the active render-target contract");
 	        assertTrue(shadowCompositeRendererSource.contains("pipelineLayoutVariants")
-	                && shadowCompositeRendererSource.contains("? VulkanicAPI.createPipeline(descriptor, renderTargetDescriptor)")
-	                && shadowCompositeRendererSource.contains(": VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId())")
+	                && shadowCompositeRendererSource.contains("renderTargetSelection.createPipeline(descriptor)")
 	                && shadowCompositeRendererSource.contains("renderTargetContractKey")
 	                && shadowCompositeRendererSource.contains("targetContractChanged"),
 	            "ShadowCompositeRenderer custom passes should cache descriptor-layout pipeline variants against the active render-target contract");
@@ -4888,6 +4886,8 @@ public class Phase3DrawPathTest {
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
+            boolean usesRenderTargetSelectionSeam = source.contains("IrisVulkanRenderTargetContract.selectTarget(")
+                || source.contains("renderTargetSelection.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -4898,6 +4898,7 @@ public class Phase3DrawPathTest {
                 usesDeviceSeam
                     || usesCommandEncoderSeam
                     || usesRenderPassSeam
+                    || usesRenderTargetSelectionSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
@@ -4927,6 +4928,8 @@ public class Phase3DrawPathTest {
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
+            boolean usesRenderTargetSelectionSeam = source.contains("IrisVulkanRenderTargetContract.selectTarget(")
+                || source.contains("renderTargetSelection.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -4937,6 +4940,7 @@ public class Phase3DrawPathTest {
                 usesDeviceSeam
                     || usesCommandEncoderSeam
                     || usesRenderPassSeam
+                    || usesRenderTargetSelectionSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
@@ -4970,6 +4974,8 @@ public class Phase3DrawPathTest {
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
+            boolean usesRenderTargetSelectionSeam = source.contains("IrisVulkanRenderTargetContract.selectTarget(")
+                || source.contains("renderTargetSelection.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -4980,6 +4986,7 @@ public class Phase3DrawPathTest {
                 usesDeviceSeam
                     || usesCommandEncoderSeam
                     || usesRenderPassSeam
+                    || usesRenderTargetSelectionSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
@@ -5024,6 +5031,8 @@ public class Phase3DrawPathTest {
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
+            boolean usesRenderTargetSelectionSeam = source.contains("IrisVulkanRenderTargetContract.selectTarget(")
+                || source.contains("renderTargetSelection.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -5034,6 +5043,7 @@ public class Phase3DrawPathTest {
                 usesDeviceSeam
                     || usesCommandEncoderSeam
                     || usesRenderPassSeam
+                    || usesRenderTargetSelectionSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
@@ -5071,6 +5081,8 @@ public class Phase3DrawPathTest {
             boolean usesDeviceSeam = source.contains("VulkanicAPI.getDevice(");
             boolean usesCommandEncoderSeam = source.contains("VulkanicAPI.createCommandEncoder(");
             boolean usesRenderPassSeam = source.contains("VulkanicAPI.createRenderPass(");
+            boolean usesRenderTargetSelectionSeam = source.contains("IrisVulkanRenderTargetContract.selectTarget(")
+                || source.contains("renderTargetSelection.createRenderPass(");
             boolean usesTextureSeam = source.contains("VulkanicAPI.createTexture(");
             boolean usesBufferSeam = source.contains("VulkanicAPI.createBuffer(");
             boolean usesTextureViewSeam = source.contains("VulkanicAPI.createTextureView(");
@@ -5081,13 +5093,14 @@ public class Phase3DrawPathTest {
                 usesDeviceSeam
                     || usesCommandEncoderSeam
                     || usesRenderPassSeam
+                    || usesRenderTargetSelectionSeam
                     || usesTextureSeam
                     || usesBufferSeam
                     || usesTextureViewSeam
                     || usesBackendMaxTextureSizeSeam
                     || usesBackendUniformAlignmentSeam
                     || usesBackendDeviceInfoSeam,
-                file + " should call a backend-owned VulkanicAPI seam after Iris/Sodium migration"
+                file + " should call a backend-owned VulkanicAPI or Iris render-target-selection seam after Iris/Sodium migration"
             );
         }
     }
@@ -5579,42 +5592,44 @@ public class Phase3DrawPathTest {
             "Sodium shader terrain should pass the framebuffer fallback id while CommandEncoder owns the fallback depth contract");
 	        assertTrue(compositeSource.contains("USE_DESCRIPTOR_COMPOSITE_RENDER_PASS")
 	                && compositeSource.contains("this.renderTargetDescriptor(label)")
-	                && compositeSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
-		                && shaderTargetContractSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(framebuffer, descriptor)")
+	                && compositeSource.contains("IrisVulkanRenderTargetContract.selectTarget(")
+	                && compositeSource.contains("TargetSelection")
+		                && shaderTargetContractSource.contains("VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(fallbackFramebuffer, descriptor)")
 		                && shaderTargetContractSource.contains("IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorMatchesFramebuffer={} {}")
-		                && shaderTargetContractSource.contains("return descriptorMatchesFramebuffer ? descriptor : null"),
+		                && shaderTargetContractSource.contains("descriptorMatchesFramebuffer ? descriptor : null"),
 		            "Iris composite passes should use the shared explicit Vulkan render-target equivalence contract instead of relying on framebuffer inference");
-	        assertTrue(compositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor)"),
+	        assertTrue(compositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetSelection)")
+	                && compositeSource.contains("return renderTargetSelection.createPipeline(descriptor);"),
 	            "Iris composite passes should create pipelines through the same descriptor/fallback seam used to begin the render pass");
         assertTrue(finalPassSource.contains("VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> \"Final pass\", baseWidth, baseHeight)"),
             "FinalPassRenderer should snapshot the final pass target before pipeline/render-pass creation");
         assertTrue(finalPassSource.contains("VulkanicResourceUsage.SAMPLED_READ")
                 && finalPassSource.contains("VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE"),
             "FinalPassRenderer should carry explicit render-target usage intent for descriptor-backed Vulkan final passes");
-	        assertTrue(finalPassSource.contains("boolean useDescriptorBackedFinalPass = shouldUseDescriptorBackedFinalPass(renderTargetDescriptor)")
-	                && finalPassSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(")
+	        assertTrue(finalPassSource.contains("IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection")
+	                && finalPassSource.contains("IrisVulkanRenderTargetContract.selectTarget(")
 	                && shaderTargetContractSource.contains("IrisShaderRenderTargetContract"),
 	            "FinalPassRenderer should use descriptor-backed final-pass rendering only after proving framebuffer/descriptor parity");
-	        assertTrue(finalPassSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)"),
-	            "FinalPassRenderer should route parity-proven Vulkan final passes through the descriptor-backed render-pass path");
+	        assertTrue(finalPassSource.contains("? renderTargetSelection.createRenderPass(() -> \"Final pass\")"),
+	            "FinalPassRenderer should route Vulkan final passes through the shared target selection render-pass path");
         assertTrue(finalPassSource.contains("VulkanicAPI.createRenderPass(() -> \"Final pass\", main.getColorTextureView(), OptionalInt.empty())"),
             "FinalPassRenderer should preserve the existing OpenGL texture-view render-pass path");
-        assertTrue(finalPassSource.contains("useVulkanFramebufferFallback")
-                && finalPassSource.contains("VulkanicAPI.createRenderPass(() -> \"Final pass\", this.colorHolder.getId(), false)"),
+        assertTrue(finalPassSource.contains("renderTargetSelection.vulkanRecordedPass()")
+                && shaderTargetContractSource.contains("VulkanicAPI.createRenderPass(label, this.fallbackFramebuffer, this.fallbackHasDepthAttachment)"),
             "FinalPassRenderer should keep Vulkan fallback render-pass compatibility aligned with its framebuffer-target pipeline");
-        assertTrue(finalPassSource.contains("finalPass.ensurePipelineState(useDescriptorBackedFinalPass ? renderTargetDescriptor : null)")
+        assertTrue(finalPassSource.contains("finalPass.ensurePipelineState(renderTargetSelection)")
 	                && finalPassSource.contains("renderTargetContractKey")
 	                && finalPassSource.contains("targetContractChanged"),
             "FinalPassRenderer should create the final-pass pipeline against the same descriptor used to begin the Vulkan render pass");
-	        assertTrue(shadowCompositeSource.contains("? VulkanicAPI.createRenderPass(renderTargetDescriptor)")
-	                && shadowCompositeSource.contains(": VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment())")
-	                && shadowCompositeSource.contains("IrisVulkanRenderTargetContract.selectDescriptorBackedTarget("),
+	        assertTrue(shadowCompositeSource.contains("renderTargetSelection.createRenderPass(label)")
+	                && shadowCompositeSource.contains("IrisVulkanRenderTargetContract.selectTarget("),
 	            "Iris shadow composite passes should use the shared parity-proven descriptor contract while preserving framebuffer rendering for OpenGL/immediate paths");
-	        assertTrue(shadowCompositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor)"),
+	        assertTrue(shadowCompositeSource.contains("this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetSelection)")
+	                && shadowCompositeSource.contains("return renderTargetSelection.createPipeline(descriptor);"),
 	            "Iris shadow composite passes should create the custom-pass pipeline against the same descriptor used to begin the Vulkan render pass");
-        assertTrue(compositeSource.contains("IrisVulkanRenderTargetContract.targetContractKey(this.framebuffer.getId(), renderTargetDescriptor)")
+        assertTrue(compositeSource.contains("String targetContractKey = renderTargetSelection.contractKey()")
                 && compositeSource.contains("targetContractChanged")
-                && shadowCompositeSource.contains("IrisVulkanRenderTargetContract.targetContractKey(this.framebuffer.getId(), renderTargetDescriptor)")
+                && shadowCompositeSource.contains("String targetContractKey = renderTargetSelection.contractKey()")
                 && shadowCompositeSource.contains("targetContractChanged"),
             "Iris composite and shadow composite passes should invalidate cached pipelines when the descriptor/framebuffer target contract changes");
         assertTrue(vulkanBackendSource.contains("resolveRenderTargetDescriptor(VulkanicRenderTargetDescriptor descriptor)"),

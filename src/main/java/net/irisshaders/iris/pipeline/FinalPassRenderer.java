@@ -261,14 +261,10 @@ public class FinalPassRenderer {
 			GpuBuffer indices = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(6);
 			VertexFormat.IndexType type = VulkanicAPI.getSequentialBuffer(VertexFormat.Mode.QUADS).type();
 			VulkanicRenderTargetDescriptor renderTargetDescriptor = createFinalRenderTargetDescriptor(() -> "Final pass", baseWidth, baseHeight);
-			boolean useDescriptorBackedFinalPass = shouldUseDescriptorBackedFinalPass(renderTargetDescriptor);
-			boolean useVulkanFramebufferFallback = !useDescriptorBackedFinalPass
-				&& VulkanicAPI.isVulkanBackendSelected()
-				&& !ctx.isImmediate();
-			try (RenderPass renderPass = useDescriptorBackedFinalPass
-					? VulkanicAPI.createRenderPass(renderTargetDescriptor)
-					: useVulkanFramebufferFallback
-					? VulkanicAPI.createRenderPass(() -> "Final pass", this.colorHolder.getId(), false)
+			IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection =
+				selectFinalRenderTarget(renderTargetDescriptor);
+			try (RenderPass renderPass = renderTargetSelection.vulkanRecordedPass()
+					? renderTargetSelection.createRenderPass(() -> "Final pass")
 					: VulkanicAPI.createRenderPass(() -> "Final pass", main.getColorTextureView(), OptionalInt.empty())) {
 				renderPass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
 				VulkanicAPI.bindDefaultUniforms(renderPass);
@@ -276,7 +272,7 @@ public class FinalPassRenderer {
 				renderPass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
 				VulkanicAPI.setDynamicViewport(ctx, 0, 0, baseWidth, baseHeight);
 
-				finalPass.ensurePipelineState(useDescriptorBackedFinalPass ? renderTargetDescriptor : null);
+				finalPass.ensurePipelineState(renderTargetSelection);
 				renderPass.iris$setCustomPass(finalPass);
 
 				finalPass.program.use();
@@ -346,14 +342,15 @@ public class FinalPassRenderer {
 		net.irisshaders.iris.gl.IrisRenderSystem.setActiveTextureUnitIndex(0);
 	}
 
-	private boolean shouldUseDescriptorBackedFinalPass(VulkanicRenderTargetDescriptor descriptor) {
-		return IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(
+	private IrisVulkanRenderTargetContract.TargetSelection selectFinalRenderTarget(VulkanicRenderTargetDescriptor descriptor) {
+		return IrisVulkanRenderTargetContract.selectTarget(
 			"final",
 			null,
 			this.colorHolder.getId(),
+			false,
 			true,
 			() -> descriptor
-		) != null;
+		);
 	}
 
 	private VulkanicRenderTargetDescriptor createFinalRenderTargetDescriptor(Supplier<String> label, int width, int height) {
@@ -524,14 +521,13 @@ public class FinalPassRenderer {
 		GlFramebuffer colorHolder;
 		@Nullable net.vulkanic.PipelineDescriptor pipelineDescriptor;
 		@Nullable net.vulkanic.PipelineHandle pipelineHandle;
-		@Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor;
+		@Nullable IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection;
 		@Nullable String renderTargetContractKey;
 		final java.util.Map<net.vulkanic.PipelineDescriptor.ResourceLayout, net.vulkanic.PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
 
-		void ensurePipelineState(@Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
+		void ensurePipelineState(IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection) {
 			var ctx = VulkanicAPI.getCommandContext();
-			String targetContractKey =
-				IrisVulkanRenderTargetContract.targetContractKey(colorHolder.getId(), renderTargetDescriptor);
+			String targetContractKey = renderTargetSelection.contractKey();
 			boolean targetContractChanged = this.renderTargetContractKey != null
 				&& !this.renderTargetContractKey.equals(targetContractKey);
 			if (targetContractChanged) {
@@ -542,7 +538,7 @@ public class FinalPassRenderer {
 				}
 				this.pipelineDescriptor = null;
 			}
-			this.renderTargetDescriptor = renderTargetDescriptor;
+			this.renderTargetSelection = renderTargetSelection;
 			this.renderTargetContractKey = targetContractKey;
 			if (ctx.isImmediate()) return;
 			if (this.pipelineHandle != null && this.pipelineHandle.isValid() && this.pipelineDescriptor != null) return;
@@ -553,9 +549,7 @@ public class FinalPassRenderer {
 			closePipelineVariants();
 			if (this.pipelineHandle != null) this.pipelineHandle.close();
 			this.pipelineDescriptor = descriptor;
-			this.pipelineHandle = renderTargetDescriptor != null
-				? VulkanicAPI.createPipeline(descriptor, renderTargetDescriptor)
-				: VulkanicAPI.createPipeline(descriptor, colorHolder.getId());
+			this.pipelineHandle = renderTargetSelection.createPipeline(descriptor);
 		}
 
 		private void closePipelineVariants() {
@@ -598,9 +592,11 @@ public class FinalPassRenderer {
 			net.vulkanic.PipelineHandle variant = pipelineLayoutVariants.get(descriptor.getResourceLayout());
 			if (variant != null && variant.isValid()) return variant;
 			if (variant != null) variant.close();
-			net.vulkanic.PipelineHandle created = this.renderTargetDescriptor != null
-				? VulkanicAPI.createPipeline(descriptor, this.renderTargetDescriptor)
-				: VulkanicAPI.createPipeline(descriptor, colorHolder.getId());
+			IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection = this.renderTargetSelection;
+			if (renderTargetSelection == null) {
+				return this.pipelineHandle;
+			}
+			net.vulkanic.PipelineHandle created = renderTargetSelection.createPipeline(descriptor);
 			pipelineLayoutVariants.put(descriptor.getResourceLayout(), created);
 			return created;
 		}

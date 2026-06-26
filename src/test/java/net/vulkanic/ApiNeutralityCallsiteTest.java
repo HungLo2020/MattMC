@@ -1623,8 +1623,8 @@ public class ApiNeutralityCallsiteTest {
         assertFalse(horizonRendererSource.contains("RenderSystem.getDevice("),
             "HorizonRenderer should avoid direct RenderSystem.getDevice() resource and pass creation");
 
-        assertTrue(shadowCompositeSource.contains("VulkanicAPI.createRenderPass("),
-            "ShadowCompositeRenderer should create composite passes through backend-owned VulkanicAPI seam");
+        assertTrue(shadowCompositeSource.contains("renderTargetSelection.createRenderPass("),
+            "ShadowCompositeRenderer should create composite passes through the shared backend-owned render-target selection seam");
         assertFalse(shadowCompositeSource.contains("RenderSystem.getDevice("),
             "ShadowCompositeRenderer should avoid direct RenderSystem.getDevice() render-pass creation");
         assertTrue(shadowRenderTargetsSource.contains("VulkanicAPI.createTexture("),
@@ -1636,8 +1636,8 @@ public class ApiNeutralityCallsiteTest {
             "FinalPassRenderer should create final-pass render passes through backend-owned VulkanicAPI seam");
         assertFalse(finalPassRendererSource.contains("RenderSystem.getDevice("),
             "FinalPassRenderer should avoid direct RenderSystem.getDevice() render-pass creation");
-        assertTrue(compositeRendererSource.contains("VulkanicAPI.createRenderPass("),
-            "CompositeRenderer should create composite passes through backend-owned VulkanicAPI seam");
+        assertTrue(compositeRendererSource.contains("renderTargetSelection.createRenderPass("),
+            "CompositeRenderer should create composite passes through the shared backend-owned render-target selection seam");
         assertFalse(compositeRendererSource.contains("RenderSystem.getDevice("),
             "CompositeRenderer should avoid direct RenderSystem.getDevice() render-pass creation");
 

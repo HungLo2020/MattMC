@@ -235,11 +235,11 @@ public class ShadowCompositeRenderer {
 				}
 			}
 
-			VulkanicRenderTargetDescriptor renderTargetDescriptor =
-				renderPass.vulkanRenderTargetDescriptor(() -> "Shadow composites");
-			renderPass.ensurePipelineState(renderTargetDescriptor);
+			IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection =
+				renderPass.vulkanRenderTargetSelection(() -> "Shadow composites");
+			renderPass.ensurePipelineState(renderTargetSelection);
 
-			try (RenderPass pass = renderPass.createRenderPass(() -> "Shadow composites", renderTargetDescriptor)) {
+			try (RenderPass pass = renderPass.createRenderPass(() -> "Shadow composites", renderTargetSelection)) {
 				pass.setPipeline(CompositeRenderer.COMPOSITE_PIPELINE);
 				VulkanicAPI.bindDefaultUniforms(pass);
 				pass.setVertexBuffer(0, FullScreenQuadRenderer.INSTANCE.getQuad());
@@ -385,7 +385,7 @@ public class ShadowCompositeRenderer {
 		int viewHeight;
 		PipelineDescriptor pipelineDescriptor;
 		PipelineHandle pipelineHandle;
-		VulkanicRenderTargetDescriptor renderTargetDescriptor;
+		IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection;
 		String renderTargetContractKey;
 		final java.util.Map<PipelineDescriptor.ResourceLayout, PipelineHandle> pipelineLayoutVariants = new java.util.HashMap<>();
 		ImmutableSet<Integer> flippedAtLeastOnce;
@@ -405,32 +405,28 @@ public class ShadowCompositeRenderer {
 			return this.framebuffer.createRenderTargetDescriptor(label, this.viewWidth, this.viewHeight);
 		}
 
-		private VulkanicRenderTargetDescriptor vulkanRenderTargetDescriptor(Supplier<String> label) {
-			return IrisVulkanRenderTargetContract.selectDescriptorBackedTarget(
+		private IrisVulkanRenderTargetContract.TargetSelection vulkanRenderTargetSelection(Supplier<String> label) {
+			return IrisVulkanRenderTargetContract.selectTarget(
 				"shadowComposite",
 				this.name,
 				this.framebuffer.getId(),
+				this.framebuffer.hasDepthAttachment(),
 				true,
 				() -> this.renderTargetDescriptor(label)
 			);
 		}
 
-		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor, @org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
-			return renderTargetDescriptor != null
-				? VulkanicAPI.createPipeline(descriptor, renderTargetDescriptor)
-				: VulkanicAPI.createPipeline(descriptor, this.framebuffer.getId());
+		private PipelineHandle createCompatiblePipeline(PipelineDescriptor descriptor, IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection) {
+			return renderTargetSelection.createPipeline(descriptor);
 		}
 
-		private RenderPass createRenderPass(Supplier<String> label, @org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
-			return renderTargetDescriptor != null
-				? VulkanicAPI.createRenderPass(renderTargetDescriptor)
-				: VulkanicAPI.createRenderPass(label, this.framebuffer.getId(), this.framebuffer.hasDepthAttachment());
+		private RenderPass createRenderPass(Supplier<String> label, IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection) {
+			return renderTargetSelection.createRenderPass(label);
 		}
 
-		private void ensurePipelineState(@org.jetbrains.annotations.Nullable VulkanicRenderTargetDescriptor renderTargetDescriptor) {
+		private void ensurePipelineState(IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection) {
 			var ctx = VulkanicAPI.getCommandContext();
-			String targetContractKey =
-				IrisVulkanRenderTargetContract.targetContractKey(this.framebuffer.getId(), renderTargetDescriptor);
+			String targetContractKey = renderTargetSelection.contractKey();
 			boolean targetContractChanged = this.renderTargetContractKey != null
 				&& !this.renderTargetContractKey.equals(targetContractKey);
 			if (targetContractChanged) {
@@ -441,7 +437,7 @@ public class ShadowCompositeRenderer {
 				}
 				this.pipelineDescriptor = null;
 			}
-			this.renderTargetDescriptor = renderTargetDescriptor;
+			this.renderTargetSelection = renderTargetSelection;
 			this.renderTargetContractKey = targetContractKey;
 
 			if (ctx.isImmediate()) {
@@ -465,7 +461,7 @@ public class ShadowCompositeRenderer {
 			}
 
 			this.pipelineDescriptor = descriptor;
-			this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetDescriptor);
+			this.pipelineHandle = this.createCompatiblePipeline(descriptor, renderTargetSelection);
 		}
 
 		protected void destroy() {
@@ -531,9 +527,11 @@ public class ShadowCompositeRenderer {
 				pipelineVariant.close();
 			}
 
-			VulkanicRenderTargetDescriptor renderTargetDescriptor =
-				this.renderTargetDescriptor;
-			PipelineHandle createdVariant = this.createCompatiblePipeline(descriptor, renderTargetDescriptor);
+			IrisVulkanRenderTargetContract.TargetSelection renderTargetSelection = this.renderTargetSelection;
+			if (renderTargetSelection == null) {
+				return this.pipelineHandle;
+			}
+			PipelineHandle createdVariant = this.createCompatiblePipeline(descriptor, renderTargetSelection);
 			this.pipelineLayoutVariants.put(descriptor.getResourceLayout(), createdVariant);
 			return createdVariant;
 		}
