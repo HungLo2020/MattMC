@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Usage: ./RunVulkanPerfAudit.sh [options] [-- extra compare-harness args]
+Usage: ./DevUtils/RunVulkanPerfAudit.sh [options] [-- extra compare-harness args]
 
 Runs a bounded backend comparison with the Vulkan perf audit enabled, then
 summarizes the dominant Vulkan slowdown bucket into machine-readable and
@@ -23,12 +23,12 @@ Options:
 
 Environment:
   JFR_SETTINGS             Passed through to compare harness. Default: profile
-  PERF_MODE                Passed through to compare harness. Default: off
+  PERF_MODE                Passed through to compare harness. Default: stat
 
 Examples:
-  ./RunVulkanPerfAudit.sh
-  ./RunVulkanPerfAudit.sh --world Origin --warmup-secs 30 --sample-secs 30
-  ./RunVulkanPerfAudit.sh --label world-entry -- --launch-timeout-secs 300
+  ./DevUtils/RunVulkanPerfAudit.sh
+  ./DevUtils/RunVulkanPerfAudit.sh --world Origin --warmup-secs 30 --sample-secs 30
+  ./DevUtils/RunVulkanPerfAudit.sh --label world-entry -- --launch-timeout-secs 300
 EOF
 }
 
@@ -142,7 +142,17 @@ for value_name in WARMUP_SECS SAMPLE_SECS RUNS_PER_BACKEND; do
 done
 
 SCRIPT_PATH="$(canonicalize_path "$0")"
-PROJECT_ROOT="$(dirname "$SCRIPT_PATH")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+PROJECT_ROOT="$SCRIPT_DIR"
+while [[ ! -f "$PROJECT_ROOT/gradlew" && "$PROJECT_ROOT" != "/" ]]; do
+    PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+done
+
+if [[ ! -f "$PROJECT_ROOT/gradlew" ]]; then
+    echo "ERROR: Could not find gradlew from $SCRIPT_DIR" >&2
+    exit 1
+fi
+
 COMPARE_SCRIPT="$PROJECT_ROOT/DevUtils/RunBackendPerfCompare.sh"
 
 if [[ ! -x "$COMPARE_SCRIPT" ]]; then
