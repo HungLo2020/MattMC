@@ -5074,12 +5074,12 @@ public class Phase3DrawPathTest {
     public void testCubemapRenderPassStaysColorOnly() throws IOException {
         String source = readSource(SRC_MAIN_JAVA.resolve("net/minecraft/client/renderer/CubeMap.java"));
 
+        assertTrue(source.contains("gpuTextureView != null\n\t\t\t? VulkanicAPI.createRenderPass(() -> \"Cubemap\", gpuTextureView, OptionalInt.empty())"),
+            "CubeMap should prefer the native texture-view render-pass path for panorama background rendering");
         assertTrue(source.contains("VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture())"),
-            "CubeMap should recover the main render target framebuffer contract before rendering the panorama background");
+            "CubeMap should retain framebuffer recovery only for the missing-texture-view fallback");
         assertTrue(source.contains("VulkanicAPI.createRenderPass(() -> \"Cubemap\", framebuffer, renderTarget.getDepthTexture() != null)"),
-            "CubeMap should prefer the framebuffer-owned render-pass path for panorama background rendering");
-        assertTrue(source.contains(": VulkanicAPI.createRenderPass(() -> \"Cubemap\", gpuTextureView, OptionalInt.empty())"),
-            "CubeMap should retain a texture-view fallback when framebuffer recovery is unavailable");
+            "CubeMap should retain a framebuffer-owned render-pass fallback when texture-view rendering is unavailable");
     }
 
     @Test

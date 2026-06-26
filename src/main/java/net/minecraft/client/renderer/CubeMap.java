@@ -36,7 +36,6 @@ public class CubeMap implements AutoCloseable {
 		RenderPipeline renderPipeline = RenderPipelines.PANORAMA;
 		RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
 		GpuTextureView gpuTextureView = renderTarget.getColorTextureView();
-		int framebuffer = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
 		Matrix4fStack matrix4fStack = VulkanicAPI.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.rotationX((float) Math.PI);
@@ -46,15 +45,20 @@ public class CubeMap implements AutoCloseable {
 			.writeTransform(new Matrix4f(matrix4fStack), new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		matrix4fStack.popMatrix();
 
-		try (RenderPass renderPass = framebuffer != 0
-			? VulkanicAPI.createRenderPass(() -> "Cubemap", framebuffer, renderTarget.getDepthTexture() != null)
-			: VulkanicAPI.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty())) {
+		try (RenderPass renderPass = gpuTextureView != null
+			? VulkanicAPI.createRenderPass(() -> "Cubemap", gpuTextureView, OptionalInt.empty())
+			: createFramebufferRenderPass(renderTarget)) {
 			renderPass.setPipeline(renderPipeline);
 			net.vulkanic.VulkanicAPI.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", gpuBufferSlice);
 			renderPass.bindSampler("Sampler0", minecraft.getTextureManager().getTexture(this.location).getTextureView());
 			renderPass.draw(0, 3);
 		}
+	}
+
+	private static RenderPass createFramebufferRenderPass(RenderTarget renderTarget) {
+		int framebuffer = VulkanicAPI.resolveFramebufferForTextures(renderTarget.getColorTexture(), renderTarget.getDepthTexture());
+		return VulkanicAPI.createRenderPass(() -> "Cubemap", framebuffer, renderTarget.getDepthTexture() != null);
 	}
 
 	public void registerTextures(TextureManager textureManager) {
