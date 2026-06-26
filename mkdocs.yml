@@ -9,6 +9,10 @@ site_dir: site
 
 theme:
   name: material
+  palette:
+    scheme: slate
+    primary: blue grey
+    accent: light blue
   features:
     - navigation.sections
     - navigation.indexes
@@ -57,6 +61,3 @@ nav:
       - Dev Tips And Tools: devtools/DEV-TIPS-TOOLS.md
   - Changelog:
       - Overview: changelog/CHANGELOG.md
-      - 6.2026: changelog/changelog/6.2026.md
-      - 1.2026: changelog/changelog/1.2026.md
-      - 12.2025: changelog/changelog/12.2025.md
