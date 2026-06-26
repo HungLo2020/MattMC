@@ -1,0 +1,18 @@
+# Flood Basalt
+
+## Obtaining
+
+Flood Basalt can be obtained from the Creative Menu and from its normal survival sources when those sources are available.
+
+## Usage
+
+Flood Basalt is used as a crafting ingredient, utility item, or decorative item depending on the recipe and gameplay system.
+
+## Behavior
+
+It is a stackable item unless its item properties define a different stack limit.
+
+## Notes
+
+* This item is registered as `minecraft:flood_basalt`.
+* This item comes from bundled content integrated into MattMC.
