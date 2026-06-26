@@ -55,8 +55,6 @@ nav:
           - Chunk Generation Performance Tracker: testing/performance/chunk_gen_performance_tracker.md
   - Development:
       - Dev Tips And Tools: devtools/DEV-TIPS-TOOLS.md
-      - Data Generation: DATA-GENERATION.md
-      - Data System: DATA-SYSTEM.md
   - Changelog:
       - Overview: changelog/CHANGELOG.md
       - 6.2026: changelog/changelog/6.2026.md
