@@ -26,6 +26,7 @@
 #### U
 #### V
 #### W
+- [World Edit Wand](WorldEditWand.md)
 #### X
 #### Y
 #### Z
