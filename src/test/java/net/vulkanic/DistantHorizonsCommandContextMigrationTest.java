@@ -14,6 +14,7 @@ public class DistantHorizonsCommandContextMigrationTest {
 
     private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
     private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
+    private static final Path SRC_MAIN_RESOURCES = PROJECT_ROOT.resolve("src/main/resources");
 
     private static String readSourceWithoutComments(Path file) throws IOException {
         assertTrue(Files.exists(file), file + " must exist");
@@ -156,6 +157,10 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DhFramebuffer should expose context-aware bind operations");
         assertTrue(framebufferSource.contains("addDepthAttachment(CommandContext ctx"),
             "DhFramebuffer should expose context-aware attachment operations");
+        assertTrue(framebufferSource.contains("VulkanicAPI.drawBuffers(ctx, glBuffers);"),
+            "DhFramebuffer.drawBuffers should preserve requested color attachments instead of forcing GL_NONE");
+        assertTrue(framebufferSource.contains("VulkanicAPI.drawBuffers(ctx, new int[]{VulkanicAPI.colorAttachment(textureIndex)});"),
+            "DhFramebuffer.addColorAttachment should restore color drawing when a color target is first attached");
 
         assertTrue(glBufferSource.contains("bind(CommandContext ctx)"),
             "GLBuffer should expose context-aware bind/unbind operations");
@@ -198,6 +203,48 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH level render hook should still invoke the core LOD render entrypoint");
         assertTrue(chunkHookSource.contains("ClientApi.INSTANCE.renderDeferredLodsForShaders()"),
             "DH chunk render hook should still invoke deferred LOD rendering for shader pipelines");
+        String deferredModeUpdate = "DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(Iris.isPackInUseQuick())";
+        assertTrue(levelHookSource.contains(deferredModeUpdate),
+            "DH level render hook should publish Iris deferred mode before ClientApi chooses the DH render pass");
+        assertTrue(levelHookSource.indexOf(deferredModeUpdate) < levelHookSource.indexOf("ClientApi.INSTANCE.renderLods()"),
+            "DH level render hook should publish Iris deferred mode before ClientApi chooses the DH render pass");
+    }
+
+    @Test
+    public void testDhApplyShaderOnlyCompositesDrawnDepthPixels() throws IOException {
+        Path applyShader = SRC_MAIN_RESOURCES.resolve("shaders/apply.frag");
+        String sourceWithoutComments = readSourceWithoutComments(applyShader);
+
+        assertTrue(sourceWithoutComments.contains("fragmentDepth < 1.0"),
+            "DH apply shader should composite only pixels closer than the untouched clear-depth value");
+        assertFalse(sourceWithoutComments.contains("fragmentDepth != 1"),
+            "DH apply shader should not treat tiny Vulkan depth sampling differences as drawn LOD pixels");
+        assertFalse(sourceWithoutComments.contains("1.0 - TexCoord.y"),
+            "DH apply shader should not apply a Vulkan-only texture-coordinate flip; capture evidence showed that leaves the sky-water artifact in place");
+    }
+
+    @Test
+    public void testDhVulkanCoordinateCorrectionsStayOnProvenPaths() throws IOException {
+        String standardVert = readSourceWithoutComments(SRC_MAIN_RESOURCES.resolve("shaders/standard.vert"));
+        String curveVert = readSourceWithoutComments(SRC_MAIN_RESOURCES.resolve("shaders/curve.vert"));
+        String vanillaFade = readSourceWithoutComments(SRC_MAIN_RESOURCES.resolve("shaders/fade/vanillaFade.frag"));
+
+        assertTrue(standardVert.contains("#ifdef VULKANIC_BACKEND")
+                && standardVert.contains("gl_Position.y = -gl_Position.y;"),
+            "DH standard terrain vertices should flip Vulkan clip-space Y without changing OpenGL");
+        assertTrue(curveVert.contains("#ifdef VULKANIC_BACKEND")
+                && curveVert.contains("gl_Position.y = -gl_Position.y;"),
+            "DH curved terrain vertices should match the standard Vulkan clip-space Y correction");
+
+        assertTrue(vanillaFade.contains("vec2 mcTexCoord = TexCoord;")
+                && vanillaFade.contains("mcTexCoord.y = 1.0 - mcTexCoord.y;"),
+            "DH vanilla fade should sample Minecraft target textures with Vulkan-corrected Y coordinates");
+        assertTrue(vanillaFade.contains("texture(uCombinedMcDhColorTexture, mcTexCoord)")
+                && vanillaFade.contains("texture(uMcDepthTexture, mcTexCoord)"),
+            "DH vanilla fade should apply the Vulkan texture-coordinate correction only to Minecraft color/depth inputs");
+        assertTrue(vanillaFade.contains("texture(uDhColorTexture, TexCoord)")
+                && vanillaFade.contains("texture(uDhDepthTexture, TexCoord)"),
+            "DH vanilla fade should leave DH offscreen textures on the already-proven DH coordinate path");
     }
 
     @Test
@@ -313,6 +360,33 @@ public class DistantHorizonsCommandContextMigrationTest {
             "Typed stencil operations should be converted before routing to the direct Vulkan raw-state implementation");
         assertTrue(source.contains("direct -> direct.setStencilWriteMaskSeparate(ctx, toLegacyStencilFace(face), mask)"),
             "Typed per-face stencil write masks should route to the direct Vulkan raw-state implementation");
+    }
+
+    @Test
+    public void testVulkanLegacyDhDrawsBindProgramPipelineAndExplicitVertexInput() throws IOException {
+        Path backend = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        Path descriptor = SRC_MAIN_JAVA.resolve("net/vulkanic/PipelineDescriptor.java");
+        String backendSource = readSourceWithoutComments(backend);
+        String descriptorSource = readSourceWithoutComments(descriptor);
+
+        assertTrue(backendSource.contains("bindLegacyProgramPipelineForDraw(commandBufferHandle, mode)"),
+            "Legacy DH draw calls should bind a Vulkan pipeline before issuing indexed draws");
+        assertTrue(backendSource.contains("currentVirtualVaoState().setAttributeFormat"),
+            "VulkanBackend should record GL43 vertex attribute format calls instead of accepting them as no-ops");
+        assertTrue(backendSource.contains("currentVirtualVaoState().setAttributeBinding"),
+            "VulkanBackend should record GL43 vertex attribute binding calls for pipeline vertex input");
+        assertTrue(backendSource.contains("createLegacyProgramPipelineDescriptor"),
+            "VulkanBackend should derive a pipeline descriptor from the currently bound standalone shader program");
+        assertTrue(backendSource.contains("spine.activeRenderPassCompatibilityKey()"),
+            "Legacy standalone program pipelines should compile against the active render pass contract");
+        assertTrue(backendSource.contains("withVertexInputState(vertexInputState)"),
+            "Legacy standalone program descriptors should carry explicit VAO-derived vertex input");
+        int legacyTextureLookup = backendSource.indexOf("spine.legacyTexture2DBindingsByUnit.getOrDefault(unit, 0)");
+        int irisTextureLookup = backendSource.indexOf("IrisRenderSystem.getTextureBinding(unit)", legacyTextureLookup);
+        assertTrue(legacyTextureLookup >= 0 && irisTextureLookup > legacyTextureLookup,
+            "Legacy standalone sampler resolution should trust Vulkanic's tracked texture-unit binding before falling back to Iris' cache");
+        assertTrue(descriptorSource.contains("record VertexInputState"),
+            "PipelineDescriptor should expose backend-neutral explicit vertex input metadata");
     }
 
     @Test

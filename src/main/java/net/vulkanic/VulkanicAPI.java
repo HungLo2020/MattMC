@@ -5869,7 +5869,6 @@ public class VulkanicAPI {
                 throw new IllegalStateException(
                     "Unable to resolve backend texture handle for view texture: " + textureView.texture().getLabel());
             }
-
             directVulkanBackend.bindTextureUnit(ctx, unit, textureHandle);
             net.irisshaders.iris.gl.IrisRenderSystem.setTextureBinding(unit, textureHandle);
             return;
@@ -7011,11 +7010,23 @@ public class VulkanicAPI {
         java.util.function.Supplier<String> label,
         int framebuffer
     ) {
+        return beginRenderPass(ctx, label, framebuffer, true);
+    }
+
+    /**
+     * Begins a render pass using the attachment contract of an existing framebuffer.
+     */
+    public static VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        java.util.function.Supplier<String> label,
+        int framebuffer,
+        boolean hasDepthTexture
+    ) {
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         if (directVulkanBackend != null) {
-            return directVulkanBackend.beginRenderPass(ctx, label, framebuffer);
+            return directVulkanBackend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture);
         }
-        return getBackend().beginRenderPass(ctx, label, framebuffer);
+        return getBackend().beginRenderPass(ctx, label, framebuffer, hasDepthTexture);
     }
 
     /**

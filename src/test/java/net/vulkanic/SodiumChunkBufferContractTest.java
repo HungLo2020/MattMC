@@ -126,4 +126,17 @@ public class SodiumChunkBufferContractTest {
         assertTrue(sharedIndex.contains("VulkanicAPI.createBuffer"),
             "Vulkan shared quad indices should use backend-owned GpuBuffer storage");
     }
+
+    @Test
+    public void testVulkanChunkArenaRoundsRemainingUploadsIndividually() throws IOException {
+        String gpuArena = Files.readString(SRC_MAIN_JAVA.resolve(
+            "net/sodium/client/render/chunk/buffer/GpuChunkBufferArena.java"));
+
+        assertTrue(gpuArena.contains("mapToLong(upload -> ceilDiv(upload.getDataBuffer().getDirectBuffer().remaining(), this.stride))"),
+            "Vulkan chunk arena growth must round the allocator's direct-buffer byte count for each upload before summing");
+        assertFalse(gpuArena.contains("mapToInt(PendingUpload::getLength)"),
+            "Vulkan chunk arena must not round the aggregate byte count once; that can undergrow under heavy batching");
+        assertFalse(gpuArena.contains("if (elementsNeeded <= 0)"),
+            "Vulkan chunk arena growth must still compact when aggregate free space is fragmented");
+    }
 }

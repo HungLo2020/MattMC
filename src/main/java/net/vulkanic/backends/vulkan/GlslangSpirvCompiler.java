@@ -29,6 +29,9 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:(?:flat|smooth|noperspective)\\s+)?in\\s+\\w+\\s+gl_FragCoord\\s*;\\s*(?://.*)?(?:\\R|$)"
     );
     private static final java.util.regex.Pattern GLSL_VERSION_PATTERN = java.util.regex.Pattern.compile("(?m)^\\s*#version\\s+(\\d+)");
+    private static final java.util.regex.Pattern VULKANIC_BACKEND_DEFINE_PATTERN = java.util.regex.Pattern.compile(
+        "(?m)^\\s*#\\s*define\\s+VULKANIC_BACKEND\\b"
+    );
     private static final java.util.regex.Pattern VIEW_HEIGHT_DECLARATION_PATTERN = java.util.regex.Pattern.compile("\\bfloat\\s+viewHeight\\s*;");
     private static final java.util.regex.Pattern STANDALONE_UNIFORM_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
         "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+([^;{}=]+?)(?:\\s*=\\s*[^;]+)?\\s*;\\s*(?://.*)?$"
@@ -42,6 +45,17 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
     private static final java.util.regex.Pattern SODIUM_REGION_OFFSET_REFERENCE_PATTERN = java.util.regex.Pattern.compile("\\bu_RegionOffset\\b");
     private static final java.util.regex.Pattern DYNAMIC_TRANSFORMS_BLOCK_PATTERN = java.util.regex.Pattern.compile(
         "(?m)(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+DynamicTransforms\\s*\\{"
+    );
+    private static final java.util.regex.Pattern VARYING_DECLARATION_PATTERN = java.util.regex.Pattern.compile(
+        "(?m)^([ \\t]*)((?:(?:flat|smooth|noperspective|centroid|sample)[ \\t]+)*)(in|out)[ \\t]+"
+            + "([A-Za-z_][A-Za-z0-9_]*(?:\\s*\\[[^\\]]+\\])?)\\s+"
+            + "([A-Za-z_][A-Za-z0-9_]*)(\\s*\\[[^;]+\\])?\\s*;"
+    );
+    private static final java.util.Map<String, Integer> DH_TERRAIN_VARYING_LOCATIONS_BY_NAME = java.util.Map.of(
+        "vPos", 0,
+        "vertexColor", 1,
+        "vertexWorldPos", 2,
+        "vertexYPos", 3
     );
     static final String GENERATED_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
 
@@ -171,7 +185,8 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             return shaderSource;
         }
 
-        String normalized = promoteVersionForVulkan(shaderSource);
+        String normalized = injectVulkanicBackendDefine(promoteVersionForVulkan(shaderSource));
+        normalized = injectDistantHorizonsTerrainVaryingLocationsForVulkan(stage, normalized);
         if (stage == VulkanicShaderStage.FRAGMENT) {
             normalized = LEGACY_FRAG_COORD_INPUT_DECLARATION_PATTERN.matcher(normalized).replaceAll("");
         }
@@ -194,6 +209,87 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         normalized = LEGACY_VERTEX_ID_PATTERN.matcher(normalized).replaceAll("gl_VertexIndex");
         normalized = LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
         return rewriteVertexClipDepthForVulkan(normalized);
+    }
+
+    private static String injectVulkanicBackendDefine(String shaderSource) {
+        if (VULKANIC_BACKEND_DEFINE_PATTERN.matcher(shaderSource).find()) {
+            return shaderSource;
+        }
+
+        java.util.regex.Matcher matcher = GLSL_VERSION_PATTERN.matcher(shaderSource);
+        if (!matcher.find()) {
+            return "#define VULKANIC_BACKEND 1\n" + shaderSource;
+        }
+
+        int lineEnd = shaderSource.indexOf('\n', matcher.end());
+        if (lineEnd < 0) {
+            return shaderSource + "\n#define VULKANIC_BACKEND 1";
+        }
+
+        return shaderSource.substring(0, lineEnd + 1)
+            + "#define VULKANIC_BACKEND 1\n"
+            + shaderSource.substring(lineEnd + 1);
+    }
+
+    private static String injectDistantHorizonsTerrainVaryingLocationsForVulkan(VulkanicShaderStage stage, String shaderSource) {
+        if (stage != VulkanicShaderStage.VERTEX && stage != VulkanicShaderStage.FRAGMENT) {
+            return shaderSource;
+        }
+        if (!isDistantHorizonsTerrainInterfaceShader(stage, shaderSource)) {
+            return shaderSource;
+        }
+
+        boolean targetVertexOutputs = stage == VulkanicShaderStage.VERTEX;
+        java.util.regex.Matcher matcher = VARYING_DECLARATION_PATTERN.matcher(shaderSource);
+        StringBuffer rewritten = new StringBuffer();
+        while (matcher.find()) {
+            String direction = matcher.group(3);
+            if ((targetVertexOutputs && !"out".equals(direction)) || (!targetVertexOutputs && !"in".equals(direction))) {
+                matcher.appendReplacement(rewritten, java.util.regex.Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
+
+            int lineStart = shaderSource.lastIndexOf('\n', Math.max(0, matcher.start() - 1));
+            String linePrefix = shaderSource.substring(lineStart < 0 ? 0 : lineStart + 1, matcher.start());
+            if (linePrefix.contains("layout")) {
+                matcher.appendReplacement(rewritten, java.util.regex.Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
+
+            Integer location = DH_TERRAIN_VARYING_LOCATIONS_BY_NAME.get(matcher.group(5));
+            if (location == null) {
+                matcher.appendReplacement(rewritten, java.util.regex.Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
+
+            String replacement = matcher.group(1)
+                + "layout(location = " + location + ") "
+                + matcher.group(2)
+                + direction
+                + " "
+                + matcher.group(4)
+                + " "
+                + matcher.group(5)
+                + (matcher.group(6) == null ? "" : matcher.group(6))
+                + ";";
+            matcher.appendReplacement(rewritten, java.util.regex.Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(rewritten);
+        return rewritten.toString();
+    }
+
+    private static boolean isDistantHorizonsTerrainInterfaceShader(VulkanicShaderStage stage, String shaderSource) {
+        if (stage == VulkanicShaderStage.VERTEX) {
+            return shaderSource.contains("in uvec4 vPosition;")
+                && shaderSource.contains("out vec4 vPos;")
+                && shaderSource.contains("out vec4 vertexColor;")
+                && shaderSource.contains("out vec3 vertexWorldPos;");
+        }
+
+        return shaderSource.contains("in vec4 vertexColor;")
+            && shaderSource.contains("in vec3 vertexWorldPos;")
+            && shaderSource.contains("in vec4 vPos;")
+            && shaderSource.contains("uDitherDhRendering");
     }
 
     static String prepareSourceForVulkanResourceReflection(VulkanicShaderStage stage, String shaderSource) {
@@ -250,71 +346,6 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
         return "vec2(gl_FragCoord.x, viewHeight - gl_FragCoord.y)";
     }
 
-    private static String rewriteVertexClipDepthForVulkan(String shaderSource) {
-        if (!shaderSource.contains("gl_Position") || shaderSource.contains("vulkanicOpenGlClipDepthToVulkan")) {
-            return shaderSource;
-        }
-
-        int mainStart = indexOfFunctionCall(shaderSource, "main", 0);
-        if (mainStart < 0) {
-            return shaderSource;
-        }
-
-        int mainOpenParen = shaderSource.indexOf('(', mainStart);
-        int mainCloseParen = findMatchingParen(shaderSource, mainOpenParen);
-        if (mainOpenParen < 0 || mainCloseParen < 0) {
-            return shaderSource;
-        }
-
-        int mainOpenBrace = nextNonWhitespaceIndex(shaderSource, mainCloseParen + 1);
-        if (mainOpenBrace < 0 || shaderSource.charAt(mainOpenBrace) != '{') {
-            return shaderSource;
-        }
-
-        int mainCloseBrace = findMatchingBrace(shaderSource, mainOpenBrace);
-        if (mainCloseBrace < 0) {
-            return shaderSource;
-        }
-
-        String remap = "\n    gl_Position.z = vulkanicOpenGlClipDepthToVulkan(gl_Position.z, gl_Position.w);\n";
-        int helperOffset = findUniformBlockInsertionOffset(shaderSource);
-        String withHelper = shaderSource.substring(0, helperOffset)
-            + "float vulkanicOpenGlClipDepthToVulkan(float z, float w) {\n"
-            + "    return 0.5f * (z + w);\n"
-            + "}\n\n"
-            + shaderSource.substring(helperOffset);
-        int adjustedMainCloseBrace = mainCloseBrace + (withHelper.length() - shaderSource.length());
-        return withHelper.substring(0, adjustedMainCloseBrace) + remap + withHelper.substring(adjustedMainCloseBrace);
-    }
-
-    private static int nextNonWhitespaceIndex(String text, int start) {
-        for (int index = Math.max(0, start); index < text.length(); index++) {
-            if (!Character.isWhitespace(text.charAt(index))) {
-                return index;
-            }
-        }
-        return -1;
-    }
-
-    private static int findMatchingBrace(String text, int openBrace) {
-        if (openBrace < 0 || openBrace >= text.length() || text.charAt(openBrace) != '{') {
-            return -1;
-        }
-        int depth = 0;
-        for (int index = openBrace; index < text.length(); index++) {
-            char c = text.charAt(index);
-            if (c == '{') {
-                depth++;
-            } else if (c == '}') {
-                depth--;
-                if (depth == 0) {
-                    return index;
-                }
-            }
-        }
-        return -1;
-    }
-
     private static String rewriteFramebufferTextureSamplingForVulkan(String shaderSource) {
         if (!shaderSource.contains("texture")) {
             return shaderSource;
@@ -360,60 +391,6 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             return texture;
         }
         return Math.min(texture, texture2D);
-    }
-
-    private static int indexOfFunctionCall(String shaderSource, String functionName, int start) {
-        int cursor = Math.max(0, start);
-        while (cursor < shaderSource.length()) {
-            int index = shaderSource.indexOf(functionName, cursor);
-            if (index < 0) {
-                return -1;
-            }
-            int afterName = index + functionName.length();
-            if (isIdentifierBoundary(shaderSource, index - 1)
-                && isIdentifierBoundary(shaderSource, afterName)
-                && nextNonWhitespaceIs(shaderSource, afterName, '(')) {
-                return index;
-            }
-            cursor = afterName;
-        }
-        return -1;
-    }
-
-    private static boolean isIdentifierBoundary(String text, int index) {
-        return index < 0 || index >= text.length() || !isGlslIdentifierPart(text.charAt(index));
-    }
-
-    private static boolean isGlslIdentifierPart(char c) {
-        return Character.isLetterOrDigit(c) || c == '_';
-    }
-
-    private static boolean nextNonWhitespaceIs(String text, int start, char expected) {
-        for (int index = start; index < text.length(); index++) {
-            if (!Character.isWhitespace(text.charAt(index))) {
-                return text.charAt(index) == expected;
-            }
-        }
-        return false;
-    }
-
-    private static int findMatchingParen(String text, int openParen) {
-        if (openParen < 0 || openParen >= text.length() || text.charAt(openParen) != '(') {
-            return -1;
-        }
-        int depth = 0;
-        for (int index = openParen; index < text.length(); index++) {
-            char c = text.charAt(index);
-            if (c == '(') {
-                depth++;
-            } else if (c == ')') {
-                depth--;
-                if (depth == 0) {
-                    return index;
-                }
-            }
-        }
-        return -1;
     }
 
     private static String rewriteFramebufferTextureArguments(String arguments) {
@@ -484,6 +461,125 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
     private static String framebufferTextureCoordExpression(String coord) {
         return "vec2((" + coord + ").x, 1.0f - (" + coord + ").y)";
+    }
+
+    private static String rewriteVertexClipDepthForVulkan(String shaderSource) {
+        if (!shaderSource.contains("gl_Position") || shaderSource.contains("vulkanicOpenGlClipDepthToVulkan")) {
+            return shaderSource;
+        }
+
+        int mainStart = indexOfFunctionCall(shaderSource, "main", 0);
+        if (mainStart < 0) {
+            return shaderSource;
+        }
+
+        int mainOpenParen = shaderSource.indexOf('(', mainStart);
+        int mainCloseParen = findMatchingParen(shaderSource, mainOpenParen);
+        if (mainOpenParen < 0 || mainCloseParen < 0) {
+            return shaderSource;
+        }
+
+        int mainOpenBrace = nextNonWhitespaceIndex(shaderSource, mainCloseParen + 1);
+        if (mainOpenBrace < 0 || shaderSource.charAt(mainOpenBrace) != '{') {
+            return shaderSource;
+        }
+
+        int mainCloseBrace = findMatchingBrace(shaderSource, mainOpenBrace);
+        if (mainCloseBrace < 0) {
+            return shaderSource;
+        }
+
+        String remap = "\n    gl_Position.z = vulkanicOpenGlClipDepthToVulkan(gl_Position.z, gl_Position.w);\n";
+        int helperOffset = findUniformBlockInsertionOffset(shaderSource);
+        String withHelper = shaderSource.substring(0, helperOffset)
+            + "float vulkanicOpenGlClipDepthToVulkan(float z, float w) {\n"
+            + "    return 0.5f * (z + w);\n"
+            + "}\n\n"
+            + shaderSource.substring(helperOffset);
+        int adjustedMainCloseBrace = mainCloseBrace + (withHelper.length() - shaderSource.length());
+        return withHelper.substring(0, adjustedMainCloseBrace) + remap + withHelper.substring(adjustedMainCloseBrace);
+    }
+
+    private static int nextNonWhitespaceIndex(String text, int start) {
+        for (int index = Math.max(0, start); index < text.length(); index++) {
+            if (!Character.isWhitespace(text.charAt(index))) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static int findMatchingBrace(String text, int openBrace) {
+        if (openBrace < 0 || openBrace >= text.length() || text.charAt(openBrace) != '{') {
+            return -1;
+        }
+        int depth = 0;
+        for (int index = openBrace; index < text.length(); index++) {
+            char c = text.charAt(index);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return index;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static int indexOfFunctionCall(String shaderSource, String functionName, int start) {
+        int cursor = Math.max(0, start);
+        while (cursor < shaderSource.length()) {
+            int index = shaderSource.indexOf(functionName, cursor);
+            if (index < 0) {
+                return -1;
+            }
+            int afterName = index + functionName.length();
+            if (isIdentifierBoundary(shaderSource, index - 1)
+                && isIdentifierBoundary(shaderSource, afterName)
+                && nextNonWhitespaceIs(shaderSource, afterName, '(')) {
+                return index;
+            }
+            cursor = afterName;
+        }
+        return -1;
+    }
+
+    private static boolean isIdentifierBoundary(String text, int index) {
+        return index < 0 || index >= text.length() || !isGlslIdentifierPart(text.charAt(index));
+    }
+
+    private static boolean isGlslIdentifierPart(char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
+    }
+
+    private static boolean nextNonWhitespaceIs(String text, int start, char expected) {
+        for (int index = start; index < text.length(); index++) {
+            if (!Character.isWhitespace(text.charAt(index))) {
+                return text.charAt(index) == expected;
+            }
+        }
+        return false;
+    }
+
+    private static int findMatchingParen(String text, int openParen) {
+        if (openParen < 0 || openParen >= text.length() || text.charAt(openParen) != '(') {
+            return -1;
+        }
+        int depth = 0;
+        for (int index = openParen; index < text.length(); index++) {
+            char c = text.charAt(index);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+                if (depth == 0) {
+                    return index;
+                }
+            }
+        }
+        return -1;
     }
 
     private static String promoteVersionForVulkan(String shaderSource) {

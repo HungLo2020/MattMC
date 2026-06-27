@@ -10,6 +10,7 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicBufferTarget;
 
 
 public final class VertexAttributePreGL43 extends AbstractVertexAttribute
@@ -60,6 +61,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	public void bindBufferToAllBindingPoints(int buffer)
 	{
 		CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, buffer);
 		for (int i = 0; i < this.pointers.length; i++)
 		{
 			VulkanicAPI.enableVertexAttribArray(ctx, i);
@@ -91,6 +93,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	public void bindBufferToBindingPoint(int buffer, int bindingPoint)
 	{
 		CommandContext ctx = VulkanicAPI.getCommandContext();
+		VulkanicAPI.bindBuffer(ctx, VulkanicBufferTarget.VERTEX, buffer);
 		int[] bindingPointIndexes = this.bindingPointsToIndex[bindingPoint];
 		
 		for (int bindingPointIndex : bindingPointIndexes)

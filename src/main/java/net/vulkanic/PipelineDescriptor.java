@@ -49,6 +49,8 @@ public final class PipelineDescriptor {
     private final List<VulkanicSpirvModule> spirvModules;
     private final List<PushConstantRange> pushConstantRanges;
     @Nullable
+    private final VertexInputState vertexInputState;
+    @Nullable
     private volatile ResourceLayout derivedResourceLayout;
     @Nullable
     private volatile String stableCacheKey;
@@ -64,13 +66,15 @@ public final class PipelineDescriptor {
         PortableState portableState,
         @Nullable ResourceLayout explicitResourceLayout,
         List<VulkanicSpirvModule> spirvModules,
-        List<PushConstantRange> pushConstantRanges
+        List<PushConstantRange> pushConstantRanges,
+        @Nullable VertexInputState vertexInputState
     ) {
         this.nativeDescriptor = nativeDescriptor;
         this.portableState = Objects.requireNonNull(portableState, "portableState must not be null");
         this.explicitResourceLayout = explicitResourceLayout;
         this.spirvModules = normalizeSpirvModules(spirvModules);
         this.pushConstantRanges = normalizePushConstantRanges(pushConstantRanges);
+        this.vertexInputState = vertexInputState;
     }
 
     /**
@@ -88,7 +92,8 @@ public final class PipelineDescriptor {
             PortableState.fromRenderPipeline(pipeline),
             null,
             List.of(),
-            List.of()
+            List.of(),
+            null
         );
     }
 
@@ -102,7 +107,7 @@ public final class PipelineDescriptor {
         if (portableState == null) {
             throw new IllegalArgumentException("portableState must not be null");
         }
-        return new PipelineDescriptor(null, portableState, null, List.of(), List.of());
+        return new PipelineDescriptor(null, portableState, null, List.of(), List.of(), null);
     }
 
     /**
@@ -115,7 +120,7 @@ public final class PipelineDescriptor {
         if (portableState == null) {
             throw new IllegalArgumentException("portableState must not be null");
         }
-        return new PipelineDescriptor(null, portableState, null, spirvModules, List.of());
+        return new PipelineDescriptor(null, portableState, null, spirvModules, List.of(), null);
     }
 
     /**
@@ -133,7 +138,8 @@ public final class PipelineDescriptor {
             PortableState.fromRenderPipeline(pipeline),
             null,
             spirvModules,
-            List.of()
+            List.of(),
+            null
         );
     }
 
@@ -209,6 +215,16 @@ public final class PipelineDescriptor {
     }
 
     /**
+     * Returns explicit vertex input metadata when a caller is migrating a
+     * GL-style vertex attribute layout that cannot be represented by
+     * Blaze3D's fixed {@link VertexFormatElement} set.
+     */
+    @Nullable
+    public VertexInputState getVertexInputState() {
+        return vertexInputState;
+    }
+
+    /**
      * Returns a copy of this descriptor with push-constant range metadata attached.
      */
     public PipelineDescriptor withPushConstantRanges(List<PushConstantRange> ranges) {
@@ -217,7 +233,23 @@ public final class PipelineDescriptor {
             this.portableState,
             this.explicitResourceLayout,
             this.spirvModules,
-            ranges
+            ranges,
+            this.vertexInputState
+        );
+    }
+
+    /**
+     * Returns a copy of this descriptor with explicit Vulkan-style vertex input
+     * metadata attached.
+     */
+    public PipelineDescriptor withVertexInputState(VertexInputState vertexInputState) {
+        return new PipelineDescriptor(
+            this.nativeDescriptor,
+            this.portableState,
+            this.explicitResourceLayout,
+            this.spirvModules,
+            this.pushConstantRanges,
+            Objects.requireNonNull(vertexInputState, "vertexInputState must not be null")
         );
     }
 
@@ -241,7 +273,8 @@ public final class PipelineDescriptor {
             this.portableState,
             layout,
             this.spirvModules,
-            this.pushConstantRanges
+            this.pushConstantRanges,
+            this.vertexInputState
         ));
     }
 
@@ -253,10 +286,35 @@ public final class PipelineDescriptor {
     public String getStableCacheKey() {
         String cached = stableCacheKey;
         if (cached == null) {
-            cached = portableState.stableCacheKey();
+            if (vertexInputState == null) {
+                cached = portableState.stableCacheKey();
+            } else {
+                cached = sha256Hex(
+                    (portableState.stableCacheKey() + "|vertexInput=" + vertexInputSignature(vertexInputState))
+                        .getBytes(StandardCharsets.UTF_8)
+                );
+            }
             stableCacheKey = cached;
         }
         return cached;
+    }
+
+    private static String vertexInputSignature(VertexInputState state) {
+        StringBuilder builder = new StringBuilder(256);
+        for (VertexInputBinding binding : state.bindings()) {
+            builder.append("b:")
+                .append(binding.binding()).append(':')
+                .append(binding.stride()).append(':')
+                .append(binding.inputRate().name()).append(';');
+        }
+        for (VertexInputAttribute attribute : state.attributes()) {
+            builder.append("a:")
+                .append(attribute.location()).append(':')
+                .append(attribute.binding()).append(':')
+                .append(attribute.format().name()).append(':')
+                .append(attribute.offset()).append(';');
+        }
+        return builder.toString();
     }
 
     /**
@@ -341,6 +399,23 @@ public final class PipelineDescriptor {
                 .sorted()
                 .toList();
             canonical.append("stages=").append(String.join(",", stageNames)).append(';');
+        }
+
+        canonical.append("vertexInputPresent=").append(vertexInputState != null).append(';');
+        if (vertexInputState != null) {
+            canonical.append("vertexBindingCount=").append(vertexInputState.bindings().size()).append(';');
+            for (VertexInputBinding binding : vertexInputState.bindings()) {
+                canonical.append("binding=").append(binding.binding()).append(';');
+                canonical.append("stride=").append(binding.stride()).append(';');
+                canonical.append("inputRate=").append(binding.inputRate().name()).append(';');
+            }
+            canonical.append("vertexAttributeCount=").append(vertexInputState.attributes().size()).append(';');
+            for (VertexInputAttribute attribute : vertexInputState.attributes()) {
+                canonical.append("location=").append(attribute.location()).append(';');
+                canonical.append("binding=").append(attribute.binding()).append(';');
+                canonical.append("format=").append(attribute.format().name()).append(';');
+                canonical.append("offset=").append(attribute.offset()).append(';');
+            }
         }
 
         cached = sha256Hex(canonical.toString().getBytes(StandardCharsets.UTF_8));
@@ -440,6 +515,99 @@ public final class PipelineDescriptor {
                 throw new IllegalArgumentException("stages must not be empty");
             }
         }
+    }
+
+    /**
+     * Backend-neutral vertex input metadata for GL-style programs that do not
+     * have a native Blaze3D {@link VertexFormat}.
+     */
+    public record VertexInputState(List<VertexInputBinding> bindings, List<VertexInputAttribute> attributes) {
+        public VertexInputState {
+            bindings = List.copyOf(Objects.requireNonNull(bindings, "bindings must not be null"));
+            attributes = List.copyOf(Objects.requireNonNull(attributes, "attributes must not be null"));
+            if (attributes.isEmpty()) {
+                throw new IllegalArgumentException("attributes must not be empty");
+            }
+        }
+    }
+
+    public record VertexInputBinding(int binding, int stride, VertexInputRate inputRate) {
+        public VertexInputBinding {
+            if (binding < 0) {
+                throw new IllegalArgumentException("binding must be >= 0");
+            }
+            if (stride <= 0) {
+                throw new IllegalArgumentException("stride must be > 0");
+            }
+            inputRate = Objects.requireNonNull(inputRate, "inputRate must not be null");
+        }
+    }
+
+    public record VertexInputAttribute(int location, int binding, VertexAttributeFormat format, int offset) {
+        public VertexInputAttribute {
+            if (location < 0) {
+                throw new IllegalArgumentException("location must be >= 0");
+            }
+            if (binding < 0) {
+                throw new IllegalArgumentException("binding must be >= 0");
+            }
+            format = Objects.requireNonNull(format, "format must not be null");
+            if (offset < 0) {
+                throw new IllegalArgumentException("offset must be >= 0");
+            }
+        }
+    }
+
+    public enum VertexInputRate {
+        VERTEX,
+        INSTANCE
+    }
+
+    public enum VertexAttributeFormat {
+        R8_UNORM,
+        R8G8_UNORM,
+        R8G8B8_UNORM,
+        R8G8B8A8_UNORM,
+        R8_UINT,
+        R8G8_UINT,
+        R8G8B8_UINT,
+        R8G8B8A8_UINT,
+        R8_SNORM,
+        R8G8_SNORM,
+        R8G8B8_SNORM,
+        R8G8B8A8_SNORM,
+        R8_SINT,
+        R8G8_SINT,
+        R8G8B8_SINT,
+        R8G8B8A8_SINT,
+        R16_USCALED,
+        R16G16_USCALED,
+        R16G16B16_USCALED,
+        R16G16B16A16_USCALED,
+        R16_UINT,
+        R16G16_UINT,
+        R16G16B16_UINT,
+        R16G16B16A16_UINT,
+        R16_SSCALED,
+        R16G16_SSCALED,
+        R16G16B16_SSCALED,
+        R16G16B16A16_SSCALED,
+        R16_SINT,
+        R16G16_SINT,
+        R16G16B16_SINT,
+        R16G16B16A16_SINT,
+        R32_SFLOAT,
+        R32G32_SFLOAT,
+        R32G32B32_SFLOAT,
+        R32G32B32A32_SFLOAT,
+        R32_SINT,
+        R32G32_SINT,
+        R32G32B32_SINT,
+        R32G32B32A32_SINT,
+        R32_UINT,
+        R32G32_UINT,
+        R32G32B32_UINT,
+        R32G32B32A32_UINT
     }
 
     /**

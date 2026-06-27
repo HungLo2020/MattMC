@@ -2,15 +2,26 @@ package net.vulkanic.backends.vulkan;
 
 import net.vulkanic.VulkanicAPI;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VK10;
+import org.lwjgl.vulkan.VkSubpassDependency;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanBackendFramebufferCompatibilityTest {
 
 	private static final int GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE = 0x8CD0;
 	private static final VulkanCommandContext TEST_CONTEXT = new VulkanCommandContext(1L, "framebuffer-test");
+	private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
 
 	@Test
 	public void testNamedFramebufferTextureTracksColorAndDepthAttachments() {
@@ -70,6 +81,40 @@ public class VulkanBackendFramebufferCompatibilityTest {
 	}
 
 	@Test
+	public void testTextureViewDepthRenderPassDependenciesIncludeFragmentTests() throws Exception {
+		Method allocator = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
+			.getDeclaredMethod(
+				"allocateTextureViewDependencies",
+				MemoryStack.class,
+				VulkanRenderPassCompatibilityKey.class
+			);
+		allocator.setAccessible(true);
+
+		VulkanRenderPassCompatibilityKey key = VulkanRenderPassCompatibilityKey.textureView(
+			List.of(VK10.VK_FORMAT_R8G8B8A8_UNORM),
+			VK10.VK_FORMAT_D32_SFLOAT,
+			false
+		);
+
+		try (MemoryStack stack = MemoryStack.stackPush()) {
+			VkSubpassDependency.Buffer dependencies = (VkSubpassDependency.Buffer) allocator.invoke(null, stack, key);
+			int entryStages = dependencies.get(0).dstStageMask();
+			int entryAccess = dependencies.get(0).dstAccessMask();
+			int exitStages = dependencies.get(1).srcStageMask();
+			int exitAccess = dependencies.get(1).srcAccessMask();
+
+			assertTrue((entryStages & VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT) != 0);
+			assertTrue((entryStages & VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT) != 0);
+			assertTrue((entryAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT) != 0);
+			assertTrue((entryAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) != 0);
+			assertTrue((exitStages & VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT) != 0);
+			assertTrue((exitStages & VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT) != 0);
+			assertTrue((exitAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT) != 0);
+			assertTrue((exitAccess & VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) != 0);
+		}
+	}
+
+	@Test
 	public void testFramebufferReadAndDrawBuffersRestorePerFramebufferStateOnBind() throws Exception {
 		VulkanBackend backend = new VulkanBackend();
 		int framebufferA = backend.createFramebuffer(TEST_CONTEXT);
@@ -87,6 +132,20 @@ public class VulkanBackendFramebufferCompatibilityTest {
 		backend.bindFramebuffer(TEST_CONTEXT, VulkanicAPI.GL_FRAMEBUFFER, framebufferB);
 		assertEquals(VulkanicAPI.colorAttachment(0), getPrivateInt(backend, "pendingReadBuffer"));
 		assertEquals(VulkanicAPI.colorAttachment(1), getPrivateInt(backend, "pendingDrawBuffer"));
+	}
+
+	@Test
+	public void testLegacyTextureClearsPreserveUntrackedLayouts() throws Exception {
+		String backendSource = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+
+		Pattern preservationFallback = Pattern.compile(
+			"int oldLayout = trackedLayoutForLevel\\(texture, 0\\);\\s+"
+				+ "if \\(oldLayout == VK10\\.VK_IMAGE_LAYOUT_UNDEFINED\\) \\{\\s+"
+				+ "oldLayout = preferredIdleLayout\\(texture\\);\\s+"
+				+ "\\}\\s+transitionImageLayout\\(");
+		assertTrue(preservationFallback.matcher(backendSource).results().count() >= 2,
+			"Legacy color/depth clears must not transition from UNDEFINED and discard shader-readable texture contents");
 	}
 
 	private static int getPrivateInt(VulkanBackend backend, String fieldName) throws Exception {

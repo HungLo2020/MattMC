@@ -15,6 +15,8 @@ public enum VulkanicTextureFormat {
     RGBA8_SNORM(4),
     /** Packed unsigned floating-point R11/G11/B10 color. */
     R11F_G11F_B10F(4),
+    /** 1-component red, 16-bit floating point. */
+    RED16F(2),
     /** 1-component red, 32-bit floating point. */
     RED32F(4),
     /** 4-component BGRA, 8 bits per channel. */
@@ -47,6 +49,7 @@ public enum VulkanicTextureFormat {
             || this == RGBA16F
             || this == RGBA8_SNORM
             || this == R11F_G11F_B10F
+            || this == RED16F
             || this == RED32F
             || this == BGRA8
             || this == RED8

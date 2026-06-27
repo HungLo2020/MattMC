@@ -37,8 +37,13 @@ vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj)
  */
 void main() 
 {
+    vec2 mcTexCoord = TexCoord;
+#ifdef VULKANIC_BACKEND
+    mcTexCoord.y = 1.0 - mcTexCoord.y;
+#endif
+
     // includes both the vanilla chunks as well as DH
-    vec4 combinedMcDhColor = texture(uCombinedMcDhColorTexture, TexCoord);
+    vec4 combinedMcDhColor = texture(uCombinedMcDhColorTexture, mcTexCoord);
     // just the DH render pass
     vec4 dhColor = texture(uDhColorTexture, TexCoord);
     
@@ -59,7 +64,7 @@ void main()
         dhColor = combinedMcDhColor;
     }
     
-    float mcFragmentDepth = texture(uMcDepthTexture, TexCoord).r;
+    float mcFragmentDepth = texture(uMcDepthTexture, mcTexCoord).r;
     float dhFragmentDepth = texture(uDhDepthTexture, TexCoord).r;
     vec3 dhVertexWorldPos = calcViewPosition(dhFragmentDepth, uDhInvMvmProj);
     
@@ -88,4 +93,3 @@ void main()
         fragColor = vec4(combinedMcDhColor.rgb, 0.0);
     }
 }
-

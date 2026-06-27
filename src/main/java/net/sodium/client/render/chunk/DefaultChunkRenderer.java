@@ -185,9 +185,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         GpuTextureView colorTargetView = VulkanicAPI.getOutputColorTextureOverride() != null
             ? VulkanicAPI.getOutputColorTextureOverride()
             : target.getColorTextureView();
-        GpuTextureView depthTargetView = target.useDepth
-            ? (VulkanicAPI.getOutputDepthTextureOverride() != null ? VulkanicAPI.getOutputDepthTextureOverride() : target.getDepthTextureView())
-            : null;
+        GpuTextureView depthTargetView = this.resolveVulkanTerrainDepthTarget(target);
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
             VulkanicAPI.setDynamicViewport(
                 VulkanicAPI.getCommandContext(),
@@ -336,6 +334,20 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         }
 
         return irisRenderingPipeline.getSodiumPrograms().getFramebuffer(terrainPass);
+    }
+
+    private GpuTextureView resolveVulkanTerrainDepthTarget(RenderTarget target) {
+        GpuTextureView depthOverride = VulkanicAPI.getOutputDepthTextureOverride();
+        if (depthOverride != null) {
+            return depthOverride;
+        }
+
+        GpuTextureView targetDepth = target.getDepthTextureView();
+        if (targetDepth != null) {
+            return targetDepth;
+        }
+
+        return net.minecraft.client.Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();
     }
 
     private RenderPass createVulkanTerrainRenderPass(

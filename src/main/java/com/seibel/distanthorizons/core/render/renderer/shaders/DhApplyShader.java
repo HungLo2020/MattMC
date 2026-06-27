@@ -160,8 +160,6 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		
 		
-		VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.activeTargetColorTextureId, 0);
-		
 		// Copy to MC's texture via MC's framebuffer
 		if (!LodRenderer.INSTANCE.bindActiveRenderTarget())
 		{
@@ -169,13 +167,22 @@ public class DhApplyShader extends AbstractShaderRenderer
 			MC_RENDER.bindTargetRenderTarget(ctx);
 			return;
 		}
+
+		VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.activeTargetColorTextureId, 0);
 		
-		ScreenQuad.INSTANCE.render();
-		
-		
-		// restore everything, except at this point the MC framebuffer should now be used instead
-		state.restore(ctx);
-		MC_RENDER.bindTargetRenderTarget(ctx);
+		try
+		{
+			ScreenQuad.INSTANCE.render();
+		}
+		finally
+		{
+			LodRenderer.INSTANCE.bindActiveRenderTarget();
+			VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.activeDhColorTextureId, 0);
+
+			// restore everything, except at this point the MC framebuffer should now be used instead
+			state.restore(ctx);
+			MC_RENDER.bindTargetRenderTarget(ctx);
+		}
 		
 	}
 	

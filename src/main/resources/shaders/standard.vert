@@ -62,4 +62,7 @@ void main()
     }
 
     gl_Position = uCombinedMatrix * vec4(vertexWorldPos + vec3(mx, 0, mz), 1.0);
+#ifdef VULKANIC_BACKEND
+    gl_Position.y = -gl_Position.y;
+#endif
 }

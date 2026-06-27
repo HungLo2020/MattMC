@@ -59,4 +59,3 @@ public class LightMapWrapper implements ILightMapWrapper
 	public void unbind() { DhTextureState.bindTexture2D(0); }
 	
 }
-

@@ -107,7 +107,7 @@ public class VulkanBackendSpirvPathTest {
 
         assertEquals(VulkanicAPI.GL_TRUE,
             backend.getShaderParameter(TEST_CONTEXT, shader, VulkanicAPI.GL_COMPILE_STATUS));
-        assertEquals("#version 450\nvoid main(){}", capturedSource.get());
+        assertEquals("#version 450\n#define VULKANIC_BACKEND 1\nvoid main(){}", capturedSource.get());
 
         Optional<VulkanicSpirvModule> module = backend.getCompiledSpirvModule(TEST_CONTEXT, shader);
         assertTrue(module.isPresent());
@@ -143,7 +143,26 @@ public class VulkanBackendSpirvPathTest {
         String source = "#version 450\nvoid main(){int a = gl_VertexID; int b = gl_InstanceID;}";
 
         assertEquals(
-            source,
+            "#version 450\n#define VULKANIC_BACKEND 1\nvoid main(){int a = gl_VertexID; int b = gl_InstanceID;}",
+            GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
+        );
+    }
+
+    @Test
+    public void testNormalizeForVulkanInjectsBackendDefineWhenShaderReferencesConditional() {
+        String source = "#version 150 core\n"
+            + "#ifdef VULKANIC_BACKEND\n"
+            + "vec2 uv = vec2(1.0);\n"
+            + "#endif\n"
+            + "void main(){}";
+
+        assertEquals(
+            "#version 450 core\n"
+                + "#define VULKANIC_BACKEND 1\n"
+                + "#ifdef VULKANIC_BACKEND\n"
+                + "vec2 uv = vec2(1.0);\n"
+                + "#endif\n"
+                + "void main(){}",
             GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
         );
     }
@@ -293,7 +312,7 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
-    public void testNormalizeForVulkanKeepsIrisTaaHistoryBlend() {
+    public void testNormalizeForVulkanFlipsIrisTaaHistoryTextureSampling() {
         String source = "#version 330\n"
             + "uniform float viewHeight;\n"
             + "uniform sampler2D colortex2;\n"
@@ -335,7 +354,7 @@ public class VulkanBackendSpirvPathTest {
         String source = "#version 330\nvoid main(){}";
 
         assertEquals(
-            "#version 450\nvoid main(){}",
+            "#version 450\n#define VULKANIC_BACKEND 1\nvoid main(){}",
             GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source)
         );
     }
@@ -390,6 +409,9 @@ public class VulkanBackendSpirvPathTest {
         String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, source);
 
         assertTrue(normalized.startsWith("#version 450"));
+        assertTrue(normalized.contains("layout(location = 1) in vec4 vertexColor;"));
+        assertTrue(normalized.contains("layout(location = 2) in vec3 vertexWorldPos;"));
+        assertTrue(normalized.contains("layout(location = 0) in vec4 vPos;"));
         assertTrue(normalized.contains("uniform VulkanicStandaloneUniforms {"));
         assertTrue(normalized.contains("float uClipDistance;"));
         assertTrue(normalized.contains("bool uNoiseEnabled;"));
@@ -400,6 +422,51 @@ public class VulkanBackendSpirvPathTest {
         assertFalse(normalized.contains("in vec4 gl_FragCoord;"));
         assertFalse(normalized.contains("uniform float uClipDistance = 0.0;"));
         assertTrue(normalized.contains("fragColor.a = gl_FragCoord.x;"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanPinsDistantHorizonsTerrainVaryingsByName() {
+        String vertexSource = "#version 150 core\n"
+            + "\n"
+            + "in uvec4 vPosition;\n"
+            + "out vec4 vPos;\n"
+            + "in vec4 color;\n"
+            + "\n"
+            + "out vec4 vertexColor;\n"
+            + "out vec3 vertexWorldPos;\n"
+            + "out float vertexYPos;\n"
+            + "void main(){ vPos = vPosition; vertexColor = color; vertexWorldPos = vPosition.xyz; vertexYPos = vPosition.y; }\n";
+        String fragmentSource = "#version 150\n"
+            + "in vec4 vertexColor;\n"
+            + "in vec3 vertexWorldPos;\n"
+            + "in vec4 vPos;\n"
+            + "uniform bool uDitherDhRendering;\n"
+            + "out vec4 fragColor;\n"
+            + "void main(){ fragColor = vertexColor + vec4(vertexWorldPos, 0.0) + vPos; if (uDitherDhRendering) { discard; } }\n";
+
+        String normalizedVertex = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, vertexSource);
+        String normalizedFragment = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.FRAGMENT, fragmentSource);
+
+        assertTrue(normalizedVertex.contains("layout(location = 0) out vec4 vPos;"));
+        assertTrue(normalizedVertex.contains("layout(location = 1) out vec4 vertexColor;"));
+        assertTrue(normalizedVertex.contains("layout(location = 2) out vec3 vertexWorldPos;"));
+        assertTrue(normalizedVertex.contains("layout(location = 3) out float vertexYPos;"));
+
+        assertTrue(normalizedFragment.contains("layout(location = 1) in vec4 vertexColor;"));
+        assertTrue(normalizedFragment.contains("layout(location = 2) in vec3 vertexWorldPos;"));
+        assertTrue(normalizedFragment.contains("layout(location = 0) in vec4 vPos;"));
+    }
+
+    @Test
+    public void testNormalizeForVulkanDoesNotGloballyPinVertexColorVaryings() {
+        String source = "#version 330\n"
+            + "out vec4 vertexColor;\n"
+            + "void main(){ vertexColor = vec4(1.0); }\n";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+
+        assertTrue(normalized.contains("out vec4 vertexColor;"));
+        assertFalse(normalized.contains("layout(location = 1) out vec4 vertexColor;"));
     }
 
     @Test

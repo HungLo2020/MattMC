@@ -60,10 +60,9 @@ public class GpuChunkBufferArena implements ChunkBufferArena {
         this.tryUploads(queue);
 
         if (!queue.isEmpty()) {
-            int remainingUploadSize = queue.stream()
-                    .mapToInt(PendingUpload::getLength)
+            long remainingElements = queue.stream()
+                    .mapToLong(upload -> ceilDiv(upload.getDataBuffer().getDirectBuffer().remaining(), this.stride))
                     .sum();
-            long remainingElements = ceilDiv(remainingUploadSize, this.stride);
 
             this.ensureCapacity(remainingElements);
             this.tryUploads(queue);
@@ -148,9 +147,6 @@ public class GpuChunkBufferArena implements ChunkBufferArena {
 
     private void ensureCapacity(long elementCount) {
         long elementsNeeded = elementCount - (this.capacity - this.used);
-        if (elementsNeeded <= 0) {
-            return;
-        }
 
         this.resize(Math.max(this.capacity + this.resizeIncrement, this.capacity + elementsNeeded));
     }

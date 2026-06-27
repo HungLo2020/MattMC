@@ -20,7 +20,7 @@ void main()
     // a fragment depth of "1" means the fragment wasn't drawn to,
     // only update fragments that were drawn to
     float fragmentDepth = texture(gDhDepthTexture, TexCoord).r;
-    if (fragmentDepth != 1)
+    if (fragmentDepth < 1.0)
     {
         fragColor = texture(gDhColorTexture, TexCoord);
     }
@@ -30,4 +30,3 @@ void main()
         discard;
     }
 }
-

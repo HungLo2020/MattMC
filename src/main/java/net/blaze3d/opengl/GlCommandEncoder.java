@@ -217,7 +217,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				this.activeRenderPassContext = null;
 			} else {
 				CommandContext renderPassCtx = VulkanicAPI.beginCommandBuffer();
-				this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(renderPassCtx, supplier, framebuffer);
+				this.activeVulkanicRenderPass = VulkanicAPI.beginRenderPass(renderPassCtx, supplier, framebuffer, hasDepthTexture);
 				this.activeRenderPassContext = renderPassCtx;
 			}
 		} catch (RuntimeException | Error exception) {

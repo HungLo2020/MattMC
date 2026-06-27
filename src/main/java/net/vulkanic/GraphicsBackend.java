@@ -241,6 +241,20 @@ public interface GraphicsBackend {
         Supplier<String> label,
         int framebuffer
     ) {
+        return beginRenderPass(ctx, label, framebuffer, true);
+    }
+
+    /**
+     * Begins a render pass that targets an existing framebuffer contract, with
+     * explicit control over whether the framebuffer depth attachment participates
+     * in the render pass.
+     */
+    default VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        Supplier<String> label,
+        int framebuffer,
+        boolean hasDepthTexture
+    ) {
         throw new UnsupportedOperationException(
             "Backend " + getBackendType() + " does not support framebuffer-backed beginRenderPass."
         );

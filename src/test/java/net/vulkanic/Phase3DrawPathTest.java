@@ -369,10 +369,12 @@ public class Phase3DrawPathTest {
             "Vulkan legacy storage should preserve Iris R32F history/depth render targets even when the null allocation external type is unsigned byte");
         assertTrue(formatSource.contains("RGBA8_SNORM(4)")
                 && formatSource.contains("R11F_G11F_B10F(4)")
+                && formatSource.contains("RED16F(2)")
                 && formatSource.contains("RED32F(4)"),
             "Vulkanic texture wrappers should be able to represent shaderpack render-target formats without collapsing them to RGBA8");
         assertTrue(backendSource.contains("case VK10.VK_FORMAT_R8G8B8A8_SNORM -> VulkanicTextureFormat.RGBA8_SNORM")
                 && backendSource.contains("case VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> VulkanicTextureFormat.R11F_G11F_B10F")
+                && backendSource.contains("case VK10.VK_FORMAT_R16_SFLOAT -> VulkanicTextureFormat.RED16F")
                 && backendSource.contains("case VK10.VK_FORMAT_R32_SFLOAT -> VulkanicTextureFormat.RED32F"),
             "Managed legacy texture wrappers should expose the preserved VkFormat through VulkanicTextureFormat");
     }
@@ -1212,12 +1214,33 @@ public class Phase3DrawPathTest {
             "Native Vulkan terrain should use explicit DynamicTransforms draw data instead of per-draw GL-style region uniform mutation");
         assertTrue(rendererSource.contains("renderPass.setUniform(\"DynamicTransforms\", preparedDraw.transforms());"),
             "Native Vulkan terrain should bind per-region translation through the explicit Vulkanic DynamicTransforms UBO");
+        assertTrue(rendererSource.contains("GpuTextureView depthTargetView = this.resolveVulkanTerrainDepthTarget(target);")
+                && rendererSource.contains("private GpuTextureView resolveVulkanTerrainDepthTarget(RenderTarget target)")
+                && rendererSource.contains("GpuTextureView depthOverride = VulkanicAPI.getOutputDepthTextureOverride();")
+                && rendererSource.contains("return net.minecraft.client.Minecraft.getInstance().getMainRenderTarget().getDepthTextureView();"),
+            "Native Vulkan terrain should never drop depth just because the selected terrain color target lacks its own depth view");
         assertTrue(rendererSource.contains("final boolean useIndexedTessellation = terrainPass.isTranslucent() && indexedRenderingEnabled;"),
             "Vulkan shader terrain should keep Sodium's sorted translucent local-index path enabled");
         assertTrue(rendererSource.contains("if (useIndexedTessellation && SectionRenderDataUnsafe.isLocalIndex(pMeshData))"),
             "Local sorted translucent sections should use their region-local sorted index data instead of an unsorted shared fallback");
         assertTrue(rendererSource.contains("super.end(terrainPass);"),
             "The Vulkan chunk renderer should close the shared chunk program path after terrain submission");
+    }
+
+    @Test
+    public void testVulkanLegacyVaoCapturesAttributeBufferBindingsForInstancedDraws() throws IOException {
+        Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        String backendSource = readSource(backendFile);
+
+        assertTrue(backendSource.contains("currentVirtualVaoState().setAttributePointer(index, size, type, normalized, false, stride, pointer, currentLegacyArrayBufferBinding())")
+                && backendSource.contains("currentVirtualVaoState().setAttributePointer(index, size, type, false, true, stride, pointer, currentLegacyArrayBufferBinding())"),
+            "Legacy glVertexAttribPointer/IPointer must capture the array buffer bound when the attribute is specified");
+        assertTrue(backendSource.contains("bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, 0, buffer))"),
+            "Pre-GL43 attribute pointers should use a per-attribute Vulkan binding that preserves the captured buffer");
+        assertTrue(backendSource.contains("bindLegacyVertexBuffersForDraw(commandBufferHandle)")
+                && backendSource.contains("filter(binding -> binding.buffer() > 0)")
+                && backendSource.contains("bindVertexBuffer(commandBufferHandle, binding.binding(), vertexBuffer.getVkBufferHandle(), binding.offset())"),
+            "Legacy draw calls should bind every captured VAO vertex buffer before indexed or instanced draws");
     }
 
     @Test
@@ -1253,7 +1276,7 @@ public class Phase3DrawPathTest {
         assertTrue(nativeEncoderSource.contains("private final class NativeRenderPass implements RenderPass"),
             "The native terrain encoder should provide a Mojang RenderPass adapter for existing Sodium draw code");
         assertTrue(nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, colorView, clearColor, depthView, clearDepth)")
-                && nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer)"),
+                && nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)"),
             "The native terrain encoder should begin native Vulkan render passes directly instead of routing through GlCommandEncoder");
         assertTrue(nativeEncoderSource.contains("this.colorView != null")
                 && nativeEncoderSource.contains("this.colorView,")
@@ -1293,6 +1316,32 @@ public class Phase3DrawPathTest {
             "Iris ProgramSamplers should pass sampler texture units to native Vulkan render passes");
         assertTrue(programSamplersSource.contains("resourceBinder.bindLegacySampler(name, textureId, binding.textureUnit())"),
             "Iris ProgramSamplers should pass raw texture-id samplers to native Vulkan render passes");
+    }
+
+    @Test
+    public void testVulkanFramebufferRenderPassHonorsDepthAttachmentFlag() throws IOException {
+        Path glCommandEncoderFile = SRC_MAIN_JAVA.resolve("net/blaze3d/opengl/GlCommandEncoder.java");
+        Path apiFile = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
+        Path backendFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java");
+        Path nativeEncoderFile = SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java");
+
+        String glCommandEncoderSource = readSource(glCommandEncoderFile);
+        String apiSource = readSource(apiFile);
+        String backendSource = readSource(backendFile);
+        String nativeEncoderSource = readSource(nativeEncoderFile);
+
+        assertTrue(glCommandEncoderSource.contains("VulkanicAPI.beginRenderPass(renderPassCtx, supplier, framebuffer, hasDepthTexture)"),
+            "Compatibility framebuffer render passes must pass hasDepthTexture through to Vulkan");
+        assertTrue(apiSource.contains("beginRenderPass(ctx, label, framebuffer, true)")
+                && apiSource.contains("directVulkanBackend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)")
+                && apiSource.contains("getBackend().beginRenderPass(ctx, label, framebuffer, hasDepthTexture)"),
+            "VulkanicAPI should preserve the old default while exposing explicit framebuffer depth participation");
+        assertTrue(nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)"),
+            "Native framebuffer render passes must preserve hasDepthTexture when bypassing GlCommandEncoder");
+        assertTrue(backendSource.contains("resolveFramebufferRenderTargetPlan(label, framebuffer, hasDepthTexture)")
+                && backendSource.contains("resolveFramebufferTargets(framebuffer, includeDepthAttachment)")
+                && backendSource.contains("if (includeDepthAttachment && depthTextureId != 0)"),
+            "Vulkan framebuffer target resolution must omit the depth attachment when the caller requests color-only rendering");
     }
 
     @Test
@@ -4218,6 +4267,15 @@ public class Phase3DrawPathTest {
         assertTrue(dhApplySource.contains("if (!MC_RENDER.bindTargetRenderTarget(ctx))")
                 && dhApplySource.contains("if (!LodRenderer.INSTANCE.bindActiveRenderTarget())"),
             "DhApplyShader should bind MC and DH outputs through owner seams instead of raw framebuffer ids");
+        int bindActiveTarget = dhApplySource.indexOf("if (!LodRenderer.INSTANCE.bindActiveRenderTarget())");
+        int attachMcTarget = dhApplySource.indexOf("VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.activeTargetColorTextureId, 0);");
+        int renderApplyQuad = dhApplySource.indexOf("ScreenQuad.INSTANCE.render();", attachMcTarget);
+        int restoreDhTarget = dhApplySource.indexOf("VulkanicAPI.framebufferColorAttachment0Texture2D(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER, this.activeDhColorTextureId, 0);");
+        assertTrue(bindActiveTarget >= 0
+                && attachMcTarget > bindActiveTarget
+                && renderApplyQuad > attachMcTarget
+                && restoreDhTarget > renderApplyQuad,
+            "DhApplyShader should attach the MC color target to the active DH framebuffer only for the scoped apply pass, then restore DH color output");
 
         Path fadeApplyFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/FadeApplyShader.java");
         String fadeApplySource = readSource(fadeApplyFile);

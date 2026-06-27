@@ -21,6 +21,7 @@ import net.vulkanic.GraphicsBackendType;
 import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.PipelineResourceBindings;
+import net.vulkanic.PipelineResourcePlanner;
 import net.vulkanic.VulkanReadinessReport;
 import net.vulkanic.VulkanicBufferSlice;
 import net.vulkanic.VulkanicBuffer;
@@ -257,6 +258,7 @@ public class VulkanBackend {
     private volatile boolean pendingDepthTestEnabled  = false;
     private volatile int     pendingDepthFunc         = 0x0201 /* GL_LESS */;
     private volatile boolean pendingDepthWriteMask    = true;
+    private volatile boolean pendingCullFaceEnabled   = false;
 
     private volatile boolean pendingColorMaskR = true;
     private volatile boolean pendingColorMaskG = true;
@@ -291,6 +293,7 @@ public class VulkanBackend {
     // Virtual VAO tracking (Vulkan has no VAO concept; virtual IDs satisfy GL compat calls)
     private final AtomicInteger nextVirtualVaoId     = new AtomicInteger(1);
     private final Set<Integer>  virtualVaos          = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<Integer, VirtualVaoState> virtualVaoStates = new ConcurrentHashMap<>();
 
     // Virtual sampler tracking (Vulkan samplers created at pipeline init; virtual IDs for GL compat)
     private final AtomicInteger nextVirtualSamplerId = new AtomicInteger(1);
@@ -301,6 +304,7 @@ public class VulkanBackend {
     private final ConcurrentHashMap<Integer, Integer> boundSamplerPerUnit = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<DescriptorPipelineKey, PipelineHandle> descriptorPipelineCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<RenderTargetPipelineKey, PipelineHandle> renderTargetPipelineCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<LegacyProgramPipelineKey, PipelineHandle> legacyProgramPipelineCache = new ConcurrentHashMap<>();
 
     // Virtual query/sync tracking for GL-compat control flow on the Vulkan path
     private final AtomicInteger nextVirtualQueryId = new AtomicInteger(1);
@@ -438,6 +442,20 @@ public class VulkanBackend {
         String stableCacheKey,
         String resourceLayoutKey
     ) {
+    }
+
+    private record LegacyProgramPipelineKey(
+        int programId,
+        int framebuffer,
+        String pipelineCompilationKey,
+        String resourceLayoutKey,
+        VulkanRenderPassCompatibilityKey renderPassCompatibilityKey
+    ) {
+        private LegacyProgramPipelineKey {
+            Objects.requireNonNull(pipelineCompilationKey, "pipelineCompilationKey must not be null");
+            Objects.requireNonNull(resourceLayoutKey, "resourceLayoutKey must not be null");
+            Objects.requireNonNull(renderPassCompatibilityKey, "renderPassCompatibilityKey must not be null");
+        }
     }
 
     private record IndexedBlendState(
@@ -683,6 +701,12 @@ void main() {
             }
         }
         renderTargetPipelineCache.clear();
+        for (PipelineHandle pipelineHandle : new ArrayList<>(legacyProgramPipelineCache.values())) {
+            if (pipelineHandle != null) {
+                pipelineHandle.close();
+            }
+        }
+        legacyProgramPipelineCache.clear();
     }
 
     private PrecompiledPipelineState compilePrecompiledPipeline(
@@ -1455,7 +1479,6 @@ void main() {
                 Long.toHexString(mainWindowHandle));
             GLFW.glfwShowWindow(mainWindowHandle);
             GLFW.glfwFocusWindow(mainWindowHandle);
-            GLFW.glfwPollEvents();
         }
 
         cleanupRendererBootstrapResources();
@@ -2028,9 +2051,6 @@ void main() {
     public int createShaderProgram(CommandContext ctx) {
         int programId = nextVirtualProgramId.getAndIncrement();
         virtualPrograms.put(programId, new VirtualProgram());
-		if (programId == 5) {
-			logStandaloneProgramKeyTrace("program-store", programId, virtualPrograms.get(programId), "createShaderProgram");
-		}
         return programId;
     }
 
@@ -2504,9 +2524,6 @@ void main() {
             }
             virtualProgram.standaloneDirty = backingSize > 0;
             virtualProgram.closeStandaloneUniformBacking();
-        }
-		if (programId == 5) {
-			logStandaloneProgramKeyTrace("backing-store", programId, virtualProgram, "initializeStandaloneUniformState");
         }
         logStandaloneSliceTraceInternal(programId, "backing-init", null, virtualProgram, null, false, null);
     }
@@ -4105,6 +4122,247 @@ void main() {
         return new PipelineDescriptor.ResourceLayout(bindings);
     }
 
+    @Nullable
+    private PipelineDescriptor createLegacyProgramPipelineDescriptor(int programId, int mode) {
+        VirtualProgram virtualProgram = virtualPrograms.get(programId);
+        if (virtualProgram == null || !virtualProgram.linkStatus || virtualProgram.linkedSpirvModules.isEmpty()) {
+            return null;
+        }
+
+        PipelineDescriptor.VertexInputState vertexInputState = createLegacyVertexInputState();
+        if (vertexInputState == null) {
+            return null;
+        }
+
+        Set<VulkanicShaderStage> stages = virtualProgram.linkedSpirvModules.stream()
+            .map(VulkanicSpirvModule::stage)
+            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        PipelineDescriptor.ResourceLayout resourceLayout = getLinkedProgramResourceLayout(
+            getCurrentCommandContext(),
+            programId,
+            stages
+        );
+        if (resourceLayout == null) {
+            resourceLayout = new PipelineDescriptor.ResourceLayout(List.of());
+        }
+
+        java.util.Optional<PipelineDescriptor.BlendState> blendState = java.util.Optional.empty();
+        if (pendingBlendEnabled) {
+            SourceFactor srcRgb = sourceFactorFromLegacyGl(pendingBlendSrcRgb);
+            DestFactor dstRgb = destFactorFromLegacyGl(pendingBlendDstRgb);
+            SourceFactor srcAlpha = sourceFactorFromLegacyGl(pendingBlendSrcAlpha);
+            DestFactor dstAlpha = destFactorFromLegacyGl(pendingBlendDstAlpha);
+            if (srcRgb != null && dstRgb != null && srcAlpha != null && dstAlpha != null) {
+                blendState = java.util.Optional.of(new PipelineDescriptor.BlendState(srcRgb, dstRgb, srcAlpha, dstAlpha));
+            }
+        }
+
+        PipelineDescriptor.PortableState portableState = new PipelineDescriptor.PortableState(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("vulkanic", "legacy_program/" + programId),
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("vulkanic", "legacy_program/" + programId + "/vertex"),
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("vulkanic", "legacy_program/" + programId + "/fragment"),
+            Map.of(),
+            Set.of(),
+            List.of(),
+            List.of(),
+            blendState,
+            pendingDepthTestEnabled ? legacyDepthFunction(pendingDepthFunc) : net.blaze3d.platform.DepthTestFunction.NO_DEPTH_TEST,
+            legacyPolygonMode(),
+            pendingCullFaceEnabled,
+            pendingColorMaskR || pendingColorMaskG || pendingColorMaskB,
+            pendingColorMaskA,
+            pendingDepthWriteMask,
+            pendingLogicOp == 0x150B /* GL_OR_REVERSE */
+                ? net.blaze3d.platform.LogicOp.OR_REVERSE
+                : net.blaze3d.platform.LogicOp.NONE,
+            net.blaze3d.vertex.DefaultVertexFormat.EMPTY,
+            legacyVertexMode(mode),
+            pendingPolygonOffsetFactor,
+            pendingPolygonOffsetUnits
+        );
+
+        return PipelineDescriptor.fromPortableStateAndSpirvModules(portableState, virtualProgram.linkedSpirvModules)
+            .withResourceLayout(resourceLayout)
+            .withVertexInputState(vertexInputState);
+    }
+
+    @Nullable
+    private PipelineDescriptor.VertexInputState createLegacyVertexInputState() {
+        VirtualVaoState vaoState = currentVirtualVaoState();
+        List<LegacyVertexAttribute> attributes = vaoState.enabledAttributes.stream()
+            .map(vaoState.attributes::get)
+            .filter(Objects::nonNull)
+            .sorted(java.util.Comparator.comparingInt(LegacyVertexAttribute::index))
+            .toList();
+        if (attributes.isEmpty()) {
+            return null;
+        }
+
+        java.util.LinkedHashMap<Integer, PipelineDescriptor.VertexInputBinding> bindings = new java.util.LinkedHashMap<>();
+        List<PipelineDescriptor.VertexInputAttribute> vertexAttributes = new ArrayList<>(attributes.size());
+        for (LegacyVertexAttribute attribute : attributes) {
+            LegacyVertexBinding binding = vaoState.bindings.get(attribute.binding());
+            int stride = binding != null && binding.stride() > 0
+                ? binding.stride()
+                : attributeByteSize(attribute.size(), attribute.type());
+            bindings.putIfAbsent(attribute.binding(), new PipelineDescriptor.VertexInputBinding(
+                attribute.binding(),
+                stride,
+                attribute.divisor() > 0
+                    ? PipelineDescriptor.VertexInputRate.INSTANCE
+                    : PipelineDescriptor.VertexInputRate.VERTEX
+            ));
+            vertexAttributes.add(new PipelineDescriptor.VertexInputAttribute(
+                attribute.index(),
+                attribute.binding(),
+                toVertexAttributeFormat(attribute.type(), attribute.size(), attribute.normalized(), attribute.integer()),
+                attribute.offset()
+            ));
+        }
+
+        return new PipelineDescriptor.VertexInputState(new ArrayList<>(bindings.values()), vertexAttributes);
+    }
+
+    private PipelineResourcePlanner.Plan buildLegacyProgramResourcePlan(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int programId
+    ) {
+        VirtualProgram virtualProgram = virtualPrograms.get(programId);
+        if (virtualProgram == null) {
+            return null;
+        }
+        return net.vulkanic.VulkanicPipelineResourceResolver.buildPlan(
+            ctx,
+            descriptor,
+            new net.vulkanic.VulkanicPipelineResourceResolver.ResourceLookup() {
+                @Override
+                @Nullable
+                public VulkanicTextureView samplerView(PipelineDescriptor.ResourceBinding binding) {
+                    Integer unit = samplerUnit(binding);
+                    if (unit == null) {
+                        return null;
+                    }
+                    NativeSpine spine = nativeSpine;
+                    int textureId = 0;
+                    if (spine != null) {
+                        textureId = spine.legacyTexture2DBindingsByUnit.getOrDefault(unit, 0);
+                    }
+                    if (textureId <= 0) {
+                        textureId = net.irisshaders.iris.gl.IrisRenderSystem.getTextureBinding(unit);
+                    }
+                    return textureId > 0 ? createManagedLegacyTextureView(textureId) : null;
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerUnit(PipelineDescriptor.ResourceBinding binding) {
+                    int uniformIndex = virtualProgram.activeUniformNames.indexOf(binding.name());
+                    if (uniformIndex < 0) {
+                        return binding.binding();
+                    }
+                    return virtualProgram.samplerUniformValuesByIndex.getOrDefault(uniformIndex, binding.binding());
+                }
+
+                @Override
+                @Nullable
+                public VulkanicBufferSlice uniformBufferSlice(PipelineDescriptor.ResourceBinding binding) {
+                    return null;
+                }
+
+                @Override
+                @Nullable
+                public Integer texelBufferUnit(PipelineDescriptor.ResourceBinding binding) {
+                    return samplerUnit(binding);
+                }
+
+                @Override
+                @Nullable
+                public Integer standaloneProgramId(PipelineDescriptor.ResourceBinding binding) {
+                    return programId;
+                }
+
+                @Override
+                @Nullable
+                public Integer samplerObject(int samplerUnit) {
+                    Integer samplerObject = boundSamplerPerUnit.get(samplerUnit);
+                    return samplerObject != null && samplerObject > 0 ? samplerObject : null;
+                }
+            },
+            PipelineResourcePlanner.options().requireAtLeastOneBinding(false)
+        );
+    }
+
+    private void bindLegacyProgramPipelineForDraw(long commandBufferHandle, int mode) {
+        int programId = boundVirtualProgram;
+        if (programId <= 0) {
+            return;
+        }
+        PipelineDescriptor descriptor = createLegacyProgramPipelineDescriptor(programId, mode);
+        if (descriptor == null) {
+            return;
+        }
+
+        CommandContext ctx = getCurrentCommandContext();
+        PipelineResourcePlanner.Plan resourcePlan = buildLegacyProgramResourcePlan(ctx, descriptor, programId);
+        if (resourcePlan == null) {
+            return;
+        }
+
+        ensureNativeReady("bindLegacyProgramPipelineForDraw");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+
+        int framebuffer = boundDrawFbo;
+        VulkanRenderPassCompatibilityKey compatibilityKey = spine.activeRenderPassCompatibilityKey();
+        if (compatibilityKey == null && framebuffer != 0) {
+            ResolvedFramebufferTargets targets = resolveFramebufferTargets(framebuffer);
+            compatibilityKey = VulkanRenderPassCompatibilityKey.framebuffer(
+                targets.colorFormats(),
+                targets.hasDepthTarget() ? targets.depthTexture.vkFormat : VK10.VK_FORMAT_UNDEFINED,
+                targets.hasFeedbackLoopTarget()
+            );
+        } else if (compatibilityKey == null) {
+            compatibilityKey = defaultRenderPassCompatibilityKey();
+        }
+
+        PipelineDescriptor submissionDescriptor = resourcePlan.descriptor();
+        LegacyProgramPipelineKey key = new LegacyProgramPipelineKey(
+            programId,
+            framebuffer,
+            submissionDescriptor.getPipelineCompilationKey()
+                + '|'
+                + dynamicPipelineStateCacheKey(submissionDescriptor.getPortableState(), compatibilityKey),
+            submissionDescriptor.getResourceLayoutCacheKey(),
+            compatibilityKey
+        );
+        PipelineHandle pipelineHandle = legacyProgramPipelineCache.get(key);
+        if (pipelineHandle != null && !pipelineHandle.isValid()) {
+            legacyProgramPipelineCache.remove(key, pipelineHandle);
+            pipelineHandle = null;
+        }
+        if (pipelineHandle == null) {
+            PipelineHandle created = createPipeline(submissionDescriptor, compatibilityKey);
+            PipelineHandle raced = legacyProgramPipelineCache.putIfAbsent(key, created);
+            if (raced != null) {
+                created.close();
+                pipelineHandle = raced;
+            } else {
+                pipelineHandle = created;
+            }
+        }
+        if (pipelineHandle == null || !pipelineHandle.isValid()) {
+            return;
+        }
+
+        if (pipelineHandle instanceof VulkanPipelineHandle vulkanPipeline) {
+            spine.bindPipeline(commandBufferHandle, vulkanPipeline.getVkPipelineHandle());
+        }
+        bindPipelineResources(ctx, pipelineHandle, submissionDescriptor, resourcePlan.bindings());
+    }
+
     private static final class BoundPipelineResources {
         private final PipelineHandle pipeline;
         private final PipelineDescriptor descriptor;
@@ -4593,6 +4851,107 @@ void main() {
         return net.vulkanic.VulkanicBlendFactor.fromLegacyGlConstant(factor)
             .flatMap(VulkanBackend::toDestFactor)
             .orElse(null);
+    }
+
+    private static net.blaze3d.platform.DepthTestFunction legacyDepthFunction(int func) {
+        return switch (func) {
+            case 0x0202 -> net.blaze3d.platform.DepthTestFunction.EQUAL_DEPTH_TEST; // GL_EQUAL
+            case 0x0203 -> net.blaze3d.platform.DepthTestFunction.LEQUAL_DEPTH_TEST; // GL_LEQUAL
+            case 0x0204 -> net.blaze3d.platform.DepthTestFunction.GREATER_DEPTH_TEST; // GL_GREATER
+            case 0x0201 -> net.blaze3d.platform.DepthTestFunction.LESS_DEPTH_TEST; // GL_LESS
+            default -> net.blaze3d.platform.DepthTestFunction.LESS_DEPTH_TEST;
+        };
+    }
+
+    private PolygonMode legacyPolygonMode() {
+        return pendingPolygonMode == 0x1B01 /* GL_LINE */
+            ? PolygonMode.WIREFRAME
+            : PolygonMode.FILL;
+    }
+
+    private static VertexFormat.Mode legacyVertexMode(int mode) {
+        return switch (mode) {
+            case VulkanicAPI.GL_LINES -> VertexFormat.Mode.LINES;
+            case 0x0003 -> VertexFormat.Mode.LINE_STRIP; // GL_LINE_STRIP
+            case 0x0005 -> VertexFormat.Mode.TRIANGLE_STRIP; // GL_TRIANGLE_STRIP
+            case VulkanicAPI.GL_TRIANGLE_FAN -> VertexFormat.Mode.TRIANGLE_FAN;
+            case 0x0007 -> VertexFormat.Mode.QUADS; // GL_QUADS
+            default -> VertexFormat.Mode.TRIANGLES;
+        };
+    }
+
+    private static int attributeByteSize(int size, int type) {
+        if (size <= 0) {
+            throw new IllegalArgumentException("attribute size must be > 0");
+        }
+        int bytesPerComponent = switch (type) {
+            case VulkanicAPI.GL_BYTE, VulkanicAPI.GL_UNSIGNED_BYTE -> 1;
+            case VulkanicAPI.GL_SHORT, VulkanicAPI.GL_UNSIGNED_SHORT, VulkanicAPI.GL_HALF_FLOAT -> 2;
+            case VulkanicAPI.GL_INT, VulkanicAPI.GL_UNSIGNED_INT, VulkanicAPI.GL_FLOAT -> 4;
+            case VulkanicAPI.GL_DOUBLE -> 8;
+            default -> throw new IllegalArgumentException("Unsupported vertex attribute GL type: " + type);
+        };
+        return size * bytesPerComponent;
+    }
+
+    private static PipelineDescriptor.VertexAttributeFormat toVertexAttributeFormat(
+        int type,
+        int size,
+        boolean normalized,
+        boolean integer
+    ) {
+        return switch (type) {
+            case VulkanicAPI.GL_UNSIGNED_BYTE -> switch (size) {
+                case 1 -> integer ? PipelineDescriptor.VertexAttributeFormat.R8_UINT : PipelineDescriptor.VertexAttributeFormat.R8_UNORM;
+                case 2 -> integer ? PipelineDescriptor.VertexAttributeFormat.R8G8_UINT : PipelineDescriptor.VertexAttributeFormat.R8G8_UNORM;
+                case 3 -> integer ? PipelineDescriptor.VertexAttributeFormat.R8G8B8_UINT : PipelineDescriptor.VertexAttributeFormat.R8G8B8_UNORM;
+                case 4 -> integer ? PipelineDescriptor.VertexAttributeFormat.R8G8B8A8_UINT : PipelineDescriptor.VertexAttributeFormat.R8G8B8A8_UNORM;
+                default -> throw new IllegalArgumentException("Unsupported unsigned-byte attribute size: " + size);
+            };
+            case VulkanicAPI.GL_BYTE -> switch (size) {
+                case 1 -> integer ? PipelineDescriptor.VertexAttributeFormat.R8_SINT : PipelineDescriptor.VertexAttributeFormat.R8_SNORM;
+                case 2 -> integer ? PipelineDescriptor.VertexAttributeFormat.R8G8_SINT : PipelineDescriptor.VertexAttributeFormat.R8G8_SNORM;
+                case 3 -> integer ? PipelineDescriptor.VertexAttributeFormat.R8G8B8_SINT : PipelineDescriptor.VertexAttributeFormat.R8G8B8_SNORM;
+                case 4 -> integer ? PipelineDescriptor.VertexAttributeFormat.R8G8B8A8_SINT : PipelineDescriptor.VertexAttributeFormat.R8G8B8A8_SNORM;
+                default -> throw new IllegalArgumentException("Unsupported byte attribute size: " + size);
+            };
+            case VulkanicAPI.GL_UNSIGNED_SHORT -> switch (size) {
+                case 1 -> integer ? PipelineDescriptor.VertexAttributeFormat.R16_UINT : PipelineDescriptor.VertexAttributeFormat.R16_USCALED;
+                case 2 -> integer ? PipelineDescriptor.VertexAttributeFormat.R16G16_UINT : PipelineDescriptor.VertexAttributeFormat.R16G16_USCALED;
+                case 3 -> integer ? PipelineDescriptor.VertexAttributeFormat.R16G16B16_UINT : PipelineDescriptor.VertexAttributeFormat.R16G16B16_USCALED;
+                case 4 -> integer ? PipelineDescriptor.VertexAttributeFormat.R16G16B16A16_UINT : PipelineDescriptor.VertexAttributeFormat.R16G16B16A16_USCALED;
+                default -> throw new IllegalArgumentException("Unsupported unsigned-short attribute size: " + size);
+            };
+            case VulkanicAPI.GL_SHORT -> switch (size) {
+                case 1 -> integer ? PipelineDescriptor.VertexAttributeFormat.R16_SINT : PipelineDescriptor.VertexAttributeFormat.R16_SSCALED;
+                case 2 -> integer ? PipelineDescriptor.VertexAttributeFormat.R16G16_SINT : PipelineDescriptor.VertexAttributeFormat.R16G16_SSCALED;
+                case 3 -> integer ? PipelineDescriptor.VertexAttributeFormat.R16G16B16_SINT : PipelineDescriptor.VertexAttributeFormat.R16G16B16_SSCALED;
+                case 4 -> integer ? PipelineDescriptor.VertexAttributeFormat.R16G16B16A16_SINT : PipelineDescriptor.VertexAttributeFormat.R16G16B16A16_SSCALED;
+                default -> throw new IllegalArgumentException("Unsupported short attribute size: " + size);
+            };
+            case VulkanicAPI.GL_INT -> switch (size) {
+                case 1 -> PipelineDescriptor.VertexAttributeFormat.R32_SINT;
+                case 2 -> PipelineDescriptor.VertexAttributeFormat.R32G32_SINT;
+                case 3 -> PipelineDescriptor.VertexAttributeFormat.R32G32B32_SINT;
+                case 4 -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SINT;
+                default -> throw new IllegalArgumentException("Unsupported int attribute size: " + size);
+            };
+            case VulkanicAPI.GL_UNSIGNED_INT -> switch (size) {
+                case 1 -> PipelineDescriptor.VertexAttributeFormat.R32_UINT;
+                case 2 -> PipelineDescriptor.VertexAttributeFormat.R32G32_UINT;
+                case 3 -> PipelineDescriptor.VertexAttributeFormat.R32G32B32_UINT;
+                case 4 -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_UINT;
+                default -> throw new IllegalArgumentException("Unsupported unsigned-int attribute size: " + size);
+            };
+            case VulkanicAPI.GL_FLOAT -> switch (size) {
+                case 1 -> PipelineDescriptor.VertexAttributeFormat.R32_SFLOAT;
+                case 2 -> PipelineDescriptor.VertexAttributeFormat.R32G32_SFLOAT;
+                case 3 -> PipelineDescriptor.VertexAttributeFormat.R32G32B32_SFLOAT;
+                case 4 -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SFLOAT;
+                default -> throw new IllegalArgumentException("Unsupported float attribute size: " + size);
+            };
+            default -> throw new IllegalArgumentException("Unsupported vertex attribute GL type: " + type);
+        };
     }
 
     private static SourceFactor toSourceFactor(net.vulkanic.VulkanicBlendFactor factor) {
@@ -5439,11 +5798,23 @@ void main() {
     }
 
     private VulkanRenderTargetPlan resolveFramebufferRenderTargetPlan(Supplier<String> label, int framebuffer) {
+        return resolveFramebufferRenderTargetPlan(label, framebuffer, true);
+    }
+
+    private VulkanRenderTargetPlan resolveFramebufferRenderTargetPlan(
+        Supplier<String> label,
+        int framebuffer,
+        boolean includeDepthAttachment
+    ) {
         Objects.requireNonNull(label, "label must not be null");
-        return VulkanRenderTargetPlan.framebuffer(label, resolveFramebufferTargets(framebuffer));
+        return VulkanRenderTargetPlan.framebuffer(label, resolveFramebufferTargets(framebuffer, includeDepthAttachment));
     }
 
     private ResolvedFramebufferTargets resolveFramebufferTargets(int framebuffer) {
+        return resolveFramebufferTargets(framebuffer, true);
+    }
+
+    private ResolvedFramebufferTargets resolveFramebufferTargets(int framebuffer, boolean includeDepthAttachment) {
         ensureNativeReady("resolveFramebufferTargets");
         NativeSpine spine = nativeSpine;
         if (spine == null) {
@@ -5511,7 +5882,7 @@ void main() {
 
         NativeSpine.LegacyTextureObject depthTexture = null;
         long depthViewHandle = VK10.VK_NULL_HANDLE;
-        if (depthTextureId != 0) {
+        if (includeDepthAttachment && depthTextureId != 0) {
             depthTexture = spine.requireLegacyTexture(depthTextureId);
             if (depthTexture.imageHandle == VK10.VK_NULL_HANDLE || depthTexture.defaultViewHandle == VK10.VK_NULL_HANDLE) {
                 throw new IllegalStateException(
@@ -6250,8 +6621,17 @@ void main() {
         java.util.function.Supplier<String> label,
         int framebuffer
     ) {
+        return beginRenderPass(ctx, label, framebuffer, true);
+    }
+
+    public net.vulkanic.VulkanicRenderPass beginRenderPass(
+        CommandContext ctx,
+        java.util.function.Supplier<String> label,
+        int framebuffer,
+        boolean hasDepthTexture
+    ) {
         long commandBufferHandle = requireVulkanCommandBufferHandle("beginRenderPass(framebuffer)", ctx);
-        VulkanRenderTargetPlan plan = resolveFramebufferRenderTargetPlan(label, framebuffer);
+        VulkanRenderTargetPlan plan = resolveFramebufferRenderTargetPlan(label, framebuffer, hasDepthTexture);
 
         ensureNativeReady("beginRenderPass(framebuffer)");
         NativeSpine spine = nativeSpine;
@@ -6431,7 +6811,16 @@ void main() {
     public void setDepthTest(CommandContext ctx, net.vulkanic.VulkanicDepthCompareOp func) {
         requireVulkanCommandBufferHandle("setDepthTest", ctx);
         this.pendingDepthTestEnabled = true;
-        this.pendingDepthFunc = func.ordinal();
+        this.pendingDepthFunc = switch (func) {
+            case NEVER -> VulkanicAPI.GL_NEVER;
+            case LESS -> VulkanicAPI.GL_LESS;
+            case EQUAL -> VulkanicAPI.GL_EQUAL;
+            case LEQUAL -> VulkanicAPI.GL_LEQUAL;
+            case GREATER -> VulkanicAPI.GL_GREATER;
+            case NOTEQUAL -> VulkanicAPI.GL_NOTEQUAL;
+            case GEQUAL -> VulkanicAPI.GL_GEQUAL;
+            case ALWAYS -> VulkanicAPI.GL_ALWAYS;
+        };
     }
 
     /** Caches depth function (alternative entry point identical to {@link #setDepthTest(CommandContext, int)}). */
@@ -6476,7 +6865,11 @@ void main() {
     /** Caches cull face mode — typed overload. */
     public void setCullFaceMode(CommandContext ctx, net.vulkanic.VulkanicCullFaceMode mode) {
         requireVulkanCommandBufferHandle("setCullFaceMode", ctx);
-        this.pendingCullFaceMode = mode.ordinal();
+        this.pendingCullFaceMode = switch (mode) {
+            case FRONT -> VulkanicAPI.GL_FRONT;
+            case BACK -> VulkanicAPI.GL_BACK;
+            case FRONT_AND_BACK -> VulkanicAPI.GL_FRONT_AND_BACK;
+        };
     }
 
     /** Caches polygon rasterization mode (applied at pipeline creation). */
@@ -6525,6 +6918,8 @@ void main() {
             updateIndexedBlendEnabled(0, enabled);
         } else if (cap == GL_DEPTH_TEST) {
             this.pendingDepthTestEnabled = enabled;
+        } else if (cap == VulkanicAPI.GL_CULL_FACE) {
+            this.pendingCullFaceEnabled = enabled;
         } else if (cap == GL_STENCIL_TEST) {
             this.pendingStencilTestEnabled = enabled;
         } else if (cap == GL_SCISSOR_TEST) {
@@ -6532,7 +6927,7 @@ void main() {
             NativeSpine spine = requireNativeSpineForCommandOp("setCapabilityEnabled(scissor)");
             spine.setScissorTestEnabled(commandBufferHandle, enabled);
         }
-        // Other capabilities (GL_CULL_FACE, GL_POLYGON_OFFSET_FILL, etc.) are stored
+        // Other capabilities (GL_POLYGON_OFFSET_FILL, etc.) are stored
         // implicitly via their own dedicated setXxx methods or are no-ops in Vulkan.
     }
 
@@ -6737,6 +7132,7 @@ void main() {
             STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
             VirtualProgram program = virtualPrograms.get(locationRef.programId());
             if (program != null) {
+                captureSamplerUniformInt(program, locationRef.uniformIndex(), values[0]);
                 writeStandaloneUniformInts(program, locationRef.uniformIndex(), values);
             }
             maybeLogStandaloneUniformStats();
@@ -6746,9 +7142,22 @@ void main() {
         VirtualProgram boundProgram = virtualPrograms.get(boundVirtualProgram);
         if (boundProgram != null) {
             STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
+            captureSamplerUniformInt(boundProgram, location, values[0]);
             writeStandaloneUniformInts(boundProgram, location, values);
         }
         maybeLogStandaloneUniformStats();
+    }
+
+    private void captureSamplerUniformInt(VirtualProgram program, int uniformIndex, int value) {
+        if (uniformIndex < 0 || uniformIndex >= program.activeUniforms.size()) {
+            return;
+        }
+        ReflectedUniform uniform = program.activeUniforms.get(uniformIndex);
+        Optional<net.vulkanic.VulkanicUniformReflectionType> reflectionType =
+            net.vulkanic.VulkanicUniformReflectionType.fromLegacyGlConstant(uniform.legacyType());
+        if (reflectionType.isPresent() && reflectionType.get().isSampler()) {
+            program.samplerUniformValuesByIndex.put(uniformIndex, value);
+        }
     }
 
     private void captureStandaloneUniformFloats(int location, float[] values) {
@@ -6946,15 +7355,16 @@ void main() {
 
     @Nullable
     public VulkanicBufferSlice getStandaloneUniformBufferSlice(CommandContext ctx, int program) {
-        boolean ctxIsVulkan = ctx instanceof VulkanCommandContext;
-        long ctxHandle = ctx != null ? ctx.getHandle() : 0L;
         int sampledProgram = STANDALONE_LOOKUP_SAMPLE_PROGRAM.get();
-        boolean traceLookup = program == 5 || program == sampledProgram;
+        boolean traceLookup = VulkanicAPI.isStandaloneUniformTracingEnabled()
+            && (program == sampledProgram || (sampledProgram < 0 && STANDALONE_LOOKUP_SAMPLE_PROGRAM.compareAndSet(-1, program)));
         if (traceLookup) {
+            boolean ctxIsVulkan = ctx instanceof VulkanCommandContext;
+            long ctxHandle = ctx != null ? ctx.getHandle() : 0L;
             LOGGER.info(
                 "StandaloneLookupDecisionTrace stage=enter programId={} sampledProgram={} commandBufferContextIsVulkan={} commandBufferHandle={} commandBufferExists={}",
                 program,
-                sampledProgram,
+                STANDALONE_LOOKUP_SAMPLE_PROGRAM.get(),
                 yesNo(ctxIsVulkan),
                 ctxHandle,
                 yesNo(ctxIsVulkan && ctxHandle != 0L)
@@ -7042,11 +7452,8 @@ void main() {
                 virtualProgram.standaloneBackingSize
             );
             virtualProgram.standaloneDirty = false;
-            if (program != 5) {
-                STANDALONE_LOOKUP_SAMPLE_PROGRAM.compareAndSet(-1, program);
-            }
             int sampledAfterCreate = STANDALONE_LOOKUP_SAMPLE_PROGRAM.get();
-            if (program == 5 || program == sampledAfterCreate) {
+            if (traceLookup && program == sampledAfterCreate) {
                 logStandaloneProgramKeyTrace("slice-created", program, virtualProgram, "new VulkanicBufferSlice from virtualPrograms map entry");
                 LOGGER.info(
                     "StandaloneLookupDecisionTrace stage=return-slice programId={} sampledProgram={} sliceAvailable=yes sliceId={} sliceLength={} reason=success",
@@ -7967,7 +8374,7 @@ void main() {
             case VulkanicAPI.GL_BLEND -> pendingBlendEnabled;
             case VulkanicAPI.GL_DEPTH_TEST -> pendingDepthTestEnabled;
             case VulkanicAPI.GL_STENCIL_TEST -> pendingStencilTestEnabled;
-            case VulkanicAPI.GL_CULL_FACE -> pendingCullFaceMode != 0;
+            case VulkanicAPI.GL_CULL_FACE -> pendingCullFaceEnabled;
             case VulkanicAPI.GL_POLYGON_OFFSET_FILL -> pendingPolygonOffsetFactor != 0.0f || pendingPolygonOffsetUnits != 0.0f;
             default -> false;
         };
@@ -8616,6 +9023,7 @@ void main() {
         requireVulkanCommandBufferHandle("createVertexArray", ctx);
         int id = nextVirtualVaoId.getAndIncrement();
         virtualVaos.add(id);
+        virtualVaoStates.put(id, new VirtualVaoState());
         return id;
     }
 
@@ -8626,9 +9034,21 @@ void main() {
     public void deleteVertexArrays(CommandContext ctx, int vertexArray) {
         requireVulkanCommandBufferHandle("deleteVertexArrays", ctx);
         virtualVaos.remove(vertexArray);
+        virtualVaoStates.remove(vertexArray);
         if (boundVirtualVao == vertexArray) {
             boundVirtualVao = 0;
         }
+    }
+
+    private VirtualVaoState currentVirtualVaoState() {
+        int vao = boundVirtualVao;
+        if (vao == 0) {
+            return virtualVaoStates.computeIfAbsent(0, ignored -> new VirtualVaoState());
+        }
+        if (!virtualVaos.contains(vao)) {
+            virtualVaos.add(vao);
+        }
+        return virtualVaoStates.computeIfAbsent(vao, ignored -> new VirtualVaoState());
     }
 
     /**
@@ -8639,11 +9059,13 @@ void main() {
      */
     public void enableVertexAttribArray(CommandContext ctx, int index) {
         requireVulkanCommandBufferHandle("enableVertexAttribArray", ctx);
+        currentVirtualVaoState().enableAttribute(index);
     }
 
     /** Marks vertex attribute {@code index} as disabled. */
     public void disableVertexAttribArray(CommandContext ctx, int index) {
         requireVulkanCommandBufferHandle("disableVertexAttribArray", ctx);
+        currentVirtualVaoState().disableAttribute(index);
     }
 
     /**
@@ -8653,16 +9075,19 @@ void main() {
     public void setVertexAttribPointer(CommandContext ctx, int index, int size, int type,
                                        boolean normalized, int stride, long pointer) {
         requireVulkanCommandBufferHandle("setVertexAttribPointer", ctx);
+        currentVirtualVaoState().setAttributePointer(index, size, type, normalized, false, stride, pointer, currentLegacyArrayBufferBinding());
     }
 
     public void setVertexAttribIPointer(CommandContext ctx, int index, int size, int type,
                                         int stride, long pointer) {
         requireVulkanCommandBufferHandle("setVertexAttribIPointer", ctx);
+        currentVirtualVaoState().setAttributePointer(index, size, type, false, true, stride, pointer, currentLegacyArrayBufferBinding());
     }
 
     /** Sets the per-instance divisor for vertex attribute {@code index}. */
     public void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
         requireVulkanCommandBufferHandle("setVertexAttribDivisor", ctx);
+        currentVirtualVaoState().setDivisor(index, divisor);
     }
 
     /**
@@ -8678,15 +9103,45 @@ void main() {
     public void setVertexAttribFormat(CommandContext ctx, int attribindex, int size, int type,
                                       boolean normalized, int relativeoffset) {
         requireVulkanCommandBufferHandle("setVertexAttribFormat", ctx);
+        currentVirtualVaoState().setAttributeFormat(attribindex, size, type, normalized, false, relativeoffset);
     }
 
     public void setVertexAttribIFormat(CommandContext ctx, int attribindex, int size, int type,
                                        int relativeoffset) {
         requireVulkanCommandBufferHandle("setVertexAttribIFormat", ctx);
+        currentVirtualVaoState().setAttributeFormat(attribindex, size, type, false, true, relativeoffset);
     }
 
     public void setVertexAttribBinding(CommandContext ctx, int attribindex, int bindingindex) {
         requireVulkanCommandBufferHandle("setVertexAttribBinding", ctx);
+        currentVirtualVaoState().setAttributeBinding(attribindex, bindingindex);
+    }
+
+    public void bindVertexBuffer(CommandContext ctx, int bindingindex, int buffer, long offset, int stride) {
+        long commandBufferHandle = requireVulkanCommandBufferHandle("bindVertexBuffer", ctx);
+        currentVirtualVaoState().setBinding(bindingindex, stride, offset, buffer);
+        if (buffer <= 0) {
+            return;
+        }
+        ensureNativeReady("bindVertexBuffer");
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
+        }
+        NativeSpine.LegacyBufferObject legacy = spine.requireLegacyBuffer(buffer);
+        VulkanBuffer vulkanBuffer = legacy.buffer;
+        if (vulkanBuffer == null || vulkanBuffer.isClosed()) {
+            return;
+        }
+        spine.bindVertexBuffer(commandBufferHandle, bindingindex, vulkanBuffer.getVkBufferHandle(), offset);
+    }
+
+    private int currentLegacyArrayBufferBinding() {
+        NativeSpine spine = nativeSpine;
+        if (spine == null) {
+            return 0;
+        }
+        return spine.legacyBufferBindings.getOrDefault(VulkanicAPI.GL_ARRAY_BUFFER, 0);
     }
 
     // =====================================================================
@@ -9108,6 +9563,7 @@ void main() {
         private final Set<Integer> attachedShaderIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
         private final Map<String, Integer> attributeLocationsByName = new ConcurrentHashMap<>();
         private final Map<String, Integer> uniformLocationTokensByName = new ConcurrentHashMap<>();
+        private final ConcurrentHashMap<Integer, Integer> samplerUniformValuesByIndex = new ConcurrentHashMap<>();
         private volatile List<String> activeUniformNames = List.of();
         private volatile List<ReflectedUniform> activeUniforms = List.of();
         private volatile List<String> activeUniformBlocks = List.of();
@@ -9131,6 +9587,125 @@ void main() {
                 buffer.close();
             }
         }
+    }
+
+    private static final class VirtualVaoState {
+        private final ConcurrentHashMap<Integer, LegacyVertexAttribute> attributes = new ConcurrentHashMap<>();
+        private final ConcurrentHashMap<Integer, LegacyVertexBinding> bindings = new ConcurrentHashMap<>();
+        private final Set<Integer> enabledAttributes = ConcurrentHashMap.newKeySet();
+
+        private void enableAttribute(int index) {
+            if (index < 0) {
+                throw new IllegalArgumentException("attribute index must be >= 0");
+            }
+            enabledAttributes.add(index);
+        }
+
+        private void disableAttribute(int index) {
+            enabledAttributes.remove(index);
+        }
+
+        private void setAttributePointer(int index, int size, int type, boolean normalized, boolean integer, int stride, long pointer, int buffer) {
+            int effectiveStride = stride > 0 ? stride : attributeByteSize(size, type);
+            attributes.put(index, new LegacyVertexAttribute(index, index, size, type, normalized, integer, Math.toIntExact(pointer), 0));
+            bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, 0, buffer));
+        }
+
+        private void setAttributeFormat(int index, int size, int type, boolean normalized, boolean integer, int relativeOffset) {
+            LegacyVertexAttribute previous = attributes.get(index);
+            int binding = previous != null ? previous.binding() : 0;
+            int divisor = previous != null ? previous.divisor() : 0;
+            attributes.put(index, new LegacyVertexAttribute(index, binding, size, type, normalized, integer, relativeOffset, divisor));
+        }
+
+        private void setAttributeBinding(int index, int binding) {
+            if (binding < 0) {
+                throw new IllegalArgumentException("attribute binding must be >= 0");
+            }
+            LegacyVertexAttribute previous = attributes.get(index);
+            if (previous == null) {
+                attributes.put(index, new LegacyVertexAttribute(index, binding, 4, VulkanicAPI.GL_FLOAT, false, false, 0, 0));
+                return;
+            }
+            attributes.put(index, new LegacyVertexAttribute(
+                previous.index(),
+                binding,
+                previous.size(),
+                previous.type(),
+                previous.normalized(),
+                previous.integer(),
+                previous.offset(),
+                previous.divisor()
+            ));
+        }
+
+        private void setBinding(int binding, int stride, long offset) {
+            if (binding < 0) {
+                throw new IllegalArgumentException("binding index must be >= 0");
+            }
+            if (stride < 0) {
+                throw new IllegalArgumentException("binding stride must be >= 0");
+            }
+            LegacyVertexBinding previous = bindings.get(binding);
+            int divisor = previous != null ? previous.divisor() : 0;
+            int buffer = previous != null ? previous.buffer() : 0;
+            bindings.put(binding, new LegacyVertexBinding(binding, stride, offset, divisor, buffer));
+        }
+
+        private void setBinding(int binding, int stride, long offset, int buffer) {
+            if (binding < 0) {
+                throw new IllegalArgumentException("binding index must be >= 0");
+            }
+            if (stride < 0) {
+                throw new IllegalArgumentException("binding stride must be >= 0");
+            }
+            LegacyVertexBinding previous = bindings.get(binding);
+            int divisor = previous != null ? previous.divisor() : 0;
+            bindings.put(binding, new LegacyVertexBinding(binding, stride, offset, divisor, buffer));
+        }
+
+        private void setDivisor(int index, int divisor) {
+            LegacyVertexAttribute previous = attributes.get(index);
+            if (previous == null) {
+                attributes.put(index, new LegacyVertexAttribute(index, 0, 4, VulkanicAPI.GL_FLOAT, false, false, 0, divisor));
+                return;
+            }
+            attributes.put(index, new LegacyVertexAttribute(
+                previous.index(),
+                previous.binding(),
+                previous.size(),
+                previous.type(),
+                previous.normalized(),
+                previous.integer(),
+                previous.offset(),
+                divisor
+            ));
+            LegacyVertexBinding previousBinding = bindings.get(previous.binding());
+            if (previousBinding != null) {
+                bindings.put(previous.binding(), new LegacyVertexBinding(
+                    previousBinding.binding(),
+                    previousBinding.stride(),
+                    previousBinding.offset(),
+                    divisor,
+                    previousBinding.buffer()
+                ));
+            }
+        }
+    }
+
+    private record LegacyVertexAttribute(
+        int index,
+        int binding,
+        int size,
+        int type,
+        boolean normalized,
+        boolean integer,
+        int offset,
+        int divisor
+    ) {
+    }
+
+    private record LegacyVertexBinding(int binding, int stride, long offset, int divisor, int buffer) {
     }
 
     private record ReflectedUniform(String name, int arraySize, int legacyType) {
@@ -9441,6 +10016,7 @@ void main() {
         private final java.util.ArrayList<Integer> activeRenderPassColorFinalLayouts = new java.util.ArrayList<>();
         @Nullable private LegacyTextureObject activeRenderPassDepthTexture;
         private int activeRenderPassDepthFinalLayout = VK10.VK_IMAGE_LAYOUT_UNDEFINED;
+        @Nullable private VulkanRenderPassCompatibilityKey activeRenderPassCompatibilityKey;
         private boolean frameInProgress;
         private int acquiredSwapchainImageIndex = -1;
         private int renderPassSwapchainImageIndex = -1;
@@ -11042,7 +11618,6 @@ void main() {
                 destroyLegacyTextureStorage(texture);
             }
             imageStateTracker.unregisterTexture(textureId);
-
             for (Map.Entry<Integer, Integer> entry : new ArrayList<>(legacyTexture2DBindingsByUnit.entrySet())) {
                 if (entry.getValue() == textureId) {
                     legacyTexture2DBindingsByUnit.remove(entry.getKey());
@@ -13300,10 +13875,8 @@ void main() {
                     renderPassRecording
                 );
             }
-            VulkanBuffer vertexBuffer = resolveOptionalLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER);
-            if (vertexBuffer != null) {
-                bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
-            }
+            backend.bindLegacyProgramPipelineForDraw(commandBufferHandle, mode);
+            bindLegacyVertexBuffersForDraw(commandBufferHandle);
             drawInstanced(commandBufferHandle, first, count, instanceCount);
         }
 
@@ -13328,7 +13901,7 @@ void main() {
                     renderPassRecording
                 );
             }
-            VulkanBuffer vertexBuffer = resolveOptionalLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER);
+            backend.bindLegacyProgramPipelineForDraw(commandBufferHandle, mode);
             VulkanBuffer indexBuffer = requireLegacyDrawBuffer(VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, "drawElements(index)");
 
             int bytesPerIndex = indexType.bytesPerIndex();
@@ -13342,11 +13915,34 @@ void main() {
                 throw new IllegalArgumentException("Computed firstIndex exceeds int range: " + firstIndexLong);
             }
 
-            if (vertexBuffer != null) {
-                bindVertexBuffer(commandBufferHandle, 0, vertexBuffer.getVkBufferHandle());
-            }
+            bindLegacyVertexBuffersForDraw(commandBufferHandle);
             bindIndexBuffer(commandBufferHandle, indexBuffer.getVkBufferHandle(), indexType);
             drawIndexed(commandBufferHandle, (int) firstIndexLong, count, baseVertex, instanceCount);
+        }
+
+        private void bindLegacyVertexBuffersForDraw(long commandBufferHandle) {
+            VirtualVaoState vaoState = backend.currentVirtualVaoState();
+            java.util.List<LegacyVertexBinding> bindings = vaoState.bindings.values().stream()
+                .filter(binding -> binding.buffer() > 0)
+                .sorted(java.util.Comparator.comparingInt(LegacyVertexBinding::binding))
+                .toList();
+
+            if (bindings.isEmpty()) {
+                VulkanBuffer fallbackVertexBuffer = resolveOptionalLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER);
+                if (fallbackVertexBuffer != null) {
+                    bindVertexBuffer(commandBufferHandle, 0, fallbackVertexBuffer.getVkBufferHandle());
+                }
+                return;
+            }
+
+            for (LegacyVertexBinding binding : bindings) {
+                LegacyBufferObject legacy = requireLegacyBuffer(binding.buffer());
+                VulkanBuffer vertexBuffer = legacy.buffer;
+                if (vertexBuffer == null || vertexBuffer.isClosed() || legacy.logicalSizeBytes <= 0) {
+                    continue;
+                }
+                bindVertexBuffer(commandBufferHandle, binding.binding(), vertexBuffer.getVkBufferHandle(), binding.offset());
+            }
         }
 
         private VulkanicBuffer createManagedBuffer(String label,
@@ -13772,6 +14368,7 @@ void main() {
                 case RGBA16F        -> VK10.VK_FORMAT_R16G16B16A16_SFLOAT;
                 case RGBA8_SNORM    -> VK10.VK_FORMAT_R8G8B8A8_SNORM;
                 case R11F_G11F_B10F -> VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+                case RED16F         -> VK10.VK_FORMAT_R16_SFLOAT;
                 case RED32F         -> VK10.VK_FORMAT_R32_SFLOAT;
                 case BGRA8   -> VK10.VK_FORMAT_B8G8R8A8_UNORM;
                 case RED8           -> VK10.VK_FORMAT_R8_UNORM;
@@ -15514,6 +16111,7 @@ void main() {
                 case VK10.VK_FORMAT_R16G16B16A16_SFLOAT -> VulkanicTextureFormat.RGBA16F;
                 case VK10.VK_FORMAT_R8G8B8A8_SNORM -> VulkanicTextureFormat.RGBA8_SNORM;
                 case VK10.VK_FORMAT_B10G11R11_UFLOAT_PACK32 -> VulkanicTextureFormat.R11F_G11F_B10F;
+                case VK10.VK_FORMAT_R16_SFLOAT -> VulkanicTextureFormat.RED16F;
                 case VK10.VK_FORMAT_R32_SFLOAT -> VulkanicTextureFormat.RED32F;
                 case VK10.VK_FORMAT_B8G8R8A8_UNORM, VK10.VK_FORMAT_B8G8R8A8_SRGB -> VulkanicTextureFormat.BGRA8;
                 case VK10.VK_FORMAT_R8_UNORM -> VulkanicTextureFormat.RED8;
@@ -16072,7 +16670,6 @@ void main() {
                         swapchainColorAttachment
                     );
                 }
-
                 if (usePersistentSwapchainPass) {
                     if (swapchainPresentRenderPass == VK10.VK_NULL_HANDLE) {
                         throw new IllegalStateException("Swapchain present render pass is unavailable for swapchain-targeted compose pass.");
@@ -16138,6 +16735,7 @@ void main() {
                     renderPassSwapchainImageIndex = swapchainColorImageIndex;
                     activeRenderPassTargetsSwapchain = true;
                     renderPassRecording = true;
+                    activeRenderPassCompatibilityKey = VulkanRenderPassCompatibilityKey.swapchainPresent(swapchainImageFormat);
                     activeRenderPassWidth = width;
                     activeRenderPassHeight = height;
                     return VulkanRenderPassCompatibilityKey.swapchainPresent(swapchainImageFormat);
@@ -16395,6 +16993,7 @@ void main() {
                 }
 
                 renderPassRecording = true;
+                activeRenderPassCompatibilityKey = compatibilityKey;
                 activeRenderPassWidth = width;
                 activeRenderPassHeight = height;
                 trackTransientRenderPassHandle(renderPassHandle);
@@ -16769,6 +17368,7 @@ void main() {
 	                }
 
                 renderPassRecording = true;
+                activeRenderPassCompatibilityKey = compatibilityKey;
                 activeRenderPassWidth = targets.width;
                 activeRenderPassHeight = targets.height;
                 // Permanently-cached render passes must NOT be added to transient handles.
@@ -16803,6 +17403,7 @@ void main() {
 
             VK10.vkCmdEndRenderPass(activeCommandBuffer);
             renderPassRecording = false;
+            activeRenderPassCompatibilityKey = null;
             activeRenderPassWidth = 0;
             activeRenderPassHeight = 0;
             activeRenderPassTargetsSwapchain = false;
@@ -16834,6 +17435,10 @@ void main() {
         }
 
         private void bindVertexBuffer(long commandBufferHandle, int slot, long bufferHandle) {
+            bindVertexBuffer(commandBufferHandle, slot, bufferHandle, 0L);
+        }
+
+        private void bindVertexBuffer(long commandBufferHandle, int slot, long bufferHandle, long offset) {
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindVertexBuffer");
             if (!renderPassRecording) {
                 throw new IllegalStateException("bindVertexBuffer requires an active render pass");
@@ -16841,10 +17446,13 @@ void main() {
             if (slot < 0) {
                 throw new IllegalArgumentException("slot must be >= 0, got: " + slot);
             }
+            if (offset < 0L) {
+                throw new IllegalArgumentException("vertex buffer offset must be >= 0, got: " + offset);
+            }
 
             try (MemoryStack stack = stackPush()) {
                 java.nio.LongBuffer buffers = stack.longs(bufferHandle);
-                java.nio.LongBuffer offsets = stack.longs(0L);
+                java.nio.LongBuffer offsets = stack.longs(offset);
                 VK10.vkCmdBindVertexBuffers(activeCommandBuffer, slot, buffers, offsets);
             }
         }
@@ -17310,11 +17918,22 @@ void main() {
                     normalizeDescriptorLayoutBindings(descriptor.getResourceLayout().bindings());
 
                 if (TRACE_PIPELINE_CREATION) {
-                    LOGGER.info("createVulkanPipeline location={} hasSpirvModules={} bindingCount={} bindings={}",
+                    PipelineDescriptor.VertexInputState vertexInput = descriptor.getVertexInputState();
+                    LOGGER.info("createVulkanPipeline location={} hasSpirvModules={} bindingCount={} bindings={} vertexBindings={} vertexAttributes={}",
                         portableState != null ? portableState.location() : "null",
                         descriptor.hasSpirvModules(),
                         bindings.size(),
-                        bindings.stream().map(b -> b.binding() + ":" + b.name() + ":" + b.type()).toList());
+                        bindings.stream().map(b -> b.binding() + ":" + b.name() + ":" + b.type()).toList(),
+                        vertexInput == null
+                            ? "default"
+                            : vertexInput.bindings().stream()
+                                .map(b -> b.binding() + ":stride=" + b.stride() + ":rate=" + b.inputRate())
+                                .toList(),
+                        vertexInput == null
+                            ? "default"
+                            : vertexInput.attributes().stream()
+                                .map(a -> a.location() + ":binding=" + a.binding() + ":format=" + a.format() + ":offset=" + a.offset())
+                                .toList());
                 }
 
                 long descriptorSetLayoutHandle;
@@ -17403,25 +18022,49 @@ void main() {
                     .pName(mainEntry);
 
                 // --- 4. Vertex input state ---
-                VertexFormat vertexFormat = portableState.vertexFormat();
-                java.util.List<VertexFormatElement> vfElements = vertexFormat.getElements();
+                PipelineDescriptor.VertexInputState explicitVertexInput = descriptor.getVertexInputState();
+                VkVertexInputBindingDescription.Buffer vBindings;
+                VkVertexInputAttributeDescription.Buffer vAttribs;
+                if (explicitVertexInput != null) {
+                    vBindings = VkVertexInputBindingDescription.calloc(explicitVertexInput.bindings().size(), stack);
+                    for (int i = 0; i < explicitVertexInput.bindings().size(); i++) {
+                        PipelineDescriptor.VertexInputBinding binding = explicitVertexInput.bindings().get(i);
+                        vBindings.get(i)
+                            .binding(binding.binding())
+                            .stride(binding.stride())
+                            .inputRate(binding.inputRate() == PipelineDescriptor.VertexInputRate.INSTANCE
+                                ? VK10.VK_VERTEX_INPUT_RATE_INSTANCE
+                                : VK10.VK_VERTEX_INPUT_RATE_VERTEX);
+                    }
 
-                VkVertexInputBindingDescription.Buffer vBindings =
-                    VkVertexInputBindingDescription.calloc(1, stack);
-                vBindings.get(0)
-                    .binding(0)
-                    .stride(vertexFormat.getVertexSize())
-                    .inputRate(VK10.VK_VERTEX_INPUT_RATE_VERTEX);
+                    vAttribs = VkVertexInputAttributeDescription.calloc(explicitVertexInput.attributes().size(), stack);
+                    for (int i = 0; i < explicitVertexInput.attributes().size(); i++) {
+                        PipelineDescriptor.VertexInputAttribute attribute = explicitVertexInput.attributes().get(i);
+                        vAttribs.get(i)
+                            .location(attribute.location())
+                            .binding(attribute.binding())
+                            .format(toVkVertexAttributeFormat(attribute.format()))
+                            .offset(attribute.offset());
+                    }
+                } else {
+                    VertexFormat vertexFormat = portableState.vertexFormat();
+                    java.util.List<VertexFormatElement> vfElements = vertexFormat.getElements();
 
-                VkVertexInputAttributeDescription.Buffer vAttribs =
-                    VkVertexInputAttributeDescription.calloc(vfElements.size(), stack);
-                for (int i = 0; i < vfElements.size(); i++) {
-                    VertexFormatElement elem = vfElements.get(i);
-                    vAttribs.get(i)
-						.location(vertexFormat.getShaderAttributeLocation(i))
+                    vBindings = VkVertexInputBindingDescription.calloc(1, stack);
+                    vBindings.get(0)
                         .binding(0)
-                        .format(toVkVertexElementFormat(elem))
-                        .offset(vertexFormat.getOffset(elem));
+                        .stride(vertexFormat.getVertexSize())
+                        .inputRate(VK10.VK_VERTEX_INPUT_RATE_VERTEX);
+
+                    vAttribs = VkVertexInputAttributeDescription.calloc(vfElements.size(), stack);
+                    for (int i = 0; i < vfElements.size(); i++) {
+                        VertexFormatElement elem = vfElements.get(i);
+                        vAttribs.get(i)
+							.location(vertexFormat.getShaderAttributeLocation(i))
+                            .binding(0)
+                            .format(toVkVertexElementFormat(elem))
+                            .offset(vertexFormat.getOffset(elem));
+                    }
                 }
 
                 VkPipelineVertexInputStateCreateInfo vertexInputInfo =
@@ -17676,24 +18319,31 @@ void main() {
                 compatibilityKey.feedbackLoop() ? 3 : 2,
                 stack
             );
+            int entryStageMask = VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            int entryAccessMask = VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                | VK10.VK_ACCESS_SHADER_READ_BIT;
+            if (compatibilityKey.hasDepthAttachment()) {
+                entryStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                    | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                entryAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                    | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            }
             dependencies.get(0)
                 .srcSubpass(VK10.VK_SUBPASS_EXTERNAL)
                 .dstSubpass(0)
-                .srcStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                    | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                .dstStageMask(VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                    | VK10.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
-                .srcAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                    | VK10.VK_ACCESS_SHADER_READ_BIT)
-                .dstAccessMask(VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                    | VK10.VK_ACCESS_SHADER_READ_BIT);
+                .srcStageMask(entryStageMask)
+                .dstStageMask(entryStageMask)
+                .srcAccessMask(entryAccessMask)
+                .dstAccessMask(entryAccessMask);
 
             int exitSrcStageMask = VK10.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             int exitSrcAccessMask = VK10.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
             if (compatibilityKey.hasDepthAttachment()) {
                 exitSrcStageMask |= VK10.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
                     | VK10.VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-                exitSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                exitSrcAccessMask |= VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                    | VK10.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
             }
             dependencies.get(1)
                 .srcSubpass(0)
@@ -18021,6 +18671,55 @@ void main() {
             };
         }
 
+        private static int toVkVertexAttributeFormat(PipelineDescriptor.VertexAttributeFormat format) {
+            return switch (format) {
+                case R8_UNORM -> VK10.VK_FORMAT_R8_UNORM;
+                case R8G8_UNORM -> VK10.VK_FORMAT_R8G8_UNORM;
+                case R8G8B8_UNORM -> VK10.VK_FORMAT_R8G8B8_UNORM;
+                case R8G8B8A8_UNORM -> VK10.VK_FORMAT_R8G8B8A8_UNORM;
+                case R8_UINT -> VK10.VK_FORMAT_R8_UINT;
+                case R8G8_UINT -> VK10.VK_FORMAT_R8G8_UINT;
+                case R8G8B8_UINT -> VK10.VK_FORMAT_R8G8B8_UINT;
+                case R8G8B8A8_UINT -> VK10.VK_FORMAT_R8G8B8A8_UINT;
+                case R8_SNORM -> VK10.VK_FORMAT_R8_SNORM;
+                case R8G8_SNORM -> VK10.VK_FORMAT_R8G8_SNORM;
+                case R8G8B8_SNORM -> VK10.VK_FORMAT_R8G8B8_SNORM;
+                case R8G8B8A8_SNORM -> VK10.VK_FORMAT_R8G8B8A8_SNORM;
+                case R8_SINT -> VK10.VK_FORMAT_R8_SINT;
+                case R8G8_SINT -> VK10.VK_FORMAT_R8G8_SINT;
+                case R8G8B8_SINT -> VK10.VK_FORMAT_R8G8B8_SINT;
+                case R8G8B8A8_SINT -> VK10.VK_FORMAT_R8G8B8A8_SINT;
+                case R16_USCALED -> VK10.VK_FORMAT_R16_USCALED;
+                case R16G16_USCALED -> VK10.VK_FORMAT_R16G16_USCALED;
+                case R16G16B16_USCALED -> VK10.VK_FORMAT_R16G16B16_USCALED;
+                case R16G16B16A16_USCALED -> VK10.VK_FORMAT_R16G16B16A16_USCALED;
+                case R16_UINT -> VK10.VK_FORMAT_R16_UINT;
+                case R16G16_UINT -> VK10.VK_FORMAT_R16G16_UINT;
+                case R16G16B16_UINT -> VK10.VK_FORMAT_R16G16B16_UINT;
+                case R16G16B16A16_UINT -> VK10.VK_FORMAT_R16G16B16A16_UINT;
+                case R16_SSCALED -> VK10.VK_FORMAT_R16_SSCALED;
+                case R16G16_SSCALED -> VK10.VK_FORMAT_R16G16_SSCALED;
+                case R16G16B16_SSCALED -> VK10.VK_FORMAT_R16G16B16_SSCALED;
+                case R16G16B16A16_SSCALED -> VK10.VK_FORMAT_R16G16B16A16_SSCALED;
+                case R16_SINT -> VK10.VK_FORMAT_R16_SINT;
+                case R16G16_SINT -> VK10.VK_FORMAT_R16G16_SINT;
+                case R16G16B16_SINT -> VK10.VK_FORMAT_R16G16B16_SINT;
+                case R16G16B16A16_SINT -> VK10.VK_FORMAT_R16G16B16A16_SINT;
+                case R32_SFLOAT -> VK10.VK_FORMAT_R32_SFLOAT;
+                case R32G32_SFLOAT -> VK10.VK_FORMAT_R32G32_SFLOAT;
+                case R32G32B32_SFLOAT -> VK10.VK_FORMAT_R32G32B32_SFLOAT;
+                case R32G32B32A32_SFLOAT -> VK10.VK_FORMAT_R32G32B32A32_SFLOAT;
+                case R32_SINT -> VK10.VK_FORMAT_R32_SINT;
+                case R32G32_SINT -> VK10.VK_FORMAT_R32G32_SINT;
+                case R32G32B32_SINT -> VK10.VK_FORMAT_R32G32B32_SINT;
+                case R32G32B32A32_SINT -> VK10.VK_FORMAT_R32G32B32A32_SINT;
+                case R32_UINT -> VK10.VK_FORMAT_R32_UINT;
+                case R32G32_UINT -> VK10.VK_FORMAT_R32G32_UINT;
+                case R32G32B32_UINT -> VK10.VK_FORMAT_R32G32B32_UINT;
+                case R32G32B32A32_UINT -> VK10.VK_FORMAT_R32G32B32A32_UINT;
+            };
+        }
+
         private static boolean isSodiumIrisFloatAttribute(VertexFormatElement element) {
             return (element.index() == 10 && element.type() == VertexFormatElement.Type.BYTE && element.count() == 4)
                 || (element.index() == 12 && element.type() == VertexFormatElement.Type.USHORT && element.count() == 2)
@@ -18163,6 +18862,11 @@ void main() {
 
         private boolean isRenderPassActive() {
             return renderPassRecording;
+        }
+
+        @Nullable
+        private VulkanRenderPassCompatibilityKey activeRenderPassCompatibilityKey() {
+            return renderPassRecording ? activeRenderPassCompatibilityKey : null;
         }
 
         private void cmdSetViewport(long commandBufferHandle, int x, int y, int width, int height) {

@@ -202,6 +202,15 @@ public class VulkanRenderStateContractTest {
     }
 
     @Test
+    public void testTypedDepthCompareOpCachesLegacyGlConstant() {
+        vulkanBackend.setDepthTest(stubCtx, VulkanicDepthCompareOp.GEQUAL);
+
+        assertEquals(VulkanicAPI.GL_GEQUAL,
+            vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.DEPTH_FUNC),
+            "Typed Vulkan depth compare state must cache the matching GL constant for legacy pipeline creation");
+    }
+
+    @Test
     public void testSetDepthFuncDelegatesToSetDepthTest() {
         assertDoesNotThrow(() -> vulkanBackend.setDepthFunc(stubCtx, 0x0203));
         assertDoesNotThrow(() -> vulkanBackend.setDepthFunc(stubCtx, VulkanicDepthCompareOp.LEQUAL));
@@ -235,6 +244,15 @@ public class VulkanRenderStateContractTest {
     }
 
     @Test
+    public void testTypedCullFaceModeCachesLegacyGlConstant() {
+        vulkanBackend.setCullFaceMode(stubCtx, VulkanicCullFaceMode.FRONT_AND_BACK);
+
+        assertEquals(VulkanicAPI.GL_FRONT_AND_BACK,
+            vulkanBackend.getInteger(stubCtx, VulkanicIntegerQuery.CULL_FACE_MODE),
+            "Typed Vulkan cull mode must cache the matching GL constant, not the enum ordinal");
+    }
+
+    @Test
     public void testSetPolygonModeCachesState() {
         assertDoesNotThrow(() -> vulkanBackend.setPolygonMode(stubCtx, 0x0408, 0x1B02));
     }
@@ -255,8 +273,21 @@ public class VulkanRenderStateContractTest {
         final int GL_DEPTH_TEST = 0x0B71;
         assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, GL_BLEND, true));
         assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, GL_DEPTH_TEST, false));
+        assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, VulkanicAPI.GL_CULL_FACE, true));
         assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, VulkanicAPI.GL_STENCIL_TEST, true));
         assertDoesNotThrow(() -> vulkanBackend.setCapabilityEnabled(stubCtx, 0xDEAD, true));
+    }
+
+    @Test
+    public void testCullFaceCapabilityDefaultsOffAndTracksEnableState() {
+        assertFalse(vulkanBackend.isEnabled(stubCtx, VulkanicAPI.GL_CULL_FACE),
+            "OpenGL defaults GL_CULL_FACE to disabled; Vulkan legacy state must match that default");
+
+        vulkanBackend.setCapabilityEnabled(stubCtx, VulkanicAPI.GL_CULL_FACE, true);
+        assertTrue(vulkanBackend.isEnabled(stubCtx, VulkanicAPI.GL_CULL_FACE));
+
+        vulkanBackend.setCapabilityEnabled(stubCtx, VulkanicAPI.GL_CULL_FACE, false);
+        assertFalse(vulkanBackend.isEnabled(stubCtx, VulkanicAPI.GL_CULL_FACE));
     }
 
     @Test

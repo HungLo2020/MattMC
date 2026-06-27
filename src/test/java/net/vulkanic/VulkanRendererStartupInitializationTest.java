@@ -165,6 +165,14 @@ public class VulkanRendererStartupInitializationTest {
         assertTrue(vulkanBackendSource.contains("Iris.onRenderSystemInit()"),
             "VulkanBackend.onRendererDeviceInitialized should call Iris.onRenderSystemInit() "
                 + "to complete Iris renderer initialization on the Vulkan path");
+
+        int initHook = vulkanBackendSource.indexOf("public void onRendererDeviceInitialized");
+        int cleanupHook = vulkanBackendSource.indexOf("public void cleanupRendererBootstrapResources", initHook);
+        assertTrue(initHook >= 0 && cleanupHook > initHook,
+            "VulkanBackend should expose a bounded onRendererDeviceInitialized hook body");
+        String initHookSource = vulkanBackendSource.substring(initHook, cleanupHook);
+        assertFalse(initHookSource.contains("glfwPollEvents()"),
+            "VulkanBackend.onRendererDeviceInitialized must not poll GLFW events before Minecraft finishes constructing input/framerate state");
     }
 
     @Test

@@ -77,6 +77,10 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		this.bind(ctx);
 		
 		VulkanicAPI.framebufferColorAttachmentTexture2D(ctx, textureIndex, textureId, 0);
+		if (this.attachments.isEmpty())
+		{
+			VulkanicAPI.drawBuffers(ctx, new int[]{VulkanicAPI.colorAttachment(textureIndex)});
+		}
 		this.attachments.put(textureIndex, textureId);
 	}
 
@@ -117,7 +121,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		}
 		
 		this.bind(ctx); 
-		VulkanicAPI.drawBuffers(ctx, new int[]{VulkanicAPI.GL_NONE});
+		VulkanicAPI.drawBuffers(ctx, glBuffers);
 	}
 	
 	public void readBuffer(int buffer)

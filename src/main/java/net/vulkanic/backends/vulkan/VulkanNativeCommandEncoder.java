@@ -132,7 +132,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
             return this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture);
         }
         CommandContext ctx = this.backend.beginCommandBuffer();
-        VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, framebuffer);
+        VulkanicRenderPass pass = this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture);
         this.inRenderPass = true;
         return new NativeRenderPass(ctx, pass, framebuffer, hasDepthTexture, null, null, null);
     }
