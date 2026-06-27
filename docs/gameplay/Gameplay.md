@@ -4,6 +4,7 @@ Gameplay.
 
 ## Table of Contents
 
+- [Backports](backports/Backports.md)
 - [Biomes](biomes/Biomes.md)
 - [Blocks](blocks/Blocks.md)
 - [Brewing](brewing/Brewing.md)
@@ -15,6 +16,7 @@ Gameplay.
 - [Gamemodes](gamemodes/Gamemodes.md)
 - [Items](items/Items.md)
 - [Mobs](mobs/Mobs.md)
+- [Mechanics](mechanics/Mechanics.md)
 - [Redstone](redstone/Redstone.md)
 - [Smelting](smelting/Smelting.md)
 - [Smithing](smithing/Smithing.md)
