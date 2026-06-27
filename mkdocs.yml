@@ -3,6 +3,7 @@ site_description: Version-controlled MattMC wiki and project documentation
 site_url: https://hunglo2020.github.io/MattMC/
 repo_url: https://github.com/HungLo2020/MattMC
 repo_name: HungLo2020/MattMC
+edit_uri: edit/master/docs/
 
 docs_dir: docs
 site_dir: site
@@ -20,6 +21,7 @@ theme:
     - search.highlight
     - search.suggest
     - content.code.copy
+    - content.action.edit
 
 markdown_extensions:
   - admonition
@@ -58,6 +60,6 @@ nav:
       - Performance:
           - Chunk Generation Performance Tracker: testing/performance/chunk_gen_performance_tracker.md
   - Development:
-      - Dev Tips And Tools: devtools/DEV-TIPS-TOOLS.md
+      - Dev Tips And Tools: development/DEV-TIPS-TOOLS.md
   - Changelog:
       - Overview: changelog/CHANGELOG.md
