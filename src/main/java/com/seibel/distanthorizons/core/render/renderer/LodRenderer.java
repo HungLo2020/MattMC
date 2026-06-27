@@ -42,6 +42,7 @@ import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicPolygonMode;
 import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicResourceBarriers;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -62,6 +63,8 @@ public class LodRenderer
 	private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	private static final IIrisAccessor IRIS_ACCESSOR = ModAccessorInjector.INSTANCE.get(IIrisAccessor.class);
+	private static final VulkanicResourceBarriers OFFSCREEN_LOD_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
+			VulkanicResourceBarriers.Barrier.TEXTURE_FETCH);
 	
 	public static final LodRenderer INSTANCE = new LodRenderer();
 	
@@ -233,7 +236,7 @@ public class LodRenderer
 			}
 			
 			// combined pass transparent rendering
-			if (!deferTransparentRendering 
+			if (!deferTransparentRendering
 				&& Config.Client.Advanced.Graphics.Quality.transparency.get().transparencyEnabled)
 			{
 				profiler.popPush("LOD Transparent");
@@ -304,6 +307,10 @@ public class LodRenderer
 			if (!cancelApplyShader)
 			{
 				profiler.popPush("LOD Apply");
+				if (VulkanicAPI.isVulkanBackendSelected())
+				{
+					VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_LOD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+				}
 				
 				// Copy the LOD framebuffer to Minecraft's framebuffer
 				DhApplyShader.INSTANCE.render(renderParams.partialTicks);
@@ -397,7 +404,9 @@ public class LodRenderer
 		);
 		
 		VulkanicAPI.setCapabilityEnabled(ctx, VulkanicCapability.SCISSOR_TEST, false);
-		
+
+		VulkanicAPI.setColorMask(ctx, true, true, true, true);
+
 		// Enable depth test and depth mask
 		VulkanicAPI.setDepthTestEnabled(ctx, true);
 		VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);

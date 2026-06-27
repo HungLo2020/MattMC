@@ -120,6 +120,12 @@ public class DHCompatInternal {
 		return getDhBlockRenderDistance();
 	}
 
+	public static boolean shouldUseShaderOverrides() {
+		return Iris.getIrisConfig() != null
+			&& Iris.getIrisConfig().areShadersEnabled()
+			&& Iris.isPackInUseQuick();
+	}
+
 	public static float getFarPlane() {
 		if (DhApi.Delayed.configs == null) {
 			// Called before DH has finished setup
@@ -149,7 +155,7 @@ public class DHCompatInternal {
 		if (DhApi.Delayed.configs == null) return dhEnabled;
 
 		if ((dhEnabled != DhApi.Delayed.configs.graphics().renderingEnabled().getValue() || guiScale != Minecraft.getInstance().options.guiScale().get())
-			&& Iris.isPackInUseQuick()) {
+			&& shouldUseShaderOverrides()) {
 			guiScale = Minecraft.getInstance().options.guiScale().get();
 			dhEnabled = DhApi.Delayed.configs.graphics().renderingEnabled().getValue();
 			try {

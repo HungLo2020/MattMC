@@ -13,6 +13,8 @@ import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPoi
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
+import net.vulkanic.VulkanicAPI;
 
 public class GenericObjectShaderProgram extends ShaderProgram implements IDhApiGenericObjectShaderProgram
 {
@@ -157,7 +159,7 @@ public class GenericObjectShaderProgram extends ShaderProgram implements IDhApiG
 		
 		this.setUniform(this.instancedShaderProjectionModelViewMatrixUniform, projectionMvmMatrix);
 		
-		this.setUniform(this.lightMapUniform, 0); // TODO this should probably be passed in
+		this.setUniform(this.lightMapUniform, getLightmapTextureUnit());
 		this.setUniform(this.skyLightUniform, boxGroup.getSkyLight());
 		this.setUniform(this.blockLightUniform, boxGroup.getBlockLight());
 		
@@ -180,7 +182,7 @@ public class GenericObjectShaderProgram extends ShaderProgram implements IDhApiG
 			DhApiVec3d camPos)
 	{
 		
-		this.setUniform(this.lightMapUniform, 0); // TODO this should probably be passed in
+		this.setUniform(this.lightMapUniform, getLightmapTextureUnit());
 		this.setUniform(this.skyLightUniform, boxGroup.getSkyLight());
 		this.setUniform(this.blockLightUniform, boxGroup.getBlockLight());
 		
@@ -225,5 +227,12 @@ public class GenericObjectShaderProgram extends ShaderProgram implements IDhApiG
 	/** The base DH render program should always render */
 	@Override
 	public boolean overrideThisFrame() { return true; }
+
+	private static int getLightmapTextureUnit()
+	{
+		return VulkanicAPI.isVulkanBackendSelected()
+				? ILightMapWrapper.VULKAN_LIGHTMAP_TEXTURE_UNIT
+				: ILightMapWrapper.OPENGL_LIGHTMAP_TEXTURE_UNIT;
+	}
 	
 }

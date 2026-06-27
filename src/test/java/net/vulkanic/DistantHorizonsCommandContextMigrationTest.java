@@ -31,6 +31,18 @@ public class DistantHorizonsCommandContextMigrationTest {
             file + " should not hard-wire immediate OpenGL context retrieval");
     }
 
+    private static void assertDhIntermediateTextureIsSampleable(Path file) throws IOException {
+        String sourceWithoutComments = readSourceWithoutComments(file);
+
+        assertTrue(sourceWithoutComments.contains("VulkanicAPI.isVulkanBackendSelected()")
+                && sourceWithoutComments.contains("VulkanicAPI.GL_RGBA8")
+                && sourceWithoutComments.contains("VulkanicAPI.GL_UNSIGNED_BYTE"),
+            file + " should allocate post-process intermediate textures with a Vulkan-sampleable RGBA8 upload tuple");
+        assertTrue(sourceWithoutComments.contains("VulkanicAPI.GL_RGBA16")
+                && sourceWithoutComments.contains("VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4"),
+            file + " should preserve the original packed OpenGL intermediate format outside Vulkan compatibility mode");
+    }
+
     private static void assertBackendNeutralSingleContext(Path file) throws IOException {
         String sourceWithoutComments = readSourceWithoutComments(file);
 
@@ -203,11 +215,36 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH level render hook should still invoke the core LOD render entrypoint");
         assertTrue(chunkHookSource.contains("ClientApi.INSTANCE.renderDeferredLodsForShaders()"),
             "DH chunk render hook should still invoke deferred LOD rendering for shader pipelines");
-        String deferredModeUpdate = "DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(Iris.isPackInUseQuick())";
+        String deferredModeUpdate = "DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(DHCompatInternal.shouldUseShaderOverrides())";
         assertTrue(levelHookSource.contains(deferredModeUpdate),
             "DH level render hook should publish Iris deferred mode before ClientApi chooses the DH render pass");
         assertTrue(levelHookSource.indexOf(deferredModeUpdate) < levelHookSource.indexOf("ClientApi.INSTANCE.renderLods()"),
             "DH level render hook should publish Iris deferred mode before ClientApi chooses the DH render pass");
+    }
+
+    @Test
+    public void testDhShaderpackOverridesRequireEnabledShaders() throws IOException {
+        Path dhCompat = SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/compat/dh/DHCompatInternal.java");
+        Path lodEvents = SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/compat/dh/LodRendererEvents.java");
+        Path genericProgram = SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java");
+        String compatSource = readSourceWithoutComments(dhCompat);
+        String eventSource = readSourceWithoutComments(lodEvents);
+        String genericSource = readSourceWithoutComments(genericProgram);
+
+        assertTrue(compatSource.contains("public static boolean shouldUseShaderOverrides()"),
+            "DH Iris compat should expose one shared shader-override predicate");
+        assertTrue(compatSource.contains("Iris.getIrisConfig().areShadersEnabled()")
+                && compatSource.contains("Iris.isPackInUseQuick()"),
+            "DH shaderpack overrides should require both enabled shaders and an Iris shaderpack pipeline");
+        assertTrue(eventSource.contains("DHCompatInternal.shouldUseShaderOverrides()"),
+            "DH Iris event bridge should use the shared shader-override predicate");
+        assertTrue(eventSource.contains("return DHCompatInternal.SHADERLESS;"),
+            "DH Iris event bridge should fall back to shaderless DH compat when shaders are disabled");
+        assertTrue(genericSource.contains("return DHCompatInternal.shouldUseShaderOverrides();"),
+            "DH generic shader override should not stay active when shaders are disabled");
     }
 
     @Test
@@ -221,6 +258,108 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH apply shader should not treat tiny Vulkan depth sampling differences as drawn LOD pixels");
         assertFalse(sourceWithoutComments.contains("1.0 - TexCoord.y"),
             "DH apply shader should not apply a Vulkan-only texture-coordinate flip; capture evidence showed that leaves the sky-water artifact in place");
+    }
+
+    @Test
+    public void testDhLodTerrainRestoresColorWritesBeforeDrawing() throws IOException {
+        Path lodRenderer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
+
+        int stateStart = sourceWithoutComments.indexOf("private void setGLState");
+        int bindProgram = sourceWithoutComments.indexOf("this.lodRenderProgram.bind()", stateStart);
+        int colorMask = sourceWithoutComments.indexOf("VulkanicAPI.setColorMask(ctx, true, true, true, true)", stateStart);
+        int depthMask = sourceWithoutComments.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", stateStart);
+
+        assertTrue(stateStart >= 0 && bindProgram > stateStart,
+            "DH LOD renderer should have a setup block before binding the terrain program");
+        assertTrue(colorMask > stateStart && colorMask < bindProgram,
+            "DH LOD terrain setup should restore RGBA color writes before drawing into the DH color target");
+        assertTrue(depthMask > colorMask && depthMask < bindProgram,
+            "DH LOD terrain setup should restore depth writes after color writes and before binding the terrain program");
+    }
+
+    @Test
+    public void testDhApplyShaderRestoresColorWritesBeforeCompositing() throws IOException {
+        Path applyShader = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/shaders/DhApplyShader.java");
+        String sourceWithoutComments = readSourceWithoutComments(applyShader);
+
+        int renderToFrameBuffer = sourceWithoutComments.indexOf("private void renderToFrameBuffer");
+        int renderToMcTexture = sourceWithoutComments.indexOf("private void renderToMcTexture");
+        int firstQuad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render()", renderToFrameBuffer);
+        int secondQuad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render()", renderToMcTexture);
+        int firstColorMask = sourceWithoutComments.indexOf(
+            "VulkanicAPI.setColorMask(ctx, true, true, true, true)", renderToFrameBuffer);
+        int secondColorMask = sourceWithoutComments.indexOf(
+            "VulkanicAPI.setColorMask(ctx, true, true, true, true)", renderToMcTexture);
+
+        assertTrue(renderToFrameBuffer >= 0 && firstQuad > renderToFrameBuffer,
+            "DH apply shader should have a framebuffer composite path");
+        assertTrue(renderToMcTexture >= 0 && secondQuad > renderToMcTexture,
+            "DH apply shader should have an MC texture composite path");
+        assertTrue(firstColorMask > renderToFrameBuffer && firstColorMask < firstQuad,
+            "DH framebuffer apply path should restore RGBA color writes before compositing");
+        assertTrue(secondColorMask > renderToMcTexture && secondColorMask < secondQuad,
+            "DH MC texture apply path should restore RGBA color writes before compositing");
+    }
+
+    @Test
+    public void testDhApplyPassMakesOffscreenLodWritesVisibleToTextureFetch() throws IOException {
+        Path lodRenderer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
+
+        int barrierConstant = sourceWithoutComments.indexOf("OFFSCREEN_LOD_WRITES_VISIBLE_TO_TEXTURE_FETCH");
+        int applyEvent = sourceWithoutComments.indexOf("DhApiBeforeApplyShaderRenderEvent");
+        int applyRender = sourceWithoutComments.indexOf("DhApplyShader.INSTANCE.render", applyEvent);
+        int barrierCall = sourceWithoutComments.indexOf(
+            "VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_LOD_WRITES_VISIBLE_TO_TEXTURE_FETCH)",
+            applyEvent);
+
+        assertTrue(barrierConstant >= 0,
+            "DH should declare an explicit Vulkan barrier for the offscreen LOD texture handoff");
+        assertTrue(applyEvent >= 0 && applyRender > applyEvent,
+            "DH should have an apply phase after its offscreen LOD render");
+        assertTrue(barrierCall > applyEvent && barrierCall < applyRender,
+            "DH should make offscreen color/depth writes visible before the apply shader samples them");
+    }
+
+    @Test
+    public void testDhBuiltInLightmapUnitMatchesActiveBackend() throws IOException {
+        Path lightMapWrapper = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/common/wrappers/misc/LightMapWrapper.java");
+        Path lightMapInterface = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/wrapperInterfaces/misc/ILightMapWrapper.java");
+        Path terrainProgram = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/DhTerrainShaderProgram.java");
+        Path genericProgram = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/generic/GenericObjectShaderProgram.java");
+
+        String wrapperSource = readSourceWithoutComments(lightMapWrapper);
+        String interfaceSource = readSourceWithoutComments(lightMapInterface);
+        String terrainSource = readSourceWithoutComments(terrainProgram);
+        String genericSource = readSourceWithoutComments(genericProgram);
+
+        assertTrue(interfaceSource.contains("OPENGL_LIGHTMAP_TEXTURE_UNIT = 0")
+                && interfaceSource.contains("VULKAN_LIGHTMAP_TEXTURE_UNIT = 2"),
+            "DH should keep the legacy OpenGL lightmap unit while using Minecraft's canonical Vulkan/Iris unit");
+        assertTrue(wrapperSource.contains("VulkanicAPI.isVulkanBackendSelected() ? VULKAN_LIGHTMAP_TEXTURE_UNIT : OPENGL_LIGHTMAP_TEXTURE_UNIT"),
+            "DH lightmap wrapper should bind and unbind the lightmap on the texture unit selected for the active backend");
+        assertTrue(terrainSource.contains("VulkanicAPI.isVulkanBackendSelected()")
+                && terrainSource.contains("ILightMapWrapper.VULKAN_LIGHTMAP_TEXTURE_UNIT")
+                && terrainSource.contains("ILightMapWrapper.OPENGL_LIGHTMAP_TEXTURE_UNIT")
+                && terrainSource.contains("this.setUniform(this.uLightMap, lightmapTextureUnit)"),
+            "DH built-in terrain shader should sample the same backend-selected unit that the lightmap wrapper binds");
+        assertTrue(genericSource.contains("VulkanicAPI.isVulkanBackendSelected()")
+                && genericSource.contains("ILightMapWrapper.VULKAN_LIGHTMAP_TEXTURE_UNIT")
+                && genericSource.contains("ILightMapWrapper.OPENGL_LIGHTMAP_TEXTURE_UNIT")
+                && genericSource.contains("this.setUniform(this.lightMapUniform, getLightmapTextureUnit())"),
+            "DH generic/cloud shader should sample the same backend-selected unit that the lightmap wrapper binds");
+        assertFalse(terrainSource.contains("ILightMapWrapper.LIGHTMAP_TEXTURE_UNIT")
+                || genericSource.contains("ILightMapWrapper.LIGHTMAP_TEXTURE_UNIT")
+                || wrapperSource.contains("ILightMapWrapper.LIGHTMAP_TEXTURE_UNIT"),
+            "DH should not use one global lightmap texture unit across OpenGL and Vulkan built-in paths");
     }
 
     @Test
@@ -274,6 +413,16 @@ public class DistantHorizonsCommandContextMigrationTest {
         assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/DhFadeRenderer.java"));
         assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java"));
+    }
+
+    @Test
+    public void testDhPostProcessIntermediateTexturesRemainSampleableOnVulkan() throws IOException {
+        assertDhIntermediateTextureIsSampleable(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/FogRenderer.java"));
+        assertDhIntermediateTextureIsSampleable(SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/DhFadeRenderer.java"));
+        assertDhIntermediateTextureIsSampleable(SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/VanillaFadeRenderer.java"));
     }
 

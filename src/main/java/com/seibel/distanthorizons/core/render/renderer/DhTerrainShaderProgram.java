@@ -15,6 +15,8 @@ import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Handles rendering the normal LOD terrain.
@@ -157,7 +159,10 @@ public class DhTerrainShaderProgram extends ShaderProgram implements IDhApiShade
 		this.setUniform(this.uMircoOffset, 0.01f); // 0.01 block offset
 		
 		// setUniform(skyLightUniform, skyLight);
-		this.setUniform(this.uLightMap, 0); // TODO this should probably be passed in
+		int lightmapTextureUnit = VulkanicAPI.isVulkanBackendSelected()
+				? ILightMapWrapper.VULKAN_LIGHTMAP_TEXTURE_UNIT
+				: ILightMapWrapper.OPENGL_LIGHTMAP_TEXTURE_UNIT;
+		this.setUniform(this.uLightMap, lightmapTextureUnit);
 		
 		if (this.uWorldYOffset != -1) this.setUniform(this.uWorldYOffset, (float) renderParameters.worldYOffset);
 		

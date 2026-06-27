@@ -88,8 +88,8 @@ public class LodRendererEvents {
 			public void beforeRender(DhApiCancelableEventParam<DhApiRenderParam> event) {
 				// When any Iris shader pack is loaded, always use separate opaque/transparent passes
 				// This is required for proper texture binding and water rendering with shaders
-				boolean irisShaderActive = Iris.isPackInUseQuick();
-				DHCompatInternal instance = getInstance();
+					boolean irisShaderActive = DHCompatInternal.shouldUseShaderOverrides();
+					DHCompatInternal instance = getInstance();
 				
 				DhApi.Delayed.renderProxy.setDeferTransparentRendering(irisShaderActive);
 				DhApi.Delayed.configs.graphics().fog().drawMode().setValue(instance.shouldOverride ? EDhApiFogDrawMode.FOG_DISABLED : EDhApiFogDrawMode.FOG_ENABLED);
@@ -148,6 +148,9 @@ public class LodRendererEvents {
 	}
 
 	private static DHCompatInternal getInstance() {
+		if (!DHCompatInternal.shouldUseShaderOverrides()) {
+			return DHCompatInternal.SHADERLESS;
+		}
 		return (DHCompatInternal) Iris.getPipelineManager().getPipeline().map(WorldRenderingPipeline::getDHCompat).map(DHCompat::getInstance).orElse(DHCompatInternal.SHADERLESS);
 	}
 
@@ -403,8 +406,8 @@ public class LodRendererEvents {
 		DhApiBeforeApplyShaderRenderEvent beforeApplyShaderEvent = new DhApiBeforeApplyShaderRenderEvent() {
 			@Override
 			public void beforeRender(DhApiCancelableEventParam<DhApiRenderParam> event) {
-				if (Iris.isPackInUseQuick()) {
-					DHCompatInternal instance = getInstance();
+					if (DHCompatInternal.shouldUseShaderOverrides()) {
+						DHCompatInternal instance = getInstance();
 
 					OverrideInjector.INSTANCE.unbind(IDhApiShadowCullingFrustum.class, (IDhApiOverrideable) ShadowRenderer.FRUSTUM);
 					OverrideInjector.INSTANCE.unbind(IDhApiFramebuffer.class, instance.getShadowFBWrapper());

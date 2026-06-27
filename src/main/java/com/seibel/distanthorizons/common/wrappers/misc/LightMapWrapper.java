@@ -51,11 +51,20 @@ public class LightMapWrapper implements ILightMapWrapper
 	@Override
 	public void bind()
 	{
-		DhTextureState.setActiveTextureUnitIndex(0);
+		DhTextureState.setActiveTextureUnitIndex(getLightmapTextureUnit());
 		DhTextureState.bindTexture2D(this.textureId);
 	}
 	
 	@Override
-	public void unbind() { DhTextureState.bindTexture2D(0); }
+	public void unbind()
+	{
+		DhTextureState.setActiveTextureUnitIndex(getLightmapTextureUnit());
+		DhTextureState.bindTexture2D(0);
+	}
+
+	private static int getLightmapTextureUnit()
+	{
+		return VulkanicAPI.isVulkanBackendSelected() ? VULKAN_LIGHTMAP_TEXTURE_UNIT : OPENGL_LIGHTMAP_TEXTURE_UNIT;
+	}
 	
 }

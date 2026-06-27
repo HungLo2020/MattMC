@@ -100,6 +100,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		GLState state = new GLState(ctx);
 		
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setColorMask(ctx, true, true, true, true);
 		
 		// blending isn't needed, we're manually merging the MC and DH textures
 		// Note: this prevents the sun/moon and stars from rendering through transparent LODs,
@@ -139,6 +140,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		GLState state = new GLState(ctx);
 		
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setColorMask(ctx, true, true, true, true);
 		
 		// blending isn't needed, we're just directly merging the MC and DH textures
 		// Note: this prevents the sun/moon and stars from rendering through transparent LODs,

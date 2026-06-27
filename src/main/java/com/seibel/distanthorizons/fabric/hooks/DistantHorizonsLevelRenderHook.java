@@ -7,7 +7,7 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.DhApiRenderProxy;
 import com.seibel.distanthorizons.coreapi.ModInfo;
-import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.compat.dh.DHCompatInternal;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -57,12 +57,12 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
                 LOGGER.error("[DH-RENDER-HOOK] canRenderOrThrow() failed: " + ex.getMessage(), ex);
                 throw ex;
             }
-        }
-        
-        try {
-            DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(Iris.isPackInUseQuick());
-            ClientApi.INSTANCE.renderLods();
-        } catch (Exception ex) {
+	        }
+
+	        try {
+	            DhApiRenderProxy.INSTANCE.setDeferTransparentRendering(DHCompatInternal.shouldUseShaderOverrides());
+	            ClientApi.INSTANCE.renderLods();
+	        } catch (Exception ex) {
             LOGGER.error("[DH-RENDER-HOOK] renderLods() failed: " + ex.getMessage(), ex);
         }
     }

@@ -10,7 +10,6 @@ import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
-import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.gl.blending.BufferBlendOverride;
@@ -292,7 +291,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	@Override
 	public boolean overrideThisFrame() {
-		return Iris.isPackInUseQuick();
+		return DHCompatInternal.shouldUseShaderOverrides();
 	}
 
 	@Override

@@ -73,7 +73,14 @@ public class FogRenderer
 		this.fogTexture = VulkanicAPI.createTexture2D(ctx);
 		{
 			DhTextureState.bindTexture2D(this.fogTexture);
-			VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
+			if (VulkanicAPI.isVulkanBackendSelected())
+			{
+				VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+			}
+			else
+			{
+				VulkanicAPI.uploadTexture2D(ctx, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
+			}
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MIN_FILTER, VulkanicTextureParameterValue.LINEAR);
 			VulkanicAPI.texParameteri(ctx, VulkanicTextureTarget.TEXTURE_2D, VulkanicTextureParameterName.MAG_FILTER, VulkanicTextureParameterValue.LINEAR);
 			this.fogFramebuffer.addColorAttachment(ctx, 0, this.fogTexture);
