@@ -8,6 +8,9 @@ uniform sampler2D Sampler2;
 
 layout(std140) uniform SodiumChunkParams {
     vec2 TexCoordShrink;
+    vec4 SodiumFogColor;
+    vec2 SodiumEnvironmentFog;
+    vec2 SodiumRenderFog;
 };
 
 layout(location = 0) in uvec2 a_Position;

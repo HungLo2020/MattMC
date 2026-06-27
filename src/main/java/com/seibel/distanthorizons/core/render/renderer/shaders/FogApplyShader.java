@@ -27,8 +27,10 @@ public class FogApplyShader extends AbstractShaderRenderer
 	// uniforms
 	public int colorTextureUniform;
 	public int depthTextureUniform;
+	public int dhColorTextureUniform;
 
 	private int activeDepthTextureId = -1;
+	private int activeColorTextureId = -1;
 	
 	
 	
@@ -48,6 +50,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 		// uniform setup
 		this.colorTextureUniform = this.shader.getUniformLocation("uColorTexture");
 		this.depthTextureUniform = this.shader.getUniformLocation("uDepthTexture");
+		this.dhColorTextureUniform = this.shader.getUniformLocation("uDhColorTexture");
 		
 	}
 	
@@ -61,8 +64,10 @@ public class FogApplyShader extends AbstractShaderRenderer
 	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		this.activeDepthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
+		this.activeColorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
 		return this.fogTexture != -1
 			&& this.activeDepthTextureId != -1
+			&& this.activeColorTextureId != -1
 			&& FogShader.INSTANCE.frameBuffer != null
 			&& LodRenderer.INSTANCE.hasActiveRenderTarget();
 	}
@@ -77,6 +82,10 @@ public class FogApplyShader extends AbstractShaderRenderer
 		DhTextureState.setActiveTextureUnitIndex(1);
 		DhTextureState.bindTexture2D(this.activeDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.depthTextureUniform, 1);
+
+		DhTextureState.setActiveTextureUnitIndex(2);
+		DhTextureState.bindTexture2D(this.activeColorTextureId);
+		VulkanicAPI.setUniform1i(ctx, this.dhColorTextureUniform, 2);
 		
 	}
 	
@@ -103,6 +112,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
 		// it should be automatically restored after rendering is complete.
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
+		VulkanicAPI.setColorMask(ctx, true, true, true, true);
 		
 		
 		// apply the rendered Fog to DH's framebuffer
@@ -112,7 +122,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 			VulkanicAPI.bindReadFramebuffer(ctx, 0);
 			return;
 		}
-		
+
 		ScreenQuad.INSTANCE.render();
 		
 		VulkanicAPI.bindReadFramebuffer(ctx, 0);

@@ -38,6 +38,25 @@ public class LodQuadBuilder
 	
 	private final EDhApiDebugRendering debugRenderingMode;
 	private final EDhApiGrassSideRendering grassSideRenderingMode;
+
+	private static final int[] DEFAULT_DIRECTION_RENDER_ORDER = new int[] {
+			EDhDirection.DOWN.ordinal(),
+			EDhDirection.UP.ordinal(),
+			EDhDirection.NORTH.ordinal(),
+			EDhDirection.SOUTH.ordinal(),
+			EDhDirection.WEST.ordinal(),
+			EDhDirection.EAST.ordinal()
+	};
+	private static final int[] TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER = new int[] {
+			EDhDirection.DOWN.ordinal(),
+			EDhDirection.NORTH.ordinal(),
+			EDhDirection.SOUTH.ordinal(),
+			EDhDirection.WEST.ordinal(),
+			EDhDirection.EAST.ordinal()
+	};
+	private static final int[] TRANSPARENT_UP_DIRECTION_RENDER_ORDER = new int[] {
+			EDhDirection.UP.ordinal()
+	};
 	
 	
 	public static final int[][][] DIRECTION_VERTEX_IBO_QUAD = new int[][][]
@@ -256,14 +275,15 @@ public class LodQuadBuilder
 	// buffer setup //
 	//==============//
 	
-	public ArrayList<ByteBuffer> makeOpaqueVertexBuffers() { return this.makeVertexBuffers(this.opaqueQuads); }
-	public ArrayList<ByteBuffer> makeTransparentVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads); }
-	private ArrayList<ByteBuffer> makeVertexBuffers(ArrayList<BufferQuad>[] quadList)
+	public ArrayList<ByteBuffer> makeOpaqueVertexBuffers() { return this.makeVertexBuffers(this.opaqueQuads, DEFAULT_DIRECTION_RENDER_ORDER); }
+	public ArrayList<ByteBuffer> makeTransparentVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER); }
+	public ArrayList<ByteBuffer> makeTransparentUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER); }
+	private ArrayList<ByteBuffer> makeVertexBuffers(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder)
 	{
 		ArrayList<ByteBuffer> byteBufferList = new ArrayList<>(3);
 		
 		ByteBuffer buffer = null;
-		for (int directionIndex = 0; directionIndex < 6; directionIndex++)
+		for (int directionIndex : directionRenderOrder)
 		{
 			// ignore empty directions
 			if (quadList[directionIndex].isEmpty())

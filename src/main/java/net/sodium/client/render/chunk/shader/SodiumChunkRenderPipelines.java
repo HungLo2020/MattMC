@@ -149,7 +149,6 @@ public final class SodiumChunkRenderPipelines {
 
         RenderPipeline.Builder builder = RenderPipeline.builder(snippet)
             .withLocation(key.contract().sharedPipelineLocation())
-            .withShaderDefine("VULKAN_DISABLE_TERRAIN_FOG")
             .withDepthTestFunction(passState.depthTest())
             .withPolygonMode(passState.polygonMode())
             .withCull(passState.cull())

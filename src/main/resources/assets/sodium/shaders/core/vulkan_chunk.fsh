@@ -9,6 +9,13 @@
 
 uniform sampler2D Sampler0;
 
+layout(std140) uniform SodiumChunkParams {
+    vec2 TexCoordShrink;
+    vec4 SodiumFogColor;
+    vec2 SodiumEnvironmentFog;
+    vec2 SodiumRenderFog;
+};
+
 layout(location = 0) in float sphericalVertexDistance;
 layout(location = 1) in float cylindricalVertexDistance;
 layout(location = 2) in vec4 vertexColor;
@@ -41,11 +48,11 @@ void main() {
         color,
         sphericalVertexDistance,
         cylindricalVertexDistance,
-        FogEnvironmentalStart,
-        FogEnvironmentalEnd,
-        FogRenderDistanceStart,
-        FogRenderDistanceEnd,
-        FogColor
+        SodiumEnvironmentFog.x,
+        SodiumEnvironmentFog.y,
+        SodiumRenderFog.x,
+        SodiumRenderFog.y,
+        SodiumFogColor
     );
 #endif
 }

@@ -83,10 +83,11 @@ public class ScreenQuad
 			return null;
 		}
 
+		CommandContext ctx = VulkanicAPI.getCommandContext();
 		return VulkanicAPI.createRenderPass(
 				() -> "Distant Horizons screen quad",
 				VulkanicAPI.getDrawFramebufferBinding(),
-				false);
+				VulkanicAPI.getFramebufferDepthAttachmentObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0);
 	}
 		
 	private void createBuffer()

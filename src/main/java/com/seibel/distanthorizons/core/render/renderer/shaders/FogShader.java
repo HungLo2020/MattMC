@@ -31,6 +31,7 @@ public class FogShader extends AbstractShaderRenderer
 	public DhFramebuffer frameBuffer;
 	private DhFramebuffer activeFrameBuffer;
 	private int activeDepthTextureId = -1;
+	private int activeColorTextureId = -1;
 	
 	private Mat4f inverseMvmProjMatrix; 
 	
@@ -41,6 +42,7 @@ public class FogShader extends AbstractShaderRenderer
 	//==========//
 	
 	public int uDepthMap;
+	public int uColorMap;
 	/** Inverted Model View Projection matrix */
 	public int uInvMvmProj;
 	
@@ -49,6 +51,7 @@ public class FogShader extends AbstractShaderRenderer
 	public int uFogScale;
 	public int uFogVerticalScale;
 	public int uFullFogMode;
+	public int uFogFalloffType;
 	
 	// far fog
 	public int uFarFogStart;
@@ -94,6 +97,7 @@ public class FogShader extends AbstractShaderRenderer
 		// because disabling fog can cause the GLSL to optimize out most (if not all) uniforms
 		
 		this.uDepthMap = this.shader.getUniformLocation("uDepthMap");
+		this.uColorMap = this.shader.getUniformLocation("uColorMap");
 		this.uInvMvmProj = this.shader.getUniformLocation("uInvMvmProj");
 		
 		// Fog uniforms
@@ -101,6 +105,7 @@ public class FogShader extends AbstractShaderRenderer
 		this.uFogVerticalScale = this.shader.getUniformLocation("uFogVerticalScale");
 		this.uFogColor = this.shader.getUniformLocation("uFogColor");
 		this.uFullFogMode = this.shader.getUniformLocation("uFullFogMode");
+		this.uFogFalloffType = this.shader.getUniformLocation("uFogFalloffType");
 		
 		// fog config
 		this.uFarFogStart = this.shader.getUniformLocation("uFarFogStart");
@@ -175,6 +180,7 @@ public class FogShader extends AbstractShaderRenderer
 		this.shader.setUniform(ctx, this.uFarFogMin, farFogMin);
 		this.shader.setUniform(ctx, this.uFarFogRange, farFogMax - farFogMin);
 		this.shader.setUniform(ctx, this.uFarFogDensity, farFogDensity);
+		this.shader.setUniform(ctx, this.uFogFalloffType, Config.Client.Advanced.Graphics.Fog.farFogFalloff.get().value);
 		
 		
 		// height config
@@ -239,15 +245,18 @@ public class FogShader extends AbstractShaderRenderer
 	protected boolean onPreRender(CommandContext ctx, float partialTicks)
 	{
 		int depthTextureId = LodRenderer.INSTANCE.getActiveDepthTextureId();
-		if (this.frameBuffer == null || depthTextureId == -1)
+		int colorTextureId = LodRenderer.INSTANCE.getActiveColorTextureId();
+		if (this.frameBuffer == null || depthTextureId == -1 || colorTextureId == -1)
 		{
 			this.activeFrameBuffer = null;
 			this.activeDepthTextureId = -1;
+			this.activeColorTextureId = -1;
 			return false;
 		}
 
 		this.activeFrameBuffer = this.frameBuffer;
 		this.activeDepthTextureId = depthTextureId;
+		this.activeColorTextureId = colorTextureId;
 		return true;
 	}
 	
@@ -258,10 +267,15 @@ public class FogShader extends AbstractShaderRenderer
 		VulkanicAPI.setScissorTestEnabled(ctx, false);
 		VulkanicAPI.setDepthTestEnabled(ctx, false);
 		VulkanicAPI.setBlendEnabled(ctx, false);
+		VulkanicAPI.setColorMask(ctx, true, true, true, true);
 		
 		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(this.activeDepthTextureId);
 		VulkanicAPI.setUniform1i(ctx, this.uDepthMap, 0);
+
+		DhTextureState.setActiveTextureUnitIndex(1);
+		DhTextureState.bindTexture2D(this.activeColorTextureId);
+		VulkanicAPI.setUniform1i(ctx, this.uColorMap, 1);
 		
 		// this is necessary for Legacy OpenGL support
 		// otherwise the framebuffer isn't cleared correctly and the fog smears across the screen

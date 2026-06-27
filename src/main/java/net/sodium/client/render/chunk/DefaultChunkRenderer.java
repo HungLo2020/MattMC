@@ -56,7 +56,12 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
 public class DefaultChunkRenderer extends ShaderChunkRenderer {
-    private static final int SODIUM_CHUNK_PARAMS_UBO_SIZE = new Std140SizeCalculator().putVec2().get();
+    private static final int SODIUM_CHUNK_PARAMS_UBO_SIZE = new Std140SizeCalculator()
+        .putVec2()
+        .putVec4()
+        .putVec2()
+        .putVec2()
+        .get();
     private static final Logger LOGGER = LoggerFactory.getLogger("Sodium-VulkanTerrain");
     private static final int MAX_VULKAN_RENDER_PROBES = 48;
     private static final boolean TRACE_VULKAN_TERRAIN_RENDER_TARGETS = Boolean.getBoolean("mattmc.vulkan.traceTerrainRenderTargets");
@@ -197,7 +202,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
         }
 
         CommandEncoder commandEncoder = VulkanicAPI.createNativeTerrainCommandEncoder();
-        GpuBufferSlice chunkParams = this.writeChunkParams(commandEncoder);
+        GpuBufferSlice chunkParams = this.writeChunkParams(commandEncoder, parameters);
         List<PreparedRegionDraw> preparedDraws = new ArrayList<>();
         double nearestRegionDistanceSq = Double.POSITIVE_INFINITY;
         int nearestRegionOriginX = 0;
@@ -398,7 +403,7 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
     public void endFrame() {
     }
 
-    private GpuBufferSlice writeChunkParams(CommandEncoder commandEncoder) {
+    private GpuBufferSlice writeChunkParams(CommandEncoder commandEncoder, FogParameters fogParameters) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             var textureAtlas = (net.minecraft.client.renderer.texture.TextureAtlas) net.minecraft.client.Minecraft.getInstance()
                 .getTextureManager()
@@ -413,6 +418,9 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                 this.sodiumChunkParamsBuffer.slice(),
                 Std140Builder.onStack(stack, SODIUM_CHUNK_PARAMS_UBO_SIZE)
                     .putVec2(shrinkX, shrinkY)
+                    .putVec4(fogParameters.red(), fogParameters.green(), fogParameters.blue(), fogParameters.alpha())
+                    .putVec2(fogParameters.environmentalStart(), fogParameters.environmentalEnd())
+                    .putVec2(fogParameters.renderStart(), fogParameters.renderEnd())
                     .get()
             );
         }

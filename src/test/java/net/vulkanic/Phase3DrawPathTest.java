@@ -1187,9 +1187,22 @@ public class Phase3DrawPathTest {
 
         Path pipelineFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/shader/SodiumChunkRenderPipelines.java");
         String pipelineSource = readSource(pipelineFile);
+        Path rendererFile = SRC_MAIN_JAVA.resolve("net/sodium/client/render/chunk/DefaultChunkRenderer.java");
+        String rendererSource = readSource(rendererFile);
 
         assertTrue(pipelineSource.contains("withShaderDefine(\"USE_FRAGMENT_DISCARD\")"),
             "The Vulkan Sodium cutout pipeline should keep the cutout-only shader define that scopes alpha discard to alpha-tested terrain");
+        assertFalse(pipelineSource.contains("withShaderDefine(\"VULKAN_DISABLE_TERRAIN_FOG\")"),
+            "The Vulkan Sodium chunk pipeline should keep vanilla terrain fog enabled so underwater cutout terrain is fogged like OpenGL");
+        assertTrue(shaderSource.contains("vec4 SodiumFogColor")
+                && shaderSource.contains("SodiumEnvironmentFog.x")
+                && shaderSource.contains("SodiumRenderFog.x"),
+            "The Vulkan Sodium chunk shader should apply fog from Sodium's terrain FogParameters instead of Minecraft's global fog block");
+        assertTrue(rendererSource.contains("this.writeChunkParams(commandEncoder, parameters)")
+                && rendererSource.contains(".putVec4(fogParameters.red(), fogParameters.green(), fogParameters.blue(), fogParameters.alpha())")
+                && rendererSource.contains(".putVec2(fogParameters.environmentalStart(), fogParameters.environmentalEnd())")
+                && rendererSource.contains(".putVec2(fogParameters.renderStart(), fogParameters.renderEnd())"),
+            "The Vulkan Sodium chunk renderer should upload Sodium terrain fog parameters with the chunk render-pass UBO");
     }
 
     @Test
@@ -4368,13 +4381,15 @@ public class Phase3DrawPathTest {
             "FogShader should store its target as a framebuffer owner instead of a raw id");
         assertTrue(fogShaderSource.contains("protected boolean onPreRender(CommandContext ctx, float partialTicks)"),
             "FogShader should use shared pre-bind precheck hook for unresolved resources");
-        assertTrue(fogShaderSource.contains("if (this.frameBuffer == null || depthTextureId == -1)")
+        assertTrue(fogShaderSource.contains("if (this.frameBuffer == null || depthTextureId == -1 || colorTextureId == -1)")
                 && fogShaderSource.contains("this.activeFrameBuffer = this.frameBuffer;")
-                && fogShaderSource.contains("this.activeDepthTextureId = depthTextureId;"),
-            "FogShader precheck should validate and cache framebuffer/depth texture ids before bind/uniform work");
+                && fogShaderSource.contains("this.activeDepthTextureId = depthTextureId;")
+                && fogShaderSource.contains("this.activeColorTextureId = colorTextureId;"),
+            "FogShader precheck should validate and cache framebuffer/depth/color texture ids before bind/uniform work");
         assertTrue(fogShaderSource.contains("this.activeFrameBuffer.bind(ctx);")
-                && fogShaderSource.contains("DhTextureState.bindTexture2D(this.activeDepthTextureId)"),
-            "FogShader should bind cached validated framebuffer owners and depth texture ids resolved during precheck");
+                && fogShaderSource.contains("DhTextureState.bindTexture2D(this.activeDepthTextureId)")
+                && fogShaderSource.contains("DhTextureState.bindTexture2D(this.activeColorTextureId)"),
+            "FogShader should bind cached validated framebuffer owners and texture ids resolved during precheck");
 
         Path ssaoShaderFile = SRC_MAIN_JAVA.resolve("com/seibel/distanthorizons/core/render/renderer/shaders/SSAOShader.java");
         String ssaoShaderSource = readSource(ssaoShaderFile);

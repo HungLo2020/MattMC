@@ -10,6 +10,7 @@ import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.VulkanicResourceBarriers;
 import net.vulkanic.VulkanicTextureParameterName;
 import net.vulkanic.VulkanicTextureParameterValue;
 import net.vulkanic.VulkanicTextureTarget;
@@ -25,6 +26,8 @@ import java.nio.ByteBuffer;
 public class FogRenderer
 {
 	public static FogRenderer INSTANCE = new FogRenderer();
+	private static final VulkanicResourceBarriers FOG_WRITES_VISIBLE_TO_TEXTURE_FETCH = VulkanicResourceBarriers.of(
+			VulkanicResourceBarriers.Barrier.TEXTURE_FETCH);
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
@@ -126,10 +129,15 @@ public class FogRenderer
 		{
 			return;
 		}
-		
+
 		FogShader.INSTANCE.frameBuffer = this.fogFramebuffer;
 		FogShader.INSTANCE.setProjectionMatrix(modelViewProjectionMatrix);
 		FogShader.INSTANCE.render(partialTicks);
+
+		if (VulkanicAPI.isVulkanBackendSelected())
+		{
+			VulkanicAPI.applyResourceBarriers(ctx, FOG_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+		}
 		
 		FogApplyShader.INSTANCE.fogTexture = this.fogTexture;
 		FogApplyShader.INSTANCE.render(partialTicks);

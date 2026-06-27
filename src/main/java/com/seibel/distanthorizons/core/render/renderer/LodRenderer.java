@@ -262,6 +262,11 @@ public class LodRenderer
 				
 				Mat4f combinedMatrix = new Mat4f(renderParams.dhProjectionMatrix);
 				combinedMatrix.multiply(renderParams.dhModelViewMatrix);
+
+				if (VulkanicAPI.isVulkanBackendSelected())
+				{
+					VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_LOD_WRITES_VISIBLE_TO_TEXTURE_FETCH);
+				}
 				
 				FogRenderer.INSTANCE.render(combinedMatrix, renderParams.partialTicks);
 			}
@@ -471,7 +476,7 @@ public class LodRenderer
 			
 			float[] clearColorValues = new float[4];
 			VulkanicAPI.getClearColor(ctx, clearColorValues);
-			VulkanicAPI.setClearColor(ctx, clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
+			VulkanicAPI.setClearColor(ctx, clearColorValues[0], clearColorValues[1], clearColorValues[2], 0.0f);
 			
 			if (this.usingMcFramebuffer && framebufferOverride == null)
 			{
@@ -616,6 +621,7 @@ public class LodRenderer
 		{
 			VulkanicAPI.setBlendEnabled(ctx, true);
 			VulkanicAPI.setDepthTestEnabled(ctx, true);
+			VulkanicAPI.setDepthWriteMask(ctx, true);
 			VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
 			VulkanicAPI.setBlendFunction(
 				ctx,
@@ -628,6 +634,7 @@ public class LodRenderer
 		else
 		{
 			VulkanicAPI.setBlendEnabled(ctx, false);
+			VulkanicAPI.setDepthWriteMask(ctx, true);
 		}
 		
 		
@@ -651,38 +658,25 @@ public class LodRenderer
 		
 		try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
 		{
-			SortedArraySet<LodBufferContainer> lodBufferContainer = lodBufferHandler.getColumnRenderBuffers();
-			if (lodBufferContainer != null)
+			SortedArraySet<LodBufferContainer> lodBufferContainers = lodBufferHandler.getColumnRenderBuffers();
+			if (lodBufferContainers != null)
 			{
-				for (int lodIndex = 0; lodIndex < lodBufferContainer.size(); lodIndex++)
+				if (opaquePass)
 				{
-					LodBufferContainer bufferContainer = lodBufferContainer.get(lodIndex);
-					this.setShaderProgramMvmOffset(bufferContainer.minCornerBlockPos, shaderProgram, renderEventParam);
-					
-					GLVertexBuffer[] vbos = opaquePass ? bufferContainer.vbos : bufferContainer.vbosTransparent;
-					for (int vboIndex = 0; vboIndex < vbos.length; vboIndex++)
-					{
-						GLVertexBuffer vbo = vbos[vboIndex];
-						if (vbo == null)
-						{
-							continue;
-						}
-						
-						if (vbo.getVertexCount() == 0)
-						{
-							continue;
-						}
-						
-						vbo.bind();
-						shaderProgram.bindVertexBuffer(vbo.getId());
-						VulkanicAPI.drawElements(
-								ctx,
-								VulkanicPrimitiveMode.TRIANGLES,
-								(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
-								this.quadIBO.getType(), 0);
-						vbo.unbind();
-					}
+					this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbos);
 				}
+				else
+				{
+					this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparent);
+					this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentUp);
+				}
+			}
+		}
+		finally
+		{
+			if (!opaquePass)
+			{
+				VulkanicAPI.setDepthWriteMask(ctx, true);
 			}
 		}
 		
@@ -701,14 +695,66 @@ public class LodRenderer
 		
 	}
 
+	private void renderLodBuffers(
+			SortedArraySet<LodBufferContainer> lodBufferContainers,
+			IDhApiShaderProgram shaderProgram,
+			RenderParams renderEventParam,
+			java.util.function.Function<LodBufferContainer, GLVertexBuffer[]> vboSelector)
+	{
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		for (int lodIndex = 0; lodIndex < lodBufferContainers.size(); lodIndex++)
+		{
+			LodBufferContainer bufferContainer = lodBufferContainers.get(lodIndex);
+			this.setShaderProgramMvmOffset(bufferContainer.minCornerBlockPos, shaderProgram, renderEventParam);
+
+			GLVertexBuffer[] vbos = vboSelector.apply(bufferContainer);
+			for (int vboIndex = 0; vboIndex < vbos.length; vboIndex++)
+			{
+				GLVertexBuffer vbo = vbos[vboIndex];
+				if (vbo == null)
+				{
+					continue;
+				}
+
+				if (vbo.getVertexCount() == 0)
+				{
+					continue;
+				}
+
+				vbo.bind();
+				shaderProgram.bindVertexBuffer(vbo.getId());
+				VulkanicAPI.drawElements(
+						ctx,
+						VulkanicPrimitiveMode.TRIANGLES,
+						(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
+						this.quadIBO.getType(), 0);
+				vbo.unbind();
+			}
+		}
+	}
+
 	private RenderPass createVulkanCompatibilityRenderPass(String label)
 	{
-		if (!VulkanicAPI.isVulkanBackendSelected() || this.activeFramebufferId < 0)
+		if (!VulkanicAPI.isVulkanBackendSelected())
 		{
 			return null;
 		}
 
-		return VulkanicAPI.createRenderPass(() -> label, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment());
+		CommandContext ctx = VulkanicAPI.getCommandContext();
+		int framebufferId = this.activeFramebufferId;
+		boolean framebufferHasDepthAttachment = this.activeFramebufferHasDepthAttachment();
+		int drawFramebufferId = VulkanicAPI.getDrawFramebufferBinding();
+		if (drawFramebufferId > 0 && VulkanicAPI.getFramebufferColorAttachment0ObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0)
+		{
+			framebufferId = drawFramebufferId;
+			framebufferHasDepthAttachment = VulkanicAPI.getFramebufferDepthAttachmentObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0;
+		}
+		if (framebufferId < 0)
+		{
+			return null;
+		}
+
+		return VulkanicAPI.createRenderPass(() -> label, framebufferId, framebufferHasDepthAttachment);
 	}
 
 	private boolean activeFramebufferHasDepthAttachment()

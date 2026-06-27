@@ -39,6 +39,7 @@ public class LodBufferContainer implements AutoCloseable
 	
 	public GLVertexBuffer[] vbos;
 	public GLVertexBuffer[] vbosTransparent;
+	public GLVertexBuffer[] vbosTransparentUp;
 	
 	private CompletableFuture<LodBufferContainer> uploadFuture = null;
 	
@@ -54,6 +55,7 @@ public class LodBufferContainer implements AutoCloseable
 		this.minCornerBlockPos = minCornerBlockPos;
 		this.vbos = new GLVertexBuffer[0];
 		this.vbosTransparent = new GLVertexBuffer[0];
+		this.vbosTransparentUp = new GLVertexBuffer[0];
 	}
 	
 	
@@ -82,9 +84,11 @@ public class LodBufferContainer implements AutoCloseable
 		// make the buffers
 		ArrayList<ByteBuffer> opaqueBuffers = builder.makeOpaqueVertexBuffers();
 		ArrayList<ByteBuffer> transparentBuffers = builder.makeTransparentVertexBuffers();
+		ArrayList<ByteBuffer> transparentUpBuffers = builder.makeTransparentUpVertexBuffers();
 		
 		this.vbos = resizeBuffer(this.vbos, opaqueBuffers.size());
 		this.vbosTransparent = resizeBuffer(this.vbosTransparent, transparentBuffers.size());
+		this.vbosTransparentUp = resizeBuffer(this.vbosTransparentUp, transparentUpBuffers.size());
 		
 		
 		// upload on MC's render thread
@@ -104,6 +108,7 @@ public class LodBufferContainer implements AutoCloseable
 				// upload on the render thread
 				uploadBuffersDirect(this.vbos, opaqueBuffers, gpuUploadMethod);
 				uploadBuffersDirect(this.vbosTransparent, transparentBuffers, gpuUploadMethod);
+				uploadBuffersDirect(this.vbosTransparentUp, transparentUpBuffers, gpuUploadMethod);
 				this.buffersUploaded = true;
 				
 				// success
@@ -132,6 +137,11 @@ public class LodBufferContainer implements AutoCloseable
 				}
 				
 				for (ByteBuffer buffer : transparentBuffers)
+				{
+					MemoryUtil.memFree(buffer);
+				}
+
+				for (ByteBuffer buffer : transparentUpBuffers)
 				{
 					MemoryUtil.memFree(buffer);
 				}
@@ -213,7 +223,7 @@ public class LodBufferContainer implements AutoCloseable
 	//================//
 	
 	/** can be used when debugging */
-	public boolean hasNonNullVbos() { return this.vbos != null || this.vbosTransparent != null; }
+	public boolean hasNonNullVbos() { return this.vbos != null || this.vbosTransparent != null || this.vbosTransparentUp != null; }
 	
 	/** can be used when debugging */
 	public int vboBufferCount() 
@@ -228,6 +238,11 @@ public class LodBufferContainer implements AutoCloseable
 		if (this.vbosTransparent != null)
 		{
 			count += this.vbosTransparent.length;
+		}
+
+		if (this.vbosTransparentUp != null)
+		{
+			count += this.vbosTransparentUp.length;
 		}
 		
 		return count;
@@ -287,6 +302,14 @@ public class LodBufferContainer implements AutoCloseable
 			}
 			
 			for (GLVertexBuffer buffer : this.vbosTransparent)
+			{
+				if (buffer != null)
+				{
+					buffer.destroyAsync();
+				}
+			}
+
+			for (GLVertexBuffer buffer : this.vbosTransparentUp)
 			{
 				if (buffer != null)
 				{

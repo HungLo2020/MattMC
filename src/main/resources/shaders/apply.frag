@@ -15,14 +15,15 @@ uniform sampler2D gDhDepthTexture;
  */
 void main()
 {
+    vec4 dhColor = texture(gDhColorTexture, TexCoord);
     fragColor = vec4(0.0);
     
     // a fragment depth of "1" means the fragment wasn't drawn to,
     // only update fragments that were drawn to
     float fragmentDepth = texture(gDhDepthTexture, TexCoord).r;
-    if (fragmentDepth < 1.0)
+    if (fragmentDepth < 1.0 || dhColor.a > 0.0)
     {
-        fragColor = texture(gDhColorTexture, TexCoord);
+        fragColor = dhColor;
     }
     else
     {

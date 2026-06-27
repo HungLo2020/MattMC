@@ -280,6 +280,108 @@ public class DistantHorizonsCommandContextMigrationTest {
     }
 
     @Test
+    public void testDhTransparentLodPassPreservesDepthForFogComposite() throws IOException {
+        Path lodRenderer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
+
+        int renderLodPass = sourceWithoutComments.indexOf(
+            "private void renderLodPass(IDhApiShaderProgram shaderProgram, RenderBufferHandler lodBufferHandler, RenderParams renderEventParam, boolean opaquePass)");
+        int transparentBranch = sourceWithoutComments.indexOf("if (!opaquePass)", renderLodPass);
+        int transparentDepthMask = sourceWithoutComments.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", transparentBranch);
+        int transparentBlendEquation = sourceWithoutComments.indexOf("VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD)", transparentBranch);
+        int opaqueBranch = sourceWithoutComments.indexOf("else", transparentBranch);
+        int opaqueDepthMask = sourceWithoutComments.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", opaqueBranch);
+        int renderPass = sourceWithoutComments.indexOf("createVulkanCompatibilityRenderPass(\"Distant Horizons LOD\")", opaqueBranch);
+        int restoreDepthMask = sourceWithoutComments.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", renderPass);
+
+        assertTrue(renderLodPass >= 0 && transparentBranch > renderLodPass,
+            "DH LOD renderer should have an explicit transparent branch in the LOD draw path");
+        assertTrue(transparentDepthMask > transparentBranch && transparentDepthMask < transparentBlendEquation,
+            "DH transparent LOD rendering should write depth so later fog/apply passes see the final water surface");
+        assertTrue(opaqueDepthMask > opaqueBranch && opaqueDepthMask < renderPass,
+            "DH opaque LOD rendering should explicitly restore depth writes before drawing opaque terrain");
+        assertTrue(restoreDepthMask > renderPass,
+            "DH transparent LOD rendering should restore depth writes after the transparent pass so later passes inherit sane state");
+    }
+
+    @Test
+    public void testDhVulkanRenderPassUsesCurrentlyBoundDrawFramebuffer() throws IOException {
+        Path lodRenderer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
+
+        int renderPassHelper = sourceWithoutComments.indexOf("private RenderPass createVulkanCompatibilityRenderPass");
+        int cachedDefault = sourceWithoutComments.indexOf("int framebufferId = this.activeFramebufferId", renderPassHelper);
+        int drawFramebuffer = sourceWithoutComments.indexOf("VulkanicAPI.getDrawFramebufferBinding()", renderPassHelper);
+        int colorAttachmentGuard = sourceWithoutComments.indexOf(
+            "VulkanicAPI.getFramebufferColorAttachment0ObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0",
+            drawFramebuffer);
+        int currentDrawAssignment = sourceWithoutComments.indexOf("framebufferId = drawFramebufferId", colorAttachmentGuard);
+        int currentDrawDepth = sourceWithoutComments.indexOf(
+            "VulkanicAPI.getFramebufferDepthAttachmentObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0",
+            currentDrawAssignment);
+        int createRenderPass = sourceWithoutComments.indexOf(
+            "VulkanicAPI.createRenderPass(() -> label, framebufferId, framebufferHasDepthAttachment)",
+            currentDrawDepth);
+
+        assertTrue(renderPassHelper >= 0,
+            "DH LOD renderer should centralize Vulkan compatibility render pass creation");
+        assertTrue(cachedDefault > renderPassHelper && cachedDefault < drawFramebuffer,
+            "DH Vulkan LOD render passes should default to DH's cached active framebuffer");
+        assertTrue(drawFramebuffer > renderPassHelper,
+            "DH Vulkan LOD render passes should use the framebuffer currently bound by DH/Iris render-pass events");
+        assertTrue(colorAttachmentGuard > drawFramebuffer && colorAttachmentGuard < currentDrawAssignment,
+            "DH Vulkan LOD render passes should only follow the current draw framebuffer when it has a color attachment");
+        assertTrue(currentDrawAssignment > colorAttachmentGuard && currentDrawDepth > currentDrawAssignment,
+            "DH Vulkan LOD render passes should copy the current draw framebuffer and its depth contract only after the color-attachment guard");
+        assertTrue(createRenderPass > currentDrawDepth,
+            "DH Vulkan LOD render passes should create the pass for the resolved draw framebuffer");
+    }
+
+    @Test
+    public void testDhTransparentLodBuffersDrawWaterSurfaceLast() throws IOException {
+        Path lodQuadBuilder = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder.java");
+        Path lodRenderer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        Path lodBufferContainer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodBufferContainer.java");
+        String sourceWithoutComments = readSourceWithoutComments(lodQuadBuilder);
+        String rendererSource = readSourceWithoutComments(lodRenderer);
+        String containerSource = readSourceWithoutComments(lodBufferContainer);
+
+        int nonUpOrder = sourceWithoutComments.indexOf("TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER");
+        int north = sourceWithoutComments.indexOf("EDhDirection.NORTH.ordinal()", nonUpOrder);
+        int south = sourceWithoutComments.indexOf("EDhDirection.SOUTH.ordinal()", nonUpOrder);
+        int west = sourceWithoutComments.indexOf("EDhDirection.WEST.ordinal()", nonUpOrder);
+        int east = sourceWithoutComments.indexOf("EDhDirection.EAST.ordinal()", nonUpOrder);
+        int upOrder = sourceWithoutComments.indexOf("TRANSPARENT_UP_DIRECTION_RENDER_ORDER");
+        int up = sourceWithoutComments.indexOf("EDhDirection.UP.ordinal()", upOrder);
+        int transparentBuffers = sourceWithoutComments.indexOf(
+            "makeTransparentVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER);");
+        int transparentUpBuffers = sourceWithoutComments.indexOf(
+            "makeTransparentUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER);");
+        int sideDraw = rendererSource.indexOf("container -> container.vbosTransparent");
+        int upDraw = rendererSource.indexOf("container -> container.vbosTransparentUp", sideDraw);
+
+        assertTrue(nonUpOrder >= 0 && upOrder > nonUpOrder,
+            "DH transparent LOD buffers should split side/down quads from UP water-surface quads");
+        assertTrue(north > nonUpOrder && south > north && west > south && east > west,
+            "DH transparent LOD side buffers should include non-UP faces before the water-surface pass");
+        assertTrue(up > upOrder,
+            "DH transparent UP buffers should contain only UP faces");
+        assertTrue(transparentBuffers > up && transparentUpBuffers > transparentBuffers,
+            "DH transparent LOD buffer creation should build separate side and UP buffers");
+        assertTrue(containerSource.contains("public GLVertexBuffer[] vbosTransparentUp")
+                && containerSource.contains("builder.makeTransparentUpVertexBuffers()")
+                && containerSource.contains("uploadBuffersDirect(this.vbosTransparentUp"),
+            "DH LOD buffer containers should own and upload the transparent UP pass independently");
+        assertTrue(sideDraw >= 0 && upDraw > sideDraw,
+            "DH LOD rendering should draw all transparent side faces before drawing transparent UP water surfaces");
+    }
+
+    @Test
     public void testDhApplyShaderRestoresColorWritesBeforeCompositing() throws IOException {
         Path applyShader = SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/shaders/DhApplyShader.java");
@@ -305,6 +407,40 @@ public class DistantHorizonsCommandContextMigrationTest {
     }
 
     @Test
+    public void testDhFogApplyShaderRestoresColorWritesBeforeCompositing() throws IOException {
+        Path fogApplyShader = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/shaders/FogApplyShader.java");
+        String sourceWithoutComments = readSourceWithoutComments(fogApplyShader);
+
+        int render = sourceWithoutComments.indexOf("protected void onRender(CommandContext ctx)");
+        int colorMask = sourceWithoutComments.indexOf(
+            "VulkanicAPI.setColorMask(ctx, true, true, true, true)", render);
+        int quad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render()", render);
+
+        assertTrue(render >= 0 && quad > render,
+            "DH fog apply shader should render a fullscreen composite quad");
+        assertTrue(colorMask > render && colorMask < quad,
+            "DH fog apply shader should restore RGBA color writes before compositing generated fog");
+    }
+
+    @Test
+    public void testDhFogShaderRestoresColorWritesBeforeGeneratingFogTexture() throws IOException {
+        Path fogShader = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/shaders/FogShader.java");
+        String sourceWithoutComments = readSourceWithoutComments(fogShader);
+
+        int render = sourceWithoutComments.indexOf("protected void onRender(CommandContext ctx)");
+        int colorMask = sourceWithoutComments.indexOf(
+            "VulkanicAPI.setColorMask(ctx, true, true, true, true)", render);
+        int quad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render()", render);
+
+        assertTrue(render >= 0 && quad > render,
+            "DH fog shader should render a fullscreen fog-generation quad");
+        assertTrue(colorMask > render && colorMask < quad,
+            "DH fog shader should restore RGBA color writes before generating the fog texture");
+    }
+
+    @Test
     public void testDhApplyPassMakesOffscreenLodWritesVisibleToTextureFetch() throws IOException {
         Path lodRenderer = SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
@@ -323,6 +459,87 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH should have an apply phase after its offscreen LOD render");
         assertTrue(barrierCall > applyEvent && barrierCall < applyRender,
             "DH should make offscreen color/depth writes visible before the apply shader samples them");
+    }
+
+    @Test
+    public void testDhFogPassMakesOffscreenLodDepthVisibleToTextureFetch() throws IOException {
+        Path lodRenderer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
+
+        int fogBlock = sourceWithoutComments.indexOf("Config.Client.Advanced.Graphics.Fog.enableDhFog.get()");
+        int fogRender = sourceWithoutComments.indexOf("FogRenderer.INSTANCE.render(combinedMatrix, renderParams.partialTicks)", fogBlock);
+        int barrierCall = sourceWithoutComments.indexOf(
+            "VulkanicAPI.applyResourceBarriers(VulkanicAPI.getCommandContext(), OFFSCREEN_LOD_WRITES_VISIBLE_TO_TEXTURE_FETCH)",
+            fogBlock);
+
+        assertTrue(fogBlock >= 0 && fogRender > fogBlock,
+            "DH should have a fog pass that samples the offscreen LOD depth texture");
+        assertTrue(barrierCall > fogBlock && barrierCall < fogRender,
+            "DH should make offscreen LOD depth writes visible before the fog shader samples them");
+    }
+
+    @Test
+    public void testDhFogApplyMakesGeneratedFogVisibleToTextureFetch() throws IOException {
+        Path fogRenderer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/FogRenderer.java");
+        String sourceWithoutComments = readSourceWithoutComments(fogRenderer);
+
+        int barrierConstant = sourceWithoutComments.indexOf("FOG_WRITES_VISIBLE_TO_TEXTURE_FETCH");
+        int fogGenerate = sourceWithoutComments.indexOf("FogShader.INSTANCE.render(partialTicks)");
+        int barrierCall = sourceWithoutComments.indexOf(
+            "VulkanicAPI.applyResourceBarriers(ctx, FOG_WRITES_VISIBLE_TO_TEXTURE_FETCH)",
+            fogGenerate);
+        int fogApply = sourceWithoutComments.indexOf("FogApplyShader.INSTANCE.render(partialTicks)", fogGenerate);
+
+        assertTrue(barrierConstant >= 0,
+            "DH fog renderer should declare an explicit Vulkan barrier for the generated fog texture handoff");
+        assertTrue(fogGenerate >= 0 && fogApply > fogGenerate,
+            "DH fog renderer should generate fog before applying it");
+        assertTrue(barrierCall > fogGenerate && barrierCall < fogApply,
+            "DH fog renderer should make generated fog writes visible before the apply shader samples them");
+    }
+
+    @Test
+    public void testDhFogApplyShaderOnlyAppliesDrawnDepthPixels() throws IOException {
+        Path fogApplyShader = SRC_MAIN_RESOURCES.resolve("shaders/fog/apply.frag");
+        String sourceWithoutComments = readSourceWithoutComments(fogApplyShader);
+
+        assertTrue(sourceWithoutComments.contains("fragmentDepth < 1.0"),
+            "DH fog apply shader should apply only pixels closer than the untouched clear-depth value");
+        assertFalse(sourceWithoutComments.contains("fragmentDepth != 1"),
+            "DH fog apply shader should not rely on exact sampled-depth equality on Vulkan");
+    }
+
+    @Test
+    public void testDhFogShaderUsesBackendCorrectDepthReconstruction() throws IOException {
+        Path fogShader = SRC_MAIN_RESOURCES.resolve("shaders/fog/fog.frag");
+        String sourceWithoutComments = readSourceWithoutComments(fogShader);
+
+        int calcViewPosition = sourceWithoutComments.indexOf("vec3 calcViewPosition(float fragmentDepth)");
+        int ndcSetup = sourceWithoutComments.indexOf("vec4 ndc = vec4(TexCoord.xy * 2.0 - 1.0, fragmentDepth, 1.0)", calcViewPosition);
+        int depthRemap = sourceWithoutComments.indexOf("ndc.z = ndc.z * 2.0 - 1.0", ndcSetup);
+        int inverseProject = sourceWithoutComments.indexOf("uInvMvmProj * ndc", depthRemap);
+
+        assertTrue(calcViewPosition >= 0 && ndcSetup > calcViewPosition,
+            "DH fog shader should reconstruct view position from sampled LOD depth");
+        assertTrue(depthRemap > ndcSetup && inverseProject > depthRemap,
+            "DH fog shader should remap sampled depth into the clip-space convention used by the DH inverse projection matrix");
+    }
+
+    @Test
+    public void testDhFogShaderReceivesConfiguredFarFogFalloff() throws IOException {
+        Path fogShader = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/shaders/FogShader.java");
+        String sourceWithoutComments = readSourceWithoutComments(fogShader);
+
+        assertTrue(sourceWithoutComments.contains("public int uFogFalloffType"),
+            "DH fog shader wrapper should track the far-fog falloff uniform");
+        assertTrue(sourceWithoutComments.contains("this.uFogFalloffType = this.shader.getUniformLocation(\"uFogFalloffType\")"),
+            "DH fog shader wrapper should resolve the far-fog falloff uniform");
+        assertTrue(sourceWithoutComments.contains(
+                "this.shader.setUniform(ctx, this.uFogFalloffType, Config.Client.Advanced.Graphics.Fog.farFogFalloff.get().value)"),
+            "DH fog shader wrapper should upload the configured far-fog falloff instead of relying on GLSL defaults");
     }
 
     @Test
@@ -463,15 +680,19 @@ public class DistantHorizonsCommandContextMigrationTest {
 
         assertTrue(lodSource.contains("try (RenderPass ignored = this.createVulkanCompatibilityRenderPass(\"Distant Horizons LOD\"))"),
             "DH LOD draw calls should execute inside a Vulkan compatibility render pass");
-        assertTrue(lodSource.contains("VulkanicAPI.createRenderPass(() -> label, this.activeFramebufferId"),
-            "DH LOD render pass should target the active DH framebuffer");
+        assertTrue(lodSource.contains("VulkanicAPI.getDrawFramebufferBinding()")
+                && lodSource.contains("VulkanicAPI.getFramebufferColorAttachment0ObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0")
+                && lodSource.contains("int framebufferId = this.activeFramebufferId")
+                && lodSource.contains("VulkanicAPI.createRenderPass(() -> label, framebufferId"),
+            "DH LOD render pass should target a color-backed current draw framebuffer and fall back to the cached DH framebuffer");
         assertTrue(lodSource.contains("!VulkanicAPI.isVulkanBackendSelected()"),
             "DH LOD render pass bridge should be disabled for OpenGL");
 
         assertTrue(screenQuadSource.contains("try (RenderPass ignored = createVulkanCompatibilityRenderPass())"),
             "DH full-screen quad draws should execute inside a Vulkan compatibility render pass");
-        assertTrue(screenQuadSource.contains("VulkanicAPI.getDrawFramebufferBinding()"),
-            "DH full-screen quad render pass should target the current draw framebuffer");
+        assertTrue(screenQuadSource.contains("VulkanicAPI.getDrawFramebufferBinding()")
+                && screenQuadSource.contains("VulkanicAPI.getFramebufferDepthAttachmentObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0"),
+            "DH full-screen quad render pass should target the current draw framebuffer with its real depth attachment contract");
         assertTrue(screenQuadSource.contains("!VulkanicAPI.isVulkanBackendSelected()"),
             "DH full-screen quad render pass bridge should be disabled for OpenGL");
 

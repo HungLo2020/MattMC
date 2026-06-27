@@ -6,6 +6,7 @@ out vec4 fragColor;
 
 uniform sampler2D uColorTexture;
 uniform sampler2D uDepthTexture;
+uniform sampler2D uDhColorTexture;
 
 
 /** 
@@ -20,7 +21,8 @@ void main()
     // a fragment depth of "1" means the fragment wasn't drawn to,
     // only update fragments that were drawn to
     float fragmentDepth = textureLod(uDepthTexture, TexCoord, 0).r;
-    if (fragmentDepth != 1)
+    float lodAlpha = textureLod(uDhColorTexture, TexCoord, 0).a;
+    if (fragmentDepth < 1.0 || lodAlpha > 0.0)
     {
         fragColor = texture(uColorTexture, TexCoord);
     }

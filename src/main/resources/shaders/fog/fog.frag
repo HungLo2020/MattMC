@@ -7,6 +7,7 @@ out vec4 fragColor;
 
 
 uniform sampler2D uDepthMap;
+uniform sampler2D uColorMap;
 // inverted model view matrix and projection matrix
 uniform mat4 uInvMvmProj;
 
@@ -73,17 +74,21 @@ float mixFogThickness(float far, float height);
 void main()
 {
     float fragmentDepth = texture(uDepthMap, TexCoord).r;
+    vec4 lodColor = texture(uColorMap, TexCoord);
+    bool hasDepth = fragmentDepth < 1.0;
+    bool hasTransparentColor = lodColor.a > 0.0;
     fragColor = vec4(uFogColor.rgb, 0.0);
 
     // a fragment depth of "1" means the fragment wasn't drawn to,
     // we only want to apply Fog to LODs, not to the sky outside the LODs
-    if (fragmentDepth < 1.0)
+    if (hasDepth || hasTransparentColor)
     {
         int fogMode = uFullFogMode;
         if (fogMode == 0)
         {
+            float fogDepth = hasDepth ? fragmentDepth : 0.999999;
             // render fog based on distance from the camera
-            vec3 vertexWorldPos = calcViewPosition(fragmentDepth);
+            vec3 vertexWorldPos = calcViewPosition(fogDepth);
 
             float horizontalWorldDistance = length(vertexWorldPos.xz) * uFogScale;
             float worldDistance = length(vertexWorldPos.xyz) * uFogScale;
@@ -99,6 +104,10 @@ void main()
 
             // combined fog
             float mixedFogThickness = mixFogThickness(farFogThickness, heightFogThickness);
+            if (lodColor.a > 0.0 && lodColor.a < 1.0)
+            {
+                mixedFogThickness = max(mixedFogThickness, lodColor.a);
+            }
             fragColor.a = clamp(mixedFogThickness, 0.0, 1.0);
 
             // test
@@ -122,7 +131,7 @@ void main()
             // a uniform we don't have to worry about GLSL optimizing away different
             // options when testing, causing a bunch of headaches if we just want to render the screen red.
 
-            float depthValue = textureLod(uDepthMap, TexCoord, 0).r;
+            float depthValue = hasDepth ? textureLod(uDepthMap, TexCoord, 0).r : 0.999999;
             fragColor.rgb = vec3(depthValue); // Convert depth value to grayscale color
             fragColor.a = 1.0;
         }
@@ -142,8 +151,8 @@ float InterleavedGradientNoise(const in vec2 pixel)
 
 vec3 calcViewPosition(float fragmentDepth)
 {
-    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);
-    ndc.xyz = ndc.xyz * 2.0 - 1.0;
+    vec4 ndc = vec4(TexCoord.xy * 2.0 - 1.0, fragmentDepth, 1.0);
+    ndc.z = ndc.z * 2.0 - 1.0;
 
     vec4 eyeCoord = uInvMvmProj * ndc;
     return eyeCoord.xyz / eyeCoord.w;
@@ -297,6 +306,3 @@ float mixFogThickness(float far, float height)
     // if an invalid option is selected
     return far;
 }
-
-
-
