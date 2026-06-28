@@ -563,6 +563,10 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH should keep the legacy OpenGL lightmap unit while using Minecraft's canonical Vulkan/Iris unit");
         assertTrue(wrapperSource.contains("VulkanicAPI.isVulkanBackendSelected() ? VULKAN_LIGHTMAP_TEXTURE_UNIT : OPENGL_LIGHTMAP_TEXTURE_UNIT"),
             "DH lightmap wrapper should bind and unbind the lightmap on the texture unit selected for the active backend");
+        assertTrue(wrapperSource.contains("Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer()"),
+            "DH Vulkan lightmap binding should use Minecraft's live lightmap texture-view path so Vulkan samplers see the current lightmap");
+        assertFalse(wrapperSource.contains("Minecraft.getInstance().gameRenderer.lightTexture().turnOffLightLayer()"),
+            "DH Vulkan lightmap unbind should not clear Minecraft's shared lightmap state before later renderers use it");
         assertTrue(terrainSource.contains("VulkanicAPI.isVulkanBackendSelected()")
                 && terrainSource.contains("ILightMapWrapper.VULKAN_LIGHTMAP_TEXTURE_UNIT")
                 && terrainSource.contains("ILightMapWrapper.OPENGL_LIGHTMAP_TEXTURE_UNIT")
@@ -591,6 +595,9 @@ public class DistantHorizonsCommandContextMigrationTest {
         assertTrue(curveVert.contains("#ifdef VULKANIC_BACKEND")
                 && curveVert.contains("gl_Position.y = -gl_Position.y;"),
             "DH curved terrain vertices should match the standard Vulkan clip-space Y correction");
+        assertTrue(standardVert.contains("light2 = max(light2, 1.0 - light2);")
+                && curveVert.contains("light2 = max(light2, 1.0 - light2);"),
+            "DH built-in Vulkan terrain should preserve OpenGL-visible water-adjacent LOD lighting instead of sampling black sky rows");
 
         assertTrue(vanillaFade.contains("vec2 mcTexCoord = TexCoord;")
                 && vanillaFade.contains("mcTexCoord.y = 1.0 - mcTexCoord.y;"),

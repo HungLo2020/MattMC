@@ -5,6 +5,7 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.DhTextureState;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.minecraft.client.Minecraft;
 import net.vulkanic.VulkanicAPI;
 
 public class LightMapWrapper implements ILightMapWrapper
@@ -51,6 +52,12 @@ public class LightMapWrapper implements ILightMapWrapper
 	@Override
 	public void bind()
 	{
+		if (VulkanicAPI.isVulkanBackendSelected())
+		{
+			Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
+			return;
+		}
+
 		DhTextureState.setActiveTextureUnitIndex(getLightmapTextureUnit());
 		DhTextureState.bindTexture2D(this.textureId);
 	}
@@ -58,6 +65,11 @@ public class LightMapWrapper implements ILightMapWrapper
 	@Override
 	public void unbind()
 	{
+		if (VulkanicAPI.isVulkanBackendSelected())
+		{
+			return;
+		}
+
 		DhTextureState.setActiveTextureUnitIndex(getLightmapTextureUnit());
 		DhTextureState.bindTexture2D(0);
 	}

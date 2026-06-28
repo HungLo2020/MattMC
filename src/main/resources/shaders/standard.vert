@@ -54,6 +54,9 @@ void main()
 
 	float light2 = (mod(float(lights), 16.0)+0.5) / 16.0;
 	float light = (float(lights/16u)+0.5) / 16.0;
+#ifdef VULKANIC_BACKEND
+	light2 = max(light2, 1.0 - light2);
+#endif
 	vertexColor = vec4(texture(uLightMap, vec2(light, light2)).xyz, 1.0);
     
     if (!uIsWhiteWorld)
