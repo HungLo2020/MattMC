@@ -1,6 +1,7 @@
 package com.seibel.distanthorizons.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.IColumnDataView;
 import com.seibel.distanthorizons.core.pooling.AbstractPhantomArrayList;
@@ -293,11 +294,25 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 	 */
 	public void reduce(int target)
 	{
-		if (this.mergeVerySmallConnectedSegments(target)) return;
+		long waterSurfaceToPreserve = this.findWaterSurfaceToPreserve();
+		if (this.mergeVerySmallConnectedSegments(target))
+		{
+			this.preserveWaterSurfaceIfNeeded(waterSurfaceToPreserve);
+			return;
+		}
 		
-		if (this.mergeConnectedSegments(target)) return;
-		if (this.removeLeastImportantSegments(target)) return;
+		if (this.mergeConnectedSegments(target))
+		{
+			this.preserveWaterSurfaceIfNeeded(waterSurfaceToPreserve);
+			return;
+		}
+		if (this.removeLeastImportantSegments(target))
+		{
+			this.preserveWaterSurfaceIfNeeded(waterSurfaceToPreserve);
+			return;
+		}
 		this.forceBottomToMerge(target);
+		this.preserveWaterSurfaceIfNeeded(waterSurfaceToPreserve);
 	}
 	
 	
@@ -557,9 +572,11 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 		int toRemove;
 		
 		
-		if (higher != NULL && this.getAlpha(higher) == this.getAlpha(current)) 
+		boolean canMergeHigher = higher != NULL && this.canMergeInStep1(higher, current);
+		boolean canMergeLower = lower != NULL && this.canMergeInStep1(lower, current);
+		if (canMergeHigher)
 		{
-			if (lower != NULL && this.getAlpha(lower) == this.getAlpha(current)) 
+			if (canMergeLower)
 			{
 				if (this.getSize(higher) <= this.getSize(lower)) 
 				{
@@ -580,7 +597,7 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 		}
 		else
 		{
-			if (lower != NULL && this.getAlpha(lower) == this.getAlpha(current))
+			if (canMergeLower)
 			{
 				toExtendDownwards = current;
 				toRemove = lower;
@@ -612,6 +629,25 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 		// in my testing, I didn't see the step 1 loop run more
 		// than twice as many times as the starting list size.
 		return fastPath ? result : this.getSmallest();
+	}
+
+	private boolean canMergeInStep1(int first, int second)
+	{
+		return this.getAlpha(first) == this.getAlpha(second)
+			&& !this.shouldKeepSeparateFromWater(first, second);
+	}
+
+	private boolean shouldKeepSeparateFromWater(int first, int second)
+	{
+		boolean firstWater = isWater(this.getData(first));
+		boolean secondWater = isWater(this.getData(second));
+		if (firstWater == secondWater)
+		{
+			return false;
+		}
+
+		int detailIndex = firstWater ? second : first;
+		return this.isIndexVisible(detailIndex);
 	}
 	
 	/**
@@ -825,6 +861,7 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 		
 		long highestDataPoint;
 		long lowestDataPoint;
+		long highestWaterDataPoint = RenderDataPointUtil.EMPTY_DATA;
 		int index = 0;
 		//first loop: find the first visible segment.
 		foundVisible:
@@ -836,6 +873,10 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 				{
 					highestDataPoint = dataPoint;
 					lowestDataPoint = dataPoint;
+					if (isWater(dataPoint))
+					{
+						highestWaterDataPoint = dataPoint;
+					}
 					break foundVisible;
 				}
 			}
@@ -854,10 +895,149 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 				
 				if (yMax > RenderDataPointUtil.getYMax(highestDataPoint)) highestDataPoint = dataPoint;
 				else if (yMin < RenderDataPointUtil.getYMin(lowestDataPoint)) lowestDataPoint = dataPoint;
+				if (isWater(dataPoint)
+					&& (!RenderDataPointUtil.doesDataPointExist(highestWaterDataPoint)
+						|| yMax > RenderDataPointUtil.getYMax(highestWaterDataPoint)))
+				{
+					highestWaterDataPoint = dataPoint;
+				}
 			}
 		}
 		
-		return (highestDataPoint & ~RenderDataPointUtil.DEPTH_SHIFTED_MASK) | (RenderDataPointUtil.getYMin(lowestDataPoint) << RenderDataPointUtil.DEPTH_SHIFT);
+		long selectedDataPoint = highestDataPoint;
+		if (RenderDataPointUtil.doesDataPointExist(highestWaterDataPoint)
+			&& !hasOpaqueVisibleSegmentAbove(view, RenderDataPointUtil.getYMax(highestWaterDataPoint)))
+		{
+			selectedDataPoint = highestWaterDataPoint;
+		}
+		
+		return (selectedDataPoint & ~RenderDataPointUtil.DEPTH_SHIFTED_MASK) | (RenderDataPointUtil.getYMin(lowestDataPoint) << RenderDataPointUtil.DEPTH_SHIFT);
+	}
+
+	private static boolean hasOpaqueVisibleSegmentAbove(IColumnDataView view, int y)
+	{
+		for (int i = 0; i < view.size(); i++)
+		{
+			long dataPoint = view.get(i);
+			if (isDataVisible(dataPoint)
+				&& isWaterSurfaceOccludingMaterial(RenderDataPointUtil.getBlockMaterialId(dataPoint))
+				&& RenderDataPointUtil.getYMax(dataPoint) > y)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static boolean isWater(long dataPoint)
+	{
+		return RenderDataPointUtil.doesDataPointExist(dataPoint)
+			&& RenderDataPointUtil.getBlockMaterialId(dataPoint) == EDhApiBlockMaterial.WATER.index;
+	}
+
+	private long findWaterSurfaceToPreserve()
+	{
+		long highestWaterDataPoint = RenderDataPointUtil.EMPTY_DATA;
+		for (int index = this.getLowest(); index != NULL; index = this.getHigher(index))
+		{
+			long dataPoint = this.getData(index);
+			if (this.isIndexVisible(index)
+				&& isWater(dataPoint)
+				&& (!RenderDataPointUtil.doesDataPointExist(highestWaterDataPoint)
+					|| this.getMaxY(index) > RenderDataPointUtil.getYMax(highestWaterDataPoint)))
+			{
+				highestWaterDataPoint = dataPoint;
+			}
+		}
+
+		return highestWaterDataPoint;
+	}
+
+	private boolean hasOpaqueVisibleSegmentAbove(int y)
+	{
+		for (int index = this.getLowest(); index != NULL; index = this.getHigher(index))
+		{
+			if (this.isIndexVisible(index)
+				&& isWaterSurfaceOccludingMaterial(RenderDataPointUtil.getBlockMaterialId(this.getData(index)))
+				&& this.getMaxY(index) > y)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private void preserveWaterSurfaceIfNeeded(long waterDataPoint)
+	{
+		if (!RenderDataPointUtil.doesDataPointExist(waterDataPoint)
+			|| this.containsWaterSurfaceAtOrAbove(RenderDataPointUtil.getYMax(waterDataPoint)))
+		{
+			return;
+		}
+
+		int targetIndex = this.findVisibleSegmentCoveringY(RenderDataPointUtil.getYMax(waterDataPoint));
+		if (targetIndex == NULL)
+		{
+			return;
+		}
+
+		this.setData(targetIndex, waterDataPoint);
+	}
+
+	private boolean containsWaterSurfaceAtOrAbove(int y)
+	{
+		for (int index = this.getLowest(); index != NULL; index = this.getHigher(index))
+		{
+			long dataPoint = this.getData(index);
+			if (this.isIndexVisible(index)
+				&& isWater(dataPoint)
+				&& RenderDataPointUtil.getYMax(dataPoint) >= y)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private int findVisibleSegmentCoveringY(int y)
+	{
+		int closestBelow = NULL;
+		for (int index = this.getLowest(); index != NULL; index = this.getHigher(index))
+		{
+			if (!this.isIndexVisible(index))
+			{
+				continue;
+			}
+
+			int minY = this.getMinY(index);
+			int maxY = this.getMaxY(index);
+			if (minY <= y && maxY >= y)
+			{
+				return index;
+			}
+			if (maxY < y)
+			{
+				closestBelow = index;
+			}
+		}
+		return closestBelow;
+	}
+
+	private static boolean isWaterSurfaceOccludingMaterial(int materialId)
+	{
+		switch (EDhApiBlockMaterial.getFromIndex(materialId))
+		{
+			case STONE:
+			case WOOD:
+			case METAL:
+			case DIRT:
+			case LAVA:
+			case SAND:
+			case DEEPSLATE:
+				return true;
+			default:
+				return false;
+		}
 	}
 	
 	

@@ -1,5 +1,6 @@
 package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
@@ -51,10 +52,10 @@ public class ColumnBox
 		boolean transparencyEnabled = Config.Client.Advanced.Graphics.Quality.transparency.get().transparencyEnabled;
 		boolean fakeOceanFloor = Config.Client.Advanced.Graphics.Quality.transparency.get().fakeTransparencyEnabled;
 		
-		boolean isTransparent = ColorUtil.getAlpha(color) < 255 && transparencyEnabled;
+		boolean isTransparent = isTransparent(color, irisBlockMaterialId, transparencyEnabled);
 		boolean overVoid = !RenderDataPointUtil.doesDataPointExist(bottomData);
-		boolean isTopTransparent = RenderDataPointUtil.getAlpha(topData) < 255 && transparencyEnabled;
-		boolean isBottomTransparent = RenderDataPointUtil.getAlpha(bottomData) < 255 && transparencyEnabled;
+		boolean isTopTransparent = isTransparent(topData, transparencyEnabled);
+		boolean isBottomTransparent = isTransparent(bottomData, transparencyEnabled);
 		
 		// defaulting to a value far below what we can normally render means we
 		// don't need to have an additional "is cave culling enabled" check
@@ -101,7 +102,9 @@ public class ColumnBox
 		{
 			boolean skipTop = RenderDataPointUtil.doesDataPointExist(topData)
 					&& (RenderDataPointUtil.getYMin(topData) == maxY)
-					&& !isTopTransparent;
+					&& !isTopTransparent
+					&& (!isWaterMaterial(irisBlockMaterialId)
+						|| isWaterSurfaceOccludingMaterial(RenderDataPointUtil.getBlockMaterialId(topData)));
 			if (!skipTop)
 			{
 				builder.addQuadUp(minX, maxY, minZ, width, width, ColorUtil.applyShade(color, MC_RENDER.getShade(EDhDirection.UP)), irisBlockMaterialId, skyLightTop, blockLight);
@@ -261,7 +264,7 @@ public class ColumnBox
 		//=================================//
 		
 		boolean transparencyEnabled = Config.Client.Advanced.Graphics.Quality.transparency.get().transparencyEnabled;
-		boolean inputTransparent = ColorUtil.getAlpha(color) < 255 && transparencyEnabled;
+		boolean inputTransparent = isTransparent(color, irisBlockMaterialId, transparencyEnabled);
 		short yMax = (short) (yMin + ySize);
 		
 		
@@ -293,8 +296,7 @@ public class ColumnBox
 			boolean adjOverVoid = !RenderDataPointUtil.doesDataPointExist(adjBelowPoint);
 			boolean adjTransparent = 
 				!adjOverVoid
-				&& RenderDataPointUtil.getAlpha(adjPoint) < 255
-				&& transparencyEnabled;
+				&& isTransparent(adjPoint, transparencyEnabled);
 			
 			byte adjSkyLight = RenderDataPointUtil.getLightSky(adjPoint);
 			byte lightToApply;
@@ -440,6 +442,47 @@ public class ColumnBox
 				x, (short) quadBottomY, z, 
 				horizontalWidth, height, 
 				color, irisBlockMaterialId, lastSkyLight, blockLight);
+	}
+
+	private static boolean isTransparent(int color, byte materialId, boolean transparencyEnabled)
+	{
+		return transparencyEnabled
+			&& (ColorUtil.getAlpha(color) < 255 || isTransparentMaterial(materialId));
+	}
+
+	private static boolean isTransparent(long dataPoint, boolean transparencyEnabled)
+	{
+		return RenderDataPointUtil.doesDataPointExist(dataPoint)
+			&& transparencyEnabled
+			&& (RenderDataPointUtil.getAlpha(dataPoint) < 255
+				|| isTransparentMaterial(RenderDataPointUtil.getBlockMaterialId(dataPoint)));
+	}
+
+	private static boolean isTransparentMaterial(int materialId)
+	{
+		return isWaterMaterial(materialId);
+	}
+
+	private static boolean isWaterMaterial(int materialId)
+	{
+		return materialId == EDhApiBlockMaterial.WATER.index;
+	}
+
+	private static boolean isWaterSurfaceOccludingMaterial(int materialId)
+	{
+		switch (EDhApiBlockMaterial.getFromIndex(materialId))
+		{
+			case STONE:
+			case WOOD:
+			case METAL:
+			case DIRT:
+			case LAVA:
+			case SAND:
+			case DEEPSLATE:
+				return true;
+			default:
+				return false;
+		}
 	}
 	
 	

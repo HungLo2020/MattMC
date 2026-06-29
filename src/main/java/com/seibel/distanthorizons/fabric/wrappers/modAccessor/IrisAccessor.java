@@ -12,9 +12,11 @@ public class IrisAccessor implements IIrisAccessor
 	
 	@Override
 	public boolean isShaderPackInUse() { return IrisApi.getInstance().isShaderPackInUse(); }
-	
+
+	@Override
+	public boolean areShadersEnabled() { return IrisApi.getInstance().getConfig().areShadersEnabled(); }
+		
 	@Override
 	public boolean isRenderingShadowPass() { return IrisApi.getInstance().isRenderingShadowPass(); }
 	
 }
-

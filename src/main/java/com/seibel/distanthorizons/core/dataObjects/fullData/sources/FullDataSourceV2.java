@@ -22,6 +22,7 @@ import com.seibel.distanthorizons.core.sql.dto.util.FullDataMinMaxPosUtil;
 import com.seibel.distanthorizons.core.util.*;
 import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
@@ -980,20 +981,37 @@ public class FullDataSourceV2
 		if (maxCount == count0)
 		// if the max count is 1 then we'll just go with the first column
 		{
-			return value0;
+			return selectWaterValueForColumnSlice(sliceArray, mapping, value0);
 		}
 		else if (maxCount == count1)
 		{
-			return value1;
+			return selectWaterValueForColumnSlice(sliceArray, mapping, value1);
 		}
 		else if (maxCount == count2)
 		{
-			return value2;
+			return selectWaterValueForColumnSlice(sliceArray, mapping, value2);
 		}
 		else
 		{
-			return value3;
+			return selectWaterValueForColumnSlice(sliceArray, mapping, value3);
 		}
+	}
+	private static int selectWaterValueForColumnSlice(int[] sliceArray, @Nullable FullDataPointIdMap mapping, int fallbackValue)
+	{
+		if (mapping == null)
+		{
+			return fallbackValue;
+		}
+
+		for (int value : sliceArray)
+		{
+			if (mapping.getBlockStateWrapper(value).isLiquid())
+			{
+				return value;
+			}
+		}
+		
+		return fallbackValue;
 	}
 	private static int determineAverageValueInColumnSlice(int[] sliceArray)
 	{

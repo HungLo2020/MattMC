@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.function.Predicate;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiGrassSideRendering;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
@@ -9,8 +10,6 @@ import com.seibel.distanthorizons.api.enums.rendering.EDhApiDebugRendering;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
-import com.seibel.distanthorizons.core.logging.DhLogger;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
@@ -25,7 +24,6 @@ import org.lwjgl.system.MemoryUtil;
  */
 public class LodQuadBuilder
 {
-	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
 	@SuppressWarnings("unchecked")
@@ -151,7 +149,7 @@ public class LodQuadBuilder
 		
 		
 		ArrayList<BufferQuad> quadList;
-		if (this.doTransparency && ColorUtil.getAlpha(color) < 255)
+		if (this.shouldUseTransparentBuffer(color, irisBlockMaterialId))
 		{
 			quadList = this.transparentQuads[dir.ordinal()];
 		}
@@ -177,7 +175,7 @@ public class LodQuadBuilder
 	// XZ
 	public void addQuadUp(short minX, short maxY, short minZ, short widthEastWest, short widthNorthSouthOrUpDown, int color, byte irisBlockMaterialId, byte skylight, byte blocklight) // TODO argument names are wrong
 	{
-		boolean isTransparent = (this.doTransparency && ColorUtil.getAlpha(color) < 255);
+		boolean isTransparent = this.shouldUseTransparentBuffer(color, irisBlockMaterialId);
 		ArrayList<BufferQuad> quadList = isTransparent 
 				? this.transparentQuads[EDhDirection.UP.ordinal()] 
 				: this.opaqueQuads[EDhDirection.UP.ordinal()];
@@ -188,7 +186,7 @@ public class LodQuadBuilder
 	
 	public void addQuadDown(short x, short y, short z, short width, short wz, int color, byte irisBlockMaterialId, byte skylight, byte blocklight)
 	{
-		ArrayList<BufferQuad> quadArray = (this.doTransparency && ColorUtil.getAlpha(color) < 255)
+		ArrayList<BufferQuad> quadArray = this.shouldUseTransparentBuffer(color, irisBlockMaterialId)
 				? this.transparentQuads[EDhDirection.DOWN.ordinal()]
 				: this.opaqueQuads[EDhDirection.DOWN.ordinal()];
 		
@@ -277,8 +275,13 @@ public class LodQuadBuilder
 	
 	public ArrayList<ByteBuffer> makeOpaqueVertexBuffers() { return this.makeVertexBuffers(this.opaqueQuads, DEFAULT_DIRECTION_RENDER_ORDER); }
 	public ArrayList<ByteBuffer> makeTransparentVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_NON_UP_DIRECTION_RENDER_ORDER); }
-	public ArrayList<ByteBuffer> makeTransparentUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER); }
+	public ArrayList<ByteBuffer> makeTransparentUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, quad -> !isWater(quad)); }
+	public ArrayList<ByteBuffer> makeTransparentWaterUpVertexBuffers() { return this.makeVertexBuffers(this.transparentQuads, TRANSPARENT_UP_DIRECTION_RENDER_ORDER, LodQuadBuilder::isWater); }
 	private ArrayList<ByteBuffer> makeVertexBuffers(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder)
+	{
+		return this.makeVertexBuffers(quadList, directionRenderOrder, quad -> true);
+	}
+	private ArrayList<ByteBuffer> makeVertexBuffers(ArrayList<BufferQuad>[] quadList, int[] directionRenderOrder, Predicate<BufferQuad> quadFilter)
 	{
 		ArrayList<ByteBuffer> byteBufferList = new ArrayList<>(3);
 		
@@ -294,6 +297,12 @@ public class LodQuadBuilder
 			// put all the quads in this direction into the buffer
 			for (int quadIndex = 0; quadIndex < quadList[directionIndex].size(); quadIndex++)
 			{
+				BufferQuad quad = quadList[directionIndex].get(quadIndex);
+				if (!quadFilter.test(quad))
+				{
+					continue;
+				}
+
 				// if this is the first iteration or the buffer is full, 
 				// create a new buffer
 				if (buffer == null || !buffer.hasRemaining())
@@ -302,7 +311,7 @@ public class LodQuadBuilder
 					byteBufferList.add(buffer);
 				}
 				
-				this.putQuad(buffer, quadList[directionIndex].get(quadIndex));
+				this.putQuad(buffer, quad);
 			}
 		}
 		
@@ -315,6 +324,15 @@ public class LodQuadBuilder
 		}
 		
 		return byteBufferList;
+	}
+	private static boolean isWater(BufferQuad quad)
+	{
+		return quad.irisBlockMaterialId == EDhApiBlockMaterial.WATER.index;
+	}
+	private boolean shouldUseTransparentBuffer(int color, byte irisBlockMaterialId)
+	{
+		return this.doTransparency
+			&& (ColorUtil.getAlpha(color) < 255 || irisBlockMaterialId == EDhApiBlockMaterial.WATER.index);
 	}
 	private void putQuad(ByteBuffer bb, BufferQuad quad)
 	{
@@ -359,7 +377,6 @@ public class LodQuadBuilder
 			
 			
 			int color = quad.color;
-			
 			// use custom side color logic for grass blocks
 			if (quad.irisBlockMaterialId == EDhApiBlockMaterial.GRASS.index)
 			{

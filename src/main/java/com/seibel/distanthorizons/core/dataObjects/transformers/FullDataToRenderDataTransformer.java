@@ -354,10 +354,11 @@ public class FullDataToRenderDataTransformer
 			
 			
 			int color;
-			if (colorToApplyToNextBlock == -1)
+			if (colorToApplyToNextBlock == -1 || block.isLiquid())
 			{
 				// use this block's color
 				color = levelWrapper.getBlockColor(mutableBlockPos, biome, fullDataSource, block);
+				colorToApplyToNextBlock = -1;
 			}
 			else
 			{

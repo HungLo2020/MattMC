@@ -412,7 +412,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		
 		IDhApiGenericObjectShaderProgram shaderProgram = useInstancedRendering ? this.instancedShaderProgram : this.directShaderProgram;
 		IDhApiGenericObjectShaderProgram shaderProgramOverride = OverrideInjector.INSTANCE.get(IDhApiGenericObjectShaderProgram.class);
-		if (shaderProgramOverride != null && shaderProgram.overrideThisFrame())
+		if (shaderProgramOverride != null && shaderProgramOverride.overrideThisFrame())
 		{
 			shaderProgram = shaderProgramOverride;
 		}

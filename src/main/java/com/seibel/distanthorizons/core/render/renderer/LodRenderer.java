@@ -54,7 +54,6 @@ public class LodRenderer
 	public static final DhLogger LOGGER = new DhLoggerBuilder()
 			.fileLevelConfig(Config.Common.Logging.logRendererEventToFile)
 			.build();
-	
 	public static final DhLogger RATE_LIMITED_LOGGER = new DhLoggerBuilder()
 			.fileLevelConfig(Config.Common.Logging.logRendererEventToFile)
 			.maxCountPerSecond(4)
@@ -192,7 +191,7 @@ public class LodRenderer
 		
 		IDhApiShaderProgram lodShaderProgram = this.lodRenderProgram;
 		IDhApiShaderProgram lodShaderProgramOverride = OverrideInjector.INSTANCE.get(IDhApiShaderProgram.class);
-		if (lodShaderProgramOverride != null && lodShaderProgram.overrideThisFrame())
+		if (lodShaderProgramOverride != null && lodShaderProgramOverride.overrideThisFrame())
 		{
 			lodShaderProgram = lodShaderProgramOverride;
 		}
@@ -344,9 +343,6 @@ public class LodRenderer
 				}
 			}
 		}
-		
-		
-		
 		//================//
 		// render cleanup //
 		//================//
@@ -430,7 +426,7 @@ public class LodRenderer
 		//==========//
 		
 		IDhApiShaderProgram shaderProgramOverride = OverrideInjector.INSTANCE.get(IDhApiShaderProgram.class);
-		if (shaderProgramOverride != null)
+		if (shaderProgramOverride != null && shaderProgramOverride.overrideThisFrame())
 		{
 			shaderProgramOverride.fillUniformData(renderEventParam);
 		}
@@ -656,28 +652,90 @@ public class LodRenderer
 		}
 		
 		
-		try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
+		SortedArraySet<LodBufferContainer> lodBufferContainers = lodBufferHandler.getColumnRenderBuffers();
+		if (lodBufferContainers != null)
 		{
-			SortedArraySet<LodBufferContainer> lodBufferContainers = lodBufferHandler.getColumnRenderBuffers();
-			if (lodBufferContainers != null)
-			{
-				if (opaquePass)
+			try
 				{
-					this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbos);
-				}
+					boolean useVulkanNoShaderWaterOrdering = this.shouldUseVulkanNoShaderWaterOrdering();
+					if (opaquePass && useVulkanNoShaderWaterOrdering)
+					{
+						try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
+						{
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbos);
+
+							VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.ALWAYS);
+							VulkanicAPI.setDepthTestEnabled(ctx, true);
+							VulkanicAPI.setCullFaceEnabled(ctx, false);
+							VulkanicAPI.setDepthWriteMask(ctx, true);
+							VulkanicAPI.setBlendEnabled(ctx, true);
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentWaterUp);
+
+							VulkanicAPI.setColorMask(ctx, true, true, true, true);
+							VulkanicAPI.setCullFaceEnabled(ctx, true);
+							VulkanicAPI.setDepthTestEnabled(ctx, true);
+							VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);
+							VulkanicAPI.setDepthWriteMask(ctx, true);
+							VulkanicAPI.setBlendEnabled(ctx, false);
+						}
+					}
+					else if (!opaquePass && useVulkanNoShaderWaterOrdering)
+					{
+						try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
+						{
+							VulkanicAPI.setColorMask(ctx, true, true, true, true);
+							VulkanicAPI.setCullFaceEnabled(ctx, true);
+							VulkanicAPI.setDepthWriteMask(ctx, false);
+							VulkanicAPI.setBlendEnabled(ctx, true);
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparent);
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentUp);
+
+							VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.ALWAYS);
+							VulkanicAPI.setDepthTestEnabled(ctx, true);
+							VulkanicAPI.setCullFaceEnabled(ctx, false);
+							VulkanicAPI.setDepthWriteMask(ctx, true);
+							VulkanicAPI.setBlendEnabled(ctx, true);
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentWaterUp);
+						}
+					}
 				else
 				{
-					this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparent);
-					this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentUp);
+					try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
+					{
+						if (opaquePass)
+						{
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbos);
+						}
+						else
+						{
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparent);
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentUp);
+							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentWaterUp);
+						}
+					}
+				}
+			}
+			finally
+			{
+				if (!opaquePass)
+				{
+					VulkanicAPI.setColorMask(ctx, true, true, true, true);
+					VulkanicAPI.setCullFaceEnabled(ctx, true);
+					VulkanicAPI.setDepthTestEnabled(ctx, true);
+					VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);
+					VulkanicAPI.setDepthWriteMask(ctx, true);
+					VulkanicAPI.setBlendEnabled(ctx, true);
 				}
 			}
 		}
-		finally
+		if (!opaquePass)
 		{
-			if (!opaquePass)
-			{
-				VulkanicAPI.setDepthWriteMask(ctx, true);
-			}
+			VulkanicAPI.setColorMask(ctx, true, true, true, true);
+			VulkanicAPI.setCullFaceEnabled(ctx, true);
+			VulkanicAPI.setDepthTestEnabled(ctx, true);
+			VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);
+			VulkanicAPI.setDepthWriteMask(ctx, true);
+			VulkanicAPI.setBlendEnabled(ctx, true);
 		}
 		
 		
@@ -731,6 +789,19 @@ public class LodRenderer
 				vbo.unbind();
 			}
 		}
+	}
+
+	private boolean shouldUseVulkanNoShaderWaterOrdering()
+	{
+		return VulkanicAPI.isVulkanBackendSelected()
+			&& !isIrisShaderRenderingEnabled();
+	}
+
+	private static boolean isIrisShaderRenderingEnabled()
+	{
+		return IRIS_ACCESSOR != null
+			&& IRIS_ACCESSOR.areShadersEnabled()
+			&& IRIS_ACCESSOR.isShaderPackInUse();
 	}
 
 	private RenderPass createVulkanCompatibilityRenderPass(String label)
