@@ -1951,7 +1951,7 @@ if (mat < 11024) {
                             }
                         } else {
                             if (mat < 10696) {
-                                if (mat < 10692) { // Pearlescent Froglight
+                                if (mat < 10692) { // Pearlescent Froglight, Carmine Froglight
                                     float frogPow = 24.0;
                                     #include "/lib/materials/specificMaterials/terrain/froglights.glsl"
                                 }
