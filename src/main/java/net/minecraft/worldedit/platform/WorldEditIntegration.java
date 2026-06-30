@@ -80,6 +80,13 @@ public class WorldEditIntegration {
             tool.actPrimary(player);
         }
     }
+
+    /**
+     * Handle right-click in air (for trace-based brushes).
+     */
+    public static boolean onRightClickAir(ServerPlayer player, InteractionHand hand) {
+        return activateBrush(player, hand, null);
+    }
     
     /**
      * Handle block break (for super pickaxe).
@@ -111,6 +118,10 @@ public class WorldEditIntegration {
      * Handle right-click on block (for brushes).
      */
     public static boolean onRightClickBlock(ServerPlayer player, BlockPos pos, InteractionHand hand) {
+        return activateBrush(player, hand, pos);
+    }
+
+    private static boolean activateBrush(ServerPlayer player, InteractionHand hand, BlockPos target) {
         if (!WorldEdit.isInitialized()) {
             return false;
         }
@@ -123,10 +134,8 @@ public class WorldEditIntegration {
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         Tool tool = session.getTool(stack.getItem());
         
-        if (tool instanceof BrushTool) {
-            if (tool.canUse(player)) {
-                return tool.actSecondary(player);
-            }
+        if (tool instanceof BrushTool brush && tool.canUse(player)) {
+            return target == null ? brush.actSecondary(player) : brush.actSecondary(player, target);
         }
         
         return false;

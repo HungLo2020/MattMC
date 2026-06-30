@@ -4,24 +4,24 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.worldedit.core.WorldEdit;
+import net.minecraft.worldedit.pattern.BlockPatternParser;
+import net.minecraft.worldedit.pattern.Pattern;
 import net.minecraft.worldedit.platform.MattMCPlatform;
 import net.minecraft.worldedit.session.LocalSession;
 import net.minecraft.worldedit.tool.SuperPickaxeTool;
 import net.minecraft.worldedit.tool.BrushTool;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Tool-related commands for WorldEdit.
@@ -61,25 +61,34 @@ public class ToolCommands {
                 .then(Commands.argument("range", IntegerArgumentType.integer(1, 5))
                     .executes(ctx -> superPickaxeMode(ctx, "recursive")))));
         
-        // //brush sphere command
-        dispatcher.register(Commands.literal("/brush")
-            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.brush.sphere"))
+        registerBrushCommand(dispatcher, "/brush");
+        registerBrushCommand(dispatcher, "/br");
+    }
+
+    private static void registerBrushCommand(CommandDispatcher<CommandSourceStack> dispatcher, String name) {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal(name)
+            .requires(CommandSourceStack::isPlayer)
+            .then(Commands.literal("unbind")
+                .requires(source -> hasPermission(source, "worldedit.tool.none"))
+                .executes(ToolCommands::toolNone))
+            .then(Commands.literal("none")
+                .requires(source -> hasPermission(source, "worldedit.tool.none"))
+                .executes(ToolCommands::toolNone))
             .then(Commands.literal("sphere")
-                .then(Commands.argument("block", StringArgumentType.word())
-                    .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
-                        .executes(ctx -> brushSphere(ctx,
-                            StringArgumentType.getString(ctx, "block"),
-                            IntegerArgumentType.getInteger(ctx, "radius"))))))
+                .requires(source -> hasPermission(source, "worldedit.brush.sphere"))
+                .then(Commands.argument("args", StringArgumentType.greedyString())
+                    .executes(ctx -> brushSphere(ctx, StringArgumentType.getString(ctx, "args")))))
             .then(Commands.literal("cylinder")
-                .then(Commands.argument("block", StringArgumentType.word())
-                    .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
-                        .executes(ctx -> brushCylinder(ctx,
-                            StringArgumentType.getString(ctx, "block"),
-                            IntegerArgumentType.getInteger(ctx, "radius"))))))
+                .requires(source -> hasPermission(source, "worldedit.brush.cylinder"))
+                .then(Commands.argument("args", StringArgumentType.greedyString())
+                    .executes(ctx -> brushCylinder(ctx, StringArgumentType.getString(ctx, "args")))))
             .then(Commands.literal("smooth")
-                .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
-                    .executes(ctx -> brushSmooth(ctx,
-                        IntegerArgumentType.getInteger(ctx, "radius"))))));
+                .requires(source -> hasPermission(source, "worldedit.brush.smooth"))
+                .executes(ctx -> brushSmooth(ctx, ""))
+                .then(Commands.argument("args", StringArgumentType.greedyString())
+                    .executes(ctx -> brushSmooth(ctx, StringArgumentType.getString(ctx, "args")))));
+
+        dispatcher.register(root);
     }
     
     /**
@@ -163,7 +172,7 @@ public class ToolCommands {
     /**
      * Bind sphere brush to item.
      */
-    private static int brushSphere(CommandContext<CommandSourceStack> context, String blockName, int radius) throws CommandSyntaxException {
+    private static int brushSphere(CommandContext<CommandSourceStack> context, String args) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
@@ -172,29 +181,19 @@ public class ToolCommands {
             player.sendSystemMessage(Component.literal("Hold an item to bind brush"));
             return 0;
         }
-        
-        // Parse block
-        ResourceLocation blockId = parseBlockId(blockName);
-        if (blockId == null) {
-            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+
+        BrushPatternArgs parsed = parsePatternWithOptionalRadius(player, args, 2);
+        if (parsed == null) {
             return 0;
         }
-        
-        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
-        if (block == null) {
-            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
-            return 0;
-        }
-        
-        BlockState state = block.defaultBlockState();
-        
+
         // Create and bind brush
-        BrushTool brush = new BrushTool("sphere", state, radius);
+        BrushTool brush = new BrushTool("sphere", parsed.pattern(), parsed.radius());
         session.setTool(item.getItem(), brush);
         
         player.sendSystemMessage(Component.literal(
             String.format("§aSphere brush bound to %s (radius: %d, block: %s)", 
-                item.getHoverName().getString(), radius, blockName)
+                item.getHoverName().getString(), parsed.radius(), parsed.patternText())
         ));
         
         return Command.SINGLE_SUCCESS;
@@ -203,7 +202,7 @@ public class ToolCommands {
     /**
      * Bind cylinder brush to item.
      */
-    private static int brushCylinder(CommandContext<CommandSourceStack> context, String blockName, int radius) throws CommandSyntaxException {
+    private static int brushCylinder(CommandContext<CommandSourceStack> context, String args) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
@@ -212,29 +211,19 @@ public class ToolCommands {
             player.sendSystemMessage(Component.literal("Hold an item to bind brush"));
             return 0;
         }
-        
-        // Parse block
-        ResourceLocation blockId = parseBlockId(blockName);
-        if (blockId == null) {
-            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+
+        CylinderBrushArgs parsed = parseCylinderArgs(player, args);
+        if (parsed == null) {
             return 0;
         }
-        
-        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
-        if (block == null) {
-            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
-            return 0;
-        }
-        
-        BlockState state = block.defaultBlockState();
-        
+
         // Create and bind brush
-        BrushTool brush = new BrushTool("cylinder", state, radius);
+        BrushTool brush = new BrushTool("cylinder", parsed.pattern(), parsed.radius(), parsed.height());
         session.setTool(item.getItem(), brush);
         
         player.sendSystemMessage(Component.literal(
-            String.format("§aCylinder brush bound to %s (radius: %d, block: %s)", 
-                item.getHoverName().getString(), radius, blockName)
+            String.format("§aCylinder brush bound to %s (radius: %d, height: %d, block: %s)",
+                item.getHoverName().getString(), parsed.radius(), parsed.height(), parsed.patternText())
         ));
         
         return Command.SINGLE_SUCCESS;
@@ -243,7 +232,7 @@ public class ToolCommands {
     /**
      * Bind smooth brush to item.
      */
-    private static int brushSmooth(CommandContext<CommandSourceStack> context, int radius) throws CommandSyntaxException {
+    private static int brushSmooth(CommandContext<CommandSourceStack> context, String args) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
@@ -252,28 +241,158 @@ public class ToolCommands {
             player.sendSystemMessage(Component.literal("Hold an item to bind brush"));
             return 0;
         }
-        
+
+        SmoothBrushArgs parsed = parseSmoothArgs(player, args);
+        if (parsed == null) {
+            return 0;
+        }
+
         // Create and bind brush (smooth doesn't need a block)
-        BrushTool brush = new BrushTool("smooth", net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), radius);
+        BrushTool brush = new BrushTool(
+            "smooth",
+            net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(),
+            parsed.radius(),
+            parsed.iterations()
+        );
         session.setTool(item.getItem(), brush);
         
         player.sendSystemMessage(Component.literal(
-            String.format("§aSmooth brush bound to %s (radius: %d)", 
-                item.getHoverName().getString(), radius)
+            String.format("§aSmooth brush bound to %s (radius: %d, iterations: %d)",
+                item.getHoverName().getString(), parsed.radius(), parsed.iterations())
         ));
         
         return Command.SINGLE_SUCCESS;
     }
-    
-    /**
-     * Parse a block ID from a string.
-     */
-    private static ResourceLocation parseBlockId(String name) {
-        if (name.contains(":")) {
-            return ResourceLocation.tryParse(name);
-        } else {
-            return ResourceLocation.withDefaultNamespace(name);
+
+    private static BrushPatternArgs parsePatternWithOptionalRadius(ServerPlayer player, String args, int defaultRadius) {
+        List<String> tokens = splitArgs(args);
+        if (tokens.isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cUsage: /brush sphere <pattern> [radius]"));
+            return null;
         }
+
+        int radius = defaultRadius;
+        Integer last = parseInteger(tokens.get(tokens.size() - 1));
+        if (last != null) {
+            radius = last;
+            tokens.remove(tokens.size() - 1);
+        }
+
+        if (!validateRange(player, "radius", radius, 1, 10) || tokens.isEmpty()) {
+            if (tokens.isEmpty()) {
+                player.sendSystemMessage(Component.literal("§cMissing brush pattern"));
+            }
+            return null;
+        }
+
+        String patternText = String.join(" ", tokens);
+        Pattern pattern = parsePattern(player, patternText);
+        return pattern == null ? null : new BrushPatternArgs(pattern, patternText, radius);
+    }
+
+    private static CylinderBrushArgs parseCylinderArgs(ServerPlayer player, String args) {
+        List<String> tokens = splitArgs(args);
+        if (tokens.isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cUsage: /brush cylinder <pattern> [radius] [height]"));
+            return null;
+        }
+
+        int radius = 2;
+        int height = 1;
+        int size = tokens.size();
+        Integer trailing = parseInteger(tokens.get(size - 1));
+        Integer previous = size >= 2 ? parseInteger(tokens.get(size - 2)) : null;
+        if (trailing != null && previous != null) {
+            radius = previous;
+            height = trailing;
+            tokens.remove(tokens.size() - 1);
+            tokens.remove(tokens.size() - 1);
+        } else if (trailing != null) {
+            radius = trailing;
+            tokens.remove(tokens.size() - 1);
+        }
+
+        if (!validateRange(player, "radius", radius, 1, 10)
+            || !validateRange(player, "height", height, 1, 10)
+            || tokens.isEmpty()) {
+            if (tokens.isEmpty()) {
+                player.sendSystemMessage(Component.literal("§cMissing brush pattern"));
+            }
+            return null;
+        }
+
+        String patternText = String.join(" ", tokens);
+        Pattern pattern = parsePattern(player, patternText);
+        return pattern == null ? null : new CylinderBrushArgs(pattern, patternText, radius, height);
+    }
+
+    private static SmoothBrushArgs parseSmoothArgs(ServerPlayer player, String args) {
+        List<String> tokens = splitArgs(args);
+        if (tokens.size() > 2) {
+            player.sendSystemMessage(Component.literal("§cUsage: /brush smooth [radius] [iterations]"));
+            return null;
+        }
+
+        int radius = 2;
+        int iterations = 3;
+        if (!tokens.isEmpty()) {
+            Integer parsedRadius = parseInteger(tokens.get(0));
+            if (parsedRadius == null) {
+                player.sendSystemMessage(Component.literal("§cInvalid radius: " + tokens.get(0)));
+                return null;
+            }
+            radius = parsedRadius;
+        }
+        if (tokens.size() == 2) {
+            Integer parsedIterations = parseInteger(tokens.get(1));
+            if (parsedIterations == null) {
+                player.sendSystemMessage(Component.literal("§cInvalid iterations: " + tokens.get(1)));
+                return null;
+            }
+            iterations = parsedIterations;
+        }
+
+        if (!validateRange(player, "radius", radius, 1, 10)
+            || !validateRange(player, "iterations", iterations, 1, 10)) {
+            return null;
+        }
+
+        return new SmoothBrushArgs(radius, iterations);
+    }
+
+    private static List<String> splitArgs(String args) {
+        String trimmed = args == null ? "" : args.trim();
+        if (trimmed.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(List.of(trimmed.split("\\s+")));
+    }
+
+    private static Pattern parsePattern(ServerPlayer player, String patternText) {
+        try {
+            return BlockPatternParser.parse(patternText);
+        } catch (IllegalArgumentException e) {
+            player.sendSystemMessage(Component.literal("§cInvalid brush pattern: " + e.getMessage()));
+            return null;
+        }
+    }
+
+    private static Integer parseInteger(String value) {
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static boolean validateRange(ServerPlayer player, String name, int value, int min, int max) {
+        if (value < min || value > max) {
+            player.sendSystemMessage(Component.literal(
+                String.format("§cBrush %s must be between %d and %d", name, min, max)
+            ));
+            return false;
+        }
+        return true;
     }
     
     /**
@@ -291,5 +410,14 @@ public class ToolCommands {
         } catch (CommandSyntaxException e) {
             return false;
         }
+    }
+
+    private record BrushPatternArgs(Pattern pattern, String patternText, int radius) {
+    }
+
+    private record CylinderBrushArgs(Pattern pattern, String patternText, int radius, int height) {
+    }
+
+    private record SmoothBrushArgs(int radius, int iterations) {
     }
 }

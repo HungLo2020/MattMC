@@ -20,16 +20,26 @@ import net.minecraft.worldedit.session.LocalSession;
  */
 public class BrushTool implements Tool {
     private final String type;
-    private final BlockState material;
     private final int radius;
     private Brush brush;
     private Pattern pattern;
     
     public BrushTool(String type, BlockState material, int radius) {
+        this(type, new SingleBlockPattern(material), radius, radius);
+    }
+
+    public BrushTool(String type, BlockState material, int radius, int secondarySize) {
+        this(type, new SingleBlockPattern(material), radius, secondarySize);
+    }
+
+    public BrushTool(String type, Pattern pattern, int radius) {
+        this(type, pattern, radius, radius);
+    }
+
+    public BrushTool(String type, Pattern pattern, int radius, int secondarySize) {
         this.type = type;
-        this.material = material;
         this.radius = radius;
-        this.pattern = new SingleBlockPattern(material);
+        this.pattern = pattern;
         
         // Initialize brush based on type
         switch (type) {
@@ -37,10 +47,10 @@ public class BrushTool implements Tool {
                 this.brush = new SphereBrush(false);
                 break;
             case "smooth":
-                this.brush = new SmoothBrush(3);
+                this.brush = new SmoothBrush(secondarySize);
                 break;
             case "cylinder":
-                this.brush = new CylinderBrush(radius, false);
+                this.brush = new CylinderBrush(secondarySize, false);
                 break;
             default:
                 this.brush = new SphereBrush(false);
@@ -57,10 +67,13 @@ public class BrushTool implements Tool {
         // Apply brush at target location
         net.minecraft.world.phys.HitResult hit = player.pick(100, 0, false);
         if (hit instanceof net.minecraft.world.phys.BlockHitResult blockHit) {
-            applyBrush(player, blockHit.getBlockPos());
-            return true;
+            return applyBrush(player, blockHit.getBlockPos());
         }
         return false;
+    }
+
+    public boolean actSecondary(ServerPlayer player, BlockPos target) {
+        return applyBrush(player, target);
     }
     
     @Override
@@ -71,7 +84,7 @@ public class BrushTool implements Tool {
     /**
      * Apply the brush at a location.
      */
-    private void applyBrush(ServerPlayer player, BlockPos target) {
+    private boolean applyBrush(ServerPlayer player, BlockPos target) {
         ServerLevel world = player.level();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
@@ -87,5 +100,7 @@ public class BrushTool implements Tool {
         if (editSession.getBlockChangeCount() > 0) {
             session.remember(editSession);
         }
+
+        return true;
     }
 }

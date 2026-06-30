@@ -266,6 +266,10 @@ public class ServerPlayerGameMode {
 			} else if (this.player.blockActionRestricted(this.level, blockPos, this.gameModeForPlayer)) {
 				return false;
 			} else {
+				if (net.minecraft.worldedit.platform.WorldEditIntegration.onBlockBreak(this.player, blockPos)) {
+					return true;
+				}
+
 				BlockState blockState2 = block.playerWillDestroy(this.level, blockPos, blockState, this.player);
 				boolean bl = this.level.removeBlock(blockPos, false);
 				if (SharedConstants.DEBUG_BLOCK_BREAK) {
@@ -298,6 +302,8 @@ public class ServerPlayerGameMode {
 			return InteractionResult.PASS;
 		} else if (serverPlayer.getCooldowns().isOnCooldown(itemStack)) {
 			return InteractionResult.PASS;
+		} else if (net.minecraft.worldedit.platform.WorldEditIntegration.onRightClickAir(serverPlayer, interactionHand)) {
+			return InteractionResult.SUCCESS;
 		} else {
 			int i = itemStack.getCount();
 			int j = itemStack.getDamageValue();
@@ -345,6 +351,10 @@ public class ServerPlayerGameMode {
 				return InteractionResult.PASS;
 			}
 		} else {
+			if (net.minecraft.worldedit.platform.WorldEditIntegration.onRightClickBlock(serverPlayer, blockPos, interactionHand)) {
+				return InteractionResult.SUCCESS;
+			}
+
 			boolean bl = !serverPlayer.getMainHandItem().isEmpty() || !serverPlayer.getOffhandItem().isEmpty();
 			boolean bl2 = serverPlayer.isSecondaryUseActive() && bl;
 			ItemStack itemStack2 = itemStack.copy();

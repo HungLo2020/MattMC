@@ -59,6 +59,55 @@ class WorldEditReplacementCommandSyntaxTest {
     }
 
     @Test
+    void brushCommandsUseWorldEditPatternParsingAndExpectedAliases() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/worldedit/command/ToolCommands.java"));
+
+        assertTrue(source.contains("registerBrushCommand(dispatcher, \"/brush\")"));
+        assertTrue(source.contains("registerBrushCommand(dispatcher, \"/br\")"));
+        assertTrue(source.contains("BlockPatternParser.parse(patternText)"));
+        assertTrue(source.contains("StringArgumentType.greedyString()"));
+        assertTrue(source.contains("new BrushTool(\"cylinder\", parsed.pattern(), parsed.radius(), parsed.height())"));
+        assertTrue(source.contains("\"smooth\""));
+        assertTrue(source.contains("parsed.iterations()"));
+        assertFalse(source.contains("BuiltInRegistries.BLOCK.getValue(blockId)"));
+        assertFalse(source.contains("Commands.argument(\"block\", StringArgumentType.word())"));
+    }
+
+    @Test
+    void brushAndToolActivationHooksAreWiredIntoServerInteractionPaths() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/server/level/ServerPlayerGameMode.java"));
+
+        int blockBreakHook = source.indexOf("WorldEditIntegration.onBlockBreak(this.player, blockPos)");
+        int vanillaDestroy = source.indexOf("block.playerWillDestroy(this.level, blockPos, blockState, this.player)");
+        assertTrue(blockBreakHook >= 0);
+        assertTrue(vanillaDestroy >= 0);
+        assertTrue(blockBreakHook < vanillaDestroy);
+
+        int rightClickAirHook = source.indexOf("WorldEditIntegration.onRightClickAir(serverPlayer, interactionHand)");
+        int vanillaItemUse = source.indexOf("itemStack.use(level, serverPlayer, interactionHand)");
+        assertTrue(rightClickAirHook >= 0);
+        assertTrue(vanillaItemUse >= 0);
+        assertTrue(rightClickAirHook < vanillaItemUse);
+
+        int rightClickBlockHook = source.indexOf("WorldEditIntegration.onRightClickBlock(serverPlayer, blockPos, interactionHand)");
+        int vanillaBlockUse = source.indexOf("blockState.useItemOn(");
+        assertTrue(rightClickBlockHook >= 0);
+        assertTrue(vanillaBlockUse >= 0);
+        assertTrue(rightClickBlockHook < vanillaBlockUse);
+    }
+
+    @Test
+    void brushToolSupportsClickedBlockActivationAndSeparateCylinderHeight() throws IOException {
+        String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/worldedit/tool/BrushTool.java"));
+
+        assertTrue(source.contains("public BrushTool(String type, Pattern pattern, int radius, int secondarySize)"));
+        assertTrue(source.contains("this.brush = new CylinderBrush(secondarySize, false)"));
+        assertTrue(source.contains("this.brush = new SmoothBrush(secondarySize)"));
+        assertTrue(source.contains("public boolean actSecondary(ServerPlayer player, BlockPos target)"));
+        assertTrue(source.contains("return applyBrush(player, target)"));
+    }
+
+    @Test
     void worldEditMaskArgumentAcceptsPartialReplaceNearInputBlock() throws CommandSyntaxException {
         StringReader reader = new StringReader("sand");
 
