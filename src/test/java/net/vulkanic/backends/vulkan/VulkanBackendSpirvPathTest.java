@@ -614,6 +614,59 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testRemainingStandaloneVertexInputsGetNonConflictingLocations() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitRemainingVertexInputLocations",
+            String.class
+        );
+        injector.setAccessible(true);
+
+        String source = "#version 330\n"
+            + "layout(location = 0) in uvec4 vPosition;\n"
+            + "layout(location = 1) in vec4 iris_color;\n"
+            + "layout(location = 2) in uvec4 irisExtra;\n"
+            + "in vec4 glColor;\n"
+            + "in mat4 mat;\n"
+            + "in vec4 at_tangent;\n"
+            + "void main() { gl_Position = mat * glColor + at_tangent + vec4(vPosition); }\n";
+
+        String rewritten = (String) injector.invoke(null, source);
+
+        assertTrue(rewritten.contains("layout(location = 3) in vec4 glColor;"),
+            "Unbound shaderpack vertex inputs should be assigned after explicit DH terrain inputs");
+        assertTrue(rewritten.contains("layout(location = 4) in mat4 mat;"),
+            "Matrix inputs should receive a stable first location");
+        assertTrue(rewritten.contains("layout(location = 8) in vec4 at_tangent;"),
+            "Matrix location spans must be reserved so following inputs cannot collide");
+        assertFalse(rewritten.contains("\nin vec4 glColor;"),
+            "No auto-located standalone input should remain to collide with location zero");
+    }
+
+    @Test
+    public void testStandaloneVertexInputReflectionReservesFallbackMatrixColumns() throws Exception {
+        Method collector = VulkanBackend.class.getDeclaredMethod(
+            "collectExplicitVertexInputDeclarations",
+            String.class
+        );
+        collector.setAccessible(true);
+
+        String source = "#version 330\n"
+            + "layout(location = 3) in vec4 glColor;\n"
+            + "layout(location = 4) in mat4 mat;\n"
+            + "layout(location = 8) in uvec4 irisExtra;\n"
+            + "void main() { gl_Position = mat * glColor + vec4(irisExtra); }\n";
+
+        List<?> inputs = (List<?>) collector.invoke(null, source);
+
+        assertEquals(6, inputs.size(),
+            "Fallback input reflection should expand matrix declarations into occupied Vulkan locations");
+        assertTrue(inputs.toString().contains("ReflectedVertexInput[location=3, typeName=vec4]"));
+        assertTrue(inputs.toString().contains("ReflectedVertexInput[location=4, typeName=vec4]"));
+        assertTrue(inputs.toString().contains("ReflectedVertexInput[location=7, typeName=vec4]"));
+        assertTrue(inputs.toString().contains("ReflectedVertexInput[location=8, typeName=uvec4]"));
+    }
+
+    @Test
     public void testInjectExplicitVulkanBindingsPinsParticleStageInterfaces() throws Exception {
         Method injector = VulkanBackend.class.getDeclaredMethod(
             "injectExplicitVulkanBindings",

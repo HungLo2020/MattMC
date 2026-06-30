@@ -94,5 +94,9 @@ public class VulkanDrawCallLifecycleTest {
             "Vulkan draw-call path should route through legacy drawElements bridge");
         assertTrue(source.contains("vkCmdDrawIndexed"),
             "Vulkan draw-call path should record vkCmdDrawIndexed");
+        assertTrue(source.contains("BoundIndexBufferState"),
+            "Vulkan indexed draws should track the bound index buffer range");
+        assertTrue(source.contains("Indexed draw exceeds bound index buffer range"),
+            "Vulkan indexed draws should fail before recording an out-of-range vkCmdDrawIndexed");
     }
 }

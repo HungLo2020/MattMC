@@ -898,4 +898,18 @@ public class DistantHorizonsCommandContextMigrationTest {
                 && vulkanicApiSource.contains("direct -> direct.drawIndexedInstanced(ctx, mode, count, type, indices, instanceCount)"),
             "Instanced indexed draws should route to the direct Vulkan implementation");
     }
+
+    @Test
+    public void testDhLodDrawRebindsQuadIndexBufferAtDrawSite() throws IOException {
+        Path lodRenderer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
+        String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
+
+        int vertexBind = sourceWithoutComments.indexOf("shaderProgram.bindVertexBuffer(vbo.getId())");
+        int indexBind = sourceWithoutComments.indexOf("this.quadIBO.bind()", vertexBind);
+        int drawElements = sourceWithoutComments.indexOf("VulkanicAPI.drawElements(", vertexBind);
+
+        assertTrue(vertexBind >= 0 && indexBind > vertexBind && drawElements > indexBind,
+            "DH LOD draws should rebind their shared quad index buffer immediately before drawElements");
+    }
 }

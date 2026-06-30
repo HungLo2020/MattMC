@@ -191,6 +191,10 @@ public class VulkanBackend {
     private static final int GL_LUMINANCE_ALPHA = 0x190A;
     private static final Pattern GLSL_BLOCK_COMMENT_PATTERN = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
     private static final Pattern GLSL_LINE_COMMENT_PATTERN = Pattern.compile("(?m)//.*$");
+    private static final Pattern GLSL_VERTEX_INPUT_DECLARATION_PATTERN = Pattern.compile(
+        "(?m)(^\\s*)(?:layout\\s*\\(([^)]*)\\)\\s*)?((?:[A-Za-z0-9_]+\\s+)*)in\\s+([A-Za-z0-9_]+)\\s+([A-Za-z_][A-Za-z0-9_]*)(\\s*\\[[^]]+\\])?\\s*;"
+    );
+    private static final Pattern GLSL_LAYOUT_LOCATION_PATTERN = Pattern.compile("\\blocation\\s*=\\s*(\\d+)");
     private static final Pattern GLSL_UNIFORM_BLOCK_PATTERN = Pattern.compile("(?m)(?:layout\\s*\\(([^)]*)\\)\\s*)?uniform\\s+(\\w+)\\s*\\{");
     private static final Pattern GLSL_STANDALONE_UNIFORM_PATTERN = Pattern.compile(
         "(?m)^\\s*(?:layout\\s*\\(([^)]*)\\)\\s*)?(?:lowp\\s+|mediump\\s+|highp\\s+)?uniform\\s+(\\w+)\\s+(\\w+)(?:\\s*\\[\\s*(\\d+)\\s*\\])?(?:\\s*=\\s*[^;]+)?\\s*;"
@@ -218,6 +222,7 @@ public class VulkanBackend {
     private static final int GL_DEPTH = 0x1801;
     private static final int GL_STENCIL = 0x1802;
     private static final int GL_NEAREST = 0x2600;
+    private static final int LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING = 15;
 
     private final Object nativeInitLock = new Object();
     private volatile NativeSpine nativeSpine;
@@ -812,6 +817,7 @@ void main() {
         String reboundSource = shaderSource;
         if (shaderType == ShaderType.VERTEX) {
             reboundSource = injectExplicitVertexInputLocations(renderPipeline, reboundSource);
+            reboundSource = injectExplicitRemainingVertexInputLocations(reboundSource);
         }
         if (isParticlePipeline(renderPipeline)) {
             reboundSource = injectExplicitParticleStageLocations(shaderType, reboundSource);
@@ -981,6 +987,138 @@ void main() {
                     + ";"
             )
         );
+    }
+
+    private static String injectExplicitRemainingVertexInputLocations(String shaderSource) {
+        java.util.Set<Integer> occupiedLocations = new java.util.TreeSet<>();
+
+        Matcher occupiedMatcher = GLSL_VERTEX_INPUT_DECLARATION_PATTERN.matcher(shaderSource);
+        while (occupiedMatcher.find()) {
+            String layoutBody = occupiedMatcher.group(2);
+            if (layoutBody == null) {
+                continue;
+            }
+
+            Matcher locationMatcher = GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody);
+            if (!locationMatcher.find()) {
+                continue;
+            }
+
+            int location = Integer.parseInt(locationMatcher.group(1));
+            reserveVertexInputLocations(occupiedLocations, location, occupiedMatcher.group(4));
+        }
+
+        Matcher declarationMatcher = GLSL_VERTEX_INPUT_DECLARATION_PATTERN.matcher(shaderSource);
+        StringBuffer rewritten = new StringBuffer();
+        while (declarationMatcher.find()) {
+            String layoutBody = declarationMatcher.group(2);
+            if (layoutBody != null && GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody).find()) {
+                declarationMatcher.appendReplacement(rewritten, Matcher.quoteReplacement(declarationMatcher.group(0)));
+                continue;
+            }
+
+            int location = nextAvailableVertexInputLocation(occupiedLocations);
+            reserveVertexInputLocations(occupiedLocations, location, declarationMatcher.group(4));
+
+            String layout = layoutBody == null
+                ? "layout(location = " + location + ") "
+                : "layout(" + layoutBody + ", location = " + location + ") ";
+            String replacement = declarationMatcher.group(1)
+                + layout
+                + declarationMatcher.group(3)
+                + "in "
+                + declarationMatcher.group(4)
+                + " "
+                + declarationMatcher.group(5)
+                + (declarationMatcher.group(6) == null ? "" : declarationMatcher.group(6))
+                + ";";
+            declarationMatcher.appendReplacement(rewritten, Matcher.quoteReplacement(replacement));
+        }
+        declarationMatcher.appendTail(rewritten);
+        return rewritten.toString();
+    }
+
+    private static List<ReflectedVertexInput> collectExplicitVertexInputDeclarations(String shaderSource) {
+        java.util.LinkedHashMap<Integer, ReflectedVertexInput> inputsByLocation = new java.util.LinkedHashMap<>();
+        Matcher matcher = GLSL_VERTEX_INPUT_DECLARATION_PATTERN.matcher(shaderSource);
+        while (matcher.find()) {
+            String layoutBody = matcher.group(2);
+            if (layoutBody == null) {
+                continue;
+            }
+
+            Matcher locationMatcher = GLSL_LAYOUT_LOCATION_PATTERN.matcher(layoutBody);
+            if (!locationMatcher.find()) {
+                continue;
+            }
+
+            int location = Integer.parseInt(locationMatcher.group(1));
+            String typeName = matcher.group(4);
+            int span = vertexInputLocationSpan(typeName);
+            for (int i = 0; i < span; i++) {
+                inputsByLocation.putIfAbsent(
+                    location + i,
+                    new ReflectedVertexInput(location + i, vertexInputColumnType(typeName))
+                );
+            }
+        }
+
+        return List.copyOf(inputsByLocation.values());
+    }
+
+    private static int nextAvailableVertexInputLocation(java.util.Set<Integer> occupiedLocations) {
+        int location = 0;
+        while (occupiedLocations.contains(location)) {
+            location++;
+        }
+        return location;
+    }
+
+    private static void reserveVertexInputLocations(java.util.Set<Integer> occupiedLocations, int firstLocation, String typeName) {
+        int count = vertexInputLocationSpan(typeName);
+        for (int i = 0; i < count; i++) {
+            occupiedLocations.add(firstLocation + i);
+        }
+    }
+
+    private static int vertexInputLocationSpan(String typeName) {
+        return switch (typeName) {
+            case "mat2", "mat2x2", "dmat2", "dmat2x2" -> 2;
+            case "mat3", "mat2x3", "mat3x2", "dmat3", "dmat2x3", "dmat3x2" -> 3;
+            case "mat4", "mat2x4", "mat3x4", "mat4x2", "mat4x3",
+                "dmat4", "dmat2x4", "dmat3x4", "dmat4x2", "dmat4x3" -> 4;
+            default -> 1;
+        };
+    }
+
+    private static String vertexInputColumnType(String typeName) {
+        return switch (typeName) {
+            case "mat2", "mat2x2", "mat3x2", "mat4x2" -> "vec2";
+            case "mat3", "mat2x3", "mat3x3", "mat4x3" -> "vec3";
+            case "mat4", "mat2x4", "mat3x4", "mat4x4" -> "vec4";
+            case "dmat2", "dmat2x2", "dmat3x2", "dmat4x2" -> "dvec2";
+            case "dmat3", "dmat2x3", "dmat3x3", "dmat4x3" -> "dvec3";
+            case "dmat4", "dmat2x4", "dmat3x4", "dmat4x4" -> "dvec4";
+            default -> typeName;
+        };
+    }
+
+    private static PipelineDescriptor.VertexAttributeFormat defaultVertexAttributeFormatForGlslType(String typeName) {
+        return switch (typeName) {
+            case "float" -> PipelineDescriptor.VertexAttributeFormat.R32_SFLOAT;
+            case "vec2" -> PipelineDescriptor.VertexAttributeFormat.R32G32_SFLOAT;
+            case "vec3" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32_SFLOAT;
+            case "vec4", "dvec2" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SFLOAT;
+            case "int" -> PipelineDescriptor.VertexAttributeFormat.R32_SINT;
+            case "ivec2" -> PipelineDescriptor.VertexAttributeFormat.R32G32_SINT;
+            case "ivec3" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32_SINT;
+            case "ivec4" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SINT;
+            case "uint", "bool" -> PipelineDescriptor.VertexAttributeFormat.R32_UINT;
+            case "uvec2", "bvec2" -> PipelineDescriptor.VertexAttributeFormat.R32G32_UINT;
+            case "uvec3", "bvec3" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32_UINT;
+            case "uvec4", "bvec4" -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_UINT;
+            default -> PipelineDescriptor.VertexAttributeFormat.R32G32B32A32_SFLOAT;
+        };
     }
 
     private static String injectExplicitUniformBlockBinding(String shaderSource, String blockName, int bindingIndex) {
@@ -2136,6 +2274,8 @@ void main() {
             for (Map.Entry<String, Integer> entry : virtualProgram.attributeLocationsByName.entrySet()) {
                 reboundSource = injectExplicitVertexInputLocation(reboundSource, entry.getKey(), entry.getValue());
             }
+            reboundSource = injectExplicitRemainingVertexInputLocations(reboundSource);
+            virtualProgram.vertexInputs = collectExplicitVertexInputDeclarations(reboundSource);
         }
         reboundSource = injectExplicitReflectedResourceBindings(reboundSource, virtualProgram);
 
@@ -4129,7 +4269,7 @@ void main() {
             return null;
         }
 
-        PipelineDescriptor.VertexInputState vertexInputState = createLegacyVertexInputState();
+        PipelineDescriptor.VertexInputState vertexInputState = createLegacyVertexInputState(virtualProgram);
         if (vertexInputState == null) {
             return null;
         }
@@ -4187,7 +4327,7 @@ void main() {
     }
 
     @Nullable
-    private PipelineDescriptor.VertexInputState createLegacyVertexInputState() {
+    private PipelineDescriptor.VertexInputState createLegacyVertexInputState(VirtualProgram virtualProgram) {
         VirtualVaoState vaoState = currentVirtualVaoState();
         List<LegacyVertexAttribute> attributes = vaoState.enabledAttributes.stream()
             .map(vaoState.attributes::get)
@@ -4200,6 +4340,7 @@ void main() {
 
         java.util.LinkedHashMap<Integer, PipelineDescriptor.VertexInputBinding> bindings = new java.util.LinkedHashMap<>();
         List<PipelineDescriptor.VertexInputAttribute> vertexAttributes = new ArrayList<>(attributes.size());
+        java.util.Set<Integer> providedLocations = new java.util.HashSet<>();
         for (LegacyVertexAttribute attribute : attributes) {
             LegacyVertexBinding binding = vaoState.bindings.get(attribute.binding());
             int stride = binding != null && binding.stride() > 0
@@ -4218,6 +4359,34 @@ void main() {
                 toVertexAttributeFormat(attribute.type(), attribute.size(), attribute.normalized(), attribute.integer()),
                 attribute.offset()
             ));
+            providedLocations.add(attribute.index());
+        }
+
+        boolean needsDefaultBinding = false;
+        for (ReflectedVertexInput input : virtualProgram.vertexInputs) {
+            if (providedLocations.contains(input.location())) {
+                continue;
+            }
+
+            vertexAttributes.add(new PipelineDescriptor.VertexInputAttribute(
+                input.location(),
+                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+                defaultVertexAttributeFormatForGlslType(input.typeName()),
+                0
+            ));
+            providedLocations.add(input.location());
+            needsDefaultBinding = true;
+        }
+
+        if (needsDefaultBinding) {
+            bindings.putIfAbsent(
+                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+                new PipelineDescriptor.VertexInputBinding(
+                    LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+                    16,
+                    PipelineDescriptor.VertexInputRate.INSTANCE
+                )
+            );
         }
 
         return new PipelineDescriptor.VertexInputState(new ArrayList<>(bindings.values()), vertexAttributes);
@@ -6311,7 +6480,7 @@ void main() {
             if (vulkanBuffer.isClosed()) {
                 throw new IllegalStateException("Cannot bind closed VulkanBuffer as index buffer");
             }
-            spine.bindIndexBuffer(commandBufferHandle, vulkanBuffer.getVkBufferHandle(), indexType);
+            spine.bindIndexBuffer(commandBufferHandle, vulkanBuffer.getVkBufferHandle(), vulkanBuffer.size(), indexType);
         }
 
         @Override
@@ -9570,6 +9739,7 @@ void main() {
         private volatile List<ReflectedResourceBinding> activeResourceBindings = List.of();
         private volatile List<String> standaloneUniformDeclarations = List.of();
         private volatile List<VulkanicSpirvModule> linkedSpirvModules = List.of();
+        private volatile List<ReflectedVertexInput> vertexInputs = List.of();
         private volatile Map<Integer, StandaloneUniformField> standaloneFieldsByLocation = Map.of();
         private volatile int standaloneBackingSize;
         @Nullable
@@ -9587,6 +9757,9 @@ void main() {
                 buffer.close();
             }
         }
+    }
+
+    private record ReflectedVertexInput(int location, String typeName) {
     }
 
     private static final class VirtualVaoState {
@@ -9941,6 +10114,9 @@ void main() {
         private final Map<DescriptorSetCacheKey, Long> descriptorSetCache = new HashMap<>();
         private final Map<Long, Long> lastBoundGraphicsPipelineByCommandBuffer = new HashMap<>();
         private final Map<Long, BoundDescriptorSetState> lastBoundDescriptorSetByCommandBuffer = new HashMap<>();
+        private final Map<Long, BoundIndexBufferState> boundIndexBuffersByCommandBuffer = new ConcurrentHashMap<>();
+        @Nullable
+        private volatile VulkanBuffer legacyDefaultVertexAttributeBuffer;
         private final Set<Long> managedShaderModules = ConcurrentHashMap.newKeySet();
         private final Set<Long> transientRenderPassHandles = ConcurrentHashMap.newKeySet();
         private final List<Set<Long>> transientRenderPassHandlesByImmediateSlot = createTransientHandleBuckets(IMMEDIATE_SUBMIT_SLOTS);
@@ -10110,6 +10286,9 @@ void main() {
                 this.id = id;
                 this.lastTarget = VulkanicAPI.GL_ARRAY_BUFFER;
             }
+        }
+
+        private record BoundIndexBufferState(long bufferHandle, int sizeBytes, VulkanicIndexType indexType) {
         }
 
         private static final class TextureLevelInfo {
@@ -10679,11 +10858,13 @@ void main() {
             descriptorSetCache.clear();
             lastBoundGraphicsPipelineByCommandBuffer.clear();
             lastBoundDescriptorSetByCommandBuffer.clear();
+            boundIndexBuffersByCommandBuffer.clear();
         }
 
         private void clearTrackedCommandBufferState(long commandBufferHandle) {
             lastBoundGraphicsPipelineByCommandBuffer.remove(commandBufferHandle);
             lastBoundDescriptorSetByCommandBuffer.remove(commandBufferHandle);
+            boundIndexBuffersByCommandBuffer.remove(commandBufferHandle);
         }
 
         private void bindDescriptorSetIfNeeded(
@@ -13916,7 +14097,7 @@ void main() {
             }
 
             bindLegacyVertexBuffersForDraw(commandBufferHandle);
-            bindIndexBuffer(commandBufferHandle, indexBuffer.getVkBufferHandle(), indexType);
+            bindIndexBuffer(commandBufferHandle, indexBuffer.getVkBufferHandle(), indexBuffer.size(), indexType);
             drawIndexed(commandBufferHandle, (int) firstIndexLong, count, baseVertex, instanceCount);
         }
 
@@ -13926,6 +14107,11 @@ void main() {
                 .filter(binding -> binding.buffer() > 0)
                 .sorted(java.util.Comparator.comparingInt(LegacyVertexBinding::binding))
                 .toList();
+            bindVertexBuffer(
+                commandBufferHandle,
+                LEGACY_DEFAULT_VERTEX_ATTRIBUTE_BINDING,
+                requireLegacyDefaultVertexAttributeBuffer().getVkBufferHandle()
+            );
 
             if (bindings.isEmpty()) {
                 VulkanBuffer fallbackVertexBuffer = resolveOptionalLegacyDrawBuffer(VulkanicAPI.GL_ARRAY_BUFFER);
@@ -13943,6 +14129,22 @@ void main() {
                 }
                 bindVertexBuffer(commandBufferHandle, binding.binding(), vertexBuffer.getVkBufferHandle(), binding.offset());
             }
+        }
+
+        private VulkanBuffer requireLegacyDefaultVertexAttributeBuffer() {
+            VulkanBuffer buffer = legacyDefaultVertexAttributeBuffer;
+            if (buffer != null && !buffer.isClosed()) {
+                return buffer;
+            }
+
+            java.nio.ByteBuffer zeroData = org.lwjgl.BufferUtils.createByteBuffer(64 * 1024);
+            legacyDefaultVertexAttributeBuffer = (VulkanBuffer) createManagedBuffer(
+                "Legacy default vertex attributes",
+                VulkanicBuffer.USAGE_VERTEX,
+                zeroData.remaining(),
+                zeroData
+            );
+            return legacyDefaultVertexAttributeBuffer;
         }
 
         private VulkanicBuffer createManagedBuffer(String label,
@@ -17457,12 +17659,15 @@ void main() {
             }
         }
 
-        private void bindIndexBuffer(long commandBufferHandle, long bufferHandle, VulkanicIndexType indexType) {
+        private void bindIndexBuffer(long commandBufferHandle, long bufferHandle, int sizeBytes, VulkanicIndexType indexType) {
             VkCommandBuffer activeCommandBuffer = requireRecordingCommandBuffer(commandBufferHandle, "bindIndexBuffer");
             if (!renderPassRecording) {
                 throw new IllegalStateException("bindIndexBuffer requires an active render pass");
             }
             Objects.requireNonNull(indexType, "indexType must not be null");
+            if (sizeBytes <= 0) {
+                throw new IllegalArgumentException("index buffer size must be > 0, got: " + sizeBytes);
+            }
 
             int vkIndexType;
             switch (indexType) {
@@ -17474,6 +17679,10 @@ void main() {
             }
 
             VK10.vkCmdBindIndexBuffer(activeCommandBuffer, bufferHandle, 0L, vkIndexType);
+            boundIndexBuffersByCommandBuffer.put(
+                commandBufferHandle,
+                new BoundIndexBufferState(bufferHandle, sizeBytes, indexType)
+            );
         }
 
         private void drawIndexed(long commandBufferHandle, int firstIndex, int indexCount, int baseVertex, int instanceCount) {
@@ -17483,6 +17692,21 @@ void main() {
             }
             if (firstIndex < 0 || indexCount < 0 || instanceCount < 1) {
                 throw new IllegalArgumentException("Invalid indexed draw arguments");
+            }
+            BoundIndexBufferState indexBufferState = boundIndexBuffersByCommandBuffer.get(commandBufferHandle);
+            if (indexBufferState == null) {
+                throw new IllegalStateException("drawIndexed requires a bound index buffer");
+            }
+            long requiredBytes = (long) indexBufferState.indexType().bytesPerIndex() * ((long) firstIndex + indexCount);
+            if (requiredBytes > indexBufferState.sizeBytes()) {
+                throw new IllegalStateException(
+                    "Indexed draw exceeds bound index buffer range: firstIndex=" + firstIndex
+                        + ", indexCount=" + indexCount
+                        + ", indexType=" + indexBufferState.indexType()
+                        + ", requiredBytes=" + requiredBytes
+                        + ", boundSizeBytes=" + indexBufferState.sizeBytes()
+                        + ", buffer=0x" + Long.toHexString(indexBufferState.bufferHandle())
+                );
             }
 
             VK10.vkCmdDrawIndexed(activeCommandBuffer, indexCount, instanceCount, firstIndex, baseVertex, 0);
@@ -19050,6 +19274,7 @@ void main() {
                     }
                     managedBufferAllocations.clear();
                 }
+                legacyDefaultVertexAttributeBuffer = null;
 
                 if (!legacyTextures.isEmpty()) {
                     new ArrayList<>(legacyTextures.values()).forEach(this::destroyLegacyTextureStorage);

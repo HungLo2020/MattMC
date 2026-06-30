@@ -781,6 +781,7 @@ public class LodRenderer
 
 				vbo.bind();
 				shaderProgram.bindVertexBuffer(vbo.getId());
+				this.quadIBO.bind();
 				VulkanicAPI.drawElements(
 						ctx,
 						VulkanicPrimitiveMode.TRIANGLES,
