@@ -38,11 +38,7 @@ extra_javascript:
 
 nav:
   - Home: index.md
-  - Gameplay:
-      - Overview: gameplay/Gameplay.md
-  - Testing:
-      - Overview: testing/home.md
-  - Development:
-      - Dev Tips And Tools: development/DEV-TIPS-TOOLS.md
-  - Changelog:
-      - Overview: changelog/CHANGELOG.md
+  - Gameplay: gameplay/Gameplay.md
+  - Testing: testing/home.md
+  - Development: development/DEV-TIPS-TOOLS.md
+  - Changelog: changelog/CHANGELOG.md
