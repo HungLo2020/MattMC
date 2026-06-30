@@ -4,7 +4,6 @@ Gameplay.
 
 ## Table of Contents
 
-- [Backports](backports/Backports.md)
 - [Biomes](biomes/Biomes.md)
 - [Blocks](blocks/Blocks.md)
 - [Brewing](brewing/Brewing.md)
