@@ -157,7 +157,7 @@ public record TerrainPipelineContract(
                 false,
                 DepthColorStorage.isRedMaskEnabled() || DepthColorStorage.isGreenMaskEnabled() || DepthColorStorage.isBlueMaskEnabled(),
                 DepthColorStorage.isAlphaMaskEnabled(),
-                !translucentPass && DepthColorStorage.isDepthMaskEnabled(),
+                pipeline.isWriteDepth() && DepthColorStorage.isDepthMaskEnabled(),
                 pipeline.getDepthBiasScaleFactor(),
                 pipeline.getDepthBiasConstant(),
                 indexedBlendStates(indexedBlendOverrides)

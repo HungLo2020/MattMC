@@ -179,6 +179,29 @@ public class VulkanRenderStateContractTest {
     }
 
     @Test
+    public void testSharedChunkTranslucentPassPreservesPipelineDepthWrites() {
+        RenderPipeline pipeline = RenderPipeline.builder()
+            .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/shared_chunk_translucent_depth"))
+            .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+            .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+            .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+            .withPolygonMode(PolygonMode.FILL)
+            .withCull(false)
+            .withBlend(BlendFunction.TRANSLUCENT)
+            .withColorWrite(true, true)
+            .withDepthWrite(true)
+            .withColorLogic(LogicOp.NONE)
+            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.TRIANGLES)
+            .withDepthBias(0.0f, 0.0f)
+            .build();
+
+        TerrainPipelineContract.PassState passState = TerrainPipelineContract.PassState.from(pipeline, true);
+
+        assertTrue(passState.writeDepth(),
+            "Vulkan shared chunk terrain should preserve pipeline-declared depth writes for translucent water");
+    }
+
+    @Test
     public void testSetBlendEquationAcceptsBothOverloads() {
         assertDoesNotThrow(() -> vulkanBackend.setBlendEquation(stubCtx, 0x8006));
         assertDoesNotThrow(() -> vulkanBackend.setBlendEquation(stubCtx, VulkanicBlendEquation.ADD));

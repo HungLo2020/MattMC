@@ -1438,8 +1438,8 @@ public class Phase3DrawPathTest {
 
         assertTrue(contractSource.contains("PassState.from(pipeline, pass.isTranslucent(), indexedBlendOverrides)")
                 && contractSource.contains("currentBlend(pipeline, translucentPass)")
-                && contractSource.contains("!translucentPass && DepthColorStorage.isDepthMaskEnabled()"),
-            "Shared Sodium chunk pipelines should derive Vulkan terrain depth, blend, and write-mask state from the explicit terrain contract while keeping translucent water from writing depth");
+                && contractSource.contains("pipeline.isWriteDepth() && DepthColorStorage.isDepthMaskEnabled()"),
+            "Shared Sodium chunk pipelines should derive Vulkan terrain depth, blend, and write-mask state from the explicit terrain contract, including pipeline-declared translucent depth writes");
         assertTrue(contractSource.contains("blendOverrideForAttachment(int colorAttachmentIndex)")
                 && contractSource.contains("List<IndexedBlendState> indexedBlendStates"),
             "Shared Sodium chunk pipelines should carry Iris per-buffer blend overrides in the explicit terrain contract");

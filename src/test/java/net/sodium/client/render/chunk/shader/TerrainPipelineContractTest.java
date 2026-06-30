@@ -30,13 +30,13 @@ public class TerrainPipelineContractTest {
     }
 
     @Test
-    public void testTranslucentContractUsesBlendAndDoesNotWriteDepth() {
+    public void testTranslucentContractUsesBlendAndPreservesPipelineDepthWrites() {
         TerrainPipelineContract.PassState state = TerrainPipelineContract.PassState.from(testPipeline("translucent"), true);
 
         assertFalse(state.cull());
         assertTrue(state.blend().isPresent(), "Translucent terrain must retain an explicit blend state");
         assertEquals(BlendFunction.TRANSLUCENT, state.blend().get());
-        assertFalse(state.writeDepth());
+        assertTrue(state.writeDepth(), "Translucent terrain should preserve the RenderPipeline depth-write contract");
     }
 
     @Test

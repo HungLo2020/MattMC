@@ -448,7 +448,7 @@ public class DistantHorizonsCommandContextMigrationTest {
                         && waterDepthWritesOn > waterCullOff && waterBlendOn > waterDepthWritesOn
                         && waterDraw > waterBlendOn
                         && restoreBlendOn > waterDraw && restoreCull > waterDraw && restoreDepthTest > restoreCull && restoreDepthFunc > restoreDepthTest,
-                    "DH Vulkan no-shader rendering should draw transparent details and water surfaces in one compatibility pass, with water last and owning depth for fog/apply");
+                    "DH Vulkan no-shader rendering should draw transparent details first, then let the final water surface own depth for fog/apply");
         assertTrue(defaultRenderPass > waterDraw && defaultSideDraw > defaultRenderPass && defaultUpDraw > defaultSideDraw && defaultWaterDraw > defaultUpDraw,
             "DH shader/OpenGL rendering should keep the normal transparent side, non-water UP, and water UP order");
     }
