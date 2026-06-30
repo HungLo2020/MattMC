@@ -144,6 +144,6 @@ public class SSAOShader extends AbstractShaderRenderer
 		DhTextureState.setActiveTextureUnitIndex(0);
 		DhTextureState.bindTexture2D(this.activeDepthTextureId);
 		
-		ScreenQuad.INSTANCE.render();
+		ScreenQuad.INSTANCE.render(ctx, this.activeFrameBuffer);
 	}
 }

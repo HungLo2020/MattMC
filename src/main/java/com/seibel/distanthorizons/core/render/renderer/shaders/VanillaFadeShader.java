@@ -196,7 +196,7 @@ public class VanillaFadeShader extends AbstractShaderRenderer
 		VulkanicAPI.setUniform1i(ctx, this.uDhColorTexture, 3);
 		
 		
-		ScreenQuad.INSTANCE.render();
+		ScreenQuad.INSTANCE.render(ctx, this.activeFrameBuffer);
 	}
 	
 }

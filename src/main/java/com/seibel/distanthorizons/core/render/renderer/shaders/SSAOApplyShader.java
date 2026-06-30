@@ -142,7 +142,7 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		}
 		
 		
-		ScreenQuad.INSTANCE.render();
+		ScreenQuad.INSTANCE.render(ctx, LodRenderer.INSTANCE.getActiveDhFramebuffer());
 		
 	}
 }

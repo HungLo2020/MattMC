@@ -499,8 +499,8 @@ public class DistantHorizonsCommandContextMigrationTest {
 
         int renderToFrameBuffer = sourceWithoutComments.indexOf("private void renderToFrameBuffer");
         int renderToMcTexture = sourceWithoutComments.indexOf("private void renderToMcTexture");
-        int firstQuad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render()", renderToFrameBuffer);
-        int secondQuad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render()", renderToMcTexture);
+        int firstQuad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render", renderToFrameBuffer);
+        int secondQuad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render", renderToMcTexture);
         int firstColorMask = sourceWithoutComments.indexOf(
             "VulkanicAPI.setColorMask(ctx, true, true, true, true)", renderToFrameBuffer);
         int secondColorMask = sourceWithoutComments.indexOf(
@@ -525,7 +525,7 @@ public class DistantHorizonsCommandContextMigrationTest {
         int render = sourceWithoutComments.indexOf("protected void onRender(CommandContext ctx)");
         int colorMask = sourceWithoutComments.indexOf(
             "VulkanicAPI.setColorMask(ctx, true, true, true, true)", render);
-        int quad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render()", render);
+        int quad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render", render);
 
         assertTrue(render >= 0 && quad > render,
             "DH fog apply shader should render a fullscreen composite quad");
@@ -542,7 +542,7 @@ public class DistantHorizonsCommandContextMigrationTest {
         int render = sourceWithoutComments.indexOf("protected void onRender(CommandContext ctx)");
         int colorMask = sourceWithoutComments.indexOf(
             "VulkanicAPI.setColorMask(ctx, true, true, true, true)", render);
-        int quad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render()", render);
+        int quad = sourceWithoutComments.indexOf("ScreenQuad.INSTANCE.render", render);
 
         assertTrue(render >= 0 && quad > render,
             "DH fog shader should render a fullscreen fog-generation quad");
@@ -771,6 +771,30 @@ public class DistantHorizonsCommandContextMigrationTest {
     }
 
     @Test
+    public void testDhFramebufferExposesExplicitRenderTargetDescriptor() throws IOException {
+        Path framebuffer = SRC_MAIN_JAVA.resolve(
+            "com/seibel/distanthorizons/core/render/glObject/texture/DhFramebuffer.java");
+        String framebufferSource = readSourceWithoutComments(framebuffer);
+
+        assertTrue(framebufferSource.contains("createRenderTargetDescriptor(Supplier<String> label)"),
+            "DH framebuffers should expose a descriptor snapshot for migrated Vulkan render-pass paths");
+        assertTrue(framebufferSource.contains("private int depthAttachmentTextureId;")
+                && framebufferSource.contains("this.depthAttachmentTextureId = textureId;"),
+            "DH framebuffers should track the depth texture needed by explicit render-target descriptors");
+	        assertTrue(framebufferSource.contains("private int[] drawBuffers;")
+	                && framebufferSource.contains("this.drawBuffers = Arrays.copyOf(buffers, buffers.length);")
+	                && framebufferSource.contains("this.drawBuffers = new int[]{VulkanicAPI.GL_NONE};"),
+	            "DH framebuffers should track active draw buffers, including no-draw-buffer state");
+	        assertTrue(framebufferSource.contains("public boolean canCreateRenderTargetDescriptor()")
+	                && framebufferSource.contains("this.hasDepthAttachment && this.depthAttachmentTextureId > 0"),
+	            "DH framebuffers should report whether descriptor-backed render passes have real attachment state");
+	        assertTrue(framebufferSource.contains("VulkanicResourceUsage.SAMPLED_READ")
+	                && framebufferSource.contains("VulkanicResourceUsage.COLOR_ATTACHMENT_WRITE")
+	                && framebufferSource.contains("VulkanicResourceUsage.DEPTH_ATTACHMENT_WRITE"),
+            "DH render-target descriptors should carry explicit sampled/read-write usage intent");
+    }
+
+    @Test
     public void testIrisDhCompatProgramsAvoidImmediateContext() throws IOException {
         assertNoImmediateContext(SRC_MAIN_JAVA.resolve(
             "net/irisshaders/iris/compat/dh/IrisGenericRenderProgram.java"));
@@ -805,11 +829,18 @@ public class DistantHorizonsCommandContextMigrationTest {
         assertTrue(lodSource.contains("!VulkanicAPI.isVulkanBackendSelected()"),
             "DH LOD render pass bridge should be disabled for OpenGL");
 
-        assertTrue(screenQuadSource.contains("try (RenderPass ignored = createVulkanCompatibilityRenderPass())"),
-            "DH full-screen quad draws should execute inside a Vulkan compatibility render pass");
+		assertTrue(screenQuadSource.contains("try (RenderPass ignored = createVulkanCompatibilityRenderPass(targetFramebuffer))"),
+			"DH full-screen quad draws should execute inside a Vulkan compatibility render pass");
+		String compactScreenQuadSource = screenQuadSource.replaceAll("\\s+", " ");
+		assertTrue(screenQuadSource.contains("targetFramebuffer.createRenderTargetDescriptor(() -> \"Distant Horizons screen quad\")")
+				&& screenQuadSource.contains("VulkanicAPI.createCommandEncoder().createRenderPass(")
+				&& screenQuadSource.contains("boolean preferDescriptor = true")
+				&& screenQuadSource.contains("targetFramebuffer.canCreateRenderTargetDescriptor()")
+				&& compactScreenQuadSource.contains("targetFramebuffer.getId(), preferDescriptor"),
+			"DH full-screen quad render pass should prefer explicit DH render-target descriptors when the bound framebuffer owner matches");
         assertTrue(screenQuadSource.contains("VulkanicAPI.getDrawFramebufferBinding()")
                 && screenQuadSource.contains("VulkanicAPI.getFramebufferDepthAttachmentObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0"),
-            "DH full-screen quad render pass should target the current draw framebuffer with its real depth attachment contract");
+            "DH full-screen quad render pass should retain the current-draw-framebuffer fallback and its real depth attachment contract");
         assertTrue(screenQuadSource.contains("!VulkanicAPI.isVulkanBackendSelected()"),
             "DH full-screen quad render pass bridge should be disabled for OpenGL");
 

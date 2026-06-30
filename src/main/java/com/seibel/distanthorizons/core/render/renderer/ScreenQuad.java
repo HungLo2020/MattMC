@@ -2,12 +2,15 @@ package com.seibel.distanthorizons.core.render.renderer;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
 import net.blaze3d.systems.RenderPass;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicPrimitiveMode;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -63,6 +66,11 @@ public class ScreenQuad
 
 	public void render(CommandContext ctx)
 	{
+		this.render(ctx, null);
+	}
+
+	public void render(CommandContext ctx, @Nullable DhFramebuffer targetFramebuffer)
+	{
 		this.init();
 		
 		this.boxBuffer.bind();
@@ -70,13 +78,13 @@ public class ScreenQuad
 		this.va.bind();
 		this.va.bindBufferToAllBindingPoints(this.boxBuffer.getId());
 		
-		try (RenderPass ignored = createVulkanCompatibilityRenderPass())
+		try (RenderPass ignored = createVulkanCompatibilityRenderPass(targetFramebuffer))
 		{
 			VulkanicAPI.drawArrays(ctx, VulkanicPrimitiveMode.TRIANGLES, 0, 6);
 		}
 	}
 
-	private static RenderPass createVulkanCompatibilityRenderPass()
+	private static RenderPass createVulkanCompatibilityRenderPass(@Nullable DhFramebuffer targetFramebuffer)
 	{
 		if (!VulkanicAPI.isVulkanBackendSelected())
 		{
@@ -84,6 +92,19 @@ public class ScreenQuad
 		}
 
 		CommandContext ctx = VulkanicAPI.getCommandContext();
+		if (targetFramebuffer != null
+				&& targetFramebuffer.getId() == VulkanicAPI.getDrawFramebufferBinding()
+				&& targetFramebuffer.canCreateRenderTargetDescriptor())
+		{
+			VulkanicRenderTargetDescriptor descriptor =
+					targetFramebuffer.createRenderTargetDescriptor(() -> "Distant Horizons screen quad");
+			boolean preferDescriptor = true;
+			return VulkanicAPI.createCommandEncoder().createRenderPass(
+					descriptor,
+					targetFramebuffer.getId(),
+					preferDescriptor);
+		}
+
 		return VulkanicAPI.createRenderPass(
 				() -> "Distant Horizons screen quad",
 				VulkanicAPI.getDrawFramebufferBinding(),

@@ -971,6 +971,12 @@ public class LodRenderer
 		this.activeFramebuffer.bind();
 		return true;
 	}
+
+	@Nullable
+	public DhFramebuffer getActiveDhFramebuffer()
+	{
+		return this.activeFramebuffer instanceof DhFramebuffer dhFramebuffer ? dhFramebuffer : null;
+	}
 	
 	/** @return -1 if no texture has been bound yet */
 	public int getActiveColorTextureId() { return this.activeColorTextureId; }

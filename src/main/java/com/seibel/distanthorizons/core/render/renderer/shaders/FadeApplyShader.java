@@ -122,7 +122,7 @@ public class FadeApplyShader extends AbstractShaderRenderer
 			return;
 		}
 		
-		ScreenQuad.INSTANCE.render();
+		ScreenQuad.INSTANCE.render(ctx, this.activeDrawToLodTarget ? LodRenderer.INSTANCE.getActiveDhFramebuffer() : null);
 		
 		VulkanicAPI.setDepthTestEnabled(ctx, true);
 		VulkanicAPI.bindReadFramebuffer(ctx, 0);

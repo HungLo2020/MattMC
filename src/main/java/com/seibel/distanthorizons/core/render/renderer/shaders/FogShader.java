@@ -290,7 +290,7 @@ public class FogShader extends AbstractShaderRenderer
 		}
 		
 		
-		ScreenQuad.INSTANCE.render();
+		ScreenQuad.INSTANCE.render(ctx, this.activeFrameBuffer);
 	}
 	
 }

@@ -158,7 +158,7 @@ public class DhFadeShader extends AbstractShaderRenderer
 		VulkanicAPI.setUniform1i(ctx, this.uDhColorTexture, 2);
 		
 		
-		ScreenQuad.INSTANCE.render();
+		ScreenQuad.INSTANCE.render(ctx, this.activeFrameBuffer);
 	}
 	
 }

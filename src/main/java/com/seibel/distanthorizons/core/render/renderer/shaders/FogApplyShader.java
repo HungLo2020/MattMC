@@ -123,7 +123,7 @@ public class FogApplyShader extends AbstractShaderRenderer
 			return;
 		}
 
-		ScreenQuad.INSTANCE.render();
+		ScreenQuad.INSTANCE.render(ctx, LodRenderer.INSTANCE.getActiveDhFramebuffer());
 		
 		VulkanicAPI.bindReadFramebuffer(ctx, 0);
 	}
