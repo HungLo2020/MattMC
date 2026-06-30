@@ -872,9 +872,12 @@ public class DistantHorizonsCommandContextMigrationTest {
             "com/seibel/distanthorizons/core/render/glObject/GLProxy.java");
         Path dhCompat = SRC_MAIN_JAVA.resolve(
             "net/irisshaders/iris/compat/dh/DHCompatInternal.java");
+        Path dhCompatFacade = SRC_MAIN_JAVA.resolve(
+            "net/irisshaders/iris/compat/dh/DHCompat.java");
         Path vulkanicApi = SRC_MAIN_JAVA.resolve("net/vulkanic/VulkanicAPI.java");
         String glProxySource = readSourceWithoutComments(glProxy);
         String dhCompatSource = readSourceWithoutComments(dhCompat);
+        String dhCompatFacadeSource = readSourceWithoutComments(dhCompatFacade);
         String vulkanicApiSource = readSourceWithoutComments(vulkanicApi);
 
         assertTrue(glProxySource.contains("if (vulkanBackend)")
@@ -885,6 +888,10 @@ public class DistantHorizonsCommandContextMigrationTest {
             "Iris DH translucent depth snapshots should use the depth-copy strategy instead of copyTexImage2D");
         assertTrue(dhCompatSource.contains("depthTexNoTranslucentFramebuffer.addDepthAttachmentBypass(depthTexNoTranslucent.getTextureId())"),
             "Iris DH translucent depth snapshots should have a depth-only destination framebuffer for Vulkan blits");
+        assertFalse(dhCompatFacadeSource.contains("getMainDepthTextureIdForVulkanCompositeFallback"),
+            "Iris DH shaderpack samplers must expose DH depth textures instead of substituting the main scene depth on Vulkan");
+        assertFalse(dhCompatFacadeSource.contains("Minecraft.getInstance().getMainRenderTarget().getDepthTexture()"),
+            "Iris DH shaderpack samplers must not bind the main scene depth for dhDepthTex/dhDepthTex1");
         assertTrue(vulkanicApiSource.contains("direct -> direct.setVertexAttribDivisor(ctx, index, divisor)"),
             "Instanced attribute divisors should route to the direct Vulkan implementation");
         assertTrue(vulkanicApiSource.contains("private static void drawIndexedInstancedRaw")
