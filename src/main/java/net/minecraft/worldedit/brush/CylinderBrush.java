@@ -18,30 +18,6 @@ public class CylinderBrush implements Brush {
     
     @Override
     public void build(EditSession editSession, BlockVector3 position, Pattern pattern, double size) {
-        int radius = (int) Math.floor(size);
-        int radiusSquared = radius * radius;
-        
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
-                int distSquared = x * x + z * z;
-                
-                if (distSquared <= radiusSquared) {
-                    if (hollow) {
-                        int innerRadiusSquared = (radius - 1) * (radius - 1);
-                        if (distSquared > innerRadiusSquared) {
-                            for (int y = 0; y < height; y++) {
-                                BlockVector3 pos = position.add(x, y, z);
-                                editSession.setBlock(pos, pattern.apply(pos));
-                            }
-                        }
-                    } else {
-                        for (int y = 0; y < height; y++) {
-                            BlockVector3 pos = position.add(x, y, z);
-                            editSession.setBlock(pos, pattern.apply(pos));
-                        }
-                    }
-                }
-            }
-        }
+        editSession.makeCylinder(position, pattern, size, height, !hollow);
     }
 }

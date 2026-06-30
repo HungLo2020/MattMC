@@ -107,6 +107,14 @@ public class EditSession implements Extent {
         }
         return count;
     }
+
+    /**
+     * Set a block using a pattern evaluated at the target position.
+     */
+    public boolean setBlock(BlockVector3 position, Pattern pattern) {
+        BlockState block = pattern.apply(position);
+        return block != null && setBlock(position, block);
+    }
     
     /**
      * Replace blocks in a region.
@@ -162,6 +170,94 @@ public class EditSession implements Extent {
             }
         }
         return count;
+    }
+
+    /**
+     * Make a cylinder with equal X/Z radius.
+     */
+    public int makeCylinder(BlockVector3 pos, Pattern block, double radius, int height, boolean filled) {
+        return makeCylinder(pos, block, radius, radius, height, filled);
+    }
+
+    /**
+     * Make a cylinder using WorldEdit-style radii and shell sampling.
+     */
+    public int makeCylinder(BlockVector3 pos, Pattern block, double radiusX, double radiusZ, int height, boolean filled) {
+        int affected = 0;
+
+        radiusX = Math.max(1, radiusX) + 0.5;
+        radiusZ = Math.max(1, radiusZ) + 0.5;
+
+        if (height == 0) {
+            return 0;
+        }
+        if (height < 0) {
+            height = -height;
+            pos = pos.subtract(0, height, 0);
+        }
+
+        if (world != null) {
+            if (pos.getY() < world.getMinY()) {
+                int clipped = world.getMinY() - pos.getY();
+                pos = pos.withY(world.getMinY());
+                height -= clipped;
+            }
+            if (height <= 0) {
+                return 0;
+            }
+            int maxY = world.getMaxY() - 1;
+            if (pos.getY() + height - 1 > maxY) {
+                height = maxY - pos.getY() + 1;
+            }
+            if (height <= 0) {
+                return 0;
+            }
+        }
+
+        final double invRadiusX = 1.0 / radiusX;
+        final double invRadiusZ = 1.0 / radiusZ;
+        final int ceilRadiusX = (int) Math.ceil(radiusX);
+        final int ceilRadiusZ = (int) Math.ceil(radiusZ);
+
+        double nextXn = 0;
+        forX: for (int x = 0; x <= ceilRadiusX; x++) {
+            double xn = nextXn;
+            nextXn = (x + 1) * invRadiusX;
+            double nextZn = 0;
+
+            forZ: for (int z = 0; z <= ceilRadiusZ; z++) {
+                double zn = nextZn;
+                nextZn = (z + 1) * invRadiusZ;
+
+                if (lengthSq(xn, zn) > 1) {
+                    if (z == 0) {
+                        break forX;
+                    }
+                    break forZ;
+                }
+
+                if (!filled && lengthSq(nextXn, zn) <= 1 && lengthSq(xn, nextZn) <= 1) {
+                    continue;
+                }
+
+                for (int y = 0; y < height; y++) {
+                    affected += setCylinderSymmetricBlock(pos.add(x, y, z), block) ? 1 : 0;
+                    affected += setCylinderSymmetricBlock(pos.add(-x, y, z), block) ? 1 : 0;
+                    affected += setCylinderSymmetricBlock(pos.add(x, y, -z), block) ? 1 : 0;
+                    affected += setCylinderSymmetricBlock(pos.add(-x, y, -z), block) ? 1 : 0;
+                }
+            }
+        }
+
+        return affected;
+    }
+
+    private boolean setCylinderSymmetricBlock(BlockVector3 position, Pattern block) {
+        return setBlock(position, block);
+    }
+
+    private static double lengthSq(double x, double z) {
+        return x * x + z * z;
     }
     
     /**
