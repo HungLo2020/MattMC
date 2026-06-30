@@ -285,24 +285,32 @@ public class DistantHorizonsCommandContextMigrationTest {
             "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
         String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
 
-        int renderLodPass = sourceWithoutComments.indexOf(
-            "private void renderLodPass(IDhApiShaderProgram shaderProgram, RenderBufferHandler lodBufferHandler, RenderParams renderEventParam, boolean opaquePass)");
-        int transparentBranch = sourceWithoutComments.indexOf("if (!opaquePass)", renderLodPass);
-        int transparentDepthMask = sourceWithoutComments.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", transparentBranch);
-        int transparentBlendEquation = sourceWithoutComments.indexOf("VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD)", transparentBranch);
-        int opaqueBranch = sourceWithoutComments.indexOf("else", transparentBranch);
-        int opaqueDepthMask = sourceWithoutComments.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", opaqueBranch);
-        int renderPass = sourceWithoutComments.indexOf("createVulkanCompatibilityRenderPass(\"Distant Horizons LOD\")", opaqueBranch);
-        int restoreDepthMask = sourceWithoutComments.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", renderPass);
+        int planCreation = sourceWithoutComments.indexOf("DhLodRenderPlan renderPlan = this.createLodRenderPlan(opaquePass)");
+        int initialStateApply = sourceWithoutComments.indexOf("renderPlan.initialState().apply(ctx)", planCreation);
+        int beforeRenderPassEvent = sourceWithoutComments.indexOf("DhApiBeforeRenderPassEvent.class", initialStateApply);
+        int transparentState = sourceWithoutComments.indexOf(
+            "TRANSPARENT(true, true, true, VulkanicDepthCompareOp.LESS, true, true, true)");
+        int opaqueState = sourceWithoutComments.indexOf(
+            "OPAQUE(true, true, true, VulkanicDepthCompareOp.LESS, true, false, false)");
+        int stateApply = sourceWithoutComments.indexOf("private void apply(CommandContext ctx)");
+        int depthWriteApply = sourceWithoutComments.indexOf("VulkanicAPI.setDepthWriteMask(ctx, this.depthWrite)", stateApply);
+        int blendApply = sourceWithoutComments.indexOf("VulkanicAPI.setBlendEnabled(ctx, this.blend)", depthWriteApply);
+        int transparentPlan = sourceWithoutComments.indexOf("private static DhLodRenderPlan transparentDefaultPlan()");
+        int transparentCleanup = sourceWithoutComments.indexOf("DhOptionalLodRenderState.of(DhLodRenderState.TRANSPARENT)", transparentPlan);
+        int cleanupApply = sourceWithoutComments.indexOf("renderPlan.cleanupState().applyIfPresent(ctx)", beforeRenderPassEvent);
 
-        assertTrue(renderLodPass >= 0 && transparentBranch > renderLodPass,
-            "DH LOD renderer should have an explicit transparent branch in the LOD draw path");
-        assertTrue(transparentDepthMask > transparentBranch && transparentDepthMask < transparentBlendEquation,
-            "DH transparent LOD rendering should write depth so later fog/apply passes see the final water surface");
-        assertTrue(opaqueDepthMask > opaqueBranch && opaqueDepthMask < renderPass,
-            "DH opaque LOD rendering should explicitly restore depth writes before drawing opaque terrain");
-        assertTrue(restoreDepthMask > renderPass,
-            "DH transparent LOD rendering should restore depth writes after the transparent pass so later passes inherit sane state");
+        assertTrue(planCreation >= 0 && initialStateApply > planCreation && beforeRenderPassEvent > initialStateApply,
+            "DH LOD renderer should choose and apply an explicit render plan before DH/Iris render-pass events");
+        assertTrue(transparentState >= 0,
+            "DH transparent LOD initial state should keep depth writes on so fog/apply see the final water surface");
+        assertTrue(opaqueState >= 0,
+            "DH opaque LOD initial state should explicitly disable blending and keep depth writes on");
+        assertTrue(depthWriteApply > stateApply && blendApply > depthWriteApply,
+            "DH LOD render states should own depth-write and blend application through one explicit state contract");
+        assertTrue(transparentPlan >= 0 && transparentCleanup > transparentPlan,
+            "DH transparent LOD plans should restore the transparent state after drawing");
+        assertTrue(cleanupApply > beforeRenderPassEvent,
+            "DH LOD draw cleanup should apply the plan's explicit cleanup state after the render pass work");
     }
 
     @Test
@@ -376,26 +384,24 @@ public class DistantHorizonsCommandContextMigrationTest {
         int waterOrderingShaderGuard = rendererSource.indexOf("!isIrisShaderRenderingEnabled()", waterOrderingVulkanGuard);
         int rendererEnabledGuard = rendererSource.indexOf("IRIS_ACCESSOR.areShadersEnabled()", waterOrderingShaderGuard);
         int rendererPackGuard = rendererSource.indexOf("IRIS_ACCESSOR.isShaderPackInUse()", rendererEnabledGuard);
-        int transparentBranch = rendererSource.indexOf("if (!opaquePass)");
-        int waterOrderingGuard = rendererSource.indexOf("this.shouldUseVulkanNoShaderWaterOrdering()", transparentBranch);
-        int waterOrderingRenderPass = rendererSource.indexOf("createVulkanCompatibilityRenderPass(\"Distant Horizons LOD\")", waterOrderingGuard);
-        int detailDepthWritesOff = rendererSource.indexOf("VulkanicAPI.setDepthWriteMask(ctx, false)", waterOrderingRenderPass);
-        int sideDraw = rendererSource.indexOf("container -> container.vbosTransparent", detailDepthWritesOff);
-        int upDraw = rendererSource.indexOf("container -> container.vbosTransparentUp", sideDraw);
-        int waterAlwaysDepth = rendererSource.indexOf("VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.ALWAYS)", upDraw);
-        int waterDepthTestOn = rendererSource.indexOf("VulkanicAPI.setDepthTestEnabled(ctx, true)", waterAlwaysDepth);
-        int waterCullOff = rendererSource.indexOf("VulkanicAPI.setCullFaceEnabled(ctx, false)", waterDepthTestOn);
-        int waterDepthWritesOn = rendererSource.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", waterCullOff);
-        int waterBlendOn = rendererSource.indexOf("VulkanicAPI.setBlendEnabled(ctx, true)", waterDepthWritesOn);
-        int waterDraw = rendererSource.indexOf("container -> container.vbosTransparentWaterUp", waterBlendOn);
-        int restoreBlendOn = rendererSource.indexOf("VulkanicAPI.setBlendEnabled(ctx, true)", waterDraw);
-        int restoreCull = rendererSource.indexOf("VulkanicAPI.setCullFaceEnabled(ctx, true)", waterDraw);
-        int restoreDepthTest = rendererSource.indexOf("VulkanicAPI.setDepthTestEnabled(ctx, true)", restoreCull);
-        int restoreDepthFunc = rendererSource.indexOf("VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS)", restoreDepthTest);
-        int defaultRenderPass = rendererSource.indexOf("Distant Horizons LOD\")", waterDraw);
-        int defaultSideDraw = rendererSource.indexOf("container -> container.vbosTransparent", defaultRenderPass);
-        int defaultUpDraw = rendererSource.indexOf("container -> container.vbosTransparentUp", defaultSideDraw);
-        int defaultWaterDraw = rendererSource.indexOf("container -> container.vbosTransparentWaterUp", defaultUpDraw);
+        int planFactory = rendererSource.indexOf("private DhLodRenderPlan createLodRenderPlan(boolean opaquePass)");
+        int waterOrderingGuard = rendererSource.indexOf("this.shouldUseVulkanNoShaderWaterOrdering()", planFactory);
+        int opaqueSpecialReturn = rendererSource.indexOf("DhLodRenderPlan.opaqueVulkanNoShaderWaterPlan()", waterOrderingGuard);
+        int transparentSpecialReturn = rendererSource.indexOf("DhLodRenderPlan.transparentVulkanNoShaderWaterPlan()", opaqueSpecialReturn);
+        int defaultPlanReturn = rendererSource.indexOf("opaquePass ? DhLodRenderPlan.opaqueDefaultPlan() : DhLodRenderPlan.transparentDefaultPlan()", transparentSpecialReturn);
+        int executorLoop = rendererSource.indexOf("for (DhLodRenderPhase phase : renderPlan.phases())");
+        int stateBeforeDraw = rendererSource.indexOf("phase.stateOverride().applyIfPresent(ctx)", executorLoop);
+        int drawAfterState = rendererSource.indexOf("this.renderLodBuffers", stateBeforeDraw);
+        int renderPassExitState = rendererSource.indexOf("renderPlan.renderPassExitState().applyIfPresent(ctx)", drawAfterState);
+        int bucketEnum = rendererSource.indexOf("private enum DhLodBufferBucket");
+        int bucketOpaque = rendererSource.indexOf("OPAQUE(container -> container.vbos)", bucketEnum);
+        int bucketSide = rendererSource.indexOf("TRANSPARENT_SIDE(container -> container.vbosTransparent)", bucketOpaque);
+        int bucketUp = rendererSource.indexOf("TRANSPARENT_UP(container -> container.vbosTransparentUp)", bucketSide);
+        int bucketWater = rendererSource.indexOf("TRANSPARENT_WATER_UP(container -> container.vbosTransparentWaterUp)", bucketUp);
+        int defaultTransparentPlan = rendererSource.indexOf("private static DhLodRenderPlan transparentDefaultPlan()");
+        int defaultSideDraw = rendererSource.indexOf("DhLodRenderPhase.inherited(DhLodBufferBucket.TRANSPARENT_SIDE)", defaultTransparentPlan);
+        int defaultUpDraw = rendererSource.indexOf("DhLodRenderPhase.inherited(DhLodBufferBucket.TRANSPARENT_UP)", defaultSideDraw);
+        int defaultWaterDraw = rendererSource.indexOf("DhLodRenderPhase.inherited(DhLodBufferBucket.TRANSPARENT_WATER_UP)", defaultUpDraw);
 
         assertTrue(nonUpOrder >= 0 && upOrder > nonUpOrder,
             "DH transparent LOD buffers should split side/down quads from UP water-surface quads");
@@ -426,30 +432,34 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH should restrict the Vulkan water ordering workaround to Vulkan without enabled shaderpack rendering");
         assertTrue(irisAccessorSource.contains("IrisApi.getInstance().getConfig().areShadersEnabled()"),
             "DH Iris accessor should distinguish selected shader packs from shader rendering being enabled");
-        int opaqueBranch = rendererSource.indexOf("if (opaquePass && useVulkanNoShaderWaterOrdering)");
-        int opaqueRenderPass = rendererSource.indexOf("createVulkanCompatibilityRenderPass(\"Distant Horizons LOD\")", opaqueBranch);
-        int opaqueTerrainDraw = rendererSource.indexOf("container -> container.vbos);", opaqueRenderPass);
-        int opaqueWaterAlwaysDepth = rendererSource.indexOf("VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.ALWAYS)", opaqueTerrainDraw);
-        int opaqueWaterCullOff = rendererSource.indexOf("VulkanicAPI.setCullFaceEnabled(ctx, false)", opaqueWaterAlwaysDepth);
-        int opaqueWaterDepthWritesOn = rendererSource.indexOf("VulkanicAPI.setDepthWriteMask(ctx, true)", opaqueWaterCullOff);
-        int opaqueWaterBlendOn = rendererSource.indexOf("VulkanicAPI.setBlendEnabled(ctx, true)", opaqueWaterDepthWritesOn);
-        int opaqueWaterDraw = rendererSource.indexOf("container -> container.vbosTransparentWaterUp", opaqueWaterBlendOn);
-        int opaqueRestoreDepthFunc = rendererSource.indexOf("VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS)", opaqueWaterDraw);
-        int opaqueRestoreBlendOff = rendererSource.indexOf("VulkanicAPI.setBlendEnabled(ctx, false)", opaqueRestoreDepthFunc);
-        assertTrue(opaqueBranch >= 0 && opaqueRenderPass > opaqueBranch && opaqueTerrainDraw > opaqueRenderPass
-                && opaqueWaterAlwaysDepth > opaqueTerrainDraw && opaqueWaterCullOff > opaqueWaterAlwaysDepth
-                && opaqueWaterDepthWritesOn > opaqueWaterCullOff && opaqueWaterBlendOn > opaqueWaterDepthWritesOn
-                && opaqueWaterDraw > opaqueWaterBlendOn && opaqueRestoreDepthFunc > opaqueWaterDraw
-                && opaqueRestoreBlendOff > opaqueRestoreDepthFunc,
-            "DH Vulkan no-shader opaque pass should seed water-surface color/depth immediately after opaque terrain and restore opaque state afterward");
-        assertTrue(waterOrderingGuard > transparentBranch && waterOrderingRenderPass > waterOrderingGuard
-                        && detailDepthWritesOff > waterOrderingRenderPass && sideDraw > detailDepthWritesOff && upDraw > sideDraw
-                        && waterAlwaysDepth > upDraw && waterDepthTestOn > waterAlwaysDepth && waterCullOff > waterDepthTestOn
-                        && waterDepthWritesOn > waterCullOff && waterBlendOn > waterDepthWritesOn
-                        && waterDraw > waterBlendOn
-                        && restoreBlendOn > waterDraw && restoreCull > waterDraw && restoreDepthTest > restoreCull && restoreDepthFunc > restoreDepthTest,
-                    "DH Vulkan no-shader rendering should draw transparent details first, then let the final water surface own depth for fog/apply");
-        assertTrue(defaultRenderPass > waterDraw && defaultSideDraw > defaultRenderPass && defaultUpDraw > defaultSideDraw && defaultWaterDraw > defaultUpDraw,
+        assertTrue(planFactory >= 0 && waterOrderingGuard > planFactory
+                && opaqueSpecialReturn > waterOrderingGuard && transparentSpecialReturn > opaqueSpecialReturn
+                && defaultPlanReturn > transparentSpecialReturn,
+            "DH LOD renderer should choose explicit default and Vulkan no-shader render plans from one factory");
+        assertTrue(executorLoop >= 0 && stateBeforeDraw > executorLoop && drawAfterState > stateBeforeDraw
+                && renderPassExitState > drawAfterState,
+            "DH LOD renderer should apply each phase's declared state before drawing and restore render-pass exit state before closing the pass");
+        assertTrue(bucketOpaque > bucketEnum && bucketSide > bucketOpaque && bucketUp > bucketSide && bucketWater > bucketUp,
+            "DH LOD render buckets should centralize the VBO selectors in opaque, side, non-water UP, then water UP order");
+        int opaquePlan = rendererSource.indexOf("private static DhLodRenderPlan opaqueVulkanNoShaderWaterPlan()");
+        int opaqueInitial = rendererSource.indexOf("DhLodRenderState.OPAQUE", opaquePlan);
+        int opaqueTerrainDraw = rendererSource.indexOf("DhLodRenderPhase.inherited(DhLodBufferBucket.OPAQUE)", opaqueInitial);
+        int opaqueWaterDraw = rendererSource.indexOf("DhLodRenderPhase.withState(DhLodRenderState.WATER_SURFACE, DhLodBufferBucket.TRANSPARENT_WATER_UP)", opaqueTerrainDraw);
+        int opaqueRenderPassExit = rendererSource.indexOf("DhOptionalLodRenderState.of(DhLodRenderState.OPAQUE)", opaqueWaterDraw);
+        int opaqueCleanup = rendererSource.indexOf("DhOptionalLodRenderState.of(DhLodRenderState.OPAQUE)", opaqueRenderPassExit + 1);
+        int transparentPlan = rendererSource.indexOf("private static DhLodRenderPlan transparentVulkanNoShaderWaterPlan()");
+        int transparentInitial = rendererSource.indexOf("DhLodRenderState.TRANSPARENT", transparentPlan);
+        int sideDraw = rendererSource.indexOf("DhLodRenderPhase.withState(DhLodRenderState.TRANSPARENT_DETAIL, DhLodBufferBucket.TRANSPARENT_SIDE)", transparentInitial);
+        int upDraw = rendererSource.indexOf("DhLodRenderPhase.inherited(DhLodBufferBucket.TRANSPARENT_UP)", sideDraw);
+        int waterDraw = rendererSource.indexOf("DhLodRenderPhase.withState(DhLodRenderState.WATER_SURFACE, DhLodBufferBucket.TRANSPARENT_WATER_UP)", upDraw);
+        int transparentCleanup = rendererSource.indexOf("DhOptionalLodRenderState.of(DhLodRenderState.TRANSPARENT)", waterDraw);
+        assertTrue(opaquePlan >= 0 && opaqueInitial > opaquePlan && opaqueTerrainDraw > opaqueInitial
+                && opaqueWaterDraw > opaqueTerrainDraw && opaqueRenderPassExit > opaqueWaterDraw && opaqueCleanup > opaqueRenderPassExit,
+            "DH Vulkan no-shader opaque plan should seed water-surface color/depth after opaque terrain and restore opaque state before/after the pass");
+        assertTrue(transparentPlan >= 0 && transparentInitial > transparentPlan && sideDraw > transparentInitial
+                && upDraw > sideDraw && waterDraw > upDraw && transparentCleanup > waterDraw,
+            "DH Vulkan no-shader transparent plan should draw transparent details first, then let the final water surface own depth for fog/apply");
+        assertTrue(defaultTransparentPlan >= 0 && defaultSideDraw > defaultTransparentPlan && defaultUpDraw > defaultSideDraw && defaultWaterDraw > defaultUpDraw,
             "DH shader/OpenGL rendering should keep the normal transparent side, non-water UP, and water UP order");
     }
 

@@ -597,10 +597,8 @@ public class LodRenderer
 	private void renderLodPass(IDhApiShaderProgram shaderProgram, RenderBufferHandler lodBufferHandler, RenderParams renderEventParam, boolean opaquePass)
 	{
 		CommandContext ctx = VulkanicAPI.getCommandContext();
-		//=======================//
-		// debug wireframe setup //
-		//=======================//
-		
+		DhLodRenderPlan renderPlan = this.createLodRenderPlan(opaquePass);
+
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
 		{
@@ -612,30 +610,9 @@ public class LodRenderer
 			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
-		
-		if (!opaquePass)
-		{
-			VulkanicAPI.setBlendEnabled(ctx, true);
-			VulkanicAPI.setDepthTestEnabled(ctx, true);
-			VulkanicAPI.setDepthWriteMask(ctx, true);
-			VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
-			VulkanicAPI.setBlendFunction(
-				ctx,
-				VulkanicBlendFactor.SRC_ALPHA,
-				VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
-				VulkanicBlendFactor.ONE,
-				VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA
-			);
-		}
-		else
-		{
-			VulkanicAPI.setBlendEnabled(ctx, false);
-			VulkanicAPI.setDepthWriteMask(ctx, true);
-		}
-		
-		
-		
-		
+
+		renderPlan.initialState().apply(ctx);
+
 		//===========//
 		// rendering //
 		//===========//
@@ -656,87 +633,23 @@ public class LodRenderer
 		if (lodBufferContainers != null)
 		{
 			try
+			{
+				try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
 				{
-					boolean useVulkanNoShaderWaterOrdering = this.shouldUseVulkanNoShaderWaterOrdering();
-					if (opaquePass && useVulkanNoShaderWaterOrdering)
+					for (DhLodRenderPhase phase : renderPlan.phases())
 					{
-						try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
-						{
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbos);
-
-							VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.ALWAYS);
-							VulkanicAPI.setDepthTestEnabled(ctx, true);
-							VulkanicAPI.setCullFaceEnabled(ctx, false);
-							VulkanicAPI.setDepthWriteMask(ctx, true);
-							VulkanicAPI.setBlendEnabled(ctx, true);
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentWaterUp);
-
-							VulkanicAPI.setColorMask(ctx, true, true, true, true);
-							VulkanicAPI.setCullFaceEnabled(ctx, true);
-							VulkanicAPI.setDepthTestEnabled(ctx, true);
-							VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);
-							VulkanicAPI.setDepthWriteMask(ctx, true);
-							VulkanicAPI.setBlendEnabled(ctx, false);
-						}
+						phase.stateOverride().applyIfPresent(ctx);
+						this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, phase.bufferBucket().selector());
 					}
-					else if (!opaquePass && useVulkanNoShaderWaterOrdering)
-					{
-						try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
-						{
-							VulkanicAPI.setColorMask(ctx, true, true, true, true);
-							VulkanicAPI.setCullFaceEnabled(ctx, true);
-							VulkanicAPI.setDepthWriteMask(ctx, false);
-							VulkanicAPI.setBlendEnabled(ctx, true);
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparent);
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentUp);
-
-							VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.ALWAYS);
-							VulkanicAPI.setDepthTestEnabled(ctx, true);
-							VulkanicAPI.setCullFaceEnabled(ctx, false);
-							VulkanicAPI.setDepthWriteMask(ctx, true);
-							VulkanicAPI.setBlendEnabled(ctx, true);
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentWaterUp);
-						}
-					}
-				else
-				{
-					try (RenderPass ignored = this.createVulkanCompatibilityRenderPass("Distant Horizons LOD"))
-					{
-						if (opaquePass)
-						{
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbos);
-						}
-						else
-						{
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparent);
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentUp);
-							this.renderLodBuffers(lodBufferContainers, shaderProgram, renderEventParam, container -> container.vbosTransparentWaterUp);
-						}
-					}
+					renderPlan.renderPassExitState().applyIfPresent(ctx);
 				}
 			}
 			finally
 			{
-				if (!opaquePass)
-				{
-					VulkanicAPI.setColorMask(ctx, true, true, true, true);
-					VulkanicAPI.setCullFaceEnabled(ctx, true);
-					VulkanicAPI.setDepthTestEnabled(ctx, true);
-					VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);
-					VulkanicAPI.setDepthWriteMask(ctx, true);
-					VulkanicAPI.setBlendEnabled(ctx, true);
-				}
+				renderPlan.cleanupState().applyIfPresent(ctx);
 			}
 		}
-		if (!opaquePass)
-		{
-			VulkanicAPI.setColorMask(ctx, true, true, true, true);
-			VulkanicAPI.setCullFaceEnabled(ctx, true);
-			VulkanicAPI.setDepthTestEnabled(ctx, true);
-			VulkanicAPI.setDepthFunc(ctx, VulkanicDepthCompareOp.LESS);
-			VulkanicAPI.setDepthWriteMask(ctx, true);
-			VulkanicAPI.setBlendEnabled(ctx, true);
-		}
+		renderPlan.cleanupState().applyIfPresent(ctx);
 		
 		
 		
@@ -750,7 +663,187 @@ public class LodRenderer
 			VulkanicAPI.setPolygonMode(ctx, VulkanicPolygonFace.FRONT_AND_BACK, VulkanicPolygonMode.FILL);
 			VulkanicAPI.setCullFaceEnabled(ctx, true);
 		}
-		
+	}
+
+	private DhLodRenderPlan createLodRenderPlan(boolean opaquePass)
+	{
+		boolean useVulkanNoShaderWaterOrdering = this.shouldUseVulkanNoShaderWaterOrdering();
+		if (opaquePass && useVulkanNoShaderWaterOrdering)
+		{
+			return DhLodRenderPlan.opaqueVulkanNoShaderWaterPlan();
+		}
+		if (!opaquePass && useVulkanNoShaderWaterOrdering)
+		{
+			return DhLodRenderPlan.transparentVulkanNoShaderWaterPlan();
+		}
+		return opaquePass ? DhLodRenderPlan.opaqueDefaultPlan() : DhLodRenderPlan.transparentDefaultPlan();
+	}
+
+	private enum DhLodBufferBucket
+	{
+		OPAQUE(container -> container.vbos),
+		TRANSPARENT_SIDE(container -> container.vbosTransparent),
+		TRANSPARENT_UP(container -> container.vbosTransparentUp),
+		TRANSPARENT_WATER_UP(container -> container.vbosTransparentWaterUp);
+
+		private final java.util.function.Function<LodBufferContainer, GLVertexBuffer[]> selector;
+
+		DhLodBufferBucket(java.util.function.Function<LodBufferContainer, GLVertexBuffer[]> selector)
+		{
+			this.selector = selector;
+		}
+
+		private java.util.function.Function<LodBufferContainer, GLVertexBuffer[]> selector()
+		{
+			return this.selector;
+		}
+	}
+
+	private record DhLodRenderPlan(
+			DhLodRenderState initialState,
+			DhLodRenderPhase[] phases,
+			DhOptionalLodRenderState renderPassExitState,
+			DhOptionalLodRenderState cleanupState)
+	{
+		private static DhLodRenderPlan opaqueDefaultPlan()
+		{
+			return new DhLodRenderPlan(
+					DhLodRenderState.OPAQUE,
+					new DhLodRenderPhase[] {
+							DhLodRenderPhase.inherited(DhLodBufferBucket.OPAQUE)
+					},
+					DhOptionalLodRenderState.empty(),
+					DhOptionalLodRenderState.empty());
+		}
+
+		private static DhLodRenderPlan transparentDefaultPlan()
+		{
+			return new DhLodRenderPlan(
+					DhLodRenderState.TRANSPARENT,
+					new DhLodRenderPhase[] {
+							DhLodRenderPhase.inherited(DhLodBufferBucket.TRANSPARENT_SIDE),
+							DhLodRenderPhase.inherited(DhLodBufferBucket.TRANSPARENT_UP),
+							DhLodRenderPhase.inherited(DhLodBufferBucket.TRANSPARENT_WATER_UP)
+					},
+					DhOptionalLodRenderState.empty(),
+					DhOptionalLodRenderState.of(DhLodRenderState.TRANSPARENT));
+		}
+
+		private static DhLodRenderPlan opaqueVulkanNoShaderWaterPlan()
+		{
+			return new DhLodRenderPlan(
+					DhLodRenderState.OPAQUE,
+					new DhLodRenderPhase[] {
+							DhLodRenderPhase.inherited(DhLodBufferBucket.OPAQUE),
+							DhLodRenderPhase.withState(DhLodRenderState.WATER_SURFACE, DhLodBufferBucket.TRANSPARENT_WATER_UP)
+					},
+					DhOptionalLodRenderState.of(DhLodRenderState.OPAQUE),
+					DhOptionalLodRenderState.of(DhLodRenderState.OPAQUE));
+		}
+
+		private static DhLodRenderPlan transparentVulkanNoShaderWaterPlan()
+		{
+			return new DhLodRenderPlan(
+					DhLodRenderState.TRANSPARENT,
+					new DhLodRenderPhase[] {
+							DhLodRenderPhase.withState(DhLodRenderState.TRANSPARENT_DETAIL, DhLodBufferBucket.TRANSPARENT_SIDE),
+							DhLodRenderPhase.inherited(DhLodBufferBucket.TRANSPARENT_UP),
+							DhLodRenderPhase.withState(DhLodRenderState.WATER_SURFACE, DhLodBufferBucket.TRANSPARENT_WATER_UP)
+					},
+					DhOptionalLodRenderState.empty(),
+					DhOptionalLodRenderState.of(DhLodRenderState.TRANSPARENT));
+		}
+	}
+
+	private record DhLodRenderPhase(
+			DhOptionalLodRenderState stateOverride,
+			DhLodBufferBucket bufferBucket)
+	{
+		private static DhLodRenderPhase inherited(DhLodBufferBucket bufferBucket)
+		{
+			return new DhLodRenderPhase(DhOptionalLodRenderState.empty(), bufferBucket);
+		}
+
+		private static DhLodRenderPhase withState(DhLodRenderState state, DhLodBufferBucket bufferBucket)
+		{
+			return new DhLodRenderPhase(DhOptionalLodRenderState.of(state), bufferBucket);
+		}
+	}
+
+	private record DhOptionalLodRenderState(@Nullable DhLodRenderState state)
+	{
+		private static DhOptionalLodRenderState empty()
+		{
+			return new DhOptionalLodRenderState(null);
+		}
+
+		private static DhOptionalLodRenderState of(DhLodRenderState state)
+		{
+			return new DhOptionalLodRenderState(state);
+		}
+
+		private void applyIfPresent(CommandContext ctx)
+		{
+			if (this.state != null)
+			{
+				this.state.apply(ctx);
+			}
+		}
+	}
+
+	private enum DhLodRenderState
+	{
+		OPAQUE(true, true, true, VulkanicDepthCompareOp.LESS, true, false, false),
+		TRANSPARENT(true, true, true, VulkanicDepthCompareOp.LESS, true, true, true),
+		TRANSPARENT_DETAIL(true, true, true, VulkanicDepthCompareOp.LESS, false, true, false),
+		WATER_SURFACE(true, false, true, VulkanicDepthCompareOp.ALWAYS, true, true, false);
+
+		private final boolean colorWrite;
+		private final boolean cullFace;
+		private final boolean depthTest;
+		private final VulkanicDepthCompareOp depthFunc;
+		private final boolean depthWrite;
+		private final boolean blend;
+		private final boolean configureTransparentBlend;
+
+		DhLodRenderState(
+				boolean colorWrite,
+				boolean cullFace,
+				boolean depthTest,
+				VulkanicDepthCompareOp depthFunc,
+				boolean depthWrite,
+				boolean blend,
+				boolean configureTransparentBlend)
+		{
+			this.colorWrite = colorWrite;
+			this.cullFace = cullFace;
+			this.depthTest = depthTest;
+			this.depthFunc = depthFunc;
+			this.depthWrite = depthWrite;
+			this.blend = blend;
+			this.configureTransparentBlend = configureTransparentBlend;
+		}
+
+		private void apply(CommandContext ctx)
+		{
+			VulkanicAPI.setColorMask(ctx, this.colorWrite, this.colorWrite, this.colorWrite, this.colorWrite);
+			VulkanicAPI.setCullFaceEnabled(ctx, this.cullFace);
+			VulkanicAPI.setDepthTestEnabled(ctx, this.depthTest);
+			VulkanicAPI.setDepthFunc(ctx, this.depthFunc);
+			VulkanicAPI.setDepthWriteMask(ctx, this.depthWrite);
+			VulkanicAPI.setBlendEnabled(ctx, this.blend);
+			if (this.configureTransparentBlend)
+			{
+				VulkanicAPI.setBlendEquation(ctx, VulkanicBlendEquation.ADD);
+				VulkanicAPI.setBlendFunction(
+					ctx,
+					VulkanicBlendFactor.SRC_ALPHA,
+					VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA,
+					VulkanicBlendFactor.ONE,
+					VulkanicBlendFactor.ONE_MINUS_SRC_ALPHA
+				);
+			}
+		}
 	}
 
 	private void renderLodBuffers(
