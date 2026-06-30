@@ -126,9 +126,7 @@ public class RegionCommands {
         }
         
         // Create edit session
-        net.minecraft.worldedit.core.EditSession editSession = 
-            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        net.minecraft.worldedit.core.EditSession editSession = session.createEditSession(world);
         
         // Set blocks
         int count = editSession.setBlocks(region, pattern);
@@ -157,9 +155,7 @@ public class RegionCommands {
         }
         
         // Create edit session
-        net.minecraft.worldedit.core.EditSession editSession = 
-            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        net.minecraft.worldedit.core.EditSession editSession = session.createEditSession(world);
 
         Mask fromMask;
         Pattern toPattern;
@@ -198,9 +194,7 @@ public class RegionCommands {
         }
         
         // Create edit session
-        net.minecraft.worldedit.core.EditSession editSession = 
-            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        net.minecraft.worldedit.core.EditSession editSession = session.createEditSession(world);
         
         // Build walls (only the vertical sides, not floor/ceiling)
         BlockVector3 min = region.getMinimumPoint();
@@ -255,9 +249,7 @@ public class RegionCommands {
         }
         
         // Create edit session
-        net.minecraft.worldedit.core.EditSession editSession = 
-            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        net.minecraft.worldedit.core.EditSession editSession = session.createEditSession(world);
         
         // Build all 6 faces
         BlockVector3 min = region.getMinimumPoint();
@@ -318,9 +310,7 @@ public class RegionCommands {
         }
         
         // Create edit session
-        net.minecraft.worldedit.core.EditSession editSession = 
-            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        net.minecraft.worldedit.core.EditSession editSession = session.createEditSession(world);
         
         // Place overlay on top of solid blocks
         BlockVector3 min = region.getMinimumPoint();

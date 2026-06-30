@@ -64,6 +64,10 @@ class WorldEditReplacementCommandSyntaxTest {
 
         assertTrue(source.contains("registerBrushCommand(dispatcher, \"/brush\")"));
         assertTrue(source.contains("registerBrushCommand(dispatcher, \"/br\")"));
+        assertTrue(source.contains("registerBrushMaskCommand(dispatcher, \"/mask\")"));
+        assertTrue(source.contains("registerBrushMaskCommand(dispatcher, \"mask\")"));
+        assertTrue(source.contains("Commands.argument(\"mask\", WorldEditMaskArgument.mask())"));
+        assertTrue(source.contains("brushTool.setMask(mask)"));
         assertTrue(source.contains("BlockPatternParser.parse(patternText)"));
         assertTrue(source.contains("StringArgumentType.greedyString()"));
         assertTrue(source.contains("new BrushTool(\"cylinder\", parsed.pattern(), parsed.radius(), parsed.height())"));
@@ -101,10 +105,29 @@ class WorldEditReplacementCommandSyntaxTest {
         String source = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/worldedit/tool/BrushTool.java"));
 
         assertTrue(source.contains("public BrushTool(String type, Pattern pattern, int radius, int secondarySize)"));
+        assertTrue(source.contains("private Mask mask"));
+        assertTrue(source.contains("public void setMask(Mask mask)"));
+        assertTrue(source.contains("new MaskIntersection(sessionMask, mask)"));
         assertTrue(source.contains("this.brush = new CylinderBrush(secondarySize, false)"));
         assertTrue(source.contains("this.brush = new SmoothBrush(secondarySize)"));
         assertTrue(source.contains("public boolean actSecondary(ServerPlayer player, BlockPos target)"));
         assertTrue(source.contains("return applyBrush(player, target)"));
+    }
+
+    @Test
+    void globalMaskCommandIsRegisteredAndStoredOnSession() throws IOException {
+        String commandRoot = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/worldedit/command/WorldEditCommands.java"));
+        String generalCommands = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/worldedit/command/GeneralCommands.java"));
+        String localSession = Files.readString(SRC_MAIN_JAVA.resolve("net/minecraft/worldedit/session/LocalSession.java"));
+
+        assertTrue(commandRoot.contains("GeneralCommands.register(dispatcher)"));
+        assertTrue(generalCommands.contains("registerGlobalMaskCommand(dispatcher, \"/gmask\")"));
+        assertTrue(generalCommands.contains("registerGlobalMaskCommand(dispatcher, \"gmask\")"));
+        assertTrue(generalCommands.contains("session.setMask(mask)"));
+        assertTrue(generalCommands.contains("session.setMask(null)"));
+        assertTrue(localSession.contains("private Mask mask"));
+        assertTrue(localSession.contains("public EditSession createEditSession(ServerLevel world)"));
+        assertTrue(localSession.contains("editSession.setMask(mask)"));
     }
 
     @Test

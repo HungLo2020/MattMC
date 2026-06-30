@@ -12,6 +12,9 @@ public class WorldEditCommands {
      * Register all WorldEdit commands.
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        // General commands
+        GeneralCommands.register(dispatcher);
+
         // Selection commands
         SelectionCommands.register(dispatcher);
         

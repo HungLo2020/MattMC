@@ -10,6 +10,8 @@ import net.minecraft.worldedit.brush.CylinderBrush;
 import net.minecraft.worldedit.brush.SmoothBrush;
 import net.minecraft.worldedit.core.EditSession;
 import net.minecraft.worldedit.core.WorldEdit;
+import net.minecraft.worldedit.mask.Mask;
+import net.minecraft.worldedit.mask.MaskIntersection;
 import net.minecraft.worldedit.math.BlockVector3;
 import net.minecraft.worldedit.pattern.Pattern;
 import net.minecraft.worldedit.pattern.SingleBlockPattern;
@@ -23,6 +25,7 @@ public class BrushTool implements Tool {
     private final int radius;
     private Brush brush;
     private Pattern pattern;
+    private Mask mask;
     
     public BrushTool(String type, BlockState material, int radius) {
         this(type, new SingleBlockPattern(material), radius, radius);
@@ -80,6 +83,14 @@ public class BrushTool implements Tool {
     public boolean canUse(ServerPlayer player) {
         return WorldEdit.getInstance().getPlatform().hasPermission(player, "worldedit.brush." + type);
     }
+
+    public Mask getMask() {
+        return mask;
+    }
+
+    public void setMask(Mask mask) {
+        this.mask = mask;
+    }
     
     /**
      * Apply the brush at a location.
@@ -88,8 +99,11 @@ public class BrushTool implements Tool {
         ServerLevel world = player.level();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
+        if (mask != null) {
+            Mask sessionMask = editSession.getMask();
+            editSession.setMask(sessionMask == null ? mask : new MaskIntersection(sessionMask, mask));
+        }
         
         BlockVector3 center = BlockVector3.from(target);
         

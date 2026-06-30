@@ -88,7 +88,17 @@ class BlockPatternParserTest {
         Mask mask = BlockPatternParser.parseMask("oak_stairs[facing=east,half=top],stone");
 
         assertTrue(mask.test(BlockPatternParser.parseSingleBlockState("oak_stairs[facing=east,half=top]")));
+        assertFalse(mask.test(BlockPatternParser.parseSingleBlockState("oak_stairs[facing=north,half=bottom]")));
         assertTrue(mask.test(Blocks.STONE.defaultBlockState()));
         assertFalse(mask.test(Blocks.DIORITE.defaultBlockState()));
+    }
+
+    @Test
+    void masksWithoutPropertiesMatchEveryStateOfThatBlockType() {
+        Mask mask = BlockPatternParser.parseMask("oak_stairs");
+
+        assertTrue(mask.test(BlockPatternParser.parseSingleBlockState("oak_stairs[facing=east,half=top]")));
+        assertTrue(mask.test(BlockPatternParser.parseSingleBlockState("oak_stairs[facing=north,half=bottom]")));
+        assertFalse(mask.test(Blocks.STONE.defaultBlockState()));
     }
 }

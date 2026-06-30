@@ -45,8 +45,7 @@ public class SuperPickaxeTool implements Tool {
         ServerLevel world = player.level();
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         BlockState air = Blocks.AIR.defaultBlockState();
         BlockVector3 center = BlockVector3.from(pos);

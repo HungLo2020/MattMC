@@ -12,11 +12,14 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.worldedit.command.argument.WorldEditMaskArgument;
 import net.minecraft.worldedit.core.WorldEdit;
+import net.minecraft.worldedit.mask.Mask;
 import net.minecraft.worldedit.pattern.BlockPatternParser;
 import net.minecraft.worldedit.pattern.Pattern;
 import net.minecraft.worldedit.platform.MattMCPlatform;
 import net.minecraft.worldedit.session.LocalSession;
+import net.minecraft.worldedit.tool.Tool;
 import net.minecraft.worldedit.tool.SuperPickaxeTool;
 import net.minecraft.worldedit.tool.BrushTool;
 
@@ -63,6 +66,8 @@ public class ToolCommands {
         
         registerBrushCommand(dispatcher, "/brush");
         registerBrushCommand(dispatcher, "/br");
+        registerBrushMaskCommand(dispatcher, "/mask");
+        registerBrushMaskCommand(dispatcher, "mask");
     }
 
     private static void registerBrushCommand(CommandDispatcher<CommandSourceStack> dispatcher, String name) {
@@ -90,6 +95,14 @@ public class ToolCommands {
 
         dispatcher.register(root);
     }
+
+    private static void registerBrushMaskCommand(CommandDispatcher<CommandSourceStack> dispatcher, String name) {
+        dispatcher.register(Commands.literal(name)
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.brush.options.mask"))
+            .executes(ctx -> setBrushMask(ctx, null))
+            .then(Commands.argument("mask", WorldEditMaskArgument.mask())
+                .executes(ctx -> setBrushMask(ctx, WorldEditMaskArgument.getMask(ctx, "mask")))));
+    }
     
     /**
      * Unbind the current tool.
@@ -107,6 +120,27 @@ public class ToolCommands {
         session.setTool(item.getItem(), null);
         player.sendSystemMessage(Component.literal("Tool unbound from " + item.getHoverName().getString()));
         
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int setBrushMask(CommandContext<CommandSourceStack> context, Mask mask) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+
+        ItemStack item = player.getMainHandItem();
+        if (item.isEmpty()) {
+            player.sendSystemMessage(Component.literal("§cHold a brush item to set its mask"));
+            return 0;
+        }
+
+        Tool tool = session.getTool(item.getItem());
+        if (!(tool instanceof BrushTool brushTool)) {
+            player.sendSystemMessage(Component.literal("§cNo brush is bound to " + item.getHoverName().getString()));
+            return 0;
+        }
+
+        brushTool.setMask(mask);
+        player.sendSystemMessage(Component.literal(mask == null ? "§eBrush mask disabled" : "§aBrush mask set"));
         return Command.SINGLE_SUCCESS;
     }
     

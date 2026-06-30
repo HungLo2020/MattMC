@@ -100,8 +100,7 @@ public class UtilityCommands {
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
         // Create edit session
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         // Drain fluids
         BlockVector3 center = BlockVector3.from(player.blockPosition());
@@ -160,8 +159,7 @@ public class UtilityCommands {
         BlockState state = block.defaultBlockState();
         
         // Create edit session
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         // Fill air
         BlockVector3 center = BlockVector3.from(player.blockPosition());
@@ -216,8 +214,7 @@ public class UtilityCommands {
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
         // Create edit session
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         // Remove blocks above
         BlockVector3 playerPos = BlockVector3.from(player.blockPosition());
@@ -252,8 +249,7 @@ public class UtilityCommands {
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
         // Create edit session
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         // Remove blocks below
         BlockVector3 playerPos = BlockVector3.from(player.blockPosition());
@@ -294,8 +290,7 @@ public class UtilityCommands {
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         
         // Create edit session
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         // Replace blocks
         BlockVector3 center = BlockVector3.from(player.blockPosition());

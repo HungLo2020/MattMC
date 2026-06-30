@@ -6,11 +6,13 @@ import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.worldedit.mask.BlockSetMask;
+import net.minecraft.worldedit.mask.BlockTypeMask;
 import net.minecraft.worldedit.mask.Mask;
+import net.minecraft.worldedit.mask.MaskUnion;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -39,7 +41,8 @@ public final class BlockPatternParser {
         }
 
         List<String> parts = splitTopLevel(expression, ',');
-        Set<BlockState> states = new LinkedHashSet<>();
+        List<Mask> masks = new ArrayList<>();
+        Set<BlockState> exactStates = new LinkedHashSet<>();
         for (String part : parts) {
             String token = part.trim();
             if (token.isEmpty()) {
@@ -48,10 +51,20 @@ public final class BlockPatternParser {
             if (firstTopLevelChar(token, '%') >= 0) {
                 throw new IllegalArgumentException("Input block patterns do not support weights: " + token);
             }
-            states.add(parseSingleBlockState(token));
+            if (token.indexOf('[') >= 0) {
+                exactStates.add(parseSingleBlockState(token));
+            } else {
+                masks.add(new BlockTypeMask(parseSingleBlockState(token).getBlock()));
+            }
         }
 
-        return new BlockSetMask(states);
+        if (!exactStates.isEmpty()) {
+            masks.add(new BlockSetMask(exactStates));
+        }
+        if (masks.size() == 1) {
+            return masks.get(0);
+        }
+        return new MaskUnion(masks.toArray(Mask[]::new));
     }
 
     public static ReplacementPatterns parseReplacementPatterns(String expression) {

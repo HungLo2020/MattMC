@@ -21,6 +21,8 @@ public class EditSession implements Extent {
     private final int maxBlocks;
     private int blocksChanged = 0;
     private boolean fastMode = false;
+    private Mask mask;
+    private boolean recordingChanges = true;
     
     public EditSession(ServerLevel world, int maxBlocks) {
         this.world = world;
@@ -44,7 +46,10 @@ public class EditSession implements Extent {
     
     @Override
     public boolean setBlock(BlockVector3 position, BlockState block) {
-        if (maxBlocks >= 0 && blocksChanged >= maxBlocks) {
+        if (mask != null && !mask.test(this, position)) {
+            return false;
+        }
+        if (recordingChanges && maxBlocks >= 0 && blocksChanged >= maxBlocks) {
             return false;
         }
         
@@ -56,13 +61,17 @@ public class EditSession implements Extent {
         }
         
         // Record the change for undo/redo
-        changeSet.add(position, oldBlock, block);
+        if (recordingChanges) {
+            changeSet.add(position, oldBlock, block);
+        }
         
         // Set the block in the world
         int flags = fastMode ? 2 : 3; // Fast mode skips updates
         world.setBlock(pos, block, flags);
         
-        blocksChanged++;
+        if (recordingChanges) {
+            blocksChanged++;
+        }
         return true;
     }
     
@@ -182,18 +191,45 @@ public class EditSession implements Extent {
     public boolean isFastMode() {
         return fastMode;
     }
+
+    /**
+     * Get the mask applied to block changes in this edit session.
+     */
+    public Mask getMask() {
+        return mask;
+    }
+
+    /**
+     * Set the mask applied to block changes in this edit session.
+     */
+    public void setMask(Mask mask) {
+        this.mask = mask;
+    }
     
     /**
      * Undo all changes made in this session.
      */
     public void undo() {
-        changeSet.undo(this);
+        replayHistory(() -> changeSet.undo(this));
     }
     
     /**
      * Redo all changes made in this session.
      */
     public void redo() {
-        changeSet.redo(this);
+        replayHistory(() -> changeSet.redo(this));
+    }
+
+    private void replayHistory(Runnable action) {
+        Mask previousMask = mask;
+        boolean previousRecordingChanges = recordingChanges;
+        mask = null;
+        recordingChanges = false;
+        try {
+            action.run();
+        } finally {
+            mask = previousMask;
+            recordingChanges = previousRecordingChanges;
+        }
     }
 }

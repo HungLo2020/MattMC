@@ -2,6 +2,7 @@ package net.minecraft.worldedit.session;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.worldedit.core.EditSession;
+import net.minecraft.worldedit.mask.Mask;
 import net.minecraft.worldedit.region.Region;
 import net.minecraft.worldedit.region.RegionSelector;
 import net.minecraft.worldedit.region.selector.CuboidRegionSelector;
@@ -30,6 +31,7 @@ public class LocalSession {
     private boolean fastMode;
     private boolean wandItem;
     private int defaultChangeLimit;
+    private Mask mask;
     
     // Clipboard
     private Object clipboard; // TODO: Change to ClipboardHolder when implemented
@@ -155,6 +157,30 @@ public class LocalSession {
      */
     public void setDefaultChangeLimit(int limit) {
         this.defaultChangeLimit = limit;
+    }
+
+    /**
+     * Get the global mask applied to new edit sessions.
+     */
+    public Mask getMask() {
+        return mask;
+    }
+
+    /**
+     * Set the global mask applied to new edit sessions.
+     */
+    public void setMask(Mask mask) {
+        this.mask = mask;
+    }
+
+    /**
+     * Create an edit session with this player's current preferences.
+     */
+    public EditSession createEditSession(ServerLevel world) {
+        EditSession editSession = new EditSession(world, defaultChangeLimit);
+        editSession.setFastMode(fastMode);
+        editSession.setMask(mask);
+        return editSession;
     }
     
     /**

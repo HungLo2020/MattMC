@@ -111,8 +111,7 @@ public class GenerationCommands {
         BlockState state = block.defaultBlockState();
         
         // Create edit session
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         // Generate sphere
         BlockVector3 center = BlockVector3.from(player.blockPosition());
@@ -178,8 +177,7 @@ public class GenerationCommands {
         BlockState state = block.defaultBlockState();
         
         // Create edit session
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         // Generate cylinder
         BlockVector3 center = BlockVector3.from(player.blockPosition());
@@ -236,8 +234,7 @@ public class GenerationCommands {
         BlockState state = block.defaultBlockState();
         
         // Create edit session
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         // Generate pyramid
         BlockVector3 center = BlockVector3.from(player.blockPosition());

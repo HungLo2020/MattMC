@@ -172,8 +172,7 @@ public class ClipboardCommands {
         Clipboard clipboard = new Clipboard(region, origin);
         
         // Create edit session for cutting
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
 
         BlockState leaveState = parseBlockState(leavePattern);
         if (leaveState == null) {
@@ -280,8 +279,7 @@ public class ClipboardCommands {
         }
 
         // Create edit session for pasting
-        EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
-        editSession.setFastMode(session.isFastMode());
+        EditSession editSession = session.createEditSession(world);
         
         int count = 0;
         for (Map.Entry<BlockVector3, BlockState> entry : clipboard.getBlocks().entrySet()) {
