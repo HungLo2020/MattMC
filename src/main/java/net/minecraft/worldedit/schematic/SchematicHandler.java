@@ -1,15 +1,14 @@
 package net.minecraft.worldedit.schematic;
 
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.worldedit.clipboard.Clipboard;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.pattern.BlockPatternParser;
 import net.minecraft.worldedit.region.CuboidRegion;
 
 import java.io.File;
@@ -89,10 +88,7 @@ public class SchematicHandler {
         // Write palette
         CompoundTag paletteTag = new CompoundTag();
         for (Map.Entry<BlockState, Integer> entry : palette.entrySet()) {
-            Block block = entry.getKey().getBlock();
-            ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
-            String blockName = blockId.toString();
-            paletteTag.putInt(blockName, entry.getValue());
+            paletteTag.putInt(BlockStateParser.serialize(entry.getKey()), entry.getValue());
         }
         root.put("Palette", paletteTag);
         
@@ -143,22 +139,12 @@ public class SchematicHandler {
         for (String blockName : paletteTag.keySet()) {
             int paletteId = paletteTag.getIntOr(blockName, 0);
             
-            // Parse block name to get BlockState
-            ResourceLocation blockId = ResourceLocation.tryParse(blockName);
-            if (blockId == null) {
-                System.err.println("Warning: Invalid block ID in schematic: " + blockName);
+            try {
+                palette.put(paletteId, BlockPatternParser.parseSingleBlockState(blockName));
+            } catch (IllegalArgumentException e) {
+                System.err.println("Warning: Invalid block state in schematic: " + blockName);
                 palette.put(paletteId, Blocks.AIR.defaultBlockState());
-                continue;
             }
-            
-            Block block = BuiltInRegistries.BLOCK.getValue(blockId);
-            if (block == null) {
-                System.err.println("Warning: Unknown block in schematic: " + blockName);
-                palette.put(paletteId, Blocks.AIR.defaultBlockState());
-                continue;
-            }
-            
-            palette.put(paletteId, block.defaultBlockState());
         }
         
         // Read block data
