@@ -13,10 +13,12 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Iris + Complementary Shaders
 - AlexsCaves Primordial Caves Mobs & Blocks
 - AlexsMobs Mobs & Items
-- 
 
 ## Removals
-- empty
+- Microsoft Telemetry
+- Microsoft Accounts
 
 ## Tweaks
 - Removed Creative Mode Menu & Replaced with JEI Style Menu
+- Replaced Microsoft Accounts with Offline Accounts
+- Game servers host Player Skins instead of Microsoft Servers
