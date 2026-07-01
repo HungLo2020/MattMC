@@ -154,7 +154,9 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         boolean preferDescriptor
     ) {
         this.ensureNoRenderPass();
-        if (preferDescriptor && this.backend.isRenderTargetDescriptorEquivalentToFramebuffer(fallbackFramebuffer, descriptor)) {
+        if (preferDescriptor
+                && this.backend.renderTargetDescriptorCompatibilityWithFramebuffer(fallbackFramebuffer, descriptor)
+                    .allowsDescriptorBackedRenderPass()) {
             return this.createRenderPass(descriptor);
         }
 

@@ -6,6 +6,7 @@ import net.vulkanic.PipelineDescriptor;
 import net.vulkanic.PipelineHandle;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
+import net.vulkanic.VulkanicRenderTargetCompatibility;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -41,15 +42,17 @@ public final class IrisVulkanRenderTargetContract {
 		}
 
 		VulkanicRenderTargetDescriptor descriptor = descriptorSupplier.get();
-		boolean descriptorMatchesFramebuffer =
-			VulkanicAPI.isRenderTargetDescriptorEquivalentToFramebuffer(fallbackFramebuffer, descriptor);
+		VulkanicRenderTargetCompatibility compatibility =
+			VulkanicAPI.renderTargetDescriptorCompatibilityWithFramebuffer(fallbackFramebuffer, descriptor);
+		boolean descriptorBacked = compatibility.allowsDescriptorBackedRenderPass();
 		if (TRACE_SHADER_RENDER_TARGETS) {
 			LOGGER.info(
-				"IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorMatchesFramebuffer={} {}",
+				"IrisShaderRenderTargetContract stage={} passName={} framebuffer={} descriptorCompatibility={} descriptorBacked={} {}",
 				stage,
 				passName != null ? passName : "(none)",
 				fallbackFramebuffer,
-				descriptorMatchesFramebuffer ? "yes" : "no",
+				compatibility,
+				descriptorBacked ? "yes" : "no",
 				descriptor.debugSignature()
 			);
 		}
@@ -57,7 +60,7 @@ public final class IrisVulkanRenderTargetContract {
 		return new TargetSelection(
 			fallbackFramebuffer,
 			fallbackHasDepthAttachment,
-			descriptorMatchesFramebuffer ? descriptor : null,
+			descriptorBacked ? descriptor : null,
 			vulkanRecordedPass
 		);
 	}

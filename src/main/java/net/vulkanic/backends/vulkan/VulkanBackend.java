@@ -29,6 +29,7 @@ import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicPrimitiveMode;
 import net.vulkanic.VulkanicRenderPass;
 import net.vulkanic.VulkanicRenderPassDescriptor;
+import net.vulkanic.VulkanicRenderTargetCompatibility;
 import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicResourceUsage;
 import net.vulkanic.VulkanicTexture;
@@ -5886,13 +5887,6 @@ void main() {
         }
     }
 
-    private enum RenderTargetCompatibility {
-        EXACT,
-        DESCRIPTOR_SUFFIX,
-        DESCRIPTOR_ATTACHMENTLESS,
-        MISMATCH
-    }
-
     private VulkanRenderTargetPlan resolveRenderPassDescriptorPlan(VulkanicRenderPassDescriptor descriptor) {
         VulkanicRenderPassDescriptor safeDescriptor =
             Objects.requireNonNull(descriptor, "descriptor must not be null");
@@ -6199,9 +6193,9 @@ void main() {
             VulkanRenderTargetPlan descriptorPlan = resolveRenderTargetDescriptorPlan(descriptor);
             ResolvedFramebufferTargets framebufferTargets = framebufferPlan.requireFramebufferTargets();
             ResolvedFramebufferTargets descriptorTargets = descriptorPlan.requireFramebufferTargets();
-            RenderTargetCompatibility compatibility =
+            VulkanicRenderTargetCompatibility compatibility =
                 classifyRenderTargetCompatibility(framebufferTargets, descriptorTargets);
-            boolean equivalent = compatibility == RenderTargetCompatibility.EXACT;
+            boolean equivalent = compatibility.isEquivalent();
             if (TRACE_RENDER_TARGET_PARITY) {
                 logRenderTargetParity(
                     equivalent,
@@ -6232,6 +6226,13 @@ void main() {
         int framebuffer,
         VulkanicRenderTargetDescriptor descriptor
     ) {
+        return renderTargetDescriptorCompatibilityWithFramebuffer(framebuffer, descriptor).isCompatible();
+    }
+
+    public VulkanicRenderTargetCompatibility renderTargetDescriptorCompatibilityWithFramebuffer(
+        int framebuffer,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
         Objects.requireNonNull(descriptor, "descriptor must not be null");
 
         try {
@@ -6240,12 +6241,11 @@ void main() {
             VulkanRenderTargetPlan descriptorPlan = resolveRenderTargetDescriptorPlan(descriptor);
             ResolvedFramebufferTargets framebufferTargets = framebufferPlan.requireFramebufferTargets();
             ResolvedFramebufferTargets descriptorTargets = descriptorPlan.requireFramebufferTargets();
-            RenderTargetCompatibility compatibility =
+            VulkanicRenderTargetCompatibility compatibility =
                 classifyRenderTargetCompatibility(framebufferTargets, descriptorTargets);
-            boolean compatible = compatibility != RenderTargetCompatibility.MISMATCH;
             if (TRACE_RENDER_TARGET_PARITY) {
                 logRenderTargetCompatibility(
-                    compatible,
+                    compatibility.isCompatible(),
                     compatibility,
                     framebuffer,
                     descriptor.label().get(),
@@ -6254,12 +6254,12 @@ void main() {
                     null
                 );
             }
-            return compatible;
+            return compatibility;
         } catch (RuntimeException exception) {
             if (TRACE_RENDER_TARGET_PARITY) {
                 logRenderTargetCompatibility(
                     false,
-                    RenderTargetCompatibility.MISMATCH,
+                    VulkanicRenderTargetCompatibility.MISMATCH,
                     framebuffer,
                     descriptor.label().get(),
                     "unresolved",
@@ -6267,25 +6267,25 @@ void main() {
                     exception
                 );
             }
-            return false;
+            return VulkanicRenderTargetCompatibility.MISMATCH;
         }
     }
 
-    private static RenderTargetCompatibility classifyRenderTargetCompatibility(
+    private static VulkanicRenderTargetCompatibility classifyRenderTargetCompatibility(
         ResolvedFramebufferTargets framebufferTargets,
         ResolvedFramebufferTargets descriptorTargets
     ) {
         if (framebufferTargets.width != descriptorTargets.width || framebufferTargets.height != descriptorTargets.height) {
-            return RenderTargetCompatibility.MISMATCH;
+            return VulkanicRenderTargetCompatibility.MISMATCH;
         }
         if (!descriptorTargets.depthAttachmentMatches(framebufferTargets)) {
-            return RenderTargetCompatibility.MISMATCH;
+            return VulkanicRenderTargetCompatibility.MISMATCH;
         }
 
         int framebufferColorCount = framebufferTargets.colorAttachmentCount();
         int descriptorColorCount = descriptorTargets.colorAttachmentCount();
         if (descriptorColorCount > framebufferColorCount) {
-            return RenderTargetCompatibility.MISMATCH;
+            return VulkanicRenderTargetCompatibility.MISMATCH;
         }
 
         boolean exactColorMatch = framebufferColorCount == descriptorColorCount;
@@ -6297,21 +6297,21 @@ void main() {
                 }
             }
             if (exactColorMatch) {
-                return RenderTargetCompatibility.EXACT;
+                return VulkanicRenderTargetCompatibility.EXACT;
             }
         }
 
         if (descriptorColorCount == 0) {
-            return RenderTargetCompatibility.DESCRIPTOR_ATTACHMENTLESS;
+            return VulkanicRenderTargetCompatibility.DESCRIPTOR_ATTACHMENTLESS;
         }
 
         int suffixStart = framebufferColorCount - descriptorColorCount;
         for (int descriptorIndex = 0; descriptorIndex < descriptorColorCount; descriptorIndex++) {
             if (!descriptorTargets.colorAttachmentMatches(framebufferTargets, descriptorIndex, suffixStart + descriptorIndex)) {
-                return RenderTargetCompatibility.MISMATCH;
+                return VulkanicRenderTargetCompatibility.MISMATCH;
             }
         }
-        return RenderTargetCompatibility.DESCRIPTOR_SUFFIX;
+        return VulkanicRenderTargetCompatibility.DESCRIPTOR_SUFFIX;
     }
 
     private static void logRenderTargetParity(
@@ -6363,7 +6363,7 @@ void main() {
 
     private static void logRenderTargetCompatibility(
         boolean compatible,
-        RenderTargetCompatibility compatibility,
+        VulkanicRenderTargetCompatibility compatibility,
         int framebuffer,
         String label,
         String framebufferSignature,

@@ -3664,9 +3664,21 @@ public class VulkanicAPI {
         int framebuffer,
         VulkanicRenderTargetDescriptor descriptor
     ) {
+        return renderTargetDescriptorCompatibilityWithFramebuffer(framebuffer, descriptor).isCompatible();
+    }
+
+    /**
+     * Classifies how an explicit render-target descriptor relates to a tracked
+     * legacy framebuffer contract.
+     */
+    public static VulkanicRenderTargetCompatibility renderTargetDescriptorCompatibilityWithFramebuffer(
+        int framebuffer,
+        VulkanicRenderTargetDescriptor descriptor
+    ) {
         VulkanBackend directVulkanBackend = directVulkanBackendForImplementedMethods();
         return directVulkanBackend != null
-            && directVulkanBackend.isRenderTargetDescriptorCompatibleWithFramebuffer(framebuffer, descriptor);
+            ? directVulkanBackend.renderTargetDescriptorCompatibilityWithFramebuffer(framebuffer, descriptor)
+            : VulkanicRenderTargetCompatibility.MISMATCH;
     }
 
     /**
