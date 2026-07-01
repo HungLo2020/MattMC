@@ -9791,8 +9791,10 @@ void main() {
 
         private void setAttributePointer(int index, int size, int type, boolean normalized, boolean integer, int stride, long pointer, int buffer) {
             int effectiveStride = stride > 0 ? stride : attributeByteSize(size, type);
-            attributes.put(index, new LegacyVertexAttribute(index, index, size, type, normalized, integer, Math.toIntExact(pointer), 0));
-            bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, 0, buffer));
+            LegacyVertexAttribute previous = attributes.get(index);
+            int divisor = previous != null ? previous.divisor() : 0;
+            attributes.put(index, new LegacyVertexAttribute(index, index, size, type, normalized, integer, Math.toIntExact(pointer), divisor));
+            bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, divisor, buffer));
         }
 
         private void setAttributeFormat(int index, int size, int type, boolean normalized, boolean integer, int relativeOffset) {

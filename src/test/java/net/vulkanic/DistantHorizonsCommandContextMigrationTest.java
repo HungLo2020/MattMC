@@ -706,6 +706,10 @@ public class DistantHorizonsCommandContextMigrationTest {
     public void testDhVulkanCoordinateCorrectionsStayOnProvenPaths() throws IOException {
         String standardVert = readSourceWithoutComments(SRC_MAIN_RESOURCES.resolve("shaders/standard.vert"));
         String curveVert = readSourceWithoutComments(SRC_MAIN_RESOURCES.resolve("shaders/curve.vert"));
+        String genericDirectVert = readSourceWithoutComments(
+            SRC_MAIN_RESOURCES.resolve("shaders/genericObject/direct/vert.vert"));
+        String genericInstancedVert = readSourceWithoutComments(
+            SRC_MAIN_RESOURCES.resolve("shaders/genericObject/instanced/vert.vert"));
         String vanillaFade = readSourceWithoutComments(SRC_MAIN_RESOURCES.resolve("shaders/fade/vanillaFade.frag"));
 
         assertTrue(standardVert.contains("#ifdef VULKANIC_BACKEND")
@@ -714,6 +718,12 @@ public class DistantHorizonsCommandContextMigrationTest {
         assertTrue(curveVert.contains("#ifdef VULKANIC_BACKEND")
                 && curveVert.contains("gl_Position.y = -gl_Position.y;"),
             "DH curved terrain vertices should match the standard Vulkan clip-space Y correction");
+        assertTrue(genericDirectVert.contains("#ifdef VULKANIC_BACKEND")
+                && genericDirectVert.contains("gl_Position.y = -gl_Position.y;"),
+            "DH generic direct vertices should flip Vulkan clip-space Y without changing OpenGL");
+        assertTrue(genericInstancedVert.contains("#ifdef VULKANIC_BACKEND")
+                && genericInstancedVert.contains("gl_Position.y = -gl_Position.y;"),
+            "DH generic/cloud instanced vertices should flip Vulkan clip-space Y without changing OpenGL");
         assertTrue(standardVert.contains("light2 = max(light2, 1.0 - light2);")
                 && curveVert.contains("light2 = max(light2, 1.0 - light2);"),
             "DH built-in Vulkan terrain should preserve OpenGL-visible water-adjacent LOD lighting instead of sampling black sky rows");

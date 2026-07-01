@@ -21,6 +21,9 @@ out vec4 fColor;
 void main()
 {
     gl_Position = uTransform * vec4(vPosition, 1.0);
+#ifdef VULKANIC_BACKEND
+    gl_Position.y = -gl_Position.y;
+#endif
     
     
     float blockLight = (float(uBlockLight)+0.5) / 16.0;

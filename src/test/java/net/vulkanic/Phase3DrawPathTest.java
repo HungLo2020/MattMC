@@ -1248,8 +1248,11 @@ public class Phase3DrawPathTest {
         assertTrue(backendSource.contains("currentVirtualVaoState().setAttributePointer(index, size, type, normalized, false, stride, pointer, currentLegacyArrayBufferBinding())")
                 && backendSource.contains("currentVirtualVaoState().setAttributePointer(index, size, type, false, true, stride, pointer, currentLegacyArrayBufferBinding())"),
             "Legacy glVertexAttribPointer/IPointer must capture the array buffer bound when the attribute is specified");
-        assertTrue(backendSource.contains("bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, 0, buffer))"),
-            "Pre-GL43 attribute pointers should use a per-attribute Vulkan binding that preserves the captured buffer");
+        assertTrue(backendSource.contains("LegacyVertexAttribute previous = attributes.get(index);")
+                && backendSource.contains("int divisor = previous != null ? previous.divisor() : 0;")
+                && backendSource.contains("new LegacyVertexAttribute(index, index, size, type, normalized, integer, Math.toIntExact(pointer), divisor)")
+                && backendSource.contains("bindings.put(index, new LegacyVertexBinding(index, effectiveStride, 0, divisor, buffer))"),
+            "Pre-GL43 attribute pointers should preserve captured buffers and any divisor set before the pointer call");
         assertTrue(backendSource.contains("bindLegacyVertexBuffersForDraw(commandBufferHandle)")
                 && backendSource.contains("filter(binding -> binding.buffer() > 0)")
                 && backendSource.contains("bindVertexBuffer(commandBufferHandle, binding.binding(), vertexBuffer.getVkBufferHandle(), binding.offset())"),
