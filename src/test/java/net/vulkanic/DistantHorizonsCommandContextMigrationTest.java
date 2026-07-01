@@ -314,7 +314,7 @@ public class DistantHorizonsCommandContextMigrationTest {
     }
 
     @Test
-    public void testDhVulkanRenderPassUsesCurrentlyBoundDrawFramebuffer() throws IOException {
+    public void testDhVulkanRenderPassPrefersDescriptorForOwnedFramebuffer() throws IOException {
         Path lodRenderer = SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/LodRenderer.java");
         String sourceWithoutComments = readSourceWithoutComments(lodRenderer);
@@ -329,9 +329,14 @@ public class DistantHorizonsCommandContextMigrationTest {
         int currentDrawDepth = sourceWithoutComments.indexOf(
             "VulkanicAPI.getFramebufferDepthAttachmentObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0",
             currentDrawAssignment);
+        int descriptorOwner = sourceWithoutComments.indexOf("DhFramebuffer descriptorOwner = this.getActiveDhFramebuffer()", currentDrawDepth);
+        int descriptorGuard = sourceWithoutComments.indexOf("descriptorOwner.getId() == framebufferId", descriptorOwner);
+        int descriptorCapability = sourceWithoutComments.indexOf("descriptorOwner.canCreateRenderTargetDescriptor()", descriptorGuard);
+        int descriptorPass = sourceWithoutComments.indexOf("VulkanicAPI.createCommandEncoder().createRenderPass(", descriptorCapability);
+        int descriptorCreate = sourceWithoutComments.indexOf("descriptorOwner.createRenderTargetDescriptor(() -> label)", descriptorPass);
         int createRenderPass = sourceWithoutComments.indexOf(
             "VulkanicAPI.createRenderPass(() -> label, framebufferId, framebufferHasDepthAttachment)",
-            currentDrawDepth);
+            descriptorPass);
 
         assertTrue(renderPassHelper >= 0,
             "DH LOD renderer should centralize Vulkan compatibility render pass creation");
@@ -343,8 +348,12 @@ public class DistantHorizonsCommandContextMigrationTest {
             "DH Vulkan LOD render passes should only follow the current draw framebuffer when it has a color attachment");
         assertTrue(currentDrawAssignment > colorAttachmentGuard && currentDrawDepth > currentDrawAssignment,
             "DH Vulkan LOD render passes should copy the current draw framebuffer and its depth contract only after the color-attachment guard");
-        assertTrue(createRenderPass > currentDrawDepth,
-            "DH Vulkan LOD render passes should create the pass for the resolved draw framebuffer");
+        assertTrue(descriptorOwner > currentDrawDepth && descriptorGuard > descriptorOwner && descriptorCapability > descriptorGuard,
+            "DH Vulkan LOD render passes should only prefer descriptors when the active DH framebuffer owns the resolved target");
+        assertTrue(descriptorPass > descriptorCapability && descriptorCreate > descriptorPass,
+            "DH Vulkan LOD render passes should prefer explicit DH render-target descriptors for owned targets");
+        assertTrue(createRenderPass > descriptorPass,
+            "DH Vulkan LOD render passes should retain the raw framebuffer fallback");
     }
 
     @Test
@@ -824,8 +833,10 @@ public class DistantHorizonsCommandContextMigrationTest {
         assertTrue(lodSource.contains("VulkanicAPI.getDrawFramebufferBinding()")
                 && lodSource.contains("VulkanicAPI.getFramebufferColorAttachment0ObjectName(ctx, VulkanicAPI.GL_DRAW_FRAMEBUFFER) > 0")
                 && lodSource.contains("int framebufferId = this.activeFramebufferId")
+                && lodSource.contains("descriptorOwner.createRenderTargetDescriptor(() -> label)")
+                && lodSource.contains("VulkanicAPI.createCommandEncoder().createRenderPass(")
                 && lodSource.contains("VulkanicAPI.createRenderPass(() -> label, framebufferId"),
-            "DH LOD render pass should target a color-backed current draw framebuffer and fall back to the cached DH framebuffer");
+            "DH LOD render pass should prefer explicit DH render-target descriptors and retain the raw framebuffer fallback");
         assertTrue(lodSource.contains("!VulkanicAPI.isVulkanBackendSelected()"),
             "DH LOD render pass bridge should be disabled for OpenGL");
 
@@ -847,11 +858,19 @@ public class DistantHorizonsCommandContextMigrationTest {
         Path genericRenderer = SRC_MAIN_JAVA.resolve(
             "com/seibel/distanthorizons/core/render/renderer/generic/GenericObjectRenderer.java");
         String genericSource = readSourceWithoutComments(genericRenderer);
-        assertTrue(genericSource.contains("try (RenderPass ignored = this.createVulkanCompatibilityRenderPass(framebufferId, framebufferHasDepthAttachment))"),
+        assertTrue(genericSource.contains("try (RenderPass ignored = this.createVulkanCompatibilityRenderPass(framebufferId, framebufferHasDepthAttachment, targetFramebuffer))"),
             "DH generic-object draw calls should execute inside a Vulkan compatibility render pass");
-        assertTrue(lodSource.contains("genericRenderer.render(renderParams, profiler, true, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment())")
-                && lodSource.contains("genericRenderer.render(renderParams, profiler, false, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment())"),
-            "DH generic-object render pass should inherit LodRenderer's active DH framebuffer target");
+        assertTrue(lodSource.contains("genericRenderer.render(renderParams, profiler, true, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment(), this.getActiveDhFramebuffer())")
+                && lodSource.contains("genericRenderer.render(renderParams, profiler, false, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment(), this.getActiveDhFramebuffer())"),
+            "DH generic-object render pass should inherit LodRenderer's active DH framebuffer target owner");
+        assertTrue(genericSource.contains("targetFramebuffer.createRenderTargetDescriptor(() -> \"Distant Horizons generic objects\")")
+                && genericSource.contains("targetFramebuffer.getId() == framebufferId")
+                && genericSource.contains("VulkanicAPI.createCommandEncoder().createRenderPass(")
+                && genericSource.contains("boolean preferDescriptor = true"),
+            "DH generic-object render pass should prefer explicit DH render-target descriptors when the owner matches");
+        assertTrue(genericSource.contains("VulkanicAPI.createRenderPass(")
+                && genericSource.contains("framebufferHasDepthAttachment"),
+            "DH generic-object render pass should retain the raw framebuffer fallback");
         assertTrue(genericSource.contains("!VulkanicAPI.isVulkanBackendSelected()"),
             "DH generic-object render pass bridge should be disabled for OpenGL");
 

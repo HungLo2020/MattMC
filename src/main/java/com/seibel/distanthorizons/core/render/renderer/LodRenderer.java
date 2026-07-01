@@ -217,7 +217,7 @@ public class LodRenderer
 			if (Config.Client.Advanced.Graphics.GenericRendering.enableGenericRendering.get())
 			{
 				profiler.popPush("Custom Objects");
-				genericRenderer.render(renderParams, profiler, true, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment());
+				genericRenderer.render(renderParams, profiler, true, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment(), this.getActiveDhFramebuffer());
 			}
 			
 			// SSAO
@@ -231,7 +231,7 @@ public class LodRenderer
 			if (Config.Client.Advanced.Graphics.GenericRendering.enableGenericRendering.get())
 			{
 				profiler.popPush("Custom Objects");
-				genericRenderer.render(renderParams, profiler, false, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment());
+				genericRenderer.render(renderParams, profiler, false, this.activeFramebufferId, this.activeFramebufferHasDepthAttachment(), this.getActiveDhFramebuffer());
 			}
 			
 			// combined pass transparent rendering
@@ -917,6 +917,18 @@ public class LodRenderer
 		if (framebufferId < 0)
 		{
 			return null;
+		}
+
+		DhFramebuffer descriptorOwner = this.getActiveDhFramebuffer();
+		if (descriptorOwner != null
+				&& descriptorOwner.getId() == framebufferId
+				&& descriptorOwner.canCreateRenderTargetDescriptor())
+		{
+			boolean preferDescriptor = true;
+			return VulkanicAPI.createCommandEncoder().createRenderPass(
+					descriptorOwner.createRenderTargetDescriptor(() -> label),
+					framebufferId,
+					preferDescriptor);
 		}
 
 		return VulkanicAPI.createRenderPass(() -> label, framebufferId, framebufferHasDepthAttachment);

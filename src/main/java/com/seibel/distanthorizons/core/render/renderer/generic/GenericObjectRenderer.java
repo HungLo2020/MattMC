@@ -20,6 +20,7 @@ import com.seibel.distanthorizons.core.logging.f3.F3Screen;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.render.glObject.buffer.GLElementBuffer;
 import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
+import com.seibel.distanthorizons.core.render.glObject.texture.DhFramebuffer;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
@@ -38,7 +39,9 @@ import net.vulkanic.VulkanicIndexType;
 import net.vulkanic.VulkanicPolygonFace;
 import net.vulkanic.VulkanicPolygonMode;
 import net.vulkanic.VulkanicPrimitiveMode;
+import net.vulkanic.VulkanicRenderTargetDescriptor;
 import net.vulkanic.VulkanicVertexAttributeType;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
 import java.awt.*;
@@ -371,10 +374,21 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	 */
 	public void render(DhApiRenderParam renderEventParam, IProfilerWrapper profiler, boolean renderingWithSsao)
 	{
-		this.render(renderEventParam, profiler, renderingWithSsao, VulkanicAPI.getDrawFramebufferBinding(), true);
+		this.render(renderEventParam, profiler, renderingWithSsao, VulkanicAPI.getDrawFramebufferBinding(), true, null);
 	}
 
 	public void render(DhApiRenderParam renderEventParam, IProfilerWrapper profiler, boolean renderingWithSsao, int framebufferId, boolean framebufferHasDepthAttachment)
+	{
+		this.render(renderEventParam, profiler, renderingWithSsao, framebufferId, framebufferHasDepthAttachment, null);
+	}
+
+	public void render(
+			DhApiRenderParam renderEventParam,
+			IProfilerWrapper profiler,
+			boolean renderingWithSsao,
+			int framebufferId,
+			boolean framebufferHasDepthAttachment,
+			@Nullable DhFramebuffer targetFramebuffer)
 	{
 		// render setup //
 		profiler.push("setup");
@@ -467,7 +481,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 
 		if (!renderableBoxGroups.isEmpty())
 		{
-			try (RenderPass ignored = this.createVulkanCompatibilityRenderPass(framebufferId, framebufferHasDepthAttachment))
+			try (RenderPass ignored = this.createVulkanCompatibilityRenderPass(framebufferId, framebufferHasDepthAttachment, targetFramebuffer))
 			{
 				for (RenderableBoxGroup boxGroup : renderableBoxGroups)
 				{
@@ -513,11 +527,27 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		profiler.pop();
 	}
 
-	private RenderPass createVulkanCompatibilityRenderPass(int framebufferId, boolean framebufferHasDepthAttachment)
+	private RenderPass createVulkanCompatibilityRenderPass(
+			int framebufferId,
+			boolean framebufferHasDepthAttachment,
+			@Nullable DhFramebuffer targetFramebuffer)
 	{
 		if (!VulkanicAPI.isVulkanBackendSelected() || framebufferId < 0)
 		{
 			return null;
+		}
+
+		if (targetFramebuffer != null
+				&& targetFramebuffer.getId() == framebufferId
+				&& targetFramebuffer.canCreateRenderTargetDescriptor())
+		{
+			VulkanicRenderTargetDescriptor descriptor =
+					targetFramebuffer.createRenderTargetDescriptor(() -> "Distant Horizons generic objects");
+			boolean preferDescriptor = true;
+			return VulkanicAPI.createCommandEncoder().createRenderPass(
+					descriptor,
+					framebufferId,
+					preferDescriptor);
 		}
 
 		return VulkanicAPI.createRenderPass(
