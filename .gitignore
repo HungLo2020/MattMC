@@ -1,3 +1,6 @@
+# Rust
+target/
+
 # Gradle
 .gradle/
 build/

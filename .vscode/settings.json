@@ -29,5 +29,6 @@
 		"**/out/**",
     "**/logs/**",
 		"**/run/**"
-	]
+	],
+	"java.configuration.updateBuildConfiguration": "automatic"
 }
