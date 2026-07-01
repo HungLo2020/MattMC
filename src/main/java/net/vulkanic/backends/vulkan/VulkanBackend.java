@@ -1341,9 +1341,7 @@ void main() {
         int framebuffer,
         boolean hasDepthTexture
     ) {
-        // Framebuffer-id callers still need the framebuffer-aware compatibility resource
-        // recovery path. Descriptor-backed callers use the native Vulkan render-pass path.
-        return createCompatibilityCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);
+        return new VulkanNativeCommandEncoder(this).createRenderPass(supplier, framebuffer, hasDepthTexture);
     }
 
     public net.blaze3d.systems.RenderPass createRenderPass(VulkanicRenderTargetDescriptor descriptor) {
@@ -5977,6 +5975,19 @@ void main() {
     ) {
         Objects.requireNonNull(label, "label must not be null");
         return VulkanRenderTargetPlan.framebuffer(label, resolveFramebufferTargets(framebuffer, includeDepthAttachment));
+    }
+
+    boolean canCreateNativeFramebufferRenderPass(int framebuffer, boolean includeDepthAttachment) {
+        try {
+            resolveFramebufferRenderTargetPlan(
+                () -> "Native framebuffer render-pass preflight",
+                framebuffer,
+                includeDepthAttachment
+            );
+            return true;
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     private ResolvedFramebufferTargets resolveFramebufferTargets(int framebuffer) {

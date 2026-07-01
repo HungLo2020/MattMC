@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanBackendFramebufferCompatibilityTest {
@@ -146,6 +147,26 @@ public class VulkanBackendFramebufferCompatibilityTest {
 				+ "\\}\\s+transitionImageLayout\\(");
 		assertTrue(preservationFallback.matcher(backendSource).results().count() >= 2,
 			"Legacy color/depth clears must not transition from UNDEFINED and discard shader-readable texture contents");
+	}
+
+	@Test
+	public void testGeneralFramebufferRenderPassesPromoteResolvableTargetsToNativeEncoder() throws Exception {
+		String backendSource = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/vulkanic/backends/vulkan/VulkanBackend.java"));
+		String nativeEncoderSource = Files.readString(PROJECT_ROOT.resolve(
+			"src/main/java/net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java"));
+
+		assertTrue(backendSource.contains("return new VulkanNativeCommandEncoder(this).createRenderPass(supplier, framebuffer, hasDepthTexture);"),
+			"VulkanBackend framebuffer render-pass creation should route through the native encoder");
+		assertTrue(backendSource.contains("boolean canCreateNativeFramebufferRenderPass(int framebuffer, boolean includeDepthAttachment)")
+				&& backendSource.contains("resolveFramebufferRenderTargetPlan("),
+			"VulkanBackend should expose a preflight that proves framebuffer attachments can be resolved before opening a command buffer");
+		assertFalse(backendSource.contains("return createCompatibilityCommandEncoder().createRenderPass(supplier, framebuffer, hasDepthTexture);"),
+			"VulkanBackend should not blanket-route framebuffer render passes through GlCommandEncoder");
+		assertTrue(nativeEncoderSource.contains("!this.backend.canCreateNativeFramebufferRenderPass(framebuffer, hasDepthTexture)")
+				&& nativeEncoderSource.contains("this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture)")
+				&& nativeEncoderSource.contains("this.backend.beginRenderPass(ctx, label, framebuffer, hasDepthTexture)"),
+			"VulkanNativeCommandEncoder should use native framebuffer render passes when resolvable and keep only unresolved fallback explicit");
 	}
 
 	private static int getPrivateInt(VulkanBackend backend, String fieldName) throws Exception {

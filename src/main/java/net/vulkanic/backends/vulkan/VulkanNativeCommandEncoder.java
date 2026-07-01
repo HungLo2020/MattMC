@@ -128,7 +128,8 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
     @Override
     public RenderPass createRenderPass(Supplier<String> label, int framebuffer, boolean hasDepthTexture) {
         this.ensureNoRenderPass();
-        if (this.resourceMode == ResourceMode.GENERAL) {
+        if (this.resourceMode == ResourceMode.GENERAL
+                && !this.backend.canCreateNativeFramebufferRenderPass(framebuffer, hasDepthTexture)) {
             return this.backend.createCompatibilityCommandEncoder().createRenderPass(label, framebuffer, hasDepthTexture);
         }
         CommandContext ctx = this.backend.beginCommandBuffer();
