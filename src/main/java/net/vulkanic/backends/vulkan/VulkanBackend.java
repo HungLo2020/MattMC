@@ -12711,7 +12711,8 @@ void main() {
                 checkVk("vkMapMemory(staging)",
                     VK10.vkMapMemory(logicalDevice, memoryHandle, 0, size, 0, mappedPointer));
 
-                java.nio.ByteBuffer mapped = MemoryUtil.memByteBuffer(mappedPointer.get(0), size);
+                java.nio.ByteBuffer mapped = MemoryUtil.memByteBuffer(mappedPointer.get(0), size)
+                    .order(ByteOrder.nativeOrder());
                 mapped.put(data.duplicate());
                 VK10.vkUnmapMemory(logicalDevice, memoryHandle);
 
@@ -13991,10 +13992,10 @@ void main() {
             VulkanicBuffer.MappedView view = mapManagedBuffer(buffer, read, write);
             legacyBufferMappedViews.put(bufferId, view);
 
-            java.nio.ByteBuffer mapped = view.data().duplicate();
+            java.nio.ByteBuffer mapped = view.data().duplicate().order(ByteOrder.nativeOrder());
             mapped.position((int) offset);
             mapped.limit((int) (offset + length));
-            return mapped.slice();
+            return mapped.slice().order(ByteOrder.nativeOrder());
         }
 
         private java.nio.ByteBuffer mapBufferByTarget(int target, long offset, long length, int access) {
@@ -14254,7 +14255,8 @@ void main() {
 
                 checkVkAllocation("vkMapMemory", mapResult, buffer.size(), buffer.toString());
 
-                java.nio.ByteBuffer mappedData = MemoryUtil.memByteBuffer(mappedPointer.get(0), buffer.size());
+                java.nio.ByteBuffer mappedData = MemoryUtil.memByteBuffer(mappedPointer.get(0), buffer.size())
+                    .order(ByteOrder.nativeOrder());
                 return new VulkanBuffer.VulkanMappedView(
                     mappedData,
                     () -> {
@@ -14274,7 +14276,8 @@ void main() {
                 int mapResult = VK10.vkMapMemory(logicalDevice, memoryHandle, 0, size, 0, mappedPointer);
                 checkVkAllocation("vkMapMemory(initial upload)", mapResult, size, "managed buffer initial upload");
 
-                java.nio.ByteBuffer mappedData = MemoryUtil.memByteBuffer(mappedPointer.get(0), size);
+                java.nio.ByteBuffer mappedData = MemoryUtil.memByteBuffer(mappedPointer.get(0), size)
+                    .order(ByteOrder.nativeOrder());
                 java.nio.ByteBuffer source = initialData.duplicate();
                 mappedData.put(source);
                 VK10.vkUnmapMemory(logicalDevice, memoryHandle);

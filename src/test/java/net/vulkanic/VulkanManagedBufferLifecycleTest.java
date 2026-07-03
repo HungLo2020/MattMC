@@ -7,6 +7,9 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class VulkanManagedBufferLifecycleTest {
+    private static final Path PROJECT_ROOT = Paths.get(System.getProperty("user.dir"));
+    private static final Path SRC_MAIN_JAVA = PROJECT_ROOT.resolve("src/main/java");
 
     @BeforeEach
     public void beforeEach() throws Exception {
@@ -143,12 +148,34 @@ public class VulkanManagedBufferLifecycleTest {
         assertReadinessFailure(mapFailure);
     }
 
+    @Test
+    public void testVulkanMappedBuffersUseNativeByteOrder() throws Exception {
+        String backendSource = readSource(
+            SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanBackend.java")
+        );
+        String nativeEncoderSource = readSource(
+            SRC_MAIN_JAVA.resolve("net/vulkanic/backends/vulkan/VulkanNativeCommandEncoder.java")
+        );
+
+        assertTrue(backendSource.contains("MemoryUtil.memByteBuffer(mappedPointer.get(0), buffer.size())\n" +
+                "                    .order(ByteOrder.nativeOrder())"),
+            "Vulkan-managed mapped buffers must expose native-order ByteBuffers for typed Java writes");
+        assertTrue(backendSource.contains("return mapped.slice().order(ByteOrder.nativeOrder());"),
+            "Legacy mapped range slices must preserve native byte order after slicing");
+        assertTrue(nativeEncoderSource.contains("mapped.order(ByteOrder.nativeOrder());"),
+            "CommandEncoder mapBuffer must return a native-order mapped view to render-system callers");
+    }
+
     private static void assertReadinessFailure(IllegalStateException failure) {
         String message = failure.getMessage();
         assertNotNull(message);
         assertTrue(message.contains("Readiness report:"), "Failure should include readiness diagnostics");
         assertFalse(message.contains("OpenGL fallback is intentionally blocked"),
             "Newly implemented Vulkan pathways should route to Vulkan readiness checks, not proxy fallback errors");
+    }
+
+    private static String readSource(Path path) throws Exception {
+        return Files.readString(path).replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private static void resetBackendState() throws Exception {

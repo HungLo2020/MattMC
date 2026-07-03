@@ -6861,7 +6861,35 @@ public class VulkanicAPI {
             + ",length=" + slice.length()
             + ",payloadHash=" + payloadHash
             + ",rangeHash=" + rangeHash
+            + shaderInputParitySemanticDetails(resourceBinding.name(), slice)
             + "}}";
+    }
+
+    private static String shaderInputParitySemanticDetails(String name, VulkanicBufferSlice slice) {
+        if (!"Fog".equals(name)) {
+            return "";
+        }
+
+        java.nio.ByteBuffer data = shaderInputParityRead(slice, Math.min(40, slice.length()));
+        if (data == null || data.capacity() < 40) {
+            return ",semantic=unavailable";
+        }
+
+        data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        return String.format(
+            java.util.Locale.ROOT,
+            ",semantic={FogColor=(%.8f,%.8f,%.8f,%.8f),FogEnvironmentalStart=%.8f,FogEnvironmentalEnd=%.8f,FogRenderDistanceStart=%.8f,FogRenderDistanceEnd=%.8f,FogSkyEnd=%.8f,FogCloudsEnd=%.8f}",
+            data.getFloat(0),
+            data.getFloat(4),
+            data.getFloat(8),
+            data.getFloat(12),
+            data.getFloat(16),
+            data.getFloat(20),
+            data.getFloat(24),
+            data.getFloat(28),
+            data.getFloat(32),
+            data.getFloat(36)
+        );
     }
 
     private static String shaderInputParityPayloadHash(String name, VulkanicBufferSlice slice) {

@@ -7,6 +7,7 @@ import net.blaze3d.buffers.Std140Builder;
 import net.blaze3d.buffers.Std140SizeCalculator;
 import java.nio.ByteBuffer;
 import java.util.List;
+import net.logging.LogUtils;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Camera;
@@ -34,9 +35,12 @@ import net.sodium.client.util.FogStorage;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
+import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class FogRenderer implements AutoCloseable, FogStorage {
+	private static final Logger LOGGER = LogUtils.getLogger();
+	private static final boolean TRACE_FOG_STATE = Boolean.getBoolean("mattmc.vulkan.traceFogState");
 	public static final int FOG_UBO_SIZE = new Std140SizeCalculator().putVec4().putFloat().putFloat().putFloat().putFloat().putFloat().putFloat().get();
 	private static final List<FogEnvironment> FOG_ENVIRONMENTS = Lists.<FogEnvironment>newArrayList(
 		new LavaFogEnvironment(),
@@ -203,7 +207,8 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 		fogData.renderDistanceEnd = h;
 		
 		// DH: Cancel fog if configured
-		if (shouldCancelDhFog(camera, entity)) {
+		DhFogCancelState dhFogCancelState = getDhFogCancelState(camera, entity);
+		if (dhFogCancelState.cancelFog()) {
 			final float A_REALLY_REALLY_BIG_VALUE = 420694206942069.F;
 			final float A_EVEN_LARGER_VALUE = 42069420694206942069.F;
 			
@@ -233,6 +238,30 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 			// Sodium: Store fog parameters (from FogRendererMixin)
 			parameters = new FogParameters(vector4f.x, vector4f.y, vector4f.z, vector4f.w, fogData.environmentalStart, fogData.environmentalEnd, fogData.renderDistanceStart, fogData.renderDistanceEnd);
 		}
+
+		if (TRACE_FOG_STATE) {
+			LOGGER.info(
+				"FogStateTrace backend={} renderer={} fogType={} dhCancel={} cameraNotInFluid={} specialFog={} wrapperSpecial={} enableVanillaFog={} color=({},{},{},{}) envStart={} envEnd={} renderStart={} renderEnd={} skyEnd={} cloudEnd={}",
+				VulkanicAPI.getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+				Integer.toHexString(System.identityHashCode(this)),
+				fogType,
+				dhFogCancelState.cancelFog(),
+				dhFogCancelState.cameraNotInFluid(),
+				dhFogCancelState.specialFog(),
+				dhFogCancelState.wrapperSpecialFog(),
+				dhFogCancelState.enableVanillaFog(),
+				vector4f.x,
+				vector4f.y,
+				vector4f.z,
+				vector4f.w,
+				fogData.environmentalStart,
+				fogData.environmentalEnd,
+				fogData.renderDistanceStart,
+				fogData.renderDistanceEnd,
+				fogData.skyEnd,
+				fogData.cloudEnd
+			);
+		}
 		
 		// Iris: Capture fog color
 		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogColor(vector4f.x, vector4f.y, vector4f.z);
@@ -256,19 +285,27 @@ public class FogRenderer implements AutoCloseable, FogStorage {
 	
 	// DH: Helper method to determine if vanilla fog should be cancelled
 	private static boolean shouldCancelDhFog(Camera camera, Entity entity) {
-		FogType fogType = camera.getFluidInCamera();
-		boolean cameraNotInFluid = fogType == FogType.NONE;
-		
-		boolean isSpecialFog = (entity instanceof net.minecraft.world.entity.LivingEntity) 
-			&& ((net.minecraft.world.entity.LivingEntity) entity).hasEffect(net.minecraft.world.effect.MobEffects.BLINDNESS);
-		
-		boolean cancelFog = !isSpecialFog;
-		cancelFog = cancelFog && cameraNotInFluid;
-		cancelFog = cancelFog && !com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE.get(
+		return getDhFogCancelState(camera, entity).cancelFog();
+	}
+
+	private static DhFogCancelState getDhFogCancelState(Camera camera, Entity entity) {
+		boolean cameraNotInFluid = camera.getFluidInCamera() == FogType.NONE;
+		boolean isSpecialFog = (entity instanceof net.minecraft.world.entity.LivingEntity)
+			&& ((net.minecraft.world.entity.LivingEntity)entity).hasEffect(net.minecraft.world.effect.MobEffects.BLINDNESS);
+		boolean wrapperSpecialFog = com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE.get(
 			com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper.class).isFogStateSpecial();
-		cancelFog = cancelFog && !com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
-		
-		return cancelFog;
+		boolean enableVanillaFog = com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
+		boolean cancelFog = !isSpecialFog && cameraNotInFluid && !wrapperSpecialFog && !enableVanillaFog;
+		return new DhFogCancelState(cancelFog, cameraNotInFluid, isSpecialFog, wrapperSpecialFog, enableVanillaFog);
+	}
+
+	private record DhFogCancelState(
+		boolean cancelFog,
+		boolean cameraNotInFluid,
+		boolean specialFog,
+		boolean wrapperSpecialFog,
+		boolean enableVanillaFog
+	) {
 	}
 	
 	// Sodium: FogStorage interface method (from FogRendererMixin)

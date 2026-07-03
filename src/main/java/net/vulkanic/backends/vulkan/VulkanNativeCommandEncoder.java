@@ -40,6 +40,7 @@ import net.vulkanic.VulkanicTextureView;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -241,6 +242,7 @@ class VulkanNativeCommandEncoder implements CommandEncoder {
         if (mapped == null) {
             throw new IllegalStateException("Unable to map Vulkan buffer");
         }
+        mapped.order(ByteOrder.nativeOrder());
 
         return new GpuBuffer.MappedView() {
             private boolean closed;
