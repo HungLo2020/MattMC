@@ -2,8 +2,6 @@ package net.sodium.client;
 
 import net.sodium.client.console.Console;
 import net.sodium.client.console.message.MessageLevel;
-import net.sodium.client.data.fingerprint.FingerprintMeasure;
-import net.sodium.client.data.fingerprint.HashedFingerprint;
 import net.sodium.client.gui.SodiumDebugEntry;
 import net.sodium.client.gui.SodiumGameOptions;
 import net.sodium.client.services.PlatformRuntimeInformation;
@@ -25,12 +23,6 @@ public class SodiumClientMod {
         MOD_VERSION = version;
 
         CONFIG = loadConfig();
-
-        try {
-            updateFingerprint();
-        } catch (Throwable t) {
-            LOGGER.error("Failed to update fingerprint", t);
-        }
     }
 
     public static SodiumGameOptions options() {
@@ -81,35 +73,6 @@ public class SodiumClientMod {
         }
 
         return MOD_VERSION;
-    }
-
-    private static void updateFingerprint() {
-        var current = FingerprintMeasure.create();
-
-        if (current == null) {
-            return;
-        }
-
-        HashedFingerprint saved = null;
-
-        try {
-            saved = HashedFingerprint.loadFromDisk();
-        } catch (Throwable t) {
-            LOGGER.error("Failed to load existing fingerprint",  t);
-        }
-
-        if (saved == null || !current.looselyMatches(saved)) {
-            HashedFingerprint.writeToDisk(current.hashed());
-
-            CONFIG.notifications.hasSeenDonationPrompt = false;
-            CONFIG.notifications.hasClearedDonationButton = false;
-
-            try {
-                SodiumGameOptions.writeToDisk(CONFIG);
-            } catch (IOException e) {
-                LOGGER.error("Failed to update config file", e);
-            }
-        }
     }
 
     public static boolean allowDebuggingOptions() {

@@ -17,6 +17,9 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 ## Removals
 - Microsoft Telemetry
 - Microsoft Accounts
+- Microsoft Realms
+- Sodium "Buy us a Coffee" Button
+- Chat Reporting
 
 ## Tweaks
 - Removed Creative Mode Menu & Replaced with JEI Style Menu

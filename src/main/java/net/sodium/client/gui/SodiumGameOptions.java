@@ -25,7 +25,6 @@ public class SodiumGameOptions {
     public final QualitySettings quality = new QualitySettings();
     public final AdvancedSettings advanced = new AdvancedSettings();
     public final PerformanceSettings performance = new PerformanceSettings();
-    public final NotificationSettings notifications = new NotificationSettings();
     public @NotNull DebugSettings debug = new DebugSettings();
 
     private boolean readOnly;
@@ -67,11 +66,6 @@ public class SodiumGameOptions {
         public LeavesQuality leavesQuality = LeavesQuality.DEFAULT;
 
         public boolean enableVignette = true;
-    }
-
-    public static class NotificationSettings {
-        public boolean hasClearedDonationButton = false;
-        public boolean hasSeenDonationPrompt = false;
     }
 
     public enum WeatherQuality implements TextProvider {

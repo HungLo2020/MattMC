@@ -6593,7 +6593,6 @@
   "sodium.options.biome_blend.value": "%sx%s blocks",
   "sodium.options.brightness.tooltip": "Controls the minimum brightness in the world. When increased, darker areas of the world will appear brighter. This does not affect the brightness of already well-lit areas.",
   "sodium.options.buttons.apply": "Apply",
-  "sodium.options.buttons.donate": "Buy us a coffee!",
   "sodium.options.buttons.undo": "Undo",
   "sodium.options.chunk_update_threads.name": "Chunk Update Threads",
   "sodium.options.chunk_update_threads.tooltip": "Specifies the number of threads to use for chunk building and sorting. Using more threads can speed up chunk loading and update speed, but may negatively impact frame times. The default value is usually good enough for all situations.",
