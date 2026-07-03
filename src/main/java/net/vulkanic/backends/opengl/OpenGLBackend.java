@@ -3445,6 +3445,7 @@ public class OpenGLBackend implements GraphicsBackend {
 
         net.vulkanic.PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
         bindings.validateAgainst(layout);
+        net.vulkanic.VulkanicAPI.traceShaderInputParityResources("opengl-bindPipelineResources", pipeline, descriptor, bindings);
 
         int program = glPipelineHandle.getGlRenderPipeline().program().getProgramId();
 

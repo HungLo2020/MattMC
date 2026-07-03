@@ -5216,6 +5216,7 @@ void main() {
 
         PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
         bindings.validateAgainst(layout);
+        net.vulkanic.VulkanicAPI.traceShaderInputParityResources("vulkan-bindPipelineResources", pipeline, descriptor, bindings);
 
         for (PipelineDescriptor.ResourceBinding resourceBinding : layout.bindings()) {
             switch (resourceBinding.type()) {

@@ -372,6 +372,25 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testNormalizeForVulkanMovesMinecraftLightingFlipIntoShader() {
+        String source = "#version 450\n"
+            + "layout(std140) uniform Lighting {\n"
+            + "    vec3 Light0_Direction;\n"
+            + "    vec3 Light1_Direction;\n"
+            + "};\n"
+            + "vec2 minecraft_compute_light(vec3 lightDir0, vec3 lightDir1, vec3 normal) {\n"
+            + "    return vec2(dot(lightDir0, normal), dot(lightDir1, normal));\n"
+            + "}\n"
+            + "void main(){gl_Position = vec4(1.0);}";
+
+        String normalized = GlslangSpirvCompiler.normalizeForVulkan(VulkanicShaderStage.VERTEX, source);
+
+        assertTrue(normalized.contains("vec3 vulkanicMinecraftLightingNormal(vec3 normal)"));
+        assertTrue(normalized.contains("normal = vulkanicMinecraftLightingNormal(normal);"));
+        assertTrue(normalized.contains("return vec3(normal.x, -normal.y, normal.z);"));
+    }
+
+    @Test
     public void testNormalizeForVulkanRewritesStandaloneNonOpaqueUniformsIntoBlock() {
         String source = "#version 330\n"
             + "uniform vec3 u_RegionOffset;\n"

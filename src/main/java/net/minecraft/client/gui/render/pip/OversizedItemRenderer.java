@@ -1,6 +1,5 @@
 package net.minecraft.client.gui.render.pip;
 
-import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.platform.Lighting;
 import net.blaze3d.vertex.PoseStack;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -11,7 +10,6 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
 import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.client.gui.render.state.pip.OversizedItemRenderState;
-import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
@@ -28,9 +26,6 @@ import org.joml.Matrix3x2f;
 @Environment(EnvType.CLIENT)
 public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedItemRenderState> {
 	private static final AtomicBoolean STANDARD_BLOCK_ITEM_DEBUG_DUMPED = new AtomicBoolean();
-	private final CachedOrthoProjectionMatrixBuffer vulkanProjectionMatrixBuffer = new CachedOrthoProjectionMatrixBuffer(
-		"PIP - OversizedItemRenderer Vulkan Depth", -1000.0F, 1000.0F, true, true
-	);
 	private boolean usedOnThisFrame;
 	@Nullable
 	private Object modelOnTextureIdentity;
@@ -176,20 +171,7 @@ public class OversizedItemRenderer extends PictureInPictureRenderer<OversizedIte
 	}
 
 	@Override
-	protected GpuBufferSlice getProjectionMatrixBuffer(int i, int j) {
-		return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			? this.vulkanProjectionMatrixBuffer.getBuffer(i, j)
-			: super.getProjectionMatrixBuffer(i, j);
-	}
-
-	@Override
 	protected String getTextureLabel() {
 		return "oversized_item";
-	}
-
-	@Override
-	public void close() {
-		super.close();
-		this.vulkanProjectionMatrixBuffer.close();
 	}
 }

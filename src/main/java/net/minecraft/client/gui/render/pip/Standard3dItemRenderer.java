@@ -1,6 +1,5 @@
 package net.minecraft.client.gui.render.pip;
 
-import net.blaze3d.buffers.GpuBufferSlice;
 import net.blaze3d.platform.Lighting;
 import net.blaze3d.vertex.PoseStack;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -10,7 +9,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.render.state.GuiItemRenderState;
 import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.client.gui.render.state.pip.OversizedItemRenderState;
-import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
@@ -30,9 +28,6 @@ public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedIt
 	private static final int STANDARD_3D_ITEM_GUARD_PIXELS = 1;
 	private static final AtomicBoolean STANDARD_3D_ITEM_DEBUG_DUMPED = new AtomicBoolean();
 	private static final AtomicBoolean FORCED_STANDARD_3D_ITEM_DEBUG_DUMPED = new AtomicBoolean();
-	private final CachedOrthoProjectionMatrixBuffer vulkanProjectionMatrixBuffer = new CachedOrthoProjectionMatrixBuffer(
-		"PIP - Standard3dItemRenderer Vulkan Depth", -1000.0F, 1000.0F, true, true
-	);
 	private boolean usedOnThisFrame;
 	@Nullable
 	private Object modelOnTextureIdentity;
@@ -94,9 +89,7 @@ public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedIt
 			float g = (float)(-(aABB.minY + aABB.maxY) / 2.0);
 			poseStack.translate(f, g, 0.0F);
 		}
-		Minecraft.getInstance().gameRenderer.getLighting().setupFor(
-			net.vulkanic.VulkanicAPI.isVulkanBackendSelected() ? Lighting.Entry.ITEMS_3D_UPRIGHT : Lighting.Entry.ITEMS_3D
-		);
+		Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ITEMS_3D);
 
 		FeatureRenderDispatcher featureRenderDispatcher = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
 		SubmitNodeStorage submitNodeStorage = featureRenderDispatcher.getSubmitNodeStorage();
@@ -146,13 +139,6 @@ public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedIt
 		return !trackingItemStackRenderState.isAnimated() && trackingItemStackRenderState.getModelIdentity().equals(this.modelOnTextureIdentity);
 	}
 
-	@Override
-	protected GpuBufferSlice getProjectionMatrixBuffer(int i, int j) {
-		return net.vulkanic.VulkanicAPI.isVulkanBackendSelected()
-			? this.vulkanProjectionMatrixBuffer.getBuffer(i, j)
-			: super.getProjectionMatrixBuffer(i, j);
-	}
-
 	private boolean usesExpandedStandardItemTexture(GuiItemRenderState guiItemRenderState) {
 		return this.getExpandedStandardItemWidth(guiItemRenderState) > 16 || this.getExpandedStandardItemHeight(guiItemRenderState) > 16;
 	}
@@ -175,11 +161,5 @@ public class Standard3dItemRenderer extends PictureInPictureRenderer<OversizedIt
 	@Override
 	protected String getTextureLabel() {
 		return "standard_3d_item";
-	}
-
-	@Override
-	public void close() {
-		super.close();
-		this.vulkanProjectionMatrixBuffer.close();
 	}
 }

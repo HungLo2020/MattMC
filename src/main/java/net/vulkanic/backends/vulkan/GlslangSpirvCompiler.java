@@ -206,6 +206,7 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
             return normalized;
         }
 
+        normalized = rewriteMinecraftLightingNormalsForVulkan(normalized);
         normalized = LEGACY_VERTEX_ID_PATTERN.matcher(normalized).replaceAll("gl_VertexIndex");
         normalized = LEGACY_INSTANCE_ID_PATTERN.matcher(normalized).replaceAll("gl_InstanceIndex");
         return rewriteVertexClipDepthForVulkan(normalized);
@@ -461,6 +462,47 @@ final class GlslangSpirvCompiler implements SpirvCompiler {
 
     private static String framebufferTextureCoordExpression(String coord) {
         return "vec2((" + coord + ").x, 1.0f - (" + coord + ").y)";
+    }
+
+    private static String rewriteMinecraftLightingNormalsForVulkan(String shaderSource) {
+        if (!shaderSource.contains("Light0_Direction") || shaderSource.contains("vulkanicMinecraftLightingNormal")) {
+            return shaderSource;
+        }
+
+        String helper = ""
+            + "vec3 vulkanicMinecraftLightingNormal(vec3 normal) {\n"
+            + "    return vec3(normal.x, -normal.y, normal.z);\n"
+            + "}\n\n";
+
+        String computeFunction = ""
+            + "vec2 minecraft_compute_light(vec3 lightDir0, vec3 lightDir1, vec3 normal) {\n"
+            + "    return vec2(dot(lightDir0, normal), dot(lightDir1, normal));\n"
+            + "}\n";
+        if (shaderSource.contains(computeFunction)) {
+            return shaderSource.replace(
+                computeFunction,
+                helper
+                    + "vec2 minecraft_compute_light(vec3 lightDir0, vec3 lightDir1, vec3 normal) {\n"
+                    + "    normal = vulkanicMinecraftLightingNormal(normal);\n"
+                    + "    return vec2(dot(lightDir0, normal), dot(lightDir1, normal));\n"
+                    + "}\n"
+            );
+        }
+
+        String fallbackLightingBody = ""
+            + "vec4 minecraft_mix_light(vec3 lightDir0, vec3 lightDir1, vec3 normal, vec4 color) {\n"
+            + "    float light0 = max(0.0, dot(lightDir0, normal));\n";
+        if (shaderSource.contains(fallbackLightingBody)) {
+            return shaderSource.replace(
+                fallbackLightingBody,
+                helper
+                    + "vec4 minecraft_mix_light(vec3 lightDir0, vec3 lightDir1, vec3 normal, vec4 color) {\n"
+                    + "    normal = vulkanicMinecraftLightingNormal(normal);\n"
+                    + "    float light0 = max(0.0, dot(lightDir0, normal));\n"
+            );
+        }
+
+        return shaderSource;
     }
 
     private static String rewriteVertexClipDepthForVulkan(String shaderSource) {

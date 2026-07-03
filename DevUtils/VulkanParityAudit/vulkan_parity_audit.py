@@ -73,6 +73,7 @@ class CaptureMeta:
 class ResourceRecord:
     backend: str
     source: str
+    pipeline_key: str
     stable_key: str
     name: str
     resource_type: str
@@ -277,7 +278,7 @@ def split_top_level_resources(text: str) -> list[str]:
     return resources
 
 
-def parse_resource(raw: str, backend: str, source: str, stable_key: str) -> ResourceRecord | None:
+def parse_resource(raw: str, backend: str, source: str, pipeline_key: str, stable_key: str) -> ResourceRecord | None:
     match = re.match(r"([A-Za-z0-9_.$:-]+)\{(.*)\}$", raw.strip())
     if not match:
         return None
@@ -289,6 +290,7 @@ def parse_resource(raw: str, backend: str, source: str, stable_key: str) -> Reso
     record = ResourceRecord(
         backend=backend,
         source=source,
+        pipeline_key=pipeline_key,
         stable_key=stable_key,
         name=name,
         resource_type=fields.get("type", ""),
@@ -338,10 +340,11 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
         backend = fields.get("backend", "unknown")
         events.backend = backend
         source = fields.get("source", "")
+        pipeline_key = fields.get("pipelineKey", "")
         stable_key = fields.get("stableKey", "")
         resources_text = extract_balanced_after("resources=", payload)
         for raw_resource in split_top_level_resources(resources_text):
-            record = parse_resource(raw_resource, backend, source, stable_key)
+            record = parse_resource(raw_resource, backend, source, pipeline_key, stable_key)
             if record:
                 events.resources[record.semantic_key].append(record)
 
@@ -410,6 +413,10 @@ def values_for_payload_hashes(records: list[ResourceRecord]) -> list[str]:
     return sorted({record.payload_hash for record in records if record.payload_hash})
 
 
+def values_for_pipeline_keys(records: list[ResourceRecord]) -> list[str]:
+    return sorted({record.pipeline_key for record in records if record.pipeline_key})
+
+
 def format_key(key: tuple[str, str, str]) -> str:
     stable_key, name, resource_type = key
     return f"stableKey={stable_key} / name={name} / type={resource_type}"
@@ -445,11 +452,38 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
             gl_payloads = values_for_payload_hashes(gl_records)
             vk_payloads = values_for_payload_hashes(vk_records)
             if gl_payloads and vk_payloads and set(gl_payloads) != set(vk_payloads):
+                gl_pipeline_keys = values_for_pipeline_keys(gl_records)
+                vk_pipeline_keys = values_for_pipeline_keys(vk_records)
+                if len(gl_pipeline_keys) > 1 or len(vk_pipeline_keys) > 1:
+                    differences.append(Difference(
+                        severity=50,
+                        category="layout-ambiguous-ubo-payload-set-difference",
+                        key=key_text,
+                        reason="stable resource key is shared by multiple pipeline keys, so disjoint payloads may be different draws with the same layout",
+                        opengl_count=len(gl_records),
+                        vulkan_count=len(vk_records),
+                        opengl_values=[f"pipelineKeys={len(gl_pipeline_keys)}", *gl_payloads[:4]],
+                        vulkan_values=[f"pipelineKeys={len(vk_pipeline_keys)}", *vk_payloads[:4]],
+                    ))
+                    continue
+                overlap = sorted(set(gl_payloads) & set(vk_payloads))
+                if overlap:
+                    differences.append(Difference(
+                        severity=45,
+                        category="timing-sensitive-ubo-payload-set-difference",
+                        key=key_text,
+                        reason="same semantic UBO has overlapping payload hashes plus backend-specific observations in separate captures",
+                        opengl_count=len(gl_records),
+                        vulkan_count=len(vk_records),
+                        opengl_values=[f"shared={','.join(overlap[:3])}", *gl_payloads[:4]],
+                        vulkan_values=[f"shared={','.join(overlap[:3])}", *vk_payloads[:4]],
+                    ))
+                    continue
                 differences.append(Difference(
                     severity=100,
                     category="strict-ubo-payload-mismatch",
                     key=key_text,
-                    reason="same semantic UBO has different payload hash set",
+                    reason="same semantic UBO has disjoint payload hash sets",
                     opengl_count=len(gl_records),
                     vulkan_count=len(vk_records),
                     opengl_values=gl_payloads[:4],
@@ -538,12 +572,25 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
         gl_values = sorted({event.signature for event in gl_events})
         vk_values = sorted({event.signature for event in vk_events})
         if set(gl_values) != set(vk_values):
+            overlap = sorted(set(gl_values) & set(vk_values))
+            if overlap:
+                differences.append(Difference(
+                    severity=40,
+                    category="timing-sensitive-uniform-buffer-payload-set-difference",
+                    key=f"name={name}",
+                    reason="direct UniformBuffer payloads overlap but separate captures observed additional dynamic states",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[f"shared={','.join(overlap[:3])}", *gl_values[:6]],
+                    vulkan_values=[f"shared={','.join(overlap[:3])}", *vk_values[:6]],
+                ))
+                continue
             severity = 85 if name in {"Projection", "Fog", "Globals", "Lighting", "DynamicTransforms"} else 65
             differences.append(Difference(
                 severity=severity,
                 category="uniform-buffer-payload-set-difference",
                 key=f"name={name}",
-                reason="direct UniformBuffer event payload hash sets differ",
+                reason="direct UniformBuffer event payload hash sets are disjoint",
                 opengl_count=len(gl_events),
                 vulkan_count=len(vk_events),
                 opengl_values=gl_values[:6],
@@ -771,8 +818,8 @@ def run_self_test() -> None:
     resources = extract_balanced_after("resources=", line)
     parts = split_top_level_resources(resources)
     assert len(parts) == 2, parts
-    first = parse_resource(parts[0], "vulkan", "test", "stable")
-    second = parse_resource(parts[1], "vulkan", "test", "stable")
+    first = parse_resource(parts[0], "vulkan", "test", "abc", "stable")
+    second = parse_resource(parts[1], "vulkan", "test", "abc", "stable")
     assert first and first.name == "Projection" and first.payload_hash == "crc32:aaaa/bytes:64"
     assert second and second.name == "Sampler0" and second.sampler_signature.endswith("usage=5")
     print("self-test passed")

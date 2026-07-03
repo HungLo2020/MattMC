@@ -49,9 +49,13 @@ import java.util.function.BiFunction;
 public class VulkanicAPI {
     private static final String LWJGL_STACK_SIZE_PROPERTY = "org.lwjgl.system.stackSize";
     private static final String GENERATED_STANDALONE_UNIFORM_BLOCK_NAME = "VulkanicStandaloneUniforms";
+    private static final org.slf4j.Logger LOGGER = net.logging.LogUtils.getLogger();
     private static final boolean TRACE_STANDALONE_UNIFORMS = Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniforms");
     private static final int MAX_STANDALONE_UNIFORM_TRACE_LOGS = Integer.getInteger("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
     private static final java.util.concurrent.atomic.AtomicInteger STANDALONE_UNIFORM_TRACE_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
+    private static final boolean TRACE_SHADER_INPUT_PARITY = Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity");
+    private static final int MAX_SHADER_INPUT_PARITY_LOGS = Integer.getInteger("mattmc.vulkan.traceShaderInputParity.maxLogs", 20000);
+    private static final java.util.concurrent.atomic.AtomicInteger SHADER_INPUT_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
     private static GraphicsBackend backend;
     @Nullable
@@ -6788,6 +6792,171 @@ public class VulkanicAPI {
             return;
         }
         getBackend().bindPipelineResources(ctx, pipeline, descriptor, bindings);
+    }
+
+    public static void traceShaderInputParityResources(
+            String source,
+            PipelineHandle pipeline,
+            PipelineDescriptor descriptor,
+            PipelineResourceBindings bindings) {
+        if (!TRACE_SHADER_INPUT_PARITY) {
+            return;
+        }
+
+        int logIndex = SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet();
+        if (logIndex > MAX_SHADER_INPUT_PARITY_LOGS) {
+            return;
+        }
+
+        java.util.List<String> resources = new java.util.ArrayList<>();
+        for (PipelineDescriptor.ResourceBinding resourceBinding : descriptor.getResourceLayout().bindings()) {
+            if (resourceBinding.type() != PipelineDescriptor.ResourceType.UNIFORM_BUFFER) {
+                continue;
+            }
+
+            VulkanicBufferSlice slice = bindings.getUniformBufferBindingOrNull(resourceBinding.name());
+            if (slice == null) {
+                continue;
+            }
+
+            resources.add(describeShaderInputParityUniform(resourceBinding, slice));
+        }
+
+        if (resources.isEmpty()) {
+            return;
+        }
+
+        LOGGER.info(
+            "ShaderInputParityResources backend={} source={} pipelineHandle={} pipelineKey={} stableKey={} resources=[{}]",
+            getActiveBackendType().name().toLowerCase(java.util.Locale.ROOT),
+            source,
+            pipeline == null ? "none" : pipeline.getClass().getSimpleName() + "@" + Integer.toHexString(System.identityHashCode(pipeline)),
+            descriptor.getPipelineCompilationKey(),
+            descriptor.getStableCacheKey(),
+            String.join(", ", resources)
+        );
+    }
+
+    private static String describeShaderInputParityUniform(
+            PipelineDescriptor.ResourceBinding resourceBinding,
+            VulkanicBufferSlice slice) {
+        String payloadHash = shaderInputParityPayloadHash(resourceBinding.name(), slice);
+        String rangeHash = shaderInputParityHash(slice, slice.length());
+        java.util.List<String> stages = resourceBinding.stages().stream()
+            .map(Enum::name)
+            .sorted()
+            .toList();
+
+        return resourceBinding.name()
+            + "{layout=set:" + resourceBinding.set()
+            + ",binding:" + resourceBinding.binding()
+            + ",type:" + resourceBinding.type()
+            + ",stages:[" + String.join(", ", stages) + "]"
+            + ",buffer={bufferClass=" + slice.buffer().getClass().getSimpleName()
+            + ",bufferId=" + Integer.toHexString(System.identityHashCode(slice.buffer()))
+            + ",size=" + slice.buffer().size()
+            + ",usage=" + slice.buffer().usage()
+            + ",closed=" + slice.buffer().isClosed()
+            + ",offset=" + slice.offset()
+            + ",length=" + slice.length()
+            + ",payloadHash=" + payloadHash
+            + ",rangeHash=" + rangeHash
+            + "}}";
+    }
+
+    private static String shaderInputParityPayloadHash(String name, VulkanicBufferSlice slice) {
+        return switch (name) {
+            case "DynamicTransforms" -> shaderInputParityHash(slice, new int[][] {
+                {0, 64},   // mat4 ModelViewMat
+                {64, 16},  // vec4 ColorModulator
+                {80, 12},  // vec3 ModelOffset, excluding std140 padding
+                {96, 64},  // mat4 TextureMat
+                {160, 4}   // float LineWidth
+            }, 160);
+            case "Lighting" -> shaderInputParityHash(slice, new int[][] {
+                {0, 12},   // vec3 Light0_Direction, excluding std140 padding
+                {16, 12}   // vec3 Light1_Direction, excluding std140 padding
+            }, 24);
+            case "Projection" -> shaderInputParityHash(slice, Math.min(64, slice.length()));
+            case "Fog" -> shaderInputParityHash(slice, Math.min(40, slice.length()));
+            case "Globals" -> shaderInputParityHash(slice, Math.min(20, slice.length()));
+            default -> shaderInputParityHash(slice, slice.length());
+        };
+    }
+
+    private static String shaderInputParityHash(VulkanicBufferSlice slice, int length) {
+        java.nio.ByteBuffer data = shaderInputParityRead(slice, length);
+        if (data == null) {
+            return "unavailable";
+        }
+
+        return shaderInputParityHash(data, length);
+    }
+
+    private static String shaderInputParityHash(VulkanicBufferSlice slice, int[][] spans, int semanticLength) {
+        if (slice.buffer().isClosed() || semanticLength <= 0) {
+            return "unavailable";
+        }
+
+        int requiredLength = 0;
+        for (int[] span : spans) {
+            requiredLength = Math.max(requiredLength, span[0] + span[1]);
+        }
+        java.nio.ByteBuffer source = shaderInputParityRead(slice, requiredLength);
+        if (source == null) {
+            return "unavailable";
+        }
+
+        java.nio.ByteBuffer semanticBytes = org.lwjgl.BufferUtils.createByteBuffer(semanticLength);
+        for (int[] span : spans) {
+            int start = span[0];
+            int count = span[1];
+            for (int index = 0; index < count; index++) {
+                semanticBytes.put(source.get(start + index));
+            }
+        }
+        semanticBytes.flip();
+        return shaderInputParityHash(semanticBytes, semanticLength);
+    }
+
+    private static java.nio.ByteBuffer shaderInputParityRead(VulkanicBufferSlice slice, int length) {
+        if (slice.buffer().isClosed() || length <= 0 || length > slice.length()) {
+            return null;
+        }
+
+        if (slice.buffer() instanceof net.vulkanic.backends.opengl.OpenGLBuffer openGLBuffer) {
+            try {
+                java.nio.ByteBuffer data = org.lwjgl.BufferUtils.createByteBuffer(length);
+                org.lwjgl.opengl.GL45.glGetNamedBufferSubData(openGLBuffer.getGlHandle(), slice.offset(), data);
+                data.position(0);
+                return data;
+            } catch (RuntimeException ex) {
+                return null;
+            }
+        }
+
+        try (VulkanicBuffer.MappedView mappedView = mapManagedBuffer(slice.buffer(), true, false)) {
+            java.nio.ByteBuffer data = mappedView.data().duplicate();
+            int start = slice.offset();
+            int end = start + length;
+            if (start < 0 || end > data.capacity()) {
+                return null;
+            }
+
+            data.position(start);
+            data.limit(end);
+            return data.slice();
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private static String shaderInputParityHash(java.nio.ByteBuffer data, int length) {
+        java.util.zip.CRC32 crc32 = new java.util.zip.CRC32();
+        for (int index = 0; index < length; index++) {
+            crc32.update(data.get(index) & 0xFF);
+        }
+        return "crc32:" + Long.toHexString(crc32.getValue()) + "/bytes:" + length;
     }
 
     /**
