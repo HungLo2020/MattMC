@@ -22,3 +22,4 @@ This Document is a list of all changes in MattMC over base Minecraft Java 1.21.1
 - Removed Creative Mode Menu & Replaced with JEI Style Menu
 - Replaced Microsoft Accounts with Offline Accounts
 - Game servers host Player Skins instead of Microsoft Servers
+- Reverted to old mob spawn egg textures
