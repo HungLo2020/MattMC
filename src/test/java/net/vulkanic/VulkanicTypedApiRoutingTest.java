@@ -4,8 +4,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import net.blaze3d.pipeline.CompiledRenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.shaders.UniformType;
 import net.blaze3d.systems.CommandEncoder;
 import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
+import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -44,6 +49,7 @@ public class VulkanicTypedApiRoutingTest {
     public void setUp() throws Exception {
         resetBackendState();
         invocationHandler.configureProgramReflection(java.util.List.of(), java.util.List.of());
+        invocationHandler.configureLinkedProgramSpirvModules(java.util.List.of());
         invocationHandler.setBackendType(GraphicsBackendType.VULKAN);
 
         GraphicsBackend proxyBackend = (GraphicsBackend) Proxy.newProxyInstance(
@@ -643,6 +649,95 @@ public class VulkanicTypedApiRoutingTest {
     }
 
     @Test
+    public void testMergedReflectedResourceLayoutPreservesPortableBindingContract() {
+        invocationHandler.configureProgramReflection(
+            java.util.List.of("Globals", "ReflectedOnly"),
+            java.util.List.of(new RecordingInvocationHandler.ReflectedUniform("Sampler0[0]", 1, VulkanicAPI.GL_SAMPLER_2D))
+        );
+
+        RenderPipeline pipeline = RenderPipeline.builder()
+            .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/test_reflected_merge"))
+            .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+            .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+            .withSampler("Sampler0")
+            .withUniform("Globals", UniformType.UNIFORM_BUFFER)
+            .withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.TRIANGLES)
+            .build();
+
+        PipelineDescriptor merged = VulkanicCoreAPI.withReflectedResourceLayout(
+            TEST_CONTEXT,
+            PipelineDescriptor.fromRenderPipeline(pipeline),
+            VulkanicProgramHandle.of(91),
+            128,
+            java.util.Set.of(VulkanicShaderStage.FRAGMENT)
+        );
+
+        PipelineDescriptor.ResourceLayout layout = merged.getResourceLayout();
+        PipelineDescriptor.ResourceBinding sampler = layout.findByName("Sampler0").orElseThrow();
+        PipelineDescriptor.ResourceBinding globals = layout.findByName("Globals").orElseThrow();
+        PipelineDescriptor.ResourceBinding reflectedOnly = layout.findByName("ReflectedOnly").orElseThrow();
+
+        assertEquals(0, sampler.set());
+        assertEquals(0, sampler.binding());
+        assertEquals(PipelineDescriptor.ResourceType.SAMPLER, sampler.type());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), sampler.stages());
+
+        assertEquals(0, globals.set());
+        assertEquals(1, globals.binding());
+        assertEquals(PipelineDescriptor.ResourceType.UNIFORM_BUFFER, globals.type());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT), globals.stages());
+
+        assertEquals(0, reflectedOnly.set());
+        assertEquals(2, reflectedOnly.binding());
+        assertEquals(PipelineDescriptor.ResourceType.UNIFORM_BUFFER, reflectedOnly.type());
+        assertEquals(java.util.Set.of(VulkanicShaderStage.FRAGMENT), reflectedOnly.stages());
+    }
+
+    @Test
+    public void testLiveProgramDescriptorWithLinkedSpirvPreservesNativeReflectedBindings() {
+        invocationHandler.configureProgramReflection(
+            java.util.List.of("DynamicTransforms"),
+            java.util.List.of(new RecordingInvocationHandler.ReflectedUniform("shadowtex0", 1, VulkanicAPI.GL_SAMPLER_2D))
+        );
+        invocationHandler.configureLinkedProgramSpirvModules(java.util.List.of(
+            new VulkanicSpirvModule(
+                VulkanicShaderStage.VERTEX,
+                "main",
+                new byte[]{3, 2, 23, 7},
+                "vulkanic/test_live_vertex",
+                "test"
+            )
+        ));
+
+        RenderPipeline pipeline = RenderPipeline.builder()
+            .withLocation(ResourceLocation.withDefaultNamespace("vulkanic/test_live_reflection"))
+            .withVertexShader(ResourceLocation.withDefaultNamespace("core/test_vertex"))
+            .withFragmentShader(ResourceLocation.withDefaultNamespace("core/test_fragment"))
+            .withSampler("shadowtex0")
+            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
+            .withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.TRIANGLES)
+            .build();
+
+        PipelineDescriptor descriptor = VulkanicAPI.createLiveProgramPipelineDescriptor(
+            TEST_CONTEXT,
+            PipelineDescriptor.fromRenderPipeline(pipeline),
+            92
+        );
+
+        PipelineDescriptor.ResourceLayout layout = descriptor.getResourceLayout();
+        PipelineDescriptor.ResourceBinding dynamicTransforms = layout.findByName("DynamicTransforms").orElseThrow();
+        PipelineDescriptor.ResourceBinding shadowtex0 = layout.findByName("shadowtex0").orElseThrow();
+
+        assertEquals(0, dynamicTransforms.set());
+        assertEquals(0, dynamicTransforms.binding());
+        assertEquals(PipelineDescriptor.ResourceType.UNIFORM_BUFFER, dynamicTransforms.type());
+
+        assertEquals(0, shadowtex0.set());
+        assertEquals(1, shadowtex0.binding());
+        assertEquals(PipelineDescriptor.ResourceType.SAMPLER, shadowtex0.type());
+    }
+
+    @Test
     public void testCapabilityRoutingUsesTypedMethodForKnownCapability() {
         VulkanicCoreAPI.setCapabilityEnabled(TEST_CONTEXT, VulkanicCapability.SCISSOR_TEST, false);
 
@@ -1040,6 +1135,7 @@ public class VulkanicTypedApiRoutingTest {
         private RecordedInvocation lastInvocation;
         private java.util.List<String> reflectedUniformBlocks = java.util.List.of();
         private java.util.List<ReflectedUniform> reflectedUniforms = java.util.List.of();
+        private java.util.List<VulkanicSpirvModule> linkedProgramSpirvModules = java.util.List.of();
         private GraphicsBackendType backendType = GraphicsBackendType.VULKAN;
 
         private void setBackendType(GraphicsBackendType backendType) {
@@ -1052,6 +1148,10 @@ public class VulkanicTypedApiRoutingTest {
         ) {
             this.reflectedUniformBlocks = java.util.List.copyOf(uniformBlocks);
             this.reflectedUniforms = java.util.List.copyOf(uniforms);
+        }
+
+        private void configureLinkedProgramSpirvModules(java.util.List<VulkanicSpirvModule> modules) {
+            this.linkedProgramSpirvModules = java.util.List.copyOf(modules);
         }
 
         @Override
@@ -1092,6 +1192,10 @@ public class VulkanicTypedApiRoutingTest {
 
             if (method.getName().equals("getBackendType")) {
                 return backendType;
+            }
+
+            if (method.getName().equals("getLinkedProgramSpirvModules")) {
+                return linkedProgramSpirvModules;
             }
 
             if (method.getName().equals("getBackendVendorName")) {

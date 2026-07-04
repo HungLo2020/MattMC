@@ -1123,38 +1123,73 @@ void main() {
     }
 
     private static String injectExplicitUniformBlockBinding(String shaderSource, String blockName, int bindingIndex) {
-        java.util.regex.Pattern layoutPattern = java.util.regex.Pattern.compile(
-            "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*uniform\\s+" + java.util.regex.Pattern.quote(blockName) + "\\s*\\{"
-        );
-        java.util.regex.Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
-        if (layoutMatcher.find()) {
-            String layoutBody = layoutMatcher.group(2);
-            if (layoutBody.contains("binding") || layoutBody.contains("set")) {
-                return shaderSource;
+        for (String candidateBlockName : uniformBlockBindingAliases(blockName)) {
+            java.util.regex.Pattern layoutPattern = java.util.regex.Pattern.compile(
+                "(?m)(^\\s*)layout\\s*\\(([^)]*)\\)\\s*uniform\\s+"
+                    + java.util.regex.Pattern.quote(candidateBlockName)
+                    + "\\s*\\{"
+            );
+            java.util.regex.Matcher layoutMatcher = layoutPattern.matcher(shaderSource);
+            if (layoutMatcher.find()) {
+                String layoutBody = layoutMatcher.group(2);
+                if (layoutBody.contains("binding") || layoutBody.contains("set")) {
+                    return shaderSource;
+                }
+
+                return layoutMatcher.replaceFirst(
+                    java.util.regex.Matcher.quoteReplacement(
+                        layoutMatcher.group(1)
+                            + "layout(" + layoutBody + ", set = 0, binding = " + bindingIndex + ") uniform "
+                            + candidateBlockName
+                            + " {"
+                    )
+                );
             }
 
-            return layoutMatcher.replaceFirst(
+            java.util.regex.Pattern plainPattern = java.util.regex.Pattern.compile(
+                "(?m)(^\\s*)uniform\\s+" + java.util.regex.Pattern.quote(candidateBlockName) + "\\s*\\{"
+            );
+            java.util.regex.Matcher plainMatcher = plainPattern.matcher(shaderSource);
+            if (!plainMatcher.find()) {
+                continue;
+            }
+
+            return plainMatcher.replaceFirst(
                 java.util.regex.Matcher.quoteReplacement(
-                    layoutMatcher.group(1)
-                        + "layout(" + layoutBody + ", set = 0, binding = " + bindingIndex + ") uniform " + blockName + " {"
+                    plainMatcher.group(1)
+                        + "layout(set = 0, binding = " + bindingIndex + ") uniform "
+                        + candidateBlockName
+                        + " {"
                 )
             );
         }
 
-        java.util.regex.Pattern plainPattern = java.util.regex.Pattern.compile(
-            "(?m)(^\\s*)uniform\\s+" + java.util.regex.Pattern.quote(blockName) + "\\s*\\{"
-        );
-        java.util.regex.Matcher plainMatcher = plainPattern.matcher(shaderSource);
-        if (!plainMatcher.find()) {
-            return shaderSource;
+        return shaderSource;
+    }
+
+    private static java.util.List<String> uniformBlockBindingAliases(String blockName) {
+        String normalizedName = normalizeIrisUniformBlockName(blockName);
+        if (normalizedName.equals(blockName) && isIrisWrappedPipelineUniformBlock(blockName)) {
+            return java.util.List.of(blockName, "iris_" + blockName);
+        }
+        return java.util.List.of(blockName);
+    }
+
+    private static String normalizeIrisUniformBlockName(String blockName) {
+        if (blockName == null || !blockName.startsWith("iris_")) {
+            return blockName;
         }
 
-        return plainMatcher.replaceFirst(
-            java.util.regex.Matcher.quoteReplacement(
-                plainMatcher.group(1)
-                    + "layout(set = 0, binding = " + bindingIndex + ") uniform " + blockName + " {"
-            )
-        );
+        String unprefixed = blockName.substring("iris_".length());
+        return isIrisWrappedPipelineUniformBlock(unprefixed) ? unprefixed : blockName;
+    }
+
+    private static boolean isIrisWrappedPipelineUniformBlock(String blockName) {
+        return "DynamicTransforms".equals(blockName)
+            || "Projection".equals(blockName)
+            || "Globals".equals(blockName)
+            || "Fog".equals(blockName)
+            || "Lighting".equals(blockName);
     }
 
     private static String injectExplicitNamedUniformBinding(String shaderSource, String uniformName, int bindingIndex) {
@@ -2554,7 +2589,7 @@ void main() {
             ).replaceAll("");
             Matcher blockMatcher = GLSL_UNIFORM_BLOCK_PATTERN.matcher(normalizedSource);
             while (blockMatcher.find()) {
-                String blockName = blockMatcher.group(2);
+                String blockName = normalizeIrisUniformBlockName(blockMatcher.group(2));
                 activeUniformBlocks.add(blockName);
                 parseExplicitDescriptorBinding(blockMatcher.group(1))
                     .ifPresent(binding -> explicitBindings.putIfAbsent(blockName, binding));

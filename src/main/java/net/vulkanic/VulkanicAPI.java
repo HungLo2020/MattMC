@@ -5287,6 +5287,26 @@ public class VulkanicAPI {
         return descriptor.withResourceLayout(mergedLayout);
     }
 
+    private static PipelineDescriptor withNativeReflectedResourceLayout(
+        CommandContext ctx,
+        PipelineDescriptor descriptor,
+        int program,
+        int maxNameLength,
+        java.util.Set<VulkanicShaderStage> stages,
+        java.util.function.Predicate<PipelineDescriptor.ResourceBinding> reflectedResourceFilter
+    ) {
+        Objects.requireNonNull(descriptor, "descriptor must not be null");
+        Objects.requireNonNull(reflectedResourceFilter, "reflectedResourceFilter must not be null");
+        PipelineDescriptor.ResourceLayout reflectedLayout =
+            deriveResourceLayoutFromProgramReflection(ctx, program, maxNameLength, stages);
+        reflectedLayout = filterResourceLayout(reflectedLayout, reflectedResourceFilter);
+        PipelineDescriptor.ResourceLayout mergedLayout = mergeResourceLayoutsPreservingReflectedBindings(
+            descriptor.getResourceLayout(),
+            reflectedLayout
+        );
+        return descriptor.withResourceLayout(mergedLayout);
+    }
+
     public static PipelineDescriptor withMergedReflectedResourceLayout(
         CommandContext ctx,
         PipelineDescriptor descriptor,
@@ -5320,14 +5340,83 @@ public class VulkanicAPI {
             return baseLayout;
         }
 
+        java.util.Map<String, PipelineDescriptor.ResourceBinding> reflectedByName = new java.util.LinkedHashMap<>();
+        for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedBindings) {
+            reflectedByName.put(reflectedBinding.name(), reflectedBinding);
+        }
+
+        java.util.List<PipelineDescriptor.ResourceBinding> merged = new java.util.ArrayList<>(baseBindings.size() + reflectedBindings.size());
+        java.util.Set<String> seenNames = new java.util.LinkedHashSet<>();
+        java.util.Set<String> usedSlots = new java.util.LinkedHashSet<>();
+        java.util.Map<Integer, Integer> nextBindingBySet = new java.util.LinkedHashMap<>();
+
+        for (PipelineDescriptor.ResourceBinding baseBinding : baseBindings) {
+            usedSlots.add(baseBinding.set() + ":" + baseBinding.binding());
+            nextBindingBySet.merge(baseBinding.set(), baseBinding.binding() + 1, Math::max);
+        }
+
+        for (PipelineDescriptor.ResourceBinding baseBinding : baseBindings) {
+            PipelineDescriptor.ResourceBinding reflectedBinding = reflectedByName.get(baseBinding.name());
+            java.util.Set<VulkanicShaderStage> mergedStages = new java.util.LinkedHashSet<>(baseBinding.stages());
+            if (reflectedBinding != null) {
+                mergedStages.addAll(reflectedBinding.stages());
+            }
+
+            merged.add(new PipelineDescriptor.ResourceBinding(
+                baseBinding.set(),
+                baseBinding.binding(),
+                baseBinding.name(),
+                baseBinding.type(),
+                baseBinding.textureFormat(),
+                java.util.Set.copyOf(mergedStages)
+            ));
+            seenNames.add(baseBinding.name());
+        }
+
+        for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedBindings) {
+            if (!seenNames.add(reflectedBinding.name())) {
+                continue;
+            }
+
+            int set = reflectedBinding.set();
+            int binding = nextBindingBySet.getOrDefault(set, 0);
+            while (usedSlots.contains(set + ":" + binding)) {
+                binding++;
+            }
+            usedSlots.add(set + ":" + binding);
+            nextBindingBySet.put(set, binding + 1);
+
+            merged.add(new PipelineDescriptor.ResourceBinding(
+                set,
+                binding,
+                reflectedBinding.name(),
+                reflectedBinding.type(),
+                reflectedBinding.textureFormat(),
+                reflectedBinding.stages()
+            ));
+        }
+
+        return new PipelineDescriptor.ResourceLayout(merged);
+    }
+
+    private static PipelineDescriptor.ResourceLayout mergeResourceLayoutsPreservingReflectedBindings(
+        PipelineDescriptor.ResourceLayout baseLayout,
+        PipelineDescriptor.ResourceLayout reflectedLayout
+    ) {
+        java.util.List<PipelineDescriptor.ResourceBinding> baseBindings = baseLayout.bindings();
+        java.util.List<PipelineDescriptor.ResourceBinding> reflectedBindings = reflectedLayout.bindings();
+        if (reflectedBindings.isEmpty()) {
+            return baseLayout;
+        }
+
         java.util.Map<String, PipelineDescriptor.ResourceBinding> baseByName = new java.util.LinkedHashMap<>();
         for (PipelineDescriptor.ResourceBinding baseBinding : baseBindings) {
             baseByName.put(baseBinding.name(), baseBinding);
         }
 
-        java.util.List<PipelineDescriptor.ResourceBinding> merged = new java.util.ArrayList<>(baseBindings.size() + reflectedBindings.size());
+        java.util.List<PipelineDescriptor.ResourceBinding> merged = new java.util.ArrayList<>(reflectedBindings.size() + baseBindings.size());
         java.util.Set<String> seenNames = new java.util.LinkedHashSet<>();
-        int nextBindingIndex = 0;
+        java.util.Set<String> usedSlots = new java.util.LinkedHashSet<>();
 
         for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedBindings) {
             PipelineDescriptor.ResourceBinding baseBinding = baseByName.get(reflectedBinding.name());
@@ -5345,7 +5434,12 @@ public class VulkanicAPI {
                 java.util.Set.copyOf(mergedStages)
             ));
             seenNames.add(reflectedBinding.name());
-            nextBindingIndex = Math.max(nextBindingIndex, reflectedBinding.binding() + 1);
+            usedSlots.add(reflectedBinding.set() + ":" + reflectedBinding.binding());
+        }
+
+        java.util.Map<Integer, Integer> nextBindingBySet = new java.util.LinkedHashMap<>();
+        for (PipelineDescriptor.ResourceBinding reflectedBinding : reflectedBindings) {
+            nextBindingBySet.merge(reflectedBinding.set(), reflectedBinding.binding() + 1, Math::max);
         }
 
         for (PipelineDescriptor.ResourceBinding baseBinding : baseBindings) {
@@ -5353,15 +5447,22 @@ public class VulkanicAPI {
                 continue;
             }
 
+            int set = baseBinding.set();
+            int binding = nextBindingBySet.getOrDefault(set, 0);
+            while (usedSlots.contains(set + ":" + binding)) {
+                binding++;
+            }
+            usedSlots.add(set + ":" + binding);
+            nextBindingBySet.put(set, binding + 1);
+
             merged.add(new PipelineDescriptor.ResourceBinding(
-                baseBinding.set(),
-                nextBindingIndex,
+                set,
+                binding,
                 baseBinding.name(),
                 baseBinding.type(),
                 baseBinding.textureFormat(),
                 baseBinding.stages()
             ));
-            nextBindingIndex++;
         }
 
         return new PipelineDescriptor.ResourceLayout(merged);
@@ -6724,7 +6825,7 @@ public class VulkanicAPI {
             .map(VulkanicSpirvModule::stage)
             .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
         if (stages.isEmpty()) {
-            return withMergedReflectedResourceLayout(
+            return withNativeReflectedResourceLayout(
                 ctx,
                 descriptorWithModules,
                 program,
@@ -6734,7 +6835,7 @@ public class VulkanicAPI {
             );
         }
 
-        return withMergedReflectedResourceLayout(
+        return withNativeReflectedResourceLayout(
             ctx,
             descriptorWithModules,
             program,

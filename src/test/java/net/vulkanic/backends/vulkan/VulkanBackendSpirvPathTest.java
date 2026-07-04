@@ -12,6 +12,7 @@ import net.blaze3d.pipeline.RenderPipeline;
 import net.blaze3d.platform.DepthTestFunction;
 import net.blaze3d.platform.LogicOp;
 import net.blaze3d.platform.PolygonMode;
+import net.blaze3d.shaders.UniformType;
 import net.blaze3d.vertex.DefaultVertexFormat;
 import net.blaze3d.vertex.VertexFormat;
 import net.blaze3d.vertex.VertexFormatElement;
@@ -43,13 +44,23 @@ public class VulkanBackendSpirvPathTest {
         private final VertexFormat vertexFormat;
 
         private TestRenderPipeline(ResourceLocation location, VertexFormat vertexFormat, VertexFormat.Mode mode) {
+            this(location, vertexFormat, mode, List.of(), List.of());
+        }
+
+        private TestRenderPipeline(
+            ResourceLocation location,
+            VertexFormat vertexFormat,
+            VertexFormat.Mode mode,
+            List<String> samplers,
+            List<RenderPipeline.UniformDescription> uniforms
+        ) {
             super(
                 location,
                 ResourceLocation.withDefaultNamespace("core/particle"),
                 ResourceLocation.withDefaultNamespace("core/particle"),
                 ShaderDefines.builder().build(),
-                List.of(),
-                List.of(),
+                samplers,
+                uniforms,
                 Optional.<BlendFunction>empty(),
                 DepthTestFunction.LEQUAL_DEPTH_TEST,
                 PolygonMode.FILL,
@@ -615,6 +626,48 @@ public class VulkanBackendSpirvPathTest {
     }
 
     @Test
+    public void testInjectExplicitVulkanBindingsPinsIrisWrappedUniformBlocksToPortableBindings() throws Exception {
+        Method injector = VulkanBackend.class.getDeclaredMethod(
+            "injectExplicitVulkanBindings",
+            RenderPipeline.class,
+            net.blaze3d.shaders.ShaderType.class,
+            String.class
+        );
+        injector.setAccessible(true);
+
+        RenderPipeline pipeline = new TestRenderPipeline(
+            ResourceLocation.withDefaultNamespace("vulkanic/iris_wrapped_uniform_blocks"),
+            DefaultVertexFormat.PARTICLE,
+            VertexFormat.Mode.TRIANGLES,
+            List.of("Sampler0", "Sampler2"),
+            List.of(
+                new RenderPipeline.UniformDescription("DynamicTransforms", UniformType.UNIFORM_BUFFER),
+                new RenderPipeline.UniformDescription("Projection", UniformType.UNIFORM_BUFFER),
+                new RenderPipeline.UniformDescription("Fog", UniformType.UNIFORM_BUFFER),
+                new RenderPipeline.UniformDescription("SodiumChunkParams", UniformType.UNIFORM_BUFFER)
+            )
+        );
+
+        String source = "#version 450\n"
+            + "layout(std140) uniform iris_DynamicTransforms { mat4 ModelViewMat; };\n"
+            + "layout(std140) uniform iris_Projection { mat4 ProjMat; };\n"
+            + "layout(std140) uniform iris_Fog { vec4 FogColor; };\n"
+            + "layout(std140) uniform SodiumChunkParams { vec4 ChunkInfo; };\n"
+            + "uniform sampler2D Sampler0;\n"
+            + "uniform sampler2D Sampler2;\n"
+            + "void main(){ gl_Position = ProjMat * ModelViewMat * vec4(0.0); }";
+
+        String rewritten = (String) injector.invoke(null, pipeline, net.blaze3d.shaders.ShaderType.VERTEX, source);
+
+        assertTrue(rewritten.contains("layout(set = 0, binding = 0) uniform sampler2D Sampler0;"));
+        assertTrue(rewritten.contains("layout(set = 0, binding = 1) uniform sampler2D Sampler2;"));
+        assertTrue(rewritten.contains("layout(std140, set = 0, binding = 2) uniform iris_DynamicTransforms"));
+        assertTrue(rewritten.contains("layout(std140, set = 0, binding = 3) uniform iris_Projection"));
+        assertTrue(rewritten.contains("layout(std140, set = 0, binding = 4) uniform iris_Fog"));
+        assertTrue(rewritten.contains("layout(std140, set = 0, binding = 5) uniform SodiumChunkParams"));
+    }
+
+    @Test
     public void testSodiumIrisTerrainVertexFormatsMatchShaderInputTypes() throws Exception {
         Method mapper = Class.forName("net.vulkanic.backends.vulkan.VulkanBackend$NativeSpine")
             .getDeclaredMethod("toVkVertexElementFormat", VertexFormatElement.class);
@@ -888,6 +941,51 @@ public class VulkanBackendSpirvPathTest {
         assertEquals(VulkanicAPI.GL_FLOAT_VEC4, fogColorType.get(0));
         assertEquals(VulkanicUniformReflectionType.FLOAT_VEC4,
             VulkanicUniformReflectionType.fromLegacyGlConstant(fogColorType.get(0)).orElseThrow());
+    }
+
+    @Test
+    public void testLinkedProgramResourceLayoutNormalizesIrisWrappedUniformBlockNames() {
+        VulkanBackend backend = new VulkanBackend((stage, source, sourceName, entryPoint) ->
+            new VulkanicSpirvModule(stage, entryPoint, new byte[]{0x3A, 0x3B}, sourceName, "stub")
+        );
+
+        int vertexShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_VERTEX_SHADER);
+        int fragmentShader = backend.createShader(TEST_CONTEXT, VulkanicAPI.GL_FRAGMENT_SHADER);
+
+        uploadSource(
+            backend,
+            vertexShader,
+            "#version 450\n"
+                + "layout(std140, set = 0, binding = 7) uniform iris_DynamicTransforms { mat4 ModelViewMat; };\n"
+                + "void main(){ gl_Position = ModelViewMat * vec4(0.0); }"
+        );
+        uploadSource(
+            backend,
+            fragmentShader,
+            "#version 450\n"
+                + "layout(location = 0) out vec4 fragColor;\n"
+                + "void main(){ fragColor = vec4(1.0); }"
+        );
+
+        backend.compileShader(TEST_CONTEXT, vertexShader);
+        backend.compileShader(TEST_CONTEXT, fragmentShader);
+
+        int program = backend.createShaderProgram(TEST_CONTEXT);
+        backend.attachShader(TEST_CONTEXT, program, vertexShader);
+        backend.attachShader(TEST_CONTEXT, program, fragmentShader);
+        backend.linkProgram(TEST_CONTEXT, program);
+
+        VulkanCommandContext introspectionContext = new VulkanCommandContext(1L, "iris-wrapped-block-layout-test");
+        PipelineDescriptor.ResourceLayout layout = backend.getLinkedProgramResourceLayout(
+            introspectionContext,
+            program,
+            Set.of(VulkanicShaderStage.VERTEX, VulkanicShaderStage.FRAGMENT)
+        );
+
+        assertTrue(layout.findByName("DynamicTransforms").isPresent());
+        assertFalse(layout.findByName("iris_DynamicTransforms").isPresent());
+        assertEquals(7, layout.findByName("DynamicTransforms").orElseThrow().binding());
+        assertEquals(0, backend.getUniformBlockIndex(introspectionContext, program, "DynamicTransforms"));
     }
 
     @Test
