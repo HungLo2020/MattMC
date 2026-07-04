@@ -20,7 +20,7 @@ import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.level.Level;
 
-public class TaczMvpGunItem extends Item {
+public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	private static final String AMMO_KEY = "TaczMvpAmmo";
 	private static final int MAGAZINE_SIZE = 17;
 	private static final int RELOAD_TICKS = 24;
@@ -30,6 +30,11 @@ public class TaczMvpGunItem extends Item {
 
 	public TaczMvpGunItem(Item.Properties properties) {
 		super(properties);
+	}
+
+	@Override
+	public java.util.Set<TaczAttachmentType> supportedAttachmentTypes(ItemStack gunStack) {
+		return TaczRefitGun.only(TaczAttachmentType.EXTENDED_MAG);
 	}
 
 	@Override
@@ -47,7 +52,7 @@ public class TaczMvpGunItem extends Item {
 		if (ammo <= 0) {
 			level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TACZ_GLOCK_17_EMPTY, SoundSource.PLAYERS, 0.7F, 1.0F);
 			if (!level.isClientSide()) {
-				player.displayClientMessage(Component.translatable("item.tacz.glock_17.empty").withStyle(ChatFormatting.GRAY), true);
+				player.displayClientMessage(Component.translatable("item.minecraft.glock_17.empty").withStyle(ChatFormatting.GRAY), true);
 			}
 			return InteractionResult.CONSUME;
 		}
@@ -69,14 +74,14 @@ public class TaczMvpGunItem extends Item {
 	}
 
 	public InteractionResult tryStartReload(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
-		if (getAmmo(itemStack) >= MAGAZINE_SIZE) {
+		if (getAmmo(itemStack) >= getMagazineSize(itemStack)) {
 			return InteractionResult.FAIL;
 		}
 
 		if (!player.hasInfiniteMaterials() && findAmmo(player).isEmpty()) {
 			level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TACZ_GLOCK_17_EMPTY, SoundSource.PLAYERS, 0.7F, 0.85F);
 			if (!level.isClientSide()) {
-				player.displayClientMessage(Component.translatable("item.tacz.glock_17.no_ammo").withStyle(ChatFormatting.GRAY), true);
+				player.displayClientMessage(Component.translatable("item.minecraft.glock_17.no_ammo").withStyle(ChatFormatting.GRAY), true);
 			}
 			return InteractionResult.CONSUME;
 		}
@@ -111,12 +116,12 @@ public class TaczMvpGunItem extends Item {
 
 	@Override
 	public boolean isBarVisible(ItemStack itemStack) {
-		return getAmmo(itemStack) < MAGAZINE_SIZE;
+		return getAmmo(itemStack) < getMagazineSize(itemStack);
 	}
 
 	@Override
 	public int getBarWidth(ItemStack itemStack) {
-		return Math.round(13.0F * getAmmo(itemStack) / MAGAZINE_SIZE);
+		return Math.round(13.0F * getAmmo(itemStack) / getMagazineSize(itemStack));
 	}
 
 	@Override
@@ -126,19 +131,23 @@ public class TaczMvpGunItem extends Item {
 
 	@Override
 	public void appendHoverText(ItemStack itemStack, Item.TooltipContext tooltipContext, TooltipDisplay tooltipDisplay, Consumer<Component> consumer, TooltipFlag tooltipFlag) {
-		consumer.accept(Component.translatable("item.tacz.glock_17.ammo", getAmmo(itemStack), MAGAZINE_SIZE).withStyle(ChatFormatting.GRAY));
-		consumer.accept(Component.translatable("item.tacz.glock_17.reload_hint").withStyle(ChatFormatting.DARK_GRAY));
+		consumer.accept(Component.translatable("item.minecraft.glock_17.ammo", getAmmo(itemStack), getMagazineSize(itemStack)).withStyle(ChatFormatting.GRAY));
+		consumer.accept(Component.translatable("item.minecraft.glock_17.reload_hint").withStyle(ChatFormatting.DARK_GRAY));
+		ItemStack extendedMag = this.getAttachment(itemStack, TaczAttachmentType.EXTENDED_MAG);
+		if (!extendedMag.isEmpty()) {
+			consumer.accept(Component.translatable("tooltip.tacz.refit.installed", extendedMag.getHoverName()).withStyle(ChatFormatting.GRAY));
+		}
 	}
 
 	@Override
 	public ItemStack getDefaultInstance() {
 		ItemStack itemStack = super.getDefaultInstance();
-		setAmmo(itemStack, MAGAZINE_SIZE);
+		setAmmo(itemStack, getMagazineSize(itemStack));
 		return itemStack;
 	}
 
 	private static void reload(ItemStack gunStack, Player player) {
-		int needed = MAGAZINE_SIZE - getAmmo(gunStack);
+		int needed = getMagazineSize(gunStack) - getAmmo(gunStack);
 		if (needed <= 0) {
 			return;
 		}
@@ -172,7 +181,7 @@ public class TaczMvpGunItem extends Item {
 	}
 
 	public static boolean canStartReload(Player player, ItemStack itemStack) {
-		if (getAmmo(itemStack) >= MAGAZINE_SIZE) {
+		if (getAmmo(itemStack) >= getMagazineSize(itemStack)) {
 			return false;
 		}
 
@@ -185,6 +194,19 @@ public class TaczMvpGunItem extends Item {
 	}
 
 	private static void setAmmo(ItemStack itemStack, int ammo) {
-		CustomData.update(DataComponents.CUSTOM_DATA, itemStack, tag -> tag.putInt(AMMO_KEY, Math.max(0, Math.min(MAGAZINE_SIZE, ammo))));
+		CustomData.update(DataComponents.CUSTOM_DATA, itemStack, tag -> tag.putInt(AMMO_KEY, Math.max(0, Math.min(getMagazineSize(itemStack), ammo))));
+	}
+
+	public static int getMagazineSize(ItemStack itemStack) {
+		ItemStack extendedMag = TaczRefitGun.getStoredAttachment(itemStack, TaczAttachmentType.EXTENDED_MAG);
+		if (extendedMag.getItem() instanceof TaczAttachmentItem attachment) {
+			return switch (attachment.getAttachmentLevel()) {
+				case 1 -> 21;
+				case 2 -> 24;
+				case 3 -> 33;
+				default -> MAGAZINE_SIZE;
+			};
+		}
+		return MAGAZINE_SIZE;
 	}
 }

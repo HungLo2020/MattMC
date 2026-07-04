@@ -1,0 +1,7 @@
+{
+  "slot": "minecraft:item/glock_extended_mag_i",
+  "sounds": {
+    "install": "minecraft:attachments/extended_mag_install",
+    "uninstall": "minecraft:attachments/extended_mag_uninstall"
+  }
+}

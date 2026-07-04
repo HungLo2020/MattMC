@@ -1,0 +1,9 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/glock_17_base",
+    "model": {
+      "type": "minecraft:glock_17"
+    }
+  }
+}

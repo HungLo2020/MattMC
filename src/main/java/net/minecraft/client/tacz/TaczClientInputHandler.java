@@ -8,6 +8,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TaczMvpGunItem;
+import net.minecraft.world.item.TaczRefitGun;
 
 public final class TaczClientInputHandler {
 	private TaczClientInputHandler() {
@@ -20,6 +21,13 @@ public final class TaczClientInputHandler {
 
 		ItemStack itemStack = minecraft.player.getMainHandItem();
 		TaczGlock17AnimationController.updateHeld(itemStack);
+		while (TaczKeyMappings.REFIT.consumeClick()) {
+			if (!minecraft.player.isSpectator() && itemStack.getItem() instanceof TaczRefitGun) {
+				minecraft.setScreen(new TaczGunRefitScreen());
+				return true;
+			}
+		}
+
 		if (!itemStack.is(Items.TACZ_GLOCK_17) || !(itemStack.getItem() instanceof TaczMvpGunItem gunItem) || minecraft.player.isSpectator()) {
 			return false;
 		}

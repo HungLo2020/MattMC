@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "tacz:item/nine_mm_ammo"
+    "layer0": "minecraft:item/glock_extended_mag_iii"
   }
 }

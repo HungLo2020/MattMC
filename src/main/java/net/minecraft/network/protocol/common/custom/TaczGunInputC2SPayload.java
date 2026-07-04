@@ -6,7 +6,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public record TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action action) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<TaczGunInputC2SPayload> TYPE = new CustomPacketPayload.Type<>(
-		ResourceLocation.fromNamespaceAndPath("tacz", "gun_input")
+		ResourceLocation.withDefaultNamespace("gun_input")
 	);
 	public static final StreamCodec<FriendlyByteBuf, TaczGunInputC2SPayload> STREAM_CODEC = CustomPacketPayload.codec(
 		TaczGunInputC2SPayload::write,

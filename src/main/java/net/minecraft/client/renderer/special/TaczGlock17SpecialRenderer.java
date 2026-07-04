@@ -23,12 +23,14 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.tacz.TaczGlock17AnimationController;
+import net.minecraft.client.tacz.TaczRefitTransform;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.PlayerModelPart;
+import net.minecraft.world.item.TaczAttachmentType;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.logging.LogUtils;
@@ -41,9 +43,9 @@ import org.slf4j.Logger;
 @Environment(EnvType.CLIENT)
 public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final ResourceLocation MODEL = ResourceLocation.fromNamespaceAndPath("tacz", "geo_models/gun/glock_17_geo.json");
-	private static final ResourceLocation ANIMATION = ResourceLocation.fromNamespaceAndPath("tacz", "animations/glock_17.animation.json");
-	private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath("tacz", "textures/gun/uv/glock_17.png");
+	private static final ResourceLocation MODEL = ResourceLocation.withDefaultNamespace("geo_models/gun/glock_17_geo.json");
+	private static final ResourceLocation ANIMATION = ResourceLocation.withDefaultNamespace("animations/glock_17.animation.json");
+	private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/gun/uv/glock_17.png");
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
 	private final BedrockGunGeometry geometry;
 	private final BedrockAnimationSet animations;
@@ -150,7 +152,14 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			this.applyCameraAnimation(poseStack, animationPose);
 			poseStack.translate(0.0F, 1.5F, 0.0F);
 			poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
-			this.geometry.applyFirstPersonPositioning(poseStack, animationPose.aimProgress);
+			this.geometry.applyFirstPersonPositioning(
+				poseStack,
+				animationPose.aimProgress,
+				TaczRefitTransform.openingProgress(),
+				TaczRefitTransform.previousType(),
+				TaczRefitTransform.currentType(),
+				TaczRefitTransform.viewProgress()
+			);
 			return;
 		}
 
@@ -279,17 +288,40 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			}
 		}
 
-		void applyFirstPersonPositioning(PoseStack poseStack, float aimProgress) {
+		void applyFirstPersonPositioning(
+			PoseStack poseStack,
+			float aimProgress,
+			float refitProgress,
+			TaczAttachmentType previousRefitType,
+			TaczAttachmentType currentRefitType,
+			float refitViewProgress
+		) {
 			Matrix4f idle = this.positioningMatrix("idle_view");
 			Matrix4f aim = this.positioningMatrix("iron_view");
 			Matrix4f matrix = idle;
 			if (aim != null && aimProgress > 0.0F) {
-				matrix = interpolateMatrix(idle, aim, aimProgress);
+				matrix = interpolateMatrix(idle, aim, aimProgress * (1.0F - refitProgress));
+			}
+			if (refitProgress > 0.0F) {
+				Matrix4f previousRefit = this.refitMatrix(previousRefitType);
+				Matrix4f currentRefit = this.refitMatrix(currentRefitType);
+				Matrix4f refit = interpolateMatrix(previousRefit, currentRefit, refitViewProgress);
+				matrix = interpolateMatrix(matrix, refit, refitProgress);
 			}
 
 			poseStack.translate(0.0F, 1.5F, 0.0F);
 			poseStack.mulPose(matrix);
 			poseStack.translate(0.0F, -1.5F, 0.0F);
+		}
+
+		private Matrix4f refitMatrix(TaczAttachmentType type) {
+			if (type != TaczAttachmentType.NONE) {
+				String typedView = "refit_" + type.getSerializedName() + "_view";
+				if (this.pathTo(typedView) != null) {
+					return this.positioningMatrix(typedView);
+				}
+			}
+			return this.positioningMatrix("refit_view");
 		}
 
 		private Matrix4f positioningMatrix(String name) {

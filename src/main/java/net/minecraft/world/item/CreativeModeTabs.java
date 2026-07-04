@@ -1645,6 +1645,9 @@ public class CreativeModeTabs {
 						output.accept(Items.BOW);
 						output.accept(Items.CROSSBOW);
 						output.accept(Items.TACZ_GLOCK_17);
+						output.accept(Items.TACZ_GLOCK_EXTENDED_MAG_I);
+						output.accept(Items.TACZ_GLOCK_EXTENDED_MAG_II);
+						output.accept(Items.TACZ_GLOCK_EXTENDED_MAG_III);
 						generateFireworksAllDurations(output, CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
 						output.accept(Items.ARROW);
 						output.accept(Items.SPECTRAL_ARROW);
