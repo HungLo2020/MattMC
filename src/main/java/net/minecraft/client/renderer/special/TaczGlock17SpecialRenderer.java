@@ -258,7 +258,13 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			this.name = name;
 		}
 
-		private void render(PoseStack poseStack, ItemDisplayContext itemDisplayContext, VertexConsumer consumer, int light, int overlay) {
+		private void render(
+			PoseStack poseStack,
+			ItemDisplayContext itemDisplayContext,
+			VertexConsumer consumer,
+			int light,
+			int overlay
+		) {
 			if (this.cubes.isEmpty() && this.children.isEmpty()) {
 				return;
 			}

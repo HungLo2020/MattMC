@@ -14,6 +14,7 @@ import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.client.renderer.special.TaczGlock17SpecialRenderer;
 import net.minecraft.client.renderer.state.MapRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.component.DataComponents;
@@ -120,6 +121,7 @@ public class ItemInHandRenderer {
 	private final EntityRenderDispatcher entityRenderDispatcher;
 	private final ItemRenderer itemRenderer;
 	private final ItemModelResolver itemModelResolver;
+	private TaczGlock17SpecialRenderer taczGlock17Renderer;
 
 	public ItemInHandRenderer(Minecraft minecraft, EntityRenderDispatcher entityRenderDispatcher, ItemRenderer itemRenderer, ItemModelResolver itemModelResolver) {
 		this.minecraft = minecraft;
@@ -573,7 +575,6 @@ public class ItemInHandRenderer {
 		int i,
 		HumanoidArm humanoidArm
 	) {
-		boolean rightHand = humanoidArm == HumanoidArm.RIGHT;
 		LocalPlayer localPlayer = this.minecraft.player;
 		float xRotOffset = localPlayer != null ? Mth.lerp(f, localPlayer.xBobO, localPlayer.xBob) : 0.0F;
 		float yRotOffset = localPlayer != null ? Mth.lerp(f, localPlayer.yBobO, localPlayer.yBob) : 0.0F;
@@ -581,13 +582,18 @@ public class ItemInHandRenderer {
 		float yRot = abstractClientPlayer.getViewYRot(f) - yRotOffset;
 		poseStack.mulPose(Axis.XP.rotationDegrees(xRot * -0.1F));
 		poseStack.mulPose(Axis.YP.rotationDegrees(yRot * -0.1F));
-		this.renderItem(
-			abstractClientPlayer,
-			itemStack,
-			rightHand ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND,
+		if (this.taczGlock17Renderer == null) {
+			this.taczGlock17Renderer = new TaczGlock17SpecialRenderer();
+		}
+
+		this.taczGlock17Renderer.submit(
+			ItemDisplayContext.FIRST_PERSON_RIGHT_HAND,
 			poseStack,
 			submitNodeCollector,
-			i
+			i,
+			OverlayTexture.NO_OVERLAY,
+			false,
+			0
 		);
 	}
 
