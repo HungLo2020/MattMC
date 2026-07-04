@@ -586,14 +586,12 @@ public class ItemInHandRenderer {
 			this.taczGlock17Renderer = new TaczGlock17SpecialRenderer();
 		}
 
-		this.taczGlock17Renderer.submit(
-			ItemDisplayContext.FIRST_PERSON_RIGHT_HAND,
+		this.taczGlock17Renderer.submitFirstPerson(
+			itemStack,
 			poseStack,
 			submitNodeCollector,
 			i,
-			OverlayTexture.NO_OVERLAY,
-			false,
-			0
+			OverlayTexture.NO_OVERLAY
 		);
 	}
 

@@ -171,7 +171,15 @@ public class TaczMvpGunItem extends Item {
 		return ItemStack.EMPTY;
 	}
 
-	private static int getAmmo(ItemStack itemStack) {
+	public static boolean canStartReload(Player player, ItemStack itemStack) {
+		if (getAmmo(itemStack) >= MAGAZINE_SIZE) {
+			return false;
+		}
+
+		return player.hasInfiniteMaterials() || !findAmmo(player).isEmpty();
+	}
+
+	public static int getAmmo(ItemStack itemStack) {
 		CompoundTag tag = itemStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 		return tag.contains(AMMO_KEY) ? tag.getIntOr(AMMO_KEY, 0) : MAGAZINE_SIZE;
 	}

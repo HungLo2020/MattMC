@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.mojang.serialization.MapCodec;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,10 +20,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.tacz.TaczGlock17AnimationController;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.GsonHelper;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
 import net.logging.LogUtils;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -34,23 +38,35 @@ import org.slf4j.Logger;
 public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation MODEL = ResourceLocation.fromNamespaceAndPath("tacz", "geo_models/gun/glock_17_geo.json");
+	private static final ResourceLocation ANIMATION = ResourceLocation.fromNamespaceAndPath("tacz", "animations/glock_17.animation.json");
 	private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath("tacz", "textures/gun/uv/glock_17.png");
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
 	private final BedrockGunGeometry geometry;
+	private final BedrockAnimationSet animations;
 
 	public TaczGlock17SpecialRenderer() {
 		this.geometry = BedrockGunGeometry.load(MODEL);
+		this.animations = BedrockAnimationSet.load(ANIMATION);
 	}
 
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
+		this.submitAnimated(itemDisplayContext, poseStack, submitNodeCollector, i, j, ItemStack.EMPTY);
+	}
+
+	public void submitFirstPerson(ItemStack itemStack, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int light, int overlay) {
+		this.submitAnimated(ItemDisplayContext.FIRST_PERSON_RIGHT_HAND, poseStack, submitNodeCollector, light, overlay, itemStack);
+	}
+
+	private void submitAnimated(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, ItemStack itemStack) {
 		poseStack.pushPose();
-		this.applyTaczTransform(itemDisplayContext, poseStack);
+		AnimationPose animationPose = this.animations.sample(TaczGlock17AnimationController.snapshot(itemStack));
+		this.applyTaczTransform(itemDisplayContext, poseStack, animationPose);
 		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.entityCutoutNoCull(TEXTURE), (pose, vertexConsumer) -> {
 			PoseStack modelPoseStack = new PoseStack();
 			modelPoseStack.last().set(pose);
 			for (BedrockNode root : this.geometry.roots()) {
-				root.render(modelPoseStack, itemDisplayContext, vertexConsumer, i, j);
+				root.render(modelPoseStack, itemDisplayContext, vertexConsumer, i, j, animationPose);
 			}
 		});
 		poseStack.popPose();
@@ -62,11 +78,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		set.add(new Vector3f(1.0F, 1.0F, 1.0F));
 	}
 
-	private void applyTaczTransform(ItemDisplayContext itemDisplayContext, PoseStack poseStack) {
+	private void applyTaczTransform(ItemDisplayContext itemDisplayContext, PoseStack poseStack, AnimationPose animationPose) {
 		if (itemDisplayContext.firstPerson()) {
+			this.applyCameraAnimation(poseStack, animationPose);
 			poseStack.translate(0.0F, 1.5F, 0.0F);
 			poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
-			this.geometry.applyFirstPersonPositioning(poseStack);
+			this.geometry.applyFirstPersonPositioning(poseStack, animationPose.aimProgress);
 			return;
 		}
 
@@ -90,6 +107,19 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				poseStack.scale(0.82F, 0.82F, 0.82F);
 			}
 			default -> poseStack.scale(0.6F, 0.6F, 0.6F);
+		}
+	}
+
+	private void applyCameraAnimation(PoseStack poseStack, AnimationPose animationPose) {
+		NodePose camera = animationPose.node("camera");
+		if (camera.rotation.x() != 0.0F) {
+			poseStack.mulPose(Axis.XP.rotationDegrees(camera.rotation.x()));
+		}
+		if (camera.rotation.y() != 0.0F) {
+			poseStack.mulPose(Axis.YP.rotationDegrees(camera.rotation.y()));
+		}
+		if (camera.rotation.z() != 0.0F) {
+			poseStack.mulPose(Axis.ZP.rotationDegrees(-camera.rotation.z()));
 		}
 	}
 
@@ -182,10 +212,23 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			}
 		}
 
-		void applyFirstPersonPositioning(PoseStack poseStack) {
-			List<BedrockNode> nodePath = this.pathTo("idle_view");
+		void applyFirstPersonPositioning(PoseStack poseStack, float aimProgress) {
+			Matrix4f idle = this.positioningMatrix("idle_view");
+			Matrix4f aim = this.positioningMatrix("iron_view");
+			Matrix4f matrix = idle;
+			if (aim != null && aimProgress > 0.0F) {
+				matrix = interpolateMatrix(idle, aim, aimProgress);
+			}
+
+			poseStack.translate(0.0F, 1.5F, 0.0F);
+			poseStack.mulPose(matrix);
+			poseStack.translate(0.0F, -1.5F, 0.0F);
+		}
+
+		private Matrix4f positioningMatrix(String name) {
+			List<BedrockNode> nodePath = this.pathTo(name);
 			if (nodePath == null) {
-				return;
+				return new Matrix4f().identity();
 			}
 
 			Matrix4f matrix = new Matrix4f().identity();
@@ -200,9 +243,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 					matrix.translate(-part.x / 16.0F, 1.5F - part.y / 16.0F, -part.z / 16.0F);
 				}
 			}
-			poseStack.translate(0.0F, 1.5F, 0.0F);
-			poseStack.mulPose(matrix);
-			poseStack.translate(0.0F, -1.5F, 0.0F);
+			return matrix;
 		}
 
 		void applyPositioningNode(String name, PoseStack poseStack, float xScale, float yScale, float zScale) {
@@ -263,38 +304,239 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			ItemDisplayContext itemDisplayContext,
 			VertexConsumer consumer,
 			int light,
-			int overlay
+			int overlay,
+			AnimationPose animationPose
 		) {
 			if (this.cubes.isEmpty() && this.children.isEmpty()) {
 				return;
 			}
 
 			poseStack.pushPose();
-			this.translateAndRotate(poseStack);
+			this.translateAndRotate(poseStack, animationPose.node(this.name));
 			int cubeLight = this.name != null && this.name.endsWith("_illuminated") ? LightTexture.pack(15, 15) : light;
-			if (!this.hiddenMarker) {
+			NodePose nodePose = animationPose.node(this.name);
+			if (!this.hiddenMarker && nodePose.visible()) {
 				for (BedrockCube cube : this.cubes) {
 					cube.compile(poseStack.last(), consumer, cubeLight, overlay);
 				}
 			}
 
 			for (BedrockNode child : this.children) {
-				child.render(poseStack, itemDisplayContext, consumer, cubeLight, overlay);
+				child.render(poseStack, itemDisplayContext, consumer, cubeLight, overlay, animationPose);
 			}
 			poseStack.popPose();
 		}
 
-		private void translateAndRotate(PoseStack poseStack) {
+		private void translateAndRotate(PoseStack poseStack, NodePose nodePose) {
+			poseStack.translate(nodePose.position.x(), -nodePose.position.y(), nodePose.position.z());
 			poseStack.translate(this.x / 16.0F, this.y / 16.0F, this.z / 16.0F);
-			if (this.zRot != 0.0F) {
-				poseStack.mulPose(Axis.ZP.rotation(this.zRot));
+			float zRotation = this.zRot + degreesToRadians(nodePose.rotation.z());
+			float yRotation = this.yRot + degreesToRadians(nodePose.rotation.y());
+			float xRotation = this.xRot + degreesToRadians(nodePose.rotation.x());
+			if (zRotation != 0.0F) {
+				poseStack.mulPose(Axis.ZP.rotation(zRotation));
 			}
-			if (this.yRot != 0.0F) {
-				poseStack.mulPose(Axis.YP.rotation(this.yRot));
+			if (yRotation != 0.0F) {
+				poseStack.mulPose(Axis.YP.rotation(yRotation));
 			}
-			if (this.xRot != 0.0F) {
-				poseStack.mulPose(Axis.XP.rotation(this.xRot));
+			if (xRotation != 0.0F) {
+				poseStack.mulPose(Axis.XP.rotation(xRotation));
 			}
+			poseStack.scale(nodePose.scale.x(), nodePose.scale.y(), nodePose.scale.z());
+		}
+	}
+
+	private static final class BedrockAnimationSet {
+		private final Map<String, BedrockAnimation> animations;
+
+		private BedrockAnimationSet(Map<String, BedrockAnimation> animations) {
+			this.animations = animations;
+		}
+
+		static BedrockAnimationSet load(ResourceLocation location) {
+			try (Reader reader = Minecraft.getInstance().getResourceManager().openAsReader(location)) {
+				JsonObject root = GsonHelper.parse(reader);
+				JsonObject animationsObject = GsonHelper.getAsJsonObject(root, "animations");
+				Map<String, BedrockAnimation> animations = new HashMap<>();
+				for (Map.Entry<String, JsonElement> entry : animationsObject.entrySet()) {
+					animations.put(entry.getKey(), BedrockAnimation.read(entry.getValue().getAsJsonObject()));
+				}
+				return new BedrockAnimationSet(animations);
+			} catch (Exception exception) {
+				LOGGER.error("Failed to load TACZ Glock 17 animation {}", location, exception);
+				return new BedrockAnimationSet(Map.of());
+			}
+		}
+
+		AnimationPose sample(TaczGlock17AnimationController.Snapshot snapshot) {
+			AnimationPose pose = new AnimationPose(snapshot.aimProgress());
+			for (TaczGlock17AnimationController.ActiveAnimation layer : snapshot.animations()) {
+				BedrockAnimation animation = this.animations.get(layer.name());
+				if (animation == null) {
+					continue;
+				}
+
+				float time = layer.startNanos() == 0L ? animation.length : layer.ageSeconds();
+				if (layer.startNanos() != 0L && time > animation.length && !animation.holdOnLastFrame) {
+					continue;
+				}
+
+				animation.apply(pose, Math.min(time, animation.length), layer.additive());
+			}
+			return pose;
+		}
+	}
+
+	private static final class BedrockAnimation {
+		private final float length;
+		private final boolean holdOnLastFrame;
+		private final Map<String, NodeAnimation> nodes;
+
+		private BedrockAnimation(float length, boolean holdOnLastFrame, Map<String, NodeAnimation> nodes) {
+			this.length = length;
+			this.holdOnLastFrame = holdOnLastFrame;
+			this.nodes = nodes;
+		}
+
+		static BedrockAnimation read(JsonObject object) {
+			float length = GsonHelper.getAsFloat(object, "animation_length", 0.0F);
+			boolean holdOnLastFrame = false;
+			if (object.has("loop")) {
+				JsonElement loop = object.get("loop");
+				holdOnLastFrame = loop.isJsonPrimitive() && "hold_on_last_frame".equals(loop.getAsString());
+			}
+
+			Map<String, NodeAnimation> nodes = new HashMap<>();
+			JsonObject bones = GsonHelper.getAsJsonObject(object, "bones", new JsonObject());
+			for (Map.Entry<String, JsonElement> entry : bones.entrySet()) {
+				nodes.put(entry.getKey(), NodeAnimation.read(entry.getValue().getAsJsonObject()));
+			}
+			return new BedrockAnimation(length, holdOnLastFrame, nodes);
+		}
+
+		void apply(AnimationPose pose, float time, boolean additive) {
+			for (Map.Entry<String, NodeAnimation> entry : this.nodes.entrySet()) {
+				entry.getValue().apply(pose.node(entry.getKey()), time, additive);
+			}
+		}
+	}
+
+	private static final class NodeAnimation {
+		private final Channel position;
+		private final Channel rotation;
+		private final Channel scale;
+
+		private NodeAnimation(Channel position, Channel rotation, Channel scale) {
+			this.position = position;
+			this.rotation = rotation;
+			this.scale = scale;
+		}
+
+		static NodeAnimation read(JsonObject object) {
+			return new NodeAnimation(Channel.read(object.get("position"), 3), Channel.read(object.get("rotation"), 3), Channel.read(object.get("scale"), 3));
+		}
+
+		void apply(NodePose pose, float time, boolean additive) {
+			if (this.position != null) {
+				Vector3f value = this.position.sample(time);
+				if (additive) {
+					pose.position.add(value);
+				} else {
+					pose.position.set(value);
+				}
+			}
+			if (this.rotation != null) {
+				Vector3f value = this.rotation.sample(time);
+				if (additive) {
+					pose.rotation.add(value);
+				} else {
+					pose.rotation.set(value);
+				}
+			}
+			if (this.scale != null) {
+				Vector3f value = this.scale.sample(time);
+				if (additive) {
+					pose.scale.mul(value);
+				} else {
+					pose.scale.set(value);
+				}
+			}
+		}
+	}
+
+	private static final class Channel {
+		private final List<Keyframe> keyframes;
+
+		private Channel(List<Keyframe> keyframes) {
+			this.keyframes = keyframes;
+		}
+
+		static Channel read(JsonElement element, int length) {
+			if (element == null || element.isJsonNull()) {
+				return null;
+			}
+
+			if (element.isJsonArray() || element.isJsonPrimitive()) {
+				return new Channel(List.of(new Keyframe(0.0F, readVector(element, length))));
+			}
+
+			JsonObject object = element.getAsJsonObject();
+			List<Keyframe> keyframes = new ArrayList<>();
+			for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
+				keyframes.add(new Keyframe(Float.parseFloat(entry.getKey()), readKeyframeValue(entry.getValue(), length)));
+			}
+			keyframes.sort(Comparator.comparing(Keyframe::time));
+			return new Channel(keyframes);
+		}
+
+		Vector3f sample(float time) {
+			if (this.keyframes.isEmpty()) {
+				return new Vector3f();
+			}
+			if (this.keyframes.size() == 1 || time <= this.keyframes.get(0).time) {
+				return new Vector3f(this.keyframes.get(0).value);
+			}
+
+			Keyframe last = this.keyframes.get(this.keyframes.size() - 1);
+			if (time >= last.time) {
+				return new Vector3f(last.value);
+			}
+
+			for (int i = 0; i < this.keyframes.size() - 1; i++) {
+				Keyframe from = this.keyframes.get(i);
+				Keyframe to = this.keyframes.get(i + 1);
+				if (time >= from.time && time <= to.time) {
+					float alpha = (time - from.time) / (to.time - from.time);
+					return new Vector3f(from.value).lerp(to.value, alpha);
+				}
+			}
+			return new Vector3f(last.value);
+		}
+	}
+
+	private record Keyframe(float time, Vector3f value) {
+	}
+
+	private static final class AnimationPose {
+		private final Map<String, NodePose> nodes = new HashMap<>();
+		private final float aimProgress;
+
+		private AnimationPose(float aimProgress) {
+			this.aimProgress = aimProgress;
+		}
+
+		private NodePose node(String name) {
+			return this.nodes.computeIfAbsent(name == null ? "" : name, key -> new NodePose());
+		}
+	}
+
+	private static final class NodePose {
+		private final Vector3f position = new Vector3f();
+		private final Vector3f rotation = new Vector3f();
+		private final Vector3f scale = new Vector3f(1.0F, 1.0F, 1.0F);
+
+		private boolean visible() {
+			return this.scale.x() != 0.0F && this.scale.y() != 0.0F && this.scale.z() != 0.0F;
 		}
 	}
 
@@ -521,6 +763,53 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			values[i] = GsonHelper.convertToFloat(array.get(i), "[" + i + "]");
 		}
 		return values;
+	}
+
+	private static Vector3f readKeyframeValue(JsonElement element, int length) {
+		if (element.isJsonObject()) {
+			JsonObject object = element.getAsJsonObject();
+			if (object.has("post")) {
+				return readVector(object.get("post"), length);
+			}
+			if (object.has("pre")) {
+				return readVector(object.get("pre"), length);
+			}
+		}
+		return readVector(element, length);
+	}
+
+	private static Vector3f readVector(JsonElement element, int length) {
+		if (element.isJsonPrimitive()) {
+			float value = element.getAsFloat();
+			return new Vector3f(value, value, value);
+		}
+
+		JsonArray array = element.getAsJsonArray();
+		float x = array.size() > 0 ? GsonHelper.convertToFloat(array.get(0), "[0]") : 0.0F;
+		float y = array.size() > 1 ? GsonHelper.convertToFloat(array.get(1), "[1]") : x;
+		float z = array.size() > 2 ? GsonHelper.convertToFloat(array.get(2), "[2]") : x;
+		return new Vector3f(x, y, z);
+	}
+
+	private static Matrix4f interpolateMatrix(Matrix4f from, Matrix4f to, float alpha) {
+		return new Matrix4f(
+			Mth.lerp(alpha, from.m00(), to.m00()),
+			Mth.lerp(alpha, from.m01(), to.m01()),
+			Mth.lerp(alpha, from.m02(), to.m02()),
+			Mth.lerp(alpha, from.m03(), to.m03()),
+			Mth.lerp(alpha, from.m10(), to.m10()),
+			Mth.lerp(alpha, from.m11(), to.m11()),
+			Mth.lerp(alpha, from.m12(), to.m12()),
+			Mth.lerp(alpha, from.m13(), to.m13()),
+			Mth.lerp(alpha, from.m20(), to.m20()),
+			Mth.lerp(alpha, from.m21(), to.m21()),
+			Mth.lerp(alpha, from.m22(), to.m22()),
+			Mth.lerp(alpha, from.m23(), to.m23()),
+			Mth.lerp(alpha, from.m30(), to.m30()),
+			Mth.lerp(alpha, from.m31(), to.m31()),
+			Mth.lerp(alpha, from.m32(), to.m32()),
+			Mth.lerp(alpha, from.m33(), to.m33())
+		);
 	}
 
 	@Environment(EnvType.CLIENT)
