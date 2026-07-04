@@ -42,7 +42,7 @@ public class TaczMvpGunItem extends Item {
 		return this.tryFire(level, player, interactionHand, itemStack);
 	}
 
-	private InteractionResult tryFire(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
+	public InteractionResult tryFire(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
 		int ammo = getAmmo(itemStack);
 		if (ammo <= 0) {
 			level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TACZ_GLOCK_17_EMPTY, SoundSource.PLAYERS, 0.7F, 1.0F);
@@ -68,7 +68,7 @@ public class TaczMvpGunItem extends Item {
 		return InteractionResult.CONSUME;
 	}
 
-	private InteractionResult tryStartReload(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
+	public InteractionResult tryStartReload(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
 		if (getAmmo(itemStack) >= MAGAZINE_SIZE) {
 			return InteractionResult.FAIL;
 		}

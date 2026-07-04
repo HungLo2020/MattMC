@@ -9,6 +9,7 @@ import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.protocol.common.custom.BrandPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.DiscardedPayload;
+import net.minecraft.network.protocol.common.custom.TaczGunInputC2SPayload;
 // VoxelMap: Import VoxelMap packet types
 import net.voxelmap.packets.WorldIdC2S;
 // Distant Horizons: Import Distant Horizons packet type
@@ -23,6 +24,7 @@ public record ServerboundCustomPayloadPacket(CustomPacketPayload payload) implem
 					new CustomPacketPayload.TypeAndCodec<>(BrandPayload.TYPE, BrandPayload.STREAM_CODEC),
 					// VoxelMap: Register VoxelMap packet type
 					new CustomPacketPayload.TypeAndCodec<>(WorldIdC2S.PACKET_ID, WorldIdC2S.PACKET_CODEC),
+					new CustomPacketPayload.TypeAndCodec<>(TaczGunInputC2SPayload.TYPE, TaczGunInputC2SPayload.STREAM_CODEC),
 					// Distant Horizons: Register Distant Horizons packet type
 					new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, CommonPacketPayload.STREAM_CODEC)
 				),

@@ -63,6 +63,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketUtils;
 import net.minecraft.network.protocol.common.ServerboundClientInformationPacket;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
+import net.minecraft.network.protocol.common.custom.TaczGunInputC2SPayload;
 import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.game.ClientboundBlockChangedAckPacket;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
@@ -177,6 +178,7 @@ import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.item.component.WritableBookContent;
 import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -2188,6 +2190,30 @@ public class ServerGamePacketListenerImpl
 
 	@Override
 	public void handleCustomPayload(ServerboundCustomPayloadPacket serverboundCustomPayloadPacket) {
+		if (serverboundCustomPayloadPacket.payload() instanceof TaczGunInputC2SPayload payload) {
+			PacketUtils.ensureRunningOnSameThread(serverboundCustomPayloadPacket, this, this.player.level());
+			this.handleTaczGunInput(payload);
+		}
+	}
+
+	private void handleTaczGunInput(TaczGunInputC2SPayload payload) {
+		if (!this.player.hasClientLoaded()) {
+			return;
+		}
+
+		ItemStack itemStack = this.player.getMainHandItem();
+		if (!itemStack.is(Items.TACZ_GLOCK_17) || !(itemStack.getItem() instanceof TaczMvpGunItem gunItem) || !itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
+			return;
+		}
+
+		this.player.resetLastActionTime();
+		if (payload.action() == TaczGunInputC2SPayload.Action.SHOOT) {
+			if (!this.player.getCooldowns().isOnCooldown(itemStack)) {
+				gunItem.tryFire(this.player.level(), this.player, InteractionHand.MAIN_HAND, itemStack);
+			}
+		} else if (payload.action() == TaczGunInputC2SPayload.Action.RELOAD) {
+			gunItem.tryStartReload(this.player.level(), this.player, InteractionHand.MAIN_HAND, itemStack);
+		}
 	}
 
 	@Override
