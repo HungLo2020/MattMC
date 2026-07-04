@@ -405,7 +405,11 @@ public class ItemInHandRenderer {
 			boolean bl = interactionHand == InteractionHand.MAIN_HAND;
 			HumanoidArm humanoidArm = bl ? abstractClientPlayer.getMainArm() : abstractClientPlayer.getMainArm().getOpposite();
 			poseStack.pushPose();
-			if (itemStack.isEmpty()) {
+			if (itemStack.is(Items.TACZ_GLOCK_17)) {
+				if (bl) {
+					this.renderTaczGlockFirstPerson(abstractClientPlayer, f, h, itemStack, i, poseStack, submitNodeCollector, j, humanoidArm);
+				}
+			} else if (itemStack.isEmpty()) {
 				if (bl && !abstractClientPlayer.isInvisible()) {
 					this.renderPlayerArm(poseStack, submitNodeCollector, j, i, h, humanoidArm);
 				}
@@ -556,6 +560,35 @@ public class ItemInHandRenderer {
 
 			poseStack.popPose();
 		}
+	}
+
+	private void renderTaczGlockFirstPerson(
+		AbstractClientPlayer abstractClientPlayer,
+		float f,
+		float g,
+		ItemStack itemStack,
+		float h,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		int i,
+		HumanoidArm humanoidArm
+	) {
+		boolean rightHand = humanoidArm == HumanoidArm.RIGHT;
+		LocalPlayer localPlayer = this.minecraft.player;
+		float xRotOffset = localPlayer != null ? Mth.lerp(f, localPlayer.xBobO, localPlayer.xBob) : 0.0F;
+		float yRotOffset = localPlayer != null ? Mth.lerp(f, localPlayer.yBobO, localPlayer.yBob) : 0.0F;
+		float xRot = abstractClientPlayer.getViewXRot(f) - xRotOffset;
+		float yRot = abstractClientPlayer.getViewYRot(f) - yRotOffset;
+		poseStack.mulPose(Axis.XP.rotationDegrees(xRot * -0.1F));
+		poseStack.mulPose(Axis.YP.rotationDegrees(yRot * -0.1F));
+		this.renderItem(
+			abstractClientPlayer,
+			itemStack,
+			rightHand ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND,
+			poseStack,
+			submitNodeCollector,
+			i
+		);
 	}
 
 	private void swingArm(float f, float g, PoseStack poseStack, int i, HumanoidArm humanoidArm) {

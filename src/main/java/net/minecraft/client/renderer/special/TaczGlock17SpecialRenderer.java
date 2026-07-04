@@ -1,64 +1,520 @@
 package net.minecraft.client.renderer.special;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.mojang.serialization.MapCodec;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
+import net.math.Axis;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.client.model.Model;
-import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
-import net.minecraft.client.model.geom.builders.CubeListBuilder;
-import net.minecraft.client.model.geom.builders.LayerDefinition;
-import net.minecraft.client.model.geom.builders.MeshDefinition;
-import net.minecraft.client.model.geom.builders.PartDefinition;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.GsonHelper;
 import net.minecraft.world.item.ItemDisplayContext;
+import net.logging.LogUtils;
+import org.joml.Matrix3f;
+import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
+import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
+	private static final Logger LOGGER = LogUtils.getLogger();
+	private static final ResourceLocation MODEL = ResourceLocation.fromNamespaceAndPath("tacz", "geo_models/gun/glock_17_geo.json");
 	private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath("tacz", "textures/gun/uv/glock_17.png");
-	private final Model.Simple model;
+	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
+	private final BedrockGunGeometry geometry;
 
 	public TaczGlock17SpecialRenderer() {
-		this.model = new Model.Simple(createBodyLayer().bakeRoot(), RenderType::entityCutoutNoCull);
-	}
-
-	private static LayerDefinition createBodyLayer() {
-		MeshDefinition meshDefinition = new MeshDefinition();
-		PartDefinition root = meshDefinition.getRoot();
-		PartDefinition gun = root.addOrReplaceChild("gun", CubeListBuilder.create(), PartPose.offset(0.0F, 16.0F, 0.0F));
-		gun.addOrReplaceChild("slide", CubeListBuilder.create().texOffs(0, 0).addBox(-7.0F, -7.0F, -18.0F, 14.0F, 4.0F, 25.0F), PartPose.ZERO);
-		gun.addOrReplaceChild("barrel", CubeListBuilder.create().texOffs(80, 0).addBox(-3.0F, -6.25F, -20.5F, 6.0F, 2.0F, 8.0F), PartPose.ZERO);
-		gun.addOrReplaceChild("frame", CubeListBuilder.create().texOffs(0, 38).addBox(-6.0F, -3.2F, -15.0F, 12.0F, 3.5F, 19.0F), PartPose.ZERO);
-		gun.addOrReplaceChild("rail", CubeListBuilder.create().texOffs(68, 38).addBox(-5.0F, 0.0F, -14.0F, 10.0F, 1.8F, 12.0F), PartPose.ZERO);
-		gun.addOrReplaceChild("trigger_guard", CubeListBuilder.create().texOffs(118, 30).addBox(-4.0F, 0.0F, -5.5F, 8.0F, 6.0F, 2.0F), PartPose.ZERO);
-		gun.addOrReplaceChild("trigger", CubeListBuilder.create().texOffs(142, 30).addBox(-1.0F, 1.5F, -5.0F, 2.0F, 4.0F, 1.5F), PartPose.ZERO);
-		gun.addOrReplaceChild("grip", CubeListBuilder.create().texOffs(0, 70).addBox(-5.0F, -0.5F, 0.5F, 10.0F, 15.0F, 7.0F), PartPose.rotation(-0.22F, 0.0F, 0.0F));
-		gun.addOrReplaceChild("magazine", CubeListBuilder.create().texOffs(54, 70).addBox(-4.0F, 8.0F, 1.0F, 8.0F, 9.0F, 5.5F), PartPose.rotation(-0.22F, 0.0F, 0.0F));
-		gun.addOrReplaceChild("front_sight", CubeListBuilder.create().texOffs(104, 0).addBox(-1.5F, -8.0F, -17.0F, 3.0F, 1.0F, 2.0F), PartPose.ZERO);
-		gun.addOrReplaceChild("rear_sight", CubeListBuilder.create().texOffs(118, 0).addBox(-2.5F, -8.2F, 2.5F, 5.0F, 1.2F, 2.0F), PartPose.ZERO);
-		return LayerDefinition.create(meshDefinition, 1024, 1024);
+		this.geometry = BedrockGunGeometry.load(MODEL);
 	}
 
 	@Override
 	public void submit(ItemDisplayContext itemDisplayContext, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, boolean bl, int k) {
 		poseStack.pushPose();
-		poseStack.scale(1.0F, -1.0F, -1.0F);
-		poseStack.scale(0.82F, 0.82F, 0.82F);
-		submitNodeCollector.submitModelPart(this.model.root(), poseStack, this.model.renderType(TEXTURE), i, j, null, false, bl, -1, null, k);
+		this.applyTaczTransform(itemDisplayContext, poseStack);
+		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.entityCutoutNoCull(TEXTURE), (pose, vertexConsumer) -> {
+			PoseStack modelPoseStack = new PoseStack();
+			modelPoseStack.last().set(pose);
+			for (BedrockNode root : this.geometry.roots()) {
+				root.render(modelPoseStack, itemDisplayContext, vertexConsumer, i, j);
+			}
+		});
 		poseStack.popPose();
 	}
 
 	@Override
 	public void getExtents(Set<Vector3f> set) {
-		PoseStack poseStack = new PoseStack();
-		poseStack.scale(1.0F, -1.0F, -1.0F);
-		poseStack.scale(0.82F, 0.82F, 0.82F);
-		this.model.root().getExtentsForGui(poseStack, set);
+		set.add(new Vector3f(-1.0F, -1.0F, -1.0F));
+		set.add(new Vector3f(1.0F, 1.0F, 1.0F));
+	}
+
+	private void applyTaczTransform(ItemDisplayContext itemDisplayContext, PoseStack poseStack) {
+		if (itemDisplayContext.firstPerson()) {
+			poseStack.translate(0.0F, 1.5F, 0.0F);
+			poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
+			this.geometry.applyFirstPersonPositioning(poseStack);
+			return;
+		}
+
+		poseStack.translate(0.5F, 2.0F, 0.5F);
+		poseStack.scale(-1.0F, -1.0F, 1.0F);
+		switch (itemDisplayContext) {
+			case THIRD_PERSON_LEFT_HAND, THIRD_PERSON_RIGHT_HAND -> {
+				this.geometry.applyPositioningNode("thirdperson_hand", poseStack, 0.6F, 0.6F, 0.6F);
+				poseStack.scale(0.6F, 0.6F, 0.6F);
+			}
+			case GROUND -> {
+				this.geometry.applyPositioningNode("ground", poseStack, 0.6F, 0.6F, 0.6F);
+				poseStack.scale(0.6F, 0.6F, 0.6F);
+			}
+			case FIXED -> {
+				this.geometry.applyPositioningNode("fixed", poseStack, 1.2F, 1.2F, 1.2F);
+				poseStack.scale(1.2F, 1.2F, 1.2F);
+			}
+			case GUI -> {
+				this.geometry.applyPositioningNode("fixed", poseStack, 1.2F, 1.2F, 1.2F);
+				poseStack.scale(0.82F, 0.82F, 0.82F);
+			}
+			default -> poseStack.scale(0.6F, 0.6F, 0.6F);
+		}
+	}
+
+	private record BedrockGunGeometry(List<BedrockNode> roots, Map<String, BedrockNode> nodes) {
+		static BedrockGunGeometry load(ResourceLocation location) {
+			try (Reader reader = Minecraft.getInstance().getResourceManager().openAsReader(location)) {
+				JsonObject root = GsonHelper.parse(reader);
+				JsonObject geometry = GsonHelper.getAsJsonArray(root, "minecraft:geometry").get(0).getAsJsonObject();
+				JsonObject description = GsonHelper.getAsJsonObject(geometry, "description");
+				int textureWidth = GsonHelper.getAsInt(description, "texture_width");
+				int textureHeight = GsonHelper.getAsInt(description, "texture_height");
+				JsonArray bones = GsonHelper.getAsJsonArray(geometry, "bones");
+				Map<String, BoneData> boneData = new HashMap<>();
+				Map<String, BedrockNode> nodes = new HashMap<>();
+				List<BedrockNode> roots = new ArrayList<>();
+
+				for (JsonElement element : bones) {
+					JsonObject bone = element.getAsJsonObject();
+					String name = GsonHelper.getAsString(bone, "name");
+					BoneData data = BoneData.read(bone);
+					boneData.put(name, data);
+					nodes.put(name, new BedrockNode(name));
+				}
+
+				for (JsonElement element : bones) {
+					JsonObject bone = element.getAsJsonObject();
+					String name = GsonHelper.getAsString(bone, "name");
+					BoneData data = boneData.get(name);
+					BedrockNode node = nodes.get(name);
+					node.hiddenMarker = FUNCTIONAL_MARKER_NODES.contains(name);
+					node.x = convertPivot(data, boneData, 0);
+					node.y = convertPivot(data, boneData, 1);
+					node.z = convertPivot(data, boneData, 2);
+					if (data.rotation != null) {
+						node.xRot = degreesToRadians(data.rotation[0]);
+						node.yRot = degreesToRadians(data.rotation[1]);
+						node.zRot = degreesToRadians(data.rotation[2]);
+					}
+
+					if (data.parent != null) {
+						BedrockNode parent = nodes.get(data.parent);
+						node.parent = parent;
+						parent.children.add(node);
+					} else {
+						roots.add(node);
+					}
+
+					JsonArray cubes = GsonHelper.getAsJsonArray(bone, "cubes", null);
+					if (cubes == null) {
+						continue;
+					}
+
+					for (JsonElement cubeElement : cubes) {
+						JsonObject cube = cubeElement.getAsJsonObject();
+						float[] size = readFloatArray(cube, "size", 3);
+						float inflate = GsonHelper.getAsFloat(cube, "inflate", 0.0F);
+						boolean mirror = GsonHelper.getAsBoolean(cube, "mirror", false);
+						float x;
+						float y;
+						float z;
+						JsonArray cubeRotation = GsonHelper.getAsJsonArray(cube, "rotation", null);
+						if (cubeRotation == null) {
+							x = convertOrigin(data, cube, 0);
+							y = convertOrigin(data, cube, 1);
+							z = convertOrigin(data, cube, 2);
+							node.cubes.add(BedrockCube.create(cube, x, y, z, size, inflate, mirror, textureWidth, textureHeight));
+						} else {
+							BedrockNode cubeNode = new BedrockNode(null);
+							cubeNode.x = convertCubePivot(data, cube, 0);
+							cubeNode.y = convertCubePivot(data, cube, 1);
+							cubeNode.z = convertCubePivot(data, cube, 2);
+							float[] rotation = readFloatArray(cube, "rotation", 3);
+							cubeNode.xRot = degreesToRadians(rotation[0]);
+							cubeNode.yRot = degreesToRadians(rotation[1]);
+							cubeNode.zRot = degreesToRadians(rotation[2]);
+							x = convertOrigin(cube, 0);
+							y = convertOrigin(cube, 1);
+							z = convertOrigin(cube, 2);
+							cubeNode.cubes.add(BedrockCube.create(cube, x, y, z, size, inflate, mirror, textureWidth, textureHeight));
+							cubeNode.parent = node;
+							node.children.add(cubeNode);
+						}
+					}
+				}
+
+				return new BedrockGunGeometry(roots, nodes);
+			} catch (Exception exception) {
+				LOGGER.error("Failed to load TACZ Glock 17 Bedrock geometry {}", location, exception);
+				return new BedrockGunGeometry(List.of(), Map.of());
+			}
+		}
+
+		void applyFirstPersonPositioning(PoseStack poseStack) {
+			List<BedrockNode> nodePath = this.pathTo("idle_view");
+			if (nodePath == null) {
+				return;
+			}
+
+			Matrix4f matrix = new Matrix4f().identity();
+			for (int i = nodePath.size() - 1; i >= 0; i--) {
+				BedrockNode part = nodePath.get(i);
+				matrix.rotate(Axis.XN.rotation(part.xRot));
+				matrix.rotate(Axis.YN.rotation(part.yRot));
+				matrix.rotate(Axis.ZN.rotation(part.zRot));
+				if (part.parent != null) {
+					matrix.translate(-part.x / 16.0F, -part.y / 16.0F, -part.z / 16.0F);
+				} else {
+					matrix.translate(-part.x / 16.0F, 1.5F - part.y / 16.0F, -part.z / 16.0F);
+				}
+			}
+			poseStack.translate(0.0F, 1.5F, 0.0F);
+			poseStack.mulPose(matrix);
+			poseStack.translate(0.0F, -1.5F, 0.0F);
+		}
+
+		void applyPositioningNode(String name, PoseStack poseStack, float xScale, float yScale, float zScale) {
+			List<BedrockNode> nodePath = this.pathTo(name);
+			if (nodePath == null) {
+				return;
+			}
+
+			poseStack.translate(0.0F, 1.5F, 0.0F);
+			for (int i = nodePath.size() - 1; i >= 0; i--) {
+				BedrockNode part = nodePath.get(i);
+				poseStack.mulPose(Axis.XN.rotation(part.xRot));
+				poseStack.mulPose(Axis.YN.rotation(part.yRot));
+				poseStack.mulPose(Axis.ZN.rotation(part.zRot));
+				if (part.parent != null) {
+					poseStack.translate(-part.x * xScale / 16.0F, -part.y * yScale / 16.0F, -part.z * zScale / 16.0F);
+				} else {
+					poseStack.translate(-part.x * xScale / 16.0F, (1.5F - part.y / 16.0F) * yScale, -part.z * zScale / 16.0F);
+				}
+			}
+			poseStack.translate(0.0F, -1.5F, 0.0F);
+		}
+
+		private List<BedrockNode> pathTo(String name) {
+			BedrockNode node = this.nodes.get(name);
+			if (node == null) {
+				return null;
+			}
+
+			List<BedrockNode> path = new ArrayList<>();
+			while (node != null) {
+				path.add(0, node);
+				node = node.parent;
+			}
+			return path;
+		}
+	}
+
+	private static final class BedrockNode {
+		private final String name;
+		private final List<BedrockCube> cubes = new ArrayList<>();
+		private final List<BedrockNode> children = new ArrayList<>();
+		private BedrockNode parent;
+		private float x;
+		private float y;
+		private float z;
+		private float xRot;
+		private float yRot;
+		private float zRot;
+		private boolean hiddenMarker;
+
+		private BedrockNode(String name) {
+			this.name = name;
+		}
+
+		private void render(PoseStack poseStack, ItemDisplayContext itemDisplayContext, VertexConsumer consumer, int light, int overlay) {
+			if (this.cubes.isEmpty() && this.children.isEmpty()) {
+				return;
+			}
+
+			poseStack.pushPose();
+			this.translateAndRotate(poseStack);
+			int cubeLight = this.name != null && this.name.endsWith("_illuminated") ? LightTexture.pack(15, 15) : light;
+			if (!this.hiddenMarker) {
+				for (BedrockCube cube : this.cubes) {
+					cube.compile(poseStack.last(), consumer, cubeLight, overlay);
+				}
+			}
+
+			for (BedrockNode child : this.children) {
+				child.render(poseStack, itemDisplayContext, consumer, cubeLight, overlay);
+			}
+			poseStack.popPose();
+		}
+
+		private void translateAndRotate(PoseStack poseStack) {
+			poseStack.translate(this.x / 16.0F, this.y / 16.0F, this.z / 16.0F);
+			if (this.zRot != 0.0F) {
+				poseStack.mulPose(Axis.ZP.rotation(this.zRot));
+			}
+			if (this.yRot != 0.0F) {
+				poseStack.mulPose(Axis.YP.rotation(this.yRot));
+			}
+			if (this.xRot != 0.0F) {
+				poseStack.mulPose(Axis.XP.rotation(this.xRot));
+			}
+		}
+	}
+
+	private record BedrockCube(BedrockPolygon[] polygons) {
+		private static BedrockCube create(JsonObject cube, float x, float y, float z, float[] size, float inflate, boolean mirror, int textureWidth, int textureHeight) {
+			JsonObject faceUv = GsonHelper.getAsJsonObject(cube, "uv", null);
+			return faceUv == null || faceUv.entrySet().isEmpty()
+				? box(cube, x, y, z, size, inflate, mirror, textureWidth, textureHeight)
+				: perFace(faceUv, x, y, z, size, inflate, textureWidth, textureHeight);
+		}
+
+		private static BedrockCube box(JsonObject cube, float x, float y, float z, float[] size, float inflate, boolean mirror, int textureWidth, int textureHeight) {
+			float[] uv = readFloatArray(cube, "uv", 2);
+			float width = size[0];
+			float height = size[1];
+			float depth = size[2];
+			float xEnd = x + width + inflate;
+			float yEnd = y + height + inflate;
+			float zEnd = z + depth + inflate;
+			x -= inflate;
+			y -= inflate;
+			z -= inflate;
+			if (mirror) {
+				float tmp = xEnd;
+				xEnd = x;
+				x = tmp;
+			}
+
+			BedrockVertex v1 = new BedrockVertex(x, y, z);
+			BedrockVertex v2 = new BedrockVertex(xEnd, y, z);
+			BedrockVertex v3 = new BedrockVertex(xEnd, yEnd, z);
+			BedrockVertex v4 = new BedrockVertex(x, yEnd, z);
+			BedrockVertex v5 = new BedrockVertex(x, y, zEnd);
+			BedrockVertex v6 = new BedrockVertex(xEnd, y, zEnd);
+			BedrockVertex v7 = new BedrockVertex(xEnd, yEnd, zEnd);
+			BedrockVertex v8 = new BedrockVertex(x, yEnd, zEnd);
+			int dx = (int)width;
+			int dy = (int)height;
+			int dz = (int)depth;
+			float p1 = uv[0] + dz;
+			float p2 = uv[0] + dz + dx;
+			float p3 = uv[0] + dz + dx + dx;
+			float p4 = uv[0] + dz + dx + dz;
+			float p5 = uv[0] + dz + dx + dz + dx;
+			float p6 = uv[1] + dz;
+			float p7 = uv[1] + dz + dy;
+			float p8 = uv[1];
+			float p9 = uv[0];
+			BedrockPolygon[] polygons = new BedrockPolygon[6];
+			polygons[2] = new BedrockPolygon(new BedrockVertex[]{v6, v5, v1, v2}, p1, p8, p2, p6, textureWidth, textureHeight, mirror, Direction.DOWN);
+			polygons[3] = new BedrockPolygon(new BedrockVertex[]{v3, v4, v8, v7}, p2, p6, p3, p8, textureWidth, textureHeight, mirror, Direction.UP);
+			polygons[1] = new BedrockPolygon(new BedrockVertex[]{v1, v5, v8, v4}, p9, p6, p1, p7, textureWidth, textureHeight, mirror, Direction.WEST);
+			polygons[4] = new BedrockPolygon(new BedrockVertex[]{v2, v1, v4, v3}, p1, p6, p2, p7, textureWidth, textureHeight, mirror, Direction.NORTH);
+			polygons[0] = new BedrockPolygon(new BedrockVertex[]{v6, v2, v3, v7}, p2, p6, p4, p7, textureWidth, textureHeight, mirror, Direction.EAST);
+			polygons[5] = new BedrockPolygon(new BedrockVertex[]{v5, v6, v7, v8}, p4, p6, p5, p7, textureWidth, textureHeight, mirror, Direction.SOUTH);
+			return new BedrockCube(polygons);
+		}
+
+		private static BedrockCube perFace(JsonObject faces, float x, float y, float z, float[] size, float inflate, int textureWidth, int textureHeight) {
+			float width = size[0];
+			float height = size[1];
+			float depth = size[2];
+			float xEnd = x + width + inflate;
+			float yEnd = y + height + inflate;
+			float zEnd = z + depth + inflate;
+			x -= inflate;
+			y -= inflate;
+			z -= inflate;
+			BedrockVertex v1 = new BedrockVertex(x, y, z);
+			BedrockVertex v2 = new BedrockVertex(xEnd, y, z);
+			BedrockVertex v3 = new BedrockVertex(xEnd, yEnd, z);
+			BedrockVertex v4 = new BedrockVertex(x, yEnd, z);
+			BedrockVertex v5 = new BedrockVertex(x, y, zEnd);
+			BedrockVertex v6 = new BedrockVertex(xEnd, y, zEnd);
+			BedrockVertex v7 = new BedrockVertex(xEnd, yEnd, zEnd);
+			BedrockVertex v8 = new BedrockVertex(x, yEnd, zEnd);
+			BedrockPolygon[] polygons = new BedrockPolygon[6];
+			polygons[2] = perFacePolygon(faces, "up", new BedrockVertex[]{v6, v5, v1, v2}, textureWidth, textureHeight, Direction.DOWN);
+			polygons[3] = perFacePolygon(faces, "down", new BedrockVertex[]{v3, v4, v8, v7}, textureWidth, textureHeight, Direction.UP);
+			polygons[1] = perFacePolygon(faces, "east", new BedrockVertex[]{v1, v5, v8, v4}, textureWidth, textureHeight, Direction.WEST);
+			polygons[4] = perFacePolygon(faces, "north", new BedrockVertex[]{v2, v1, v4, v3}, textureWidth, textureHeight, Direction.NORTH);
+			polygons[0] = perFacePolygon(faces, "west", new BedrockVertex[]{v6, v2, v3, v7}, textureWidth, textureHeight, Direction.EAST);
+			polygons[5] = perFacePolygon(faces, "south", new BedrockVertex[]{v5, v6, v7, v8}, textureWidth, textureHeight, Direction.SOUTH);
+			return new BedrockCube(polygons);
+		}
+
+		private static BedrockPolygon perFacePolygon(
+			JsonObject faces, String faceName, BedrockVertex[] vertices, int textureWidth, int textureHeight, Direction direction
+		) {
+			JsonObject face = GsonHelper.getAsJsonObject(faces, faceName, null);
+			if (face == null) {
+				return BedrockPolygon.empty(direction);
+			}
+
+			float[] uv = readFloatArray(face, "uv", 2);
+			float[] uvSize = readFloatArray(face, "uv_size", 2);
+			if (uvSize[0] == 0.0F && uvSize[1] == 0.0F) {
+				return BedrockPolygon.empty(direction);
+			}
+
+			return new BedrockPolygon(vertices, uv[0], uv[1], uv[0] + uvSize[0], uv[1] + uvSize[1], textureWidth, textureHeight, false, direction);
+		}
+
+		private void compile(PoseStack.Pose pose, VertexConsumer consumer, int light, int overlay) {
+			Matrix4f poseMatrix = pose.pose();
+			Matrix3f normalMatrix = pose.normal();
+			for (BedrockPolygon polygon : this.polygons) {
+				if (polygon.empty) {
+					continue;
+				}
+
+				Vector3f normal = new Vector3f(polygon.normal);
+				normal.mul(normalMatrix);
+				for (BedrockVertex vertex : polygon.vertices) {
+					Vector4f position = new Vector4f(vertex.x / 16.0F, vertex.y / 16.0F, vertex.z / 16.0F, 1.0F);
+					position.mul(poseMatrix);
+					consumer.addVertex(position.x(), position.y(), position.z())
+						.setColor(-1)
+						.setUv(vertex.u, vertex.v)
+						.setOverlay(overlay)
+						.setLight(light)
+						.setNormal(normal.x(), normal.y(), normal.z());
+				}
+			}
+		}
+	}
+
+	private static final class BedrockPolygon {
+		private final BedrockVertex[] vertices;
+		private final Vector3f normal;
+		private final boolean empty;
+
+		private BedrockPolygon(BedrockVertex[] vertices, float u1, float v1, float u2, float v2, int textureWidth, int textureHeight, boolean mirror, Direction direction) {
+			this.vertices = vertices;
+			vertices[0] = vertices[0].remap(u2 / textureWidth, v1 / textureHeight);
+			vertices[1] = vertices[1].remap(u1 / textureWidth, v1 / textureHeight);
+			vertices[2] = vertices[2].remap(u1 / textureWidth, v2 / textureHeight);
+			vertices[3] = vertices[3].remap(u2 / textureWidth, v2 / textureHeight);
+			if (mirror) {
+				for (int i = 0; i < vertices.length / 2; i++) {
+					BedrockVertex vertex = vertices[i];
+					vertices[i] = vertices[vertices.length - 1 - i];
+					vertices[vertices.length - 1 - i] = vertex;
+				}
+			}
+
+			this.normal = direction.step();
+			if (mirror) {
+				this.normal.mul(-1.0F, 1.0F, 1.0F);
+			}
+			this.empty = false;
+		}
+
+		private BedrockPolygon(Direction direction) {
+			this.vertices = new BedrockVertex[0];
+			this.normal = direction.step();
+			this.empty = true;
+		}
+
+		private static BedrockPolygon empty(Direction direction) {
+			return new BedrockPolygon(direction);
+		}
+	}
+
+	private record BedrockVertex(float x, float y, float z, float u, float v) {
+		private BedrockVertex(float x, float y, float z) {
+			this(x, y, z, 0.0F, 0.0F);
+		}
+
+		private BedrockVertex remap(float u, float v) {
+			return new BedrockVertex(this.x, this.y, this.z, u, v);
+		}
+	}
+
+	private record BoneData(String name, String parent, float[] pivot, float[] rotation) {
+		private static BoneData read(JsonObject bone) {
+			String name = GsonHelper.getAsString(bone, "name");
+			String parent = GsonHelper.getAsString(bone, "parent", null);
+			float[] pivot = readFloatArray(bone, "pivot", 3);
+			JsonArray rotationArray = GsonHelper.getAsJsonArray(bone, "rotation", null);
+			float[] rotation = rotationArray == null ? null : readFloatArray(rotationArray, 3);
+			return new BoneData(name, parent, pivot, rotation);
+		}
+	}
+
+	private static float convertPivot(BoneData bone, Map<String, BoneData> bones, int index) {
+		if (bone.parent != null) {
+			BoneData parent = bones.get(bone.parent);
+			return index == 1 ? parent.pivot[index] - bone.pivot[index] : bone.pivot[index] - parent.pivot[index];
+		}
+
+		return index == 1 ? 24.0F - bone.pivot[index] : bone.pivot[index];
+	}
+
+	private static float convertCubePivot(BoneData parent, JsonObject cube, int index) {
+		float[] pivot = readFloatArray(cube, "pivot", 3);
+		return index == 1 ? parent.pivot[index] - pivot[index] : pivot[index] - parent.pivot[index];
+	}
+
+	private static float convertOrigin(BoneData bone, JsonObject cube, int index) {
+		float[] origin = readFloatArray(cube, "origin", 3);
+		float[] size = readFloatArray(cube, "size", 3);
+		return index == 1 ? bone.pivot[index] - origin[index] - size[index] : origin[index] - bone.pivot[index];
+	}
+
+	private static float convertOrigin(JsonObject cube, int index) {
+		float[] pivot = readFloatArray(cube, "pivot", 3);
+		float[] origin = readFloatArray(cube, "origin", 3);
+		float[] size = readFloatArray(cube, "size", 3);
+		return index == 1 ? pivot[index] - origin[index] - size[index] : origin[index] - pivot[index];
+	}
+
+	private static float degreesToRadians(float degree) {
+		return degree * (float)Math.PI / 180.0F;
+	}
+
+	private static float[] readFloatArray(JsonObject object, String key, int length) {
+		return readFloatArray(GsonHelper.getAsJsonArray(object, key), length);
+	}
+
+	private static float[] readFloatArray(JsonArray array, int length) {
+		float[] values = new float[length];
+		for (int i = 0; i < length; i++) {
+			values[i] = GsonHelper.convertToFloat(array.get(i), "[" + i + "]");
+		}
+		return values;
 	}
 
 	@Environment(EnvType.CLIENT)

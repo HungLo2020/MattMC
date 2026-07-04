@@ -2,42 +2,5 @@
   "gui_light": "front",
   "textures": {
     "particle": "tacz:item/glock_17"
-  },
-  "display": {
-    "thirdperson_righthand": {
-      "rotation": [0, -90, 45],
-      "translation": [0.5, 5.0, 1.0],
-      "scale": [0.55, 0.55, 0.55]
-    },
-    "thirdperson_lefthand": {
-      "rotation": [0, 90, -45],
-      "translation": [0.5, 5.0, 1.0],
-      "scale": [0.55, 0.55, 0.55]
-    },
-    "firstperson_righthand": {
-      "rotation": [0, -90, 18],
-      "translation": [1.0, 4.0, 1.0],
-      "scale": [0.75, 0.75, 0.75]
-    },
-    "firstperson_lefthand": {
-      "rotation": [0, 90, -18],
-      "translation": [1.0, 4.0, 1.0],
-      "scale": [0.75, 0.75, 0.75]
-    },
-    "gui": {
-      "rotation": [25, -40, -10],
-      "translation": [0, 0, 0],
-      "scale": [0.72, 0.72, 0.72]
-    },
-    "ground": {
-      "rotation": [0, 0, 0],
-      "translation": [0, 3, 0],
-      "scale": [0.35, 0.35, 0.35]
-    },
-    "fixed": {
-      "rotation": [0, 180, 0],
-      "translation": [0, 0, 0],
-      "scale": [0.55, 0.55, 0.55]
-    }
   }
 }
