@@ -11,6 +11,7 @@ import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.protocol.common.custom.BrandPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.DiscardedPayload;
+import net.minecraft.network.protocol.common.custom.TaczKillHudS2CPayload;
 // VoxelMap: Import VoxelMap packet types
 import net.voxelmap.packets.WorldIdS2C;
 // Distant Horizons: Import Distant Horizons packet type
@@ -23,6 +24,7 @@ public record ClientboundCustomPayloadPacket(CustomPacketPayload payload) implem
 			Util.make(
 				Lists.<CustomPacketPayload.TypeAndCodec<? super RegistryFriendlyByteBuf, ?>>newArrayList(
 					new CustomPacketPayload.TypeAndCodec<>(BrandPayload.TYPE, BrandPayload.STREAM_CODEC),
+					new CustomPacketPayload.TypeAndCodec<>(TaczKillHudS2CPayload.TYPE, TaczKillHudS2CPayload.STREAM_CODEC),
 					// VoxelMap: Register VoxelMap packet type
 					new CustomPacketPayload.TypeAndCodec<>(WorldIdS2C.PACKET_ID, WorldIdS2C.PACKET_CODEC),
 					// Distant Horizons: Register Distant Horizons packet type

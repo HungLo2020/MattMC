@@ -254,6 +254,7 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.HitResult.Type;
 import net.minecraft.client.tacz.TaczClientInputHandler;
+import net.minecraft.client.tacz.TaczGunHudOverlay;
 import net.minecraft.client.tacz.TaczKeyMappings;
 import net.voxelmap.VoxelConstants;
 import net.voxelmap.VoxelMapInitializer;
@@ -720,6 +721,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		// TACZ MVP: Register client controls using MattMC's direct key mapping list.
 		TaczKeyMappings.register(this);
+		TaczGunHudOverlay.register();
 	}
 
 	public boolean hasShiftDown() {
