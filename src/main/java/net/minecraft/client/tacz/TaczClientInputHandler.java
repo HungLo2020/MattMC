@@ -1,5 +1,8 @@
 package net.minecraft.client.tacz;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.protocol.common.custom.TaczGunInputC2SPayload;
@@ -10,10 +13,17 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TaczFireMode;
+import net.minecraft.world.item.TaczGunBurstData;
 import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.item.TaczRefitGun;
 
 public final class TaczClientInputHandler {
+	private static final ScheduledExecutorService BURST_FEEDBACK_EXECUTOR = Executors.newSingleThreadScheduledExecutor(runnable -> {
+		Thread thread = new Thread(runnable, "TACZ Burst Feedback");
+		thread.setDaemon(true);
+		return thread;
+	});
+
 	private TaczClientInputHandler() {
 	}
 
@@ -45,7 +55,8 @@ public final class TaczClientInputHandler {
 			tryShoot(minecraft, itemStack, gunItem);
 		}
 
-		if (TaczMvpGunItem.getFireMode(itemStack) == TaczFireMode.AUTO && TaczKeyMappings.SHOOT.isDown()) {
+		TaczFireMode fireMode = TaczMvpGunItem.getFireMode(itemStack);
+		if ((fireMode == TaczFireMode.AUTO || fireMode == TaczFireMode.BURST && TaczGunBurstData.burst(gunItem.gunId()).continuousShoot()) && TaczKeyMappings.SHOOT.isDown()) {
 			tryShoot(minecraft, itemStack, gunItem);
 		}
 
@@ -95,9 +106,34 @@ public final class TaczClientInputHandler {
 		if (interactionResult.consumesAction()) {
 			minecraft.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
 			if (ammoBeforeShot > 0) {
-				TaczGlock17AnimationController.triggerShoot();
+				scheduleClientShotFeedback(minecraft, itemStack, gunItem, ammoBeforeShot);
 			}
 			ClientPlayNetworking.send(new TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action.SHOOT));
+		}
+	}
+
+	private static void scheduleClientShotFeedback(Minecraft minecraft, ItemStack itemStack, TaczMvpGunItem gunItem, int ammoBeforeShot) {
+		int shots = TaczMvpGunItem.getFireMode(itemStack) == TaczFireMode.BURST ? Math.min(TaczGunBurstData.burst(gunItem.gunId()).count(), ammoBeforeShot) : 1;
+		long intervalMillis = TaczMvpGunItem.getFireMode(itemStack) == TaczFireMode.BURST ? TaczGunBurstData.burst(gunItem.gunId()).intervalMillis() : 1L;
+		for (int shot = 0; shot < shots; shot++) {
+			int scheduledShot = shot;
+			BURST_FEEDBACK_EXECUTOR.schedule(() -> minecraft.execute(() -> {
+				if (minecraft.player == null || minecraft.level == null || minecraft.player.getMainHandItem() != itemStack) {
+					return;
+				}
+				TaczGlock17AnimationController.triggerShoot();
+				minecraft.level
+					.playSound(
+						minecraft.player,
+						minecraft.player.getX(),
+						minecraft.player.getY(),
+						minecraft.player.getZ(),
+						gunItem.shootSound(),
+						SoundSource.PLAYERS,
+						1.25F,
+						0.96F + minecraft.level.random.nextFloat() * 0.08F
+					);
+			}), scheduledShot * intervalMillis, TimeUnit.MILLISECONDS);
 		}
 	}
 }

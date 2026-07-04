@@ -6,13 +6,16 @@ import com.google.gson.JsonObject;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.io.IOException;
 import java.io.Reader;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import net.blaze3d.vertex.PoseStack;
 import net.blaze3d.vertex.VertexConsumer;
 import net.math.Axis;
@@ -33,8 +36,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.PlayerModelPart;
 import net.minecraft.world.item.TaczAttachmentType;
+import net.minecraft.world.item.TaczAttachmentItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TaczRefitGun;
 import net.logging.LogUtils;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -46,6 +51,7 @@ import org.slf4j.Logger;
 public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
+	private static final Map<String, AttachmentRenderData> ATTACHMENT_CACHE = new ConcurrentHashMap<>();
 	private final String gunId;
 	private final ResourceLocation texture;
 	private final BedrockGunGeometry geometry;
@@ -82,8 +88,104 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				root.render(modelPoseStack, itemDisplayContext, vertexConsumer, i, j, animationPose);
 			}
 		});
+		this.submitAttachments(itemStack, itemDisplayContext, poseStack, submitNodeCollector, i, j, animationPose);
 		this.submitFirstPersonArms(itemDisplayContext, poseStack, submitNodeCollector, i, animationPose);
 		poseStack.popPose();
+	}
+
+	private void submitAttachments(
+		ItemStack gunStack,
+		ItemDisplayContext itemDisplayContext,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		int light,
+		int overlay,
+		AnimationPose animationPose
+	) {
+		if (gunStack.isEmpty()) {
+			return;
+		}
+
+		for (TaczAttachmentType type : TaczAttachmentType.values()) {
+			if (type == TaczAttachmentType.NONE || type == TaczAttachmentType.AMMO_MOD) {
+				continue;
+			}
+
+			ItemStack attachmentStack = TaczRefitGun.getStoredAttachment(gunStack, type);
+			if (!(attachmentStack.getItem() instanceof TaczAttachmentItem attachment)) {
+				continue;
+			}
+
+			AttachmentRenderData attachmentData = attachmentData(attachment.getAttachmentId());
+			if (attachmentData == null) {
+				continue;
+			}
+
+			String marker = attachmentMarker(type);
+			if (!this.geometry.hasNode(marker)) {
+				continue;
+			}
+
+			submitNodeCollector.submitCustomGeometry(poseStack, RenderType.entityCutoutNoCull(attachmentData.texture()), (pose, vertexConsumer) -> {
+				PoseStack attachmentPoseStack = new PoseStack();
+				attachmentPoseStack.last().set(pose);
+				if (this.geometry.applyAnimatedNodePath(marker, attachmentPoseStack, animationPose)) {
+					attachmentPoseStack.translate(0.0F, -1.5F, 0.0F);
+					for (BedrockNode root : attachmentData.geometry().roots()) {
+						root.render(attachmentPoseStack, itemDisplayContext, vertexConsumer, light, overlay, animationPose);
+					}
+				}
+			});
+		}
+	}
+
+	private static String attachmentMarker(TaczAttachmentType type) {
+		return switch (type) {
+			case SCOPE -> "scope_pos";
+			case MUZZLE -> "muzzle_pos";
+			case LASER -> "laser_pos";
+			case GRIP -> "grip_pos";
+			case STOCK -> "stock_pos";
+			case EXTENDED_MAG -> "magazine";
+			default -> type.getSerializedName() + "_pos";
+		};
+	}
+
+	private static AttachmentRenderData attachmentData(String attachmentId) {
+		if (attachmentId == null || attachmentId.isEmpty()) {
+			return null;
+		}
+		return ATTACHMENT_CACHE.computeIfAbsent(attachmentId, TaczGlock17SpecialRenderer::loadAttachmentData);
+	}
+
+	private static AttachmentRenderData loadAttachmentData(String attachmentId) {
+		ResourceLocation displayLocation = ResourceLocation.withDefaultNamespace("display/attachments/" + attachmentId + "_display.json");
+		try (Reader reader = Minecraft.getInstance().getResourceManager().openAsReader(displayLocation)) {
+			String json = stripLineComments(readAll(reader));
+			JsonObject display = GsonHelper.parse(new StringReader(json));
+			ResourceLocation model = ResourceLocation.parse(GsonHelper.getAsString(display, "model"));
+			ResourceLocation texture = ResourceLocation.parse(GsonHelper.getAsString(display, "texture"));
+			ResourceLocation geometryLocation = ResourceLocation.fromNamespaceAndPath(model.getNamespace(), "geo_models/" + model.getPath() + ".json");
+			ResourceLocation textureLocation = ResourceLocation.fromNamespaceAndPath(texture.getNamespace(), "textures/" + texture.getPath() + ".png");
+			return new AttachmentRenderData(BedrockGunGeometry.load(geometryLocation), textureLocation);
+		} catch (Exception exception) {
+			LOGGER.warn("Failed to load TACZ attachment display {}", displayLocation, exception);
+			return null;
+		}
+	}
+
+	private static String readAll(Reader reader) throws IOException {
+		StringBuilder builder = new StringBuilder();
+		char[] buffer = new char[2048];
+		int read;
+		while ((read = reader.read(buffer)) >= 0) {
+			builder.append(buffer, 0, read);
+		}
+		return builder.toString();
+	}
+
+	private static String stripLineComments(String text) {
+		return text.replaceAll("(?m)//.*$", "");
 	}
 
 	private void submitFirstPersonArms(
@@ -383,6 +485,10 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				node.translateAndRotate(poseStack, animationPose.node(node.name));
 			}
 			return true;
+		}
+
+		boolean hasNode(String name) {
+			return this.nodes.containsKey(name);
 		}
 
 		private List<BedrockNode> pathTo(String name) {
@@ -1000,6 +1106,9 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 			Mth.lerp(alpha, from.m32(), to.m32()),
 			Mth.lerp(alpha, from.m33(), to.m33())
 		);
+	}
+
+	private record AttachmentRenderData(BedrockGunGeometry geometry, ResourceLocation texture) {
 	}
 
 	@Environment(EnvType.CLIENT)

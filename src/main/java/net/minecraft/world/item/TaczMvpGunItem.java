@@ -7,6 +7,8 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
@@ -82,36 +84,69 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		}
 
 		if (level instanceof ServerLevel serverLevel) {
-			int rounds = this.roundsPerTrigger(itemStack, ammo);
-			int bulletCount = Math.max(1, this.definition.bulletCount());
-			float damage = this.definition.damage() / bulletCount;
-			float inaccuracy = Math.max(0.0F, this.definition.inaccuracy());
-			for (int round = 0; round < rounds; round++) {
-				for (int shot = 0; shot < bulletCount; shot++) {
-					TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, damage, Math.max(1, this.definition.pierce()));
-					bullet.setBulletProperties(
-						this.definition.gravity(),
-						this.definition.friction(),
-						this.definition.lifeTicks(),
-						this.definition.headshotMultiplier(),
-						this.definition.knockback()
-					);
-					bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, this.definition.bulletSpeed(), inaccuracy);
-					serverLevel.addFreshEntity(bullet);
-				}
-			}
-
-			setAmmo(itemStack, ammo - rounds);
-			player.awardStat(Stats.ITEM_USED.get(this));
+			this.scheduleTriggerPull(serverLevel, player, itemStack, ammo);
 		}
 
-		level.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("shoot"), SoundSource.PLAYERS, 1.25F, 0.96F + level.random.nextFloat() * 0.08F);
-		player.getCooldowns().addCooldown(itemStack, Math.max(1, Math.round(1200.0F / Math.max(1, this.definition.rpm()))));
+		player.getCooldowns().addCooldown(itemStack, this.triggerCooldownTicks(itemStack));
 		return InteractionResult.CONSUME;
 	}
 
+	private int triggerCooldownTicks(ItemStack itemStack) {
+		if (getFireMode(itemStack) == TaczFireMode.BURST) {
+			return TaczGunBurstData.burst(this.definition.id()).minIntervalTicks();
+		}
+		return Math.max(1, Math.round(1200.0F / Math.max(1, this.definition.rpm())));
+	}
+
 	private int roundsPerTrigger(ItemStack itemStack, int ammo) {
-		return getFireMode(itemStack) == TaczFireMode.BURST ? Math.min(3, ammo) : 1;
+		return getFireMode(itemStack) == TaczFireMode.BURST ? Math.min(TaczGunBurstData.burst(this.definition.id()).count(), ammo) : 1;
+	}
+
+	private void scheduleTriggerPull(ServerLevel serverLevel, Player player, ItemStack itemStack, int ammo) {
+		int rounds = this.roundsPerTrigger(itemStack, ammo);
+		if (rounds <= 1) {
+			this.fireRound(serverLevel, player, itemStack);
+			return;
+		}
+
+		MinecraftServer server = serverLevel.getServer();
+		int intervalTicks = TaczGunBurstData.burst(this.definition.id()).intervalTicks();
+		int startTick = server.getTickCount();
+		for (int round = 0; round < rounds; round++) {
+			int scheduledRound = round;
+			server.schedule(new TickTask(startTick + scheduledRound * intervalTicks, () -> {
+				if (!player.isAlive() || player.getMainHandItem() != itemStack || getAmmo(itemStack) <= 0) {
+					return;
+				}
+				this.fireRound(serverLevel, player, itemStack);
+			}));
+		}
+	}
+
+	private void fireRound(ServerLevel serverLevel, Player player, ItemStack itemStack) {
+		if (getAmmo(itemStack) <= 0) {
+			return;
+		}
+
+		int bulletCount = Math.max(1, this.definition.bulletCount());
+		float damage = this.definition.damage() / bulletCount;
+		float inaccuracy = Math.max(0.0F, this.definition.inaccuracy());
+		for (int shot = 0; shot < bulletCount; shot++) {
+			TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, damage, Math.max(1, this.definition.pierce()));
+			bullet.setBulletProperties(
+				this.definition.gravity(),
+				this.definition.friction(),
+				this.definition.lifeTicks(),
+				this.definition.headshotMultiplier(),
+				this.definition.knockback()
+			);
+			bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, this.definition.bulletSpeed(), inaccuracy);
+			serverLevel.addFreshEntity(bullet);
+		}
+
+		setAmmo(itemStack, getAmmo(itemStack) - 1);
+		player.awardStat(Stats.ITEM_USED.get(this));
+		serverLevel.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("shoot"), SoundSource.PLAYERS, 1.25F, 0.96F + serverLevel.random.nextFloat() * 0.08F);
 	}
 
 	public InteractionResult tryStartReload(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
@@ -302,5 +337,9 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 	private SoundEvent sound(String action) {
 		return SoundEvent.createVariableRangeEvent(ResourceLocation.withDefaultNamespace(this.definition.id() + "." + action));
+	}
+
+	public SoundEvent shootSound() {
+		return this.sound("shoot");
 	}
 }
