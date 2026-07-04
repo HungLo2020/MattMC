@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/db_long",
-    "particle": "minecraft:gun/slot/db_long"
+    "layer0": "minecraft:item/tacz/guns/db_long",
+    "particle": "minecraft:item/tacz/guns/db_long"
   }
 }

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/scope_aug_default"
+    "layer0": "minecraft:item/tacz/attachments/scope_aug_default"
   }
 }

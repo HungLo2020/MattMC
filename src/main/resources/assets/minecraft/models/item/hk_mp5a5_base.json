@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/hk_mp5a5",
-    "particle": "minecraft:gun/slot/hk_mp5a5"
+    "layer0": "minecraft:item/tacz/guns/hk_mp5a5",
+    "particle": "minecraft:item/tacz/guns/hk_mp5a5"
   }
 }

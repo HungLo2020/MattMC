@@ -2219,6 +2219,8 @@ public class ServerGamePacketListenerImpl
 			}
 		} else if (payload.action() == TaczGunInputC2SPayload.Action.RELOAD) {
 			gunItem.tryStartReload(this.player.level(), this.player, InteractionHand.MAIN_HAND, itemStack);
+		} else if (payload.action() == TaczGunInputC2SPayload.Action.FIRE_SELECT) {
+			gunItem.cycleFireMode(itemStack);
 		}
 	}
 

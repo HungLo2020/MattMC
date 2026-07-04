@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:ammo/slot/30_06"
+    "layer0": "minecraft:item/tacz/ammo/30_06"
   }
 }

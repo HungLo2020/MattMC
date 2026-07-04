@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/b93r_slot",
-    "particle": "minecraft:gun/slot/b93r_slot"
+    "layer0": "minecraft:item/tacz/guns/b93r",
+    "particle": "minecraft:item/tacz/guns/b93r"
   }
 }

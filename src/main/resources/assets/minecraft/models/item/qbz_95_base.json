@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/qbz_95",
-    "particle": "minecraft:gun/slot/qbz_95"
+    "layer0": "minecraft:item/tacz/guns/qbz_95",
+    "particle": "minecraft:item/tacz/guns/qbz_95"
   }
 }

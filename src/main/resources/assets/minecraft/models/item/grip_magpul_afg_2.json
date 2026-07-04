@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/grip_magpul_afg_2"
+    "layer0": "minecraft:item/tacz/attachments/grip_magpul_afg_2"
   }
 }

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/uv/laser_peq15"
+    "layer0": "minecraft:item/tacz/attachments/laser_peq15"
   }
 }

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/ammo_mod_fmj"
+    "layer0": "minecraft:item/tacz/attachments/ammo_mod_fmj"
   }
 }

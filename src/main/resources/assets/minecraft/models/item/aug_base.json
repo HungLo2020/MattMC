@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/aug",
-    "particle": "minecraft:gun/slot/aug"
+    "layer0": "minecraft:item/tacz/guns/aug",
+    "particle": "minecraft:item/tacz/guns/aug"
   }
 }

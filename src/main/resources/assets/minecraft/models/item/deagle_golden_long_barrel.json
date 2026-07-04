@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/deagle_golden_long_barrel"
+    "layer0": "minecraft:item/tacz/attachments/deagle_golden_long_barrel"
   }
 }

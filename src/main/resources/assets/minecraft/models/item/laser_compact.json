@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/laser_compact_slot"
+    "layer0": "minecraft:item/tacz/attachments/laser_compact"
   }
 }

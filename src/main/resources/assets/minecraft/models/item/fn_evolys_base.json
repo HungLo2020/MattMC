@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/fn_evolys",
-    "particle": "minecraft:gun/slot/fn_evolys"
+    "layer0": "minecraft:item/tacz/guns/fn_evolys",
+    "particle": "minecraft:item/tacz/guns/fn_evolys"
   }
 }

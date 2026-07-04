@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/g36k",
-    "particle": "minecraft:gun/slot/g36k"
+    "layer0": "minecraft:item/tacz/guns/g36k",
+    "particle": "minecraft:item/tacz/guns/g36k"
   }
 }

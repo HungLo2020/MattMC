@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/grip_vertical_talon"
+    "layer0": "minecraft:item/tacz/attachments/grip_vertical_talon"
   }
 }

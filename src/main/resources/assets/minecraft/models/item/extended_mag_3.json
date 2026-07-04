@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/extended_mag_3"
+    "layer0": "minecraft:item/tacz/attachments/extended_mag_3"
   }
 }

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/scope_lpvo_1_6"
+    "layer0": "minecraft:item/tacz/attachments/scope_lpvo_1_6"
   }
 }

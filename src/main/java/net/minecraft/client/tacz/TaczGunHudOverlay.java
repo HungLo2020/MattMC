@@ -12,11 +12,11 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TaczFireMode;
 import net.minecraft.world.item.TaczMvpGunItem;
 
 public final class TaczGunHudOverlay {
 	private static final ResourceLocation ID = ResourceLocation.withDefaultNamespace("tacz_gun_hud_overlay");
-	private static final ResourceLocation FIRE_MODE_SEMI = ResourceLocation.withDefaultNamespace("textures/hud/fire_mode_semi.png");
 	private static final DecimalFormat CURRENT_AMMO_FORMAT = new DecimalFormat("000");
 	private static final DecimalFormat INVENTORY_AMMO_FORMAT = new DecimalFormat("0000");
 	private static final int MAX_AMMO_COUNT = 9999;
@@ -55,6 +55,7 @@ public final class TaczGunHudOverlay {
 		int reserveColor = player.hasInfiniteMaterials() ? 0xFF55FFFF : 0xFFAAAAAA;
 		String currentAmmoText = CURRENT_AMMO_FORMAT.format(currentAmmo);
 		String reserveAmmoText = INVENTORY_AMMO_FORMAT.format(reserveAmmo);
+		TaczFireMode fireMode = TaczMvpGunItem.getFireMode(gunStack);
 		Font font = minecraft.font;
 
 		guiGraphics.nextStratum();
@@ -94,7 +95,7 @@ public final class TaczGunHudOverlay {
 		);
 		guiGraphics.blit(
 			RenderPipelines.GUI_TEXTURED,
-			FIRE_MODE_SEMI,
+			ResourceLocation.withDefaultNamespace("textures/hud/fire_mode_" + fireMode.getSerializedName() + ".png"),
 			(int)(width - 68.5F + font.width(currentAmmoText) * 1.5F),
 			height - 38,
 			0.0F,
@@ -105,6 +106,17 @@ public final class TaczGunHudOverlay {
 			10,
 			0xFFFFFFFF
 		);
+		guiGraphics.pose().pushMatrix();
+		guiGraphics.pose().scale(0.5F, 0.5F);
+		guiGraphics.drawString(
+			font,
+			fireMode.getSerializedName().toUpperCase(java.util.Locale.ROOT),
+			Math.round((width - 68.5F + font.width(currentAmmoText) * 1.5F) / 0.5F),
+			Math.round((height - 26.0F) / 0.5F),
+			0xFFFFFFFF,
+			false
+		);
+		guiGraphics.pose().popMatrix();
 	}
 
 	private static void handleCacheCount(LocalPlayer player, TaczMvpGunItem gunItem) {

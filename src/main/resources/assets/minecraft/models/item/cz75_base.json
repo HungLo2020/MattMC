@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/cz75",
-    "particle": "minecraft:gun/slot/cz75"
+    "layer0": "minecraft:item/tacz/guns/cz75",
+    "particle": "minecraft:item/tacz/guns/cz75"
   }
 }

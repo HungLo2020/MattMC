@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/springfield1873_slot",
-    "particle": "minecraft:gun/slot/springfield1873_slot"
+    "layer0": "minecraft:item/tacz/guns/springfield1873",
+    "particle": "minecraft:item/tacz/guns/springfield1873"
   }
 }

@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/sks_tactical",
-    "particle": "minecraft:gun/slot/sks_tactical"
+    "layer0": "minecraft:item/tacz/guns/sks_tactical",
+    "particle": "minecraft:item/tacz/guns/sks_tactical"
   }
 }

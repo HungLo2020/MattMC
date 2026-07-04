@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:gun/slot/ai_awp",
-    "particle": "minecraft:gun/slot/ai_awp"
+    "layer0": "minecraft:item/tacz/guns/ai_awp",
+    "particle": "minecraft:item/tacz/guns/ai_awp"
   }
 }

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:attachment/slot/sight_pk06_pistol"
+    "layer0": "minecraft:item/tacz/attachments/sight_pk06_pistol"
   }
 }

@@ -28,7 +28,8 @@ public record TaczGunInputC2SPayload(TaczGunInputC2SPayload.Action action) imple
 
 	public enum Action {
 		SHOOT,
-		RELOAD;
+		RELOAD,
+		FIRE_SELECT;
 
 		private static Action byId(int id) {
 			Action[] actions = values();

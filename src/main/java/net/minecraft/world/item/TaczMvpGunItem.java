@@ -22,6 +22,7 @@ import net.minecraft.world.level.Level;
 
 public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	private static final String AMMO_KEY = "TaczMvpAmmo";
+	private static final String FIRE_MODE_KEY = "TaczFireMode";
 	private final TaczGunDefinitions.Gun definition;
 
 	public TaczMvpGunItem(Item.Properties properties) {
@@ -39,6 +40,10 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 	public String gunId() {
 		return this.definition.id();
+	}
+
+	public java.util.List<TaczFireMode> supportedFireModes() {
+		return TaczGunFireModes.modes(this.definition.id());
 	}
 
 	@Override
@@ -77,29 +82,36 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		}
 
 		if (level instanceof ServerLevel serverLevel) {
+			int rounds = this.roundsPerTrigger(itemStack, ammo);
 			int bulletCount = Math.max(1, this.definition.bulletCount());
 			float damage = this.definition.damage() / bulletCount;
 			float inaccuracy = Math.max(0.0F, this.definition.inaccuracy());
-			for (int shot = 0; shot < bulletCount; shot++) {
-				TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, damage, Math.max(1, this.definition.pierce()));
-				bullet.setBulletProperties(
-					this.definition.gravity(),
-					this.definition.friction(),
-					this.definition.lifeTicks(),
-					this.definition.headshotMultiplier(),
-					this.definition.knockback()
-				);
-				bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, this.definition.bulletSpeed(), inaccuracy);
-				serverLevel.addFreshEntity(bullet);
+			for (int round = 0; round < rounds; round++) {
+				for (int shot = 0; shot < bulletCount; shot++) {
+					TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, damage, Math.max(1, this.definition.pierce()));
+					bullet.setBulletProperties(
+						this.definition.gravity(),
+						this.definition.friction(),
+						this.definition.lifeTicks(),
+						this.definition.headshotMultiplier(),
+						this.definition.knockback()
+					);
+					bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, this.definition.bulletSpeed(), inaccuracy);
+					serverLevel.addFreshEntity(bullet);
+				}
 			}
 
-			setAmmo(itemStack, ammo - 1);
+			setAmmo(itemStack, ammo - rounds);
 			player.awardStat(Stats.ITEM_USED.get(this));
 		}
 
 		level.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("shoot"), SoundSource.PLAYERS, 1.25F, 0.96F + level.random.nextFloat() * 0.08F);
 		player.getCooldowns().addCooldown(itemStack, Math.max(1, Math.round(1200.0F / Math.max(1, this.definition.rpm()))));
 		return InteractionResult.CONSUME;
+	}
+
+	private int roundsPerTrigger(ItemStack itemStack, int ammo) {
+		return getFireMode(itemStack) == TaczFireMode.BURST ? Math.min(3, ammo) : 1;
 	}
 
 	public InteractionResult tryStartReload(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
@@ -248,6 +260,24 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 			return gunItem.definition.extendedMagazineSize(attachment.getAttachmentLevel());
 		}
 		return gunItem.definition.magazineSize();
+	}
+
+	public static TaczFireMode getFireMode(ItemStack itemStack) {
+		if (!(itemStack.getItem() instanceof TaczMvpGunItem gunItem)) {
+			return TaczFireMode.SEMI;
+		}
+
+		CompoundTag tag = itemStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+		TaczFireMode mode = tag.getString(FIRE_MODE_KEY).map(TaczFireMode::byName).orElse(gunItem.supportedFireModes().get(0));
+		return gunItem.supportedFireModes().contains(mode) ? mode : gunItem.supportedFireModes().get(0);
+	}
+
+	public TaczFireMode cycleFireMode(ItemStack itemStack) {
+		java.util.List<TaczFireMode> modes = this.supportedFireModes();
+		TaczFireMode current = getFireMode(itemStack);
+		TaczFireMode next = modes.get((modes.indexOf(current) + 1) % modes.size());
+		CustomData.update(DataComponents.CUSTOM_DATA, itemStack, tag -> tag.putString(FIRE_MODE_KEY, next.getSerializedName()));
+		return next;
 	}
 
 	public int countReserveAmmo(Player player) {
