@@ -7314,7 +7314,9 @@ void main() {
             VirtualProgram program = virtualPrograms.get(locationRef.programId());
             if (program != null) {
                 captureSamplerUniformInt(program, locationRef.uniformIndex(), values[0]);
-                writeStandaloneUniformInts(program, locationRef.uniformIndex(), values);
+                if (writeStandaloneUniformInts(program, locationRef.uniformIndex(), values)) {
+                    traceStandaloneUniformInts(locationRef.programId(), program, locationRef.uniformIndex(), values);
+                }
             }
             maybeLogStandaloneUniformStats();
             return;
@@ -7324,7 +7326,9 @@ void main() {
         if (boundProgram != null) {
             STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
             captureSamplerUniformInt(boundProgram, location, values[0]);
-            writeStandaloneUniformInts(boundProgram, location, values);
+            if (writeStandaloneUniformInts(boundProgram, location, values)) {
+                traceStandaloneUniformInts(boundVirtualProgram, boundProgram, location, values);
+            }
         }
         maybeLogStandaloneUniformStats();
     }
@@ -7352,7 +7356,9 @@ void main() {
             STANDALONE_UNIFORM_TOKEN_HIT_COUNT.incrementAndGet();
             VirtualProgram program = virtualPrograms.get(locationRef.programId());
             if (program != null) {
-                writeStandaloneUniformFloats(program, locationRef.uniformIndex(), values);
+                if (writeStandaloneUniformFloats(program, locationRef.uniformIndex(), values)) {
+                    traceStandaloneUniformFloats(locationRef.programId(), program, locationRef.uniformIndex(), values);
+                }
             }
             maybeLogStandaloneUniformStats();
             return;
@@ -7361,9 +7367,52 @@ void main() {
         VirtualProgram boundProgram = virtualPrograms.get(boundVirtualProgram);
         if (boundProgram != null) {
             STANDALONE_UNIFORM_FALLBACK_COUNT.incrementAndGet();
-            writeStandaloneUniformFloats(boundProgram, location, values);
+            if (writeStandaloneUniformFloats(boundProgram, location, values)) {
+                traceStandaloneUniformFloats(boundVirtualProgram, boundProgram, location, values);
+            }
         }
         maybeLogStandaloneUniformStats();
+    }
+
+    private void traceStandaloneUniformFloats(int programId, VirtualProgram virtualProgram, int location, float[] values) {
+        if (!VulkanicAPI.isShaderInputParityTracingEnabled()) {
+            return;
+        }
+        StandaloneUniformField field = virtualProgram.standaloneFieldsByLocation.get(location);
+        if (field == null) {
+            return;
+        }
+        VulkanicAPI.traceShaderInputParityStandaloneUniformFloats(
+            "vulkan-setUniform",
+            programId,
+            location,
+            field.name(),
+            standaloneUniformValueKind(field.type()),
+            false,
+            values
+        );
+    }
+
+    private void traceStandaloneUniformInts(int programId, VirtualProgram virtualProgram, int location, int[] values) {
+        if (!VulkanicAPI.isShaderInputParityTracingEnabled()) {
+            return;
+        }
+        StandaloneUniformField field = virtualProgram.standaloneFieldsByLocation.get(location);
+        if (field == null) {
+            return;
+        }
+        VulkanicAPI.traceShaderInputParityStandaloneUniformInts(
+            "vulkan-setUniform",
+            programId,
+            location,
+            field.name(),
+            standaloneUniformValueKind(field.type()),
+            values
+        );
+    }
+
+    private static String standaloneUniformValueKind(net.vulkanic.VulkanicUniformReflectionType type) {
+        return type.getGlslTypeName();
     }
 
     private void maybeLogStandaloneUniformStats() {

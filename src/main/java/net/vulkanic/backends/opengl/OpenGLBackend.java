@@ -49,6 +49,8 @@ public class OpenGLBackend implements GraphicsBackend {
 
     private static final int TEXTURE_UNIT_COUNT = 128;
     private final int[] texture2DBindings = new int[TEXTURE_UNIT_COUNT];
+    private final java.util.concurrent.ConcurrentMap<Integer, java.util.concurrent.ConcurrentMap<Integer, String>> uniformNamesByProgramLocation =
+        new java.util.concurrent.ConcurrentHashMap<>();
     private int activeTextureUnitIndex = 0;
     private volatile int presentScratchReadFbo;
 
@@ -1311,7 +1313,13 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
-        return GL20.glGetUniformLocation(program, name);
+        int location = GL20.glGetUniformLocation(program, name);
+        if (location >= 0 && VulkanicAPI.isShaderInputParityTracingEnabled()) {
+            uniformNamesByProgramLocation
+                .computeIfAbsent(program, ignored -> new java.util.concurrent.ConcurrentHashMap<>())
+                .put(location, name.toString());
+        }
+        return location;
     }
     
     @Override
@@ -1328,6 +1336,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform1i(location, value);
+        traceStandaloneUniformInts(location, "int", new int[] {value});
     }
     
     @Override
@@ -1336,6 +1345,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform1f(location, value);
+        traceStandaloneUniformFloats(location, "float", false, new float[] {value});
     }
     
     @Override
@@ -1344,6 +1354,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform2f(location, v0, v1);
+        traceStandaloneUniformFloats(location, "vec2", false, new float[] {v0, v1});
     }
     
     @Override
@@ -1352,6 +1363,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform2i(location, v0, v1);
+        traceStandaloneUniformInts(location, "ivec2", new int[] {v0, v1});
     }
     
     @Override
@@ -1360,6 +1372,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform3i(location, v0, v1, v2);
+        traceStandaloneUniformInts(location, "ivec3", new int[] {v0, v1, v2});
     }
     
     @Override
@@ -1368,6 +1381,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform4f(location, v0, v1, v2, v3);
+        traceStandaloneUniformFloats(location, "vec4", false, new float[] {v0, v1, v2, v3});
     }
     
     @Override
@@ -1376,6 +1390,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniform4i(location, v0, v1, v2, v3);
+        traceStandaloneUniformInts(location, "ivec4", new int[] {v0, v1, v2, v3});
     }
     
     @Override
@@ -1383,6 +1398,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        traceStandaloneUniformFloats(location, "mat3", transpose, copyFloats(matrix, 9));
         GL20.glUniformMatrix3fv(location, transpose, matrix);
     }
     
@@ -1392,6 +1408,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniformMatrix3fv(location, transpose, matrix);
+        traceStandaloneUniformFloats(location, "mat3", transpose, java.util.Arrays.copyOf(matrix, Math.min(matrix.length, 9)));
     }
     
     @Override
@@ -1399,6 +1416,7 @@ public class OpenGLBackend implements GraphicsBackend {
         if (!ctx.isImmediate()) {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
+        traceStandaloneUniformFloats(location, "mat4", transpose, copyFloats(matrix, 16));
         GL20.glUniformMatrix4fv(location, transpose, matrix);
     }
     
@@ -1408,6 +1426,7 @@ public class OpenGLBackend implements GraphicsBackend {
             throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         }
         GL20.glUniformMatrix4fv(location, transpose, matrix);
+        traceStandaloneUniformFloats(location, "mat4", transpose, java.util.Arrays.copyOf(matrix, Math.min(matrix.length, 16)));
     }
     
     @Override
@@ -1778,18 +1797,66 @@ public class OpenGLBackend implements GraphicsBackend {
     public void setUniform2fv(CommandContext ctx, int location, float[] value) {
         if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         org.lwjgl.opengl.GL20C.glUniform2fv(location, value);
+        traceStandaloneUniformFloats(location, "vec2[]", false, value);
     }
     
     @Override
     public void setUniform3fv(CommandContext ctx, int location, float[] value) {
         if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         org.lwjgl.opengl.GL20C.glUniform3fv(location, value);
+        traceStandaloneUniformFloats(location, "vec3[]", false, value);
     }
     
     @Override
     public void setUniform4fv(CommandContext ctx, int location, float[] value) {
         if (!ctx.isImmediate()) throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
         org.lwjgl.opengl.GL20C.glUniform4fv(location, value);
+        traceStandaloneUniformFloats(location, "vec4[]", false, value);
+    }
+
+    private void traceStandaloneUniformFloats(int location, String valueKind, boolean transpose, float[] values) {
+        if (location < 0 || values == null || values.length == 0 || !VulkanicAPI.isShaderInputParityTracingEnabled()) {
+            return;
+        }
+        int program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+        VulkanicAPI.traceShaderInputParityStandaloneUniformFloats(
+            "opengl-setUniform",
+            program,
+            location,
+            uniformNameFor(program, location),
+            valueKind,
+            transpose,
+            values
+        );
+    }
+
+    private void traceStandaloneUniformInts(int location, String valueKind, int[] values) {
+        if (location < 0 || values == null || values.length == 0 || !VulkanicAPI.isShaderInputParityTracingEnabled()) {
+            return;
+        }
+        int program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+        VulkanicAPI.traceShaderInputParityStandaloneUniformInts(
+            "opengl-setUniform",
+            program,
+            location,
+            uniformNameFor(program, location),
+            valueKind,
+            values
+        );
+    }
+
+    @Nullable
+    private String uniformNameFor(int program, int location) {
+        java.util.concurrent.ConcurrentMap<Integer, String> namesByLocation = uniformNamesByProgramLocation.get(program);
+        return namesByLocation == null ? null : namesByLocation.get(location);
+    }
+
+    private static float[] copyFloats(java.nio.FloatBuffer buffer, int maxCount) {
+        java.nio.FloatBuffer duplicate = buffer.duplicate();
+        int count = Math.min(duplicate.remaining(), maxCount);
+        float[] values = new float[count];
+        duplicate.get(values);
+        return values;
     }
     
     @Override

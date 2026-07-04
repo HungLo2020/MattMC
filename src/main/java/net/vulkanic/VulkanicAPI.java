@@ -3192,6 +3192,10 @@ public class VulkanicAPI {
         return TRACE_STANDALONE_UNIFORMS;
     }
 
+    public static boolean isShaderInputParityTracingEnabled() {
+        return TRACE_SHADER_INPUT_PARITY;
+    }
+
     public static boolean shouldTraceStandaloneUniforms() {
         if (!isStandaloneUniformTracingEnabled()) {
             return false;
@@ -6809,12 +6813,7 @@ public class VulkanicAPI {
             PipelineHandle pipeline,
             PipelineDescriptor descriptor,
             PipelineResourceBindings bindings) {
-        if (!TRACE_SHADER_INPUT_PARITY) {
-            return;
-        }
-
-        int logIndex = SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet();
-        if (logIndex > MAX_SHADER_INPUT_PARITY_LOGS) {
+        if (!shouldTraceShaderInputParityLog()) {
             return;
         }
 
@@ -6845,6 +6844,140 @@ public class VulkanicAPI {
             descriptor.getStableCacheKey(),
             String.join(", ", resources)
         );
+    }
+
+    public static void traceShaderInputParityStandaloneUniformFloats(
+        String source,
+        int program,
+        int location,
+        @Nullable String name,
+        String valueKind,
+        boolean transpose,
+        float[] values
+    ) {
+        if (values == null || values.length == 0 || !shouldTraceShaderInputParityLog()) {
+            return;
+        }
+
+        float[] normalized = normalizeShaderInputParityFloatValues(valueKind, transpose, values);
+        ByteBuffer bytes = BufferUtils.createByteBuffer(normalized.length * Float.BYTES);
+        for (float value : normalized) {
+            bytes.putInt(Float.floatToRawIntBits(value));
+        }
+        bytes.flip();
+
+        LOGGER.info(
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} location={} name={} valueKind={} componentCount={} transpose={} payloadHash={},sample={}",
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            source,
+            program,
+            location,
+            sanitizeShaderInputParityUniformName(name),
+            valueKind,
+            normalized.length,
+            transpose,
+            shaderInputParityHash(bytes, bytes.remaining()),
+            shaderInputParityFloatSample(normalized)
+        );
+    }
+
+    public static void traceShaderInputParityStandaloneUniformInts(
+        String source,
+        int program,
+        int location,
+        @Nullable String name,
+        String valueKind,
+        int[] values
+    ) {
+        if (values == null || values.length == 0 || !shouldTraceShaderInputParityLog()) {
+            return;
+        }
+
+        ByteBuffer bytes = BufferUtils.createByteBuffer(values.length * Integer.BYTES);
+        for (int value : values) {
+            bytes.putInt(value);
+        }
+        bytes.flip();
+
+        LOGGER.info(
+            "ShaderInputParityStandaloneUniform backend={} source={} program={} location={} name={} valueKind={} componentCount={} transpose=false payloadHash={},sample={}",
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            source,
+            program,
+            location,
+            sanitizeShaderInputParityUniformName(name),
+            valueKind,
+            values.length,
+            shaderInputParityHash(bytes, bytes.remaining()),
+            shaderInputParityIntSample(values)
+        );
+    }
+
+    private static boolean shouldTraceShaderInputParityLog() {
+        if (!TRACE_SHADER_INPUT_PARITY) {
+            return false;
+        }
+        return MAX_SHADER_INPUT_PARITY_LOGS < 0
+            || SHADER_INPUT_PARITY_LOG_COUNT.incrementAndGet() <= MAX_SHADER_INPUT_PARITY_LOGS;
+    }
+
+    private static String sanitizeShaderInputParityUniformName(@Nullable String name) {
+        if (name == null || name.isBlank()) {
+            return "unknown";
+        }
+        return name.replaceAll("[^A-Za-z0-9_.$:-]", "_");
+    }
+
+    private static float[] normalizeShaderInputParityFloatValues(String valueKind, boolean transpose, float[] values) {
+        if (!transpose) {
+            return java.util.Arrays.copyOf(values, values.length);
+        }
+        if ("mat3".equals(valueKind) && values.length >= 9) {
+            return new float[] {
+                values[0], values[3], values[6],
+                values[1], values[4], values[7],
+                values[2], values[5], values[8]
+            };
+        }
+        if ("mat4".equals(valueKind) && values.length >= 16) {
+            return new float[] {
+                values[0], values[4], values[8], values[12],
+                values[1], values[5], values[9], values[13],
+                values[2], values[6], values[10], values[14],
+                values[3], values[7], values[11], values[15]
+            };
+        }
+        return java.util.Arrays.copyOf(values, values.length);
+    }
+
+    private static String shaderInputParityFloatSample(float[] values) {
+        StringBuilder builder = new StringBuilder("[");
+        int limit = Math.min(values.length, 4);
+        for (int index = 0; index < limit; index++) {
+            if (index > 0) {
+                builder.append(',');
+            }
+            builder.append(Integer.toHexString(Float.floatToRawIntBits(values[index])));
+        }
+        if (values.length > limit) {
+            builder.append(",...");
+        }
+        return builder.append(']').toString();
+    }
+
+    private static String shaderInputParityIntSample(int[] values) {
+        StringBuilder builder = new StringBuilder("[");
+        int limit = Math.min(values.length, 4);
+        for (int index = 0; index < limit; index++) {
+            if (index > 0) {
+                builder.append(',');
+            }
+            builder.append(Integer.toHexString(values[index]));
+        }
+        if (values.length > limit) {
+            builder.append(",...");
+        }
+        return builder.append(']').toString();
     }
 
     private static String describeShaderInputParityUniform(

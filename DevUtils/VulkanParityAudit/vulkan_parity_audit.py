@@ -143,6 +143,26 @@ class UniformBufferEvent:
 
 
 @dataclass
+class StandaloneUniformEvent:
+    backend: str
+    source: str
+    name: str
+    value_kind: str
+    component_count: str
+    raw: str
+    payload_hash: str = ""
+    sample: str = ""
+
+    @property
+    def key(self) -> str:
+        return self.name
+
+    @property
+    def signature(self) -> str:
+        return self.payload_hash if self.payload_hash else normalize_identity(self.raw)
+
+
+@dataclass
 class VertexInputEvent:
     backend: str
     pipeline: str
@@ -171,6 +191,7 @@ class CaptureEvents:
     backend: str = "unknown"
     resources: dict[tuple[str, str, str], list[ResourceRecord]] = field(default_factory=lambda: defaultdict(list))
     uniform_buffers: dict[str, list[UniformBufferEvent]] = field(default_factory=lambda: defaultdict(list))
+    standalone_uniforms: dict[str, list[StandaloneUniformEvent]] = field(default_factory=lambda: defaultdict(list))
     vertex_inputs: dict[str, list[VertexInputEvent]] = field(default_factory=lambda: defaultdict(list))
     counters: Counter = field(default_factory=Counter)
     skipped: Counter = field(default_factory=Counter)
@@ -180,6 +201,7 @@ class CaptureEvents:
 class ParseLimits:
     max_resource_events: int = 0
     max_uniform_buffer_events: int = 0
+    max_standalone_uniform_events: int = 0
     max_vertex_input_events: int = 0
 
     def reached(self, counter: Counter, key: str, limit: int) -> bool:
@@ -379,6 +401,30 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             length=slice_fields.get("length", ""),
         )
         events.uniform_buffers[name].append(event)
+
+    elif payload.startswith("StandaloneUniform "):
+        events.counters["StandaloneUniform"] += 1
+        if limits.reached(events.counters, "StandaloneUniform", limits.max_standalone_uniform_events):
+            events.skipped["StandaloneUniform"] += 1
+            return
+        fields = parse_top_fields(payload)
+        hashes = extract_hashes(payload)
+        backend = fields.get("backend", "unknown")
+        events.backend = backend
+        name = fields.get("name", "")
+        if not name or name == "unknown":
+            return
+        event = StandaloneUniformEvent(
+            backend=backend,
+            source=fields.get("source", ""),
+            name=name,
+            value_kind=fields.get("valueKind", ""),
+            component_count=fields.get("componentCount", ""),
+            raw=payload.strip(),
+            payload_hash=hashes.get("payloadHash", ""),
+            sample=fields.get("sample", ""),
+        )
+        events.standalone_uniforms[event.key].append(event)
 
     elif payload.startswith("VertexInput "):
         events.counters["VertexInput"] += 1
@@ -627,6 +673,62 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                 vulkan_values=vk_values[:6],
             ))
 
+    all_standalone_names = sorted(set(opengl.standalone_uniforms) | set(vulkan.standalone_uniforms))
+    for name in all_standalone_names:
+        gl_events = opengl.standalone_uniforms.get(name, [])
+        vk_events = vulkan.standalone_uniforms.get(name, [])
+        if not gl_events or not vk_events:
+            differences.append(Difference(
+                severity=35,
+                category="backend-only-standalone-uniform",
+                key=f"name={name}",
+                reason="standalone uniform update only observed on one backend; this may be a sampler/unused-uniform coverage difference",
+                opengl_count=len(gl_events),
+                vulkan_count=len(vk_events),
+                opengl_values=sorted({event.signature for event in gl_events})[:4],
+                vulkan_values=sorted({event.signature for event in vk_events})[:4],
+            ))
+            continue
+
+        gl_values = sorted({event.signature for event in gl_events})
+        vk_values = sorted({event.signature for event in vk_events})
+        if set(gl_values) != set(vk_values):
+            overlap = sorted(set(gl_values) & set(vk_values))
+            if overlap:
+                differences.append(Difference(
+                    severity=55,
+                    category="timing-sensitive-standalone-uniform-payload-set-difference",
+                    key=f"name={name}",
+                    reason="same standalone uniform has overlapping payload hashes plus backend-specific observations in separate captures",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[f"shared={','.join(overlap[:3])}", *gl_values[:6]],
+                    vulkan_values=[f"shared={','.join(overlap[:3])}", *vk_values[:6]],
+                ))
+                continue
+
+            severity = 95 if name in {
+                "iris_ProjectionMatrix",
+                "iris_ModelViewMatrix",
+                "iris_NormalMatrix",
+                "iris_FogStart",
+                "iris_FogEnd",
+                "iris_FogColor",
+                "iris_ProjMat",
+                "iris_ModelViewMat",
+                "iris_NormalMat",
+            } else 70
+            differences.append(Difference(
+                severity=severity,
+                category="strict-standalone-uniform-payload-mismatch",
+                key=f"name={name}",
+                reason="same standalone uniform name has disjoint payload hash sets",
+                opengl_count=len(gl_events),
+                vulkan_count=len(vk_events),
+                opengl_values=gl_values[:6],
+                vulkan_values=vk_values[:6],
+            ))
+
     all_vertex_keys = sorted(set(opengl.vertex_inputs) | set(vulkan.vertex_inputs))
     for key in all_vertex_keys:
         gl_events = opengl.vertex_inputs.get(key, [])
@@ -790,6 +892,7 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("- Backend object identities, Java identity hashes, pipeline handles, texture ids, view ids, and buffer ids are ignored.")
     lines.append("- Pipeline resources are matched by stableKey/name/type before comparing binding numbers.")
     lines.append("- UBOs compare payload hashes separately from range hashes and binding metadata.")
+    lines.append("- Standalone uniforms compare by semantic uniform name and normalized setter payload hash.")
     lines.append("- Samplers compare semantic texture metadata; numeric GL object labels are normalized.")
     lines.append("- Separate captures are not frame-synchronized; backend-only observations are lower-confidence than strict same-key mismatches.")
     lines.append("")
@@ -820,6 +923,7 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("")
     lines.append("Recommended narrowing rule:")
     lines.append("- Fix strict same-key UBO payload mismatches before sampler metadata mismatches.")
+    lines.append("- Fix strict standalone uniform payload mismatches before broad shader math changes.")
     lines.append("- Treat layout-binding differences as architectural cleanup unless payloads differ.")
     lines.append("- Treat backend-only observations as coverage/instrumentation suspects until reproduced in synchronized captures.")
     return "\n".join(lines) + "\n"
@@ -865,6 +969,7 @@ def main(argv: list[str]) -> int:
     diff_parser.add_argument("--limit", type=int, default=30)
     diff_parser.add_argument("--max-resource-events", type=int, default=0, help="0 means parse every resource event")
     diff_parser.add_argument("--max-uniform-buffer-events", type=int, default=0, help="0 means parse every UBO event")
+    diff_parser.add_argument("--max-standalone-uniform-events", type=int, default=0, help="0 means parse every standalone uniform event")
     diff_parser.add_argument("--max-vertex-input-events", type=int, default=0, help="0 means parse every vertex-input event")
     diff_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
@@ -872,6 +977,7 @@ def main(argv: list[str]) -> int:
     auto_parser.add_argument("--limit", type=int, default=30)
     auto_parser.add_argument("--max-resource-events", type=int, default=0, help="0 means parse every resource event")
     auto_parser.add_argument("--max-uniform-buffer-events", type=int, default=0, help="0 means parse every UBO event")
+    auto_parser.add_argument("--max-standalone-uniform-events", type=int, default=0, help="0 means parse every standalone uniform event")
     auto_parser.add_argument("--max-vertex-input-events", type=int, default=0, help="0 means parse every vertex-input event")
     auto_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
@@ -901,7 +1007,12 @@ def main(argv: list[str]) -> int:
         gl_meta, vk_meta = pair
         assert gl_meta.latest_log is not None
         assert vk_meta.latest_log is not None
-        parse_limits = ParseLimits(args.max_resource_events, args.max_uniform_buffer_events, args.max_vertex_input_events)
+        parse_limits = ParseLimits(
+            args.max_resource_events,
+            args.max_uniform_buffer_events,
+            args.max_standalone_uniform_events,
+            args.max_vertex_input_events
+        )
         text = render_diff_report(gl_meta.latest_log, vk_meta.latest_log, args.limit, parse_limits)
         if args.write:
             path = write_report(text, f"vulkan_shader_input_parity_{gl_meta.run_id}_vs_{vk_meta.run_id}")
@@ -910,7 +1021,12 @@ def main(argv: list[str]) -> int:
         return 0
 
     if args.command == "diff-captures":
-        parse_limits = ParseLimits(args.max_resource_events, args.max_uniform_buffer_events, args.max_vertex_input_events)
+        parse_limits = ParseLimits(
+            args.max_resource_events,
+            args.max_uniform_buffer_events,
+            args.max_standalone_uniform_events,
+            args.max_vertex_input_events
+        )
         text = render_diff_report(args.opengl_log, args.vulkan_log, args.limit, parse_limits)
         if args.write:
             path = write_report(text, f"vulkan_shader_input_parity_{args.opengl_log.stem}_vs_{args.vulkan_log.stem}")
