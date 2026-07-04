@@ -17,14 +17,18 @@ import net.math.Axis;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.tacz.TaczGlock17AnimationController;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.player.PlayerModelPart;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.logging.LogUtils;
@@ -69,6 +73,69 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				root.render(modelPoseStack, itemDisplayContext, vertexConsumer, i, j, animationPose);
 			}
 		});
+		this.submitFirstPersonArms(itemDisplayContext, poseStack, submitNodeCollector, i, animationPose);
+		poseStack.popPose();
+	}
+
+	private void submitFirstPersonArms(
+		ItemDisplayContext itemDisplayContext,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		int light,
+		AnimationPose animationPose
+	) {
+		Minecraft minecraft = Minecraft.getInstance();
+		AbstractClientPlayer player = minecraft.player;
+		if (!itemDisplayContext.firstPerson() || player == null || player.isInvisible()) {
+			return;
+		}
+
+		AvatarRenderer<AbstractClientPlayer> renderer = minecraft.getEntityRenderDispatcher().getPlayerRenderer(player);
+		ResourceLocation skin = player.getSkin().body().texturePath();
+		this.submitFirstPersonArm(
+			"righthand_pos",
+			HumanoidArm.RIGHT,
+			player.isModelPartShown(PlayerModelPart.RIGHT_SLEEVE),
+			renderer,
+			skin,
+			poseStack,
+			submitNodeCollector,
+			light,
+			animationPose
+		);
+		this.submitFirstPersonArm(
+			"lefthand_pos",
+			HumanoidArm.LEFT,
+			player.isModelPartShown(PlayerModelPart.LEFT_SLEEVE),
+			renderer,
+			skin,
+			poseStack,
+			submitNodeCollector,
+			light,
+			animationPose
+		);
+	}
+
+	private void submitFirstPersonArm(
+		String handNode,
+		HumanoidArm arm,
+		boolean sleeveVisible,
+		AvatarRenderer<AbstractClientPlayer> renderer,
+		ResourceLocation skin,
+		PoseStack poseStack,
+		SubmitNodeCollector submitNodeCollector,
+		int light,
+		AnimationPose animationPose
+	) {
+		poseStack.pushPose();
+		if (this.geometry.applyAnimatedNodePath(handNode, poseStack, animationPose)) {
+			poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
+			if (arm == HumanoidArm.RIGHT) {
+				renderer.renderRightHand(poseStack, submitNodeCollector, light, skin, sleeveVisible);
+			} else {
+				renderer.renderLeftHand(poseStack, submitNodeCollector, light, skin, sleeveVisible);
+			}
+		}
 		poseStack.popPose();
 	}
 
@@ -265,6 +332,18 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				}
 			}
 			poseStack.translate(0.0F, -1.5F, 0.0F);
+		}
+
+		boolean applyAnimatedNodePath(String name, PoseStack poseStack, AnimationPose animationPose) {
+			List<BedrockNode> nodePath = this.pathTo(name);
+			if (nodePath == null) {
+				return false;
+			}
+
+			for (BedrockNode node : nodePath) {
+				node.translateAndRotate(poseStack, animationPose.node(node.name));
+			}
+			return true;
 		}
 
 		private List<BedrockNode> pathTo(String name) {
