@@ -8224,5 +8224,15 @@
   "effect.minecraft.tigers_blessing": "Tiger's Blessing",
   "subtitles.entity.tiger.idle": "Tiger roars",
   "subtitles.entity.tiger.hurt": "Tiger hurts",
-  "subtitles.entity.tiger.angry": "Tiger growls"
+  "subtitles.entity.tiger.angry": "Tiger growls",
+  "item.tacz.glock_17": "Glock 17",
+  "item.tacz.glock_17.ammo": "Magazine: %s/%s",
+  "item.tacz.glock_17.empty": "Magazine empty",
+  "item.tacz.glock_17.no_ammo": "No 9mm ammo",
+  "item.tacz.glock_17.reload_hint": "Sneak-use to reload",
+  "item.tacz.nine_mm_ammo": "9mm Ammo",
+  "subtitles.tacz.glock_17.empty": "Gun clicks",
+  "subtitles.tacz.glock_17.hit": "Bullet hits",
+  "subtitles.tacz.glock_17.reload": "Glock 17 reloads",
+  "subtitles.tacz.glock_17.shoot": "Glock 17 fires"
 }

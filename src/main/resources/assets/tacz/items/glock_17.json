@@ -1,0 +1,9 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "tacz:item/glock_17_base",
+    "model": {
+      "type": "tacz:glock_17"
+    }
+  }
+}
