@@ -14,8 +14,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.AbstractArrow;
-import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.entity.projectile.TaczBullet;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.level.Level;
@@ -24,9 +23,14 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	private static final String AMMO_KEY = "TaczMvpAmmo";
 	private static final int MAGAZINE_SIZE = 17;
 	private static final int RELOAD_TICKS = 24;
-	private static final float SHOT_POWER = 4.5F;
-	private static final float SHOT_INACCURACY = 1.15F;
-	private static final double SHOT_DAMAGE = 7.0;
+	private static final float BULLET_SPEED = 12.0F;
+	private static final float BULLET_INACCURACY = 0.55F;
+	private static final float BULLET_DAMAGE = 7.0F;
+	private static final int BULLET_LIFE_TICKS = 40;
+	private static final float BULLET_GRAVITY = 0.005F;
+	private static final float BULLET_FRICTION = 0.01F;
+	private static final float BULLET_HEADSHOT_MULTIPLIER = 1.5F;
+	private static final float BULLET_KNOCKBACK = 0.12F;
 
 	public TaczMvpGunItem(Item.Properties properties) {
 		super(properties);
@@ -58,12 +62,10 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		}
 
 		if (level instanceof ServerLevel serverLevel) {
-			Arrow arrow = new Arrow(serverLevel, player, new ItemStack(Items.ARROW), itemStack);
-			arrow.pickup = AbstractArrow.Pickup.CREATIVE_ONLY;
-			arrow.setBaseDamage(SHOT_DAMAGE);
-			arrow.setSoundEvent(SoundEvents.TACZ_GLOCK_17_HIT);
-			arrow.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, SHOT_POWER, SHOT_INACCURACY);
-			serverLevel.addFreshEntity(arrow);
+			TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, BULLET_DAMAGE, 1);
+			bullet.setBulletProperties(BULLET_GRAVITY, BULLET_FRICTION, BULLET_LIFE_TICKS, BULLET_HEADSHOT_MULTIPLIER, BULLET_KNOCKBACK);
+			bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, BULLET_SPEED, BULLET_INACCURACY);
+			serverLevel.addFreshEntity(bullet);
 			setAmmo(itemStack, ammo - 1);
 			player.awardStat(Stats.ITEM_USED.get(this));
 		}

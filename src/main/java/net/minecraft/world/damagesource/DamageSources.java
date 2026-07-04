@@ -240,6 +240,10 @@ public class DamageSources {
 		return this.source(DamageTypes.THROWN, entity, entity2);
 	}
 
+	public DamageSource bullet(Entity entity, @Nullable Entity entity2) {
+		return this.source(DamageTypes.BULLET, entity, entity2);
+	}
+
 	public DamageSource indirectMagic(Entity entity, @Nullable Entity entity2) {
 		return this.source(DamageTypes.INDIRECT_MAGIC, entity, entity2);
 	}
