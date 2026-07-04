@@ -22,14 +22,23 @@ float get_brightness(float level) {
 
 vec3 notGamma(vec3 color) {
     float maxComponent = max(max(color.x, color.y), color.z);
+    if (maxComponent <= 0.0) {
+        return vec3(0.0);
+    }
+
     float maxInverted = 1.0f - maxComponent;
     float maxScaled = 1.0f - maxInverted * maxInverted * maxInverted * maxInverted;
     return color * (maxScaled / maxComponent);
 }
 
 void main() {
+    float skyCoord = texCoord.y;
+#ifdef VULKANIC_BACKEND
+    skyCoord = 1.0 - skyCoord;
+#endif
+
     float block_brightness = get_brightness(floor(texCoord.x * 16) / 15) * lightmapInfo.BlockFactor;
-    float sky_brightness = get_brightness(floor(texCoord.y * 16) / 15) * lightmapInfo.SkyFactor;
+    float sky_brightness = get_brightness(floor(skyCoord * 16) / 15) * lightmapInfo.SkyFactor;
     vec3 color = vec3(
         block_brightness,
         block_brightness * ((block_brightness * 0.6 + 0.4) * 0.6 + 0.4),
@@ -47,7 +56,7 @@ void main() {
 
     if (lightmapInfo.NightVisionFactor > 0.0) {
         float max_component = max(color.r, max(color.g, color.b));
-        if (max_component < 1.0) {
+        if (max_component > 0.0 && max_component < 1.0) {
             vec3 bright_color = color / max_component;
             color = mix(color, bright_color, lightmapInfo.NightVisionFactor);
         }
