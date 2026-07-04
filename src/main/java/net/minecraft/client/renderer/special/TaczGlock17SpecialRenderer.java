@@ -113,13 +113,13 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private void applyCameraAnimation(PoseStack poseStack, AnimationPose animationPose) {
 		NodePose camera = animationPose.node("camera");
 		if (camera.rotation.x() != 0.0F) {
-			poseStack.mulPose(Axis.XP.rotationDegrees(camera.rotation.x()));
+			poseStack.mulPose(Axis.XP.rotation(camera.rotation.x()));
 		}
 		if (camera.rotation.y() != 0.0F) {
-			poseStack.mulPose(Axis.YP.rotationDegrees(camera.rotation.y()));
+			poseStack.mulPose(Axis.YP.rotation(camera.rotation.y()));
 		}
 		if (camera.rotation.z() != 0.0F) {
-			poseStack.mulPose(Axis.ZP.rotationDegrees(-camera.rotation.z()));
+			poseStack.mulPose(Axis.ZP.rotation(-camera.rotation.z()));
 		}
 	}
 
@@ -330,9 +330,9 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		private void translateAndRotate(PoseStack poseStack, NodePose nodePose) {
 			poseStack.translate(nodePose.position.x(), -nodePose.position.y(), nodePose.position.z());
 			poseStack.translate(this.x / 16.0F, this.y / 16.0F, this.z / 16.0F);
-			float zRotation = this.zRot + degreesToRadians(nodePose.rotation.z());
-			float yRotation = this.yRot + degreesToRadians(nodePose.rotation.y());
-			float xRotation = this.xRot + degreesToRadians(nodePose.rotation.x());
+			float zRotation = this.zRot + nodePose.rotation.z();
+			float yRotation = this.yRot + nodePose.rotation.y();
+			float xRotation = this.xRot + nodePose.rotation.x();
 			if (zRotation != 0.0F) {
 				poseStack.mulPose(Axis.ZP.rotation(zRotation));
 			}
@@ -433,7 +433,11 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		}
 
 		static NodeAnimation read(JsonObject object) {
-			return new NodeAnimation(Channel.read(object.get("position"), 3), Channel.read(object.get("rotation"), 3), Channel.read(object.get("scale"), 3));
+			return new NodeAnimation(
+				Channel.read(object.get("position"), ChannelKind.POSITION),
+				Channel.read(object.get("rotation"), ChannelKind.ROTATION),
+				Channel.read(object.get("scale"), ChannelKind.SCALE)
+			);
 		}
 
 		void apply(NodePose pose, float time, boolean additive) {
@@ -466,27 +470,29 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 
 	private static final class Channel {
 		private final List<Keyframe> keyframes;
+		private final ChannelKind kind;
 
-		private Channel(List<Keyframe> keyframes) {
+		private Channel(List<Keyframe> keyframes, ChannelKind kind) {
 			this.keyframes = keyframes;
+			this.kind = kind;
 		}
 
-		static Channel read(JsonElement element, int length) {
+		static Channel read(JsonElement element, ChannelKind kind) {
 			if (element == null || element.isJsonNull()) {
 				return null;
 			}
 
 			if (element.isJsonArray() || element.isJsonPrimitive()) {
-				return new Channel(List.of(new Keyframe(0.0F, readVector(element, length))));
+				return new Channel(List.of(Keyframe.single(0.0F, convertAnimationValue(readVector(element), kind))), kind);
 			}
 
 			JsonObject object = element.getAsJsonObject();
 			List<Keyframe> keyframes = new ArrayList<>();
 			for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
-				keyframes.add(new Keyframe(Float.parseFloat(entry.getKey()), readKeyframeValue(entry.getValue(), length)));
+				keyframes.add(Keyframe.read(Float.parseFloat(entry.getKey()), entry.getValue(), kind));
 			}
 			keyframes.sort(Comparator.comparing(Keyframe::time));
-			return new Channel(keyframes);
+			return new Channel(keyframes, kind);
 		}
 
 		Vector3f sample(float time) {
@@ -494,12 +500,12 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				return new Vector3f();
 			}
 			if (this.keyframes.size() == 1 || time <= this.keyframes.get(0).time) {
-				return new Vector3f(this.keyframes.get(0).value);
+				return this.keyframes.get(0).value(false);
 			}
 
 			Keyframe last = this.keyframes.get(this.keyframes.size() - 1);
 			if (time >= last.time) {
-				return new Vector3f(last.value);
+				return last.value(true);
 			}
 
 			for (int i = 0; i < this.keyframes.size() - 1; i++) {
@@ -507,14 +513,68 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 				Keyframe to = this.keyframes.get(i + 1);
 				if (time >= from.time && time <= to.time) {
 					float alpha = (time - from.time) / (to.time - from.time);
-					return new Vector3f(from.value).lerp(to.value, alpha);
+					if (from.lerpMode == LerpMode.CATMULLROM || to.lerpMode == LerpMode.CATMULLROM) {
+						return this.catmullrom(i, i + 1, alpha);
+					}
+					return from.value(true).lerp(to.value(false), alpha);
 				}
 			}
-			return new Vector3f(last.value);
+			return last.value(true);
+		}
+
+		private Vector3f catmullrom(int indexFrom, int indexTo, float alpha) {
+			int previous = indexFrom == 0 ? 0 : indexFrom - 1;
+			int next = indexTo == this.keyframes.size() - 1 ? this.keyframes.size() - 1 : indexTo + 1;
+			Vector3f valuePrevious = this.keyframes.get(previous).value(true);
+			Vector3f valueFrom = this.keyframes.get(indexFrom).value(false);
+			Vector3f valueTo = this.keyframes.get(indexTo).value(false);
+			Vector3f valueNext = this.keyframes.get(next).value(false);
+			return new Vector3f(
+				splineCurve(valuePrevious.x(), valueFrom.x(), valueTo.x(), valueNext.x(), alpha),
+				splineCurve(valuePrevious.y(), valueFrom.y(), valueTo.y(), valueNext.y(), alpha),
+				splineCurve(valuePrevious.z(), valueFrom.z(), valueTo.z(), valueNext.z(), alpha)
+			);
 		}
 	}
 
-	private record Keyframe(float time, Vector3f value) {
+	private record Keyframe(float time, Vector3f pre, Vector3f post, LerpMode lerpMode) {
+		private static Keyframe single(float time, Vector3f value) {
+			return new Keyframe(time, value, value, LerpMode.LINEAR);
+		}
+
+		private static Keyframe read(float time, JsonElement element, ChannelKind kind) {
+			if (!element.isJsonObject()) {
+				return single(time, convertAnimationValue(readVector(element), kind));
+			}
+
+			JsonObject object = element.getAsJsonObject();
+			Vector3f pre = object.has("pre") ? convertAnimationValue(readVector(object.get("pre")), kind) : null;
+			Vector3f post = object.has("post") ? convertAnimationValue(readVector(object.get("post")), kind) : null;
+			if (pre == null && post == null) {
+				pre = convertAnimationValue(readVector(element), kind);
+				post = pre;
+			} else if (pre == null) {
+				pre = new Vector3f(post);
+			} else if (post == null) {
+				post = new Vector3f(pre);
+			}
+			return new Keyframe(time, pre, post, readLerpMode(object));
+		}
+
+		private Vector3f value(boolean usePost) {
+			return new Vector3f(usePost ? this.post : this.pre);
+		}
+	}
+
+	private enum ChannelKind {
+		POSITION,
+		ROTATION,
+		SCALE
+	}
+
+	private enum LerpMode {
+		LINEAR,
+		CATMULLROM
 	}
 
 	private static final class AnimationPose {
@@ -765,20 +825,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		return values;
 	}
 
-	private static Vector3f readKeyframeValue(JsonElement element, int length) {
-		if (element.isJsonObject()) {
-			JsonObject object = element.getAsJsonObject();
-			if (object.has("post")) {
-				return readVector(object.get("post"), length);
-			}
-			if (object.has("pre")) {
-				return readVector(object.get("pre"), length);
-			}
-		}
-		return readVector(element, length);
-	}
-
-	private static Vector3f readVector(JsonElement element, int length) {
+	private static Vector3f readVector(JsonElement element) {
 		if (element.isJsonPrimitive()) {
 			float value = element.getAsFloat();
 			return new Vector3f(value, value, value);
@@ -789,6 +836,31 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		float y = array.size() > 1 ? GsonHelper.convertToFloat(array.get(1), "[1]") : x;
 		float z = array.size() > 2 ? GsonHelper.convertToFloat(array.get(2), "[2]") : x;
 		return new Vector3f(x, y, z);
+	}
+
+	private static Vector3f convertAnimationValue(Vector3f value, ChannelKind kind) {
+		return switch (kind) {
+			case POSITION -> value.mul(1.0F / 16.0F);
+			case ROTATION -> value.mul((float)Math.PI / 180.0F);
+			case SCALE -> value;
+		};
+	}
+
+	private static LerpMode readLerpMode(JsonObject object) {
+		String lerpMode = GsonHelper.getAsString(object, "lerp_mode", "linear");
+		return "catmullrom".equals(lerpMode) ? LerpMode.CATMULLROM : LerpMode.LINEAR;
+	}
+
+	private static float splineCurve(float y0, float y1, float y2, float y3, float alpha) {
+		float v0 = (y2 - y0) * 0.5F;
+		float v1 = (y3 - y1) * 0.5F;
+		float t2 = alpha * alpha;
+		float t3 = alpha * t2;
+		float h1 = 2.0F * t3 - 3.0F * t2 + 1.0F;
+		float h2 = -2.0F * t3 + 3.0F * t2;
+		float h3 = t3 - 2.0F * t2 + alpha;
+		float h4 = t3 - t2;
+		return h1 * y1 + h2 * y2 + h3 * v0 + h4 * v1;
 	}
 
 	private static Matrix4f interpolateMatrix(Matrix4f from, Matrix4f to, float alpha) {
