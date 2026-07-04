@@ -163,6 +163,29 @@ class StandaloneUniformEvent:
 
 
 @dataclass
+class StandaloneUniformBlockMemberEvent:
+    backend: str
+    source: str
+    name: str
+    value_kind: str
+    component_count: str
+    raw: str
+    payload_hash: str = ""
+    sample: str = ""
+    offset: str = ""
+    array_size: str = ""
+    stride: str = ""
+
+    @property
+    def key(self) -> str:
+        return self.name
+
+    @property
+    def signature(self) -> str:
+        return self.payload_hash if self.payload_hash else normalize_identity(self.raw)
+
+
+@dataclass
 class VertexInputEvent:
     backend: str
     pipeline: str
@@ -192,6 +215,7 @@ class CaptureEvents:
     resources: dict[tuple[str, str, str], list[ResourceRecord]] = field(default_factory=lambda: defaultdict(list))
     uniform_buffers: dict[str, list[UniformBufferEvent]] = field(default_factory=lambda: defaultdict(list))
     standalone_uniforms: dict[str, list[StandaloneUniformEvent]] = field(default_factory=lambda: defaultdict(list))
+    standalone_uniform_block_members: dict[str, list[StandaloneUniformBlockMemberEvent]] = field(default_factory=lambda: defaultdict(list))
     vertex_inputs: dict[str, list[VertexInputEvent]] = field(default_factory=lambda: defaultdict(list))
     counters: Counter = field(default_factory=Counter)
     skipped: Counter = field(default_factory=Counter)
@@ -202,6 +226,7 @@ class ParseLimits:
     max_resource_events: int = 0
     max_uniform_buffer_events: int = 0
     max_standalone_uniform_events: int = 0
+    max_standalone_uniform_block_member_events: int = 0
     max_vertex_input_events: int = 0
 
     def reached(self, counter: Counter, key: str, limit: int) -> bool:
@@ -401,6 +426,37 @@ def parse_capture_line(line: str, events: CaptureEvents, limits: ParseLimits) ->
             length=slice_fields.get("length", ""),
         )
         events.uniform_buffers[name].append(event)
+
+    elif payload.startswith("StandaloneUniformBlockMember "):
+        events.counters["StandaloneUniformBlockMember"] += 1
+        if limits.reached(
+            events.counters,
+            "StandaloneUniformBlockMember",
+            limits.max_standalone_uniform_block_member_events
+        ):
+            events.skipped["StandaloneUniformBlockMember"] += 1
+            return
+        fields = parse_top_fields(payload)
+        hashes = extract_hashes(payload)
+        backend = fields.get("backend", "unknown")
+        events.backend = backend
+        name = fields.get("name", "")
+        if not name or name == "unknown":
+            return
+        event = StandaloneUniformBlockMemberEvent(
+            backend=backend,
+            source=fields.get("source", ""),
+            name=name,
+            value_kind=fields.get("valueKind", ""),
+            component_count=fields.get("componentCount", ""),
+            raw=payload.strip(),
+            payload_hash=hashes.get("payloadHash", ""),
+            sample=fields.get("sample", ""),
+            offset=fields.get("offset", ""),
+            array_size=fields.get("arraySize", ""),
+            stride=fields.get("stride", ""),
+        )
+        events.standalone_uniform_block_members[event.key].append(event)
 
     elif payload.startswith("StandaloneUniform "):
         events.counters["StandaloneUniform"] += 1
@@ -729,6 +785,69 @@ def compare_capture_events(opengl: CaptureEvents, vulkan: CaptureEvents) -> list
                 vulkan_values=vk_values[:6],
             ))
 
+    all_block_member_names = sorted(set(vulkan.standalone_uniform_block_members))
+    for name in all_block_member_names:
+        gl_events = opengl.standalone_uniforms.get(name, [])
+        vk_events = vulkan.standalone_uniform_block_members.get(name, [])
+        if not vk_events:
+            continue
+        if not gl_events:
+            differences.append(Difference(
+                severity=25,
+                category="vulkan-only-standalone-ubo-member",
+                key=f"name={name}",
+                reason="materialized Vulkan standalone UBO member was observed, but the matching OpenGL capture did not update that standalone uniform name",
+                opengl_count=0,
+                vulkan_count=len(vk_events),
+                opengl_values=[],
+                vulkan_values=sorted({event.signature for event in vk_events})[:4],
+            ))
+            continue
+
+        gl_values = sorted({event.signature for event in gl_events})
+        vk_values = sorted({event.signature for event in vk_events})
+        if set(gl_values) != set(vk_values):
+            overlap = sorted(set(gl_values) & set(vk_values))
+            if overlap:
+                differences.append(Difference(
+                    severity=58,
+                    category="timing-sensitive-standalone-ubo-member-payload-set-difference",
+                    key=f"name={name}",
+                    reason="materialized Vulkan standalone UBO member overlaps OpenGL setter payloads but separate captures observed additional dynamic states",
+                    opengl_count=len(gl_events),
+                    vulkan_count=len(vk_events),
+                    opengl_values=[f"shared={','.join(overlap[:3])}", *gl_values[:6]],
+                    vulkan_values=[f"shared={','.join(overlap[:3])}", *vk_values[:6]],
+                ))
+                continue
+
+            severity = 98 if name in {
+                "iris_ProjectionMatrix",
+                "iris_ProjectionMatrixInverse",
+                "iris_ModelViewMatrix",
+                "iris_ModelViewMatrixInverse",
+                "iris_NormalMatrix",
+                "iris_FogStart",
+                "iris_FogEnd",
+                "iris_FogColor",
+                "gbufferProjection",
+                "gbufferProjectionInverse",
+                "gbufferModelView",
+                "gbufferModelViewInverse",
+                "shadowProjection",
+                "shadowProjectionInverse",
+            } else 72
+            differences.append(Difference(
+                severity=severity,
+                category="strict-standalone-ubo-member-payload-mismatch",
+                key=f"name={name}",
+                reason="materialized Vulkan standalone UBO member has disjoint payload hashes from matching OpenGL standalone uniform updates",
+                opengl_count=len(gl_events),
+                vulkan_count=len(vk_events),
+                opengl_values=gl_values[:6],
+                vulkan_values=vk_values[:6],
+            ))
+
     all_vertex_keys = sorted(set(opengl.vertex_inputs) | set(vulkan.vertex_inputs))
     for key in all_vertex_keys:
         gl_events = opengl.vertex_inputs.get(key, [])
@@ -893,6 +1012,7 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("- Pipeline resources are matched by stableKey/name/type before comparing binding numbers.")
     lines.append("- UBOs compare payload hashes separately from range hashes and binding metadata.")
     lines.append("- Standalone uniforms compare by semantic uniform name and normalized setter payload hash.")
+    lines.append("- Materialized Vulkan standalone UBO members compare by semantic uniform name against OpenGL standalone uniforms when member logs are present.")
     lines.append("- Samplers compare semantic texture metadata; numeric GL object labels are normalized.")
     lines.append("- Separate captures are not frame-synchronized; backend-only observations are lower-confidence than strict same-key mismatches.")
     lines.append("")
@@ -923,6 +1043,7 @@ def render_diff_report(opengl_log: Path, vulkan_log: Path, limit: int, parse_lim
     lines.append("")
     lines.append("Recommended narrowing rule:")
     lines.append("- Fix strict same-key UBO payload mismatches before sampler metadata mismatches.")
+    lines.append("- Fix strict materialized standalone UBO member mismatches before broad shader math changes.")
     lines.append("- Fix strict standalone uniform payload mismatches before broad shader math changes.")
     lines.append("- Treat layout-binding differences as architectural cleanup unless payloads differ.")
     lines.append("- Treat backend-only observations as coverage/instrumentation suspects until reproduced in synchronized captures.")
@@ -956,6 +1077,18 @@ def run_self_test() -> None:
     second = parse_resource(parts[1], "vulkan", "test", "abc", "stable")
     assert first and first.name == "Projection" and first.payload_hash == "crc32:aaaa/bytes:64"
     assert second and second.name == "Sampler0" and second.sampler_signature.endswith("usage=5")
+
+    member_line = (
+        'ShaderInputParityStandaloneUniformBlockMember backend=vulkan source=vulkan-standalone-ubo '
+        'program=42 location=7 name=gbufferProjection valueKind=mat4 componentCount=16 '
+        'offset=64 arraySize=1 stride=64 payloadHash=crc32:bbbb/bytes:64,sample=[3f800000,0,0,0,...]'
+    )
+    events = CaptureEvents(path=Path("self-test.log"))
+    parse_capture_line(member_line, events, ParseLimits())
+    members = events.standalone_uniform_block_members["gbufferProjection"]
+    assert len(members) == 1
+    assert members[0].signature == "crc32:bbbb/bytes:64"
+    assert members[0].offset == "64"
     print("self-test passed")
 
 
@@ -970,6 +1103,7 @@ def main(argv: list[str]) -> int:
     diff_parser.add_argument("--max-resource-events", type=int, default=0, help="0 means parse every resource event")
     diff_parser.add_argument("--max-uniform-buffer-events", type=int, default=0, help="0 means parse every UBO event")
     diff_parser.add_argument("--max-standalone-uniform-events", type=int, default=0, help="0 means parse every standalone uniform event")
+    diff_parser.add_argument("--max-standalone-uniform-block-member-events", type=int, default=0, help="0 means parse every standalone UBO member event")
     diff_parser.add_argument("--max-vertex-input-events", type=int, default=0, help="0 means parse every vertex-input event")
     diff_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
@@ -978,6 +1112,7 @@ def main(argv: list[str]) -> int:
     auto_parser.add_argument("--max-resource-events", type=int, default=0, help="0 means parse every resource event")
     auto_parser.add_argument("--max-uniform-buffer-events", type=int, default=0, help="0 means parse every UBO event")
     auto_parser.add_argument("--max-standalone-uniform-events", type=int, default=0, help="0 means parse every standalone uniform event")
+    auto_parser.add_argument("--max-standalone-uniform-block-member-events", type=int, default=0, help="0 means parse every standalone UBO member event")
     auto_parser.add_argument("--max-vertex-input-events", type=int, default=0, help="0 means parse every vertex-input event")
     auto_parser.add_argument("--write", action="store_true", help="write report under logs/auto-capture")
 
@@ -1011,6 +1146,7 @@ def main(argv: list[str]) -> int:
             args.max_resource_events,
             args.max_uniform_buffer_events,
             args.max_standalone_uniform_events,
+            args.max_standalone_uniform_block_member_events,
             args.max_vertex_input_events
         )
         text = render_diff_report(gl_meta.latest_log, vk_meta.latest_log, args.limit, parse_limits)
@@ -1025,6 +1161,7 @@ def main(argv: list[str]) -> int:
             args.max_resource_events,
             args.max_uniform_buffer_events,
             args.max_standalone_uniform_events,
+            args.max_standalone_uniform_block_member_events,
             args.max_vertex_input_events
         )
         text = render_diff_report(args.opengl_log, args.vulkan_log, args.limit, parse_limits)

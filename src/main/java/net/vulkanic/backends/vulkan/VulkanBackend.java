@@ -7387,7 +7387,7 @@ void main() {
             programId,
             location,
             field.name(),
-            standaloneUniformValueKind(field.type()),
+            standaloneUniformValueKind(field),
             false,
             values
         );
@@ -7406,13 +7406,13 @@ void main() {
             programId,
             location,
             field.name(),
-            standaloneUniformValueKind(field.type()),
+            standaloneUniformValueKind(field),
             values
         );
     }
 
-    private static String standaloneUniformValueKind(net.vulkanic.VulkanicUniformReflectionType type) {
-        return type.getGlslTypeName();
+    private static String standaloneUniformValueKind(StandaloneUniformField field) {
+        return field.type().getGlslTypeName() + (field.arraySize() > 1 ? "[]" : "");
     }
 
     private void maybeLogStandaloneUniformStats() {
@@ -7472,17 +7472,34 @@ void main() {
         }
     }
 
-    private static void writeIntUniform(StandaloneUniformField field, java.nio.ByteBuffer backingData, int[] values) {
-        int[] padded = new int[4];
-        int copyLength = Math.min(values.length, 4);
-        System.arraycopy(values, 0, padded, 0, copyLength);
-
+    static void writeIntUniform(StandaloneUniformField field, java.nio.ByteBuffer backingData, int[] values) {
         for (int offset : field.offsets()) {
-            writeIntUniformAtOffset(field, backingData, offset, padded);
+            writeIntUniformAtOffset(field, backingData, offset, values);
         }
     }
 
     private static void writeIntUniformAtOffset(
+        StandaloneUniformField field,
+        java.nio.ByteBuffer backingData,
+        int offset,
+        int[] values
+    ) {
+        int componentCount = standaloneUniformLogicalComponentCount(field.type());
+        int elementCount = Math.min(field.arraySize(), Math.max(1, (values.length + componentCount - 1) / componentCount));
+        int[] padded = new int[componentCount];
+
+        for (int element = 0; element < elementCount; element++) {
+            java.util.Arrays.fill(padded, 0);
+            int sourceBase = element * componentCount;
+            int copyLength = Math.min(componentCount, values.length - sourceBase);
+            if (copyLength > 0) {
+                System.arraycopy(values, sourceBase, padded, 0, copyLength);
+            }
+            writeIntUniformElementAtOffset(field, backingData, offset + (element * field.stride()), padded);
+        }
+    }
+
+    private static void writeIntUniformElementAtOffset(
         StandaloneUniformField field,
         java.nio.ByteBuffer backingData,
         int offset,
@@ -7511,7 +7528,7 @@ void main() {
         }
     }
 
-    private static void writeFloatUniform(StandaloneUniformField field, java.nio.ByteBuffer backingData, float[] values) {
+    static void writeFloatUniform(StandaloneUniformField field, java.nio.ByteBuffer backingData, float[] values) {
         for (int offset : field.offsets()) {
             writeFloatUniformAtOffset(field, backingData, offset, values);
         }
@@ -7523,47 +7540,178 @@ void main() {
         int offset,
         float[] values
     ) {
+        int componentCount = standaloneUniformLogicalComponentCount(field.type());
+        int elementCount = Math.min(field.arraySize(), Math.max(1, (values.length + componentCount - 1) / componentCount));
+
+        for (int element = 0; element < elementCount; element++) {
+            int sourceBase = element * componentCount;
+            writeFloatUniformElementAtOffset(field, backingData, offset + (element * field.stride()), values, sourceBase);
+        }
+    }
+
+    private static void writeFloatUniformElementAtOffset(
+        StandaloneUniformField field,
+        java.nio.ByteBuffer backingData,
+        int offset,
+        float[] values,
+        int sourceBase
+    ) {
         switch (field.type()) {
-            case FLOAT -> backingData.putFloat(offset, values[0]);
+            case FLOAT -> backingData.putFloat(offset, floatValueOrZero(values, sourceBase));
             case FLOAT_VEC2 -> {
-                backingData.putFloat(offset, values[0]);
-                backingData.putFloat(offset + 4, values.length > 1 ? values[1] : 0.0F);
+                backingData.putFloat(offset, floatValueOrZero(values, sourceBase));
+                backingData.putFloat(offset + 4, floatValueOrZero(values, sourceBase + 1));
             }
             case FLOAT_VEC3 -> {
-                backingData.putFloat(offset, values[0]);
-                backingData.putFloat(offset + 4, values.length > 1 ? values[1] : 0.0F);
-                backingData.putFloat(offset + 8, values.length > 2 ? values[2] : 0.0F);
+                backingData.putFloat(offset, floatValueOrZero(values, sourceBase));
+                backingData.putFloat(offset + 4, floatValueOrZero(values, sourceBase + 1));
+                backingData.putFloat(offset + 8, floatValueOrZero(values, sourceBase + 2));
             }
             case FLOAT_VEC4 -> {
-                backingData.putFloat(offset, values[0]);
-                backingData.putFloat(offset + 4, values.length > 1 ? values[1] : 0.0F);
-                backingData.putFloat(offset + 8, values.length > 2 ? values[2] : 0.0F);
-                backingData.putFloat(offset + 12, values.length > 3 ? values[3] : 0.0F);
+                backingData.putFloat(offset, floatValueOrZero(values, sourceBase));
+                backingData.putFloat(offset + 4, floatValueOrZero(values, sourceBase + 1));
+                backingData.putFloat(offset + 8, floatValueOrZero(values, sourceBase + 2));
+                backingData.putFloat(offset + 12, floatValueOrZero(values, sourceBase + 3));
             }
-            case FLOAT_MAT2 -> writeStd140MatrixColumns(backingData, offset, values, 2, 2);
-            case FLOAT_MAT3 -> writeStd140MatrixColumns(backingData, offset, values, 3, 3);
-            case FLOAT_MAT4 -> writeStd140MatrixColumns(backingData, offset, values, 4, 4);
+            case FLOAT_MAT2 -> writeStd140MatrixColumns(backingData, offset, values, sourceBase, 2, 2);
+            case FLOAT_MAT3 -> writeStd140MatrixColumns(backingData, offset, values, sourceBase, 3, 3);
+            case FLOAT_MAT4 -> writeStd140MatrixColumns(backingData, offset, values, sourceBase, 4, 4);
             default -> {
                 // Ignore mismatched updates for non-float field types.
             }
         }
     }
 
+    private static float floatValueOrZero(float[] values, int index) {
+        return index >= 0 && index < values.length ? values[index] : 0.0F;
+    }
+
     private static void writeStd140MatrixColumns(
         java.nio.ByteBuffer backingData,
         int baseOffset,
         float[] values,
+        int sourceBase,
         int columns,
         int rows
     ) {
         for (int col = 0; col < columns; col++) {
             int columnOffset = baseOffset + (col * 16);
             for (int row = 0; row < rows; row++) {
-                int sourceIndex = (col * rows) + row;
-                float component = sourceIndex < values.length ? values[sourceIndex] : 0.0F;
+                int sourceIndex = sourceBase + (col * rows) + row;
+                float component = floatValueOrZero(values, sourceIndex);
                 backingData.putFloat(columnOffset + (row * 4), component);
             }
         }
+    }
+
+    private static int standaloneUniformLogicalComponentCount(net.vulkanic.VulkanicUniformReflectionType type) {
+        return switch (type) {
+            case FLOAT, INT, UINT, BOOL -> 1;
+            case FLOAT_VEC2, INT_VEC2, UINT_VEC2, BOOL_VEC2 -> 2;
+            case FLOAT_VEC3, INT_VEC3, UINT_VEC3, BOOL_VEC3 -> 3;
+            case FLOAT_VEC4, INT_VEC4, UINT_VEC4, BOOL_VEC4 -> 4;
+            case FLOAT_MAT2 -> 4;
+            case FLOAT_MAT3 -> 9;
+            case FLOAT_MAT4 -> 16;
+            default -> 1;
+        };
+    }
+
+    private static boolean standaloneUniformIsFloatLike(net.vulkanic.VulkanicUniformReflectionType type) {
+        return switch (type) {
+            case FLOAT, FLOAT_VEC2, FLOAT_VEC3, FLOAT_VEC4, FLOAT_MAT2, FLOAT_MAT3, FLOAT_MAT4 -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean standaloneUniformIsIntegerLike(net.vulkanic.VulkanicUniformReflectionType type) {
+        return switch (type) {
+            case INT, UINT, BOOL, INT_VEC2, UINT_VEC2, BOOL_VEC2, INT_VEC3, UINT_VEC3, BOOL_VEC3,
+                INT_VEC4, UINT_VEC4, BOOL_VEC4 -> true;
+            default -> false;
+        };
+    }
+
+    static float[] readStandaloneUniformFloats(
+        StandaloneUniformField field,
+        java.nio.ByteBuffer backingData,
+        int offset
+    ) {
+        int componentCount = standaloneUniformLogicalComponentCount(field.type());
+        float[] values = new float[Math.max(1, field.arraySize()) * componentCount];
+        int writeIndex = 0;
+        for (int element = 0; element < Math.max(1, field.arraySize()); element++) {
+            int elementOffset = offset + (element * field.stride());
+            writeIndex = readStandaloneUniformFloatElement(field, backingData, elementOffset, values, writeIndex);
+        }
+        return values;
+    }
+
+    private static int readStandaloneUniformFloatElement(
+        StandaloneUniformField field,
+        java.nio.ByteBuffer backingData,
+        int offset,
+        float[] values,
+        int writeIndex
+    ) {
+        switch (field.type()) {
+            case FLOAT -> values[writeIndex++] = backingData.getFloat(offset);
+            case FLOAT_VEC2 -> {
+                values[writeIndex++] = backingData.getFloat(offset);
+                values[writeIndex++] = backingData.getFloat(offset + 4);
+            }
+            case FLOAT_VEC3 -> {
+                values[writeIndex++] = backingData.getFloat(offset);
+                values[writeIndex++] = backingData.getFloat(offset + 4);
+                values[writeIndex++] = backingData.getFloat(offset + 8);
+            }
+            case FLOAT_VEC4 -> {
+                values[writeIndex++] = backingData.getFloat(offset);
+                values[writeIndex++] = backingData.getFloat(offset + 4);
+                values[writeIndex++] = backingData.getFloat(offset + 8);
+                values[writeIndex++] = backingData.getFloat(offset + 12);
+            }
+            case FLOAT_MAT2 -> writeIndex = readStd140MatrixColumns(backingData, offset, values, writeIndex, 2, 2);
+            case FLOAT_MAT3 -> writeIndex = readStd140MatrixColumns(backingData, offset, values, writeIndex, 3, 3);
+            case FLOAT_MAT4 -> writeIndex = readStd140MatrixColumns(backingData, offset, values, writeIndex, 4, 4);
+            default -> {
+            }
+        }
+        return writeIndex;
+    }
+
+    private static int readStd140MatrixColumns(
+        java.nio.ByteBuffer backingData,
+        int baseOffset,
+        float[] values,
+        int writeIndex,
+        int columns,
+        int rows
+    ) {
+        for (int col = 0; col < columns; col++) {
+            int columnOffset = baseOffset + (col * 16);
+            for (int row = 0; row < rows; row++) {
+                values[writeIndex++] = backingData.getFloat(columnOffset + (row * 4));
+            }
+        }
+        return writeIndex;
+    }
+
+    static int[] readStandaloneUniformInts(
+        StandaloneUniformField field,
+        java.nio.ByteBuffer backingData,
+        int offset
+    ) {
+        int componentCount = standaloneUniformLogicalComponentCount(field.type());
+        int[] values = new int[Math.max(1, field.arraySize()) * componentCount];
+        int writeIndex = 0;
+        for (int element = 0; element < Math.max(1, field.arraySize()); element++) {
+            int elementOffset = offset + (element * field.stride());
+            for (int component = 0; component < componentCount; component++) {
+                values[writeIndex++] = backingData.getInt(elementOffset + (component * 4));
+            }
+        }
+        return values;
     }
 
     private static float[] transpose3(float[] values) {
@@ -7676,6 +7824,7 @@ void main() {
                 throw new IllegalStateException("Native Vulkan spine is unavailable after readiness check.");
             }
 
+            traceStandaloneUniformBlockMembers(program, virtualProgram, backingData);
             VulkanicBufferSlice slice = spine.materializeStandaloneUniformBuffer(
                 program,
                 backingData,
@@ -7695,6 +7844,53 @@ void main() {
             }
             logStandaloneSliceTraceInternal(program, "slice-lookup", null, virtualProgram, true, true, null);
             return slice;
+        }
+    }
+
+    private void traceStandaloneUniformBlockMembers(
+        int program,
+        VirtualProgram virtualProgram,
+        java.nio.ByteBuffer backingData
+    ) {
+        if (!VulkanicAPI.shouldTraceStandaloneUniformBlockMembers()) {
+            return;
+        }
+
+        java.nio.ByteBuffer source = backingData.duplicate().order(ByteOrder.nativeOrder());
+        java.util.ArrayList<java.util.Map.Entry<Integer, StandaloneUniformField>> fields =
+            new java.util.ArrayList<>(virtualProgram.standaloneFieldsByLocation.entrySet());
+        fields.sort(java.util.Map.Entry.comparingByKey());
+        for (java.util.Map.Entry<Integer, StandaloneUniformField> entry : fields) {
+            StandaloneUniformField field = entry.getValue();
+            int offset = field.offsets().length > 0 ? field.offsets()[0] : -1;
+            if (offset < 0) {
+                continue;
+            }
+            if (standaloneUniformIsIntegerLike(field.type())) {
+                VulkanicAPI.traceShaderInputParityStandaloneUniformBlockMemberInts(
+                    "vulkan-standalone-ubo",
+                    program,
+                    entry.getKey(),
+                    field.name(),
+                    standaloneUniformValueKind(field),
+                    offset,
+                    field.arraySize(),
+                    field.stride(),
+                    readStandaloneUniformInts(field, source, offset)
+                );
+            } else if (standaloneUniformIsFloatLike(field.type())) {
+                VulkanicAPI.traceShaderInputParityStandaloneUniformBlockMemberFloats(
+                    "vulkan-standalone-ubo",
+                    program,
+                    entry.getKey(),
+                    field.name(),
+                    standaloneUniformValueKind(field),
+                    offset,
+                    field.arraySize(),
+                    field.stride(),
+                    readStandaloneUniformFloats(field, source, offset)
+                );
+            }
         }
     }
 
@@ -7791,32 +7987,21 @@ void main() {
     public void setUniform2fv(CommandContext ctx, int location, float[] value) {
         requireVulkanCommandBufferHandle("setUniform2fv", ctx);
         if (value != null && value.length > 0) {
-            captureStandaloneUniformFloats(location, value.length >= 2 ? new float[] {value[0], value[1]} : new float[] {value[0], 0.0F});
+            captureStandaloneUniformFloats(location, java.util.Arrays.copyOf(value, value.length));
         }
     }
 
     public void setUniform3fv(CommandContext ctx, int location, float[] value) {
         requireVulkanCommandBufferHandle("setUniform3fv", ctx);
         if (value != null && value.length > 0) {
-            captureStandaloneUniformFloats(
-                location,
-                new float[] {value[0], value.length > 1 ? value[1] : 0.0F, value.length > 2 ? value[2] : 0.0F}
-            );
+            captureStandaloneUniformFloats(location, java.util.Arrays.copyOf(value, value.length));
         }
     }
 
     public void setUniform4fv(CommandContext ctx, int location, float[] value) {
         requireVulkanCommandBufferHandle("setUniform4fv", ctx);
         if (value != null && value.length > 0) {
-            captureStandaloneUniformFloats(
-                location,
-                new float[] {
-                    value[0],
-                    value.length > 1 ? value[1] : 0.0F,
-                    value.length > 2 ? value[2] : 0.0F,
-                    value.length > 3 ? value[3] : 0.0F
-                }
-            );
+            captureStandaloneUniformFloats(location, java.util.Arrays.copyOf(value, value.length));
         }
     }
 
@@ -9959,7 +10144,7 @@ void main() {
     private record DescriptorSlot(int set, int binding) {
     }
 
-    private record StandaloneUniformField(
+    record StandaloneUniformField(
         String name,
         net.vulkanic.VulkanicUniformReflectionType type,
         int[] offsets,

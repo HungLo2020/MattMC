@@ -54,6 +54,8 @@ public class VulkanicAPI {
     private static final int MAX_STANDALONE_UNIFORM_TRACE_LOGS = Integer.getInteger("mattmc.vulkan.traceStandaloneUniforms.maxLogs", 512);
     private static final java.util.concurrent.atomic.AtomicInteger STANDALONE_UNIFORM_TRACE_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final boolean TRACE_SHADER_INPUT_PARITY = Boolean.getBoolean("mattmc.vulkan.traceShaderInputParity");
+    private static final boolean TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS =
+        Boolean.getBoolean("mattmc.vulkan.traceStandaloneUniformBlockMembers");
     private static final int MAX_SHADER_INPUT_PARITY_LOGS = Integer.getInteger("mattmc.vulkan.traceShaderInputParity.maxLogs", 20000);
     private static final java.util.concurrent.atomic.AtomicInteger SHADER_INPUT_PARITY_LOG_COUNT = new java.util.concurrent.atomic.AtomicInteger();
     private static final int VULKAN_LWJGL_STACK_SIZE_KB = 512;
@@ -3194,6 +3196,10 @@ public class VulkanicAPI {
 
     public static boolean isShaderInputParityTracingEnabled() {
         return TRACE_SHADER_INPUT_PARITY;
+    }
+
+    public static boolean shouldTraceStandaloneUniformBlockMembers() {
+        return TRACE_SHADER_INPUT_PARITY && TRACE_STANDALONE_UNIFORM_BLOCK_MEMBERS;
     }
 
     public static boolean shouldTraceStandaloneUniforms() {
@@ -6908,6 +6914,82 @@ public class VulkanicAPI {
             sanitizeShaderInputParityUniformName(name),
             valueKind,
             values.length,
+            shaderInputParityHash(bytes, bytes.remaining()),
+            shaderInputParityIntSample(values)
+        );
+    }
+
+    public static void traceShaderInputParityStandaloneUniformBlockMemberFloats(
+        String source,
+        int program,
+        int location,
+        @Nullable String name,
+        String valueKind,
+        int offset,
+        int arraySize,
+        int stride,
+        float[] values
+    ) {
+        if (values == null || values.length == 0 || !shouldTraceShaderInputParityLog()) {
+            return;
+        }
+
+        ByteBuffer bytes = BufferUtils.createByteBuffer(values.length * Float.BYTES);
+        for (float value : values) {
+            bytes.putInt(Float.floatToRawIntBits(value));
+        }
+        bytes.flip();
+
+        LOGGER.info(
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} location={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} payloadHash={},sample={}",
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            source,
+            program,
+            location,
+            sanitizeShaderInputParityUniformName(name),
+            valueKind,
+            values.length,
+            offset,
+            arraySize,
+            stride,
+            shaderInputParityHash(bytes, bytes.remaining()),
+            shaderInputParityFloatSample(values)
+        );
+    }
+
+    public static void traceShaderInputParityStandaloneUniformBlockMemberInts(
+        String source,
+        int program,
+        int location,
+        @Nullable String name,
+        String valueKind,
+        int offset,
+        int arraySize,
+        int stride,
+        int[] values
+    ) {
+        if (values == null || values.length == 0 || !shouldTraceShaderInputParityLog()) {
+            return;
+        }
+
+        ByteBuffer bytes = BufferUtils.createByteBuffer(values.length * Integer.BYTES);
+        for (int value : values) {
+            bytes.putInt(value);
+        }
+        bytes.flip();
+
+        LOGGER.info(
+            "ShaderInputParityStandaloneUniformBlockMember backend={} source={} program={} location={} name={} valueKind={} componentCount={} offset={} arraySize={} stride={} payloadHash={},sample={}",
+            getActiveBackendType().name().toLowerCase(Locale.ROOT),
+            source,
+            program,
+            location,
+            sanitizeShaderInputParityUniformName(name),
+            valueKind,
+            values.length,
+            offset,
+            arraySize,
+            stride,
             shaderInputParityHash(bytes, bytes.remaining()),
             shaderInputParityIntSample(values)
         );
