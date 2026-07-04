@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.ai_awp.name",
+  "display": "minecraft:ai_awp_display",
+  "data": "minecraft:ai_awp_data",
+  "tooltip": "minecraft.gun.ai_awp.desc",
+  "type": "sniper",
+  "sort": 1
+}

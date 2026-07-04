@@ -1,6 +1,7 @@
 {
-  "gui_light": "front",
+  "parent": "minecraft:item/generated",
   "textures": {
-    "particle": "minecraft:item/glock_17"
+    "layer0": "minecraft:gun/slot/glock_17",
+    "particle": "minecraft:gun/slot/glock_17"
   }
 }

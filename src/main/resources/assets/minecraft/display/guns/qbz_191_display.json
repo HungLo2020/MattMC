@@ -1,0 +1,66 @@
+{
+  "model": "minecraft:gun/qbz_191_geo",
+  "texture": "minecraft:gun/uv/qbz_191",
+  "lod": {
+    "model": "minecraft:gun/lod/qbz_191",
+    "texture": "minecraft:gun/lod/qbz_191"
+  },
+  "hud": "minecraft:gun/hud/qbz_191",
+  "slot": "minecraft:gun/slot/qbz_191",
+  "animation": "minecraft:qbz_191",
+  "use_default_animation": "rifle",
+  "third_person_animation": "default",
+  "state_machine": "minecraft:qbz_191_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 1.125
+  },
+  "iron_zoom": 1.33,
+  "zoom_model_fov": 50,
+  "shell": {
+    // Ã¦Å â€ºÃ¥Â£Â³Ã§Å¡â€žÃ¥Ë†ÂÃ©â‚¬Å¸Ã¥ÂºÂ¦
+    "initial_velocity": [6, 2, -4.5],
+    // Ã¦Å â€ºÃ¥Â£Â³Ã©Å¡ÂÃ¦Å“ÂºÃ¥ÂËœÃ¥Å’â€“Ã§Å¡â€žÃ¨Â¿ÂÃ¥Å Â¨Ã©â‚¬Å¸Ã¥ÂºÂ¦
+    "random_velocity": [2, 1.5, 0.5],
+    // Ã¦Å â€ºÃ¥Â£Â³Ã§Å¡â€žÃ¥Å Â Ã©â‚¬Å¸Ã¥ÂºÂ¦
+    "acceleration": [0.0, -12.5, 0.0],
+    // Ã¦Å â€ºÃ¥Â£Â³Ã§Å¡â€žÃ¤Â¸â€°Ã¨Â½Â´Ã¨Â§â€™Ã©â‚¬Å¸Ã¥ÂºÂ¦
+    "angular_velocity": [360, -1200, 90],
+    // Ã¦Å â€ºÃ¥Â£Â³Ã¦Â¸Â²Ã¦Å¸â€œÃ¥Â­ËœÃ¦Â´Â»Ã¦â€”Â¶Ã©â€”Â´Ã¯Â¼Å’Ã¥Ââ€¢Ã¤Â½ÂÃ¤Â¸ÂºÃ§Â§â€™
+    "living_time": 1.0
+  },
+  "sounds": {
+    "draw": "minecraft:qbz_191/qbz191_draw",
+    "put_away": "minecraft:qbz_191/qbz191_putaway",
+    "shoot": "minecraft:qbz_191/qbz191_shoot",
+    "shoot_3p": "minecraft:qbz_191/qbz191_shoot_3p",
+    "silence": "minecraft:qbz_191/qbz191_silence",
+    "silence_3p": "minecraft:qbz_191/qbz191_silence_3p",
+    "dry_fire": "minecraft:dry_fire",
+    "fire_select": "minecraft:fire_select",
+    "head_hit": "minecraft:head_hit",
+    "flesh_hit": "minecraft:flesh_hit",
+    "kill": "minecraft:kill",
+    "melee_push": "minecraft:melee_stock/melee_stock_01",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+  },
+  "offhand_show": {
+    "pos": [0, 19, 4],
+    "rotate": [0, 0, 60],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [0, 19, 3],
+      "rotate": [-180, 0, 120],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

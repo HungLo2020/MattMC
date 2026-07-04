@@ -1,0 +1,78 @@
+{
+  "model": "minecraft:gun/m700_geo",
+  "texture": "minecraft:gun/uv/m700",
+  "lod": {
+    "model": "minecraft:gun/lod/m700",
+    "texture": "minecraft:gun/lod/m700"
+  },
+  "hud": "minecraft:gun/hud/m700",
+  "slot": "minecraft:gun/slot/m700",
+  "animation": "minecraft:m700",
+  "state_machine": "minecraft:manual_action_state_machine",
+  "state_machine_param": {
+    "bolt_shell_ejecting_time": 0.4
+  },
+  "use_default_animation": "rifle",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  "shell": {
+    "initial_velocity": [8, 2, -3.5],
+    "random_velocity": [2, 1, 3],
+    "acceleration": [0.0, -20, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.0
+  },
+  "ammo":{
+    "particle": {
+    // Ã¥ÂÂÃ§Â§Â°Ã¯Â¼Å’Ã¥â€¦Â·Ã¤Â½â€œÃ¥ÂÂ¯Ã©â‚¬â€°Ã§Â²â€™Ã¥Â­ÂÃ¥ÂÂ¯Ã¥Ââ€šÃ¨â‚¬Æ’ wikiÃ¯Â¼Å¡https://minecraft.fandom.com/zh/wiki/%E7%B2%92%E5%AD%90
+    "name": "mycelium",
+    // Ã§â€Å¸Ã¦Ë†ÂÃ§Å¡â€žÃ¥Å’ÂºÃ¥Å¸Å¸Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤Ã¤Â¸Âº 0 0 0
+    "delta": [
+      0,
+      0,
+      0
+    ],
+    // Ã©â‚¬Å¸Ã¥ÂºÂ¦Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤Ã¤Â¸Âº0Ã¯Â¼Å’Ã¥Â¿â€¦Ã©Â¡Â»Ã¨â€¡Â³Ã¥Â°â€˜Ã¤Â¸Âº 0
+    "speed": 0.0,
+    // Ã§Â²â€™Ã¥Â­ÂÃ¥Â­ËœÃ¥Å“Â¨Ã¦â€”Â¶Ã©â€”Â´Ã¯Â¼Å’Ã¥Ââ€¢Ã¤Â½Â tickÃ¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤Ã¤Â¸Âº 20 tick
+    "life_time": 20,
+    // Ã§Â²â€™Ã¥Â­ÂÃ¦â€¢Â°Ã©â€¡ÂÃ¯Â¼Å’Ã¥Â½â€œÃ¥Â­ÂÃ¥Â¼Â¹Ã©â‚¬Å¸Ã¥ÂºÂ¦Ã¨Â¿â€¡Ã¥Â¿Â«Ã¦â€”Â¶Ã¯Â¼Å’Ã¥ÂÂ¯Ã¤Â»Â¥Ã¥Â¢Å¾Ã¥Â¤Â§Ã¦Â­Â¤Ã¦â€¢Â°Ã©â€¡ÂÃ¯Â¼Å’Ã¨Æ’Â½Ã¥Â¤Å¸Ã¥Â¡Â«Ã¦Â»Â¡Ã¥Â­ÂÃ¥Â¼Â¹Ã¨Â·Â¯Ã¥Â¾â€žÃ§Å¡â€žÃ§Â©ÂºÃ©Å¡â„¢
+    "count": 100
+    }
+  },
+  // Ã¦Å“ÂºÃ§Å¾â€žÃ§Å¡â€žÃ¦â€Â¾Ã¥Â¤Â§Ã¥â‚¬ÂÃ¦â€¢Â°Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤ 1.2
+  "iron_zoom": 1.5,
+  // Ã¦Å“ÂºÃ§Å¾â€žÃ¦Â¨Â¡Ã¥Å¾â€¹Ã§Â¼Â©Ã¦â€Â¾fovÃ¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤70
+  "zoom_model_fov": 35,
+  "sounds": {
+    "draw": "minecraft:m700/m700_draw",
+    "shoot": "minecraft:m700/m700_shoot",
+    "shoot_3p": "minecraft:m700/m700_shoot_3p",
+    "silence": "minecraft:m700/m700_silence",
+    "silence_3p": "minecraft:m700/m700_silence_3p",
+    "put_away": "minecraft:m700/m700_put_away",
+    "melee_push": "minecraft:melee_stock/melee_stock_02",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+  },
+  "offhand_show": {
+    "pos": [-2, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 26, 3],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

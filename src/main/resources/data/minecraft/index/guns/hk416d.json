@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.hk416d.name",
+  "display": "minecraft:hk416d_display",
+  "data": "minecraft:hk416d_data",
+  "type": "rifle",
+  "tooltip": "minecraft.gun.hk416d.desc",
+  "sort": 9
+}

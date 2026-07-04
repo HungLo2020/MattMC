@@ -2208,7 +2208,7 @@ public class ServerGamePacketListenerImpl
 		}
 
 		ItemStack itemStack = this.player.getMainHandItem();
-		if (!itemStack.is(Items.TACZ_GLOCK_17) || !(itemStack.getItem() instanceof TaczMvpGunItem gunItem) || !itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
+		if (!(itemStack.getItem() instanceof TaczMvpGunItem gunItem) || !itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
 			return;
 		}
 

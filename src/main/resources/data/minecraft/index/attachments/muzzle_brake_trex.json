@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.attachment.muzzle_brake_trex.name",
+  "display": "minecraft:muzzle_brake_trex_display",
+  "data": "minecraft:muzzle_brake_trex_data",
+  "type": "muzzle"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.attachment.muzzle_silencer_mirage.name",
+  "display": "minecraft:muzzle_silencer_mirage_display",
+  "data": "minecraft:muzzle_silencer_mirage_data",
+  "type": "muzzle"
+}

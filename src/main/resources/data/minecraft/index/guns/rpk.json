@@ -1,0 +1,9 @@
+{
+  "name": "minecraft.gun.rpk.name",
+  "display": "minecraft:rpk_display",
+  "data": "minecraft:rpk_data",
+  "tooltip": "minecraft.gun.rpk.desc",
+  "type": "mg",
+  "item_type": "modern_kinetic",
+  "sort": 2
+}

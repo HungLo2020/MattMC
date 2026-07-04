@@ -1,0 +1,11 @@
+{
+  "model": "minecraft:ammo/357mag",
+  "texture": "minecraft:ammo/uv/357mag",
+  "slot": "minecraft:ammo/slot/357mag",
+  "shell": {
+    "model": "minecraft:shell/357mag_shell",
+    "texture": "minecraft:shell/357mag_shell"
+  },
+  "tracer_color": "#ffe09e"
+}
+    

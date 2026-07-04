@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.ump45.name",
+  "display": "minecraft:ump45_display",
+  "data": "minecraft:ump45_data",
+  "tooltip": "minecraft.gun.ump45.desc",
+  "type": "smg",
+  "sort": 4
+}

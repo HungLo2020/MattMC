@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/fn_evolys_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "fn_evolys"
+    }
+  }
+}

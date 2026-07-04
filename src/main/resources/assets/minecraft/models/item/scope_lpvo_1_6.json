@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:attachment/slot/scope_lpvo_1_6"
+  }
+}

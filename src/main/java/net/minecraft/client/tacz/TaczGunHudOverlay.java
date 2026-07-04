@@ -12,12 +12,10 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TaczMvpGunItem;
 
 public final class TaczGunHudOverlay {
 	private static final ResourceLocation ID = ResourceLocation.withDefaultNamespace("tacz_gun_hud_overlay");
-	private static final ResourceLocation GLOCK_HUD = ResourceLocation.withDefaultNamespace("textures/gun/hud/glock_17.png");
 	private static final ResourceLocation FIRE_MODE_SEMI = ResourceLocation.withDefaultNamespace("textures/hud/fire_mode_semi.png");
 	private static final DecimalFormat CURRENT_AMMO_FORMAT = new DecimalFormat("000");
 	private static final DecimalFormat INVENTORY_AMMO_FORMAT = new DecimalFormat("0000");
@@ -42,11 +40,11 @@ public final class TaczGunHudOverlay {
 		}
 
 		ItemStack gunStack = player.getMainHandItem();
-		if (!gunStack.is(Items.TACZ_GLOCK_17)) {
+		if (!(gunStack.getItem() instanceof TaczMvpGunItem gunItem)) {
 			return;
 		}
 
-		handleCacheCount(player);
+		handleCacheCount(player, gunItem);
 		int width = guiGraphics.guiWidth();
 		int height = guiGraphics.guiHeight();
 		int maxAmmo = TaczMvpGunItem.getMagazineSize(gunStack);
@@ -81,7 +79,19 @@ public final class TaczGunHudOverlay {
 		guiGraphics.pose().popMatrix();
 
 		int gunIconColor = empty ? 0xFFFF4D4D : 0xFFFFFFFF;
-		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, GLOCK_HUD, width - 117, height - 44, 0.0F, 0.0F, 39, 13, 39, 13, gunIconColor);
+		guiGraphics.blit(
+			RenderPipelines.GUI_TEXTURED,
+			ResourceLocation.withDefaultNamespace("textures/gun/hud/" + gunItem.gunId() + ".png"),
+			width - 117,
+			height - 44,
+			0.0F,
+			0.0F,
+			39,
+			13,
+			39,
+			13,
+			gunIconColor
+		);
 		guiGraphics.blit(
 			RenderPipelines.GUI_TEXTURED,
 			FIRE_MODE_SEMI,
@@ -97,22 +107,12 @@ public final class TaczGunHudOverlay {
 		);
 	}
 
-	private static void handleCacheCount(LocalPlayer player) {
+	private static void handleCacheCount(LocalPlayer player, TaczMvpGunItem gunItem) {
 		if (System.currentTimeMillis() - checkAmmoTimestamp <= 50L) {
 			return;
 		}
 
 		checkAmmoTimestamp = System.currentTimeMillis();
-		cachedInventoryAmmoCount = 0;
-		for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-			ItemStack itemStack = player.getInventory().getItem(slot);
-			if (itemStack.is(Items.TACZ_NINE_MM_AMMO)) {
-				cachedInventoryAmmoCount += itemStack.getCount();
-				if (cachedInventoryAmmoCount >= MAX_AMMO_COUNT) {
-					cachedInventoryAmmoCount = MAX_AMMO_COUNT;
-					return;
-				}
-			}
-		}
+		cachedInventoryAmmoCount = Math.min(gunItem.countReserveAmmo(player), MAX_AMMO_COUNT);
 	}
 }

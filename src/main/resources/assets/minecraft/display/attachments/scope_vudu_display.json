@@ -1,0 +1,27 @@
+{
+  "slot": "minecraft:attachment/slot/scope_vudu",
+  "model": "minecraft:attachment/scope_vudu_geo",
+  "texture": "minecraft:attachment/uv/scope_vudu",
+  "lod": {
+    "model": "minecraft:attachment/lod/scope_vudu",
+    "texture": "minecraft:attachment/lod/scope_vudu"
+  },
+  "zoom": [
+    6.5,
+    1.35
+  ],
+  "views": [
+    2,
+    1
+  ],
+  "views_fov": [
+    30.0,
+    60.0
+  ],
+  "scope": true,
+  "sight": true,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_c",
+    "uninstall": "minecraft:attachments/scope_general_c"
+  }
+}

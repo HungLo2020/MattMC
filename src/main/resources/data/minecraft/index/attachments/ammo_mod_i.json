@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.attachment.ammo_mod_i.name",
+  "display": "minecraft:ammo_mod_i_display",
+  "data": "minecraft:ammo_mod_i_data",
+  "tooltip": "minecraft.attachment.ammo_mod_i.desc",
+  "type": "extended_mag",
+  "sort": 1000
+}

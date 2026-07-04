@@ -1,0 +1,19 @@
+{
+  "slot": "minecraft:attachment/slot/sight_pk06_rifle",
+  "model": "minecraft:attachment/sight_pk06_rifle_geo",
+  "texture": "minecraft:attachment/uv/sight_pk06_rifle",
+  "lod": {
+    "model": "minecraft:attachment/lod/sight_pk06_rifle",
+    "texture": "minecraft:attachment/lod/sight_pk06_rifle"
+  },
+  "zoom": [
+    2
+  ],
+  "scope": false,
+  "sight": true,
+  "fov": 40.0,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_c",
+    "uninstall": "minecraft:attachments/scope_general_c"
+  }
+}

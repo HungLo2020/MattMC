@@ -1,0 +1,10 @@
+{
+  "slot": "minecraft:attachment/slot/bayonet_m9",
+  "model": "minecraft:attachment/bayonet_m9_geo",
+  "texture": "minecraft:attachment/uv/bayonet_m9",
+  "show_muzzle": true,
+  "sounds": {
+    "install": "minecraft:attachments/bayonet_install",
+    "uninstall": "minecraft:attachments/bayonet_uninstall"
+  }
+}

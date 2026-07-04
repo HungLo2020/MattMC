@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.hk_mp5a5.name",
+  "display": "minecraft:hk_mp5a5_display",
+  "data": "minecraft:hk_mp5a5_data",
+  "tooltip": "minecraft.gun.hk_mp5a5.desc",
+  "type": "smg",
+  "sort": 1
+}

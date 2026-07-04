@@ -1,35 +1,1085 @@
 {
-  "glock_17.empty": {
-    "subtitle": "subtitles.tacz.glock_17.empty",
-    "sounds": [
-      "minecraft:glock_17/empty"
-    ]
-  },
-  "glock_17.hit": {
-    "subtitle": "subtitles.tacz.glock_17.hit",
-    "sounds": [
-      "minecraft:random/bowhit1",
-      "minecraft:random/bowhit2",
-      "minecraft:random/bowhit3",
-      "minecraft:random/bowhit4"
-    ]
-  },
-  "glock_17.reload_end": {
-    "subtitle": "subtitles.tacz.glock_17.reload",
-    "sounds": [
-      "minecraft:glock_17/glock17_reload_end"
-    ]
-  },
-  "glock_17.reload_start": {
-    "subtitle": "subtitles.tacz.glock_17.reload",
-    "sounds": [
-      "minecraft:glock_17/glock17_reload_start"
-    ]
-  },
-  "glock_17.shoot": {
-    "subtitle": "subtitles.tacz.glock_17.shoot",
-    "sounds": [
-      "minecraft:glock_17/glock17_shoot"
-    ]
-  }
+    "aa12.shoot":  {
+                       "subtitle":  "subtitles.minecraft.aa12.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/aa12/aa12_shoot"
+                                  ]
+                   },
+    "aa12.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.aa12.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/aa12/aa12_reload"
+                                         ]
+                          },
+    "aa12.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.aa12.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/aa12/aa12_reload_tactical"
+                                       ]
+                        },
+    "aa12.empty":  {
+                       "subtitle":  "subtitles.minecraft.aa12.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/aa12/aa12_inspect_empty"
+                                  ]
+                   },
+    "ai_awp.shoot":  {
+                         "subtitle":  "subtitles.minecraft.ai_awp.shoot",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/ai_awp/awp_shoot"
+                                    ]
+                     },
+    "ai_awp.reload_start":  {
+                                "subtitle":  "subtitles.minecraft.ai_awp.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/ai_awp/awp_reload_empty_magout"
+                                           ]
+                            },
+    "ai_awp.reload_end":  {
+                              "subtitle":  "subtitles.minecraft.ai_awp.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/ai_awp/awp_reload_empty_magin"
+                                         ]
+                          },
+    "ai_awp.empty":  {
+                         "subtitle":  "subtitles.minecraft.ai_awp.empty",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/ai_awp/awp_inspect_empty_magpalmhit"
+                                    ]
+                     },
+    "ak47.shoot":  {
+                       "subtitle":  "subtitles.minecraft.ak47.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/ak47/ak47_shoot"
+                                  ]
+                   },
+    "ak47.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.ak47.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/ak47/ak47_reload_empty_magout"
+                                         ]
+                          },
+    "ak47.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.ak47.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/ak47/ak47_reload_empty_magin"
+                                       ]
+                        },
+    "ak47.empty":  {
+                       "subtitle":  "subtitles.minecraft.ak47.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/ak47/ak47_inspect_empty_chamber"
+                                  ]
+                   },
+    "aug.shoot":  {
+                      "subtitle":  "subtitles.minecraft.aug.shoot",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/aug/aug_shoot"
+                                 ]
+                  },
+    "aug.reload_start":  {
+                             "subtitle":  "subtitles.minecraft.aug.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/aug/aug_reload_empty_magout"
+                                        ]
+                         },
+    "aug.reload_end":  {
+                           "subtitle":  "subtitles.minecraft.aug.reload",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/aug/aug_reload_empty_magin"
+                                      ]
+                       },
+    "aug.empty":  {
+                      "subtitle":  "subtitles.minecraft.aug.empty",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/aug/aug_reload_empty_boltclose"
+                                 ]
+                  },
+    "b93r.shoot":  {
+                       "subtitle":  "subtitles.minecraft.b93r.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/b93r/b93r_shoot"
+                                  ]
+                   },
+    "b93r.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.b93r.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/b93r/b93r_reload_empty_magout"
+                                         ]
+                          },
+    "b93r.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.b93r.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/b93r/b93r_reload_empty_magin"
+                                       ]
+                        },
+    "b93r.empty":  {
+                       "subtitle":  "subtitles.minecraft.b93r.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/b93r/b93r_reload_empty_charge"
+                                  ]
+                   },
+    "cz75.shoot":  {
+                       "subtitle":  "subtitles.minecraft.cz75.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/cz75/cz75_shoot"
+                                  ]
+                   },
+    "cz75.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.cz75.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/cz75/cz75_reload_empty_magout"
+                                         ]
+                          },
+    "cz75.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.cz75.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/cz75/cz75_reload_empty_magin"
+                                       ]
+                        },
+    "cz75.empty":  {
+                       "subtitle":  "subtitles.minecraft.cz75.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/cz75/cz75_inspect_empty_end"
+                                  ]
+                   },
+    "db_long.shoot":  {
+                          "subtitle":  "subtitles.minecraft.db_long.shoot",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/db_long/dbl_shoot"
+                                     ]
+                      },
+    "db_short.shoot":  {
+                           "subtitle":  "subtitles.minecraft.db_short.shoot",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/db_short/db_shoot"
+                                      ]
+                       },
+    "db_short.reload_start":  {
+                                  "subtitle":  "subtitles.minecraft.db_short.reload",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/db_short/db_short_reload_empty"
+                                             ]
+                              },
+    "db_short.reload_end":  {
+                                "subtitle":  "subtitles.minecraft.db_short.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/db_short/db_short_reload_tactical"
+                                           ]
+                            },
+    "db_short.empty":  {
+                           "subtitle":  "subtitles.minecraft.db_short.empty",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/db_short/db_short_inspect_empty"
+                                      ]
+                       },
+    "deagle.shoot":  {
+                         "subtitle":  "subtitles.minecraft.deagle.shoot",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/deagle/deagle_shoot"
+                                    ]
+                     },
+    "deagle.reload_start":  {
+                                "subtitle":  "subtitles.minecraft.deagle.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/deagle/deagle_reload_empty_magout"
+                                           ]
+                            },
+    "deagle.reload_end":  {
+                              "subtitle":  "subtitles.minecraft.deagle.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/deagle/deagle_reload_empty_magin"
+                                         ]
+                          },
+    "deagle.empty":  {
+                         "subtitle":  "subtitles.minecraft.deagle.empty",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/deagle/deagle_inspect_empty_end"
+                                    ]
+                     },
+    "fn_evolys.shoot":  {
+                            "subtitle":  "subtitles.minecraft.fn_evolys.shoot",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/fn_evolys/evolys_shoot"
+                                       ]
+                        },
+    "fn_evolys.reload_start":  {
+                                   "subtitle":  "subtitles.minecraft.fn_evolys.reload",
+                                   "sounds":  [
+                                                  "minecraft:tacz_sounds/fn_evolys/evolys_reload_magout"
+                                              ]
+                               },
+    "fn_evolys.reload_end":  {
+                                 "subtitle":  "subtitles.minecraft.fn_evolys.reload",
+                                 "sounds":  [
+                                                "minecraft:tacz_sounds/fn_evolys/evolys_reload_magin"
+                                            ]
+                             },
+    "fn_evolys.empty":  {
+                            "subtitle":  "subtitles.minecraft.fn_evolys.empty",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/fn_evolys/evolys_magin_empty"
+                                       ]
+                        },
+    "fn_fal.shoot":  {
+                         "subtitle":  "subtitles.minecraft.fn_fal.shoot",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/fn_fal/fn_fal_shoot"
+                                    ]
+                     },
+    "g36k.shoot":  {
+                       "subtitle":  "subtitles.minecraft.g36k.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/g36k/g36k_shoot"
+                                  ]
+                   },
+    "g36k.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.g36k.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/g36k/g36k_reload_empty_magout"
+                                         ]
+                          },
+    "g36k.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.g36k.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/g36k/g36k_reload_empty_magin"
+                                       ]
+                        },
+    "g36k.empty":  {
+                       "subtitle":  "subtitles.minecraft.g36k.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/g36k/g36k_inspect_empty_fast_charge"
+                                  ]
+                   },
+    "glock_17.shoot":  {
+                           "subtitle":  "subtitles.minecraft.glock_17.shoot",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/glock_17/glock17_shoot"
+                                      ]
+                       },
+    "glock_17.reload_start":  {
+                                  "subtitle":  "subtitles.minecraft.glock_17.reload",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/glock_17/glock17_reload_empty_magout"
+                                             ]
+                              },
+    "glock_17.reload_end":  {
+                                "subtitle":  "subtitles.minecraft.glock_17.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/glock_17/glock17_reload_empty_magin"
+                                           ]
+                            },
+    "glock_17.empty":  {
+                           "subtitle":  "subtitles.minecraft.glock_17.empty",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/glock_17/glock17_inspect_empty_magback"
+                                      ]
+                       },
+    "hk_g3.shoot":  {
+                        "subtitle":  "subtitles.minecraft.hk_g3.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/hk_g3/hk_g3_shoot"
+                                   ]
+                    },
+    "hk_g3.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.hk_g3.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/hk_g3/hk_g3_reload_empty_magout"
+                                          ]
+                           },
+    "hk_g3.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.hk_g3.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/hk_g3/hk_g3_reload_empty_smag_magin"
+                                        ]
+                         },
+    "hk_g3.empty":  {
+                        "subtitle":  "subtitles.minecraft.hk_g3.empty",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/hk_g3/hk_g3_reload_empty_carrierback"
+                                   ]
+                    },
+    "hk_mp5a5.shoot":  {
+                           "subtitle":  "subtitles.minecraft.hk_mp5a5.shoot",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/hk_mp5a5/hk_mp5a5_shoot"
+                                      ]
+                       },
+    "hk_mp5a5.reload_start":  {
+                                  "subtitle":  "subtitles.minecraft.hk_mp5a5.reload",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/hk_mp5a5/hk_mp5a5_reload_empty_magout"
+                                             ]
+                              },
+    "hk_mp5a5.reload_end":  {
+                                "subtitle":  "subtitles.minecraft.hk_mp5a5.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/hk_mp5a5/hk_mp5a5_reload_empty_fast_magin"
+                                           ]
+                            },
+    "hk_mp5a5.empty":  {
+                           "subtitle":  "subtitles.minecraft.hk_mp5a5.empty",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/hk_mp5a5/hk_mp5a5_inspect_empty_fast_pin"
+                                      ]
+                       },
+    "hk416d.shoot":  {
+                         "subtitle":  "subtitles.minecraft.hk416d.shoot",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/hk416d/hk416d_shoot"
+                                    ]
+                     },
+    "hk416d.reload_start":  {
+                                "subtitle":  "subtitles.minecraft.hk416d.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/hk416d/hk416d_reload_empty_fast_magout"
+                                           ]
+                            },
+    "hk416d.reload_end":  {
+                              "subtitle":  "subtitles.minecraft.hk416d.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/hk416d/hk416d_reload_empty_fast_xmaglrg_magin"
+                                         ]
+                          },
+    "hk416d.empty":  {
+                         "subtitle":  "subtitles.minecraft.hk416d.empty",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/hk416d/hk416d_inspect_empty_charge"
+                                    ]
+                     },
+    "kar98.shoot":  {
+                        "subtitle":  "subtitles.minecraft.kar98.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/kar98/kar98_shoot"
+                                   ]
+                    },
+    "kar98.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.kar98.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/kar98/kar98_reload_bolt_in"
+                                          ]
+                           },
+    "kar98.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.kar98.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/kar98/kar98_reload_press"
+                                        ]
+                         },
+    "kar98.empty":  {
+                        "subtitle":  "subtitles.minecraft.kar98.empty",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/kar98/kar98_reload_empty_shell_impact"
+                                   ]
+                    },
+    "lonetrail.shoot":  {
+                            "subtitle":  "subtitles.minecraft.lonetrail.shoot",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/lonetrail/breach_shoot"
+                                       ]
+                        },
+    "lonetrail.reload_start":  {
+                                   "subtitle":  "subtitles.minecraft.lonetrail.reload",
+                                   "sounds":  [
+                                                  "minecraft:tacz_sounds/lonetrail/breach_reload_eject"
+                                              ]
+                               },
+    "lonetrail.reload_end":  {
+                                 "subtitle":  "subtitles.minecraft.lonetrail.reload",
+                                 "sounds":  [
+                                                "minecraft:tacz_sounds/lonetrail/breach_reload_shell_impact"
+                                            ]
+                             },
+    "m1014.shoot":  {
+                        "subtitle":  "subtitles.minecraft.m1014.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/m1014/m1014_shoot"
+                                   ]
+                    },
+    "m1014.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.m1014.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/m1014/m1014_reload_double"
+                                          ]
+                           },
+    "m1014.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.m1014.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/m1014/m1014_reload_once"
+                                        ]
+                         },
+    "m107.shoot":  {
+                       "subtitle":  "subtitles.minecraft.m107.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m107/m107_shoot"
+                                  ]
+                   },
+    "m107.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.m107.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/m107/m107_reload_empty_fast_magout"
+                                         ]
+                          },
+    "m107.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.m107.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/m107/m107_reload_empty_magin_01"
+                                       ]
+                        },
+    "m107.empty":  {
+                       "subtitle":  "subtitles.minecraft.m107.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m107/m107_reload_empty_armmag"
+                                  ]
+                   },
+    "m16a1.shoot":  {
+                        "subtitle":  "subtitles.minecraft.m16a1.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/m16a1/m16a1_shoot"
+                                   ]
+                    },
+    "m16a1.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.m16a1.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/m16a1/m16a1_reload"
+                                          ]
+                           },
+    "m16a1.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.m16a1.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/m16a1/m16a1_reload_tactical"
+                                        ]
+                         },
+    "m16a1.empty":  {
+                        "subtitle":  "subtitles.minecraft.m16a1.empty",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/m16a1/m16a1_inspect_empty"
+                                   ]
+                    },
+    "m16a4.shoot":  {
+                        "subtitle":  "subtitles.minecraft.m16a4.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/m16a4/m16a4_shoot"
+                                   ]
+                    },
+    "m16a4.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.m16a4.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/m16a4/m16a4_reload"
+                                          ]
+                           },
+    "m16a4.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.m16a4.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/m16a4/m16a4_reload_tactical"
+                                        ]
+                         },
+    "m16a4.empty":  {
+                        "subtitle":  "subtitles.minecraft.m16a4.empty",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/m16a4/m16a4_inspect_empty"
+                                   ]
+                    },
+    "m1911.shoot":  {
+                        "subtitle":  "subtitles.minecraft.m1911.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/m1911/m1911_shoot"
+                                   ]
+                    },
+    "m1911.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.m1911.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/m1911/m1911_reload_empty_magout"
+                                          ]
+                           },
+    "m1911.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.m1911.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/m1911/m1911_reload_empty_magin"
+                                        ]
+                         },
+    "m1911.empty":  {
+                        "subtitle":  "subtitles.minecraft.m1911.empty",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/m1911/m1911_reload_empty_chamber"
+                                   ]
+                    },
+    "m249.shoot":  {
+                       "subtitle":  "subtitles.minecraft.m249.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m249/m249_shoot"
+                                  ]
+                   },
+    "m249.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.m249.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/m249/m249_reload_empty_magout"
+                                         ]
+                          },
+    "m249.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.m249.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/m249/m249_reload_empty_magin"
+                                       ]
+                        },
+    "m249.empty":  {
+                       "subtitle":  "subtitles.minecraft.m249.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m249/m249_inspect_drop_empty"
+                                  ]
+                   },
+    "m320.shoot":  {
+                       "subtitle":  "subtitles.minecraft.m320.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m320/m320_shoot"
+                                  ]
+                   },
+    "m320.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.m320.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/m320/m320_reload_empty"
+                                         ]
+                          },
+    "m320.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.m320.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/m320/m320_reload_tactical"
+                                       ]
+                        },
+    "m320.empty":  {
+                       "subtitle":  "subtitles.minecraft.m320.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m320/m320_reload_empty"
+                                  ]
+                   },
+    "m4a1.shoot":  {
+                       "subtitle":  "subtitles.minecraft.m4a1.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m4a1/m4a1_shoot"
+                                  ]
+                   },
+    "m4a1.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.m4a1.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/m4a1/m4a1_reload_empty_magout"
+                                         ]
+                          },
+    "m4a1.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.m4a1.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/m4a1/m4a1_reload_empty_magin"
+                                       ]
+                        },
+    "m4a1.empty":  {
+                       "subtitle":  "subtitles.minecraft.m4a1.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m4a1/m4a1_inspect_empty_drop"
+                                  ]
+                   },
+    "m700.shoot":  {
+                       "subtitle":  "subtitles.minecraft.m700.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m700/m700_shoot"
+                                  ]
+                   },
+    "m700.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.m700.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/m700/m700_reload_magout"
+                                         ]
+                          },
+    "m700.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.m700.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/m700/m700_reload_magin"
+                                       ]
+                        },
+    "m700.empty":  {
+                       "subtitle":  "subtitles.minecraft.m700.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m700/m700_reload_empty_rotate"
+                                  ]
+                   },
+    "m870.shoot":  {
+                       "subtitle":  "subtitles.minecraft.m870.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m870/m870_shoot"
+                                  ]
+                   },
+    "m870.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.m870.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/m870/m870_reload_empty_start_close"
+                                         ]
+                          },
+    "m870.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.m870.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/m870/m870_reload_start_twist"
+                                       ]
+                        },
+    "m870.empty":  {
+                       "subtitle":  "subtitles.minecraft.m870.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m870/m870_inspect_empty_close"
+                                  ]
+                   },
+    "m95.shoot":  {
+                      "subtitle":  "subtitles.minecraft.m95.shoot",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/m95/m95_shoot"
+                                 ]
+                  },
+    "m95.reload_start":  {
+                             "subtitle":  "subtitles.minecraft.m95.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/m95/m95_reload_empty_magout"
+                                        ]
+                         },
+    "m95.reload_end":  {
+                           "subtitle":  "subtitles.minecraft.m95.reload",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/m95/m95_reload_empty_magin"
+                                      ]
+                       },
+    "m95.empty":  {
+                      "subtitle":  "subtitles.minecraft.m95.empty",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/m95/m95_reload_empty_drop"
+                                 ]
+                  },
+    "m9a4.shoot":  {
+                       "subtitle":  "subtitles.minecraft.m9a4.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/m9a4/m9a4_shoot"
+                                  ]
+                   },
+    "m9a4.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.m9a4.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/m9a4/m9a4_reload_magout"
+                                         ]
+                          },
+    "m9a4.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.m9a4.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/m9a4/m9a4_reload_magin"
+                                       ]
+                        },
+    "minigun.shoot":  {
+                          "subtitle":  "subtitles.minecraft.minigun.shoot",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/minigun/minigun_shoot"
+                                     ]
+                      },
+    "mk14.shoot":  {
+                       "subtitle":  "subtitles.minecraft.mk14.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/mk14/mk14_shoot"
+                                  ]
+                   },
+    "mk14.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.mk14.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/mk14/mk14_reload_empty"
+                                         ]
+                          },
+    "mk14.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.mk14.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/mk14/mk14_reload_tactical"
+                                       ]
+                        },
+    "mk14.empty":  {
+                       "subtitle":  "subtitles.minecraft.mk14.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/mk14/mk14_inspect_empty"
+                                  ]
+                   },
+    "p320.shoot":  {
+                       "subtitle":  "subtitles.minecraft.p320.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/p320/p320_shoot"
+                                  ]
+                   },
+    "p320.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.p320.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/p320/p320_reload_empty_magout"
+                                         ]
+                          },
+    "p320.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.p320.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/p320/p320_reload_empty_magin"
+                                       ]
+                        },
+    "p320.empty":  {
+                       "subtitle":  "subtitles.minecraft.p320.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/p320/p320_inspect_empty_end"
+                                  ]
+                   },
+    "p90.shoot":  {
+                      "subtitle":  "subtitles.minecraft.p90.shoot",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/p90/p90_shoot"
+                                 ]
+                  },
+    "p90.reload_start":  {
+                             "subtitle":  "subtitles.minecraft.p90.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/p90/p90_reload_empty_magout"
+                                        ]
+                         },
+    "p90.reload_end":  {
+                           "subtitle":  "subtitles.minecraft.p90.reload",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/p90/p90_reload_empty_magin"
+                                      ]
+                       },
+    "p90.empty":  {
+                      "subtitle":  "subtitles.minecraft.p90.empty",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/p90/p90_reload_empty_armmvmnt"
+                                 ]
+                  },
+    "qbz_191.shoot":  {
+                          "subtitle":  "subtitles.minecraft.qbz_191.shoot",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/qbz_191/qbz191_shoot"
+                                     ]
+                      },
+    "qbz_95.shoot":  {
+                         "subtitle":  "subtitles.minecraft.qbz_95.shoot",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/qbz_95/qbz_95_shoot"
+                                    ]
+                     },
+    "qbz_95.reload_start":  {
+                                "subtitle":  "subtitles.minecraft.qbz_95.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/qbz_95/qbz_95_reload_empty_magout"
+                                           ]
+                            },
+    "qbz_95.reload_end":  {
+                              "subtitle":  "subtitles.minecraft.qbz_95.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/qbz_95/qbz_95_reload_empty_magin"
+                                         ]
+                          },
+    "qbz_95.empty":  {
+                         "subtitle":  "subtitles.minecraft.qbz_95.empty",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/qbz_95/qbz_95_reload_empty_charge_in"
+                                    ]
+                     },
+    "rhino357.shoot":  {
+                           "subtitle":  "subtitles.minecraft.rhino357.shoot",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/rhino357/rhino_shoot"
+                                      ]
+                       },
+    "rhino357.reload_start":  {
+                                  "subtitle":  "subtitles.minecraft.rhino357.reload",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/rhino357/rhino_reload_bulletin"
+                                             ]
+                              },
+    "rhino357.reload_end":  {
+                                "subtitle":  "subtitles.minecraft.rhino357.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/rhino357/rhino_reload_shell"
+                                           ]
+                            },
+    "rpg7.shoot":  {
+                       "subtitle":  "subtitles.minecraft.rpg7.shoot",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/rpg7/rpg7_shoot"
+                                  ]
+                   },
+    "rpg7.reload_start":  {
+                              "subtitle":  "subtitles.minecraft.rpg7.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/rpg7/rpg7_reload"
+                                         ]
+                          },
+    "rpg7.reload_end":  {
+                            "subtitle":  "subtitles.minecraft.rpg7.reload",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/rpg7/rpg7_reload"
+                                       ]
+                        },
+    "rpg7.empty":  {
+                       "subtitle":  "subtitles.minecraft.rpg7.empty",
+                       "sounds":  [
+                                      "minecraft:tacz_sounds/rpg7/rpg7_inspect_empty"
+                                  ]
+                   },
+    "rpk.shoot":  {
+                      "subtitle":  "subtitles.minecraft.rpk.shoot",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/rpk/rpk_shoot"
+                                 ]
+                  },
+    "rpk.reload_start":  {
+                             "subtitle":  "subtitles.minecraft.rpk.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/rpk/rpk_reload_empty"
+                                        ]
+                         },
+    "rpk.reload_end":  {
+                           "subtitle":  "subtitles.minecraft.rpk.reload",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/rpk/rpk_reload_tactical"
+                                      ]
+                       },
+    "rpk.empty":  {
+                      "subtitle":  "subtitles.minecraft.rpk.empty",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/rpk/rpk_inspect_empty"
+                                 ]
+                  },
+    "scar_h.shoot":  {
+                         "subtitle":  "subtitles.minecraft.scar_h.shoot",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/scar_h/scar_h_shoot"
+                                    ]
+                     },
+    "scar_h.reload_start":  {
+                                "subtitle":  "subtitles.minecraft.scar_h.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/scar_h/p05_ar_schotel_reload_empty_magout"
+                                           ]
+                            },
+    "scar_h.reload_end":  {
+                              "subtitle":  "subtitles.minecraft.scar_h.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/scar_h/p05_ar_schotel_branched_reload_magin"
+                                         ]
+                          },
+    "scar_h.empty":  {
+                         "subtitle":  "subtitles.minecraft.scar_h.empty",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/scar_h/p05_ar_schotel_inspect_empty_boltback"
+                                    ]
+                     },
+    "scar_l.shoot":  {
+                         "subtitle":  "subtitles.minecraft.scar_l.shoot",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/scar_l/scar_l_shoot"
+                                    ]
+                     },
+    "scar_l.reload_start":  {
+                                "subtitle":  "subtitles.minecraft.scar_l.reload",
+                                "sounds":  [
+                                               "minecraft:tacz_sounds/scar_l/p05_ar_scharlie_reload_xmaglrg_magout"
+                                           ]
+                            },
+    "scar_l.reload_end":  {
+                              "subtitle":  "subtitles.minecraft.scar_l.reload",
+                              "sounds":  [
+                                             "minecraft:tacz_sounds/scar_l/p05_ar_scharlie_reload_xmaglrg_magin"
+                                         ]
+                          },
+    "scar_l.empty":  {
+                         "subtitle":  "subtitles.minecraft.scar_l.empty",
+                         "sounds":  [
+                                        "minecraft:tacz_sounds/scar_l/p05_ar_scharlie_reload_fast_empty_boltclose"
+                                    ]
+                     },
+    "spas_12.shoot":  {
+                          "subtitle":  "subtitles.minecraft.spas_12.shoot",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/spas_12/spas12_shoot"
+                                     ]
+                      },
+    "spr15hb.shoot":  {
+                          "subtitle":  "subtitles.minecraft.spr15hb.shoot",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/spr15hb/spr15hb_shoot"
+                                     ]
+                      },
+    "spr15hb.reload_start":  {
+                                 "subtitle":  "subtitles.minecraft.spr15hb.reload",
+                                 "sounds":  [
+                                                "minecraft:tacz_sounds/spr15hb/spr15hb_reload_empty_magout"
+                                            ]
+                             },
+    "spr15hb.reload_end":  {
+                               "subtitle":  "subtitles.minecraft.spr15hb.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/spr15hb/spr15hb_reload_empty_magin"
+                                          ]
+                           },
+    "spr15hb.empty":  {
+                          "subtitle":  "subtitles.minecraft.spr15hb.empty",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/spr15hb/spr15hb_reload_empty_charge"
+                                     ]
+                      },
+    "springfield1873.shoot":  {
+                                  "subtitle":  "subtitles.minecraft.springfield1873.shoot",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/springfield1873/springfield1873_shoot"
+                                             ]
+                              },
+    "springfield1873.reload_start":  {
+                                         "subtitle":  "subtitles.minecraft.springfield1873.reload",
+                                         "sounds":  [
+                                                        "minecraft:tacz_sounds/springfield1873/springfield1873_reload_boltopen"
+                                                    ]
+                                     },
+    "springfield1873.reload_end":  {
+                                       "subtitle":  "subtitles.minecraft.springfield1873.reload",
+                                       "sounds":  [
+                                                      "minecraft:tacz_sounds/springfield1873/springfield1873_reload_start"
+                                                  ]
+                                   },
+    "springfield1873.empty":  {
+                                  "subtitle":  "subtitles.minecraft.springfield1873.empty",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/springfield1873/springfield1873_inspect_empty_closer"
+                                             ]
+                              },
+    "taurus500.shoot":  {
+                            "subtitle":  "subtitles.minecraft.taurus500.shoot",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/taurus500/taurus500_shoot"
+                                       ]
+                        },
+    "taurus500.reload_start":  {
+                                   "subtitle":  "subtitles.minecraft.taurus500.reload",
+                                   "sounds":  [
+                                                  "minecraft:tacz_sounds/taurus500/taurus500_reload_bullet_eject"
+                                              ]
+                               },
+    "taurus500.reload_end":  {
+                                 "subtitle":  "subtitles.minecraft.taurus500.reload",
+                                 "sounds":  [
+                                                "minecraft:tacz_sounds/taurus500/taurus500_reload_shell"
+                                            ]
+                             },
+    "taurus943.shoot":  {
+                            "subtitle":  "subtitles.minecraft.taurus943.shoot",
+                            "sounds":  [
+                                           "minecraft:tacz_sounds/taurus943/taurus943_shoot"
+                                       ]
+                        },
+    "taurus943.reload_start":  {
+                                   "subtitle":  "subtitles.minecraft.taurus943.reload",
+                                   "sounds":  [
+                                                  "minecraft:tacz_sounds/taurus943/943_reload_bullet_eject"
+                                              ]
+                               },
+    "taurus943.reload_end":  {
+                                 "subtitle":  "subtitles.minecraft.taurus943.reload",
+                                 "sounds":  [
+                                                "minecraft:tacz_sounds/taurus943/943_reload_shell"
+                                            ]
+                             },
+    "timeless50.shoot":  {
+                             "subtitle":  "subtitles.minecraft.timeless50.shoot",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/timeless50/timeless50_shoot"
+                                        ]
+                         },
+    "timeless50.reload_start":  {
+                                    "subtitle":  "subtitles.minecraft.timeless50.reload",
+                                    "sounds":  [
+                                                   "minecraft:tacz_sounds/timeless50/timeless50_reload_empty_magout"
+                                               ]
+                                },
+    "timeless50.reload_end":  {
+                                  "subtitle":  "subtitles.minecraft.timeless50.reload",
+                                  "sounds":  [
+                                                 "minecraft:tacz_sounds/timeless50/timeless50_reload_empty_magin"
+                                             ]
+                              },
+    "timeless50.empty":  {
+                             "subtitle":  "subtitles.minecraft.timeless50.empty",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/timeless50/timeless50_inspect_empty_raise"
+                                        ]
+                         },
+    "type_81.shoot":  {
+                          "subtitle":  "subtitles.minecraft.type_81.shoot",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/type_81/type_81_shoot"
+                                     ]
+                      },
+    "type_81.reload_start":  {
+                                 "subtitle":  "subtitles.minecraft.type_81.reload",
+                                 "sounds":  [
+                                                "minecraft:tacz_sounds/type_81/type_81_reload_fast_empty_magout"
+                                            ]
+                             },
+    "type_81.reload_end":  {
+                               "subtitle":  "subtitles.minecraft.type_81.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/type_81/type_81_reload_fast_empty_magin"
+                                          ]
+                           },
+    "type_81.empty":  {
+                          "subtitle":  "subtitles.minecraft.type_81.empty",
+                          "sounds":  [
+                                         "minecraft:tacz_sounds/type_81/type_81_inspect_empty_chamber"
+                                     ]
+                      },
+    "ump45.shoot":  {
+                        "subtitle":  "subtitles.minecraft.ump45.shoot",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/ump45/ump45_shoot"
+                                   ]
+                    },
+    "ump45.reload_start":  {
+                               "subtitle":  "subtitles.minecraft.ump45.reload",
+                               "sounds":  [
+                                              "minecraft:tacz_sounds/ump45/ump45_reload_empty"
+                                          ]
+                           },
+    "ump45.reload_end":  {
+                             "subtitle":  "subtitles.minecraft.ump45.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/ump45/ump45_reload_tactical"
+                                        ]
+                         },
+    "ump45.empty":  {
+                        "subtitle":  "subtitles.minecraft.ump45.empty",
+                        "sounds":  [
+                                       "minecraft:tacz_sounds/ump45/ump45_inspect_empty"
+                                   ]
+                    },
+    "uzi.shoot":  {
+                      "subtitle":  "subtitles.minecraft.uzi.shoot",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/uzi/uzi_shoot"
+                                 ]
+                  },
+    "uzi.reload_start":  {
+                             "subtitle":  "subtitles.minecraft.uzi.reload",
+                             "sounds":  [
+                                            "minecraft:tacz_sounds/uzi/uzi_reload_empty"
+                                        ]
+                         },
+    "uzi.reload_end":  {
+                           "subtitle":  "subtitles.minecraft.uzi.reload",
+                           "sounds":  [
+                                          "minecraft:tacz_sounds/uzi/uzi_reload_tactical"
+                                      ]
+                       },
+    "uzi.empty":  {
+                      "subtitle":  "subtitles.minecraft.uzi.empty",
+                      "sounds":  [
+                                     "minecraft:tacz_sounds/uzi/uzi_inspect_empty"
+                                 ]
+                  },
+    "bullet.hit":  {
+                       "subtitle":  "subtitles.minecraft.bullet.hit",
+                       "sounds":  [
+                                      "minecraft:random/bowhit1",
+                                      "minecraft:random/bowhit2",
+                                      "minecraft:random/bowhit3",
+                                      "minecraft:random/bowhit4"
+                                  ]
+                   }
 }

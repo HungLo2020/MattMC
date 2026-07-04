@@ -1,0 +1,8 @@
+{
+  "hidden": false,
+  "name": "minecraft.attachment.sight_acro_rifle.name",
+  "display": "minecraft:sight_acro_rifle_display",
+  "data": "minecraft:sight_acro_rifle_data",
+  "type": "scope",
+  "sort": 10
+}

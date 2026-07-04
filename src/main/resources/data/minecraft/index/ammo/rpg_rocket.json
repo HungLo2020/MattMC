@@ -1,0 +1,6 @@
+{
+  "name": "minecraft.ammo.rpg_rocket.name",
+  "display": "minecraft:rpg_rocket_display",
+  "stack_size": 6,
+  "sort": 23
+}

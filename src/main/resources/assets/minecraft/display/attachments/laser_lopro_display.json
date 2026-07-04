@@ -1,0 +1,21 @@
+{
+  "slot": "minecraft:attachment/slot/laser_lopro_slot",
+  "model": "minecraft:attachment/laser_lopro_geo",
+  "texture": "minecraft:attachment/uv/laser_lopro",
+   "lod": {
+          "model": "minecraft:attachment/lod/laser_lopro",
+          "texture": "minecraft:attachment/lod/laser_lopro"
+  },
+  "sounds": {
+    "install": "minecraft:attachments/attachment_general_b",
+    "uninstall": "minecraft:attachments/attachment_general_uninstall"
+  },
+  "laser": {
+    // Ã©Â»ËœÃ¨Â®Â¤Ã§Å¡â€žÃ©â€¢Â­Ã¥Â°â€žÃ©Â¢Å“Ã¨â€°Â² default laser color, 0x = #
+    "default_color": "0xff0000",
+    // Ã¦ËœÂ¯Ã¥ÂÂ¦Ã¥â€¦ÂÃ¨Â®Â¸Ã¥Å“Â¨Ã¦â€Â¹Ã¨Â£â€¦Ã§â€¢Å’Ã©ÂÂ¢Ã¨â€¡ÂªÃ¥Â®Å¡Ã¤Â¹â€°Ã¨Â¯Â¥Ã©â€¢Â­Ã¥Â°â€žÃ§Å¡â€žÃ©Â¢Å“Ã¨â€°Â² can be customized
+    "can_edit": true,
+    // Ã¦Â¿â‚¬Ã¥â€¦â€°Ã§Å¡â€žÃ©â€¢Â¿Ã¥ÂºÂ¦Ã¯Â¼Ë†Ã¥â€ºÂ Ã¤Â¸ÂºÃ¦ËœÂ¯Ã¦Â¸ÂÃ¥ÂËœÃ¯Â¼Å’Ã¦Å“Â«Ã§Â«Â¯Ã¥ÂÂ¯Ã¨Æ’Â½Ã¥Â®Å¾Ã©â„¢â€¦Ã¥Â®Å’Ã¥â€¦Â¨Ã§Å“â€¹Ã¤Â¸ÂÃ¨Â§ÂÃ¯Â¼â€°laser length
+    "length": 75
+  }
+}

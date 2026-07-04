@@ -1,0 +1,65 @@
+{
+  "model": "minecraft:gun/ai_awp_geo",
+  "texture": "minecraft:gun/uv/ai_awp",
+  "lod": {
+    "model": "minecraft:gun/lod/ai_awp",
+    "texture": "minecraft:gun/lod/ai_awp"
+  },
+  "hud": "minecraft:gun/hud/ai_awp",
+  "slot": "minecraft:gun/slot/ai_awp",
+  "animation": "minecraft:ai_awp",
+  "state_machine": "minecraft:manual_action_state_machine",
+  "state_machine_param": {
+    "bolt_shell_ejecting_time": 0.4
+  },
+  "use_default_animation": "rifle",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 1
+  },
+  // Ã¦Å“ÂºÃ§Å¾â€žÃ§Å¡â€žÃ¦â€Â¾Ã¥Â¤Â§Ã¥â‚¬ÂÃ¦â€¢Â°Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤ 1.2
+  "iron_zoom": 1.5,
+  // Ã¦Å“ÂºÃ§Å¾â€žÃ¦Â¨Â¡Ã¥Å¾â€¹Ã§Â¼Â©Ã¦â€Â¾fovÃ¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤70
+  "zoom_model_fov": 35,
+  "shell": {
+    "initial_velocity": [8, 2, -3.5],
+    "random_velocity": [2, 1, 3],
+    "acceleration": [0.0, -20, 0.0],
+    "angular_velocity": [360, -1200, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "reload_empty": "minecraft:ai_awp/awp_reload_empty",
+    "reload_tactical": "minecraft:ai_awp/awp_reload_tactical",
+    "inspect": "minecraft:ai_awp/awp_inspect",
+    "inspect_empty": "minecraft:ai_awp/awp_inspect_empty",
+    "draw": "minecraft:ai_awp/awp_draw",
+    "shoot": "minecraft:ai_awp/awp_shoot",
+    "shoot_3p": "minecraft:ai_awp/awp_shoot_3p",
+    "silence": "minecraft:ai_awp/awp_silence",
+    "silence_3p": "minecraft:ai_awp/awp_silence_3p",
+    "bolt": "minecraft:ai_awp/awp_bolt",
+    "put_away": "minecraft:ai_awp/awp_put_away",
+    "melee_push": "minecraft:melee_stock/melee_stock_02",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+  },
+  "offhand_show": {
+    "pos": [-2, 20, 4],
+    "rotate": [0, 0, 45],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 26, 3],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

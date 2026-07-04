@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:gun/slot/mk14",
+    "particle": "minecraft:gun/slot/mk14"
+  }
+}

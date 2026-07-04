@@ -3,7 +3,9 @@ package net.minecraft.client.renderer.special;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,16 +45,21 @@ import org.slf4j.Logger;
 @Environment(EnvType.CLIENT)
 public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final ResourceLocation MODEL = ResourceLocation.withDefaultNamespace("geo_models/gun/glock_17_geo.json");
-	private static final ResourceLocation ANIMATION = ResourceLocation.withDefaultNamespace("animations/glock_17.animation.json");
-	private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/gun/uv/glock_17.png");
 	private static final Set<String> FUNCTIONAL_MARKER_NODES = Set.of("lefthand_pos", "righthand_pos", "muzzle_flash", "shell");
+	private final String gunId;
+	private final ResourceLocation texture;
 	private final BedrockGunGeometry geometry;
 	private final BedrockAnimationSet animations;
 
 	public TaczGlock17SpecialRenderer() {
-		this.geometry = BedrockGunGeometry.load(MODEL);
-		this.animations = BedrockAnimationSet.load(ANIMATION);
+		this("glock_17");
+	}
+
+	public TaczGlock17SpecialRenderer(String gunId) {
+		this.gunId = gunId;
+		this.texture = ResourceLocation.withDefaultNamespace("textures/gun/uv/" + gunId + ".png");
+		this.geometry = BedrockGunGeometry.load(ResourceLocation.withDefaultNamespace("geo_models/gun/" + gunId + "_geo.json"));
+		this.animations = BedrockAnimationSet.load(ResourceLocation.withDefaultNamespace("animations/" + gunId + ".animation.json"));
 	}
 
 	@Override
@@ -68,7 +75,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 		poseStack.pushPose();
 		AnimationPose animationPose = this.animations.sample(TaczGlock17AnimationController.snapshot(itemStack));
 		this.applyTaczTransform(itemDisplayContext, poseStack, animationPose);
-		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.entityCutoutNoCull(TEXTURE), (pose, vertexConsumer) -> {
+		submitNodeCollector.submitCustomGeometry(poseStack, RenderType.entityCutoutNoCull(this.texture), (pose, vertexConsumer) -> {
 			PoseStack modelPoseStack = new PoseStack();
 			modelPoseStack.last().set(pose);
 			for (BedrockNode root : this.geometry.roots()) {
@@ -996,8 +1003,11 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 	}
 
 	@Environment(EnvType.CLIENT)
-	public record Unbaked() implements SpecialModelRenderer.Unbaked {
-		public static final MapCodec<TaczGlock17SpecialRenderer.Unbaked> MAP_CODEC = MapCodec.unit(new TaczGlock17SpecialRenderer.Unbaked());
+	public record Unbaked(String gun) implements SpecialModelRenderer.Unbaked {
+		public static final MapCodec<TaczGlock17SpecialRenderer.Unbaked> MAP_CODEC = RecordCodecBuilder.mapCodec(
+			instance -> instance.group(Codec.STRING.optionalFieldOf("gun", "glock_17").forGetter(TaczGlock17SpecialRenderer.Unbaked::gun))
+				.apply(instance, TaczGlock17SpecialRenderer.Unbaked::new)
+		);
 
 		@Override
 		public MapCodec<TaczGlock17SpecialRenderer.Unbaked> type() {
@@ -1006,7 +1016,7 @@ public class TaczGlock17SpecialRenderer implements NoDataSpecialModelRenderer {
 
 		@Override
 		public SpecialModelRenderer<?> bake(SpecialModelRenderer.BakingContext bakingContext) {
-			return new TaczGlock17SpecialRenderer();
+			return new TaczGlock17SpecialRenderer(this.gun);
 		}
 	}
 }

@@ -1,0 +1,9 @@
+{
+  "slot": "minecraft:ammo/slot/45_70",
+  "shell": {
+    "model": "minecraft:shell/50ae_shell",
+    "texture": "minecraft:shell/50ae_shell"
+  },
+  "tracer_color": "#FF9999"
+}
+    

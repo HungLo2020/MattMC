@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:gun/slot/hk_g3",
+    "particle": "minecraft:gun/slot/hk_g3"
+  }
+}

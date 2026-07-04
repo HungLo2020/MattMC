@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.gun.rpg7.name",
+  "display": "minecraft:rpg7_display",
+  "data": "minecraft:rpg7_data",
+  "tooltip": "minecraft.gun.rpg7.desc",
+  "type": "rpg"
+}

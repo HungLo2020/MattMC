@@ -1,0 +1,33 @@
+{
+  "materials": [
+    {
+      "item": {
+        "tag": "minecraft:logs"
+      },
+      "count": 40
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/iron"
+      },
+      "count": 28
+    },
+    {
+      "item": {
+        "tag": "forge:ingots/gold"
+      },
+      "count": 4
+    },
+    {
+      "item": {
+        "tag": "forge:gems/lapis"
+      },
+      "count": 12
+    }
+  ],
+  "result": {
+    "type": "gun",
+    "id": "minecraft:kar98"
+  },
+  "type": "minecraft:gun_smith_table_crafting"
+}

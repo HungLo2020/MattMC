@@ -1,0 +1,11 @@
+{
+  "model": "minecraft:ammo/57x28",
+  "texture": "minecraft:ammo/uv/57x28",
+  "slot": "minecraft:ammo/slot/57x28",
+  "tracer_color": "#a4fff7",
+  "shell": {
+    "model": "minecraft:shell/57x28_shell",
+    "texture": "minecraft:shell/57x28_shell"
+  }
+}
+    

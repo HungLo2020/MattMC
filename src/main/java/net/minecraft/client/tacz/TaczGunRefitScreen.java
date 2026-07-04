@@ -177,7 +177,7 @@ public class TaczGunRefitScreen extends Screen {
 		if (gunStack.getItem() instanceof TaczMvpGunItem) {
 			guiGraphics.drawString(
 				this.font,
-				Component.translatable("item.minecraft.glock_17.ammo", TaczMvpGunItem.getAmmo(gunStack), TaczMvpGunItem.getMagazineSize(gunStack)),
+				Component.translatable("item.minecraft.gun.ammo", TaczMvpGunItem.getAmmo(gunStack), TaczMvpGunItem.getMagazineSize(gunStack)),
 				x,
 				y,
 				0xFFE6E6E6

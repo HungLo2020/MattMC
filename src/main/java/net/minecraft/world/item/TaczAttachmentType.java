@@ -10,7 +10,8 @@ public enum TaczAttachmentType implements StringRepresentable {
 	STOCK("stock"),
 	GRIP("grip"),
 	LASER("laser"),
-	EXTENDED_MAG("extended_mag");
+	EXTENDED_MAG("extended_mag"),
+	AMMO_MOD("ammo_mod");
 
 	private final String serializedName;
 

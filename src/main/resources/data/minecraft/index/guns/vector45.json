@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.vector45.name",
+  "display": "minecraft:vector45_display",
+  "data": "minecraft:vector45_data",
+  "tooltip": "minecraft.gun.vector45.desc",
+  "type": "smg",
+  "sort": 3
+}

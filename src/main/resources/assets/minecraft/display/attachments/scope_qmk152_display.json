@@ -1,0 +1,23 @@
+{
+  "slot": "minecraft:attachment/slot/scope_qmk152",
+  "model": "minecraft:attachment/scope_qmk152_geo",
+  "texture": "minecraft:attachment/uv/scope_qmk152",
+  "lod": {
+    "model": "minecraft:attachment/lod/scope_qmk152",
+    "texture": "minecraft:attachment/lod/scope_qmk152"
+  },
+  "zoom": [
+    3
+  ],
+  "views": [
+    2
+  ],
+   "views_fov": [
+    50
+  ],
+  "scope": true,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_b",
+    "uninstall": "minecraft:attachments/scope_general_b"
+  }
+}

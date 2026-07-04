@@ -1,0 +1,32 @@
+{
+  "model": "minecraft:ammo/30_06",
+  "texture": "minecraft:ammo/uv/30_06",
+  "slot": "minecraft:ammo/slot/30_06",
+  "shell": {
+    "model": "minecraft:shell/30_06_shell",
+    "texture": "minecraft:shell/30_06_shell"
+  },
+  "transform": {
+    "scale": {
+      // Ã§Â¬Â¬Ã¤Â¸â€°Ã¤ÂºÂºÃ§Â§Â°Ã¦â€°â€¹Ã©Æ’Â¨
+      "thirdperson": [
+        0.75,
+        0.75,
+        0.75
+      ],
+      // Ã¥Å“Â°Ã©ÂÂ¢Ã¥Â®Å¾Ã¤Â½â€œ
+      "ground": [
+        0.75,
+        0.75,
+        0.75
+      ],
+      // Ã¥Â±â€¢Ã§Â¤ÂºÃ¦Â¡â€ 
+      "fixed": [
+        1.5,
+        1.5,
+        1.5
+      ]
+    }
+  }
+}
+    

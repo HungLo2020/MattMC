@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.kar98.name",
+  "display": "minecraft:kar98_display",
+  "data": "minecraft:kar98_data",
+  "tooltip": "minecraft.gun.kar98.desc",
+  "type": "sniper",
+  "sort": 6
+}

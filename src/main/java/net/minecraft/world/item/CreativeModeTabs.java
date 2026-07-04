@@ -1644,14 +1644,12 @@ public class CreativeModeTabs {
 						output.accept(Items.WIND_CHARGE);
 						output.accept(Items.BOW);
 						output.accept(Items.CROSSBOW);
-						output.accept(Items.TACZ_GLOCK_17);
-						output.accept(Items.TACZ_GLOCK_EXTENDED_MAG_I);
-						output.accept(Items.TACZ_GLOCK_EXTENDED_MAG_II);
-						output.accept(Items.TACZ_GLOCK_EXTENDED_MAG_III);
+						Items.TACZ_GUNS_BY_ID.values().forEach(output::accept);
+						Items.TACZ_ATTACHMENTS_BY_ID.values().forEach(output::accept);
 						generateFireworksAllDurations(output, CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
 						output.accept(Items.ARROW);
 						output.accept(Items.SPECTRAL_ARROW);
-						output.accept(Items.TACZ_NINE_MM_AMMO);
+						Items.TACZ_AMMO_BY_ID.values().forEach(output::accept);
 						itemDisplayParameters.holders()
 							.lookup(Registries.POTION)
 							.ifPresent(

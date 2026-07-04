@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/ak47_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "ak47"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "slot": "minecraft:attachment/slot/scope_aug_default",
+  "model": "minecraft:attachment/scope_aug_default_geo",
+  "texture": "minecraft:attachment/uv/scope_aug_default",
+  "lod": {
+    "model": "minecraft:attachment/lod/scope_aug_default",
+    "texture": "minecraft:attachment/lod/scope_aug_default"
+  },
+  "zoom": [
+    4.25
+  ],
+  "show_mount": false,
+  "scope": true,
+  "fov": 35.0,
+  "sounds": {
+    "install": "minecraft:attachments/scope_general_d",
+    "uninstall": "minecraft:attachments/scope_general_d"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.g36k.name",
+  "display": "minecraft:g36k_display",
+  "data": "minecraft:g36k_data",
+  "type": "rifle",
+  "tooltip": "minecraft.gun.g36k.desc",
+  "sort": 14
+}

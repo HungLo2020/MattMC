@@ -6,7 +6,6 @@ import net.minecraft.network.protocol.common.custom.TaczGunInputC2SPayload;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.item.TaczRefitGun;
 
@@ -28,7 +27,7 @@ public final class TaczClientInputHandler {
 			}
 		}
 
-		if (!itemStack.is(Items.TACZ_GLOCK_17) || !(itemStack.getItem() instanceof TaczMvpGunItem gunItem) || minecraft.player.isSpectator()) {
+		if (!(itemStack.getItem() instanceof TaczMvpGunItem gunItem) || minecraft.player.isSpectator()) {
 			return false;
 		}
 

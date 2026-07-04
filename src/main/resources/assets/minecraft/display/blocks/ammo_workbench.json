@@ -1,0 +1,38 @@
+{
+  // Ã©Â»ËœÃ¨Â®Â¤Ã§Å¡â€žÃ¦Â¨Â¡Ã¥Å¾â€¹Ã¯Â¼Å’Ã¥Å“Â¨Ã¥Å’â€¦Ã§â€ºÂ®Ã¥Â½â€¢Ã¤Â¸â€¹Ã§Å¡â€ž models Ã¦â€“â€¡Ã¤Â»Â¶Ã¥Â¤Â¹Ã¤Â¸Â­Ã¥Â¯Â»Ã¦â€°Â¾Ã¯Â¼Å’Ã¤Â¸ÂÃ¥ÂÂ¯Ã¤Â¸ÂºÃ§Â©Âº
+  "model": "minecraft:block/ammo_workbench",
+  // Ã©Â»ËœÃ¨Â®Â¤Ã¦ÂÂÃ¨Â´Â¨Ã¯Â¼Å’Ã¤Â¸ÂÃ¥ÂÂ¯Ã¤Â¸ÂºÃ§Â©Âº
+  "texture": "minecraft:block/uv/ammo_workbench",
+  "transforms": {
+    "thirdperson_righthand": {
+      "rotation": [75, 45, 0],
+      "translation": [0, 2.5, 0],
+      "scale": [0.375, 0.375, 0.375]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [75, 45, 0],
+      "translation": [0, 2.5, 0],
+      "scale": [0.375, 0.375, 0.375]
+    },
+    "firstperson_righthand": {
+      "rotation": [0, 45, 0],
+      "scale": [0.4, 0.4, 0.4]
+    },
+    "firstperson_lefthand": {
+      "rotation": [0, 225, 0],
+      "scale": [0.4, 0.4, 0.4]
+    },
+    "ground": {
+      "translation": [0, 3, 0],
+      "scale": [0.25, 0.25, 0.25]
+    },
+    "gui": {
+      "rotation": [30, 225, 0],
+      "translation": [0, -1.5, 0],
+      "scale": [0.5, 0.5, 0.5]
+    },
+    "fixed": {
+      "scale": [0.5, 0.5, 0.5]
+    }
+  }
+}

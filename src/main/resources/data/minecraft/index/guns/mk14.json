@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.mk14.name",
+  "display": "minecraft:mk14_display",
+  "data": "minecraft:mk14_data",
+  "tooltip": "minecraft.gun.mk14.desc",
+  "type": "rifle",
+  "sort": 11
+}

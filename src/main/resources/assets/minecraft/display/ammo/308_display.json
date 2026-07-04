@@ -1,0 +1,30 @@
+{
+  "model": "minecraft:ammo/308",
+  "texture": "minecraft:ammo/uv/308",
+  "slot": "minecraft:ammo/slot/308",
+  "tracer_color": "#FF9999",
+  "shell": {
+    "model": "minecraft:shell/308_shell",
+    "texture": "minecraft:shell/308_shell"
+  },
+  "transform": {
+    "scale": {
+      "thirdperson": [
+        0.2,
+        0.2,
+        0.2
+      ],
+      "ground": [
+        0.3,
+        0.3,
+        0.3
+      ],
+      "fixed": [
+        0.6,
+        0.6,
+        0.6
+      ]
+    }
+  }
+}
+    

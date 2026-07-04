@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:gun/slot/timeless50_slot",
+    "particle": "minecraft:gun/slot/timeless50_slot"
+  }
+}

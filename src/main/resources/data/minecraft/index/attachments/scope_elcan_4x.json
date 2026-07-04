@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.scope_elcan_4x.name",
+  "display": "minecraft:scope_elcan_4x_display",
+  "data": "minecraft:scope_elcan_4x_data",
+  "type": "scope",
+  "sort": 100
+}

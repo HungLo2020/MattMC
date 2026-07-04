@@ -5,7 +5,6 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TaczMvpGunItem;
 
 public final class TaczGlock17AnimationController {
@@ -30,7 +29,7 @@ public final class TaczGlock17AnimationController {
 		long now = System.nanoTime();
 		float deltaSeconds = Math.min((now - lastUpdateNanos) / 1.0E9F, 0.1F);
 		lastUpdateNanos = now;
-		boolean holding = itemStack.is(Items.TACZ_GLOCK_17);
+		boolean holding = itemStack.getItem() instanceof TaczMvpGunItem;
 		if (holding && !wasHolding) {
 			triggerMain("draw");
 		} else if (!holding && wasHolding) {
@@ -62,7 +61,7 @@ public final class TaczGlock17AnimationController {
 		List<ActiveAnimation> animations = new ArrayList<>();
 		clearExpiredAnimations();
 		animations.add(new ActiveAnimation("static_idle", 0L, false));
-		if (itemStack.is(Items.TACZ_GLOCK_17) && TaczMvpGunItem.getAmmo(itemStack) <= 0 && !isReloading()) {
+		if (itemStack.getItem() instanceof TaczMvpGunItem && TaczMvpGunItem.getAmmo(itemStack) <= 0 && !isReloading()) {
 			animations.add(new ActiveAnimation("static_bolt_caught", 0L, false));
 		}
 		if (mainAnimation != null) {

@@ -1,0 +1,7 @@
+{
+  "slot": "minecraft:attachment/slot/sniper_extended_mag_2",
+  "sounds": {
+    "install": "minecraft:attachments/extended_mag_install",
+    "uninstall": "minecraft:attachments/extended_mag_uninstall"
+  }
+}

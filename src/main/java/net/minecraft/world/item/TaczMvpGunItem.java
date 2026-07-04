@@ -1,13 +1,14 @@
 package net.minecraft.world.item;
 
+import java.util.Set;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionHand;
@@ -21,24 +22,38 @@ import net.minecraft.world.level.Level;
 
 public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	private static final String AMMO_KEY = "TaczMvpAmmo";
-	private static final int MAGAZINE_SIZE = 17;
-	private static final int RELOAD_TICKS = 24;
-	private static final float BULLET_SPEED = 12.0F;
-	private static final float BULLET_INACCURACY = 0.55F;
-	private static final float BULLET_DAMAGE = 7.0F;
-	private static final int BULLET_LIFE_TICKS = 40;
-	private static final float BULLET_GRAVITY = 0.005F;
-	private static final float BULLET_FRICTION = 0.01F;
-	private static final float BULLET_HEADSHOT_MULTIPLIER = 1.5F;
-	private static final float BULLET_KNOCKBACK = 0.12F;
+	private final TaczGunDefinitions.Gun definition;
 
 	public TaczMvpGunItem(Item.Properties properties) {
+		this("glock_17", properties);
+	}
+
+	public TaczMvpGunItem(String gunId, Item.Properties properties) {
 		super(properties);
+		this.definition = TaczGunDefinitions.GUN_BY_ID.getOrDefault(gunId, TaczGunDefinitions.GUN_BY_ID.get("glock_17"));
+	}
+
+	public TaczGunDefinitions.Gun definition() {
+		return this.definition;
+	}
+
+	public String gunId() {
+		return this.definition.id();
 	}
 
 	@Override
-	public java.util.Set<TaczAttachmentType> supportedAttachmentTypes(ItemStack gunStack) {
-		return TaczRefitGun.only(TaczAttachmentType.EXTENDED_MAG);
+	public Set<TaczAttachmentType> supportedAttachmentTypes(ItemStack gunStack) {
+		return this.definition.attachmentTypes();
+	}
+
+	@Override
+	public boolean allowAttachment(ItemStack gunStack, ItemStack attachmentStack) {
+		if (!(attachmentStack.getItem() instanceof TaczAttachmentItem attachment) || !this.allowAttachmentType(gunStack, attachment.getAttachmentType())) {
+			return false;
+		}
+
+		String attachmentId = attachment.getAttachmentId();
+		return attachmentId.isEmpty() || this.definition.attachmentIds().contains(attachmentId);
 	}
 
 	@Override
@@ -53,43 +68,55 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 	public InteractionResult tryFire(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
 		int ammo = getAmmo(itemStack);
-		if (ammo <= 0) {
-			level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TACZ_GLOCK_17_EMPTY, SoundSource.PLAYERS, 0.7F, 1.0F);
+		if (ammo <= 0 || this.definition.magazineSize() <= 0) {
+			level.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("empty"), SoundSource.PLAYERS, 0.7F, 1.0F);
 			if (!level.isClientSide()) {
-				player.displayClientMessage(Component.translatable("item.minecraft.glock_17.empty").withStyle(ChatFormatting.GRAY), true);
+				player.displayClientMessage(Component.translatable("item.minecraft.gun.empty").withStyle(ChatFormatting.GRAY), true);
 			}
 			return InteractionResult.CONSUME;
 		}
 
 		if (level instanceof ServerLevel serverLevel) {
-			TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, BULLET_DAMAGE, 1);
-			bullet.setBulletProperties(BULLET_GRAVITY, BULLET_FRICTION, BULLET_LIFE_TICKS, BULLET_HEADSHOT_MULTIPLIER, BULLET_KNOCKBACK);
-			bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, BULLET_SPEED, BULLET_INACCURACY);
-			serverLevel.addFreshEntity(bullet);
+			int bulletCount = Math.max(1, this.definition.bulletCount());
+			float damage = this.definition.damage() / bulletCount;
+			float inaccuracy = Math.max(0.0F, this.definition.inaccuracy());
+			for (int shot = 0; shot < bulletCount; shot++) {
+				TaczBullet bullet = new TaczBullet(serverLevel, player, itemStack, damage, Math.max(1, this.definition.pierce()));
+				bullet.setBulletProperties(
+					this.definition.gravity(),
+					this.definition.friction(),
+					this.definition.lifeTicks(),
+					this.definition.headshotMultiplier(),
+					this.definition.knockback()
+				);
+				bullet.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, this.definition.bulletSpeed(), inaccuracy);
+				serverLevel.addFreshEntity(bullet);
+			}
+
 			setAmmo(itemStack, ammo - 1);
 			player.awardStat(Stats.ITEM_USED.get(this));
 		}
 
-		level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TACZ_GLOCK_17_SHOOT, SoundSource.PLAYERS, 1.25F, 0.96F + level.random.nextFloat() * 0.08F);
-		player.getCooldowns().addCooldown(itemStack, 4);
+		level.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("shoot"), SoundSource.PLAYERS, 1.25F, 0.96F + level.random.nextFloat() * 0.08F);
+		player.getCooldowns().addCooldown(itemStack, Math.max(1, Math.round(1200.0F / Math.max(1, this.definition.rpm()))));
 		return InteractionResult.CONSUME;
 	}
 
 	public InteractionResult tryStartReload(Level level, Player player, InteractionHand interactionHand, ItemStack itemStack) {
-		if (getAmmo(itemStack) >= getMagazineSize(itemStack)) {
+		if (getAmmo(itemStack) >= getMagazineSize(itemStack) || this.definition.magazineSize() <= 0) {
 			return InteractionResult.FAIL;
 		}
 
-		if (!player.hasInfiniteMaterials() && findAmmo(player).isEmpty()) {
-			level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TACZ_GLOCK_17_EMPTY, SoundSource.PLAYERS, 0.7F, 0.85F);
+		if (!player.hasInfiniteMaterials() && this.findAmmo(player).isEmpty()) {
+			level.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("empty"), SoundSource.PLAYERS, 0.7F, 0.85F);
 			if (!level.isClientSide()) {
-				player.displayClientMessage(Component.translatable("item.minecraft.glock_17.no_ammo").withStyle(ChatFormatting.GRAY), true);
+				player.displayClientMessage(Component.translatable("item.minecraft.gun.no_ammo").withStyle(ChatFormatting.GRAY), true);
 			}
 			return InteractionResult.CONSUME;
 		}
 
 		player.startUsingItem(interactionHand);
-		level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.TACZ_GLOCK_17_RELOAD_START, SoundSource.PLAYERS, 0.9F, 1.0F);
+		level.playSound(null, player.getX(), player.getY(), player.getZ(), this.sound("reload_start"), SoundSource.PLAYERS, 0.9F, 1.0F);
 		return InteractionResult.CONSUME;
 	}
 
@@ -97,10 +124,10 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	public ItemStack finishUsingItem(ItemStack itemStack, Level level, LivingEntity livingEntity) {
 		if (livingEntity instanceof Player player) {
 			if (!level.isClientSide()) {
-				reload(itemStack, player);
+				this.reload(itemStack, player);
 			}
 
-			level.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), SoundEvents.TACZ_GLOCK_17_RELOAD_END, SoundSource.PLAYERS, 0.9F, 1.0F);
+			level.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), this.sound("reload_end"), SoundSource.PLAYERS, 0.9F, 1.0F);
 		}
 
 		return itemStack;
@@ -108,7 +135,7 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 	@Override
 	public int getUseDuration(ItemStack itemStack, LivingEntity livingEntity) {
-		return RELOAD_TICKS;
+		return this.definition.reloadTicks();
 	}
 
 	@Override
@@ -123,7 +150,8 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 	@Override
 	public int getBarWidth(ItemStack itemStack) {
-		return Math.round(13.0F * getAmmo(itemStack) / getMagazineSize(itemStack));
+		int magazineSize = Math.max(1, getMagazineSize(itemStack));
+		return Math.round(13.0F * getAmmo(itemStack) / magazineSize);
 	}
 
 	@Override
@@ -133,11 +161,13 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 
 	@Override
 	public void appendHoverText(ItemStack itemStack, Item.TooltipContext tooltipContext, TooltipDisplay tooltipDisplay, Consumer<Component> consumer, TooltipFlag tooltipFlag) {
-		consumer.accept(Component.translatable("item.minecraft.glock_17.ammo", getAmmo(itemStack), getMagazineSize(itemStack)).withStyle(ChatFormatting.GRAY));
-		consumer.accept(Component.translatable("item.minecraft.glock_17.reload_hint").withStyle(ChatFormatting.DARK_GRAY));
-		ItemStack extendedMag = this.getAttachment(itemStack, TaczAttachmentType.EXTENDED_MAG);
-		if (!extendedMag.isEmpty()) {
-			consumer.accept(Component.translatable("tooltip.tacz.refit.installed", extendedMag.getHoverName()).withStyle(ChatFormatting.GRAY));
+		consumer.accept(Component.translatable("item.minecraft.gun.ammo", getAmmo(itemStack), getMagazineSize(itemStack)).withStyle(ChatFormatting.GRAY));
+		consumer.accept(Component.translatable("item.minecraft.gun.reload_hint").withStyle(ChatFormatting.DARK_GRAY));
+		for (TaczAttachmentType type : this.supportedAttachmentTypes(itemStack)) {
+			ItemStack attachment = this.getAttachment(itemStack, type);
+			if (!attachment.isEmpty()) {
+				consumer.accept(Component.translatable("tooltip.tacz.refit.installed", attachment.getHoverName()).withStyle(ChatFormatting.GRAY));
+			}
 		}
 	}
 
@@ -148,20 +178,20 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		return itemStack;
 	}
 
-	private static void reload(ItemStack gunStack, Player player) {
+	private void reload(ItemStack gunStack, Player player) {
 		int needed = getMagazineSize(gunStack) - getAmmo(gunStack);
 		if (needed <= 0) {
 			return;
 		}
 
-		int loaded = player.hasInfiniteMaterials() ? needed : consumeAmmo(player, needed);
+		int loaded = player.hasInfiniteMaterials() ? needed : this.consumeAmmo(player, needed);
 		if (loaded > 0) {
 			setAmmo(gunStack, getAmmo(gunStack) + loaded);
 		}
 	}
 
-	private static int consumeAmmo(Player player, int maxCount) {
-		ItemStack ammoStack = findAmmo(player);
+	private int consumeAmmo(Player player, int maxCount) {
+		ItemStack ammoStack = this.findAmmo(player);
 		if (ammoStack.isEmpty()) {
 			return 0;
 		}
@@ -171,10 +201,15 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 		return consumed;
 	}
 
-	private static ItemStack findAmmo(Player player) {
+	private ItemStack findAmmo(Player player) {
+		Item ammoItem = Items.TACZ_AMMO_BY_ID.get(this.definition.ammoId());
+		if (ammoItem == null) {
+			return ItemStack.EMPTY;
+		}
+
 		for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
 			ItemStack itemStack = player.getInventory().getItem(i);
-			if (itemStack.is(Items.TACZ_NINE_MM_AMMO)) {
+			if (itemStack.is(ammoItem)) {
 				return itemStack;
 			}
 		}
@@ -183,16 +218,20 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	}
 
 	public static boolean canStartReload(Player player, ItemStack itemStack) {
-		if (getAmmo(itemStack) >= getMagazineSize(itemStack)) {
+		if (!(itemStack.getItem() instanceof TaczMvpGunItem gunItem) || getAmmo(itemStack) >= getMagazineSize(itemStack)) {
 			return false;
 		}
 
-		return player.hasInfiniteMaterials() || !findAmmo(player).isEmpty();
+		return player.hasInfiniteMaterials() || !gunItem.findAmmo(player).isEmpty();
 	}
 
 	public static int getAmmo(ItemStack itemStack) {
 		CompoundTag tag = itemStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-		return tag.contains(AMMO_KEY) ? tag.getIntOr(AMMO_KEY, 0) : MAGAZINE_SIZE;
+		if (tag.contains(AMMO_KEY)) {
+			return tag.getIntOr(AMMO_KEY, 0);
+		}
+
+		return itemStack.getItem() instanceof TaczMvpGunItem gunItem ? gunItem.definition.magazineSize() : 0;
 	}
 
 	private static void setAmmo(ItemStack itemStack, int ammo) {
@@ -200,15 +239,38 @@ public class TaczMvpGunItem extends Item implements TaczRefitGun {
 	}
 
 	public static int getMagazineSize(ItemStack itemStack) {
+		if (!(itemStack.getItem() instanceof TaczMvpGunItem gunItem)) {
+			return 0;
+		}
+
 		ItemStack extendedMag = TaczRefitGun.getStoredAttachment(itemStack, TaczAttachmentType.EXTENDED_MAG);
 		if (extendedMag.getItem() instanceof TaczAttachmentItem attachment) {
-			return switch (attachment.getAttachmentLevel()) {
-				case 1 -> 21;
-				case 2 -> 24;
-				case 3 -> 33;
-				default -> MAGAZINE_SIZE;
-			};
+			return gunItem.definition.extendedMagazineSize(attachment.getAttachmentLevel());
 		}
-		return MAGAZINE_SIZE;
+		return gunItem.definition.magazineSize();
+	}
+
+	public int countReserveAmmo(Player player) {
+		if (player.hasInfiniteMaterials()) {
+			return Integer.MAX_VALUE;
+		}
+
+		Item ammoItem = Items.TACZ_AMMO_BY_ID.get(this.definition.ammoId());
+		if (ammoItem == null) {
+			return 0;
+		}
+
+		int count = 0;
+		for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+			ItemStack itemStack = player.getInventory().getItem(slot);
+			if (itemStack.is(ammoItem)) {
+				count += itemStack.getCount();
+			}
+		}
+		return count;
+	}
+
+	private SoundEvent sound(String action) {
+		return SoundEvent.createVariableRangeEvent(ResourceLocation.withDefaultNamespace(this.definition.id() + "." + action));
 	}
 }

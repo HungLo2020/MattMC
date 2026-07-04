@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:gun/slot/taurus500",
+    "particle": "minecraft:gun/slot/taurus500"
+  }
+}

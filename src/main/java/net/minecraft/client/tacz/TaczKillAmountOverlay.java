@@ -9,7 +9,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
-import net.minecraft.world.item.Items;
+import net.minecraft.world.item.TaczMvpGunItem;
 
 public final class TaczKillAmountOverlay {
 	private static final ResourceLocation ID = ResourceLocation.withDefaultNamespace("tacz_kill_amount_overlay");
@@ -38,7 +38,7 @@ public final class TaczKillAmountOverlay {
 	private static void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
 		Minecraft minecraft = Minecraft.getInstance();
 		LocalPlayer player = minecraft.player;
-		if (player == null || player.isSpectator() || minecraft.options.hideGui || !player.getMainHandItem().is(Items.TACZ_GLOCK_17)) {
+		if (player == null || player.isSpectator() || minecraft.options.hideGui || !(player.getMainHandItem().getItem() instanceof TaczMvpGunItem)) {
 			return;
 		}
 

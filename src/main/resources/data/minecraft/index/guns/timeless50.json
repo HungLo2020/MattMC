@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.timeless50.name",
+  "display": "minecraft:timeless50_display",
+  "data": "minecraft:timeless50_data",
+  "tooltip": "minecraft.gun.timeless50.desc",
+  "type": "pistol",
+  "sort": 8
+}

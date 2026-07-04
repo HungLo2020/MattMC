@@ -2,6 +2,8 @@ package net.minecraft.client.renderer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
+import java.util.HashMap;
+import java.util.Map;
 import net.blaze3d.vertex.PoseStack;
 import net.math.Axis;
 import net.minecraft.api.EnvType;
@@ -31,6 +33,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.MapItem;
 import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.TaczMvpGunItem;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
@@ -121,7 +124,7 @@ public class ItemInHandRenderer {
 	private final EntityRenderDispatcher entityRenderDispatcher;
 	private final ItemRenderer itemRenderer;
 	private final ItemModelResolver itemModelResolver;
-	private TaczGlock17SpecialRenderer taczGlock17Renderer;
+	private final Map<String, TaczGlock17SpecialRenderer> taczGunRenderers = new HashMap<>();
 
 	public ItemInHandRenderer(Minecraft minecraft, EntityRenderDispatcher entityRenderDispatcher, ItemRenderer itemRenderer, ItemModelResolver itemModelResolver) {
 		this.minecraft = minecraft;
@@ -407,7 +410,7 @@ public class ItemInHandRenderer {
 			boolean bl = interactionHand == InteractionHand.MAIN_HAND;
 			HumanoidArm humanoidArm = bl ? abstractClientPlayer.getMainArm() : abstractClientPlayer.getMainArm().getOpposite();
 			poseStack.pushPose();
-			if (itemStack.is(Items.TACZ_GLOCK_17)) {
+			if (itemStack.getItem() instanceof TaczMvpGunItem) {
 				if (bl) {
 					this.renderTaczGlockFirstPerson(abstractClientPlayer, f, h, itemStack, i, poseStack, submitNodeCollector, j, humanoidArm);
 				}
@@ -582,11 +585,10 @@ public class ItemInHandRenderer {
 		float yRot = abstractClientPlayer.getViewYRot(f) - yRotOffset;
 		poseStack.mulPose(Axis.XP.rotationDegrees(xRot * -0.1F));
 		poseStack.mulPose(Axis.YP.rotationDegrees(yRot * -0.1F));
-		if (this.taczGlock17Renderer == null) {
-			this.taczGlock17Renderer = new TaczGlock17SpecialRenderer();
-		}
+		TaczMvpGunItem gunItem = (TaczMvpGunItem)itemStack.getItem();
+		TaczGlock17SpecialRenderer renderer = this.taczGunRenderers.computeIfAbsent(gunItem.gunId(), TaczGlock17SpecialRenderer::new);
 
-		this.taczGlock17Renderer.submitFirstPerson(
+		renderer.submitFirstPerson(
 			itemStack,
 			poseStack,
 			submitNodeCollector,

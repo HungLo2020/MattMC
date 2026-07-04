@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/scar_l_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "scar_l"
+    }
+  }
+}

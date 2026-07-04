@@ -1,0 +1,9 @@
+{
+  "slot": "minecraft:attachment/slot/grip_cobra",
+  "model": "minecraft:attachment/grip_cobra",
+  "texture": "minecraft:attachment/uv/grip_cobra",
+  "sounds": {
+    "install": "minecraft:attachments/attachment_general_b",
+    "uninstall": "minecraft:attachments/attachment_general_uninstall"
+  }
+}

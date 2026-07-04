@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:gun/slot/lonetrail",
+    "particle": "minecraft:gun/slot/lonetrail"
+  }
+}

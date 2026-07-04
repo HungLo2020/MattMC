@@ -3,10 +3,11 @@ package net.minecraft.world.entity.projectile;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.custom.TaczKillHudS2CPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -156,7 +157,17 @@ public class TaczBullet extends Projectile {
 			serverPlayer.connection.send(new ClientboundCustomPayloadPacket(new TaczKillHudS2CPayload(1)));
 		}
 
-		this.level().playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.TACZ_GLOCK_17_HIT, this.getSoundSource(), 0.45F, headshot ? 1.25F : 1.0F);
+		this.level()
+			.playSound(
+				null,
+				this.getX(),
+				this.getY(),
+				this.getZ(),
+				SoundEvent.createVariableRangeEvent(ResourceLocation.withDefaultNamespace("bullet.hit")),
+				this.getSoundSource(),
+				0.45F,
+				headshot ? 1.25F : 1.0F
+			);
 		this.pierce--;
 		if (this.pierce <= 0) {
 			this.discard();

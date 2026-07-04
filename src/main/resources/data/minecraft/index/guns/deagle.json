@@ -1,0 +1,8 @@
+{
+  "name": "minecraft.gun.deagle.name",
+  "display": "minecraft:deagle_display",
+  "data": "minecraft:deagle_data",
+  "tooltip": "minecraft.gun.deagle.desc",
+  "type": "pistol",
+  "sort": 2
+}

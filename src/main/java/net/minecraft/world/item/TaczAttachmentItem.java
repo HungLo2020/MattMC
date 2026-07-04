@@ -6,13 +6,23 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.component.TooltipDisplay;
 
 public class TaczAttachmentItem extends Item {
+	private final String attachmentId;
 	private final TaczAttachmentType type;
 	private final int level;
 
 	public TaczAttachmentItem(TaczAttachmentType type, int level, Item.Properties properties) {
+		this("", type, level, properties);
+	}
+
+	public TaczAttachmentItem(String attachmentId, TaczAttachmentType type, int level, Item.Properties properties) {
 		super(properties);
+		this.attachmentId = attachmentId;
 		this.type = type;
 		this.level = level;
+	}
+
+	public String getAttachmentId() {
+		return this.attachmentId;
 	}
 
 	public TaczAttachmentType getAttachmentType() {

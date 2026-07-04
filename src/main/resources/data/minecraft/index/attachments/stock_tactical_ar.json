@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.stock_tactical_ar.name",
+  "display": "minecraft:stock_tactical_ar_display",
+  "data": "minecraft:stock_tactical_ar_data",
+  "type": "stock",
+  "sort": 10
+}

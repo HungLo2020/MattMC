@@ -1,0 +1,64 @@
+{
+  "model": "minecraft:gun/m107_geo",
+  "texture": "minecraft:gun/uv/m107",
+  "lod": {
+    "model": "minecraft:gun/lod/m107",
+    "texture": "minecraft:gun/lod/m107"
+  },
+  "hud": "minecraft:gun/hud/m107",
+  "slot": "minecraft:gun/slot/m107",
+  "animation": "minecraft:m107",
+  "use_default_animation": "rifle",
+  "state_machine": "minecraft:m107_state_machine",
+  "transform": {
+    "scale": {
+      "thirdperson": [0.6, 0.6, 0.6],
+      "ground": [0.6, 0.6, 0.6],
+      "fixed": [1.2, 1.2, 1.2]
+    }
+  },
+  "muzzle_flash": {
+    "texture": "minecraft:flash/common_muzzle_flash",
+    "scale": 2
+  },
+  // Ã¦Å“ÂºÃ§Å¾â€žÃ§Å¡â€žÃ¦â€Â¾Ã¥Â¤Â§Ã¥â‚¬ÂÃ¦â€¢Â°Ã¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤ 1.2
+  "iron_zoom": 1.5,
+  // Ã¦Å“ÂºÃ§Å¾â€žÃ¦Â¨Â¡Ã¥Å¾â€¹Ã§Â¼Â©Ã¦â€Â¾fovÃ¯Â¼Å’Ã©Â»ËœÃ¨Â®Â¤70
+  "zoom_model_fov": 33,
+  "shell": {
+    "initial_velocity": [6.5, 1, -2.5],
+    "random_velocity": [1, 1, 0.25],
+    "acceleration": [0.0, -10, 0.0],
+    "angular_velocity": [240, -1200, 90],
+    "living_time": 1.0
+  },
+  "sounds": {
+    "shoot": "minecraft:m107/m107_shoot",
+    "shoot_3p": "minecraft:m107/m107_shoot_3p",
+    "silence": "minecraft:m107/m107_silence",
+    "silence_3p": "minecraft:m107/m107_silence_3p",
+    "draw": "minecraft:m107/m107_draw",
+    "put_away": "minecraft:m107/m107_put_away",
+    "melee_push": "minecraft:melee_stock/melee_stock_02",
+    "melee_stock": "minecraft:melee_stock/melee_stock_03"
+  },
+  "offhand_show": {
+    "pos": [0, 20, 4],
+    "rotate": [0, 0, 30],
+    "scale": [0.5, 0.5, 0.5]
+  },
+  "hotbar_show": {
+    "0": {
+      "pos": [-4, 24, 3],
+      "rotate": [-90, -5, -90],
+      "scale": [0.5, 0.5, 0.5]
+    }
+  },
+  "controllable": {
+    "semi": {
+      "low_frequency": 1,
+      "high_frequency": 1,
+      "time": 200
+    }
+  }
+}

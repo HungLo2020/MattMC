@@ -1,0 +1,7 @@
+{
+  "name": "minecraft.attachment.scope_lpvo_1_6.name",
+  "display": "minecraft:scope_lpvo_1_6_display",
+  "data": "minecraft:scope_lpvo_1_6_data",
+  "type": "scope",
+  "sort": 100
+}

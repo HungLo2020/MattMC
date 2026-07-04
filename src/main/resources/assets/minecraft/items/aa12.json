@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "minecraft:item/aa12_base",
+    "model": {
+      "type": "minecraft:tacz_gun",
+      "gun": "aa12"
+    }
+  }
+}
