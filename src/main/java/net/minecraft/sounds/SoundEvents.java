@@ -1918,6 +1918,11 @@ public class SoundEvents {
 	public static final SoundEvent ZOMBIE_VILLAGER_DEATH = register("entity.zombie_villager.death");
 	public static final SoundEvent ZOMBIE_VILLAGER_HURT = register("entity.zombie_villager.hurt");
 	public static final SoundEvent ZOMBIE_VILLAGER_STEP = register("entity.zombie_villager.step");
+	public static final SoundEvent TACZ_GLOCK_17_EMPTY = register(ResourceLocation.fromNamespaceAndPath("tacz", "glock_17.empty"));
+	public static final SoundEvent TACZ_GLOCK_17_HIT = register(ResourceLocation.fromNamespaceAndPath("tacz", "glock_17.hit"));
+	public static final SoundEvent TACZ_GLOCK_17_RELOAD_END = register(ResourceLocation.fromNamespaceAndPath("tacz", "glock_17.reload_end"));
+	public static final SoundEvent TACZ_GLOCK_17_RELOAD_START = register(ResourceLocation.fromNamespaceAndPath("tacz", "glock_17.reload_start"));
+	public static final SoundEvent TACZ_GLOCK_17_SHOOT = register(ResourceLocation.fromNamespaceAndPath("tacz", "glock_17.shoot"));
 	public static final SoundEvent APPLY_EFFECT_BAD_OMEN = register("event.mob_effect.bad_omen");
 	public static final SoundEvent APPLY_EFFECT_TRIAL_OMEN = register("event.mob_effect.trial_omen");
 	public static final SoundEvent APPLY_EFFECT_RAID_OMEN = register("event.mob_effect.raid_omen");

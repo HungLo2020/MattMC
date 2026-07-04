@@ -1,0 +1,35 @@
+{
+  "glock_17.empty": {
+    "subtitle": "subtitles.tacz.glock_17.empty",
+    "sounds": [
+      "tacz:glock_17/empty"
+    ]
+  },
+  "glock_17.hit": {
+    "subtitle": "subtitles.tacz.glock_17.hit",
+    "sounds": [
+      "minecraft:random/bowhit1",
+      "minecraft:random/bowhit2",
+      "minecraft:random/bowhit3",
+      "minecraft:random/bowhit4"
+    ]
+  },
+  "glock_17.reload_end": {
+    "subtitle": "subtitles.tacz.glock_17.reload",
+    "sounds": [
+      "tacz:glock_17/glock17_reload_end"
+    ]
+  },
+  "glock_17.reload_start": {
+    "subtitle": "subtitles.tacz.glock_17.reload",
+    "sounds": [
+      "tacz:glock_17/glock17_reload_start"
+    ]
+  },
+  "glock_17.shoot": {
+    "subtitle": "subtitles.tacz.glock_17.shoot",
+    "sounds": [
+      "tacz:glock_17/glock17_shoot"
+    ]
+  }
+}

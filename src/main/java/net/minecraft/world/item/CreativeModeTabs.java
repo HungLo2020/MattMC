@@ -1644,9 +1644,11 @@ public class CreativeModeTabs {
 						output.accept(Items.WIND_CHARGE);
 						output.accept(Items.BOW);
 						output.accept(Items.CROSSBOW);
+						output.accept(Items.TACZ_GLOCK_17);
 						generateFireworksAllDurations(output, CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
 						output.accept(Items.ARROW);
 						output.accept(Items.SPECTRAL_ARROW);
+						output.accept(Items.TACZ_NINE_MM_AMMO);
 						itemDisplayParameters.holders()
 							.lookup(Registries.POTION)
 							.ifPresent(

@@ -2661,6 +2661,8 @@ public class Items {
 	public static final Item TROWEL = registerItem("trowel", TrowelItem::new, new Item.Properties().stacksTo(1));
 	// Building Wand: extends contiguous planes of matching blocks
 	public static final Item BUILDING_WAND = registerItem("building_wand", BuildingWandItem::new, new Item.Properties().stacksTo(1));
+	public static final Item TACZ_GLOCK_17 = registerItem(taczItemId("glock_17"), TaczMvpGunItem::new, new Item.Properties().stacksTo(1));
+	public static final Item TACZ_NINE_MM_AMMO = registerItem(taczItemId("nine_mm_ammo"), Item::new, new Item.Properties());
 	
 	public static final Item OMINOUS_BOTTLE = registerItem(
 		"ominous_bottle",
@@ -2676,6 +2678,10 @@ public class Items {
 
 	private static ResourceKey<Item> vanillaItemId(String string) {
 		return ResourceKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(string));
+	}
+
+	private static ResourceKey<Item> taczItemId(String string) {
+		return ResourceKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("tacz", string));
 	}
 
 	private static ResourceKey<Item> blockIdToItemId(ResourceKey<Block> resourceKey) {
